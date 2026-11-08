@@ -228,7 +228,7 @@ def build(summary: dict, *, previous: Optional[dict], compacted: list[int], pass
         source_refs.update(Source(**source) for source in previous.get("source_refs", ()))
     unverified = (any(getattr(entry, "unverified_provenance", False) for entry in entries)
                   or any(isinstance(entry, ToolResult) and not entry.dependencies and not entry.control_only
-                         for entry in entries)
+                         and not entry.metadata_only for entry in entries)
                   or bool(previous and (previous.get("unverified", True) or "source_refs" not in previous)))
     return {
         "format": FORMAT, "derived": True, "goal": summary["goal"].strip(),

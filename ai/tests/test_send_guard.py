@@ -353,3 +353,49 @@ def test_a_failing_screen_shows_nothing():
 def test_without_a_screen_results_are_unchanged():
     original = _search_result()
     assert asyncio.run(_investigation(None)._screened(original)) is original
+
+
+COUNT = {"status": "ok", "count": {
+    "kind": "exact_count", "total": 3, "filters": {"classification": "Hydrology"},
+    "group_by": None, "groups": [], "ungrouped": 0, "scope": "readable_records",
+    "relative_to": "of the records you can see"}}
+LISTING = {"status": "ok", "list": {
+    "kind": "record_list", "total": 2, "filters": {"classification": "Hydrology"},
+    "truncated": False, "relative_to": "of the records you can see",
+    "papers": [{"paper": "R0123456789abcdef0123", "title": "Flood risk maps", "year": 2024},
+               {"paper": "R0123456789abcdef0124", "title": "Pond sampling", "year": None}]}}
+
+
+def metadata(body, *, marked=True):
+    return AgentRequest(PIN, "Research", (
+        ModelTurn((ToolGroup((ToolCall("c1", "count_records"),)),), StopReason.TOOLS),
+        ToolResult("c1", json.dumps(body), metadata_only=marked),
+    ))
+
+
+@pytest.mark.parametrize("body", [COUNT, LISTING])
+def test_a_count_or_listing_reaches_the_model_without_an_approval(monkeypatch, body):
+    provider, tickets, turn, reason = send(monkeypatch, approval_enabled=False, entry=metadata(body))
+    assert reason is None and turn.text == "Public answer."
+    assert json.loads(provider.requests[-1]["messages"][-1]["content"]) == body
+    assert tickets[0].usage.sent
+
+
+@pytest.mark.parametrize("body", [
+    {**COUNT, "passages": [{"text": "paper text"}]},
+    {**COUNT, "count": {**COUNT["count"], "note": "paper text"}},
+    {**LISTING, "list": {**LISTING["list"], "papers": [
+        {**LISTING["list"]["papers"][0], "abstract": "paper text"}]}},
+    {**LISTING, "list": {**LISTING["list"], "papers": [
+        {**LISTING["list"]["papers"][0], "title": "x" * 1001}]}},
+    {**COUNT, "count": {**COUNT["count"], "total": "3"}},
+])
+def test_metadata_with_any_other_field_or_shape_is_refused(monkeypatch, body):
+    provider, tickets, _, reason = send(monkeypatch, approval_enabled=False, entry=metadata(body))
+    assert reason == "source_unavailable"
+    assert provider.requests == [] and not tickets[0].usage.sent
+
+
+def test_an_unmarked_count_is_still_refused(monkeypatch):
+    provider, _, _, reason = send(monkeypatch, approval_enabled=False, entry=metadata(COUNT, marked=False))
+    assert reason == "source_unavailable" and provider.requests == []

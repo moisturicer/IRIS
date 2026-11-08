@@ -140,3 +140,16 @@ Both vector reads order the rows of the policy-filtered `research_vectors` / `re
    §26's race, UI, accessibility and load-test evidence is unchanged and stays outside this measurement.
    - **Gain:** one command, one paid run per engine and a verdict with no signing step.
    - **Cost:** a model grades answer correctness, so the verdict can be no more reliable than that grader. The grader is pinned and its rubric is frozen, so its bias is at least the same for both engines. One run per engine also cannot separate a real difference from run-to-run variation.
+
+## Amendment — 2026-11-08 (IR-994): follow-ups, exact counts and listings reach the model
+
+**Status: Decisions given by Jive Tyler I. Revalde, owner of the disclosure decision (2026-11-04 amendment), to an AI assistant in chat on 2026-11-08, and recorded here at his direction.** IR-956's paid run found 42 of the agent's 49 failed turns refused at the send guard (`source_unavailable`): every follow-up, every exact count and most listings. The decisions above stand except where this says otherwise.
+
+1. **A Turn keeps every source its answer could draw on.** At delivery, the run stores every source its history carried (read and cited, read and not cited, and the sources of the earlier answers it was given) in `iris_ai.turn.sources`. A later run sends that answer as history with those sources, and the send guard rechecks each one's approval and the reader's access exactly as it does a search result.
+   - **Gain:** follow-up questions see the full earlier answer. **Cost:** an earlier answer is withheld when any paper it read later stops passing the guard, even one it barely used.
+2. **An earlier answer that no longer passes is withheld, not refused.** Its question stays; its text is replaced by a fixed note, and the run continues, as IR-889 already does for ineligible search results. A Turn written before IR-994 is labelled by its citations and the sources its run's journal recorded. The owner chose citations; the journal is added because it also names papers read but not cited, so it can only withhold more. **Pending the owner's confirmation.** A compacted summary of earlier Turns that cannot be sent is replaced by a note the same way.
+   - **Gain:** no conversation is stuck. **Cost:** the model loses that answer's wording.
+3. **Record metadata may be sent to the vendor.** An exact count (totals, group values and filter names) and a listing (titles, completion years and paper handles of Records the reader may read) pass the guard as metadata when their JSON has exactly the expected shape; anything else is refused as before. This departs from §8's withholding of Record evidence for metadata only; Record text is unchanged.
+   - **Gain:** counts and complete lists reach the model. **Cost:** titles, including those of unpublished papers a reader may read, reach the vendor under its no-training terms.
+4. **`list_records` (tool version `research-6`).** It names every readable paper matching metadata filters, up to 50, with the exact total and whether it stopped short. New AGENT runs are pinned to `research-6`; runs pinned to `research-1` through `research-5` keep their tools.
+   - **Gain:** listings are exact rather than a search sample. **Cost:** one more tool for the model to choose between.

@@ -382,3 +382,33 @@ def test_two_readers_name_a_paper_count_an_area_and_get_a_sample_each_from_their
         assert cited <= set(Record.objects.visible_to(reader).values_list("pk", flat=True))
 
     assert expected == 3 and cited == {flood.pk, levee.pk}
+
+
+def test_a_listing_names_every_readable_match_with_an_exact_total(research):
+    owner, other = make_user("list-owner@cit.edu"), make_user("list-other@cit.edu")
+    hydrology, ecology = area("Hydrology"), area("Ecology")
+    first = bare("River sediment", classification=hydrology, year_completed=2024)
+    second = bare("Flood gauges", classification=hydrology, year_completed=2022)
+    bare("Mangrove survey", classification=ecology, year_completed=2024)
+    draft = bare("Private levee study", status=PipelineStatus.DRAFT, owner=owner,
+                 classification=hydrology, year_completed=2023)
+
+    async def script(tools):
+        await tools.list_records({"classification": "hydrology"})
+        await tools.list_records({"classification": "Hydrology"}, limit=1)
+        await tools.list_records({"classification": "Alchemy"})
+
+    _, seen, _ = ask(research, other, script, key="list-other")
+    (_, listed), (_, short), (_, unknown) = seen
+    assert listed.status == "ok"
+    assert [(r.record_id, r.title, r.year) for r in listed.records] == [
+        (second.pk, "Flood gauges", 2022), (first.pk, "River sediment", 2024)]
+    assert all(r.handle.startswith("R") for r in listed.records)
+    assert listed.count.total == 2 and listed.count.population == frozenset({first.pk, second.pk})
+    assert (listed.coverage.returned, listed.coverage.total, listed.coverage.truncated) == (2, 2, False)
+    assert (len(short.records), short.coverage.total, short.coverage.truncated) == (1, 2, True)
+    assert (unknown.status, unknown.reason) == ("unavailable", "unknown_filter_value")
+
+    _, seen, _ = ask(research, owner, script, key="list-owner")
+    (_, listed), *_ = seen
+    assert draft.pk in {r.record_id for r in listed.records} and listed.count.total == 3

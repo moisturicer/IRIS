@@ -91,7 +91,8 @@ def _entry(entry) -> dict:
                 "unverified": entry.unverified_provenance}
     if isinstance(entry, ToolResult):
         return {"t": "result", "call_id": entry.call_id, "content": entry.content,
-                "sources": _sources(entry), "control_only": entry.control_only}
+                "sources": _sources(entry), "control_only": entry.control_only,
+                "metadata_only": entry.metadata_only}
     return {"t": "model", "stop": entry.stop.value, "reasoned": entry.reasoned,
             "input_tokens": entry.input_tokens, "output_tokens": entry.output_tokens,
             "items": [_item(i) for i in entry.items], "sources": _sources(entry),
@@ -115,7 +116,7 @@ def _load_entry(raw: dict):
         return User(raw["text"], _load_sources(raw["sources"]), raw["unverified"] is True)
     if kind == "result":
         return ToolResult(raw["call_id"], raw["content"], _load_sources(raw["sources"]),
-                          raw["control_only"] is True)
+                          raw["control_only"] is True, raw.get("metadata_only") is True)
     if kind == "model":
         return ModelTurn(items=tuple(_load_item(i) for i in raw["items"]), stop=StopReason(raw["stop"]),
                          reasoned=bool(raw["reasoned"]), input_tokens=raw["input_tokens"],

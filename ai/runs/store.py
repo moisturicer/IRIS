@@ -51,19 +51,26 @@ REBUILT = "rebuilt"
 # Every source used by research, including uncited and legacy revisions, must
 # still be current before its derived answer can be replayed or recalled.
 # Correlated on Turn `{t}`.
-_OWN_SOURCES_CURRENT = """NOT EXISTS (
-    SELECT 1 FROM (
+_OWN_REVISIONS = """
       SELECT ci.revision FROM iris_ai.citation ci WHERE ci.turn_id={t}.id
       UNION
       SELECT jsonb_array_elements_text(ev.data->'sources') AS revision
         FROM iris_ai.run_event ev WHERE ev.run_id={t}.run_id AND ev.name='tool'
          AND ev.sequence > coalesce((
              SELECT max(rb.sequence) FROM iris_ai.run_event rb
-              WHERE rb.run_id=ev.run_id AND rb.name='recovery' AND rb.data->>'outcome'='""" + REBUILT + """'), 0)
+              WHERE rb.run_id=ev.run_id AND rb.name='recovery' AND rb.data->>'outcome'='""" + REBUILT + """'), 0)"""
+_OWN_SOURCES_CURRENT = """NOT EXISTS (
+    SELECT 1 FROM (""" + _OWN_REVISIONS + """
     ) dependency WHERE dependency.revision IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.is_active
         AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))
   AND NOT """ + COUNTED_UNREADABLE.replace("t.facts", "{t}.facts")
+
+# Label for a Turn with no stored sources: its citations and journal (IR-994).
+LEGACY_SOURCES = """SELECT coalesce(jsonb_agg(jsonb_build_object(
+        'record_id', cs.record_id, 'chunk_set_id', cs.id, 'extraction_hash', cs.extraction_hash)), '[]')
+      FROM iris_ai.research_chunksets() cs
+     WHERE cs.is_active AND cs.id::text || ':' || cs.extraction_hash IN (""" + _OWN_REVISIONS.replace("{t}", "t") + ")"
 
 #: Journal event naming the earlier Turns a claim carried as history or compacted (IR-721).
 CARRIED = "carried"
@@ -191,6 +198,20 @@ class Claim:
     compactions: int = 0
     #: Handoff revisions this run committed.
     committed: frozenset = frozenset()
+
+
+def _sources_json(sources) -> list[dict] | None:
+    """A Turn's sources as stored; None when the executor did not say (IR-994)."""
+    if sources is None:
+        return None
+    return [{"record_id": s.record_id, "chunk_set_id": s.chunk_set_id, "extraction_hash": s.extraction_hash}
+            for s in sorted(sources, key=lambda s: (s.record_id, s.chunk_set_id, s.extraction_hash))]
+
+
+def _sources_from_json(raw) -> frozenset:
+    from ai.research.tools import Source  # research imports this module
+
+    return frozenset(Source(**s) for s in raw or ())
 
 
 def request_hash(question: str | None, conversation_id, base_revision, *, compaction: bool = False) -> str:
@@ -533,7 +554,8 @@ class RunStore:
             row["conversation_id"],
         )
         prior = await conn.fetch(
-            f"""SELECT question, answer, kind, ordinal FROM iris_ai.turn t
+            f"""SELECT question, answer, kind, ordinal, coalesce(sources, ({LEGACY_SOURCES})) AS sources
+                  FROM iris_ai.turn t
                 WHERE conversation_id = $1 AND ordinal > $3 AND {CURRENT_SOURCE_TURN}
                 ORDER BY ordinal DESC LIMIT $2""",
             row["conversation_id"], PRIOR_TURNS, handoff["through_ordinal"] if handoff else 0,
@@ -563,7 +585,8 @@ class RunStore:
                      scope_record_id=row["scope_record_id"], run_id=run_id,
                      grant=row["reader_grant"], depth=row["depth"], allowance=row["allowance"],
                      remaining_seconds=float(row["remaining"]),
-                     prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"], t["ordinal"])
+                     prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"], t["ordinal"],
+                                           _sources_from_json(t["sources"]))
                                  for t in reversed(prior)),
                      state=row["state"], checkpoint=dict(checkpoint) if checkpoint else None,
                      spent={k: int(v) for k, v in spent.items()},
@@ -795,10 +818,11 @@ class RunStore:
                 turn_id = uuid.uuid4()
                 ordinal = conversation["revision"] + 1
                 await conn.execute(
-                    """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer, kind, facts)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+                    """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer, kind, facts,
+                                                sources)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
                     turn_id, conversation_id, run_id, ordinal, run["question"], result.answer, result.kind,
-                    list(result.facts),
+                    list(result.facts), _sources_json(result.sources),
                 )
                 if result.citations:
                     await conn.executemany(

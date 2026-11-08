@@ -88,6 +88,16 @@ COUNT_RECORDS = ToolSpec(
         "group_by": {"type": "string", "enum": list(metadata.GROUPS)},
     }))
 
+LIST_RECORDS = ToolSpec(
+    "list_records",
+    "Every paper this reader can see that matches metadata: Area (classification), PSCED area, record "
+    "type, completion years or IP flag, by title, with the exact total. Names at most 50 and says when "
+    "it stopped short. Cannot list by topic.",
+    _object({
+        "classification": _NAME, "psced": _NAME, "record_type": _NAME,
+        "year_from": _YEAR, "year_to": _YEAR, "is_ip": {"type": "boolean"},
+    }))
+
 #: research-5's search: keyword and meaning together, narrowed by metadata (IR-886).
 HYBRID_SEARCH = ToolSpec(
     "search",
@@ -142,6 +152,7 @@ class Outcome:
     clarification: Optional[str] = None
     dependencies: frozenset = frozenset()
     control_only: bool = False
+    metadata_only: bool = False
 
 
 def _str(value) -> bool:
@@ -240,6 +251,8 @@ class Investigation:
     recovery: bool = False
     #: Search by keyword and meaning with metadata filters (the research-5 tool version, IR-886).
     hybrid: bool = False
+    #: Offer list_records (the research-6 tool version, IR-994).
+    listing: bool = False
     #: Original Turns this run recovered: ordinal -> answer, whose numbers were checked when delivered.
     recovered: dict[int, str] = field(default_factory=dict)
     #: Passage handle -> what was shown for it.
@@ -278,8 +291,8 @@ class Investigation:
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
         research = (HYBRID_SEARCH, *RESEARCH[1:]) if self.hybrid else RESEARCH
-        return (*research, *(METADATA if self.metadata else ()), *(MANUSCRIPTS if self.manuscripts else ()),
-                *(RECOVERY if self.recovery else ()),
+        return (*research, *(METADATA if self.metadata else ()), *((LIST_RECORDS,) if self.listing else ()),
+                *(MANUSCRIPTS if self.manuscripts else ()), *(RECOVERY if self.recovery else ()),
                 UPDATE_PLAN, UPDATE_FOCUS, *extra)
 
     @property
@@ -334,6 +347,8 @@ class Investigation:
             if spec is COUNT_RECORDS:
                 filters = {k: v for k, v in args.items() if k != "group_by"}
                 return self._counted(await self.research.count(filters, args.get("group_by")))
+            if spec is LIST_RECORDS:
+                return self._listed(await self.research.list_records(args))
             if spec is READ_MANUSCRIPT:
                 return self._evidence(await self._screened(await self._read(args, room)), call.id)
             if spec is RECOVER_TURN:
@@ -556,31 +571,57 @@ class Investigation:
         ) if n is not None)
         return read.inspected != before
 
-    def _counted(self, result: Evidence) -> Outcome:
-        """An exact count, typed for the model; the counted Records never leave the run (IR-750)."""
+    def _listed(self, result: Evidence) -> Outcome:
+        """Every matching paper by title and handle, with the exact total: metadata only (IR-994)."""
+        body, fact = self._status(result)
+        if fact is None:
+            return Outcome(json.dumps(body), control_only=True)
+        self._fact(fact)
+        new = False
+        for record in result.records:
+            self.papers.setdefault(record.record_id, (record.handle, record.title))
+            new = new or ("paper", record.record_id) not in self.seen
+            self.seen.add(("paper", record.record_id))
+        body["list"] = {
+            "kind": "record_list", "total": fact.total, "filters": dict(fact.filters),
+            "truncated": result.coverage.truncated, "relative_to": fact.relative_to,
+            "papers": [{"paper": self.papers[r.record_id][0], "title": r.title, "year": r.year}
+                       for r in result.records],
+        }
+        return Outcome(json.dumps(body, ensure_ascii=False), progress=new, metadata_only=True)
+
+    def _status(self, result: Evidence) -> tuple[dict, Optional[Count]]:
         self._ended(result)
         body: dict = {"status": result.status}
         if result.reason:
             body["reason"] = result.reason
-        fact = result.count
-        if fact is None:
-            return Outcome(json.dumps(body))
+        return body, result.count
+
+    def _fact(self, fact: Count) -> None:
+        """Record an exact count whose total and filter names an answer may state."""
         self.counts.append(fact)
         # Only the total speaks for the whole population; a group or remainder never does.
         self.exact.add(str(fact.total))
         self.figures.update(str(n) for n in fact.figures)
-        # Years a count was filtered or grouped by may be stated; they are not totals.
+        # Years a count was filtered by may be stated; they are not totals.
         self.figures.update(str(v) for name, v in fact.filters if name in ("year_from", "year_to"))
+        self.terms.update(v.casefold() for _, v in fact.filters if isinstance(v, str))
+
+    def _counted(self, result: Evidence) -> Outcome:
+        """An exact count, typed for the model; the counted Records never leave the run (IR-750)."""
+        body, fact = self._status(result)
+        if fact is None:
+            return Outcome(json.dumps(body), control_only=True)
+        self._fact(fact)
         if fact.group_by == "year":
             self.figures.update(str(v) for v, _ in fact.groups)
         else:
             self.terms.update(str(v).casefold() for v, _ in fact.groups)
-        self.terms.update(v.casefold() for _, v in fact.filters if isinstance(v, str))
         body["count"] = counted(fact)
         key = ("count", fact.filters, fact.group_by)
         new = key not in self.seen
         self.seen.add(key)
-        return Outcome(json.dumps(body, ensure_ascii=False), progress=new)
+        return Outcome(json.dumps(body, ensure_ascii=False), progress=new, metadata_only=True)
 
     async def _plan(self, steps) -> Outcome:
         if not isinstance(steps, list) or len(steps) > PLAN_STEPS:

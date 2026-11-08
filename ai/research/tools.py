@@ -85,6 +85,8 @@ class RecordRef:
     title: str
     #: None for a paper with no Manuscript read yet: it can be named, not read (IR-750).
     source: Source | None
+    #: Completion year, carried only by a listing (IR-994).
+    year: int | None = None
 
 
 @dataclass(frozen=True)
@@ -813,6 +815,39 @@ class ResearchTools:
                               coverage=Coverage(len(rows), len(rows)))
 
         return await self._call("count", body)
+
+    async def list_records(self, filters: dict, limit: int | None = None) -> ToolResult:
+        """Readable Records matching metadata filters, by title, with the exact total (IR-994)."""
+        cap = metadata.MAX_LISTED if limit is None else limit
+        if not valid_filters(filters) or not _is_int(cap) or not 0 < cap <= metadata.MAX_LISTED:
+            return ToolResult.unavailable("invalid_argument")
+
+        async def body(conn):
+            try:
+                params, applied = await self._filters(conn, filters)
+            except _Refused as refused:
+                return ToolResult.unavailable(refused.reason)
+            rows = await conn.fetch(
+                """SELECT r.id AS record_id, r.title, r.year_completed AS year,
+                          cs.id AS chunk_set_id, cs.extraction_hash
+                     FROM public.records_record r
+                     LEFT JOIN iris_ai.research_chunksets() cs ON cs.record_id = r.id AND cs.is_active
+                    WHERE ($1::bigint IS NULL OR r.id = $1)""" + _filter_sql(2) + " ORDER BY r.title, r.id",
+                self.scope, *params,
+            )
+            named = rows[:cap]
+            handles = await self._handles(conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in named])
+            records = tuple(
+                RecordRef(h, r["record_id"], r["title"],
+                          Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"])
+                          if r["chunk_set_id"] is not None else None, r["year"])
+                for h, r in zip(handles, named))
+            fact = Count(total=len(rows), filters=tuple(sorted(applied)), scope_record_id=self.scope,
+                         population=frozenset(r["record_id"] for r in rows))
+            return ToolResult(OK if rows else NO_MATCH, records=records, count=fact,
+                              coverage=Coverage(len(records), len(rows), len(rows) > len(records)))
+
+        return await self._call("list_records", body)
 
     async def _filters(self, conn, filters: dict) -> tuple[list, list]:
         """The six `_filter_sql` parameters and the filters as applied, or raise _Refused.

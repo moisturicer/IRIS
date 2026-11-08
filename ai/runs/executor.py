@@ -35,6 +35,8 @@ class Result:
     #: Typed facts the answer stated: exact counts (with their counted Records, private)
     #: and keyword samples, which are never totals (IR-750).
     facts: tuple[dict, ...] = ()
+    #: Every source the answer could draw on; None when the executor does not say (IR-994).
+    sources: frozenset | None = None
 
 
 @dataclass(frozen=True)
@@ -55,6 +57,8 @@ class PriorTurn:
     kind: str = "answer"
     #: Its place in the Conversation, which a compact handoff refers to (IR-734).
     ordinal: int | None = None
+    #: The sources its answer could draw on, rechecked before it is sent again (IR-994).
+    sources: frozenset = frozenset()
 
 
 @dataclass(frozen=True)

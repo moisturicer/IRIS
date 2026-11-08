@@ -56,6 +56,9 @@ RECOVERY_TOOL_VERSION = "research-4"
 #: research-4 with search by keyword and meaning, narrowed by metadata (IR-886).
 HYBRID_PROMPT_VERSION = "agent-research-5"
 HYBRID_TOOL_VERSION = "research-5"
+#: research-5 plus exhaustive listing by metadata (IR-994).
+LISTING_PROMPT_VERSION = "agent-research-6"
+LISTING_TOOL_VERSION = "research-6"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -101,6 +104,14 @@ HYBRID_INSTRUCTIONS = RECOVERY_INSTRUCTIONS + (
     "record type or completion years; its results are still a sample, never a complete list. When its "
     "result says meaning search was not ok, say that the search matched keywords only."
 )
+LISTING_INSTRUCTIONS = HYBRID_INSTRUCTIONS + (
+    " For which papers match an Area, PSCED area, record type, years or IP flag, use list_records: it "
+    "names every matching paper this reader can see, up to 50, with the exact total. Say when it stopped "
+    "short, and never present a search sample as a complete list."
+)
+#: Sent in place of an earlier answer that drew on a source the send may no longer carry (IR-994).
+WITHHELD_ANSWER = "[This earlier answer is withheld: a paper it drew on can no longer be shared.]"
+WITHHELD_SUMMARY = "[The summary of earlier turns is withheld: a paper it drew on can no longer be shared.]"
 #: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
 COMPACT_REQUEST = (
     "The reader asked to condense this conversation now. This is not a question and not the reader's "
@@ -122,9 +133,10 @@ PROMPTS = {
     (MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION): MANUSCRIPT_INSTRUCTIONS,
     (RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION): RECOVERY_INSTRUCTIONS,
     (HYBRID_PROMPT_VERSION, HYBRID_TOOL_VERSION): HYBRID_INSTRUCTIONS,
+    (LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION): LISTING_INSTRUCTIONS,
 }
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
-                          RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION)
+                          RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -300,6 +312,11 @@ def _final(turn: ModelTurn) -> str:
         raise Unavailable(refused.code) from None
 
 
+def _carried(history) -> frozenset:
+    """Every source any entry of `history` depends on."""
+    return frozenset(s for entry in history for s in getattr(entry, "dependencies", ()))
+
+
 def _screen(provider, pin):
     """The admitted transport's source check, so results leave out what a send could not carry (IR-889)."""
     eligible = getattr(provider, "eligible", None)
@@ -330,13 +347,17 @@ class _Run:
         self.investigation = Investigation(
             tools, clarify=not asked,
             metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
-                                 HYBRID_TOOL_VERSION),
-            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION),
-            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION),
-            hybrid=version == HYBRID_TOOL_VERSION,
+                                 HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
+            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION,
+                                    LISTING_TOOL_VERSION),
+            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
+            hybrid=version in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
+            listing=version == LISTING_TOOL_VERSION,
             screen=_screen(agent.provider, agent.pin))
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
+        #: Sources the history carried when the answer was written (IR-994).
+        self.carried_sources: frozenset = frozenset()
         # Whatever an earlier fence spent stays spent, the attempt it left uncertain included (IR-724).
         spent = context.spent or {}
         self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0),
@@ -397,10 +418,11 @@ class _Run:
                 outcome = await self.investigation.execute(call, room=room)
                 if outcome.clarification is not None:
                     self._checked(outcome.clarification, clarification=True)
+                    self.carried_sources = _carried([*history, *results])
                     return self._result(outcome.clarification, (), kind="clarification")
                 progressed = progressed or outcome.progress
                 results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
-                                          outcome.control_only))
+                                          outcome.control_only, outcome.metadata_only))
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
             self.investigation.packed(history[len(history) - len(results):])
@@ -439,18 +461,34 @@ class _Run:
         shown = await self.investigation.recall(state, also=also)
         if handoff:
             # Earlier Turns arrive compacted (IR-734).
-            history.append(compacting.render(handoff, self.investigation.papers, passages=False))
+            summary = compacting.render(handoff, self.investigation.papers, passages=False)
+            screened = self.investigation.screen is not None
+            if screened and (summary.unverified_provenance or not await self._sendable(summary.dependencies)):
+                summary = User(WITHHELD_SUMMARY)
+            history.append(summary)
         for turn in self.prior:
-            answer = DELIVERED_MARKER.sub("", turn.answer)
+            answer, sources = DELIVERED_MARKER.sub("", turn.answer), frozenset(turn.sources)
+            if not await self._sendable(sources):
+                answer, sources = WITHHELD_ANSWER, frozenset()
             history += [User(compacting.reader(turn.question)),
-                        ModelTurn(items=(Text(answer),), stop=StopReason.END,
-                                  unverified_provenance=True)]
+                        ModelTurn(items=(Text(answer),), stop=StopReason.END, dependencies=sources)]
         if shown:
             history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False),
                                 self.investigation.recalled_sources))
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history
+
+    async def _sendable(self, sources: frozenset) -> bool:
+        """Whether a send may carry every one of `sources`; a failed check withholds (IR-994)."""
+        screen = self.investigation.screen
+        if not sources or screen is None:
+            return True
+        try:
+            return await screen(sources) == sources
+        except Exception:
+            log.warning("source screen failed", exc_info=True)
+            return False
 
     async def _resume(self) -> Optional[tuple[list, int]]:
         """The Conversation an earlier fence completed, verified now; None to start afresh (IR-724).
@@ -658,6 +696,7 @@ class _Run:
         return turn
 
     async def _deliver(self, turn: ModelTurn, history: list) -> Result:
+        self.carried_sources = _carried(history)
         text = _final(turn)
         found = self._findings(text)
         if not found:
@@ -753,4 +792,4 @@ class _Run:
                  "excluded": self._focus("excluded")}
         facts = assurance.facts(answer, citations, self.investigation) if kind == "answer" else ()
         return Result(answer=answer, citations=tuple(citations), reported_units=self.budget.reported,
-                      kind=kind, state=state, facts=facts)
+                      kind=kind, state=state, facts=facts, sources=self.carried_sources)
