@@ -23,7 +23,7 @@ from rest_framework import status
 from apps.audit.models import AuditEvent
 from apps.documents.models import PdfExtraction
 from apps.records.models import Record, RecordVersion, ReviewText, ReviewTextSection, ReviewTextState
-from apps.records.review_text import store
+from apps.records.review_text import reader, store
 from apps.records.review_text.testing import THESIS, blank, in_process_sandbox, pdf
 from apps.records.versions import versions_payload
 from apps.reviews.test_new_version import NewVersionTestBase
@@ -130,7 +130,7 @@ class EachVersionHasItsOwnTextTests(ReviewTextTestBase):
         record = self.thesis()
         self.read_all(record)
         text = self.version(record, 1).review_text
-        self.assertTrue(text.reader.startswith("review-reader-1/pdfplumber-"))
+        self.assertTrue(text.reader.startswith(f"review-reader-{reader.RULES_VERSION}/pdfplumber-"))
         self.assertIsNotNone(text.read_at)
         self.assertEqual(text.page_count, 3)
         self.assertFalse(text.read_after_submission)
