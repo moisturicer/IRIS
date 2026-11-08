@@ -412,3 +412,37 @@ def test_a_listing_names_every_readable_match_with_an_exact_total(research):
     _, seen, _ = ask(research, owner, script, key="list-owner")
     (_, listed), *_ = seen
     assert draft.pk in {r.record_id for r in listed.records} and listed.count.total == 3
+
+
+# --- Forgiving names (IR-995) --------------------------------------------------------
+
+def test_a_category_slug_is_found_by_its_spoken_name(research):
+    reader = make_user("count-slug@cit.edu")
+    hardware = area("hardware-architecture")
+    bare("Adiabatic logic gates", classification=hardware)
+    bare("Flash KV caches", classification=hardware)
+
+    async def script(tools):
+        await tools.count({"classification": "Hardware Architecture"})
+        await tools.list_records({"classification": "hardware architecture"})
+
+    _, seen, _ = ask(research, reader, script, key="count-slug")
+    (_, counted), (_, listed) = seen
+    assert (counted.count.total, counted.count.filters) == (2, (("classification", "hardware-architecture"),))
+    assert listed.count.total == 2
+
+
+def test_a_hyphenated_title_resolves_and_a_described_one_comes_back_as_a_choice(research):
+    reader = make_user("resolve-close@cit.edu")
+    ttm = paper("TTM-Bench A Framework for Text-to-Music Benchmarking", {1: [("Intro", "music systems")]})
+    lrd = paper("Exploring JWST Little Red Dots with cosmological simulations", {1: [("Intro", "dust")]})
+
+    async def script(tools):
+        await tools.resolve(["TTM Bench", "the JWST Little Red Dots simulation paper"])
+
+    _, seen, _ = ask(research, reader, script, key="resolve-close")
+    (_, found), = seen
+    by_phrase, by_description = found.matches
+    assert (by_phrase.match, [r.record_id for r in by_phrase.records]) == ("title_phrase", [ttm.pk])
+    assert (by_description.match, by_description.basis) == ("close", "close_title")
+    assert [r.record_id for r in by_description.records] == [lrd.pk]

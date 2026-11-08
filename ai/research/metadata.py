@@ -40,8 +40,40 @@ def short_title(text: str) -> str:
     return title_key(re.split(r"\s*[:–—]\s+|\s+-\s+", text, maxsplit=1)[0])
 
 
+def fold(text: str) -> str:
+    """Case folded, every run of punctuation, hyphens or spaces made one space (IR-995)."""
+    return " ".join(re.sub(r"[\W_]+", " ", text.casefold()).split())
+
+
+#: Words that say what kind of thing is named, not which one.
+_GENERIC = frozenset({"the", "a", "an", "and", "of", "on", "in", "for", "to", "with", "about", "paper",
+                      "papers", "study", "work", "article", "project", "one"})
+#: Share of a reference's distinctive words a close title must contain.
+CLOSE_SHARE = 0.75
+
+
+def _close(rows: Sequence, reference: str) -> list:
+    """Titles containing most of the reference's distinctive words, best first."""
+    words = [w for w in fold(reference).split() if w not in _GENERIC]
+    if len(words) < 2:
+        return []
+
+    def present(word, title_words):
+        return word in title_words or (len(word) >= 5 and any(t.startswith(word[:5]) for t in title_words))
+
+    scored = []
+    for row in rows:
+        if not row["title"]:
+            continue
+        title_words = set(fold(row["title"]).split())
+        share = sum(present(w, title_words) for w in words) / len(words)
+        if share >= CLOSE_SHARE:
+            scored.append((-share, fold(row["title"]), row))
+    return [row for *_, row in sorted(scored, key=lambda s: s[:2])]
+
+
 def title_matches(rows: Sequence, reference: str) -> tuple[str, list]:
-    """The strongest tier with any match: exact, then short title, then phrase."""
+    """The strongest tier with any match: exact, short title, phrase, then close titles to choose from."""
     key = title_key(reference)
     if not key:
         return "none", []
@@ -51,9 +83,13 @@ def title_matches(rows: Sequence, reference: str) -> tuple[str, list]:
     short = [r for r in rows if r["title"] and short_title(r["title"]) == key]
     if short:
         return "short_title", short
-    if len(key) >= 4:
-        pattern = re.compile(r"(?<!\w)" + re.escape(key) + r"(?!\w)")
-        phrase = [r for r in rows if r["title"] and pattern.search(title_key(r["title"]))]
+    folded = fold(reference)
+    if len(folded) >= 4:
+        pattern = re.compile(r"(?<!\w)" + re.escape(folded) + r"(?!\w)")
+        phrase = [r for r in rows if r["title"] and pattern.search(fold(r["title"]))]
         if phrase:
             return "title_phrase", phrase
+    close = _close(rows, reference)
+    if close:
+        return "close_title", close
     return "none", []

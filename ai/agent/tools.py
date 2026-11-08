@@ -251,7 +251,7 @@ class Investigation:
     recovery: bool = False
     #: Search by keyword and meaning with metadata filters (the research-5 tool version, IR-886).
     hybrid: bool = False
-    #: Offer list_records (the research-6 tool version, IR-994).
+    #: Offer list_records (the research-6 and research-7 tool versions, IR-994).
     listing: bool = False
     #: Original Turns this run recovered: ordinal -> answer, whose numbers were checked when delivered.
     recovered: dict[int, str] = field(default_factory=dict)
@@ -400,6 +400,8 @@ class Investigation:
             coverage=replace(result.coverage, returned=max(
                 0, result.coverage.returned - (len(result.passages) - len(passages)))),
             dependencies=frozenset() if dropped_whole else allowed,
+            # Tells the model some matches were left out, never which (IR-995).
+            reason=result.reason or "withheld",
         )
         if not (trimmed.passages or trimmed.records or trimmed.matches or trimmed.sections
                 or trimmed.reading or trimmed.turn):
@@ -483,7 +485,8 @@ class Investigation:
             self.papers.setdefault(record.record_id, (record.handle, record.title))
             new = new or ("paper", record.record_id) not in self.seen
             self.seen.add(("paper", record.record_id))
-        if result.matches:
+        # A miss names no paper, so it is sent as a bare status the guard can pass (IR-995).
+        if result.matches and result.records:
             body["matches"] = [{
                 "reference": m.reference, "kind": m.kind, "match": m.match,
                 **({"basis": m.basis} if m.basis else {}),

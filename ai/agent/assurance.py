@@ -16,6 +16,7 @@ from decimal import Decimal
 from typing import Optional
 
 from ai.agent.tools import Investigation, counted
+from ai.research.metadata import fold
 from ai.research.tools import Count
 from ai.runs.executor import Citation
 
@@ -103,13 +104,13 @@ def findings(text: str, investigation: Investigation, *, prior=(), excluded=(),
     for value in sorted(numbers(body) - supported):
         fail("unsupported_number", format(value, "f"))
     # Area and other catalogue names an exact count used may be quoted like titles (IR-750).
-    titles = investigation.titles() | investigation.terms
+    titles = {fold(t) for t in investigation.titles() | investigation.terms}
     for match in _TITLE.finditer(body):
         title = next(value for value in match.groups() if value is not None).strip()
-        if title.casefold() not in titles:
+        if fold(title) not in titles:
             fail("unknown_title", title)
     for match in _INTRODUCED_TITLE.finditer(body):
-        if match.group(1).casefold().strip() not in titles:
+        if fold(match.group(1)) not in titles:
             fail("unknown_title", match.group(1).strip())
     # Keyword search is a sample of matching passages, never the whole corpus; only a
     # sentence stating an exact count's own figure may speak of a total (IR-750).

@@ -399,3 +399,53 @@ def test_metadata_with_any_other_field_or_shape_is_refused(monkeypatch, body):
 def test_an_unmarked_count_is_still_refused(monkeypatch):
     provider, _, _, reason = send(monkeypatch, approval_enabled=False, entry=metadata(COUNT, marked=False))
     assert reason == "source_unavailable" and provider.requests == []
+
+
+def _sent(monkeypatch, outcome):
+    entry = AgentRequest(PIN, "Research", (
+        ModelTurn((ToolGroup((ToolCall("c1", "search"),)),), StopReason.TOOLS),
+        ToolResult("c1", outcome.content, outcome.dependencies, control_only=outcome.control_only),
+    ))
+    return send(monkeypatch, approval_enabled=False, entry=entry)
+
+
+def test_a_result_with_every_paper_withheld_reaches_the_model_as_a_bare_status(monkeypatch):
+    # IR-995: a search whose only paper the send may not carry no longer ends the run.
+    async def screen(sources):
+        return frozenset()
+
+    investigation = _investigation(screen)
+    outcome = investigation._evidence(asyncio.run(investigation._screened(_search_result())))
+    assert json.loads(outcome.content)["reason"] == "withheld"
+    provider, _, turn, reason = _sent(monkeypatch, outcome)
+    assert reason is None and turn.text == "Public answer."
+    assert "text" not in provider.requests[-1]["messages"][-1]["content"]
+
+
+def test_a_partly_withheld_result_says_so_and_keeps_its_eligible_source():
+    async def screen(sources):
+        return sources & {SOURCE}
+
+    investigation = _investigation(screen)
+    outcome = investigation._evidence(asyncio.run(investigation._screened(_search_result())))
+    assert json.loads(outcome.content)["reason"] == "withheld"
+    assert outcome.dependencies == frozenset({SOURCE})
+
+
+def test_a_paper_name_that_matched_nothing_reaches_the_model(monkeypatch):
+    # IR-995: resolve_papers' miss carries no paper, so it passes as a control.
+    from ai.research.tools import Coverage, Match, ToolResult as Evidence
+    miss = Evidence("no_match", matches=(Match(1, "title", "none"),), coverage=Coverage(0, 1, False))
+    outcome = _investigation(None)._evidence(miss)
+    assert outcome.control_only and "matches" not in json.loads(outcome.content)
+    _, _, turn, reason = _sent(monkeypatch, outcome)
+    assert reason is None and turn.text == "Public answer."
+
+
+def test_untagged_text_with_a_withheld_reason_is_still_refused(monkeypatch):
+    provider, _, _, reason = send(monkeypatch, approval_enabled=False, entry=AgentRequest(PIN, "Research", (
+        ModelTurn((ToolGroup((ToolCall("c1", "search"),)),), StopReason.TOOLS),
+        ToolResult("c1", '{"status":"no_match","reason":"withheld","text":"Institutional text."}',
+                   control_only=True),
+    )))
+    assert reason == "source_unavailable" and provider.requests == []
