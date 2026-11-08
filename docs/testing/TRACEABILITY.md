@@ -57,6 +57,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-638** | A cell value the system cannot accept skips its import row and says why | [details](traceability/IR-638.md) | **IMPLEMENTED** |
 | **IR-667** | System settings are readable and writable by RDCO only; a PATCH cannot create a key; every change is audited | [details](traceability/IR-667.md) | **IMPLEMENTED** |
 | **IR-794** | A daily job erases personal data past the retention period the System Admin sets; a blank period erases nothing, and audit rows are never touched. Subtask 15 of IR-779 (ADR-051 decision 19) | [details](traceability/IR-794.md) | **PARTIAL** |
+| **IR-795** | The System Admin's Retention page at `/admin/retention`: each type's period and last run, blank erases nothing, the data protection officer approves first, and a period that would erase existing data says how much and asks first. Subtask 16 of IR-779 (ADR-051 decisions 3 and 19) | [details](traceability/IR-795.md) | **PARTIAL** |
 | FR-M3-02 | Semantic indexing | [details](traceability/FR-M3-02.md) | **PARTIAL** |
 | FR-M3-03 | Vector embeddings | [details](traceability/FR-M3-03.md) | **PARTIAL** |
 | FR-M4-01 | RAG chatbot (Ask IRIS) | [details](traceability/FR-M4-01.md) | **PARTIAL** |

@@ -166,6 +166,17 @@ export const DIALOGS: DialogCase[] = [
     open: press("Confirm deletion"), dialog: anyDialog,
   },
   {
+    id: "confirm a retention period that erases data", screen: "retention",
+    sources: ["features/admin/RetentionPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    override: (api) => api.on("GET", "/settings/retention.download_notes_days/erasure-preview/",
+      { key: "retention.download_notes_days", days: 30, count: 12 }),
+    open: async (page) => {
+      await page.getByRole("textbox", { name: /Period in days/ }).fill("30");
+      await press("Save period")(page);
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Erase existing data?" }),
+  },
+  {
     id: "decline a download request", screen: "download-requests", sources: ["features/admin/DownloadRequestsPage.tsx"],
     open: press("Decline"), dialog: anyDialog,
   },

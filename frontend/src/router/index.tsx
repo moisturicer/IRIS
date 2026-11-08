@@ -47,6 +47,7 @@ const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequest
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
 const AccountDeletionRequestsPage = lazy(() => import("@/features/admin/AccountDeletionRequestsPage"));
+const RetentionPage = lazy(() => import("@/features/admin/RetentionPage"));
 
 export const routes: RouteObject[] = [{
   // The last resort (IR-745): a crash outside the shell's own boundary below,
@@ -208,6 +209,15 @@ export const routes: RouteObject[] = [{
               path: pathFor("accountDeletionRequests"),
               element: <DeferredPage name="Account Deletion Requests"><AccountDeletionRequestsPage /></DeferredPage>,
               handle: { crumb: "Account Deletions", width: "full" },
+            }],
+          },
+          {
+            // The System Admin alone (ADR-051 §3 and §19, IR-795).
+            element: <ProtectedRoute allowedRoles={rolesFor("retention")} />,
+            children: [{
+              path: pathFor("retention"),
+              element: <DeferredPage name="Retention"><RetentionPage /></DeferredPage>,
+              handle: { crumb: "Retention" },
             }],
           },
 
