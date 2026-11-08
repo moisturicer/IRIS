@@ -18,22 +18,19 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 
 from django.core.files.storage import default_storage
 from django.db import transaction
 from django.utils import timezone
 
 from ..models import RecordVersion, ReviewText, ReviewTextSection, ReviewTextState
-from . import sandbox
+from . import readings, sandbox
+from .readings import STALE_PENDING
 
 logger = logging.getLogger(__name__)
 
 #: Texts `read_text` may read: nothing stored yet.
 READABLE_STATES = (ReviewTextState.PENDING, ReviewTextState.UNAVAILABLE)
-#: A text still `pending` this long after it was attached lost its queued read
-#: (a worker died, a broker message was dropped); `read_review_texts` retries it.
-STALE_PENDING = timedelta(hours=1)
 
 
 def _same_manuscript(version, previous) -> bool:
@@ -55,8 +52,6 @@ def attach(version, previous) -> None:
         version.review_text_id = previous.review_text_id
         version.save(update_fields=["review_text"])
         return
-    from . import readings
-
     wanted = readings.current_reader()
     # The same file already read for this reader (a manuscript restored to an
     # earlier Version's) is the same text, so it isn't read twice.
@@ -169,12 +164,17 @@ def payload(version) -> dict:
     body.update({"version": version.number,
                  "page_count": text.page_count if text else None, "sections": []})
     if text and text.state == ReviewTextState.READ:
-        body["sections"] = [
-            {"key": s.key, "heading": s.heading, "page": s.page,
-             "text_hash": s.text_hash, "passages": s.passages}
-            for s in text.sections.all()
-        ]
+        body["sections"] = sections(text)
     return body
+
+
+def sections(text) -> list:
+    """A read text's sections, as the text view and the comparison use them."""
+    return [
+        {"key": s.key, "heading": s.heading, "page": s.page,
+         "text_hash": s.text_hash, "passages": s.passages}
+        for s in text.sections.all()
+    ]
 
 
 # --- Versions from before IR-871 ------------------------------------------------

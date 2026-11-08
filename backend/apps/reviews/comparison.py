@@ -34,7 +34,7 @@ from collections import Counter
 from difflib import SequenceMatcher
 
 
-def _norm(text: str) -> str:
+def _reader_norm(text: str) -> str:
     """The reader's own normalisation (`reader.norm`): compatibility forms
     (ligatures), straight quotes and single spaces. Repeated here because the
     reader runs only in the sandbox and is never imported into this process;
@@ -56,7 +56,7 @@ LETTER_HYPHEN = re.compile(r"(?<=[^\W\d_])-(?=[^\W\d_])")
 def norm(text: str) -> str:
     """Text as matched, never as shown: the reader's normalisation, without
     hyphens between letters."""
-    return LETTER_HYPHEN.sub("", _norm(text))
+    return LETTER_HYPHEN.sub("", _reader_norm(text))
 
 #: Raised whenever the matching below changes, so a result can be told apart
 #: from one an earlier version of this module gave. Never shown to users.
@@ -79,7 +79,7 @@ PAGE_STEADY = 0.1
 
 ESTABLISHED, TENTATIVE = "established", "tentative"
 CHANGED, ADDED, REMOVED, MOVED = "changed", "added", "removed", "moved"
-UNCHANGED = "unchanged"
+UNCHANGED, REPLACED = "unchanged", "replaced"
 
 
 # --- the comparison -------------------------------------------------------------
@@ -89,14 +89,12 @@ def compare(old: dict, new: dict) -> dict:
     notices, doubtful_side = _notices(old, new)
     by_page = any(_unreliable(r) for r in (old, new))
     if by_page:
-        changes = _diff_passages(_flat(old), _flat(new))
-        _merge_moves(changes)
+        changes = _merge_moves_in_list(_diff_passages(_flat(old), _flat(new)))
         result = {"mode": "pages", "changes": changes, "sections": []}
         every_change = changes
     else:
         sections = _compare_sections(old["sections"], new["sections"])
-        every_change = [c for s in sections for c in s["changes"]]
-        _merge_moves(every_change, sections)
+        _merge_moves_in_sections(sections)
         result = {"mode": "sections", "sections": sections, "changes": []}
         every_change = _unique(c for s in sections for c in s["changes"])
     if doubtful_side:
@@ -286,7 +284,7 @@ def _words(a: str, b: str) -> list:
     """The two texts as runs of equal, deleted and inserted words, so the
     words that differ can be marked on both sides. Words are matched as
     `norm` matches them and shown as each Version has them."""
-    ta, tb = _norm(a).split(), _norm(b).split()
+    ta, tb = _reader_norm(a).split(), _reader_norm(b).split()
     keys_a, keys_b = [norm(w) for w in ta], [norm(w) for w in tb]
     out = []
     for op, i1, i2, j1, j2 in SequenceMatcher(None, keys_a, keys_b, autojunk=False).get_opcodes():
@@ -315,10 +313,9 @@ def _ref(item):
             "regions": passage.get("regions", [])}
 
 
-def _merge_moves(changes: list, sections: list | None = None) -> None:
+def _moves(changes: list) -> dict:
     """A passage removed in one place and added word for word elsewhere is one
-    *moved* change, shown in both places. Edits ``changes`` (and the sections
-    holding them) in place."""
+    *moved* change. Maps each such removal and addition (by ``id``) to it."""
     added = {}
     for change in changes:
         if change["kind"] == ADDED:
@@ -334,16 +331,24 @@ def _merge_moves(changes: list, sections: list | None = None) -> None:
         moved = {"kind": MOVED, "certainty": ESTABLISHED, "from": change["from"], "to": target["to"]}
         replaced[id(change)] = moved
         replaced[id(target)] = moved
+    return replaced
+
+
+def _merge_moves_in_list(changes: list) -> list:
+    """By page: a move is listed once, at the first of its two places."""
+    replaced, merged = _moves(changes), []
+    for change in changes:
+        new = replaced.get(id(change), change)
+        if new is not change and any(m is new for m in merged):
+            continue
+        merged.append(new)
+    return merged
+
+
+def _merge_moves_in_sections(sections: list) -> None:
+    """By section: a move is shown in both sections, and counted once."""
+    replaced = _moves([c for s in sections for c in s["changes"]])
     if not replaced:
-        return
-    if sections is None:
-        merged = []
-        for change in changes:
-            new = replaced.get(id(change), change)
-            if new is not change and any(m is new for m in merged):
-                continue   # a move is listed once, at the first of its two places
-            merged.append(new)
-        changes[:] = merged
         return
     for section in sections:
         section["changes"] = [replaced.get(id(c), c) for c in section["changes"]]
@@ -428,7 +433,7 @@ def compare_documents(old: list, new: list) -> list:
     for slot in sorted(before.keys() | after.keys()):
         a, b = before.get(slot), after.get(slot)
         status = (ADDED if a is None else REMOVED if b is None
-                  else UNCHANGED if a == b else "replaced")
+                  else UNCHANGED if a == b else REPLACED)
         out.append({"slot": slot, "status": status, "from": a, "to": b})
     return out
 

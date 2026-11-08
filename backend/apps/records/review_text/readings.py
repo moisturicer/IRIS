@@ -20,11 +20,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from datetime import timedelta
+
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from ..models import RecordVersion, ReviewText, ReviewTextState
-from .store import STALE_PENDING
+from . import deployed_reader
+
+#: A text still `pending` this long after it was asked for lost its queued read
+#: (a worker died, a broker message was dropped), so it is queued again.
+STALE_PENDING = timedelta(hours=1)
 
 #: The comparison is waiting for a reading still being made.
 PREPARING = "preparing"
@@ -37,9 +43,9 @@ NO_TEXT = "no_text"
 
 
 def current_reader() -> str:
-    from . import version
-
-    return version.reader_version()
+    # Looked up on each call, so a test can deploy a newer reader by patching
+    # `deployed_reader.reader_version`.
+    return deployed_reader.reader_version()
 
 
 def _same_file(text):
@@ -81,9 +87,13 @@ def ensure_current(version) -> ReviewText | None:
     if found is not None:
         _requeue_if_lost(found)
         return found
+    if original.state in (ReviewTextState.PENDING, ReviewTextState.UNAVAILABLE):
+        # Not read yet, though asked for under an earlier reader: a read always
+        # runs the reader deployed now, so this text will be the current one.
+        _requeue_if_lost(original)
+        return original
     if original.state != ReviewTextState.READ:
-        # A scan or a missing file reads the same to any reader; a text not
-        # read yet is read by the current reader, so `reading_for` found it.
+        # A scan or a missing file reads the same to any reader.
         return None
     try:
         with transaction.atomic():

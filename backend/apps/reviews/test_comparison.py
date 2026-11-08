@@ -62,7 +62,7 @@ def v1():
 def test_the_comparison_normalises_exactly_as_the_reader_does(text):
     # Repeated in comparison.py because the reader is never imported outside
     # the sandbox; the two must not drift apart.
-    assert comparison._norm(text) == reader.norm(text)
+    assert comparison._reader_norm(text) == reader.norm(text)
 
 
 class TestUnchanged:
@@ -217,6 +217,35 @@ class TestTrust:
         assert {"code": "may_be_unreliable", "side": "to"} in result["notices"]
         removals = [c for s in result["sections"] for c in s["changes"] if c["kind"] == REMOVED]
         assert removals and all(c["certainty"] == TENTATIVE for c in removals)
+
+    @pytest.mark.parametrize("kept, pages, doubted", [
+        (61, 10, False),    # 39% fewer words: an edit
+        (59, 10, True),     # 41% fewer: text the reader may have missed
+        (59, 9, True),      # one page fewer is still the same pages
+        (59, 8, False),     # 20% fewer pages: the paper was cut, so the words were too
+    ])
+    def test_the_text_jump_is_doubted_only_past_its_threshold_on_steady_pages(
+            self, kept, pages, doubted):
+        # TEXT_JUMP is 40% of the words; PAGE_STEADY is 10% of the pages, or one.
+        assert (comparison.TEXT_JUMP, comparison.PAGE_STEADY) == (0.4, 0.1)
+        sentences = [f"Sentence number {n} of the paper." for n in range(100)]
+        old = {"page_count": 10, "warnings": [], "sections": [_section("body", [
+            " ".join(sentences[i:i + 4]) for i in range(0, 100, 4)])]}
+        words = [w for s in sentences for w in s.split()]
+        cut = " ".join(words[:len(words) * kept // 100])
+        new = {"page_count": pages, "warnings": [], "sections": [_section("body", [cut])]}
+        notices = compare(old, new)["notices"]
+        assert (notices == [{"code": "may_be_unreliable", "side": "to"}]) is doubted, notices
+
+    def test_more_text_on_the_same_pages_doubts_the_earlier_version_and_its_additions(self, v1):
+        def change(p):
+            p[1][3] = ("para", ["Metro Cebu generates waste."])
+            del p[2][2:]
+        result = compare(read(edited(change)), v1)
+        assert {"code": "may_be_unreliable", "side": "from"} in result["notices"]
+        changes = [c for s in result["sections"] for c in s["changes"]]
+        assert {c["certainty"] for c in changes if c["kind"] == ADDED} == {TENTATIVE}
+        assert all(c["certainty"] != TENTATIVE for c in changes if c["kind"] == REMOVED)
 
     def test_pages_without_text_matter_only_when_they_differ(self, v1):
         same = dict(v1, warnings=[{"code": "pages_without_text", "pages": [3]}])

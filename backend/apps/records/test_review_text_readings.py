@@ -14,7 +14,7 @@ from rest_framework import status
 
 from apps.audit.models import AuditEvent
 from apps.records.models import Record, ReviewText, ReviewTextState
-from apps.records.review_text import reader, readings, sandbox, version
+from apps.records.review_text import deployed_reader, reader, readings, sandbox
 from apps.records.review_text.testing import blank, in_process_sandbox
 from apps.records.test_review_text import SANDBOX, V2, ReviewTextTestBase
 from apps.reviews.models import ReviewRound
@@ -27,16 +27,16 @@ QUEUE = "apps.records.tasks.read_review_text.delay"
 @contextmanager
 def next_reader():
     """Deploy a newer reader: what the comparison asks for, and what reads."""
-    with patch("apps.records.review_text.version.reader_version", return_value=NEXT_READER), \
+    with patch("apps.records.review_text.deployed_reader.reader_version", return_value=NEXT_READER), \
             patch("apps.records.review_text.reader.reader_version", return_value=NEXT_READER):
         yield
 
 
 def test_the_web_side_names_the_reader_exactly_as_the_reader_does():
-    # `version.py` repeats the reader's name because the reader is never
+    # `deployed_reader.py` repeats the reader's name because the reader is never
     # imported outside the sandbox. Raise RULES_VERSION in both together.
-    assert version.RULES_VERSION == reader.RULES_VERSION
-    assert version.reader_version() == reader.reader_version()
+    assert deployed_reader.RULES_VERSION == reader.RULES_VERSION
+    assert deployed_reader.reader_version() == reader.reader_version()
 
 
 def failing_sandbox(source):
@@ -145,6 +145,29 @@ class SameReaderTests(ComparisonTestBase):
                                        source_file=self.version(record, 1).manuscript.name)
         self.assertEqual(v2.review_text.requested_reader, NEXT_READER)
         self.assertCountEqual([c.args[0] for c in queued.call_args_list], [v2.review_text_id, added.pk])
+
+    def test_a_text_still_being_read_when_the_reader_changes_is_preparing_not_no_text(self):
+        record, v1, v2 = self.two_versions(read=False)       # asked for under today's reader
+        with next_reader():
+            with patch(QUEUE):
+                self.assertEqual(self.pair(record).state, readings.PREPARING)
+            self.read_pending(record)                        # the newer reader reads them
+            with patch(QUEUE):
+                found = self.pair(record)
+        self.assertEqual(found.state, readings.READY)
+        self.assertEqual((found.old.pk, found.new.pk), (v1.review_text_id, v2.review_text_id))
+        self.assertEqual(found.old.reader, NEXT_READER)
+        self.assertEqual(ReviewText.objects.filter(record=record).count(), 2)
+
+    def test_a_read_that_failed_before_the_reader_changed_is_retried(self):
+        record, v1, v2 = self.two_versions(read=False)
+        self.read_pending(record, failing_sandbox)           # failed under today's reader
+        with next_reader(), patch(QUEUE) as queued, self.captureOnCommitCallbacks(execute=True):
+            found = self.pair(record)
+        self.assertEqual(found.state, readings.UNAVAILABLE)
+        self.assertCountEqual([c.args[0] for c in queued.call_args_list],
+                              [v1.review_text_id, v2.review_text_id])
+        self.assertEqual(ReviewText.objects.filter(record=record).count(), 2)
 
     def test_a_version_with_no_text_is_no_text_whatever_the_reader(self):
         record = self.thesis(Party.IERC, body=blank())

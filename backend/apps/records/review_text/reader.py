@@ -33,7 +33,8 @@ import sys
 import unicodedata
 from collections import Counter, defaultdict
 
-#: Raise on any change that can alter what a stored text says.
+#: Raise on any change that can alter what a stored text says, and raise
+#: `deployed_reader.RULES_VERSION` with it (the web side names the reader from it).
 RULES_VERSION = 2
 
 #: pdfplumber's default word gap (3 pt) is a 12 pt Times space, so a line that
