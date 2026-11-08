@@ -297,14 +297,16 @@ def test_every_admitted_attempt_records_the_agent_purpose_and_no_other_writer(ru
                                  conversation_id=None, base_revision=None))
     status = run(RunStore(runtime).status(grant, queued["id"]))
 
-    # The guard withholds Record evidence from a paid provider (IR-725), so the
-    # second attempt is refused before sending and the run ends unavailable.
-    assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
-    assert len(provider.requests) == 1
+    # The guard withholds Record evidence from a paid provider (IR-725). Since IR-995 the
+    # withheld search reaches the model as a bare status and the run answers without it.
+    assert (status["state"], status["end_reason"]) == ("completed", "answered")
+    assert len(provider.requests) == 2
+    shown = json.dumps(provider.requests[1]["messages"])
+    assert FLOOD not in shown and '\\"reason\\": \\"withheld\\"' in shown
     reservations = list(ProviderReservation.objects.order_by("id"))
     assert [(r.owner, r.purpose, r.purpose_version) for r in reservations] == [
         ("ai", "agent", "agent-research-1")] * len(reservations)
-    assert [r.sent for r in reservations] == [True, False]
+    assert [r.sent for r in reservations] == [True, True]
 
 
 def test_approved_proxy_can_be_searched_read_and_answered_by_admitted_agent(runtime):

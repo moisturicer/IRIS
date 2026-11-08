@@ -735,8 +735,6 @@ class _Run:
         if not found:
             return await self._commit(text)
         log.info("agent draft refused: %s", ",".join(sorted(found)))
-        # Rule codes only, for the operator: never the draft's text (IR-995).
-        await self._journal("check", {"stage": "draft", "codes": sorted(found)})
         # A source that changed since it was read fences delivery; it is never repaired around.
         await self._recheck(text)
         drafts = [text]
@@ -750,7 +748,6 @@ class _Run:
             if not found:
                 return await self._commit(text_now)
             log.info("agent repair refused: %s", ",".join(sorted(found)))
-            await self._journal("check", {"stage": f"repair_{attempt}", "codes": sorted(found)})
         # Out of repairs: what each sentence supports on its own is kept, and the gap is said.
         for draft in drafts:
             kept = draft and assurance.supported_units(

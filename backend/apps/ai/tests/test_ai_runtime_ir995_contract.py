@@ -87,14 +87,13 @@ BAD = f"It predicted 912 floods [{handle('P', 1)}]."
 GOOD = f"It predicted 87 floods [{handle('P', 1)}]."
 
 
-def test_research_7_repairs_a_draft_twice_and_journals_only_rule_codes():
+def test_research_7_repairs_a_failing_draft_twice():
     provider = screened(tools(call("s", "search", query="flood")), reply(BAD), reply(BAD), reply(GOOD))
     result, corpus = answer(provider, PIN_7, Searchable())
     assert result.answer == "It predicted 87 floods [1]."
     assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair", "repair"]
-    checks = [data for name, data in corpus.events if name == "check"]
-    assert checks == [{"stage": "draft", "codes": ["unsupported_number"]},
-                      {"stage": "repair_1", "codes": ["unsupported_number"]}]
+    # Validation codes stay in the worker log, never in the run's journal (IR-729).
+    assert not [name for name, _ in corpus.events if name == "check"]
 
 
 def test_research_6_still_repairs_once_then_keeps_supported_sentences():
