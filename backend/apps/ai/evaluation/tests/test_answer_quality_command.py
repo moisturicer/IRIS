@@ -189,3 +189,14 @@ def test_a_paper_the_disclosure_gate_withholds_is_a_condition_problem():
     assert _withheld_problems(papers[:1], explain.get) == []
     problems = _withheld_problems(papers, explain.get)
     assert len(problems) == 1 and "1 of 2" in problems[0] and "consented" in problems[0]
+
+
+def test_preflight_prices_every_model_django_may_call_including_the_router(settings):
+    from apps.ai.management.commands.eval_answer_quality import _django_models
+    from apps.ai.providers.openrouter_decisions import PINNED_MODEL
+
+    settings.LLM_ROUTE_MODEL = "vendor/router-backup"
+    settings.AI_JEV_ROUTING_ENABLED = True
+    assert {PINNED_MODEL, "vendor/router-backup"} <= _django_models()
+    settings.AI_JEV_ROUTING_ENABLED = False
+    assert PINNED_MODEL not in _django_models()

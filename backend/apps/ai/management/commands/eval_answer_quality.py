@@ -111,6 +111,21 @@ def _stray_attempts(since, rows) -> list[str]:
             "other work shared the campaign during the run"]
 
 
+def _django_models() -> set[str]:
+    """Every model the Django arm may call: each task's profile, plus the Jev router."""
+    from apps.ai.inference.profiles import profile_for
+    from apps.ai.inference.tasks import InferenceTask
+    from apps.ai.providers.openrouter_decisions import PINNED_MODEL
+
+    models = set()
+    for task in InferenceTask:
+        profile = profile_for(task)
+        models.update(m for m in (profile.model, *profile.fallback_models) if m)
+    if settings.AI_JEV_ROUTING_ENABLED:
+        models.add(PINNED_MODEL)
+    return models
+
+
 def _withheld_problems(records, refusal) -> list[str]:
     """Papers the disclosure gate keeps from the vendor; `refusal` returns a reason or None."""
     held = [(r, refusal(r.pk)) for r in records]
@@ -469,7 +484,8 @@ class Command(BaseCommand):
     def _preflight(self, data, options, limits, answer_model, seam_for, access):
         """Every check a paid run makes before sending, and nothing sent."""
         problems = [f"no admission price for {m}" for m in
-                    (answer_model, options["runtime_model"], options["grader_model"])
+                    sorted({answer_model, options["runtime_model"], options["grader_model"],
+                            *_django_models()})
                     if normalize_model(m) not in {normalize_model(k) for k in limits.prices}]
         if options["runtime_gateway"]:
             private = data["corpus"].get("private") or {}
