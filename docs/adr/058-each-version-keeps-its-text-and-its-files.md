@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 is amended 2026-11-05 (IR-871): a Version's text for review is read on campus without AI, apart from the LlamaParse Extraction. §1 as amended is built by IR-871, and the build notes under it record the decisions made while building it. §3 is not built.
+**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 is amended 2026-11-05 (IR-871): a Version's text for review is read on campus without AI, apart from the LlamaParse Extraction. §1 as amended is built by IR-871, and the build notes under it record the decisions made while building it. §3 is amended 2026-11-08 (IR-873): both sides of a comparison are read by the same reader, and a Version's own text view keeps its original reading. §3 is not built.
 
 **Amends:**
 
@@ -45,7 +45,7 @@ So "what exactly did the reviewers see at v2?" has no answer today. That is the 
 2. **It is read at submission, whatever the embargo or AI consent says.** Nothing leaves the server and no model is called, so neither ADR-052's gate nor ADR-054's consent concerns it. The extraction gate already applies only to Extractors that leave campus. It runs in the same bounded worker sandbox as upload checks (IR-830), never in a web worker.
 3. **The Extraction and the AI path don't change.** `PdfExtraction` stays one per Record. LlamaParse reads the latest submitted Version once it is released, and only that is chunked, embedded and retrieved (ADR-013, ADR-056). Review text is never chunked, embedded or retrieved, and it is served only under `may_read_review` (§4). Review never reads the Extraction, and the AI never reads review text.
 4. **Versions from before this change are read from their own files.** This supersedes §1's "Versions from before this change aren't reconstructed" and the Consequence "Earlier Versions on existing data can't be compared". Each existing Version still has its manuscript file (ADR-032 §5), and no file a Version names can be deleted (§2's amendment, point 3). A one-time command reads them as if they had been read at submission. That re-reads the file the reviewers saw, so nothing is guessed. The reason for "not reconstructed" was a paid, off-campus Extractor, and it no longer applies. A Version whose file is missing still reads *"vN's text was not kept"*.
-5. **The reader is recorded.** Each review text names the reader's version. Text already stored is never re-read in place, so a Thread's anchor keeps resolving against the text it was checked against. Re-reading with a newer reader is a deliberate command.
+5. **The reader is recorded.** Each review text names the reader's version. Text already stored is never re-read in place, so a Thread's anchor keeps resolving against the text it was checked against. Re-reading with a newer reader is a deliberate command. *(Superseded in part by §3's 2026-11-08 amendment: a comparison asks for a reading with the current reader, added beside the stored one, never in its place.)*
 
 **Evidence.** A throwaway prototype (`prototype/pdf-version-comparison`, `backend/apps/reviews/prototype_pdf_comparison/`, 2026-11-05) wrote two Versions of a seeded paper with seven known edits: a changed figure, an added section, a removed paragraph, swapped sections, a renamed section, a corrected table value and an added sentence. It produced them twice, once drawn by a script and once built in Microsoft Word and exported by Word, and it ran the repo's two-column and multi-page table fixtures as well. All 59 checks passed:
 - running heads and page numbers removed
@@ -109,6 +109,25 @@ It was **not** run on a real CIT-U thesis, and it didn't test figures, equations
 - **The default comparison** is the Version this reviewer last finished a review on → latest. Without one, it is previous → latest. Any pair can be chosen.
 - **The suggested-wording check** (ADR-032 §7, 2026-11-04) asks the comparison whether an accepted suggestion's text appears in the next Version, and it shows *found on p. N* or *not found*. It's a hint and decides nothing.
 
+**Amendment, 2026-11-08 (IR-873; decided by Hermoine Zozobrado, Accepted). Both sides of a comparison are read by the same reader.**
+
+The reader will keep gaining rules (IR-992 collects them), and a library upgrade changes it too: the reader's name records both (`review-reader-2/pdfplumber-…`). Two readers split the same PDF differently. One might drop a running head as a heading and the other keep it, or one might rejoin a word split across lines and the other not. Comparing v1 read by one reader with v2 read by another would show those differences as the author's edits. That is a false change, the one misread IR-992's stopping rule treats as unsafe. So:
+
+1. **A comparison uses one reader for both Versions.** If the two Versions' texts were read by different readers, the side that lacks the current reader is read again with it, from that Version's own file. Only the current reader can run, so it is always the one used, and both sides may need it. **If that read fails**, and both Versions already have a reading by one earlier reader (a Version submitted before an upgrade was read by the reader of its day), the comparison uses the newest such shared reader instead. No earlier reader is ever run again.
+2. **The new reading is added; it replaces nothing.** It is stored as another `ReviewText` of the same file, with the reader that made it, and is kept for the Record's life like any other. The Version still points at the reading made at submission (§1's build notes, point 3), and that reading is never changed or deleted. §1's amendment point 5 still holds, because nothing is re-read *in place*. This supersedes only its *"Re-reading with a newer reader is a deliberate command"*: the comparison now asks for it.
+3. **A Version's own text view keeps its original reading.** That is the text reviewers commented on, so it never shifts under their Threads. The extra reading is used only to compare. *Rejected:* showing the newest reading in the text view. It would always match the Changes tab, but an older Thread's quote might no longer match it exactly. *Cost of the choice:* for a re-read Version, the Changes tab and the text view can differ slightly, for example one word joined across a line break.
+4. **Readings are prepared ahead.** When a Version is read at submission, every earlier Version of that paper with a reading is queued for the same reader. The Outdated-thread and suggested-wording checks run at submission against the Version before it, and the default comparison usually opens with no wait.
+5. **The reader is never shown.** While a reading is still being made, the tab shows *"Preparing the comparison…"*. If it fails (timeout, sandbox refusal) and point 1's shared reading doesn't exist, it shows *"This comparison isn't available right now"* and tries again the next time it is opened. It never falls back to comparing two different readers, and no page, warning or message names a reader. *Rejected:* comparing anyway with a warning that the Versions were read differently. The reviewer still couldn't tell which changes were real, and readers are not something a reviewer should have to know about.
+6. **A file is always there to read.** No file a Version names can be deleted (§2's amendment, point 3). The only Versions without one are those from before IR-871 whose file was already gone, and they read *"vN's text was not kept"*, which is about the file, not a reader.
+7. **A Viewed mark (IR-877) belongs to the reading it was made on.** A section key can differ between two readings of the same file, so a mark made on one comparison is matched against a later one by that reading's `text_hash`, not assumed to carry over.
+
+*Rejected alternatives:*
+
+- **Pin each paper to the reader it was first read with.** Every Version would then match without re-reading. But old reader code would have to stay runnable forever, and a forced library upgrade, such as a pdfminer security fix, would break that pin anyway.
+- **Keep earlier readers runnable as a fallback**, so the old reader could read the new Version when the current one fails on the old Version. It would never leave a comparison unavailable. But every rules version would stay in the code and tested forever, and an earlier pdfplumber can't be installed beside the current one without a separate environment for each. A new reader that fails on a file an earlier one read is losing text, which IR-992 treats as a bug to fix at once.
+- **Re-read every paper when a new reader ships.** Comparisons would always be ready. But it costs one read of every Version of every paper at each release, mostly for papers nobody reopens, and still needs point 2's storage.
+- **Compare plain text only, ignoring sections.** It hides the section-level differences. But hyphenation and running heads still differ, and the tab loses *"this section changed"*.
+
 ### 4. Who reads it
 
 Earlier Versions' text, their documents and every comparison are review material under `may_read_review` (ADR-032 §10, IR-479). They never reach Discover, Ask IRIS, public Comments or a non-participant. Serving one is audited as ADR-032 §5 already audits an earlier Version's manuscript.
@@ -142,6 +161,7 @@ A Version is meant to be the snapshot a review was made against. A snapshot that
 - ~~**Earlier Versions on existing data can't be compared.** Only Versions submitted after this change have text.~~ Superseded by §1's 2026-11-05 amendment, point 4: earlier Versions are read from their own files, and only a Version whose file is missing can't be compared.
 - **Two texts per paper** (§1's 2026-11-05 amendment): review text for every Version, read on campus, and the LlamaParse Extraction for the latest released one. They can disagree about the same page, because they come from two readers.
 - Comparison of two typesettings of the same text produces noise. Normalisation reduces it and doesn't remove it.
+- **A Version can hold more than one reading** (§3's 2026-11-08 amendment): one per reader a comparison needed. Each new reader costs one more read of earlier Versions as their papers are resubmitted or compared, and a first comparison can wait a few seconds.
 
 ## MVP Impact
 
@@ -169,4 +189,4 @@ None by `FR-` label.
 
 ## Related Tasks
 
-IR-868 (records this decision). IR-872 builds §2. IR-871 builds §1 as amended 2026-11-05 (review text, read on campus). IR-873 builds §3.
+IR-868 (records this decision). IR-872 builds §2. IR-871 builds §1 as amended 2026-11-05 (review text, read on campus). IR-873 builds §3 as amended 2026-11-08 (same reader on both sides). IR-992 collects reader misreads for the next rules version.
