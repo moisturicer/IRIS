@@ -430,5 +430,7 @@ class ALastAnswerStandsTests(TestCase):
         self.assertTrue(notice.requires_answer(legacy))
 
     def test_no_notice_yet_blocks_nobody(self):
-        DataNotice.objects.all().delete()
+        # A version can't be deleted through the model or a queryset (IR-799);
+        # the raw delete stands in for a database migration 0019 never ran on.
+        DataNotice.objects.all()._raw_delete(DataNotice.objects.db)
         self.assertFalse(notice.requires_answer(make_unanswered(make_user("early@cit.edu"))))

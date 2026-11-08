@@ -24,6 +24,8 @@ carries the current notice so the person can read it before answering.
 
 from __future__ import annotations
 
+import hashlib
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
@@ -104,13 +106,43 @@ def requires_answer(user: User) -> bool:
     return answered is None or answered < current
 
 
+#: The heading a pasted version is shown under by readers that still render
+#: `title` and `sections` (IR-799). A paste has no separate title.
+PASTED_NOTICE_TITLE = "Data notice"
+
+
 def notice_payload(notice: DataNotice) -> dict:
+    """The notice as the API serves it.
+
+    `text` is the whole notice as plain text, for every version (IR-799). The
+    `title`/`subtitle`/`sections` shape stays for the screens that render it
+    today: a pasted version fills it with its text as one untitled section, so
+    a registrant can read it before those screens read `text` (IR-800).
+    """
+    if notice.text:
+        title, subtitle, sections = PASTED_NOTICE_TITLE, "", [{"title": "", "body": notice.text}]
+    else:
+        title, subtitle, sections = notice.title, notice.subtitle, notice.sections
     return {
         "version": notice.number,
-        "title": notice.title,
-        "subtitle": notice.subtitle,
-        "sections": notice.sections,
+        "title": title,
+        "subtitle": subtitle,
+        "sections": sections,
+        "text": notice.display_text(),
         "published_at": notice.published_at,
+    }
+
+
+def version_payload(notice: DataNotice) -> dict:
+    """One row of the version history: the notice plus who published it."""
+    publisher = notice.published_by
+    return {
+        **notice_payload(notice),
+        "published_by": None if publisher is None else {
+            "id": publisher.pk,
+            "name": publisher.get_full_name(),
+            "email": publisher.email,
+        },
     }
 
 
@@ -211,8 +243,6 @@ def publish_notice(publisher: User, *, based_on_version: int, text: str) -> Data
     a second person's paste never replaces the first unseen. Publishing is not
     answering: the publisher's own answer is left as it was.
     """
-    import hashlib
-
     current = DataNotice.objects.select_for_update().order_by("-number").first()
     if current is None or current.number != based_on_version:
         if current is None:

@@ -530,3 +530,32 @@ class AiAnswerChangeSerializer(serializers.Serializer):
 
     ai_consent = NoDefaultBoolean()
     papers     = serializers.ChoiceField(choices=("all", "from_now"), required=False)
+
+
+class PublishNoticeSerializer(serializers.Serializer):
+    """The body of ``POST /auth/notice/versions/`` (ADR-051 decisions 16-17, IR-799).
+
+    `text` is the whole notice, pasted, kept as plain text: nothing is parsed,
+    rendered or sanitized into markup, so an angle bracket is stored and
+    returned as the character it is. `based_on_version` is the version the
+    publisher started from; `publish_notice` refuses it under a lock when a
+    newer one exists.
+    """
+
+    based_on_version = serializers.IntegerField(min_value=1)
+    # trim_whitespace off: the paste's own line breaks and indentation are kept.
+    text = serializers.CharField(trim_whitespace=False, allow_blank=True)
+
+    def validate_text(self, value):
+        from .notice import NOTICE_TEXT_MAX_LENGTH, normalize_notice_text
+
+        if "\x00" in value:
+            raise serializers.ValidationError("The notice can't contain a null character.")
+        text = normalize_notice_text(value)
+        if not text.strip():
+            raise serializers.ValidationError("The notice can't be blank.")
+        if len(text) > NOTICE_TEXT_MAX_LENGTH:
+            raise serializers.ValidationError(
+                f"The notice can be at most {NOTICE_TEXT_MAX_LENGTH} characters; this is {len(text)}."
+            )
+        return text
