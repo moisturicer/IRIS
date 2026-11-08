@@ -40,14 +40,15 @@ ACCEPTANCE_REQUIRED_CODE = "notice_acceptance_required"
 STALE_NOTICE_CODE = "notice_stale"
 
 #: URL names reachable while the current notice is unanswered: read the notice,
-#: answer it, sign out -- and request account deletion, which ADR-054 decision 3
-#: keeps open and which joins this set when its route exists (ADR-051). Keep
-#: this to *names*, never prefixes: a new route is blocked until someone
-#: decides it belongs here.
+#: answer it, sign out, and request account deletion, which ADR-054 decision 3
+#: keeps open (ADR-051; the route arrived with IR-785, and IR-790's notice
+#: screen offers it). Keep this to *names*, never prefixes: a new route is
+#: blocked until someone decides it belongs here.
 ALLOWED_WHILE_UNANSWERED = frozenset({
     "notice-current",
     "notice-answer",
     "auth-logout",
+    "user-me-deletion-request",
 })
 
 

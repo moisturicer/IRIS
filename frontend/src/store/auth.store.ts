@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { useNoticeStore } from "./notice.store";
+import { isAcceptanceRequired } from "@/lib/noticeErrors";
 import type { User } from "@/types/auth";
 import { authApi } from "@/api/auth";
 import {
@@ -70,6 +72,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     // quietly re-authenticating the browser the user just signed out of. Bumping
     // sessionEpoch is what lets that caller notice and discard its result.
     __resetRefreshState();
+    useNoticeStore.getState().clear();
     clearAuthSession();
     clearReadingHistory();
     set((s) => ({
@@ -148,7 +151,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       const { data: user } = await authApi.me();
       set({ user });
-    } catch {
+    } catch (err) {
+      // The session is good but the current data notice is unanswered, so the
+      // server refuses `me` (IR-790). Keep the session: the guard shows the
+      // notice screen, and the account loads once they answer.
+      if (isAcceptanceRequired(err)) {
+        useNoticeStore.getState().require();
+        return;
+      }
       get().logout();
     } finally {
       set({ authReady: true });

@@ -17,6 +17,7 @@ import { useLocation } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { authApi } from "@/api/auth";
+import { noticeApi } from "@/api/notice";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
@@ -48,7 +49,24 @@ function LocationProbe() {
   return <output aria-label="Router location">{`${location.pathname}#${location.key}`}</output>;
 }
 
+/** The server's current data notice (ADR-054, IR-790), as `GET /auth/notice/` sends it. */
+const NOTICE = {
+  version: 3,
+  title: "IRIS data notice",
+  subtitle: "What IRIS keeps and why",
+  sections: [
+    { title: "What IRIS keeps", body: "Your name and CIT-U email.\nYour college and program." },
+    { title: "Who sees it", list: ["RDCO staff", "The System Admin"] },
+  ],
+  published_at: "2026-11-01T08:00:00Z",
+};
+
+function stubNotice(notice = NOTICE) {
+  return vi.spyOn(noticeApi, "current").mockResolvedValue({ data: notice } as never);
+}
+
 function stubOptions() {
+  stubNotice();
   vi.spyOn(accountsApi, "colleges").mockResolvedValue(page(COLLEGES) as never);
   vi.spyOn(accountsApi, "departments").mockResolvedValue(page(DEPARTMENTS) as never);
   vi.spyOn(accountsApi, "courses").mockResolvedValue(page(COURSES) as never);
@@ -74,8 +92,10 @@ const email     = () => screen.getByRole("textbox", { name: "Institutional email
 const college   = () => screen.getByRole("combobox", { name: "College" });
 const program   = () => screen.getByRole("combobox", { name: "Program" });
 const department = () => screen.getByRole("combobox", { name: "Department" });
-/** The consent box's name refers to the data notice (IR-540). */
+/** The agreement box's name refers to the data notice (IR-540, IR-790). */
 const CONSENT = /I have read the data notice/;
+/** The AI question, a required Yes or No with neither preselected (ADR-054 decision 1). */
+const aiQuestion = () => screen.getByRole("group", { name: "May AI use your papers?" });
 
 /** The options are loaded once the college select is enabled. */
 async function optionsLoaded() {
@@ -106,6 +126,7 @@ async function finish(user: User) {
   await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
   await user.type(screen.getByLabelText("Confirm Password"), "IrisDemo123!");
   await user.click(screen.getByRole("checkbox", { name: CONSENT }));
+  await user.click(within(aiQuestion()).getByRole("radio", { name: "No" }));
   await user.click(screen.getByRole("button", { name: "Register" }));
 }
 
@@ -295,6 +316,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
     await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
     await user.type(screen.getByLabelText("Confirm Password"), "IrisDemo123!");
     await user.click(screen.getByRole("checkbox", { name: CONSENT }));
+    await user.click(within(aiQuestion()).getByRole("radio", { name: "No" }));
 
     await user.click(tab(/^Identity, completed$/));
     expect(tab(/^Security & agreement, completed$/)).toHaveAttribute("href", "/signup");
@@ -352,6 +374,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
       screen.getByLabelText("Password"),
       screen.getByLabelText("Confirm Password"),
       screen.getByRole("checkbox", { name: CONSENT }),
+      aiQuestion(),
       screen.getByRole("button", { name: "Register" }),
     ]);
   });
@@ -500,7 +523,9 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     const consent = screen.getByRole("checkbox", { name: CONSENT });
     expect(consent).toHaveAttribute("aria-invalid", "true");
     expect(consent).toHaveFocus();
-    expect(consent).toHaveAccessibleDescription("Agree to the data notice to register.");
+    expect(consent).toHaveAccessibleDescription("Agree to the data-privacy agreement to continue.");
+    expect(aiQuestion()).toHaveAttribute("aria-invalid", "true");
+    expect(aiQuestion()).toHaveAccessibleDescription(/Choose Yes or No/);
     expect(register).not.toHaveBeenCalled();
 
     await user.click(consent);
@@ -519,13 +544,12 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     await user.keyboard("{Enter}");
     expect(notice()).toHaveAttribute("aria-expanded", "true");
 
-    const text = screen.getByRole("region", { name: "Read the data notice" }).textContent ?? "";
-    for (const item of ["name", "CIT-U email", "college", "program or department", "the role you ask for", "hash"]) {
-      expect(text).toContain(item);
-    }
-    expect(text).toMatch(/RDCO/);
-    expect(text).toMatch(/interim/i);
-    expect(text).toMatch(/Terms of Service and Data Privacy Policy/);
+    // The server's notice, its version and date, and its text as written (IR-790).
+    const region = screen.getByRole("region", { name: "Read the data notice" });
+    expect(within(region).getByRole("heading", { name: "IRIS data notice" })).toBeInTheDocument();
+    expect(region).toHaveTextContent("Version 3 · published Nov 1, 2026");
+    expect(region).toHaveTextContent("Your name and CIT-U email.");
+    expect(within(region).getByRole("list")).toHaveTextContent("RDCO staff");
 
     await user.keyboard("{Enter}");
     expect(screen.queryByRole("region", { name: "Read the data notice" })).not.toBeInTheDocument();
@@ -609,6 +633,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
       screen.getByLabelText("Password"),
       screen.getByLabelText("Confirm Password"),
       screen.getByRole("checkbox", { name: CONSENT }),
+      aiQuestion(),
       screen.getByRole("button", { name: "Register" }),
     ];
     for (let i = 1; i < order.length; i++) {
@@ -626,12 +651,53 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     expect(dead).toEqual([]);
   });
 
+  it("asks Yes or No on AI with neither preselected, and says what each means (IR-790)", async () => {
+    const user = userEvent.setup();
+    renderSignup();
+    await reachSecurity(user);
+
+    const yes = within(aiQuestion()).getByRole("radio", { name: "Yes" });
+    const no = within(aiQuestion()).getByRole("radio", { name: "No" });
+    expect(yes).not.toBeChecked();
+    expect(no).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: CONSENT })).not.toBeChecked();
+    expect(no).toHaveAccessibleDescription(/account works normally.*Ask IRIS questions still go to AI companies/);
+    expect(yes).toHaveAccessibleDescription(/embargo and the IP mark still apply/);
+    expect(aiQuestion()).toHaveAccessibleDescription(/can't be recalled/);
+  });
+
+  it("shows a notice published meanwhile and asks for both answers again (IR-790)", async () => {
+    const user = userEvent.setup();
+    const newer = { ...NOTICE, version: 4, title: "IRIS data notice, revised" };
+    const register = vi.spyOn(authApi, "register").mockRejectedValueOnce({
+      response: { status: 409, data: { code: "notice_stale", notice: newer } },
+    });
+    renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/newer notice was published/);
+    const region = screen.getByRole("region", { name: "Read the data notice" });
+    expect(within(region).getByRole("heading", { name: "IRIS data notice, revised" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: CONSENT })).not.toBeChecked();
+    expect(within(aiQuestion()).getByRole("radio", { name: "No" })).not.toBeChecked();
+
+    register.mockResolvedValue({ data: {} } as never);
+    await user.click(screen.getByRole("checkbox", { name: CONSENT }));
+    await user.click(within(aiQuestion()).getByRole("radio", { name: "Yes" }));
+    await user.click(screen.getByRole("button", { name: "Register" }));
+    await waitFor(() => expect(register).toHaveBeenCalledTimes(2));
+    expect(register.mock.calls[1][0]).toMatchObject({ notice_version: 4, ai_consent: true, agree_dpa: true });
+  });
+
 });
 
 /**
  * What IR-539 did not change, and IR-707 did not either. The request and its
- * fields are pinned. One deliberate change since IR-539 (IR-540): the request
- * carries `consent_given: true`, which the serializer always required.
+ * fields are pinned. Deliberate changes since IR-539: IR-540 added
+ * `consent_given: true`, and IR-790 replaces it with the server notice's two
+ * answers and its version (`agree_dpa`, `ai_consent`, `notice_version`), which
+ * IR-789's serializer requires.
  * IR-857 deliberately removes middle_initial from the new-account payload.
  */
 describe("what the register screen sends", { timeout: 30_000 }, () => {
@@ -650,13 +716,15 @@ describe("what the register screen sends", { timeout: 30_000 }, () => {
       last_name: "Dela Cruz",
       password: "IrisDemo123!",
       confirm_password: "IrisDemo123!",
-      consent_given: true,
+      agree_dpa: true,
+      ai_consent: false,
+      notice_version: 3,
       role_name: "Student",
       course_id: 100,
     });
     expect(Object.keys(payload)).toEqual([
       "email", "first_name", "last_name",
-      "password", "confirm_password", "consent_given", "role_name", "course_id",
+      "password", "confirm_password", "agree_dpa", "ai_consent", "notice_version", "role_name", "course_id",
     ]);
   });
 
@@ -674,7 +742,9 @@ describe("what the register screen sends", { timeout: 30_000 }, () => {
       last_name: "Dela Cruz",
       password: "IrisDemo123!",
       confirm_password: "IrisDemo123!",
-      consent_given: true,
+      agree_dpa: true,
+      ai_consent: false,
+      notice_version: 3,
       role_name: "Adviser",
       college_id: 1,
       department_id: 11,
@@ -1019,6 +1089,7 @@ describe("form options that fail to load", { timeout: 30_000 }, () => {
       .mockResolvedValue(page(COLLEGES) as never);
     vi.spyOn(accountsApi, "departments").mockResolvedValue(page(DEPARTMENTS) as never);
     vi.spyOn(accountsApi, "courses").mockResolvedValue(page(COURSES) as never);
+    stubNotice();
     renderScreen(<SignupPage />, { route: "/signup" });
     await fillIdentity(user);
 
