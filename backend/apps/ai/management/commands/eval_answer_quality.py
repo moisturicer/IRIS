@@ -175,17 +175,21 @@ def measure_access(data, users) -> tuple[aq.Access, list[str]]:
             problems.append(f"{title!r}: {len(found)} Records carry this title, need exactly 1")
         else:
             ids[title] = found[0]
-    visible = {reader: set(Record.objects.visible_to(user).filter(pk__in=ids.values())
-                           .values_list("pk", flat=True)) for reader, user in users.items()}
+    from apps.ai.grants.reads import research_records
+
+    readable = {reader: set(research_records(user).values_list("pk", flat=True))
+                for reader, user in users.items()}
+    visible = {reader: pks & set(ids.values()) for reader, pks in readable.items()}
     access = aq.Access(title_to_id=ids, visible=visible)
     for reader in aq.READERS:
         unreadable = [t for t in corpus["titles"] if ids.get(t) not in visible[reader]]
         if unreadable:
             problems.append(f"reader {reader} cannot read {len(unreadable)} corpus papers, "
                             f"e.g. {unreadable[0]!r}")
-    listed = Record.objects.publicly_visible().count()
+    # The count labels assume reader B reads exactly the corpus papers.
+    listed = len(readable.get("b", ()))
     if listed != len(corpus["titles"]):
-        problems.append(f"the catalogue lists {listed} published Records, the count labels "
+        problems.append(f"reader b can read {listed} Records, the count labels "
                         f"assume exactly the {len(corpus['titles'])} corpus papers")
     from apps.ai.policy import decision_for_record
 

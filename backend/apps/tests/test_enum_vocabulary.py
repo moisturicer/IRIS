@@ -134,6 +134,10 @@ ALLOWED = {
     # couple chat retries to institutional workflow. This module contains
     # no workflow states, only claim/replay handling for one chat request.
     "ai/submissions.py",
+    # (IR-956) "declined" is a key in the answer-quality grader's frozen JSON
+    # rubric: the grader saying an answer refused to answer. It is not a
+    # review decision; renaming it would change the frozen set's lock.
+    "ai/evaluation/answer_quality.py",
     # (IR-406) Declares its own `SuggestionState` for the Publish dialog's
     # prefill (pending/ready/failed/unsupported, IR-374 spec §4.5): the
     # manuscript *extraction's* status restated for one client -- the same
