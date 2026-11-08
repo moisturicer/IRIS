@@ -218,6 +218,23 @@ export const DIALOGS: DialogCase[] = [
     },
     open: press("Publish to Discover"), dialog: anyDialog,
   },
+  // RDCO's three acts on a paper in review (ADR-051 §10, IR-798), one dialog each.
+  ...([
+    ["replace a paper's adviser", "Replace Adviser"],
+    ["add an owner to a paper", "Add owner"],
+    ["withdraw a paper in review", "Withdraw paper"],
+  ] as const).map(([id, button]): DialogCase => ({
+    id, screen: "paper-view", sources: ["features/records/paper-view/RdcoPaperControls.tsx"],
+    override: (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "under_review",
+        workflow_state_label: "Under review", stage_label: "Under review",
+        capabilities: ["cite", "replace_adviser", "add_owner", "withdraw_paper"],
+      });
+      api.on("GET", "/users/advisers/", paginated([]));
+    },
+    open: press(button), dialog: anyDialog,
+  })),
   {
     id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
     override: (api) => {

@@ -225,6 +225,8 @@ vi.mock("@/api/records", () => ({
     releaseEmbargo:   vi.fn(() => Promise.resolve({ data: { state: "released", until: "2099-01-01" } })),
     publishUnlisted:  vi.fn(() => Promise.resolve({ data: { pipeline_status: "published" } })),
     releaseIp:        vi.fn(),
+    // RDCO's acts on a paper in review (IR-798); their own behaviour is `RdcoPaperControls.test.tsx`'s.
+    rdcoWithdraw:     vi.fn(() => Promise.resolve({ data: { id: 7, withdrawn: true } })),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
@@ -3344,6 +3346,74 @@ describe("publishing an Unlisted paper from Record details (IR-878)", () => {
     await expectNoBlockingA11yViolations(container);
     await userEvent.click(screen.getByRole("button", { name: "Publish to Discover" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(document.body);
+  });
+});
+
+
+// RDCO's controls on a paper in review sit in Record details (ADR-051 §10,
+// IR-798). What each dialog says is `RdcoPaperControls.test.tsx`'s; here, the
+// placement, and leaving a paper that a withdrawal deleted.
+describe("RDCO's controls on a paper in review (IR-798)", () => {
+  const inReview: RecordDetail = {
+    ...record,
+    pipeline_status: "in_review",
+    capabilities: [...record.capabilities, "replace_adviser", "add_owner", "withdraw_paper"],
+  };
+
+  function ReviewQueue() {
+    return <h1>Review queue</h1>;
+  }
+
+  beforeEach(() => {
+    shownRecord = inReview;
+    signInAs(99, "RDCO");
+    useUIStore.setState({ toasts: [] });
+  });
+
+  it("offers the three acts in the rail, and a withdrawal leaves for the review queue", async () => {
+    workspaceAt(1400);
+    renderScreen(
+      <Routes>
+        <Route path="/records/:id" element={<PaperViewPage />} />
+        <Route path="/review" element={<ReviewQueue />} />
+      </Routes>,
+      { route: `/records/${RECORD_ID}` },
+    );
+    await waitForRecord(record.title);
+    const rail = screen.getByRole("complementary", { name: "Record details" });
+    const card = within(rail).getByRole("region", { name: "RDCO controls" });
+    expect(within(card).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Replace Adviser", "Add owner", "Withdraw paper",
+    ]);
+
+    await userEvent.click(within(card).getByRole("button", { name: "Withdraw paper" }));
+    const dialog = screen.getByRole("dialog", { name: "Withdraw this paper?" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Reason" }), "Duplicate submission.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Withdraw paper" }));
+
+    expect(recordsApi.rdcoWithdraw).toHaveBeenCalledWith(RECORD_ID, "Duplicate submission.");
+    expect(await screen.findByRole("heading", { name: "Review queue" })).toBeInTheDocument();
+    expect(useUIStore.getState().toasts.map((t) => t.message)).toEqual([
+      "Paper withdrawn. Its owners and reviewers have been told.",
+    ]);
+  });
+
+  it("is not shown when the server offers none of them", async () => {
+    shownRecord = { ...inReview, capabilities: record.capabilities };
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    expect(screen.queryByRole("region", { name: "RDCO controls" })).not.toBeInTheDocument();
+  });
+
+  it("works on a phone, dialog included", async () => {
+    workspaceAt(360);
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+    await expectNoBlockingA11yViolations(container);
+    await userEvent.click(screen.getByRole("button", { name: "Withdraw paper" }));
+    expect(screen.getByRole("dialog", { name: "Withdraw this paper?" })).toBeInTheDocument();
     await expectNoBlockingA11yViolations(document.body);
   });
 });

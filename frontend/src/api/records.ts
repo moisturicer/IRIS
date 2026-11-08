@@ -249,6 +249,17 @@ export const recordsApi = {
   /** RDCO publishes an Unlisted paper once its embargo is released (IR-878). */
   publishUnlisted:(id: number, note: string) =>
     apiClient.post(`/records/${id}/publish-unlisted/`, { note }),
+  // RDCO's acts on a paper in review (ADR-051 §10, IR-797/IR-798).
+  replaceAdviser: (id: number, adviser: number, reason: string) =>
+    apiClient.post<{ adviser: { id: number; name: string }; seat: number }>(
+      `/records/${id}/replace-adviser/`, { adviser, reason },
+    ),
+  addOwner:       (id: number, email: string) =>
+    apiClient.post<{ owners: { id: number; name: string; is_primary: boolean }[] }>(
+      `/records/${id}/add-owner/`, { email },
+    ),
+  rdcoWithdraw:   (id: number, reason: string) =>
+    apiClient.post<{ id: number; withdrawn: true }>(`/records/${id}/withdraw/`, { reason }),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),
