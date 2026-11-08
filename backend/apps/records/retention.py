@@ -26,8 +26,8 @@ TYPE_KEY = "download_notes"
 SETTING_KEY = "retention.download_notes_days"
 
 
-def erase_download_notes(cutoff) -> int:
-    """Blank the notes of every finished download request last active before `cutoff`."""
+def _due(cutoff):
+    """Every finished download request with a note, last active before `cutoff`."""
     return (
         DownloadRequest.objects
         .exclude(status=RequestStatus.PENDING)
@@ -38,8 +38,20 @@ def erase_download_notes(cutoff) -> int:
             Case(When(status=RequestStatus.APPROVED, then=F("grant_expires_at"))),
         ))
         .filter(last_activity__lt=cutoff)
-        .update(note="", rdco_note="")
     )
 
 
-register(RetentionType(key=TYPE_KEY, setting_key=SETTING_KEY, erase=erase_download_notes))
+def erase_download_notes(cutoff) -> int:
+    """Blank the notes of every finished download request last active before `cutoff`."""
+    return _due(cutoff).update(note="", rdco_note="")
+
+
+def count_download_notes(cutoff) -> int:
+    """How many requests `erase_download_notes(cutoff)` would blank (IR-795). Reads only."""
+    return _due(cutoff).count()
+
+
+register(RetentionType(
+    key=TYPE_KEY, setting_key=SETTING_KEY,
+    erase=erase_download_notes, count=count_download_notes,
+))

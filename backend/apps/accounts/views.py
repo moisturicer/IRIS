@@ -800,6 +800,35 @@ class SystemSettingView(APIView):
         return Response(SystemSettingSerializer(setting).data)
 
 
+class RetentionPreviewView(APIView):
+    """
+    GET /settings/<key>/erasure-preview/?days=N
+    How many items the daily cleanup would erase now if retention setting `key`
+    held `days` (IR-795). The System Admin alone, like the setting itself.
+
+    Reads only: nothing is erased or saved. The Retention page asks this before
+    saving a period, so it can say how much would go and ask first. A blank
+    `days` erases nothing and previews as 0; one that isn't a positive whole
+    number is refused with the same message the PATCH gives. A key that isn't a
+    retention period is a 404.
+    """
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
+
+    def get(self, request, key):
+        retention_type = retention.type_for_setting(key)
+        if retention_type is None:
+            return Response({"detail": "Not found."}, status=404)
+        value = request.query_params.get("days")
+        if value is None:
+            return Response({"days": ["A period is required, or blank to erase nothing."]}, status=400)
+        if error := retention.period_error(value):
+            return Response({"days": [error]}, status=400)
+        count = retention.preview(retention_type, value)
+        if count is None:
+            return Response({"detail": "This kind of data can't be counted in advance."}, status=501)
+        return Response({"key": key, "days": retention.parse_period(value), "count": count})
+
+
 # ---- Account deletion (ADR-051 §8-§12, IR-785) ----------------------------
 
 def _deletion_refused(refused):
