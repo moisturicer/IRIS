@@ -56,6 +56,9 @@ RECOVERY_TOOL_VERSION = "research-4"
 #: research-4 with search by keyword and meaning, narrowed by metadata (IR-886).
 HYBRID_PROMPT_VERSION = "agent-research-5"
 HYBRID_TOOL_VERSION = "research-5"
+#: research-5 plus exhaustive listing by metadata (IR-994).
+LISTING_PROMPT_VERSION = "agent-research-6"
+LISTING_TOOL_VERSION = "research-6"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -101,6 +104,11 @@ HYBRID_INSTRUCTIONS = RECOVERY_INSTRUCTIONS + (
     "record type or completion years; its results are still a sample, never a complete list. When its "
     "result says meaning search was not ok, say that the search matched keywords only."
 )
+LISTING_INSTRUCTIONS = HYBRID_INSTRUCTIONS + (
+    " For which papers match an Area, PSCED area, record type, years or IP flag, use list_records: it "
+    "names every matching paper this reader can see, up to 50, with the exact total. Say when it stopped "
+    "short, and never present a search sample as a complete list."
+)
 #: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
 COMPACT_REQUEST = (
     "The reader asked to condense this conversation now. This is not a question and not the reader's "
@@ -122,9 +130,10 @@ PROMPTS = {
     (MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION): MANUSCRIPT_INSTRUCTIONS,
     (RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION): RECOVERY_INSTRUCTIONS,
     (HYBRID_PROMPT_VERSION, HYBRID_TOOL_VERSION): HYBRID_INSTRUCTIONS,
+    (LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION): LISTING_INSTRUCTIONS,
 }
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
-                          RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION)
+                          RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -330,10 +339,12 @@ class _Run:
         self.investigation = Investigation(
             tools, clarify=not asked,
             metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
-                                 HYBRID_TOOL_VERSION),
-            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION),
-            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION),
-            hybrid=version == HYBRID_TOOL_VERSION,
+                                 HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
+            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION,
+                                    LISTING_TOOL_VERSION),
+            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
+            hybrid=version in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
+            listing=version == LISTING_TOOL_VERSION,
             screen=_screen(agent.provider, agent.pin))
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
@@ -400,7 +411,7 @@ class _Run:
                     return self._result(outcome.clarification, (), kind="clarification")
                 progressed = progressed or outcome.progress
                 results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
-                                          outcome.control_only))
+                                          outcome.control_only, outcome.metadata_only))
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
             self.investigation.packed(history[len(history) - len(results):])

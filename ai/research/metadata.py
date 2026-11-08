@@ -13,6 +13,8 @@ from typing import Sequence
 MAX_CANDIDATES = 5
 #: References one call may resolve.
 MAX_REFERENCES = 8
+#: Most papers one listing names; the total is exact whatever the cap (IR-994).
+MAX_LISTED = 50
 #: Every count is relative to the asker (ADR-027 §3).
 RELATIVE_TO = "of the records you can see"
 

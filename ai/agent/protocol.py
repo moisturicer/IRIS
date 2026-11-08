@@ -89,6 +89,8 @@ class ToolResult:
     dependencies: frozenset = frozenset()
     #: Set only by local tool/control paths that emit no Record content.
     control_only: bool = False
+    #: An exact count or a list of titles: Record metadata, never Record text (IR-994).
+    metadata_only: bool = False
 
 
 Entry = Union[User, ModelTurn, ToolResult]

@@ -215,3 +215,19 @@ def test_counts_focus_plan_and_seen_evidence_survive_the_round_trip():
     assert restored.counted() == [4, 5, 6]
     assert restored.budget == {"input": 10, "output": 5, "reported": 15, "attempts": 2}
     assert dataclasses.asdict(ORDINARY) == body["bounds"]
+
+
+def test_a_metadata_result_stays_metadata_after_the_round_trip():
+    from ai.agent.protocol import ModelTurn, StopReason, ToolCall, ToolGroup, ToolResult
+
+    history = [ModelTurn((ToolGroup((ToolCall("c", "count_records", "{}"),)),), StopReason.TOOLS),
+               ToolResult("c", '{"status": "ok"}', metadata_only=True)]
+
+    class Spent:
+        input, output, reported, attempts = 0, 0, 0, 0
+
+    body = json.loads(json.dumps(checkpoint.dump(
+        pin=PIN, bounds=ORDINARY, task="t", history=history, investigation=Investigation(None),
+        budget=Spent, steps=1, stale=0)))
+    restored = checkpoint.load(body, pin=PIN, bounds=ORDINARY, task="t")
+    assert restored.history[-1].metadata_only is True

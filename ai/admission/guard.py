@@ -143,6 +143,65 @@ def _control_only(entry: ToolResult) -> bool:
     return "revision" not in body or (type(body["revision"]) is int and body["revision"] >= 0)
 
 
+#: Longest name or title a metadata result may carry.
+METADATA_TEXT = 1000
+COUNT_KEYS = frozenset({"kind", "total", "filters", "group_by", "groups", "ungrouped", "scope",
+                        "relative_to"})
+LIST_KEYS = frozenset({"kind", "total", "filters", "truncated", "relative_to", "papers"})
+PAPER_KEYS = frozenset({"paper", "title", "year"})
+SCOPES = frozenset({"readable_records", "paper_chat"})
+
+
+def _text(value) -> bool:
+    return isinstance(value, str) and len(value) <= METADATA_TEXT
+
+
+def _number(value) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _filters(value) -> bool:
+    return isinstance(value, dict) and all(
+        _text(k) and (_text(v) or type(v) in (int, bool)) for k, v in value.items())
+
+
+def _counted(body) -> bool:
+    if not isinstance(body, dict) or set(body) != COUNT_KEYS or body["kind"] != "exact_count":
+        return False
+    groups = body["groups"]
+    return (_number(body["total"]) and _number(body["ungrouped"]) and _filters(body["filters"])
+            and (body["group_by"] is None or _text(body["group_by"])) and body["scope"] in SCOPES
+            and _text(body["relative_to"]) and isinstance(groups, list)
+            and all(isinstance(g, dict) and set(g) == {"value", "count"} and _number(g["count"])
+                    and (_text(g["value"]) or type(g["value"]) is int) for g in groups))
+
+
+def _listed(body) -> bool:
+    if not isinstance(body, dict) or set(body) != LIST_KEYS or body["kind"] != "record_list":
+        return False
+    papers = body["papers"]
+    return (_number(body["total"]) and _filters(body["filters"]) and type(body["truncated"]) is bool
+            and _text(body["relative_to"]) and isinstance(papers, list)
+            and all(isinstance(p, dict) and set(p) == PAPER_KEYS and _text(p["paper"]) and _text(p["title"])
+                    and (p["year"] is None or type(p["year"]) is int) for p in papers))
+
+
+def _metadata_only(entry: ToolResult) -> bool:
+    """An exact count or a title list, by exact shape: Record metadata, never Record text (IR-994)."""
+    if not entry.metadata_only:
+        return False
+    try:
+        body = json.loads(entry.content)
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(body, dict) or body.get("status") not in CONTROL_VALUES:
+        return False
+    if "reason" in body and body["reason"] not in CONTROL_VALUES:
+        return False
+    rest = set(body) - {"status", "reason"}
+    return (rest == {"count"} and _counted(body["count"])) or (rest == {"list"} and _listed(body["list"]))
+
+
 def _sources(entries: Iterable) -> frozenset[Source]:
     found: set[Source] = set()
     for entry in entries:
@@ -151,7 +210,8 @@ def _sources(entries: Iterable) -> frozenset[Source]:
         if getattr(entry, "unverified_provenance", False):
             raise AdmissionDenied(errors.WITHHELD)
         dependencies = getattr(entry, "dependencies", frozenset())
-        if isinstance(entry, ToolResult) and not dependencies and not _control_only(entry):
+        if (isinstance(entry, ToolResult) and not dependencies and not _control_only(entry)
+                and not _metadata_only(entry)):
             raise AdmissionDenied(errors.WITHHELD)
         if not isinstance(dependencies, frozenset) or any(not isinstance(d, Source)
                                                            for d in dependencies):
