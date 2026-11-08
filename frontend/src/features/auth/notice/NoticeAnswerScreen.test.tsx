@@ -173,6 +173,51 @@ describe("the notice screen", () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
+  it("asks which papers when a previous No becomes a Yes, assuming neither, and sends the choice (IR-791)", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(noticeApi, "current").mockResolvedValue({
+      data: { ...NOTICE, answer: { version: 4, ai_consent: false, answered_at: "2026-10-01T00:00:00Z" }, answer_required: true },
+    } as never);
+    const answer = vi.spyOn(noticeApi, "answer").mockResolvedValue({ data: { answer_required: false } } as never);
+    vi.spyOn(authApi, "me").mockResolvedValue({ data: makeUser({ role_name: ROLES.KTTO }) } as never);
+    const { container } = renderGuard();
+    await screen.findByRole("heading", { name: "IRIS data notice" });
+
+    const papers = () => screen.queryByRole("group", { name: /Which papers does your Yes cover/ });
+    await user.click(agreement());
+    expect(papers()).not.toBeInTheDocument();
+    await user.click(within(aiQuestion()).getByRole("radio", { name: "Yes" }));
+    const group = papers()!;
+    const all = within(group).getByRole("radio", { name: "All my papers" });
+    expect(all).not.toBeChecked();
+    expect(within(group).getByRole("radio", { name: "Only papers from now on" })).not.toBeChecked();
+    expect(all).toHaveAccessibleDescription(/can't be recalled/);
+    await expectNoBlockingA11yViolations(container);
+
+    await user.click(save());
+    expect(group).toHaveAccessibleDescription("Choose which papers your Yes covers.");
+    expect(answer).not.toHaveBeenCalled();
+
+    await user.click(all);
+    await user.click(save());
+    expect(await screen.findByRole("heading", { name: "Review queue" })).toBeInTheDocument();
+    expect(answer).toHaveBeenCalledWith({ notice_version: 5, agree_dpa: true, ai_consent: true, papers: "all" });
+  });
+
+  it("asks nothing about papers when the previous answer was Yes or there was none", async () => {
+    const user = userEvent.setup();
+    for (const previous of [true, null]) {
+      vi.spyOn(noticeApi, "current").mockResolvedValue({
+        data: { ...NOTICE, answer: previous === null ? null : { version: 4, ai_consent: previous, answered_at: null }, answer_required: true },
+      } as never);
+      const { unmount } = renderGuard();
+      await screen.findByRole("heading", { name: "IRIS data notice" });
+      await user.click(within(aiQuestion()).getByRole("radio", { name: "Yes" }));
+      expect(screen.queryByRole("group", { name: /Which papers does your Yes cover/ })).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it("re-reads the notice when the tab comes back, and shows a newer one", async () => {
     const user = userEvent.setup();
     const current = vi.spyOn(noticeApi, "current");

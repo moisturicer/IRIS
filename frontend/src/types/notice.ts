@@ -30,4 +30,6 @@ export interface NoticeAnswerPayload {
   notice_version: number;
   agree_dpa: boolean;
   ai_consent: boolean;
+  /** Required when a No becomes a Yes (ADR-054 decision 13, IR-791); ignored otherwise. */
+  papers?: "all" | "from_now";
 }
