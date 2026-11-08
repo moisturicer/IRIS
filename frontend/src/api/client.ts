@@ -4,6 +4,8 @@ import { API_BASE } from "@/lib/constants";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
 import { refreshOnce, type RefreshedTokens } from "@/lib/tokenRefresh";
 import { useAuthStore } from "@/store/auth.store";
+import { useNoticeStore } from "@/store/notice.store";
+import { isAcceptanceRequired } from "@/lib/noticeErrors";
 import { DEFAULT_TIMEOUT_MS, TRANSFER_TIMEOUT_MS, asTimeoutError, isTransfer } from "./requestPolicy";
 
 export const apiClient = axios.create({
@@ -108,6 +110,11 @@ apiClient.interceptors.response.use(
     // Never replayed here: see requestPolicy.ts.
     const timedOut = asTimeoutError(error);
     if (timedOut) return Promise.reject(timedOut);
+
+    // Any request refused because the current notice is unanswered brings the
+    // person to the notice screen (IR-790), so a notice published while they
+    // work reaches them on their next request. The request still fails.
+    if (isAcceptanceRequired(error)) useNoticeStore.getState().require();
 
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 

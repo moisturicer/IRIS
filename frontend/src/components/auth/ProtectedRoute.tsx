@@ -8,6 +8,8 @@ import { wholePath } from "@/lib/redirectTarget";
 import { ForbiddenScreen } from "./ForbiddenScreen";
 import { PendingApprovalPage } from "@/features/auth/PendingApprovalPage";
 import { Spinner } from "@/components/ui/Spinner";
+import { useNoticeStore } from "@/store/notice.store";
+import { NoticeAnswerScreen } from "@/features/auth/notice/NoticeAnswerScreen";
 
 interface ProtectedRouteProps {
   allowedRoles: RoleName[];
@@ -36,6 +38,7 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const user        = useAuthStore((s) => s.user);
   const authReady     = useAuthStore((s) => s.authReady);
+  const noticeRequired = useNoticeStore((s) => s.required);
   const location      = useLocation();
   /**
    * Sticky, and it has to be.
@@ -112,6 +115,13 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
 
   if (!accessToken) {
     return <Navigate to="/login" replace state={{ from: attempted }} />;
+  }
+
+  // Everyone answers the current data notice before anything else, office
+  // staff and applicants included (ADR-054 decision 3, IR-790). Rendered in
+  // place of the page, so the address they asked for is kept for afterwards.
+  if (noticeRequired) {
+    return <NoticeAnswerScreen />;
   }
 
   // A named application role keeps its own gates, even on demo Django staff.

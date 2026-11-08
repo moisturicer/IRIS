@@ -9,7 +9,16 @@ import { Button, ButtonLink, Input, Select } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { errorDetail } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
-import { DataNotice } from "./DataNotice";
+import { noticeApi, staleNoticeFrom } from "@/api/notice";
+import type { DataNotice } from "@/types/notice";
+import {
+  NO_ANSWERS,
+  NoticeAnswerFields,
+  NoticeText,
+  missingAnswers,
+  type NoticeAnswerErrors,
+  type NoticeAnswers,
+} from "./notice/NoticeAnswerFields";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Role = "Student" | "Adviser";
@@ -49,8 +58,8 @@ const LAST_STEP = STEPS.length - 1;
 
 /**
  * The register serializer's error keys, onto the fields they mean (IR-540). Two
- * are named differently on the server; `consent_given` belongs to the consent
- * box and `role_name` to the role group (IR-708). Anything else --
+ * are named differently on the server; `agree_dpa` and `ai_consent` belong to
+ * the notice's two answers (IR-790) and `role_name` to the role group (IR-708). Anything else --
  * `non_field_errors`, `detail` -- is shown as an alert, because no field here
  * can own it.
  */
@@ -77,9 +86,6 @@ const firstMessage = (val: unknown) => (Array.isArray(val) ? String(val[0]) : St
 
 /** Every message on a field, so a password refused for two reasons says both (IR-647). */
 const allMessages = (val: unknown) => (Array.isArray(val) ? val.map(String).join(" ") : String(val));
-
-/** The consent box's own error, shown on it when a submit arrives without it (IR-540). */
-const CONSENT_REQUIRED = "Agree to the data notice to register.";
 
 /** "Adviser", not "Faculty / Adviser": the role's name, not a job title (CONTEXT.md). */
 const ROLES: Role[] = ["Student", "Adviser"];
@@ -154,8 +160,10 @@ export default function SignupPage() {
   const [step, setStep]             = useState(0);
   const [errors, setErrors]         = useState<FieldErrors>({});
   const [touched, setTouched]       = useState<Partial<Record<FieldName, boolean>>>({});
-  const [consented, setConsented]   = useState(false);
-  const [consentError, setConsentError] = useState<string>();
+  // The server's current notice and the two answers it asks for (ADR-054, IR-790).
+  const [notice, setNotice]         = useState<DataNotice | null>(null);
+  const [answers, setAnswers]       = useState<NoticeAnswers>(NO_ANSWERS);
+  const [answerErrors, setAnswerErrors] = useState<NoticeAnswerErrors>({});
   const [formAlert, setFormAlert]   = useState<FormAlert | null>(null);
   // The server's refusals, kept apart from the screen's own checks (IR-708): a
   // blur re-runs those, and must not erase a message only the server can give.
@@ -173,7 +181,6 @@ export default function SignupPage() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const noticeTriggerId = useId();
   const noticeId        = useId();
-  const consentErrorId  = useId();
   const nextStepsId     = useId();
   const summaryId       = useId();
   const { pathname }    = useLocation();
@@ -206,10 +213,12 @@ export default function SignupPage() {
       accountsApi.colleges(),
       accountsApi.departments(),
       accountsApi.courses(),
-    ]).then(([colRes, deptRes, courseRes]) => {
+      noticeApi.current(),
+    ]).then(([colRes, deptRes, courseRes, noticeRes]) => {
       setColleges(colRes.data.results);
       setAllDepts(deptRes.data.results);
       setAllCourses(courseRes.data.results);
+      setNotice(noticeRes.data);
     }).catch(() => {
       setLoadFailed(true);
     }).finally(() => setLoadingRef(false));
@@ -241,8 +250,9 @@ export default function SignupPage() {
   // Completion is derived from the answers every render, never stored, so a
   // change that invalidates a step reopens it at once (IR-704).
   const allErrors = validateAll(form, role);
+  const answered = answers.agree && answers.ai !== null;
   const complete = STEPS.map((_, i) =>
-    !hasAny(stepErrors(allErrors, i)) && (i !== LAST_STEP || consented),
+    !hasAny(stepErrors(allErrors, i)) && (i !== LAST_STEP || answered),
   );
   // A server refusal reopens only its own step (IR-708): the steps after it
   // were answered and checked, so they stay completed and reachable.
@@ -309,9 +319,9 @@ export default function SignupPage() {
 
   const handleRegister = async () => {
     const errs = validateAll(form, role);
-    // Consent is checked with the fields, not after them, so one press of
-    // Register shows everything that is missing at once (IR-540).
-    setConsentError(consented ? undefined : CONSENT_REQUIRED);
+    // The notice's answers are checked with the fields, not after them, so one
+    // press of Register shows everything that is missing at once (IR-540).
+    setAnswerErrors(missingAnswers(answers));
     revealStep(LAST_STEP, errs);
     // The tabs never reach Security past an incomplete step, so this is a
     // guard: whatever got here, an incomplete form is never sent, and the
@@ -325,7 +335,7 @@ export default function SignupPage() {
       goTo(earliest);
       return;
     }
-    if (earliest !== -1 || !consented) {
+    if (earliest !== -1 || !answered || !notice) {
       focusInvalid.current = true;
       return;
     }
@@ -340,9 +350,10 @@ export default function SignupPage() {
         last_name:        form.last_name.trim(),
         password:         form.password,
         confirm_password: form.password2,
-        // Required by the register serializer, and never sent before IR-540:
-        // every registration from this screen was refused until it was.
-        consent_given:    true,
+        // The notice the registrant was shown, and both answers (ADR-054, IR-790).
+        agree_dpa:        true,
+        ai_consent:       answers.ai === true,
+        notice_version:   notice.version,
         role_name:        role,
         ...(role === "Student"
           ? { course_id: Number(form.course_id) }
@@ -356,6 +367,16 @@ export default function SignupPage() {
         setFormAlert(UNREACHABLE);
         return;
       }
+      // A newer notice was published while the form was open: show it, and ask
+      // for both answers again, since they were given to the older one.
+      const newer = staleNoticeFrom(err);
+      if (newer) {
+        setNotice(newer);
+        setAnswers(NO_ANSWERS);
+        setNoticeOpen(true);
+        setFormAlert({ title: "The data notice changed", message: "A newer notice was published while you were registering. Read it, then answer again." });
+        return;
+      }
       if (response.status === 429) {
         setFormAlert({ title: "Registration failed", message: errorDetail(err, "") });
         return;
@@ -364,7 +385,8 @@ export default function SignupPage() {
       const elsewhere: string[] = [];
       let onRole: string | undefined;
       for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
-        if (key === "consent_given") setConsentError(firstMessage(val));
+        if (key === "agree_dpa") setAnswerErrors((prev) => ({ ...prev, agree: firstMessage(val) }));
+        else if (key === "ai_consent") setAnswerErrors((prev) => ({ ...prev, ai: firstMessage(val) }));
         else if (key === "role_name") onRole = allMessages(val);
         else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = allMessages(val);
         else elsewhere.push(firstMessage(val));
@@ -726,34 +748,11 @@ export default function SignupPage() {
                 }
               />
 
-              {/* Consent against a notice on this page (IR-540), in place of
-                  links to a Terms of Service and a Data Privacy Policy that do
-                  not exist yet (IR-214). The notice opens in place, so reading
-                  it clears nothing. */}
+              {/* The server's current notice and its two answers (ADR-054,
+                  IR-790): the same notice and questions a signed-in person
+                  answers. The notice opens in place, so reading it clears
+                  nothing. */}
               <div className="border-t border-stone-200 pt-5">
-                <div className="flex items-start gap-2.5">
-                  <input
-                    type="checkbox"
-                    id="signup-consent"
-                    checked={consented}
-                    onChange={(e) => {
-                      setConsented(e.target.checked);
-                      if (e.target.checked) setConsentError(undefined);
-                    }}
-                    aria-invalid={consentError ? true : undefined}
-                    aria-describedby={consentError ? consentErrorId : undefined}
-                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
-                  />
-                  <label htmlFor="signup-consent" className="flex min-h-11 items-center cursor-pointer text-small text-stone-600">
-                    I have read the data notice and agree to IRIS using my details as it describes.
-                  </label>
-                </div>
-                {consentError && (
-                  <p id={consentErrorId} className="mt-1.5 flex items-start gap-1.5 text-small text-brand">
-                    <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-                    {consentError}
-                  </p>
-                )}
                 <button
                   type="button"
                   id={noticeTriggerId}
@@ -761,21 +760,35 @@ export default function SignupPage() {
                   aria-controls={noticeId}
                   onClick={() => setNoticeOpen((v) => !v)}
                   // 44px tall, as sign-in's "Forgot password?" is (2.5.5).
-                  className={`mt-1 inline-flex min-h-11 items-center gap-1.5 rounded text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
+                  className={`inline-flex min-h-11 items-center gap-1.5 rounded text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
                 >
                   <i className={`fas ${noticeOpen ? "fa-chevron-up" : "fa-chevron-down"} text-label`} aria-hidden />
                   Read the data notice
                 </button>
-                {noticeOpen && (
+                {noticeOpen && notice && (
                   <div
                     id={noticeId}
                     role="region"
                     aria-labelledby={noticeTriggerId}
-                    className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3"
+                    // It scrolls, so the keyboard must be able to reach it (axe
+                    // scrollable-region-focusable).
+                    tabIndex={0}
+                    className="mb-4 max-h-80 overflow-y-auto rounded-lg border border-stone-200 bg-stone-50 px-4 py-3"
                   >
-                    <DataNotice />
+                    <NoticeText notice={notice} headingLevel={3} />
                   </div>
                 )}
+                <NoticeAnswerFields
+                  value={answers}
+                  onChange={(next) => {
+                    setAnswers(next);
+                    setAnswerErrors((prev) => ({
+                      ...(next.agree ? {} : prev.agree ? { agree: prev.agree } : {}),
+                      ...(next.ai === null && prev.ai ? { ai: prev.ai } : {}),
+                    }));
+                  }}
+                  errors={answerErrors}
+                />
               </div>
 
               {formAlert && (

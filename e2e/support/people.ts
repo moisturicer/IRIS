@@ -23,11 +23,16 @@ export async function firstCourseId(): Promise<number> {
 
 export async function register(email: string, first = "Journey", last = "Student") {
   const anon = await anonymous();
+  // Registration answers the server's current data notice: the data-privacy
+  // agreement and a Yes or No on AI, naming the version shown (IR-789, IR-790).
+  // Yes, as test data answers (ADR-054 decision 18).
+  const notice = await ok(await anon.get("/api/v1/auth/notice/"), "read the data notice");
   const res = await anon.post("/api/v1/auth/register/", {
     data: {
       email, first_name: first, last_name: last,
       password: NEW_PASSWORD, confirm_password: NEW_PASSWORD,
-      consent_given: true, role_name: "Student", course_id: await firstCourseId(),
+      agree_dpa: true, ai_consent: true, notice_version: notice.version,
+      role_name: "Student", course_id: await firstCourseId(),
     },
   });
   await ok(res, `register ${email}`);

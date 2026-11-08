@@ -1,6 +1,7 @@
-import axios from "axios";
+import axios, { AxiosError, type AxiosAdapter } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { refreshSession } from "./client";
+import { apiClient, refreshSession } from "./client";
+import { useNoticeStore } from "@/store/notice.store";
 import { useAuthStore } from "@/store/auth.store";
 
 const { redirect } = vi.hoisted(() => ({ redirect: vi.fn() }));
@@ -61,5 +62,31 @@ describe("refreshSession", () => {
 
     expect(await refreshSession()).toBeNull();
     expect(useAuthStore.getState().accessToken).toBeNull();
+  });
+});
+
+// A request refused because the current data notice is unanswered brings the
+// person to the notice screen, wherever it was made from (IR-790).
+describe("a notice_acceptance_required refusal", () => {
+  afterEach(() => useNoticeStore.setState({ required: false }));
+
+  function refuseWith(status: number, data: unknown): AxiosAdapter {
+    return async (config) => {
+      throw new AxiosError("refused", "ERR_BAD_REQUEST", config, null, {
+        status, statusText: "", headers: {}, config, data,
+      });
+    };
+  }
+
+  it("asks for the notice, and the request still fails", async () => {
+    const adapter = refuseWith(403, { code: "notice_acceptance_required", notice_version: 2 });
+    await expect(apiClient.get("/records/", { adapter })).rejects.toBeTruthy();
+    expect(useNoticeStore.getState().required).toBe(true);
+  });
+
+  it("leaves any other 403 alone", async () => {
+    const adapter = refuseWith(403, { detail: "You do not have permission." });
+    await expect(apiClient.get("/records/", { adapter })).rejects.toBeTruthy();
+    expect(useNoticeStore.getState().required).toBe(false);
   });
 });

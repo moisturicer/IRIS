@@ -16,7 +16,8 @@ authentication path the browser takes runs.
 Exempt by design, and listed so that a new exemption is a visible decision:
 
 - the routes `notice.ALLOWED_WHILE_UNANSWERED` names (read the notice, answer it,
-  sign out), and
+  sign out, request account deletion -- ADR-054 decision 3, IR-790), named again
+  in `ALLOWED` below so the two lists must agree, and
 - routes whose view has **no authentication class at all** -- token refresh and
   the two password-recovery routes and the activation confirm (IR-928). They never look at a token, so there is no
   signed-in person for the block to stop.
@@ -43,6 +44,16 @@ from apps.tests.access.routes import enumerate_routes, view_class
 from apps.tests.access.runner import _send
 from apps.tests.access.table import DECLARED, Shadowed
 from apps.tests.access.world import build_world
+
+#: The routes an unanswered person may still use (ADR-054 decision 3), named
+#: here as well as in `notice.ALLOWED_WHILE_UNANSWERED`, so widening that list
+#: fails this test until someone writes the new name here too.
+ALLOWED = frozenset({
+    ("accounts", "notice-current"),
+    ("accounts", "notice-answer"),
+    ("accounts", "auth-logout"),
+    ("accounts", "user-me-deletion-request"),
+})
 
 #: Views that authenticate nobody, so the block has no one to stop.
 NO_AUTHENTICATION = frozenset({
@@ -131,11 +142,8 @@ class UnansweredNoticeBlocksEveryRouteTests(APITestCase):
                          + "\n".join(failures))
         # A sweep that fires nothing proves nothing.
         self.assertGreater(fired, 100)
-        self.assertEqual(
-            exempt,
-            {("accounts", n) for n in notice.ALLOWED_WHILE_UNANSWERED if n.startswith(("notice-", "auth-"))}
-            | NO_AUTHENTICATION,
-        )
+        self.assertEqual({("accounts", n) for n in notice.ALLOWED_WHILE_UNANSWERED}, ALLOWED)
+        self.assertEqual(exempt, ALLOWED | NO_AUTHENTICATION)
 
     def test_the_person_answering_is_let_through_on_the_same_token(self):
         """The same token, the same sweep's route set, passes once the notice is answered."""

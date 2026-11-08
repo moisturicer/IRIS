@@ -85,6 +85,8 @@ export interface LoginResponse {
   access:  string;
   refresh: string;
   user:    User;
+  /** True until the person answers the current data notice (ADR-054, IR-789). */
+  notice_answer_required?: boolean;
 }
 
 export interface RegisterPayload {
@@ -93,8 +95,12 @@ export interface RegisterPayload {
   last_name:        string;
   password:         string;
   confirm_password: string;
-  /** Required by the register serializer: the registrant agreed to the data notice (IR-540). */
-  consent_given:    true;
+  /** The data-privacy agreement, which having an account requires (ADR-054, IR-789). */
+  agree_dpa:        true;
+  /** The required Yes or No on AI, with no default (ADR-054 decision 2). */
+  ai_consent:       boolean;
+  /** The notice version the registrant was shown; a newer one gets 409 `notice_stale`. */
+  notice_version:   number;
   /** "Student" or "Adviser" */
   role_name?:       string;
   /** Student: course FK id */
