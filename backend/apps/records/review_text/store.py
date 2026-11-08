@@ -55,15 +55,25 @@ def attach(version, previous) -> None:
         version.review_text_id = previous.review_text_id
         version.save(update_fields=["review_text"])
         return
-    text = ReviewText.objects.create(
+    from . import readings
+
+    wanted = readings.current_reader()
+    # The same file already read for this reader (a manuscript restored to an
+    # earlier Version's) is the same text, so it isn't read twice.
+    text, created = ReviewText.objects.get_or_create(
         record_id=version.record_id, source_file=version.manuscript.name,
-        manuscript_sha256=version.manuscript_sha256,
+        manuscript_sha256=version.manuscript_sha256, requested_reader=wanted,
     )
     version.review_text = text
     version.save(update_fields=["review_text"])
     from ..tasks import read_review_text
 
-    transaction.on_commit(lambda: read_review_text.delay(text.pk))
+    if created:
+        transaction.on_commit(lambda: read_review_text.delay(text.pk))
+    # Earlier Versions get the same reader now, so the comparison with this
+    # one is ready when it is opened (ADR-058 §3 as amended, point 4).
+    record_id, number = version.record_id, version.number
+    transaction.on_commit(lambda: readings.prepare_earlier(record_id, number))
 
 
 def read_text(text_id) -> str | None:
@@ -155,7 +165,8 @@ def payload(version) -> dict:
     text = version.review_text
     body = status(version) or {"state": "no_manuscript", "message": None, "warnings": []}
     body.pop("url", None)
-    body.update({"version": version.number, "reader": text.reader if text else "",
+    # The reader is never named to a reviewer (ADR-058 §3 as amended, point 5).
+    body.update({"version": version.number,
                  "page_count": text.page_count if text else None, "sections": []})
     if text and text.state == ReviewTextState.READ:
         body["sections"] = [
