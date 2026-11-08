@@ -220,6 +220,8 @@ npm install
 npm run dev
 ```
 
+With `docker compose up`, browse **http://localhost:8080**: a dev nginx edge (the production routing in front of Vite) that makes Ask IRIS work. Vite alone at http://localhost:5173 cannot reach the AI runtime.
+
 Frontend runs at **http://localhost:5173**
 
 Open your browser to `http://localhost:5173` and sign in with the superuser credentials you just created.
