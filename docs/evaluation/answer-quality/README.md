@@ -102,6 +102,10 @@ A reply that breaks the rubric is retried once and then left ungraded. Any ungra
 - `--rescore <run.json>` grades only what was left ungraded and rewrites the report.
 - `--reuse-django <run.json> --run …` collects the agent arm alone and keeps the earlier Django answers. It refuses if the set, access state or answer model changed. This is for rerunning the agent once IR-886 lands.
 
+## Result
+
+**2026-11-08: FAIL** ([report](../runs/20261108-192311-IR-956-answer-quality-2542c8f7.md)). The agent beat Django overall (correctness 47.7% vs 36.1%, citation support 50.6% vs 26.8%, no leaks), but four families fell more than ten points below Django: F04 counts, F09 compaction, F11 Paper Chat and F12 two readers. Most agent failures were `source_unavailable`: the runtime refused every count, most listings and every follow-up turn. Conditions and caveats are in [`traceability/IR-956.md`](../../testing/traceability/IR-956.md).
+
 ## Scoring rules
 
 | Measure | Rule |
