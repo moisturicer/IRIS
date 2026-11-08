@@ -29,7 +29,8 @@ CONTROL_KEYS = frozenset({"status", "reason", "coverage", "error", "revision", "
 CONTROL_VALUES = frozenset({"ok", "no_match", "partial", "unavailable", "tool_limit",
                             "invalid_arguments", "unknown_tool", "unknown_handle",
                             "source_replaced", "unauthorized", "run_ended", "exceeds_context",
-                            "invalid_argument", "unknown_filter_value", "ambiguous_filter_value"})
+                            "invalid_argument", "unknown_filter_value", "ambiguous_filter_value",
+                            "withheld"})
 #: How a combined search ran (IR-886): fixed names and outcomes, never content.
 SEARCH_SIGNALS = frozenset({"keyword", "semantic", "rerank"})
 SEARCH_VALUES = frozenset({"ok", "off", "unavailable", "provider_gated", "provider_failed",

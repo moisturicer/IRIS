@@ -59,6 +59,9 @@ HYBRID_TOOL_VERSION = "research-5"
 #: research-5 plus exhaustive listing by metadata (IR-994).
 LISTING_PROMPT_VERSION = "agent-research-6"
 LISTING_TOOL_VERSION = "research-6"
+#: research-6's tools, plus Paper Chat naming its paper and a second answer repair (IR-995).
+CHAT_PROMPT_VERSION = "agent-research-7"
+CHAT_TOOL_VERSION = "research-7"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -109,6 +112,19 @@ LISTING_INSTRUCTIONS = HYBRID_INSTRUCTIONS + (
     "names every matching paper this reader can see, up to 50, with the exact total. Say when it stopped "
     "short, and never present a search sample as a complete list."
 )
+CHAT_INSTRUCTIONS = LISTING_INSTRUCTIONS + (
+    " When a paper chat message names the paper this conversation is about, words such as 'this "
+    "approach' or 'the authors' refer to it: answer from it without asking which paper. When a question "
+    "is vague, search first and answer its most likely reading, saying which reading you took; ask a "
+    "clarifying question only when searching cannot settle it. For which papers do something, search "
+    "more than once with different wording and name every paper that fits. When resolve_papers returns "
+    "close matches, use the one that is clearly the paper meant and name it; ask only when none clearly "
+    "fits. A result whose reason is withheld left out passages from papers that cannot be shared now: "
+    "answer from the rest and say the answer may be incomplete. When a filter value is unknown, call "
+    "count_records grouped by that field to see the valid names, then try again."
+)
+#: Opens a Paper Chat under research-7: the one paper every question is about (IR-995).
+PAPER_CHAT_PREFIX = "[IRIS paper chat] This conversation is about one paper: "
 #: Sent in place of an earlier answer that drew on a source the send may no longer carry (IR-994).
 WITHHELD_ANSWER = "[This earlier answer is withheld: a paper it drew on can no longer be shared.]"
 WITHHELD_SUMMARY = "[The summary of earlier turns is withheld: a paper it drew on can no longer be shared.]"
@@ -134,9 +150,11 @@ PROMPTS = {
     (RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION): RECOVERY_INSTRUCTIONS,
     (HYBRID_PROMPT_VERSION, HYBRID_TOOL_VERSION): HYBRID_INSTRUCTIONS,
     (LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION): LISTING_INSTRUCTIONS,
+    (CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION): CHAT_INSTRUCTIONS,
 }
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
-                          RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION)
+                          RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
+                          CHAT_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -347,13 +365,17 @@ class _Run:
         self.investigation = Investigation(
             tools, clarify=not asked,
             metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
-                                 HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
+                                 HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
             manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION,
-                                    LISTING_TOOL_VERSION),
-            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
-            hybrid=version in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION),
-            listing=version == LISTING_TOOL_VERSION,
+                                    LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
+                                 CHAT_TOOL_VERSION),
+            hybrid=version in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            listing=version in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
             screen=_screen(agent.provider, agent.pin))
+        #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
+        self.chat = version == CHAT_TOOL_VERSION
+        self.repairs = 2 if self.chat else 1
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         #: Sources the history carried when the answer was written (IR-994).
@@ -458,7 +480,11 @@ class _Run:
             handoff = {**handoff, **{k: list(state.get(k, ())) for k in ("shown", "selected", "excluded")}}
         # One read gives the handoff's papers the same handles the state message uses.
         also = [*handoff["shown"], *handoff["selected"], *handoff["excluded"]] if handoff else ()
-        shown = await self.investigation.recall(state, also=also)
+        scope = getattr(self.tools, "scope", None) if self.chat else None
+        shown = await self.investigation.recall(state, also=[*also, *([scope] if scope is not None else [])])
+        if scope is not None and not any(shown.get(k) for k in ("shown", "selected", "excluded")):
+            # The scope read alone opens no state message.
+            shown = {}
         if handoff:
             # Earlier Turns arrive compacted (IR-734).
             summary = compacting.render(handoff, self.investigation.papers, passages=False)
@@ -475,6 +501,13 @@ class _Run:
         if shown:
             history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False),
                                 self.investigation.recalled_sources))
+        if scope is not None and scope in self.investigation.papers:
+            handle, title = self.investigation.papers[scope]
+            note = User(PAPER_CHAT_PREFIX + json.dumps({"paper": handle, "title": title}, ensure_ascii=False),
+                        self.investigation.recalled_sources)
+            # A paper the send may not carry is not named; its tools refuse it anyway.
+            if await self._sendable(note.dependencies):
+                history.append(note)
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history
@@ -704,14 +737,19 @@ class _Run:
         log.info("agent draft refused: %s", ",".join(sorted(found)))
         # A source that changed since it was read fences delivery; it is never repaired around.
         await self._recheck(text)
-        repaired = await self._repair(history, found)
-        if repaired is not None:
-            again = self._findings(repaired)
-            if not again:
-                return await self._commit(repaired)
-            log.info("agent repair refused: %s", ",".join(sorted(again)))
-        # No second repair: what each sentence supports on its own is kept, and the gap is said.
-        for draft in (repaired, text):
+        drafts = [text]
+        for attempt in range(1, self.repairs + 1):
+            repaired = await self._repair(history, found)
+            if repaired is None:
+                break
+            text_now, history = repaired
+            drafts.insert(0, text_now)
+            found = self._findings(text_now)
+            if not found:
+                return await self._commit(text_now)
+            log.info("agent repair refused: %s", ",".join(sorted(found)))
+        # Out of repairs: what each sentence supports on its own is kept, and the gap is said.
+        for draft in drafts:
             kept = draft and assurance.supported_units(
                 draft, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
             if kept:
@@ -720,8 +758,8 @@ class _Run:
                 return await self._commit(partial)
         raise Unavailable("invalid_draft")
 
-    async def _repair(self, history: list, found) -> Optional[str]:
-        """One more turn in the same Conversation, inside the reserve held for it; None if it cannot."""
+    async def _repair(self, history: list, found) -> Optional[tuple[str, list]]:
+        """One more turn in the same Conversation and the history ending with it; None if it cannot."""
         if not self.agent.reserves.repair_tokens:
             return None
         # `history` already ends with the draft; the feedback follows it.
@@ -731,7 +769,7 @@ class _Run:
             return None
         repaired = await self._attempt(request, status, "repair")
         try:
-            return final_answer(repaired)
+            return final_answer(repaired), [*history, repaired]
         except NotFinal:
             return None
 

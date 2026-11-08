@@ -167,7 +167,7 @@ class Match:
     reference: int
     #: "title" or "record_id".
     kind: str
-    #: exact_title, short_title, title_phrase, record_id, ambiguous or none.
+    #: exact_title, short_title, title_phrase, record_id, ambiguous, close or none.
     match: str
     records: tuple[RecordRef, ...] = ()
     #: The title tier an ambiguous reference matched at.
@@ -737,7 +737,10 @@ class ResearchTools:
             for reference in references:
                 basis, named = metadata.title_matches(rows, reference)
                 truncated = truncated or len(named) > metadata.MAX_CANDIDATES
-                if len(named) > 1:
+                if basis == "close_title":
+                    # Nearest titles to choose from, never a silent pick (IR-995).
+                    found.append(("title", "close", named[:metadata.MAX_CANDIDATES], basis))
+                elif len(named) > 1:
                     found.append(("title", "ambiguous", named[:metadata.MAX_CANDIDATES], basis))
                 else:
                     found.append(("title", basis, named, None))
@@ -852,14 +855,17 @@ class ResearchTools:
     async def _filters(self, conn, filters: dict) -> tuple[list, list]:
         """The six `_filter_sql` parameters and the filters as applied, or raise _Refused.
 
-        An unknown or case-ambiguous taxonomy name is refused, never ignored.
+        An unknown or ambiguous taxonomy name is refused, never ignored; case, hyphens and
+        spacing do not matter (IR-995).
         """
         applied, ids = [], {}
         for name, (table, _) in metadata.TAXONOMIES.items():
             if name not in filters:
                 continue
             rows = await conn.fetch(
-                f"SELECT id, name FROM public.{table} WHERE lower(name) = lower($1)", filters[name].strip())
+                f"SELECT id, name FROM public.{table} "
+                "WHERE btrim(regexp_replace(lower(name), '[^[:alnum:]]+', ' ', 'g')) = $1",
+                metadata.fold(filters[name]))
             if not rows:
                 raise _Refused("unknown_filter_value")
             if len(rows) > 1:
