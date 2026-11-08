@@ -100,6 +100,12 @@ class AuditEvent(models.Model):
     # `notice_version`, `ai_consent`, and the `previous_*` pair (None when it was
     # their first answer). Written by `apps.accounts.notice.answer_notice`.
     NOTICE_ANSWERED = "NOTICE_ANSWERED"
+    # A person changed their own AI answer from Settings, or a Yes at a new notice
+    # reached their earlier papers (ADR-054 decisions 11-13, IR-791). Metadata:
+    # `previous_ai_consent`, `ai_consent`, `papers` (`all` or `from_now`, only
+    # for a No becoming a Yes), `papers_updated` and `paper_ids`: ids and counts,
+    # never a title. Written by `apps.accounts.ai_answer`.
+    AI_ANSWER_CHANGED = "AI_ANSWER_CHANGED"
     # A person downloaded their own data (ADR-051 decision 13, IR-786). Metadata
     # is `sections` and `format` only: never a byte of what was downloaded.
     PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
@@ -181,6 +187,7 @@ class AuditEvent(models.Model):
         (ACCOUNT_DELETION_REJECTED,  "Account Deletion Rejected"),
         (RETENTION_CLEANUP_RUN,        "Retention Cleanup Run"),
         (NOTICE_ANSWERED,              "Data Notice Answered"),
+        (AI_ANSWER_CHANGED,            "AI Answer Changed"),
         (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
     ]
 

@@ -143,7 +143,7 @@ def reader(db):
 def _paper(embedder, space, stamps) -> Record:
     """A published, consented paper with no IP mark: only its embargo decides."""
     record = make_record(title="Flood Study", text=FLOOD_TEXT, embedder=embedder, space=space)
-    Record.objects.filter(pk=record.pk).update(dpa_accepted_at=timezone.now(), **stamps)
+    Record.objects.filter(pk=record.pk).update(ai_consent=True, **stamps)
     record.refresh_from_db()
     return record
 
@@ -448,7 +448,7 @@ class TestEarlierAnswersThatQuoteThePaper:
         flood = _paper(embedder, space, _stamps(released=True))
         RecordOwner.objects.create(record=flood, user=owner, is_primary=True)
         pond = make_record(title="Pond Culture", text=POND_TEXT, embedder=embedder, space=space)
-        Record.objects.filter(pk=pond.pk).update(dpa_accepted_at=timezone.now(), **_stamps(released=True))
+        Record.objects.filter(pk=pond.pk).update(ai_consent=True, **_stamps(released=True))
         RecordOwner.objects.create(record=pond, user=owner, is_primary=True)
         client = client_for(reader)
         conversation_id = client.post(reverse("ai-conversations"), {}, format="json").json()["id"]

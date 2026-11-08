@@ -165,6 +165,7 @@ There is no backfill: answers saved before this have no row. The Record holds on
 | Type | Written when | `metadata` |
 |---|---|---|
 | `NOTICE_ANSWERED` | A person answers the current data notice, at registration or after a new one is published. `user` is the person. Each answer writes a row, including a later answer to the same version. `seed_demo` writes one for each account it answers for, with a Yes | `notice_version`, `ai_consent` (the Yes or No on AI), `previous_notice_version` and `previous_ai_consent` (`null` on a first answer) |
+| `AI_ANSWER_CHANGED` | A person changes their own AI answer through `POST /users/me/ai-answer/`, or a No becomes a Yes for "all my papers" while answering a notice (IR-791, ADR-054 decisions 11-13). `user` is the person. Saying the same answer again writes nothing. A notice answer that reaches no paper is `NOTICE_ANSWERED` alone | `previous_ai_consent`, `ai_consent`, `papers` (`all` or `from_now`, only for a No becoming a Yes, else `null`), `papers_updated` and `paper_ids` (ids only, never a title) |
 
 It has no `record`. There is no backfill: accounts that existed before IR-789 start unanswered and write their first row at next sign-in.
 

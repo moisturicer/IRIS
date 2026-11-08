@@ -7,8 +7,10 @@ A proxy paper has neither, so the test-data commands release it here, never with
 unknown, so these narrow what a command can reach and don't prove a paper isn't
 real: that still rests on who runs them.
 
-Both the release and consent are written because the gate needs both, and a
-loaded paper has neither. When per-person consent lands (ADR-054, IR-791), the second one moves.
+Both the release and the AI answer are written because the gate needs both. The
+answer is the paper's stored `ai_consent` (ADR-054, IR-791): test data answers Yes
+(decision 18), so a paper storing no answer gets one. A stored No is someone's
+answer and is left as it is, so the gate still refuses that paper.
 """
 
 from __future__ import annotations
@@ -16,7 +18,6 @@ from __future__ import annotations
 from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import transaction
-from django.utils import timezone
 
 from .embargo import mark_released
 from .models import Record
@@ -33,13 +34,12 @@ def refuse_outside_development() -> None:
 
 
 def clear_for_ai(record: Record, *, actor) -> None:
-    """Release the embargo, and give consent unless someone already has."""
+    """Release the embargo, and store a Yes unless the paper already stores an answer."""
     if record.is_embargoed:
         mark_released(record, actor=actor)
-    if record.dpa_accepted_at is None:
-        record.dpa_accepted_at = timezone.now()
-        record.dpa_accepted_by = actor
-        record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+    if record.ai_consent is None:
+        record.ai_consent = True
+        record.save(update_fields=["ai_consent", "updated_at"])
     # A read held for this release goes now (IR-850).
     from apps.documents.sources import read_awaiting
 

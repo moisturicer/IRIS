@@ -650,7 +650,7 @@ class EmbargoAtDecisionTests(DecisionTestBase):
     def dated(self, record):
         Record.objects.filter(pk=record.pk).update(
             embargo_date_set_at=timezone.now(), embargoed_until=self.UNTIL,
-            dpa_accepted_at=timezone.now(),
+            ai_consent=True,
         )
         record.refresh_from_db()
         return record

@@ -62,7 +62,7 @@ VERIFIER_COLUMNS = {
     # deleted_at: reader_status() reads a deleted account as `gone` (ai/0043, IR-785).
     "accounts_user": "id, is_active, is_locked, credential_version, role_id, deleted_at",
     "accounts_role": "id, name",
-    "records_record": "id, is_deleted, pipeline_status, adviser_id, abstract_file, title, abstract, dpa_accepted_at, is_ip, ip_released_at, "
+    "records_record": "id, is_deleted, pipeline_status, adviser_id, abstract_file, title, abstract, dpa_accepted_at, ai_consent, is_ip, ip_released_at, "
                       "is_embargoed, embargo_answered_at, embargo_released_at, embargoed_until",
     "publication_manuscriptwork": "id, record_id, revision, source_file, operation, revoked_at,"
                                   " created_at, grant_token, grant_expires_at, authority_generation",

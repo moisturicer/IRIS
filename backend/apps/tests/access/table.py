@@ -531,6 +531,10 @@ ACCOUNTS = {
     # IR-786: the caller's own data, whoever they are. No id to name, so there is
     # no other person's copy for any role to reach.
     "user-me-data": Entry({"GET": _case(SIGNED_IN)}),
+    # IR-791: change one's own AI answer (ADR-054 decisions 11-13). No id to
+    # name, so nobody reaches another account's answer. An empty body is refused
+    # as invalid, which is not an access denial.
+    "user-me-ai-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
     # IR-695: a person's optional profile. Both writes act on `request.user` and
     # name nobody else; the photo is read by any signed-in user, through Django
     # only (MEDIA_URL is not routed). `photo_user` is an account that has one --

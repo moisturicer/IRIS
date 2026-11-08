@@ -44,7 +44,8 @@ unlists it. It shows in Discover and keyword search finds it, but Ask IRIS can't
 use it until it is released.
 
 ``--clear-for-ai`` releases each new paper instead (decision 16, as amended for
-IR-882), with consent. The gate then lets it through, so **after chunking the worker embeds
+IR-882). Every loaded paper but an institutional one already stores a Yes as its
+AI answer (ADR-054 decision 18, IR-791). The gate then lets it through, so **after chunking the worker embeds
 its chunks and queues its AI Overview, which spends credits**. Retrieval can't find
 the paper until ``backfill_embeddings`` adds its title-and-abstract vector. A paper
 already loaded is skipped as ever, and ``mark_corpus_cleared`` releases those.
@@ -236,6 +237,11 @@ class Command(BaseCommand):
                 classification=classification,
                 added_by=owner,
                 pipeline_status=self.status,
+                # Test data answers Yes (ADR-054 decision 18, IR-791). A paper
+                # declared institutional is real and nobody answered for it, so it
+                # stores no answer and the gate refuses it. Either way the paper
+                # starts embargoed, so nothing is sent until it is released.
+                ai_consent=None if self.origin == Record.Origin.INSTITUTIONAL else True,
             )
             with path.open("rb") as fh:
                 source = File(fh, name=path.name)

@@ -99,9 +99,9 @@ class TestTheOwnerSeesRelatedPublishedResearch:
         assert response.data["checked"] is True
 
     def test_matches_need_no_consent(self, proposal, owner, embedder):
-        """No DPA stamp and no Discoverable setting on the match: neither is read."""
+        """No AI answer and no Discoverable setting on the match: neither is read."""
         done = published(FLOOD, FLOOD_ABSTRACT, embedder)
-        assert not done.dpa_accepted
+        assert done.ai_consent is not True
 
         assert [row["id"] for row in related(proposal, owner).data["results"]] == [done.pk]
 

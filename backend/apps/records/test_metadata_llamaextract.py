@@ -47,7 +47,7 @@ class LlamaExtractSuggestionTests(APITestCase):
             added_by=self.owner, pipeline_status=PipelineStatus.DRAFT,
             abstract_file=SimpleUploadedFile("two_columns.pdf", b"%PDF-1.7 fake", content_type="application/pdf"),
             manuscript_revision=uuid.uuid4(),
-            is_embargoed=False, embargo_released_at=timezone.now(), dpa_accepted_at=timezone.now(),
+            is_embargoed=False, embargo_released_at=timezone.now(), ai_consent=True,
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
         self.extraction = PdfExtraction.objects.create(
@@ -324,7 +324,7 @@ class LlamaExtractSuggestionTests(APITestCase):
 
     def test_a_paper_the_gate_now_refuses_reports_unsupported(self):
         self._reading()
-        Record.objects.filter(pk=self.record.pk).update(dpa_accepted_at=None)
+        Record.objects.filter(pk=self.record.pk).update(ai_consent=None)
 
         data = self._data()
 

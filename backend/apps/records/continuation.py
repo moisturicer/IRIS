@@ -120,10 +120,14 @@ def _create_child(proposal, user, record_type):
         pipeline_status=lifecycle.INITIAL_STATUS,
         derived_from=proposal,
     )
+    owners = list(proposal.owners.select_related("user").order_by("-is_primary", "pk"))
     RecordOwner.objects.bulk_create([
         RecordOwner(record=child, user_id=owner.user_id, is_primary=owner.is_primary)
-        for owner in proposal.owners.all()
+        for owner in owners
     ])
+    # A new draft takes its Contact person's answer as of now (ADR-054 decision 10).
+    from .ai_answer import store_on_new_draft
+    store_on_new_draft(child, next((o.user for o in owners if o.is_primary), None))
     Author.objects.bulk_create([
         Author(record=child, name=author.name, role_id=author.role_id)
         for author in proposal.authors.order_by("pk")

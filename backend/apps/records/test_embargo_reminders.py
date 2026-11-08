@@ -49,7 +49,7 @@ class EmbargoReminderTests(TestCase):
         now = timezone.now()
         stamps = {
             "embargo_date_set_at": now, "embargo_date_set_by": self.adviser, "embargoed_until": until,
-            "dpa_accepted_at": now, "dpa_accepted_by": self.owner,
+            "ai_consent": True,
         }
         if released:
             stamps.update(is_embargoed=False, embargo_released_at=now, embargo_released_by=self.adviser)

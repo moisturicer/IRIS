@@ -59,13 +59,8 @@ class SubmitOwnershipTests(APITestCase):
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
 
     def _submit(self):
-        # Consent is sent here so these tests keep testing what they were
-        # written for -- ownership (IR-226). Submitting now also requires DPA
-        # consent, and without it every case below would fail on the consent
-        # gate before the permission check it exists to exercise ever ran.
-        # Changed deliberately, not to make a red test green: the assertions
-        # are untouched, and consent has its own suite in
-        # `DpaConsentAtSubmitTests` below. The embargo answer likewise (IR-816).
+        # Submitting asks no consent since IR-791 (ADR-054); the `dpa_accepted`
+        # sent here is ignored. See `SubmitAsksNoConsentTests` below.
         released_embargo(self.record.id)
         return self.client.post(
             reverse("record-submit", args=[self.record.id]),
@@ -631,21 +626,16 @@ class RecordVisibilityTests(APITestCase):
         self.assertNotIn(self.draft.id, returned)
 
 
-class DpaConsentAtSubmitTests(APITestCase):
+class SubmitAsksNoConsentTests(APITestCase):
     """
-    DPA consent is recorded per disclosure, at submission (IR-226, FR-M6-02).
+    Submitting asks for no consent and stamps none (ADR-054 decisions 1 and 17, IR-791).
 
-    The wizard has shown a consent gate at step 3 since IR-88, but it lived
-    entirely in the browser: `submit()` neither checked nor stored anything, so
-    a direct API call bypassed it and left no trace either way. The only
-    persisted consent in the system was `User.consent_given` -- one boolean, set
-    once, at signup. "This person ticked a box months ago" is not evidence that
-    *this disclosure* was submitted under the terms.
-
-    What these tests pin down is that the refusal happens **before** the
-    transition. A record that reaches a review queue with no consent behind it
-    is worse than one that was never submitted, because the workflow has
-    already started acting on it.
+    Reversed deliberately, not to make red tests green. These tests used to pin
+    IR-226's per-paper consent: `submit/` refused without `dpa_accepted` and
+    stamped who and when. ADR-054 replaced that with the Contact person's answer,
+    copied onto the paper when its draft is created (`Record.ai_consent`), so
+    submitting has nothing to ask and the old stamp no longer counts. The stored
+    answer has its own suite in `test_ai_answer.py`.
     """
 
     def setUp(self):
@@ -663,44 +653,22 @@ class DpaConsentAtSubmitTests(APITestCase):
     def _post(self, payload=None):
         return self.client.post(self.url, payload or {}, format="json")
 
-    def test_submitting_without_consent_is_refused(self):
+    def test_submitting_without_consent_goes_through(self):
+        released_embargo(self.record.id)
         response = self._post()
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.assertIn("10173", str(response.data))
-
-    def test_a_refused_submit_leaves_the_record_in_draft(self):
-        """The assertion that matters more than the status code.
-
-        If the consent check ran after `lifecycle.apply`, this endpoint would
-        return 400 while the record sat in `rdco_intake` -- refused, and in a
-        review queue anyway.
-        """
-        self._post()
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()
-        self.assertEqual(self.record.pipeline_status, "draft")
-        self.assertIsNone(self.record.dpa_accepted_at)
-        self.assertIsNone(self.record.dpa_accepted_by)
+        self.assertEqual(self.record.pipeline_status, "in_review")
 
-    def test_explicitly_declining_consent_is_refused(self):
-        """`false` must be refused, not merely absent-vs-present.
-
-        A check that only tested for the key's presence would accept
-        `{"dpa_accepted": false}` -- an explicit refusal recorded as consent.
-        """
-        response = self._post({"dpa_accepted": False})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.pipeline_status, "draft")
-
-    def test_consent_is_stamped_with_who_and_when(self):
+    def test_submit_stamps_no_consent_and_leaves_the_stored_answer(self):
+        Record.objects.filter(pk=self.record.pk).update(ai_consent=False)
         released_embargo(self.record.id)
         response = self._post({"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()
-        self.assertEqual(self.record.pipeline_status, "in_review")
-        self.assertIsNotNone(self.record.dpa_accepted_at)
-        self.assertEqual(self.record.dpa_accepted_by, self.owner)
-        self.assertTrue(self.record.dpa_accepted)
+        self.assertIsNone(self.record.dpa_accepted_at)
+        self.assertIsNone(self.record.dpa_accepted_by)
+        self.assertIs(self.record.ai_consent, False)
 
     def test_dpa_accepted_is_derived_not_stored(self):
         """The property must follow the timestamp, having no state of its own."""
@@ -718,6 +686,7 @@ class DpaConsentAtSubmitTests(APITestCase):
         from .serializers import RecordWriteSerializer
 
         writable = set(RecordWriteSerializer().fields)
+        self.assertNotIn("ai_consent", writable)
         self.assertNotIn("dpa_accepted_at", writable)
         self.assertNotIn("dpa_accepted_by", writable)
         self.assertNotIn("dpa_accepted", writable)
@@ -732,8 +701,16 @@ class DpaConsentAtSubmitTests(APITestCase):
         self.record.refresh_from_db()
         self.assertIsNone(
             self.record.dpa_accepted_at,
-            "PATCH must not be able to stamp consent -- only submit() may",
+            "PATCH must not be able to stamp consent",
         )
+
+    def test_patching_the_stored_answer_does_not_change_it(self):
+        """Only draft creation and the owner's own change route write it (IR-791)."""
+        self.client.patch(
+            reverse("record-detail", args=[self.record.id]), {"ai_consent": True}, format="json",
+        )
+        self.record.refresh_from_db()
+        self.assertIsNone(self.record.ai_consent)
 
     def test_detail_serializer_exposes_consent_read_only(self):
         Record.objects.filter(pk=self.record.pk).update(
@@ -762,6 +739,7 @@ class ConsentSurvivesANewVersionTests(DecisionTestBase):
         Record.objects.filter(pk=record.pk).update(
             dpa_accepted_at=original, dpa_accepted_by=self.owner,
         )
+        stored = Record.objects.get(pk=record.pk).ai_consent
         self.asked(record, self.adviser)
 
         self.client.force_authenticate(self.owner)
@@ -775,6 +753,7 @@ class ConsentSurvivesANewVersionTests(DecisionTestBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
         record.refresh_from_db()
+        self.assertEqual(record.ai_consent, stored, "the stored AI answer is kept too (IR-791)")
         self.assertEqual(record.dpa_accepted_at, original)
         self.assertEqual(record.dpa_accepted_by, self.owner)
         self.assertEqual(record.resubmission_count, 1, "the new version itself was recorded")

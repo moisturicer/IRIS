@@ -26,8 +26,9 @@ from .models import User, College, Department, Course, RoleRequest, SystemSettin
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
-    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer,
+    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer, AiAnswerChangeSerializer,
 )
+from . import ai_answer
 from .models import DataNotice
 from .notice import answer_notice, answer_payload, notice_payload, requires_answer
 from .models import RecoveryPurpose
@@ -179,11 +180,51 @@ class AnswerNoticeView(APIView):
         serializer = NoticeAnswerSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        answer_notice(request.user, notice_version=data["notice_version"], ai_consent=data["ai_consent"])
+        papers = data.get("papers")
+        previous = request.user.ai_consent
+        # A No becoming a Yes says which papers it covers, here as in Settings
+        # (ADR-054 decision 13). Checked before anything is written.
+        ai_answer.require_papers_choice(previous, data["ai_consent"], papers)
+        with transaction.atomic():
+            answer_notice(request.user, notice_version=data["notice_version"], ai_consent=data["ai_consent"])
+            ids = ai_answer.include_papers(
+                request.user, papers=papers if ai_answer.becomes_yes(previous, data["ai_consent"]) else None,
+            )
+            ai_answer.audit_sweep(
+                request.user, previous=previous, new=data["ai_consent"], papers=papers, ids=ids,
+            )
         return Response(
-            {"answer": answer_payload(request.user), "answer_required": requires_answer(request.user)},
+            {
+                "answer": answer_payload(request.user),
+                "answer_required": requires_answer(request.user),
+                "papers_updated": len(ids),
+            },
             status=status.HTTP_201_CREATED,
         )
+
+
+class AiAnswerView(APIView):
+    """
+    POST /users/me/ai-answer/   {ai_consent, papers?}
+    Change the signed-in person's own AI answer (ADR-054 decisions 11-13, IR-791).
+    There is no id in the path or body: nobody changes another account's answer.
+    Blocked, like every route, until the current notice is answered.
+
+    Yes to No changes the answer and no paper. No to Yes requires `papers`:
+    `all` (also the papers they are Contact person of that hold a No, sent on
+    through the disclosure gate) or `from_now`; 400 `papers_choice_required`
+    otherwise. Saying the same thing again changes nothing: `changed: false`.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = AiAnswerChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        result = ai_answer.change_ai_answer(
+            request.user, ai_consent=data["ai_consent"], papers=data.get("papers"),
+        )
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):

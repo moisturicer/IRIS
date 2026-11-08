@@ -14,11 +14,11 @@ from core.enums import EmbargoState
 class _Record:
     """The attributes the adapter reads, and nothing else."""
 
-    def __init__(self, *, is_ip=False, ip_released=False, dpa_accepted=True,
+    def __init__(self, *, is_ip=False, ip_released=False, ai_consent=True,
                  embargo_state=EmbargoState.RELEASED):
         self.is_ip = is_ip
         self.ip_released = ip_released
-        self.dpa_accepted = dpa_accepted
+        self.ai_consent = ai_consent
         self.embargo_state = embargo_state
 
 
@@ -31,12 +31,12 @@ class RecordAdapterTests:
         assert inputs_for_record(_Record(is_ip=True, ip_released=True)).ip_released is True
         assert inputs_for_record(_Record(is_ip=True)).ip_released is False
 
-    def test_consent_comes_from_the_per_disclosure_dpa_stamp(self):
-        """`Record.dpa_accepted` (IR-226), not `User.consent_given` -- the
-        latter records that a person accepted terms once at signup, which is a
-        different fact about a different subject."""
-        assert inputs_for_record(_Record(dpa_accepted=True)).consent_given is True
-        assert inputs_for_record(_Record(dpa_accepted=False)).consent_given is False
+    @pytest.mark.parametrize(("stored", "given"), [(True, True), (False, False), (None, False)])
+    def test_consent_is_the_answer_the_paper_keeps(self, stored, given):
+        """`Record.ai_consent` (ADR-054 decisions 9-10, IR-791), replacing the
+        per-paper stamp `Record.dpa_accepted` deliberately. Only True is consent:
+        a No and no stored answer are both refused."""
+        assert inputs_for_record(_Record(ai_consent=stored)).consent_given is given
 
     @pytest.mark.parametrize("state", list(EmbargoState))
     def test_it_hands_over_the_embargo_state(self, state):

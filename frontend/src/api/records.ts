@@ -230,12 +230,10 @@ export const recordsApi = {
   downloadCopy:   (id: number) =>
     apiClient.get<Blob>(`/records/${id}/download/`, { responseType: "blob" }),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
-  // `dpaAccepted` is required, not optional (IR-226). The backend refuses a
-  // submit without consent, and an optional flag would let a future caller
-  // omit it and discover that at runtime instead of at compile time. A record
-  // that already carries consent ignores the value, so passing it is always safe.
-  submit:         (id: number, dpaAccepted: boolean) =>
-    apiClient.post<{ detail: string }>(`/records/${id}/submit/`, { dpa_accepted: dpaAccepted }),
+  // Submitting asks no consent (ADR-054, IR-791): the paper carries its Contact
+  // person's AI answer from the moment its draft was created.
+  submit:         (id: number) =>
+    apiClient.post<{ detail: string }>(`/records/${id}/submit/`),
   duplicateMatches: (id: number) =>
     apiClient.get<{ exact: ManuscriptMatch[]; likely: ManuscriptMatch[]; acknowledged: boolean }>(`/records/${id}/duplicate-matches/`),
   acknowledgeDuplicates: (id: number, candidateIds: number[]) =>

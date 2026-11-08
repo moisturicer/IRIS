@@ -43,7 +43,7 @@ def _record(title="A thesis", *, consent=True, embargo=None, released=True, extr
         embargo_released_at=timezone.now() if released and embargo is None else None,
         embargoed_until=embargo,
         embargo_date_set_at=timezone.now() if embargo is not None else None,
-        dpa_accepted_at=timezone.now() if consent else None,
+        ai_consent=True if consent else None,
         manuscript_revision=uuid.uuid4(),
     )
     PdfExtraction.objects.create(
