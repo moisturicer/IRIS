@@ -347,7 +347,7 @@ services:
       - DJANGO_ADMIN_ALLOWED_NETWORKS=${DJANGO_ADMIN_ALLOWED_NETWORKS:-}
       - TRUSTED_PROXY_COUNT=${TRUSTED_PROXY_COUNT:-}
       # Server-only nginx credential. Never use a VITE_ prefix for this secret.
-      - AI_GATEWAY_SERVICE_SECRET=${AI_GATEWAY_SERVICE_SECRET:-}
+      - AI_GATEWAY_SERVICE_SECRET=${AI_GATEWAY_SERVICE_SECRET:?run python scripts/setup_env.py to set AI_GATEWAY_SERVICE_SECRET in the repo-root .env}
     # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
     # longer serves /media/, so the web container has no reason to be able to
     # read uploaded documents at all.
