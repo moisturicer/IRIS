@@ -54,14 +54,15 @@ class MarkCorpusClearedTests(_Papers):
         self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
         self.assertTrue(decision_for_record(record).allowed)
 
-    def test_the_loader_account_released_it_and_consented(self):
+    def test_the_loader_account_released_it_and_it_stores_a_yes(self):
+        """Test data answers Yes (ADR-054 decision 18, IR-791)."""
         record = self.paper()
 
         mark()
 
         record.refresh_from_db()
         self.assertEqual(record.embargo_released_by, self.loader)
-        self.assertEqual(record.dpa_accepted_by, self.loader)
+        self.assertIs(record.ai_consent, True)
 
     def test_another_owners_paper_stays_embargoed(self):
         record = self.paper(owner=self.someone_else)
@@ -70,7 +71,7 @@ class MarkCorpusClearedTests(_Papers):
 
         record.refresh_from_db()
         self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
-        self.assertIsNone(record.dpa_accepted_at)
+        self.assertIsNone(record.ai_consent)
 
     def test_the_owner_can_be_named(self):
         record = self.paper(owner=self.someone_else)
@@ -91,15 +92,15 @@ class MarkCorpusClearedTests(_Papers):
         self.assertEqual(record.embargo_date_set_at, set_at)
         self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
 
-    def test_consent_someone_already_gave_keeps_their_name(self):
-        given_at = timezone.now()
-        record = self.paper(dpa_accepted_at=given_at, dpa_accepted_by=self.someone_else)
+    def test_a_no_the_paper_already_stores_is_kept(self):
+        """A stored answer is someone's: only a paper storing none gets a Yes (IR-791)."""
+        record = self.paper(ai_consent=False)
 
         mark()
 
         record.refresh_from_db()
-        self.assertEqual(record.dpa_accepted_by, self.someone_else)
-        self.assertEqual(record.dpa_accepted_at, given_at)
+        self.assertIs(record.ai_consent, False)
+        self.assertFalse(decision_for_record(record).allowed)
 
     def test_a_paper_declared_institutional_stays_embargoed_and_is_named(self):
         record = self.paper(title="A real CIT-U thesis", origin=Record.Origin.INSTITUTIONAL)
@@ -138,7 +139,7 @@ class MarkCorpusClearedTests(_Papers):
 
         record.refresh_from_db()
         self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
-        self.assertIsNone(record.dpa_accepted_at)
+        self.assertIsNone(record.ai_consent)
         self.assertIn("Would mark 1 paper(s)", report)
 
     def test_a_draft_is_left_alone(self):
@@ -149,7 +150,7 @@ class MarkCorpusClearedTests(_Papers):
 
         draft.refresh_from_db()
         self.assertEqual(draft.embargo_state, EmbargoState.ACTIVE)
-        self.assertIsNone(draft.dpa_accepted_at)
+        self.assertIsNone(draft.ai_consent)
 
     def test_it_sends_nothing_to_anyone(self):
         self.paper()

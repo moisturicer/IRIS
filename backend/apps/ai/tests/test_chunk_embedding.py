@@ -95,9 +95,8 @@ def _disclosable_record(**kwargs) -> Record:
         title=kwargs.pop("title", "A thesis"),
         abstract=kwargs.pop("abstract", "An abstract about pond sampling."),
         is_ip=False,
-        # `dpa_accepted` is a derived property, not a field: consent is the
-        # timestamp, and IR-226 made that stamp the only evidence of it.
-        dpa_accepted_at=timezone.now(),
+        # Consent is the Contact person's answer the paper keeps (ADR-054, IR-791).
+        ai_consent=True,
         is_embargoed=False, embargo_released_at=timezone.now(),
         **kwargs,
     )
@@ -317,7 +316,7 @@ class DisclosureGateTests:
             title="A thesis",
             abstract="An abstract.",
             is_ip=False,
-            dpa_accepted_at=timezone.now(),
+            ai_consent=True,
         )
         _with_chunks(record, "alpha")
         provider = _CountingEmbedder()

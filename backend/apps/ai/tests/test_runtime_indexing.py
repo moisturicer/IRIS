@@ -71,7 +71,7 @@ def permitted():
         title="Pond research",
         abstract="Ponds sampled weekly",
         abstract_file="manuscripts/pond.pdf",
-        dpa_accepted_at=timezone.now(),
+        ai_consent=True,
         is_embargoed=False, embargo_released_at=timezone.now(),
     )
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
@@ -167,7 +167,7 @@ def test_resume_keeps_completed_batch_and_reader_cites_active_revision(runtime, 
         and saved["revision"] == seen[0][1].passages[0].source.revision
     )
     assert saved["quote"] == "Twelve ponds were sampled weekly. All twelve ponds improved."
-    Record.objects.filter(pk=record.pk).update(dpa_accepted_at=None)
+    Record.objects.filter(pk=record.pk).update(ai_consent=None)
     revoked = (
         api[0]
         .get(
@@ -192,7 +192,7 @@ def test_late_indexing_cannot_activate_changed_source(runtime, change):
     elif change == "delete":
         Record.objects.filter(pk=record.pk).update(is_deleted=True)
     elif change == "consent":
-        Record.objects.filter(pk=record.pk).update(dpa_accepted_at=None)
+        Record.objects.filter(pk=record.pk).update(ai_consent=None)
     else:
         Record.objects.filter(pk=record.pk).update(abstract="Updated results")
     late = Recording()
@@ -213,7 +213,7 @@ def test_wrong_space_and_disclosure_call_no_provider(runtime):
     with pytest.raises(AdmissionDenied):
         index(runtime, token, provider)
     assert not provider.calls
-    Record.objects.filter(pk=record.pk).update(dpa_accepted_at=None)
+    Record.objects.filter(pk=record.pk).update(ai_consent=None)
     token = authority.issue_grant(
         ManuscriptWork.objects.get(record=record, revoked_at=None).pk
     ).token
@@ -435,7 +435,7 @@ def test_disclosure_can_be_withdrawn_during_inference_without_waiting_for_provid
             try:
                 await conn.execute("SET statement_timeout='1s'")
                 await conn.execute(
-                    "UPDATE records_record SET dpa_accepted_at=NULL WHERE id=$1", record.pk
+                    "UPDATE records_record SET ai_consent=NULL WHERE id=$1", record.pk
                 )
             finally:
                 await conn.close()
@@ -445,7 +445,7 @@ def test_disclosure_can_be_withdrawn_during_inference_without_waiting_for_provid
     assert index(runtime, token, provider) == "stale"
     assert len(provider.calls) == 1
     record.refresh_from_db()
-    assert record.dpa_accepted_at is None
+    assert record.ai_consent is None
     with connection.cursor() as cursor:
         cursor.execute("SELECT count(*) FROM iris_ai.active_source")
         assert cursor.fetchone()[0] == 0
@@ -478,7 +478,7 @@ def test_uncited_research_dependency_is_withheld_on_replay_and_followup(runtime,
 
     response, _, grant = ask(api, owner, question, key="indexed-dependencies-0001")
     assert response.json()["state"] == "completed"
-    Record.objects.filter(pk=first.pk).update(dpa_accepted_at=None)
+    Record.objects.filter(pk=first.pk).update(ai_consent=None)
     reopened = (
         api[0]
         .get(

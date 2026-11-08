@@ -300,6 +300,17 @@ class LoadCorpusClearingTests(_LoadsCorpus):
         self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
         self.assertFalse(decision_for_record(record).allowed)
 
+    def test_a_loaded_paper_stores_a_yes(self):
+        """Test data answers Yes (ADR-054 decision 18, IR-791); the embargo still holds it."""
+        self.load(str(self.root))
+
+        self.assertIs(Record.objects.get(title="Paper").ai_consent, True)
+
+    def test_a_paper_declared_institutional_stores_no_answer(self):
+        self.load(str(self.root), origin=Record.Origin.INSTITUTIONAL)
+
+        self.assertIsNone(Record.objects.get(title="Paper").ai_consent)
+
     @override_settings(DEBUG=True)
     def test_the_option_clears_a_paper_for_the_ai(self):
         self.load(str(self.root), clear_for_ai=True)
@@ -308,7 +319,7 @@ class LoadCorpusClearingTests(_LoadsCorpus):
         self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
         self.assertTrue(decision_for_record(record).allowed)
         self.assertEqual(record.embargo_released_by.email, DEFAULT_OWNER_EMAIL)
-        self.assertEqual(record.dpa_accepted_by.email, DEFAULT_OWNER_EMAIL)
+        self.assertIs(record.ai_consent, True)
 
     @override_settings(DEBUG=True)
     def test_the_report_says_what_the_option_will_spend(self):

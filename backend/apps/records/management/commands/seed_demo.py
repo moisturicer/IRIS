@@ -58,6 +58,7 @@ from django.utils import timezone
 
 from apps.accounts.models import College, Course, Role, StudentProfile, User
 from apps.accounts.notice import answer_notice, current_notice_number
+from apps.records.ai_answer import store_on_new_draft
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.records import lifecycle
 from apps.records.embargo import mark_released, set_embargo
@@ -215,6 +216,7 @@ class Command(BaseCommand):
             self._seed_catalogue(users)
             self._seed_workflow(users)
             self._settle_papers_seeded_earlier()
+            self._answer_papers_seeded_earlier()
 
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Demo data ready."))
@@ -351,6 +353,7 @@ class Command(BaseCommand):
                 access_count=(year - 2020) * 7 + len(title) % 13,
             )
             RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+            store_on_new_draft(record, owner)
             Author.objects.bulk_create([Author(record=record, name=n) for n in author_names])
 
             entry = self._submit(record, owner)
@@ -409,15 +412,17 @@ class Command(BaseCommand):
             **extra,
         )
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+        # As the API does: the draft keeps its Contact person's AI answer, which
+        # `_answer_notice_yes` made a Yes (ADR-054 decisions 10 and 18, IR-791).
+        store_on_new_draft(record, owner)
         return record
 
     def _submit(self, record: Record, owner: User):
         """Submit through the same adviser-first service as the API."""
         from apps.reviews.routing import enter_at_adviser
 
-        record.dpa_accepted_at = timezone.now()
-        record.dpa_accepted_by = owner
-        record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+        # Submitting asks no consent (ADR-054, IR-791): the draft already keeps
+        # its Contact person's answer.
         entry = enter_at_adviser(record, owner)
         self._settle_embargo(record)
         return entry
@@ -460,6 +465,23 @@ class Command(BaseCommand):
                 continue  # already as it should be; say nothing about it
             self._settle_embargo(record)
             self.stdout.write(f"  ~ {record.title[:58]} (embargo settled)")
+
+    def _answer_papers_seeded_earlier(self):
+        """
+        Give this command's own papers from before IR-791 their Yes.
+
+        A paper created before `Record.ai_consent` existed stores no answer, so the
+        gate refuses it, and a second run creates nothing to replace it. Test data
+        answers Yes (ADR-054 decision 18). Only papers storing no answer, named by
+        title and origin together as above: a stored No is someone's answer and stays.
+        """
+        catalogue = [entry[0] for entry in CATALOGUE]
+        answered = Record.objects.filter(
+            Q(title__startswith=_PREFIX) | Q(title__in=catalogue),
+            origin=Record.Origin.SYNTHETIC, ai_consent__isnull=True,
+        ).update(ai_consent=True)
+        if answered:
+            self.stdout.write(f"  ~ {answered} paper(s) seeded earlier now keep a Yes")
 
     @transaction.atomic
     def _scenario_draft(self, users):

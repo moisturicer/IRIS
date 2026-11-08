@@ -114,7 +114,7 @@ def pending(active):
 def _record(title="A thesis", chunks=("alpha", "beta"), abstract="An abstract."):
     record = Record.objects.create(
         title=title, abstract=abstract, is_ip=False,
-        dpa_accepted_at=timezone.now(), is_embargoed=False, embargo_released_at=timezone.now(),
+        ai_consent=True, is_embargoed=False, embargo_released_at=timezone.now(),
         pipeline_status=PipelineStatus.PUBLISHED,
     )
     if chunks:
@@ -267,7 +267,7 @@ class ReadersStayOnTheActiveSpaceTests:
                         embedder=embedder, space=space),
         ]
         Record.objects.filter(pk__in=[r.pk for r in records]).update(
-            is_ip=False, dpa_accepted_at=timezone.now(), is_embargoed=False, embargo_released_at=timezone.now())
+            is_ip=False, ai_consent=True, is_embargoed=False, embargo_released_at=timezone.now())
         return reader, records
 
     def _read(self, reader, records, embedder):
@@ -307,7 +307,7 @@ class ReadersStayOnTheActiveSpaceTests:
         pending = EmbeddingSpace.objects.create(
             model_id=NEW, dimensions=DIMENSIONS, metric="cosine",
             state=EmbeddingSpaceState.PENDING)
-        Record.objects.update(is_ip=False, dpa_accepted_at=timezone.now(),
+        Record.objects.update(is_ip=False, ai_consent=True,
                               is_embargoed=False, embargo_released_at=timezone.now())
         client = APIClient()
         client.force_authenticate(user=reader)

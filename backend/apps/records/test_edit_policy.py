@@ -101,15 +101,19 @@ class OnlyAnOwnerSubmitsTests(EditPolicyTestBase):
         self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
         self.assertIsNone(record.dpa_accepted_by)
 
-    def test_a_co_owner_submits_and_the_consent_is_theirs(self):
+    def test_a_co_owner_submits_and_no_consent_is_taken_from_them(self):
+        """Submitting stamps no consent (ADR-054, IR-791): the paper keeps its
+        Contact person's answer, and a co-owner's never counts (decision 9)."""
         record = self.make_record()
+        stored = record.ai_consent
         RecordOwner.objects.create(record=record, user=self.reader, is_primary=False)
 
         response = self.submit(record, self.reader)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         record.refresh_from_db()
-        self.assertEqual(record.dpa_accepted_by, self.reader)
+        self.assertIsNone(record.dpa_accepted_by)
+        self.assertEqual(record.ai_consent, stored)
 
 
 # --- when -----------------------------------------------------------------------------

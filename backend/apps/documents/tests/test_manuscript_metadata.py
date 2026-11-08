@@ -95,7 +95,7 @@ def _record(*, consent=True):
         record_type=RecordType.objects.get_or_create(name="Thesis")[0],
         abstract_file=SimpleUploadedFile("two_columns.pdf", PDF),
         is_embargoed=False, embargo_released_at=timezone.now(),
-        dpa_accepted_at=timezone.now() if consent else None,
+        ai_consent=True if consent else None,
         manuscript_revision=uuid.uuid4(),
     )
     PdfExtraction.objects.create(
@@ -182,7 +182,7 @@ def test_a_paper_whose_consent_is_withdrawn_before_sending_is_not_sent(enforced,
     settings.LLAMAEXTRACT_VERSION = "2.5"
     record = _record()
     _parse(record)
-    Record.objects.filter(pk=record.pk).update(dpa_accepted_at=None)
+    Record.objects.filter(pk=record.pk).update(ai_consent=None)
     reader = FakeReader()
 
     reading = _read(record, reader)

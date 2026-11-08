@@ -8,7 +8,6 @@ import logging
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 
 from apps.ai.answers.citations import SYSTEM_PROMPT
 from apps.ai.answers.events import (
@@ -75,7 +74,7 @@ def make_record(title, *, is_ip=False, consented=True):
         title=title,
         pipeline_status=PipelineStatus.PUBLISHED,
         is_ip=is_ip,
-        dpa_accepted_at=timezone.now() if consented else None,
+        ai_consent=True if consented else None,
     )
 
 

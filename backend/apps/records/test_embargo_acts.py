@@ -50,7 +50,7 @@ class ActsBase(APITestCase):
     def _paper(self, status_=PipelineStatus.PUBLISHED, *, until=None, released=False, **fields):
         """A consented paper. Embargoed with no date unless a test asks otherwise."""
         now = timezone.now()
-        stamps = {"dpa_accepted_at": now, "dpa_accepted_by": self.owner}
+        stamps = {"ai_consent": True}
         if until is not None:
             stamps.update(embargoed_until=until, embargo_date_set_at=now,
                           embargo_date_set_by=self.adviser)
