@@ -501,6 +501,14 @@ ACCOUNTS = {
     # An empty body is refused as invalid, which is not an access denial.
     "notice-current": Entry({"GET": _case(PUBLIC)}),
     "notice-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # IR-799 (ADR-051 decisions 16-17, ADR-063 decision 9): RDCO and the System
+    # Admin read every version; only RDCO publishes, and only RDCO sees the
+    # impact count it publishes against. An empty body is invalid, not denied.
+    "notice-versions": Entry({
+        "GET": _case(ACCOUNT_ADMINS),
+        "POST": _case(RDCO_ONLY, data={}),
+    }),
+    "notice-impact": Entry({"GET": _case(RDCO_ONLY)}),
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),

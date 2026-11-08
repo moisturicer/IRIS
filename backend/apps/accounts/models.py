@@ -179,6 +179,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.save(update_fields=["role", "is_office_coordinator"])
 
 
+class DataNoticeQuerySet(models.QuerySet):
+    """Refuses the bulk paths that would change or remove a published version."""
+
+    def update(self, **kwargs):
+        raise ValueError("A published data notice is never edited; publish a new version.")
+
+    def delete(self):
+        raise ValueError("A published data notice is never deleted; publish a new version.")
+
+
 class DataNotice(models.Model):
     """
     One numbered version of the data notice (ADR-054 decision 1, IR-789).
@@ -188,22 +198,34 @@ class DataNotice(models.Model):
     frontend carried before. The wording is the data protection officer's to
     approve (IR-123); this model is the mechanism and works for any text.
 
-    A published version is never edited -- a person's answer names the version
-    they read, so changing its text afterwards would change what they agreed
-    to. A change is a new, higher number. The **current** notice is the highest
-    number. Publishing one (IR-790) is a separate act and a separate ticket.
+    A published version is never edited or deleted (ADR-051 decision 17) -- a
+    person's answer names the version they read, so changing its text
+    afterwards would change what they agreed to. A change is a new, higher
+    number, which RDCO publishes by pasting the whole text (IR-799,
+    `apps.accounts.notice.publish_notice`). The **current** notice is the
+    highest number.
+
+    Two shapes of body exist. Version 1 came from frontend code as structured
+    `sections`; every pasted version holds `text` instead, exactly as pasted,
+    and leaves `title`, `subtitle` and `sections` empty. `display_text()` gives
+    either as plain text.
     """
 
     number       = models.PositiveIntegerField(unique=True)
-    title        = models.CharField(max_length=200)
+    title        = models.CharField(max_length=200, blank=True)
     subtitle     = models.CharField(max_length=300, blank=True)
-    #: The notice body: a list of ``{"title": str, "body"?: str, "list"?: [str]}``
-    #: in reading order -- the shape the frontend already renders.
-    sections     = models.JSONField()
+    #: Version 1's body: a list of ``{"title": str, "body"?: str, "list"?: [str]}``
+    #: in reading order. Empty on a pasted version.
+    sections     = models.JSONField(default=list, blank=True)
+    #: A pasted version's whole text, plain, with its line breaks (IR-799).
+    #: Empty on version 1, which predates pasting.
+    text         = models.TextField(blank=True, default="")
     published_at = models.DateTimeField(default=timezone.now)
     published_by = models.ForeignKey(
         "accounts.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
     )
+
+    objects = DataNoticeQuerySet.as_manager()
 
     class Meta:
         ordering = ["-number"]
@@ -215,6 +237,22 @@ class DataNotice(models.Model):
         if not self._state.adding:
             raise ValueError("A published data notice is never edited; publish a new version.")
         return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("A published data notice is never deleted; publish a new version.")
+
+    def display_text(self) -> str:
+        """The notice as plain text: the paste, or version 1's sections laid out."""
+        if self.text:
+            return self.text
+        parts = [p for p in (self.title, self.subtitle) if p]
+        for section in self.sections or []:
+            block = [section.get("title", "")]
+            if section.get("body"):
+                block.append(section["body"])
+            block.extend(f"- {item}" for item in section.get("list") or [])
+            parts.append("\n".join(line for line in block if line))
+        return "\n\n".join(parts)
 
     @classmethod
     def current(cls) -> "DataNotice | None":

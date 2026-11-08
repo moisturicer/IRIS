@@ -26,11 +26,14 @@ from .models import User, College, Department, Course, RoleRequest, SystemSettin
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
-    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer, AiAnswerChangeSerializer,
+    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer, PublishNoticeSerializer, AiAnswerChangeSerializer,
 )
 from . import ai_answer
 from .models import DataNotice
-from .notice import answer_notice, answer_payload, notice_payload, requires_answer
+from .notice import (
+    accounts_to_answer, answer_notice, answer_payload, notice_payload, publish_notice,
+    requires_answer, version_payload,
+)
 from .models import RecoveryPurpose
 from .recovery import service as recovery_service
 from .recovery.views import INVALID_LINK
@@ -165,6 +168,50 @@ class CurrentNoticeView(APIView):
             data["answer"] = answer_payload(user)
             data["answer_required"] = requires_answer(user)
         return Response(data)
+
+
+class NoticeVersionsView(APIView):
+    """
+    GET  /auth/notice/versions/   every version, newest first, with who published it
+    POST /auth/notice/versions/   {based_on_version, text}: publish the next version
+
+    ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-799). RDCO and
+    the System Admin read the history; **only RDCO publishes**. A publish takes
+    effect at once and is refused with 409 `notice_stale` when a newer version
+    exists than the one it started from. Publishing is not answering: the
+    publisher answers the new version like everyone else, so this route stays
+    behind the sign-in block.
+    """
+
+    def get_permissions(self):
+        return [IsAdmin()] if self.request.method == "POST" else [IsAccountAdmin()]
+
+    def get(self, request):
+        notices = DataNotice.objects.select_related("published_by").order_by("-number")
+        return Response([version_payload(n) for n in notices])
+
+    def post(self, request):
+        serializer = PublishNoticeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        notice = publish_notice(request.user, **serializer.validated_data)
+        return Response(version_payload(notice), status=status.HTTP_201_CREATED)
+
+
+class NoticeImpactView(APIView):
+    """
+    GET /auth/notice/versions/impact/
+    How many accounts a new version would make answer, shown before publishing
+    (IR-799). Every live account: nobody can have answered a version not yet
+    published. RDCO only, as publishing is.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        current = DataNotice.current()
+        return Response({
+            "current_version": None if current is None else current.number,
+            "accounts_to_answer": accounts_to_answer(),
+        })
 
 
 class AnswerNoticeView(APIView):
