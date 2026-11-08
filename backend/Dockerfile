@@ -74,7 +74,7 @@ USER appuser
 # IR-154 is that a deployment missing a real credential fails loudly instead of
 # connecting to something it guessed.
 # The original set is SECRET_KEY, DB_NAME, DB_USER and DB_PASSWORD from base.py,
-# plus ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS and TRUSTED_PROXY_COUNT, which
+# plus ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS, TRUSTED_PROXY_COUNT and REGISTRATION_EMAIL_DOMAINS (IR-660), which
 # production.py adds. Recovery (IR-642) additionally requires its keys and
 # frontend/SMTP configuration. Production also requires LlamaParse (IR-843).
 # Every one is a throwaway that lives only for this RUN. Enumerating them keeps
@@ -97,6 +97,7 @@ RUN SECRET_KEY=build-time-only \
     ALLOWED_HOSTS=localhost \
     CORS_ALLOWED_ORIGINS=http://localhost \
     TRUSTED_PROXY_COUNT=1 \
+    REGISTRATION_EMAIL_DOMAINS=build.invalid \
     python manage.py collectstatic --noinput
 
 EXPOSE 8000

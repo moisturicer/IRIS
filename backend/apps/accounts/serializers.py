@@ -1,5 +1,6 @@
 import unicodedata
 
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -254,6 +255,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         ]
 
     def validate_email(self, value):
+        # Only the institution's domains may register (IR-660). Exact and case-
+        # blind: the part after the last "@" must equal one of them, so neither
+        # "cit.edu.evil.com" nor "evilcit.edu" passes. Empty accepts any domain,
+        # which only development allows.
+        domains = settings.REGISTRATION_EMAIL_DOMAINS
+        if domains and value.rsplit("@", 1)[-1].strip().lower() not in domains:
+            named = " or ".join(f"@{domain}" for domain in domains)
+            raise serializers.ValidationError(f"Register with your institutional email address, ending in {named}.")
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("This email address is already registered.")
         return value

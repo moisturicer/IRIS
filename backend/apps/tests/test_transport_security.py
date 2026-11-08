@@ -52,6 +52,8 @@ def production():
         "DEBUG": "False",
         "ALLOWED_HOSTS": "testserver",
         "CORS_ALLOWED_ORIGINS": "https://iris.example.edu",
+        # Who may register is required in production (IR-660).
+        "REGISTRATION_EMAIL_DOMAINS": "cit.edu",
         "TRUSTED_PROXY_COUNT": "2",
         # Recovery transport (IR-642) is required in production too.
         "FRONTEND_URL": "https://iris.example.edu",
