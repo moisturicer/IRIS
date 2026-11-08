@@ -357,6 +357,16 @@ def test_a_collector_that_raises_records_a_failure_and_the_run_goes_on():
     assert run["rows"]["agent"]["F01-02"]["turns"][-1]["outcome"] == "answered"
 
 
+def test_a_failed_question_keeps_its_reason_and_throttling_is_a_condition_problem():
+    def throttled(case):
+        raise ValueError("conversation creation failed with HTTP 429")
+    run = aq.collect_both(_cases(2), {"django": throttled, "agent": _row}, fits=lambda c: True)
+    assert "HTTP 429" in run["rows"]["django"]["F01-01"]["error"]
+    problems = aq.throttled_problems(run["rows"])
+    assert len(problems) == 1 and "2 questions" in problems[0]
+    assert aq.throttled_problems({"agent": {"F01-01": _row(_cases(1)[0])}}) == []
+
+
 class FlakyGrader(RecordingGrader):
     def __init__(self, failures):
         super().__init__()

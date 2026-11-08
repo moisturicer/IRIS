@@ -533,9 +533,22 @@ class Budget:
         return len(ARMS) * self.run_ceiling_micros <= self.remaining()
 
 
-def _failed_row(case: Mapping, outcome: str = "failure") -> dict:
-    return {"id": case["id"], "status": "incomplete", "cost": None, "turns": [
+def _failed_row(case: Mapping, outcome: str = "failure", error: str | None = None) -> dict:
+    row = {"id": case["id"], "status": "incomplete", "cost": None, "turns": [
         {"number": 1, "outcome": outcome, "public_answer": None, "latency_ms": None}]}
+    if error:
+        row["error"] = error[:300]
+    return row
+
+
+def throttled_problems(rows: Mapping) -> list[str]:
+    """A question the rate limiter refused measured the deployment, not the engine."""
+    hit = sorted({cid for arm in rows.values() for cid, row in arm.items()
+                  if "HTTP 429" in (row.get("error") or "")})
+    if not hit:
+        return []
+    return [f"the rate limiter refused {len(hit)} questions (HTTP 429), e.g. {hit[0]}; "
+            "raise the API_THROTTLE_* rates for the run's readers"]
 
 
 def collect_both(cases: Sequence[Mapping], collectors: Mapping, *, fits) -> dict:
@@ -553,8 +566,8 @@ def collect_both(cases: Sequence[Mapping], collectors: Mapping, *, fits) -> dict
         for arm, collect in collectors.items():
             try:
                 rows[arm][case["id"]] = collect(case)
-            except Exception:  # an unfollowable engine is a failed question, not a crash
-                rows[arm][case["id"]] = _failed_row(case)
+            except Exception as exc:  # an unfollowable engine is a failed question, not a crash
+                rows[arm][case["id"]] = _failed_row(case, error=f"{type(exc).__name__}: {exc}")
     return {"rows": rows, "not_run": not_run}
 
 

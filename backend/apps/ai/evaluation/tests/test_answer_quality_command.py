@@ -200,3 +200,26 @@ def test_preflight_prices_every_model_django_may_call_including_the_router(setti
     assert {PINNED_MODEL, "vendor/router-backup"} <= _django_models()
     settings.AI_JEV_ROUTING_ENABLED = False
     assert PINNED_MODEL not in _django_models()
+
+
+def test_a_throttled_edge_grant_is_not_mistaken_for_a_refusal():
+    from types import SimpleNamespace
+
+    from apps.ai.management.commands.eval_answer_quality import _grant_fetcher
+
+    reader = SimpleNamespace(_fresh=lambda: SimpleNamespace(
+        get=lambda *a, **k: SimpleNamespace(status_code=429, headers={})))
+    with pytest.raises(CommandError, match="HTTP 429"):
+        _grant_fetcher(reader)(None)
+
+
+def test_preflight_refuses_rate_limits_the_run_would_hit(settings):
+    from apps.ai.management.commands.eval_answer_quality import _throttle_problems
+
+    rates = dict(settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],
+                 ai_query="60/hour", user="1000/day")
+    settings.REST_FRAMEWORK = dict(settings.REST_FRAMEWORK, DEFAULT_THROTTLE_RATES=rates)
+    problems = _throttle_problems(turns=120)
+    assert any("ai_query" in p for p in problems)
+    rates.update(ai_query="100000/hour", user="100000/hour")
+    assert _throttle_problems(turns=120) == []

@@ -96,6 +96,8 @@ def _grant_fetcher(reader):
     def fetch(record_id):
         extra = {"HTTP_X_IRIS_RECORD": str(record_id)} if record_id is not None else {}
         response = reader._fresh().get("/api/v1/ai/runtime/edge-grant/", **extra)
+        if response.status_code == 429:
+            raise CommandError("the edge grant was throttled: HTTP 429")
         return response.headers.get("X-IRIS-Reader-Grant") if response.status_code == 204 else None
     return fetch
 
@@ -124,6 +126,24 @@ def _django_models() -> set[str]:
     if settings.AI_JEV_ROUTING_ENABLED:
         models.add(PINNED_MODEL)
     return models
+
+
+def _throttle_problems(*, turns: int) -> list[str]:
+    """Whether the per-user rates admit every request a reader makes in an hour's run."""
+    from rest_framework.throttling import SimpleRateThrottle
+
+    needed = 4 * turns  # conversation, edge grant, question, reopen
+    rates = settings.REST_FRAMEWORK.get("DEFAULT_THROTTLE_RATES", {})
+    problems = []
+    for scope in ("ai_query", "user"):
+        if not rates.get(scope):
+            continue
+        count, seconds = SimpleRateThrottle.parse_rate(None, rates[scope])
+        per_hour = count * 3600 / seconds if seconds <= 3600 else count
+        if per_hour < needed:
+            problems.append(f"the {scope} rate {rates[scope]} admits fewer than the {needed} "
+                            "requests a reader may make; raise it for the run")
+    return problems
 
 
 def _withheld_problems(records, refusal) -> list[str]:
@@ -454,6 +474,7 @@ class Command(BaseCommand):
         conditions = [] if after.as_dict() == access.as_dict() else [
             "access state changed during the run"]
         conditions += _served_model_problems(rows.get("agent", {}), options["runtime_model"])
+        conditions += aq.throttled_problems(rows)
         if previous is None:
             conditions += _stray_attempts(
                 CampaignAttempts(limits.campaign_key).since(watermark), rows)
@@ -487,6 +508,7 @@ class Command(BaseCommand):
                     sorted({answer_model, options["runtime_model"], options["grader_model"],
                             *_django_models()})
                     if normalize_model(m) not in {normalize_model(k) for k in limits.prices}]
+        problems += _throttle_problems(turns=sum(len(c["turns"]) for c in data["cases"]))
         if options["runtime_gateway"]:
             private = data["corpus"].get("private") or {}
             for reader in aq.READERS:
