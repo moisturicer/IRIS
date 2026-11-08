@@ -573,11 +573,7 @@ class Investigation:
 
     def _listed(self, result: Evidence) -> Outcome:
         """Every matching paper by title and handle, with the exact total: metadata only (IR-994)."""
-        self._ended(result)
-        body: dict = {"status": result.status}
-        if result.reason:
-            body["reason"] = result.reason
-        fact = result.count
+        body, fact = self._status(result)
         if fact is None:
             return Outcome(json.dumps(body), control_only=True)
         self._fact(fact)
@@ -594,6 +590,13 @@ class Investigation:
         }
         return Outcome(json.dumps(body, ensure_ascii=False), progress=new, metadata_only=True)
 
+    def _status(self, result: Evidence) -> tuple[dict, Optional[Count]]:
+        self._ended(result)
+        body: dict = {"status": result.status}
+        if result.reason:
+            body["reason"] = result.reason
+        return body, result.count
+
     def _fact(self, fact: Count) -> None:
         """Record an exact count whose total and filter names an answer may state."""
         self.counts.append(fact)
@@ -606,11 +609,7 @@ class Investigation:
 
     def _counted(self, result: Evidence) -> Outcome:
         """An exact count, typed for the model; the counted Records never leave the run (IR-750)."""
-        self._ended(result)
-        body: dict = {"status": result.status}
-        if result.reason:
-            body["reason"] = result.reason
-        fact = result.count
+        body, fact = self._status(result)
         if fact is None:
             return Outcome(json.dumps(body), control_only=True)
         self._fact(fact)

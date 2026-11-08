@@ -156,7 +156,7 @@ def _text(value) -> bool:
     return isinstance(value, str) and len(value) <= METADATA_TEXT
 
 
-def _number(value) -> bool:
+def _nonnegative(value) -> bool:
     return type(value) is int and value >= 0
 
 
@@ -169,10 +169,10 @@ def _counted(body) -> bool:
     if not isinstance(body, dict) or set(body) != COUNT_KEYS or body["kind"] != "exact_count":
         return False
     groups = body["groups"]
-    return (_number(body["total"]) and _number(body["ungrouped"]) and _filters(body["filters"])
+    return (_nonnegative(body["total"]) and _nonnegative(body["ungrouped"]) and _filters(body["filters"])
             and (body["group_by"] is None or _text(body["group_by"])) and body["scope"] in SCOPES
             and _text(body["relative_to"]) and isinstance(groups, list)
-            and all(isinstance(g, dict) and set(g) == {"value", "count"} and _number(g["count"])
+            and all(isinstance(g, dict) and set(g) == {"value", "count"} and _nonnegative(g["count"])
                     and (_text(g["value"]) or type(g["value"]) is int) for g in groups))
 
 
@@ -180,7 +180,7 @@ def _listed(body) -> bool:
     if not isinstance(body, dict) or set(body) != LIST_KEYS or body["kind"] != "record_list":
         return False
     papers = body["papers"]
-    return (_number(body["total"]) and _filters(body["filters"]) and type(body["truncated"]) is bool
+    return (_nonnegative(body["total"]) and _filters(body["filters"]) and type(body["truncated"]) is bool
             and _text(body["relative_to"]) and isinstance(papers, list)
             and all(isinstance(p, dict) and set(p) == PAPER_KEYS and _text(p["paper"]) and _text(p["title"])
                     and (p["year"] is None or type(p["year"]) is int) for p in papers))

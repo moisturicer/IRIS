@@ -817,11 +817,7 @@ class ResearchTools:
         return await self._call("count", body)
 
     async def list_records(self, filters: dict, limit: int | None = None) -> ToolResult:
-        """Every readable Record matching metadata filters, by title, with the exact total (IR-994).
-
-        The same population and filters as `count`; at most `limit` are named and
-        the rest are reported as truncated, never dropped silently.
-        """
+        """Readable Records matching metadata filters, by title, with the exact total (IR-994)."""
         cap = metadata.MAX_LISTED if limit is None else limit
         if not valid_filters(filters) or not _is_int(cap) or not 0 < cap <= metadata.MAX_LISTED:
             return ToolResult.unavailable("invalid_argument")

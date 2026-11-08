@@ -14,10 +14,11 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from ai.admission.guard import _sources  # noqa: E402
-from ai.agent.executor import AgentExecutor  # noqa: E402
+from ai.agent.executor import WITHHELD_ANSWER, WITHHELD_SUMMARY, AgentExecutor  # noqa: E402
 from ai.agent.protocol import ToolResult as Entry  # noqa: E402
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
-from ai.research.tools import OK, Count, Coverage, ToolResult  # noqa: E402
+from ai.research.tools import OK, Count, Coverage, Source, ToolResult  # noqa: E402
+from ai.runs.executor import PriorTurn  # noqa: E402
 from .test_ai_runtime_agent_loop_contract import (  # noqa: E402
     MILLION, PIN, PROFILES, Corpus, call, context, reply, run, tools,
 )
@@ -102,3 +103,82 @@ def test_a_listing_reaches_the_model_and_its_titles_may_be_named_as_complete():
     assert sent["list"]["total"] == 2 and not sent["list"]["truncated"]
     assert [p["title"] for p in sent["list"]["papers"]] == ["Flood forecasting", "Pond sampling"]
     assert result.answer.startswith("All 2 papers")
+
+
+FLOOD_SOURCE, POND_SOURCE = Source(1, 11, "e1"), Source(2, 22, "e2")
+EARLIER = "Rainfall gauges fed a neural network in «Flood forecasting»."
+
+
+class Screened(Guarded):
+    """A transport that can carry every source except `withdrawn`."""
+
+    withdrawn = frozenset()
+
+    async def eligible(self, pin, sources):
+        return frozenset(sources) - self.withdrawn
+
+
+def screened(*responses, withdrawn=()):
+    provider = Screened(responses=list(responses), capabilities=("continuation",),
+                        capacities={"scripted-model": MILLION})
+    provider.withdrawn = frozenset(withdrawn)
+    return provider
+
+
+def follow_up(provider, sources):
+    prior = (PriorTurn("Which paper predicts floods?", EARLIER, "answer", 1, sources),)
+    agent = AgentExecutor(provider, PIN_2, RESERVES, profiles=PROFILES)
+    return run(agent.answer("How many floods did it predict?", Corpus(), context(prior=prior)))
+
+
+def sent_text(request):
+    return json.dumps(request["messages"], ensure_ascii=False)
+
+
+def test_a_follow_up_sends_the_earlier_answer_with_its_sources():
+    provider = screened(reply("General background."))
+    follow_up(provider, frozenset({FLOOD_SOURCE}))
+    assert EARLIER in sent_text(provider.requests[0])
+
+
+def test_an_earlier_answer_whose_paper_can_no_longer_be_sent_is_withheld_not_refused():
+    provider = screened(reply("General background."), withdrawn=[FLOOD_SOURCE])
+    result = follow_up(provider, frozenset({FLOOD_SOURCE}))
+    sent = sent_text(provider.requests[0])
+    assert EARLIER not in sent and WITHHELD_ANSWER in sent
+    assert "Which paper predicts floods?" in sent
+    assert result.answer == "General background."
+
+
+def test_an_answer_records_every_source_it_read_and_those_its_history_carried():
+    provider = screened(
+        tools(call("s", "search", query="ponds")),
+        reply("General background."),
+    )
+    result = follow_up(provider, frozenset({FLOOD_SOURCE}))
+    assert result.sources == {FLOOD_SOURCE, POND_SOURCE}
+
+
+class Failing(Screened):
+    async def eligible(self, pin, sources):
+        raise ConnectionError("database unreachable")
+
+
+def test_a_failed_source_check_withholds_the_earlier_answer_and_the_run_continues():
+    provider = Failing(responses=[reply("General background.")], capabilities=("continuation",),
+                       capacities={"scripted-model": MILLION})
+    result = follow_up(provider, frozenset({FLOOD_SOURCE}))
+    assert WITHHELD_ANSWER in sent_text(provider.requests[0])
+    assert result.answer == "General background."
+
+
+def test_an_unverifiable_summary_of_earlier_turns_is_withheld_not_refused():
+    saved = {"goal": "Water papers.", "preferences": [], "findings": [], "limitations": [], "plan": [],
+             "shown": [], "selected": [], "excluded": [], "turns": [1], "sources": [],
+             "format": "agent-handoff-1", "derived": True}
+    provider = screened(reply("General background."))
+    agent = AgentExecutor(provider, PIN_2, RESERVES, profiles=PROFILES)
+    ctx = context(handoff={"revision": 1, "through_ordinal": 1, "body": saved})
+    result = run(agent.answer("Which was it?", Corpus(), ctx))
+    assert WITHHELD_SUMMARY in sent_text(provider.requests[0])
+    assert result.answer == "General background."
