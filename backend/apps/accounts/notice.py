@@ -184,3 +184,50 @@ def answer_notice(user: User, *, notice_version: int, ai_consent: bool) -> Notic
         },
     )
     return answer
+
+
+# -- Publishing a new version (ADR-051 decisions 16-17, ADR-063 decision 9; IR-799)
+
+#: The longest notice text accepted, in characters. Version 1 laid out as text
+#: is well under this; the limit exists so a paste cannot be unbounded.
+NOTICE_TEXT_MAX_LENGTH = 50_000
+
+
+def normalize_notice_text(text: str) -> str:
+    """Line endings as ``\n`` and no trailing whitespace; the text is otherwise kept as pasted."""
+    return text.replace("\r\n", "\n").replace("\r", "\n").rstrip()
+
+
+def accounts_to_answer() -> int:
+    """How many accounts a new version would make answer: every live one."""
+    return User.objects.filter(is_active=True, deleted_at__isnull=True).count()
+
+
+@transaction.atomic
+def publish_notice(publisher: User, *, based_on_version: int, text: str) -> DataNotice:
+    """Publish `text` as the next version, which is current at once.
+
+    Raises `StaleNotice` when `based_on_version` is not the current notice, so
+    a second person's paste never replaces the first unseen. Publishing is not
+    answering: the publisher's own answer is left as it was.
+    """
+    import hashlib
+
+    current = DataNotice.objects.select_for_update().order_by("-number").first()
+    if current is None or current.number != based_on_version:
+        if current is None:
+            raise APIException("No data notice has been published.")
+        raise StaleNotice(current)
+    notice = DataNotice.objects.create(
+        number=current.number + 1, text=text, published_by=publisher, published_at=timezone.now(),
+    )
+    create_audit_event(
+        AuditEvent.NOTICE_PUBLISHED, publisher,
+        metadata={
+            "notice_version": notice.number,
+            "previous_notice_version": current.number,
+            "characters": len(text),
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        },
+    )
+    return notice
