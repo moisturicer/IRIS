@@ -7,7 +7,7 @@
 - **GROBID alone loses words.** It dropped every body word on whole pages of 4 papers, pages where the rules lost none (see *Word loss*). The rules never do that, and a Thread's quote must always be findable.
 - **GROBID's section keys are unstable** across Versions: 8 false changes on held-out pairs (18 on tuning), against the rules' 1 (1).
 - **Its reference lists weren't better on tuning, they were worse.** It had 17 entries off pattern against the rules' 3: GROBID glued 12 entries together and split off 5 fragments. On held-out, it found entries on 3 papers where the rules found only part of the list. It also glued and split there, and it drops the printed `[n]` from every IEEE entry.
-- **The hybrid** matches the rules on Version pairs, raises mean word coverage slightly, and inherits GROBID's reference errors. It costs a second service of about **4 GB**, against the rules' 38–304 MiB.
+- **The hybrid** matches the rules on Version pairs on held out (on tuning it made 2 false changes against the rules' 1), raises mean word coverage slightly, and inherits GROBID's reference errors. It costs a second service of about **4 GB**, against the rules' 38–304 MiB.
 
 ## What it is
 
@@ -58,7 +58,7 @@ The papers are the ignored `samples/`. They are never committed, never quoted an
    - The entry count is compared with the highest `[n]` in the rules' reading, with too few and too many reported apart.
 5. **The candidate is the plain hybrid, with no guard.** On tuning, no guard beat the rules on references:
 
-   | Guard on GROBID's refs | Off pattern | Entries |
+   | Guard on GROBID's refs (tuning, measured **before** the year-range fix 3, so the rules show 5 and GROBID 19 here, against 3 and 17 in the results) | Off pattern | Entries |
    |---|---|---|
    | Rules alone | 5 | 237 |
    | Always use them | 19 | 231 |
@@ -110,6 +110,24 @@ None came from the mapping.
 | Peak memory, MiB | 38–212 | 4,031–**4,088** | 4,088 | 4,088 |
 
 † Two papers (sample22 and sample32) number their references "1." (Vancouver style), which is neither APA nor IEEE. So every entry fails the pattern check for **every** approach: 161 of the rules' 195, and 163 of GROBID's 227. This breakdown was made after the held-out run, and the measure itself wasn't changed. GROBID drops the "1." numbers too.
+
+**The rules' 34 held-out entries off pattern**, without those two papers, per paper (for IR-992, the backlog for the next rules version):
+
+| Paper | Style | Entries | Off pattern |
+|---|---|---|---|
+| sample12_v1 | APA | 10 | 5 |
+| sample12_v2 | APA | 10 | 5 |
+| sample12_v3 | APA | 10 | 5 |
+| sample9 | APA | 10 | 5 |
+| sample23 | APA | 38 | 5 |
+| sample13 | APA | 14 | 4 |
+| sample20 | APA | 17 | 2 |
+| sample8 | APA | 1 | 1 |
+| sample16 | IEEE | 17 | 1 |
+| sample25 | APA | 23 | 1 |
+
+- **Only 1 of the 34 comes from the three cut-short lists** (sample8). sample15 and sample24 have no entry off pattern: their problem is missing entries (4 and 12 found, against GROBID's 20 and 17), not malformed ones.
+- **15 of the 34 are the same 5 entries**, counted once in each of sample12's three Versions.
 
 **The hybrid's time** is the rules' time plus GROBID's, because production would run both. **GROBID's memory** is the container's peak, including its own baseline: about **3.1 GiB when idle**. All figures are from the CPU-only CRF build on one Windows 11 laptop with 15.6 GB of RAM, under Docker Desktop.
 
