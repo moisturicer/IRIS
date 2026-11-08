@@ -13,8 +13,6 @@ from .test_ai_runtime_agent_loop_contract import (
 )
 from .test_ai_runtime_context_contract import RESERVES
 
-from ai.admission.guard import _sources  # noqa: E402
-from ai.agent.protocol import ToolResult as Sent  # noqa: E402
 from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.research.tools import NO_MATCH, ToolResult  # noqa: E402
 
@@ -78,8 +76,6 @@ def test_a_keyword_only_no_match_says_meaning_search_was_unavailable_and_may_be_
     content = provider.requests[1]["messages"][-1]["content"]
     shown = json.loads(content)
     assert shown["status"] == NO_MATCH and shown["search"]["semantic"] == "provider_gated"
-    # A content-free control result passes the send guard; it carries no source.
-    assert _sources([Sent("s", content, control_only=True)]) == frozenset()
 
 
 def test_an_unlisted_failure_reason_is_shown_only_as_unavailable():
@@ -112,4 +108,3 @@ def test_a_refused_filter_value_reaches_the_model_and_may_be_sent():
     content = provider.requests[1]["messages"][-1]["content"]
     assert json.loads(content) == {"status": "unavailable", "reason": "unknown_filter_value",
                                    "coverage": {"returned": 0, "total": None, "truncated": False}}
-    assert _sources([Sent("s", content, control_only=True)]) == frozenset()

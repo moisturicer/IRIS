@@ -20,10 +20,10 @@ def test_embedding_transport_shares_trimmed_credential_account_identity():
     from ai.ingestion.embeddings import VoyageContextEmbeddings
 
     provider = VoyageContextEmbeddings(
-        " abc ", model="voyage-context-4", dimensions=1024, data_policy="no-training"
+        " abc ", model="voyage-context-4", dimensions=1024
     )
     assert provider.account == "ba7816bf8f01cfea414140de5dae2223"
     with pytest.raises(ValueError):
         VoyageContextEmbeddings(
-            " ", model="voyage-context-4", dimensions=1024, data_policy="no-training"
+            " ", model="voyage-context-4", dimensions=1024
         )

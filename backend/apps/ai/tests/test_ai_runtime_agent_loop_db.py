@@ -9,16 +9,13 @@ vendor's behaviour; the admitted case shows every attempt's purpose.
 import json
 import threading
 from dataclasses import replace
-from datetime import timedelta
 
 import pytest
-from django.utils import timezone
 
 from . import test_ai_runtime_runs_db as runs_db
 from .test_ai_runtime_runs_db import Drain, as_reader, run, submit
 from .test_ai_runtime_research_db import paper, write_source
 from ai.admission.ledger import Ledger  # noqa: E402
-from ai.admission.guard import ProxyApproval, SendGuard  # noqa: E402
 from ai.admission.transport import AdmittedAgentProvider  # noqa: E402
 from ai.agent.budget import Bounds  # noqa: E402
 from ai.agent.dialect import ChatCompletions  # noqa: E402
@@ -28,11 +25,8 @@ from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: 
 from ai.runs import config as runs_config  # noqa: E402
 from ai.runs.service import RunService  # noqa: E402
 from ai.runs.store import RunStore  # noqa: E402
-from ai.research.tools import Source  # noqa: E402
 from apps.ai.grants import issue  # noqa: E402
-from apps.ai.models.chunk import ChunkSet  # noqa: E402
 from apps.ai.models.admission import ProviderReservation  # noqa: E402
-from apps.records.models import Record  # noqa: E402
 from .corpus import make_user  # noqa: E402
 from .test_ai_runtime_admission_db import RESERVES as ADMITTED_RESERVES, limits  # noqa: E402
 from .test_ai_runtime_context_contract import MILLION, RESERVES  # noqa: E402
@@ -287,7 +281,7 @@ def test_a_source_replaced_during_the_repair_fences_delivery(api, runtime):
 def test_every_admitted_attempt_records_the_agent_purpose_and_no_other_writer(runtime):
     paper("Flood forecasting", {4: [("Methods", FLOOD)]})
     admission = limits()
-    provider = RecordingAgentProvider(responses=[tools(call("s", "search", query="water")), reply("Never sent.")],
+    provider = RecordingAgentProvider(responses=[tools(call("s", "search", query="water")), reply("Answered.")],
                                       capacities={"scripted-model": MILLION})
     transport = AdmittedAgentProvider(provider, Ledger(runtime, admission), purpose="agent")
     built = agent_service(runtime, transport, reserves=ADMITTED_RESERVES,
@@ -297,25 +291,18 @@ def test_every_admitted_attempt_records_the_agent_purpose_and_no_other_writer(ru
                                  conversation_id=None, base_revision=None))
     status = run(RunStore(runtime).status(grant, queued["id"]))
 
-    # The guard withholds Record evidence from a paid provider (IR-725). Since IR-995 the
-    # withheld search reaches the model as a bare status and the run answers without it.
+    # IR-996: the search result reaches the paid model whole; nothing checks it at send time.
     assert (status["state"], status["end_reason"]) == ("completed", "answered")
     assert len(provider.requests) == 2
-    shown = json.dumps(provider.requests[1]["messages"])
-    assert FLOOD not in shown and '\\"reason\\": \\"withheld\\"' in shown
+    assert FLOOD in json.dumps(provider.requests[1]["messages"], ensure_ascii=False)
     reservations = list(ProviderReservation.objects.order_by("id"))
     assert [(r.owner, r.purpose, r.purpose_version) for r in reservations] == [
         ("ai", "agent", "agent-research-1")] * len(reservations)
     assert [r.sent for r in reservations] == [True, True]
 
 
-def test_approved_proxy_can_be_searched_read_and_answered_by_admitted_agent(runtime):
+def test_any_indexed_paper_can_be_searched_read_and_answered_by_admitted_agent(runtime):
     proxy = paper("Public proxy", {4: [("Methods", "Water levels forecast floods.")]})
-    Record.objects.filter(pk=proxy.pk).update(
-        origin=Record.Origin.IMPORTED_REFERENCE, is_embargoed=False,
-        embargo_released_at=timezone.now())
-    chunk_set = ChunkSet.objects.get(record=proxy, is_active=True)
-    source = Source(proxy.pk, chunk_set.pk, chunk_set.extraction_hash)
 
     def open_hit(payload):
         passage = last_result(payload)["passages"][0]
@@ -327,12 +314,7 @@ def test_approved_proxy_can_be_searched_read_and_answered_by_admitted_agent(runt
 
     provider = recording(tools(call("s", "search", query="water")), open_hit, cite)
     admission = limits()
-    approval = ProxyApproval("IR-889", PIN.model, PIN.endpoint, provider.account,
-                             admission.campaign_key, timezone.now() + timedelta(hours=1),
-                             frozenset({source}))
-    transport = AdmittedAgentProvider(provider, Ledger(runtime, admission),
-                                      guard=SendGuard(runtime, approval, stage="development"),
-                                      purpose="agent")
+    transport = AdmittedAgentProvider(provider, Ledger(runtime, admission), purpose="agent")
     built = agent_service(runtime, transport, run_limits=replace(LIMITS, max_attempts=3),
                           reserves=ADMITTED_RESERVES, price=admission.prices["scripted-model"])
     grant = issue.reader_session_grant(make_user("agent-proxy@cit.edu")).token

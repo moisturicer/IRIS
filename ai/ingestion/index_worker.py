@@ -68,7 +68,6 @@ def main():
     parser.add_argument("--pipeline", required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--dimensions", type=int, required=True)
-    parser.add_argument("--data-policy", choices=["no-training"], required=True)
     args = parser.parse_args()
     dsn = os.environ.get("RUNS_DATABASE_URL", "")
     if not dsn or not 1 <= args.limit <= 1000 or not 0 < args.poll_seconds <= 60:
@@ -88,7 +87,6 @@ def main():
             os.environ.get("VOYAGE_API_KEY", ""),
             model=args.model,
             dimensions=args.dimensions,
-            data_policy=args.data_policy,
         )
     except (ValueError, NotConfigured) as exc:
         parser.error(str(exc))
