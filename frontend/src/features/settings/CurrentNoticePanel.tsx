@@ -6,7 +6,7 @@
 import { noticeApi } from "@/api/notice";
 import { Button } from "@/components/ui";
 import { Spinner } from "@/components/ui/Spinner";
-import { NoticeText } from "@/features/auth/notice/NoticeAnswerFields";
+import { NoticeText } from "@/features/auth/notice/NoticeText";
 import { useApiRead } from "@/hooks/useApiRead";
 import { Message, Panel } from "./settingsParts";
 
@@ -17,7 +17,7 @@ export function CurrentNoticePanel() {
   return (
     <Panel title="Current data notice" caption="The notice in force now, as RDCO published it.">
       {read.status === "loading" ? (
-        <p role="status" className="flex items-center gap-2 text-[13px] text-stone-600">
+        <p role="status" className="flex items-center gap-2 text-small text-stone-600">
           <Spinner size="sm" />
           Loading the notice…
         </p>

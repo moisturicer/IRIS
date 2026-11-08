@@ -152,6 +152,28 @@ describe("RDCO publishes the next version", () => {
     expect(await screen.findByRole("button", { name: "Publish version 4" })).toBeEnabled();
   });
 
+  it("keeps the paste and the outcome on screen while the history is read again", async () => {
+    versions();
+    vi.spyOn(noticeApi, "impact").mockResolvedValue({ data: { current_version: 2, accounts_to_answer: 3 } } as never);
+    vi.spyOn(noticeApi, "publish").mockRejectedValue({
+      response: {
+        status: 409,
+        data: { code: "notice_stale", detail: "A newer data notice was published.", notice: { version: 3, text: "x", published_at: null } },
+      },
+    });
+    const { user } = await openPage();
+
+    await user.clear(field());
+    await user.type(field(), "My paste");
+    await user.click(screen.getByRole("button", { name: "Publish version 3" }));
+    // The reread doesn't answer yet: the form must not give way to a spinner meanwhile.
+    vi.spyOn(noticeApi, "versions").mockReturnValue(new Promise(() => {}) as never);
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("A newer data notice was published.");
+    expect(field()).toHaveValue("My paste");
+  });
+
   it("says the server's reason when the text is refused", async () => {
     versions();
     vi.spyOn(noticeApi, "impact").mockResolvedValue({ data: { current_version: 2, accounts_to_answer: 3 } } as never);

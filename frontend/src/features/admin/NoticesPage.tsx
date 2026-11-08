@@ -21,7 +21,7 @@ import { InterruptedState } from "@/components/shared/InterruptedState";
 import { Button } from "@/components/ui/Button";
 import { WARNING_NOTICE } from "@/components/ui/fieldClasses";
 import { Spinner } from "@/components/ui/Spinner";
-import { NoticeText } from "@/features/auth/notice/NoticeAnswerFields";
+import { NoticeText } from "@/features/auth/notice/NoticeText";
 import { useAuth } from "@/hooks/useAuth";
 import { useApiRead } from "@/hooks/useApiRead";
 import { canAccess } from "@/lib/access";
@@ -47,7 +47,14 @@ export default function NoticesPage() {
   // ADR-063 decision 9: RDCO alone publishes; the server refuses anyone else.
   const canPublish = canAccess(user?.role_name as never, "notices");
   const read = useApiRead((signal) => noticeApi.versions({ signal }).then((r) => r.data), []);
-  const list = isVersionList(read.data) ? read.data : null;
+  // A reread after publishing puts the read back to loading. The last history
+  // stays on screen meanwhile, so the form, its paste and its outcome stay too.
+  const [shown, setShown] = useState<NoticeVersion[] | null>(null);
+  useEffect(() => {
+    if (read.status === "ready") setShown(isVersionList(read.data) ? read.data : null);
+  }, [read.status, read.data]);
+  const fresh = isVersionList(read.data) ? read.data : null;
+  const list = read.status === "ready" ? fresh : shown;
   const current = list?.[0] ?? null;
 
   return (
@@ -65,9 +72,9 @@ export default function NoticesPage() {
         </p>
       </div>
 
-      {read.status === "interrupted" ? (
+      {read.status === "interrupted" && !list ? (
         <InterruptedState what="notices" onRetry={read.retry} framed />
-      ) : read.status === "loading" ? (
+      ) : read.status === "loading" && !list ? (
         <p role="status" className="flex items-center gap-2 text-small text-stone-600">
           <Spinner size="sm" />
           Loading the notices…

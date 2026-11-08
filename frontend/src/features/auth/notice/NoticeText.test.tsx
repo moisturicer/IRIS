@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@/test/render";
-import { NoticeText } from "./NoticeAnswerFields";
+import { NoticeText } from "./NoticeText";
 
 const notice = {
   version: 3,

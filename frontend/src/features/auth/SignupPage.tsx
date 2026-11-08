@@ -14,11 +14,12 @@ import type { DataNotice } from "@/types/notice";
 import {
   NO_ANSWERS,
   NoticeAnswerFields,
-  NoticeText,
+ 
   missingAnswers,
   type NoticeAnswerErrors,
   type NoticeAnswers,
 } from "./notice/NoticeAnswerFields";
+import { NoticeText } from "./notice/NoticeText";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Role = "Student" | "Adviser";

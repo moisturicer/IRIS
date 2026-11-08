@@ -1,7 +1,7 @@
 import { noticeApi } from "@/api/notice";
 import { Spinner } from "@/components/ui/Spinner";
 import { useApiRead } from "@/hooks/useApiRead";
-import { NoticeText } from "./notice/NoticeAnswerFields";
+import { NoticeText } from "./notice/NoticeText";
 
 /**
  * The "Data privacy" panel of the sign-in and registration frame: the server's
