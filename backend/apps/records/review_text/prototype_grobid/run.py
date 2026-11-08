@@ -28,6 +28,12 @@ from tei_reader import reader  # noqa: E402
 
 OUT = HERE / "out"
 
+# Chosen on the tuning set only, 2026-11-08, before any held-out output was
+# read: the plain hybrid, no guard. No guard beat the rules on references
+# there, and the fallback never fired (no tuning paper collapsed), so
+# hybrid_fallback is reported beside it rather than put forward.
+CANDIDATE = "hybrid"
+
 WORKER = r'''
 import importlib.util, json, sys
 spec = importlib.util.spec_from_file_location("r", sys.argv[1]); r = importlib.util.module_from_spec(spec)
@@ -50,10 +56,19 @@ def rules_reading(pdf):
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         ps, peak = psutil.Process(proc.pid), 0
         while proc.poll() is None:
+            # A Windows venv's python.exe is a launcher that runs the real
+            # interpreter as a child, so the reader's memory is the tree's.
             try:
-                peak = max(peak, ps.memory_info().rss)
+                tree = [ps, *ps.children(recursive=True)]
             except psutil.Error:
-                pass
+                tree = []
+            rss = 0
+            for p in tree:
+                try:
+                    rss += p.memory_info().rss
+                except psutil.Error:
+                    pass
+            peak = max(peak, rss)
             time.sleep(0.05)
         seconds = time.time() - start
         r = json.loads(out.read_text(encoding="utf-8")) if out.exists() else None
@@ -113,6 +128,12 @@ def summarize(rows):
         "reference_entries": total("references", "entries"),
         "references_off_pattern": total("references", "off_pattern"),
         "references_over_120_words": total("references", "over_120_words"),
+        "ieee_papers": sum(1 for r in rows if r["references"].get("style") == "ieee"),
+        "references_unlabelled": total("references", "unlabelled"),
+        "ieee_papers_too_few": sum(1 for r in rows if r["references"].get("too_few")),
+        "ieee_entries_too_few": total("references", "too_few"),
+        "ieee_papers_too_many": sum(1 for r in rows if r["references"].get("too_many")),
+        "ieee_entries_too_many": total("references", "too_many"),
         "coverage_mean": round(statistics.mean(cov), 4) if cov else None,
         "coverage_min": min(cov) if cov else None,
         "seconds_median": statistics.median(secs) if secs else None,
@@ -149,6 +170,7 @@ def main(folder, which):
                                 max(rules["_peak_mib"], f.get("peak_mib") or 0)),
         }
         key = score.bookmarks(pdf)
+        style = score.reference_style(rules)   # every approach is judged by the paper's own style
         body = score.pdf_words(pdf)
         for label, (r, seconds, mib) in approaches.items():
             readings[(name, label)] = r
@@ -158,7 +180,7 @@ def main(folder, which):
             else:
                 row = {"sections": len(r["sections"]), "collapsed": score.collapsed(r),
                        "warnings": sorted({w["code"] for w in r["warnings"]}),
-                       "headings": score.headings(r, key), "references": score.reference_entries(r),
+                       "headings": score.headings(r, key), "references": score.reference_entries(r, style),
                        "coverage": score.coverage(r, body), "seconds": seconds, "peak_mib": mib}
             per_paper.setdefault(name, {})[label] = row
         print(f"{name:18} " + "  ".join(

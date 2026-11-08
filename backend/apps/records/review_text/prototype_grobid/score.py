@@ -10,7 +10,10 @@ from collections import Counter
 
 from tei_reader import reader
 
-YEAR = re.compile(r"\((\d{4}[a-z]?|n\.d\.)[^)]*\)")
+# A citation year: "(2020)", "(2020a)", "(n.d.)", "(2022, November 23)". Not a
+# year range inside a title, such as "(1999-2019)", which counted as a second
+# year for every approach alike (found on the tuning set, 2026-11-08).
+YEAR = re.compile(r"\((\d{4}[a-z]?|n\.d\.)(,[^)]*)?\)")
 IEEE = re.compile(r"\[\d{1,3}\]")
 TOKEN = re.compile(r"[a-z0-9]{3,}")
 BAND = 0.06   # words this close to the top or bottom edge are running heads or page numbers
@@ -51,14 +54,57 @@ def headings(r, key) -> dict:
             "recall": round(len(hit) / len(keyset), 3)}
 
 
-def reference_entries(r) -> dict:
-    texts = [p["text"] for s in r["sections"] if reader._is_references(s["heading"]) for p in s["passages"]]
+def _reference_texts(r) -> list[str]:
+    return [p["text"] for s in r["sections"] if reader._is_references(s["heading"]) for p in s["passages"]]
+
+
+def _is_ieee(texts) -> bool:
+    return bool(texts) and sum(bool(IEEE.match(t)) for t in texts) > len(texts) / 2
+
+
+def reference_style(rules) -> dict:
+    """The paper's reference style, from the rules' reading of it: GROBID drops
+    the printed [n] from IEEE entries (checked on a tuning paper, 2026-11-08),
+    so a reading's own labels can't say what style the paper uses. For IEEE,
+    also the highest printed label, which is the number of entries expected."""
+    texts = _reference_texts(rules) if rules else []
+    if not texts:
+        return {}
+    if not _is_ieee(texts):
+        return {"style": "apa"}
+    labels = [int(m.group(0)[1:-1]) for m in (IEEE.match(t) for t in texts) if m]
+    return {"style": "ieee", "highest_label": max(labels)}
+
+
+def reference_entries(r, style=None) -> dict:
+    """Reference entry counts. ``style`` comes from ``reference_style`` on the
+    rules' reading of the same paper; without one, the reading's own entries
+    decide, as before.
+
+    APA: off pattern when an entry hasn't exactly one "(year)".
+    IEEE: off pattern when a second [n] label appears inside an entry, which
+    means two entries glued together. Entries without a leading label are
+    counted as ``unlabelled``, apart. Too few or too many entries against the
+    highest printed label are reported apart, too."""
+    texts = _reference_texts(r)
     if not texts:
         return {"entries": 0}
-    ieee = sum(bool(IEEE.match(t)) for t in texts) > len(texts) / 2
-    off = [t for t in texts if not IEEE.match(t)] if ieee else [t for t in texts if len(YEAR.findall(t)) != 1]
-    return {"entries": len(texts), "style": "ieee" if ieee else "apa", "off_pattern": len(off),
-            "over_120_words": sum(1 for t in texts if len(t.split()) > 120)}
+    style = style or {"style": "ieee" if _is_ieee(texts) else "apa"}
+    out = {"entries": len(texts), "style": style["style"],
+           "over_120_words": sum(1 for t in texts if len(t.split()) > 120)}
+    if style["style"] == "apa":
+        out["off_pattern"] = sum(1 for t in texts if len(YEAR.findall(t)) != 1)
+        return out
+    def glued(t):
+        lead = IEEE.match(t)
+        return bool(IEEE.search(t, lead.end() if lead else 0))
+    out["off_pattern"] = sum(1 for t in texts if glued(t))
+    out["unlabelled"] = sum(1 for t in texts if not IEEE.match(t))
+    if "highest_label" in style:
+        out["expected"] = style["highest_label"]
+        out["too_few"] = max(0, style["highest_label"] - len(texts))
+        out["too_many"] = max(0, len(texts) - style["highest_label"])
+    return out
 
 
 def _tokens(text) -> list[str]:

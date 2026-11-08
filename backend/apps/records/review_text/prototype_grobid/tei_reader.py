@@ -154,12 +154,14 @@ def sections_from(root, doc):
                 continue
             _division(child, doc, sections, loose_figures)
 
-    # A figure outside every division goes to the section it is printed in.
+    # A figure outside every division goes to the section it is printed in,
+    # never to the reference list: a caption there would count as an entry
+    # (seen on a tuning paper, 2026-11-08).
     for fig in loose_figures:
         page = _first_page(doc, fig, sections[-1]["page"])
         target = sections[0]
         for s in sections:
-            if s["page"] <= page:
+            if s["page"] <= page and not reader._is_references(s["heading"]):
                 target = s
         target["passages"] += doc.figure_passages(fig, page)
     return [s for s in sections if s["passages"] or s["heading"]]
