@@ -49,31 +49,30 @@ export function missingAnswers(value: NoticeAnswers, previousAi?: boolean | null
   };
 }
 
-export function NoticeText({ notice, headingLevel = 2 }: { notice: DataNotice; headingLevel?: 2 | 3 }) {
+/**
+ * The one way IRIS shows a data notice (IR-800): the server's `text` as plain
+ * text, every line break kept, no markup, no links. React escapes it, so an
+ * angle bracket or an address is shown as the characters it is. A draft has
+ * no date yet, which is how the Notices page previews one.
+ */
+export function NoticeText({
+  notice, headingLevel = 2,
+}: {
+  notice: Pick<DataNotice, "version" | "text"> & { published_at: string | null };
+  headingLevel?: 2 | 3;
+}) {
   const Heading = `h${headingLevel}` as "h2";
-  const Section = `h${headingLevel + 1}` as "h3";
   return (
-    <div className="space-y-4 text-small text-stone-700">
+    <div className="space-y-3 text-small text-stone-700">
       <div>
-        <Heading className="text-body font-bold text-stone-900">{notice.title}</Heading>
-        {notice.subtitle && <p className="mt-1 whitespace-pre-line">{notice.subtitle}</p>}
+        <Heading className="text-body font-bold text-stone-900">Data notice</Heading>
         <p className="mt-1 text-label text-stone-500">
-          Version {notice.version} · published {formatDate(notice.published_at)}
+          {notice.published_at
+            ? `Version ${notice.version} · published ${formatDate(notice.published_at)}`
+            : `Version ${notice.version} · not published yet`}
         </p>
       </div>
-      {notice.sections.map((section, i) => (
-        <section key={`${i}-${section.title}`}>
-          <Section className="font-semibold text-stone-900">{section.title}</Section>
-          {section.body && <p className="mt-1 whitespace-pre-line leading-relaxed">{section.body}</p>}
-          {section.list && section.list.length > 0 && (
-            <ul className="mt-1 list-disc space-y-1 pl-5">
-              {section.list.map((item, j) => (
-                <li key={j} className="whitespace-pre-line leading-relaxed">{item}</li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ))}
+      <p className="whitespace-pre-wrap break-words leading-relaxed">{notice.text}</p>
     </div>
   );
 }

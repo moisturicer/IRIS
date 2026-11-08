@@ -135,10 +135,11 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/colleges/", paginated([]));
       api.on("GET", "/departments/", paginated([]));
       api.on("GET", "/courses/", paginated([]));
-      // The server's data notice, which registration shows and answers (IR-790).
+      // The server's data notice, which registration shows and answers (IR-790),
+      // as its `text` (IR-800).
       api.on("GET", "/auth/notice/", {
-        version: 1, title: "IRIS data notice", subtitle: "", published_at: "2026-11-01T00:00:00Z",
-        sections: [{ title: "What IRIS keeps", body: "Your name and CIT-U email." }],
+        version: 1, text: "IRIS data notice\n\nWhat IRIS keeps\nYour name and CIT-U email.",
+        published_at: "2026-11-01T00:00:00Z",
       });
     },
     heading: "Create an Account",
@@ -396,6 +397,17 @@ export const SCREENS: Screen[] = [
     }),
     heading: "Retention",
     primary: (p) => p.getByRole("button", { name: "Save period" }), primaryLabel: "Save period",
+  },
+  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): RDCO
+  // publishes the next version of the data notice here.
+  {
+    id: "notices", path: "/notices", route: "/notices", role: "RDCO",
+    mocks: wrap("RDCO", (api) => api.on("GET", "/auth/notice/versions/", [{
+      version: 1, text: "IRIS data notice\n\nWhat IRIS keeps\nYour name and CIT-U email.",
+      published_at: when("11-01"), published_by: { id: 4, name: "Rita Dela Cruz", email: "rdco@cit.edu" },
+    }])),
+    heading: "Notices",
+    primary: (p) => p.getByRole("button", { name: "Preview" }), primaryLabel: "Preview",
   },
   {
     id: "audit-log", path: "/admin/audit", route: "/admin/audit", role: "System Admin",

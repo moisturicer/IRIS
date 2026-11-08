@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
+import { noticeApi } from "@/api/notice";
 import { useAuthStore } from "@/store/auth.store";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -95,20 +96,24 @@ describe("changing your password", () => {
   });
 });
 
-it("distinguishes the current disclosure notice from historical account consent (IR-123)", async () => {
+// IR-800: the notice shown is the server's current one, not text kept in the
+// frontend, so the old IR-123 wording this test once looked for is gone with it.
+it("shows the server's current notice beside the account's consent record (IR-800)", async () => {
   const user = userEvent.setup();
   useAuthStore.setState({
     user: { ...useAuthStore.getState().user!, consent_given: true, date_joined: "2026-09-01T00:00:00Z" },
   });
+  vi.spyOn(noticeApi, "current").mockResolvedValue({
+    data: { version: 6, text: "IRIS data notice\nAI companies may read your papers' text.", published_at: "2026-11-02T08:00:00Z" },
+  } as never);
   renderScreen(<SettingsPage />, { route: "/settings" });
 
   await user.click(screen.getByRole("button", { name: "Data privacy & consent" }));
 
   expect(screen.getByText("Consent on record")).toBeVisible();
-  expect(screen.getByRole("heading", { name: "Current disclosure notice" })).toBeVisible();
-  expect(screen.getByText(/does not confirm.*accepted this revised notice/i)).toBeVisible();
-  expect(screen.queryByText("What you agreed to")).not.toBeInTheDocument();
-  expect(screen.getByText(/external AI providers outside CIT-U/i)).toBeVisible();
+  const notice = screen.getByRole("region", { name: "Current data notice" });
+  expect(await within(notice).findByText(/^IRIS data notice/)).toHaveTextContent("AI companies may read your papers' text.");
+  expect(notice).toHaveTextContent("Version 6 · published Nov 2, 2026");
 });
 
 // IR-933: Profile is its own page; Settings keeps the account.

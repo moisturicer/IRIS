@@ -16,16 +16,15 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser, validToken } from "@/test/authFixtures";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 
+// The server sends the whole notice as `text`, and that is what is shown (IR-800).
 const NOTICE = {
   version: 5,
-  title: "IRIS data notice",
-  subtitle: "Read before you continue",
-  sections: [
-    { title: "What IRIS keeps", body: "Your name.\nYour CIT-U email." },
-    { title: "Who sees it", list: ["RDCO staff"] },
-  ],
+  text: "IRIS data notice\n\nWhat IRIS keeps\nYour name.\nYour CIT-U email.\n\nWho sees it\n- RDCO staff",
   published_at: "2026-11-02T08:00:00Z",
 };
+
+/** The notice has loaded once its text is on screen. */
+const shown = (text: RegExp) => screen.findByText(text);
 
 const agreement = () => screen.getByRole("checkbox", { name: /I have read the data notice/ });
 const aiQuestion = () => screen.getByRole("group", { name: "May AI use your papers?" });
@@ -66,12 +65,11 @@ describe("the notice screen", () => {
   it("replaces the page, showing the server's notice with its version, date and text", async () => {
     const { container } = renderGuard();
 
-    expect(await screen.findByRole("heading", { name: "IRIS data notice" })).toBeInTheDocument();
+    expect(await shown(/^IRIS data notice/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Review queue" })).not.toBeInTheDocument();
     const notice = screen.getByRole("region", { name: "Data notice" });
     expect(notice).toHaveTextContent("Version 5 · published Nov 2, 2026");
-    expect(within(notice).getByText(/Your name\.\s+Your CIT-U email\./)).toBeInTheDocument();
-    expect(within(notice).getByRole("listitem")).toHaveTextContent("RDCO staff");
+    expect(within(notice).getByText(/^IRIS data notice/).textContent).toBe(NOTICE.text);
     await expectNoBlockingA11yViolations(container);
   });
 
@@ -79,7 +77,7 @@ describe("the notice screen", () => {
     const user = userEvent.setup();
     const answer = vi.spyOn(noticeApi, "answer");
     renderGuard();
-    await screen.findByRole("heading", { name: "IRIS data notice" });
+    await shown(/^IRIS data notice/);
 
     expect(agreement()).not.toBeChecked();
     for (const radio of within(aiQuestion()).getAllByRole("radio")) expect(radio).not.toBeChecked();
@@ -95,7 +93,7 @@ describe("the notice screen", () => {
     const answer = vi.spyOn(noticeApi, "answer").mockResolvedValue({ data: { answer_required: false } } as never);
     const me = vi.spyOn(authApi, "me").mockResolvedValue({ data: makeUser({ role_name: ROLES.KTTO }) } as never);
     renderGuard();
-    await screen.findByRole("heading", { name: "IRIS data notice" });
+    await shown(/^IRIS data notice/);
 
     await user.click(agreement());
     await user.click(within(aiQuestion()).getByRole("radio", { name: "No" }));
@@ -109,18 +107,18 @@ describe("the notice screen", () => {
 
   it("shows a newer notice published meanwhile, and asks for both answers again", async () => {
     const user = userEvent.setup();
-    const newer = { ...NOTICE, version: 6, title: "IRIS data notice, revised" };
+    const newer = { ...NOTICE, version: 6, text: "IRIS data notice, revised" };
     const answer = vi.spyOn(noticeApi, "answer").mockRejectedValueOnce({
       response: { status: 409, data: { code: "notice_stale", notice: newer } },
     });
     renderGuard();
-    await screen.findByRole("heading", { name: "IRIS data notice" });
+    await shown(/^IRIS data notice/);
 
     await user.click(agreement());
     await user.click(within(aiQuestion()).getByRole("radio", { name: "Yes" }));
     await user.click(save());
 
-    expect(await screen.findByRole("heading", { name: "IRIS data notice, revised" })).toBeInTheDocument();
+    expect(await shown(/^IRIS data notice, revised$/)).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(/newer notice was published/);
     expect(agreement()).not.toBeChecked();
     expect(within(aiQuestion()).getByRole("radio", { name: "Yes" })).not.toBeChecked();
@@ -132,7 +130,7 @@ describe("the notice screen", () => {
     const user = userEvent.setup();
     vi.spyOn(noticeApi, "answer").mockRejectedValueOnce({ response: { status: 500, data: {} } });
     renderGuard();
-    await screen.findByRole("heading", { name: "IRIS data notice" });
+    await shown(/^IRIS data notice/);
 
     await user.click(agreement());
     await user.click(within(aiQuestion()).getByRole("radio", { name: "No" }));
@@ -146,7 +144,7 @@ describe("the notice screen", () => {
     const user = userEvent.setup();
     const logout = vi.spyOn(authApi, "logout").mockResolvedValue({} as never);
     renderGuard();
-    await screen.findByRole("heading", { name: "IRIS data notice" });
+    await shown(/^IRIS data notice/);
 
     await user.click(screen.getByRole("button", { name: "Sign out" }));
 
@@ -160,7 +158,7 @@ describe("the notice screen", () => {
     const user = userEvent.setup();
     const request = vi.spyOn(accountsApi, "requestMyDeletion").mockResolvedValue({} as never);
     renderGuard();
-    await screen.findByRole("heading", { name: "IRIS data notice" });
+    await shown(/^IRIS data notice/);
 
     await user.click(screen.getByRole("button", { name: "Request account deletion" }));
     const confirm = screen.getByRole("group", { name: "Request account deletion" });
@@ -181,7 +179,7 @@ describe("the notice screen", () => {
     const answer = vi.spyOn(noticeApi, "answer").mockResolvedValue({ data: { answer_required: false } } as never);
     vi.spyOn(authApi, "me").mockResolvedValue({ data: makeUser({ role_name: ROLES.KTTO }) } as never);
     const { container } = renderGuard();
-    await screen.findByRole("heading", { name: "IRIS data notice" });
+    await shown(/^IRIS data notice/);
 
     const papers = () => screen.queryByRole("group", { name: /Which papers does your Yes cover/ });
     await user.click(agreement());
@@ -211,7 +209,7 @@ describe("the notice screen", () => {
         data: { ...NOTICE, answer: previous === null ? null : { version: 4, ai_consent: previous, answered_at: null }, answer_required: true },
       } as never);
       const { unmount } = renderGuard();
-      await screen.findByRole("heading", { name: "IRIS data notice" });
+      await shown(/^IRIS data notice/);
       await user.click(within(aiQuestion()).getByRole("radio", { name: "Yes" }));
       expect(screen.queryByRole("group", { name: /Which papers does your Yes cover/ })).not.toBeInTheDocument();
       unmount();
@@ -222,13 +220,13 @@ describe("the notice screen", () => {
     const user = userEvent.setup();
     const current = vi.spyOn(noticeApi, "current");
     renderGuard();
-    await screen.findByRole("heading", { name: "IRIS data notice" });
+    await shown(/^IRIS data notice/);
     await user.click(agreement());
 
-    current.mockResolvedValue({ data: { ...NOTICE, version: 7, title: "IRIS data notice, July" } } as never);
+    current.mockResolvedValue({ data: { ...NOTICE, version: 7, text: "IRIS data notice, July" } } as never);
     document.dispatchEvent(new Event("visibilitychange"));
 
-    expect(await screen.findByRole("heading", { name: "IRIS data notice, July" })).toBeInTheDocument();
+    expect(await shown(/^IRIS data notice, July$/)).toBeInTheDocument();
     await waitFor(() => expect(agreement()).not.toBeChecked());
   });
 });

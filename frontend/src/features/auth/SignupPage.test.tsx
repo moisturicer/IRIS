@@ -50,14 +50,10 @@ function LocationProbe() {
 }
 
 /** The server's current data notice (ADR-054, IR-790), as `GET /auth/notice/` sends it. */
+// The server sends the whole notice as `text`, and that is what is shown (IR-800).
 const NOTICE = {
   version: 3,
-  title: "IRIS data notice",
-  subtitle: "What IRIS keeps and why",
-  sections: [
-    { title: "What IRIS keeps", body: "Your name and CIT-U email.\nYour college and program." },
-    { title: "Who sees it", list: ["RDCO staff", "The System Admin"] },
-  ],
+  text: "IRIS data notice\n\nWhat IRIS keeps\nYour name and CIT-U email.\nYour college and program.\n\nWho sees it\n- RDCO staff\n- The System Admin",
   published_at: "2026-11-01T08:00:00Z",
 };
 
@@ -546,10 +542,9 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
 
     // The server's notice, its version and date, and its text as written (IR-790).
     const region = screen.getByRole("region", { name: "Read the data notice" });
-    expect(within(region).getByRole("heading", { name: "IRIS data notice" })).toBeInTheDocument();
+    expect(within(region).getByRole("heading", { name: "Data notice" })).toBeInTheDocument();
     expect(region).toHaveTextContent("Version 3 · published Nov 1, 2026");
-    expect(region).toHaveTextContent("Your name and CIT-U email.");
-    expect(within(region).getByRole("list")).toHaveTextContent("RDCO staff");
+    expect(within(region).getByText(/^IRIS data notice/).textContent).toBe(NOTICE.text);
 
     await user.keyboard("{Enter}");
     expect(screen.queryByRole("region", { name: "Read the data notice" })).not.toBeInTheDocument();
@@ -668,7 +663,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
 
   it("shows a notice published meanwhile and asks for both answers again (IR-790)", async () => {
     const user = userEvent.setup();
-    const newer = { ...NOTICE, version: 4, title: "IRIS data notice, revised" };
+    const newer = { ...NOTICE, version: 4, text: "IRIS data notice, revised" };
     const register = vi.spyOn(authApi, "register").mockRejectedValueOnce({
       response: { status: 409, data: { code: "notice_stale", notice: newer } },
     });
@@ -678,7 +673,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole("alert")).toHaveTextContent(/newer notice was published/);
     const region = screen.getByRole("region", { name: "Read the data notice" });
-    expect(within(region).getByRole("heading", { name: "IRIS data notice, revised" })).toBeInTheDocument();
+    expect(within(region).getByText("IRIS data notice, revised")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: CONSENT })).not.toBeChecked();
     expect(within(aiQuestion()).getByRole("radio", { name: "No" })).not.toBeChecked();
 
