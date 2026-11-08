@@ -1,6 +1,4 @@
 import { useId } from "react";
-import type { DataNotice } from "@/types/notice";
-import { formatDate } from "@/lib/utils";
 
 /**
  * The server's data notice and the two answers it asks for (ADR-054 decisions
@@ -49,34 +47,6 @@ export function missingAnswers(value: NoticeAnswers, previousAi?: boolean | null
   };
 }
 
-export function NoticeText({ notice, headingLevel = 2 }: { notice: DataNotice; headingLevel?: 2 | 3 }) {
-  const Heading = `h${headingLevel}` as "h2";
-  const Section = `h${headingLevel + 1}` as "h3";
-  return (
-    <div className="space-y-4 text-small text-stone-700">
-      <div>
-        <Heading className="text-body font-bold text-stone-900">{notice.title}</Heading>
-        {notice.subtitle && <p className="mt-1 whitespace-pre-line">{notice.subtitle}</p>}
-        <p className="mt-1 text-label text-stone-500">
-          Version {notice.version} · published {formatDate(notice.published_at)}
-        </p>
-      </div>
-      {notice.sections.map((section, i) => (
-        <section key={`${i}-${section.title}`}>
-          <Section className="font-semibold text-stone-900">{section.title}</Section>
-          {section.body && <p className="mt-1 whitespace-pre-line leading-relaxed">{section.body}</p>}
-          {section.list && section.list.length > 0 && (
-            <ul className="mt-1 list-disc space-y-1 pl-5">
-              {section.list.map((item, j) => (
-                <li key={j} className="whitespace-pre-line leading-relaxed">{item}</li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ))}
-    </div>
-  );
-}
 
 export function NoticeAnswerFields({
   value,

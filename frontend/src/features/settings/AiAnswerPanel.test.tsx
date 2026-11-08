@@ -10,7 +10,7 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, within } from "@/test/render";
 import SettingsPage from "./SettingsPage";
 
-const NOTICE = { version: 5, title: "IRIS data notice", subtitle: "", sections: [], published_at: "2026-11-02T08:00:00Z" };
+const NOTICE = { version: 5, text: "IRIS data notice", published_at: "2026-11-02T08:00:00Z" };
 
 function answered(ai_consent: boolean | null, version = 5) {
   return vi.spyOn(noticeApi, "current").mockResolvedValue({

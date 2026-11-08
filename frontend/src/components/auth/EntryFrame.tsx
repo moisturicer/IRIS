@@ -78,8 +78,8 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
         {information === "Terms" && (
           <p className="text-small text-stone-700">
             Terms of Service are pending institutional review. Approved terms have
-            not yet been published. The interim data notice describes how IRIS uses your
-            registration details.
+            not yet been published. The data notice, under Data privacy, describes how IRIS
+            uses your details.
           </p>
         )}
         {information === "Help" && (

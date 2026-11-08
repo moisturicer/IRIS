@@ -1,58 +1,36 @@
+import { noticeApi } from "@/api/notice";
+import { Spinner } from "@/components/ui/Spinner";
+import { useApiRead } from "@/hooks/useApiRead";
+import { NoticeText } from "./notice/NoticeText";
+
 /**
- * The interim data notice a registrant consents to (IR-540; decided on IR-214).
- *
- * It says only what IRIS does today, checked against the code on 2026-10-14:
- *
- * - `RegisterSerializer` stores the name, the email, `consent_given` and a
- *   password through `set_password` (a hash); a Student's program or an
- *   Adviser's college and department go on their profile, and the requested
- *   role becomes a `RoleRequest`.
- * - The verification link is emailed to the address entered
- *   (`send_verification_email`).
- * - Role requests and the user list are read by RDCO alone (`IsAdmin`); system
- *   administrators reach the same rows through the Django admin.
- * - Once approved, an Adviser is listed by `GET /users/advisers/`, open to any
- *   signed-in user, so students can name them as adviser.
- *
- * It claims nothing about retention, deletion, sharing or data-subject
- * requests, because none of those is implemented. The university's Terms of
- * Service and Data Privacy Policy replace it (IR-214).
+ * The "Data privacy" panel of the sign-in and registration frame: the server's
+ * current notice (ADR-051 decisions 16-17, IR-800). IRIS holds no notice text
+ * of its own; RDCO publishes it on the Notices page, and every screen reads it
+ * from `GET /auth/notice/`, shown through the one `NoticeText`.
  */
 export function DataNotice() {
-  return (
-    <div className="space-y-3 text-small text-stone-700">
-      <p className="font-semibold text-stone-900">
-        Interim notice. The university&apos;s Terms of Service and Data Privacy Policy will
-        replace it.
+  const read = useApiRead((signal) => noticeApi.current({ signal }).then((r) => r.data), []);
+  const notice = read.data;
+
+  if (read.status === "loading") {
+    return (
+      <p role="status" className="flex items-center gap-2 text-small text-stone-600">
+        <Spinner size="sm" />
+        Loading the data notice…
       </p>
-      <dl className="space-y-2">
-        <div>
-          <dt className="font-semibold text-stone-900">What IRIS keeps when you register</dt>
-          <dd>
-            Your name, your CIT-U email, your college, your program or department, the role you
-            ask for, and your password, which is stored only as a hash.
-          </dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-stone-900">Why</dt>
-          <dd>
-            To create your account, to email you a verification link, and to send your role
-            request to RDCO.
-          </dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-stone-900">Who sees your registration</dt>
-          <dd>
-            RDCO staff, who approve or decline role requests, and IRIS&apos;s system
-            administrators. If you are approved as an Adviser, anyone signed in to IRIS can see
-            your name, email, college and department, so students can name you as their adviser.
-          </dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-stone-900">Research you submit later</dt>
-          <dd>Visible according to its review and publication state.</dd>
-        </div>
-      </dl>
-    </div>
-  );
+    );
+  }
+  // A wrong shape is treated as a failed read (CODING_STANDARDS F1).
+  if (read.status !== "ready" || !notice || typeof notice.text !== "string") {
+    return (
+      <div className="space-y-2 text-small text-stone-700">
+        <p role="alert">The data notice didn&apos;t load. Check your connection, then try again.</p>
+        <button type="button" onClick={read.retry} className="font-semibold text-brand underline underline-offset-4">
+          Try again
+        </button>
+      </div>
+    );
+  }
+  return <NoticeText notice={notice} headingLevel={3} />;
 }
