@@ -35,11 +35,19 @@ describe("authApi", () => {
     expect(stub.only()).toMatchObject({ method: "post", url: "/auth/register/", body: payload });
   });
 
-  it("activate posts the link's two parts in a body, never in the URL (IR-928)", async () => {
-    await authApi.activate("Mjc", "abc-123");
+  it("resendVerification posts only the address to the verification endpoint (IR-643)", async () => {
+    await authApi.resendVerification("a@cit.edu");
 
     expect(stub.only()).toMatchObject({
-      method: "post", url: "/auth/activate/", body: { uid: "Mjc", token: "abc-123" },
+      method: "post", url: "/auth/verification/resend/", body: { email: "a@cit.edu" },
+    });
+  });
+
+  it("confirmVerification posts the link's token in a body, never in the URL (ADR-045 §3)", async () => {
+    await authApi.confirmVerification("abc-123");
+
+    expect(stub.only()).toMatchObject({
+      method: "post", url: "/auth/verification/confirm/", body: { token: "abc-123" },
     });
   });
 
@@ -128,10 +136,10 @@ describe("authApi", () => {
         .rejects.toMatchObject({ response: { status: 403, data: { code: "account_locked" } } });
     });
 
-    it("rejects a failed activation link", async () => {
-      stub.reply({ status: 400, data: { detail: "Link expired." } });
+    it("rejects a verification link that can't be used", async () => {
+      stub.reply({ status: 400, data: { code: "invalid_link" } });
 
-      await expect(authApi.activate("x", "y")).rejects.toMatchObject({ response: { status: 400 } });
+      await expect(authApi.confirmVerification("x")).rejects.toMatchObject({ response: { status: 400 } });
     });
 
     it("rejects a server error with its status", async () => {

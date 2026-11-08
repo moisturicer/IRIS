@@ -196,6 +196,15 @@ async function withdrawRevision(record: RecordDetail): Promise<string> {
 const officeReviewBlocked = (record: RecordDetail) => record.office_review.blocked;
 
 /**
+ * The acts *Finish review* takes as verdicts (ADR-032 §7, IR-875). Where
+ * `finish_review` is granted they leave the bar for its dialog, so a verdict
+ * never strands the reviewer's drafts.
+ */
+export const VERDICT_CAPABILITIES: readonly Capability[] = [
+  "accept_proposal", "accept_publish", "keep_unlisted", "send_to_rdco", "office_review", "request_revision", "reject",
+];
+
+/**
  * Order matters: the bar fills its first granted action. A Proposal's Adviser
  * has *Accept* as primary (IR-271). RDCO's primary on a Thesis or Project is
  * *Accept & publish*, then *Keep unlisted*; the Adviser's is *Accept & send to

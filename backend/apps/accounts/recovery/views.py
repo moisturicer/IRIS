@@ -177,3 +177,39 @@ class PasswordResetConfirmView(RecoveryView):
             "code": "password_reset",
             "detail": "Password updated. Sign in with your new password.",
         }))
+
+
+class VerificationResendView(RecoveryView):
+    """POST /auth/verification/resend/  {"email": "..."} -> always 202 (IR-643).
+
+    The same answer whether the address is unverified, verified, unknown,
+    locked or inactive: the worker decides, and an ineligible one gets no email.
+    """
+    limit_action = "verification_request"
+
+    def limit_windows(self):
+        return limits.request_windows()
+
+    def handle(self, data):
+        email = normalized_email(strings(data, ("email",))["email"])
+        service.admit_request(RecoveryPurpose.EMAIL_VERIFICATION, email)
+        return _no_store(Response(request_received(), status=202))
+
+
+class VerificationConfirmView(RecoveryView):
+    """POST /auth/verification/confirm/  {"token": "..."} (IR-643).
+
+    Only a POST verifies: opening the link's page, a preview or a scanner
+    changes nothing (ADR-045 §3). Verifying signs no one in.
+    """
+    limit_action = "verification_confirm"
+
+    def limit_windows(self):
+        return limits.confirm_windows()
+
+    def handle(self, data):
+        service.confirm_verification(strings(data, ("token",))["token"])
+        return _no_store(Response({
+            "code": "email_verified",
+            "detail": "Email verified. Return to sign-in.",
+        }))

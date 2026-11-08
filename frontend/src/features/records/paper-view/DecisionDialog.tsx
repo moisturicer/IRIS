@@ -74,7 +74,8 @@ function wording(outcome: DecisionOutcome, kind: string) {
       title: "Accept and keep unlisted?",
       body:
         `This accepts the ${kind} without publishing it. It stays out of Discover and Ask IRIS, and its ` +
-        "owners and reviewers can still open it. Publishing it later is not yet possible in IRIS.",
+        "owners and reviewers can still open it. RDCO can publish it to Discover later, once its " +
+        "embargo is released.",
     };
   }
   return {
@@ -84,7 +85,7 @@ function wording(outcome: DecisionOutcome, kind: string) {
 }
 
 /** Each piece of open work deciding would end, as one line. */
-function closingLines(closes: DecisionCloses | null): string[] {
+export function closingLines(closes: DecisionCloses | null): string[] {
   if (!closes) return [];
   const lines = closes.assignments.map((a) =>
     a.holders.length > 0

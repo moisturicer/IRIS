@@ -341,6 +341,41 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
         _log_failure("notify_decided", record=record)
 
 
+def notify_published_later(record, *, published_by, note=""):
+    """
+    RDCO published an Unlisted paper after its Decision (ADR-047 §10, IR-878).
+    Every owner and the Adviser hear it in-app, carrying RDCO's note as
+    written; the primary owner by email too, as a Decision's notice is sent.
+    """
+    try:
+        title = record.title
+        message = f'RDCO published "{title}" to Discover. It was kept unlisted until now.'
+        if note:
+            message += f" Note: {note}"
+        notif_type = NotificationType.objects.get_or_create(name="Record Published")[0]
+        owners = list(record.owners.select_related("user").all())
+        recipients = [o.user for o in owners]
+        if record.adviser is not None and record.adviser not in recipients:
+            recipients.append(record.adviser)
+        for recipient in recipients:
+            Notification.objects.create(
+                sender=published_by, recipient=recipient, record=record,
+                notif_type=notif_type, message=message,
+            )
+        if owners:
+            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
+            send_email_async(
+                subject=f"[IRIS] Published: {title[:60]}",
+                message=(
+                    f"Hello {primary.first_name},\n\n{message}\n\n"
+                    f"{_record_url(record)}\n\n-- The IRIS Team"
+                ),
+                recipient_list=[primary.email],
+            )
+    except Exception:
+        _log_failure("notify_published_later", record=record)
+
+
 def notify_revision_requested(revision_request, *, party_label: str, threads: int = 0):
     """
     Tell every owner that a party has asked for a revision (ADR-032 §5
@@ -611,6 +646,36 @@ def notify_embargo_review(record, recipient, *, type_name, message):
     """One in-app embargo reminder (ADR-052 §9), in-app like deadlines."""
     return _notify_in_app(record, recipient, type_name=type_name, message=message,
                           label="notify_embargo_review")
+
+
+def notify_account_deletion_rejected(person, actor, reason):
+    """In-app notice that a System Admin rejected an account deletion (IR-785)."""
+    try:
+        Notification.objects.create(
+            sender=actor, recipient=person,
+            notif_type=_get_type("Account Deletion Rejected"),
+            message=f"Your account deletion request was not accepted. Reason: {reason}",
+        )
+    except Exception:
+        _log_failure("notify_account_deletion_rejected", user=person)
+
+
+def notify_contact_person_took_over(record, user):
+    """
+    In-app notice to the owner who became a paper's Contact person because the
+    previous one's account was deleted (ADR-051 decision 28, IR-785).
+    """
+    try:
+        Notification.objects.create(
+            recipient=user, record=record,
+            notif_type=_get_type("Contact Person Changed"),
+            message=(
+                f'You are now the Contact person for "{record.title}", because the previous '
+                "Contact person's account was deleted."
+            ),
+        )
+    except Exception:
+        _log_failure("notify_contact_person_took_over", record=record, user=user)
 
 
 def notify_role_request(user, requested_role):

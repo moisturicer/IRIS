@@ -9,7 +9,7 @@ timing and its side effects the same for every address.
 import logging
 from datetime import timedelta
 
-from core.enums import RecoveryAuditOutcome
+from core.enums import RecoveryAuditOutcome, RequestStatus
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -41,6 +41,12 @@ class PasswordRejected(Exception):
 def is_eligible(user) -> bool:
     """ADR-045 §1: restrictions first. An axes lockout is not a restriction."""
     return user.is_active and not user.is_locked and user.has_usable_password()
+
+
+def purpose_applies(user, purpose) -> bool:
+    """A verified account is sent no verification email, and its verification
+    links are refused (ADR-045 §1). Every other purpose applies to anyone eligible."""
+    return not (purpose == RecoveryPurpose.EMAIL_VERIFICATION and user.is_verified)
 
 
 def admit_request(purpose: str, address: str) -> None:
@@ -108,6 +114,7 @@ def usable(token, user, purpose, at) -> bool:
         and token.email == user.email
         and (purpose != RecoveryPurpose.PASSWORD_RESET or token.credential_version == user.credential_version)
         and is_eligible(user)
+        and purpose_applies(user, purpose)
     )
 
 
@@ -143,23 +150,36 @@ def confirm_reset(raw_token: str, new_password: str, confirm_password: str) -> N
         raise PasswordRejected(outcome)
 
 
+def _locked_link(raw_token, purpose):
+    """The account and token ``raw_token`` names, both locked, if the link may
+    still be used for ``purpose``; else ``(None, None)`` with the rejection
+    audited. Must run inside a transaction.
+
+    User before token: the order every recovery write takes. Nothing about why
+    a link failed leaves this function.
+    """
+    user = token = None
+    if crypto.TOKEN_PATTERN.fullmatch(raw_token):
+        token_digest = crypto.digest(raw_token)
+        user_id = (RecoveryToken.objects.filter(digest=token_digest)
+                   .values_list("user_id", flat=True).first())
+        if user_id is not None:
+            user = User.objects.select_for_update().filter(pk=user_id).first()
+            token = RecoveryToken.objects.select_for_update().filter(digest=token_digest).first()
+    if user is None or token is None or not usable(token, user, purpose, clock.now()):
+        audit.record(AuditEvent.RECOVERY_TOKEN_REJECTED, purpose=purpose,
+                     outcome=RecoveryAuditOutcome.REJECTED, reason="invalid_link")
+        return None, None
+    return user, token
+
+
 def _consume_reset(raw_token, new_password, confirm_password):
     purpose = RecoveryPurpose.PASSWORD_RESET
     with transaction.atomic():
-        user = token = None
-        if crypto.TOKEN_PATTERN.fullmatch(raw_token):
-            token_digest = crypto.digest(raw_token)
-            user_id = (RecoveryToken.objects.filter(digest=token_digest)
-                       .values_list("user_id", flat=True).first())
-            if user_id is not None:
-                # User before token: the order every recovery write takes.
-                user = User.objects.select_for_update().filter(pk=user_id).first()
-                token = RecoveryToken.objects.select_for_update().filter(digest=token_digest).first()
-        at = clock.now()
-        if user is None or token is None or not usable(token, user, purpose, at):
-            audit.record(AuditEvent.RECOVERY_TOKEN_REJECTED, purpose=purpose,
-                         outcome=RecoveryAuditOutcome.REJECTED, reason="invalid_link")
+        user, token = _locked_link(raw_token, purpose)
+        if user is None:
             return InvalidLink
+        at = clock.now()
 
         errors = password_errors(user, new_password, confirm_password)
         if errors:
@@ -174,6 +194,43 @@ def _consume_reset(raw_token, new_password, confirm_password):
         user_id = user.pk
         transaction.on_commit(lambda: notify_password_changed(user_id))
     return None
+
+
+def confirm_verification(raw_token: str) -> None:
+    """Consume a verification link and mark the address verified, or raise
+    `InvalidLink` -- the same answer for every reason a link cannot be used.
+
+    It changes `is_verified` and the token's own state, nothing else: no role,
+    approval, lock or sign-in (ADR-045 §1). RDCO hears of a pending role
+    request here, on the account's first verification and only then (IR-784,
+    ADR-051 decision 20), in the same transaction as the flip.
+    """
+    if not _consume_verification(raw_token):
+        # Raised outside the transaction, so the rejection's audit row commits.
+        raise InvalidLink()
+
+
+def _consume_verification(raw_token) -> bool:
+    from apps.notifications.services import notify_role_request
+
+    purpose = RecoveryPurpose.EMAIL_VERIFICATION
+    with transaction.atomic():
+        user, token = _locked_link(raw_token, purpose)
+        if user is None:
+            return False
+        at = clock.now()
+        token.consumed_at = at
+        token.save(update_fields=["consumed_at"])
+        user.is_verified = True
+        user.save(update_fields=["is_verified"])
+        correlation_id = token.intent.correlation_id if token.intent_id else None
+        audit.record(AuditEvent.EMAIL_VERIFICATION_COMPLETED, purpose=purpose,
+                     outcome=RecoveryAuditOutcome.COMPLETED, correlation_id=correlation_id, user=user)
+        pending = (user.role_requests.filter(status=RequestStatus.PENDING)
+                   .select_related("requested_role").order_by("-created_at").first())
+        if pending:
+            notify_role_request(user, pending.requested_role)
+    return True
 
 
 def notify_password_changed(user_id) -> None:

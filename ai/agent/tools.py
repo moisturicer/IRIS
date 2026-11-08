@@ -13,14 +13,16 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass, field, replace
+from typing import Awaitable, Callable, Optional
 
 import asyncpg
 
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
-from ai.research.tools import OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence
+from ai.research.tools import (
+    NO_MATCH, OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence, valid_filters,
+)
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +88,20 @@ COUNT_RECORDS = ToolSpec(
         "group_by": {"type": "string", "enum": list(metadata.GROUPS)},
     }))
 
+#: research-5's search: keyword and meaning together, narrowed by metadata (IR-886).
+HYBRID_SEARCH = ToolSpec(
+    "search",
+    "Search the readable papers' passages by keyword and by meaning, optionally narrowed by Area "
+    "(classification), PSCED area, record type or completion years. Returns a sample of matching "
+    "passages, never all of them, and says when meaning search was unavailable.",
+    _object({
+        "query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+        "classification": _NAME, "psced": _NAME, "record_type": _NAME,
+        "year_from": _YEAR, "year_to": _YEAR,
+    }, ["query"]))
+#: Search signal outcomes the model is shown; any other reason is shown as unavailable.
+SIGNALS = ("ok", "off", "provider_gated", "provider_failed", "embedding_space_changed", "withheld")
+
 READ_MANUSCRIPT = ToolSpec(
     "read_manuscript",
     "Read a paper's extracted text in document order, as much as fits now, with what was not read. "
@@ -124,6 +140,8 @@ class Outcome:
     #: Whether the call returned evidence this run had not seen.
     progress: bool = False
     clarification: Optional[str] = None
+    dependencies: frozenset = frozenset()
+    control_only: bool = False
 
 
 def _str(value) -> bool:
@@ -220,6 +238,8 @@ class Investigation:
     manuscripts: bool = False
     #: Offer recover_turn (the research-4 tool version, IR-735).
     recovery: bool = False
+    #: Search by keyword and meaning with metadata filters (the research-5 tool version, IR-886).
+    hybrid: bool = False
     #: Original Turns this run recovered: ordinal -> answer, whose numbers were checked when delivered.
     recovered: dict[int, str] = field(default_factory=dict)
     #: Passage handle -> what was shown for it.
@@ -249,10 +269,16 @@ class Investigation:
     unpacked: dict[str, tuple[str, tuple[int, ...]]] = field(default_factory=dict)
     #: Tools that failed during the run, in order of first failure (IR-731).
     outages: list[str] = field(default_factory=list)
+    recalled_sources: frozenset = frozenset()
+    #: Which of a result's sources a send may carry (IR-889); the rest never reaches the model.
+    screen: Optional[Callable[[frozenset], Awaitable[frozenset]]] = None
+    #: Sources left out of results because a send could not carry them.
+    withheld: int = 0
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
-        return (*RESEARCH, *(METADATA if self.metadata else ()), *(MANUSCRIPTS if self.manuscripts else ()),
+        research = (HYBRID_SEARCH, *RESEARCH[1:]) if self.hybrid else RESEARCH
+        return (*research, *(METADATA if self.metadata else ()), *(MANUSCRIPTS if self.manuscripts else ()),
                 *(RECOVERY if self.recovery else ()),
                 UPDATE_PLAN, UPDATE_FOCUS, *extra)
 
@@ -277,6 +303,7 @@ class Investigation:
             return {}
         found = await self.research.recall(list(dict.fromkeys(ids)))
         self._ended(found)
+        self.recalled_sources = found.dependencies
         for record in found.records:
             self.papers[record.record_id] = (record.handle, record.title)
 
@@ -292,7 +319,7 @@ class Investigation:
         self.tool_calls += 1
         spec = next((s for s in self.specs() if s.name == call.name), None)
         if spec is None:
-            return Outcome(json.dumps({"error": "unknown_tool"}))
+            return Outcome(json.dumps({"error": "unknown_tool"}), control_only=True)
         try:
             args = _arguments(call, spec)
             if spec is UPDATE_PLAN:
@@ -308,14 +335,14 @@ class Investigation:
                 filters = {k: v for k, v in args.items() if k != "group_by"}
                 return self._counted(await self.research.count(filters, args.get("group_by")))
             if spec is READ_MANUSCRIPT:
-                return self._evidence(await self._read(args, room), call.id)
+                return self._evidence(await self._screened(await self._read(args, room)), call.id)
             if spec is RECOVER_TURN:
                 if not _int(args["turn"]):
                     raise InvalidArguments
-                return self._evidence(await self.research.recover_turn(args["turn"]))
-            return self._evidence(await self._research(spec, args))
+                return self._evidence(await self._screened(await self.research.recover_turn(args["turn"])))
+            return self._evidence(await self._screened(await self._research(spec, args)))
         except InvalidArguments:
-            return Outcome(json.dumps({"error": "invalid_arguments"}))
+            return Outcome(json.dumps({"error": "invalid_arguments"}), control_only=True)
         except asyncpg.InsufficientPrivilegeError:
             # A policy refusal is not an outage: the reader may no longer read.
             raise RunEnded("unauthorized") from None
@@ -324,9 +351,55 @@ class Investigation:
             log.warning("agent tool %s failed: %s", spec.name, type(failure).__name__)
             if spec.name not in self.outages:
                 self.outages.append(spec.name)
-            return Outcome(json.dumps({"status": UNAVAILABLE, "reason": TOOL_UNAVAILABLE}))
+            return Outcome(json.dumps({"status": UNAVAILABLE, "reason": TOOL_UNAVAILABLE}), control_only=True)
+
+    async def _screened(self, result: Evidence) -> Evidence:
+        """`result` without the sources a send could not carry, so one ineligible hit does not end the run."""
+        sources = result.dependencies
+        if self.screen is None or not sources:
+            return result
+        try:
+            allowed = await self.screen(sources)
+        except Exception:
+            # Fail closed: show nothing; the send's own guard check ends the run if it must.
+            log.warning("source screen failed", exc_info=True)
+            allowed = frozenset()
+        if allowed == sources:
+            return result
+        self.withheld += len(sources - allowed)
+
+        def kept(ref):
+            return ref.source is None or ref.source in allowed
+
+        passages = tuple(p for p in result.passages if p.source in allowed)
+        whole = result.reading is not None or bool(result.sections) or result.turn is not None
+        dropped_whole = whole and bool(sources - allowed)
+        trimmed = replace(
+            result,
+            records=tuple(r for r in result.records if kept(r)),
+            matches=tuple(replace(m, records=tuple(r for r in m.records if kept(r))) for m in result.matches),
+            passages=() if dropped_whole else passages,
+            sections=() if dropped_whole else result.sections,
+            reading=None if dropped_whole else result.reading,
+            turn=None if dropped_whole else result.turn,
+            coverage=replace(result.coverage, returned=max(
+                0, result.coverage.returned - (len(result.passages) - len(passages)))),
+            dependencies=frozenset() if dropped_whole else allowed,
+        )
+        if not (trimmed.passages or trimmed.records or trimmed.matches or trimmed.sections
+                or trimmed.reading or trimmed.turn):
+            return replace(trimmed, status=NO_MATCH, reason="withheld", dependencies=frozenset())
+        return trimmed
 
     async def _research(self, spec: ToolSpec, args: dict) -> Evidence:
+        if spec is HYBRID_SEARCH:
+            if not _str(args["query"]) or ("limit" in args and not _int(args["limit"])):
+                raise InvalidArguments
+            filters = {k: v for k, v in args.items() if k not in ("query", "limit")}
+            if not valid_filters(filters):
+                raise InvalidArguments
+            self.searched = True
+            return await self.research.hybrid_search(args["query"], args.get("limit", 10), filters)
         if spec is SEARCH:
             if not _str(args["query"]) or ("limit" in args and not _int(args["limit"])):
                 raise InvalidArguments
@@ -434,11 +507,17 @@ class Investigation:
             body["sections"] = [{"section": s.section, "heading": s.heading, "level": s.level,
                                  "first_page": s.first_page, "last_page": s.last_page}
                                 for s in result.sections]
+        if result.signals:
+            # How the search ran, so a keyword-only result is never read as a meaning search (IR-886).
+            body["search"] = {name: value if value in SIGNALS else UNAVAILABLE for name, value in result.signals}
         coverage = result.coverage
         body["coverage"] = {"returned": coverage.returned, "total": coverage.total,
                             "truncated": coverage.truncated}
         self.figures.update(str(n) for n in (coverage.returned, coverage.total) if n is not None)
-        return Outcome(json.dumps(body, ensure_ascii=False), progress=new)
+        return Outcome(json.dumps(body, ensure_ascii=False), progress=new,
+                       dependencies=result.dependencies,
+                       control_only=not (result.dependencies or result.records
+                                         or result.passages or result.sections))
 
     def _read_into(self, result: Evidence, call_id: Optional[str], body: dict) -> bool:
         """Fold one manuscript read into the run's coverage and say it to the model (IR-733)."""
@@ -528,7 +607,8 @@ class Investigation:
             "executed": {"tool_calls": self.tool_calls - 1, "evidence_reads": self.reads},
         }):
             raise RunEnded("run_ended")
-        return Outcome(json.dumps({"status": "ok", "revision": self.plan_revision}))
+        return Outcome(json.dumps({"status": "ok", "revision": self.plan_revision}),
+                       control_only=True)
 
     def _focus(self, args: dict) -> Outcome:
         chosen = {}
@@ -546,4 +626,4 @@ class Investigation:
             self.selected = chosen["selected"]
         if "excluded" in chosen:
             self.excluded = chosen["excluded"]
-        return Outcome(json.dumps({"status": "ok"}))
+        return Outcome(json.dumps({"status": "ok"}), control_only=True)

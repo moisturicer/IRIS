@@ -165,6 +165,9 @@ export const SCREEN_ACCESS = {
                  nav: { label: "Users", icon: "fa-users", section: "Administration" } },
   audit:         { path: "/admin/audit", roles: SYSTEM_ADMIN,
                  nav: { label: "Audit Log", icon: "fa-clipboard-list", section: "Administration" } },
+  // ADR-051 §8: the System Admin confirms or rejects account deletions (IR-788).
+  accountDeletionRequests: { path: "/admin/account-deletion-requests", roles: SYSTEM_ADMIN,
+                 nav: { label: "Account Deletions", icon: "fa-user-slash", section: "Administration" } },
 } as const satisfies Record<string, ScreenDef>;
 
 export type ScreenKey = keyof typeof SCREEN_ACCESS;

@@ -29,7 +29,7 @@ so the rows join back to the workflow tables when a question needs more.
 
 from __future__ import annotations
 
-from core.enums import AssignmentState
+from core.enums import AssignmentState, Party
 
 from .models import AuditEvent
 from .services import create_audit_event
@@ -137,6 +137,18 @@ def decision_recorded(record, actor, *, party, outcome, final, review):
 def published(record, actor, *, party):
     """The decision made the record publicly visible. Beside its `DECISION_RECORDED`."""
     _write(AuditEvent.PUBLISHED, actor, record, party=str(party), version=_version(record))
+
+
+def published_from_unlisted(record, actor) -> None:
+    """
+    RDCO published an Unlisted paper after its Decision (ADR-047 §10, IR-878).
+    `PUBLISHED` alone, with no second `DECISION_RECORDED`: the paper's final
+    Decision was its *keep unlisted*. The note is prose, so it is not copied.
+    """
+    _write(
+        AuditEvent.PUBLISHED, actor, record,
+        party=str(Party.RDCO), version=_version(record), via="publish_unlisted",
+    )
 
 
 # --- revisions ---------------------------------------------------------------------

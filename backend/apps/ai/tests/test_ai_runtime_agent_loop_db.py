@@ -8,13 +8,17 @@ vendor's behaviour; the admitted case shows every attempt's purpose.
 
 import json
 import threading
+from dataclasses import replace
+from datetime import timedelta
 
 import pytest
+from django.utils import timezone
 
 from . import test_ai_runtime_runs_db as runs_db
 from .test_ai_runtime_runs_db import Drain, as_reader, run, submit
 from .test_ai_runtime_research_db import paper, write_source
 from ai.admission.ledger import Ledger  # noqa: E402
+from ai.admission.guard import ProxyApproval, SendGuard  # noqa: E402
 from ai.admission.transport import AdmittedAgentProvider  # noqa: E402
 from ai.agent.budget import Bounds  # noqa: E402
 from ai.agent.dialect import ChatCompletions  # noqa: E402
@@ -24,8 +28,11 @@ from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: 
 from ai.runs import config as runs_config  # noqa: E402
 from ai.runs.service import RunService  # noqa: E402
 from ai.runs.store import RunStore  # noqa: E402
+from ai.research.tools import Source  # noqa: E402
 from apps.ai.grants import issue  # noqa: E402
+from apps.ai.models.chunk import ChunkSet  # noqa: E402
 from apps.ai.models.admission import ProviderReservation  # noqa: E402
+from apps.records.models import Record  # noqa: E402
 from .corpus import make_user  # noqa: E402
 from .test_ai_runtime_admission_db import RESERVES as ADMITTED_RESERVES, limits  # noqa: E402
 from .test_ai_runtime_context_contract import MILLION, RESERVES  # noqa: E402
@@ -51,8 +58,8 @@ FLOOD = "rainfall gauges and river water levels trained a network to forecast fl
 POND = "brackish water ponds were sampled weekly for tilapia growth"
 
 
-def agent_service(dsn, provider, **kw):
-    cfg = runs_config.RunsConfig(database_url=dsn, executor="deterministic", limits=LIMITS,
+def agent_service(dsn, provider, *, run_limits=LIMITS, **kw):
+    cfg = runs_config.RunsConfig(database_url=dsn, executor="deterministic", limits=run_limits,
                                  dispatch=runs_db.DISPATCH)
     executor = AgentExecutor(provider, PIN, kw.pop("reserves", RESERVES), profiles=PROFILES, **kw)
     built = RunService(RunStore(dsn), cfg, executor, Drain())
@@ -298,3 +305,41 @@ def test_every_admitted_attempt_records_the_agent_purpose_and_no_other_writer(ru
     assert [(r.owner, r.purpose, r.purpose_version) for r in reservations] == [
         ("ai", "agent", "agent-research-1")] * len(reservations)
     assert [r.sent for r in reservations] == [True, False]
+
+
+def test_approved_proxy_can_be_searched_read_and_answered_by_admitted_agent(runtime):
+    proxy = paper("Public proxy", {4: [("Methods", "Water levels forecast floods.")]})
+    Record.objects.filter(pk=proxy.pk).update(
+        origin=Record.Origin.IMPORTED_REFERENCE, is_embargoed=False,
+        embargo_released_at=timezone.now())
+    chunk_set = ChunkSet.objects.get(record=proxy, is_active=True)
+    source = Source(proxy.pk, chunk_set.pk, chunk_set.extraction_hash)
+
+    def open_hit(payload):
+        passage = last_result(payload)["passages"][0]
+        return tools(call("o", "open_passage", passage=passage["passage"]))
+
+    def cite(payload):
+        passage = last_result(payload)["passages"][0]
+        return reply(f"«Public proxy» reports that water levels forecast floods [{passage['passage']}].")
+
+    provider = recording(tools(call("s", "search", query="water")), open_hit, cite)
+    admission = limits()
+    approval = ProxyApproval("IR-889", PIN.model, PIN.endpoint, provider.account,
+                             admission.campaign_key, timezone.now() + timedelta(hours=1),
+                             frozenset({source}))
+    transport = AdmittedAgentProvider(provider, Ledger(runtime, admission),
+                                      guard=SendGuard(runtime, approval, stage="development"),
+                                      purpose="agent")
+    built = agent_service(runtime, transport, run_limits=replace(LIMITS, max_attempts=3),
+                          reserves=ADMITTED_RESERVES, price=admission.prices["scripted-model"])
+    grant = issue.reader_session_grant(make_user("agent-proxy@cit.edu")).token
+    queued, _ = run(built.submit(grant, key="agent-proxy-allowed",
+                                 question="What do public papers say about water?",
+                                 conversation_id=None, base_revision=None))
+    status = run(RunStore(runtime).status(grant, queued["id"]))
+    assert status["state"] == "completed", status
+    assert len(provider.requests) == 3
+    assert all(reservation.sent for reservation in ProviderReservation.objects.all())
+    reopened = run(RunStore(runtime).reopen(grant, status["conversation_id"]))
+    assert [citation["record_id"] for citation in reopened["turns"][0]["citations"]] == [proxy.pk]

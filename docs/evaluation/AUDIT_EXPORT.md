@@ -97,12 +97,18 @@ history. Existing assignments receive no backfilled date or event.
 | Type | Written when | `metadata` |
 |---|---|---|
 | `DECISION_RECORDED` | Every verdict | `party`, `outcome`, `final`, `review` (the Review's id), `version` |
-| `PUBLISHED` | **Beside** a `DECISION_RECORDED`, only when the decision made the record publicly visible | `party`, `version` |
+| `PUBLISHED` | **Beside** a `DECISION_RECORDED`, only when the decision made the record publicly visible. **Or alone**, when RDCO publishes an Unlisted paper later (ADR-047 §10, IR-878) | `party`, `version`, and `via: "publish_unlisted"` on the later publish only (absent on a Decision's) |
 
 `outcome` values: an office's `cleared` or `finding`; the Adviser's `accepted_and_routed`
 (not a Decision: the record stays in review, `final` false); and the final outcomes `accept`
 (a Proposal), `publish`, `keep_unlisted` and `reject` (`final` true). Keep-unlisted, reject
 and a Proposal's accept write no `PUBLISHED`.
+
+A later publish of an Unlisted paper (IR-878) writes `PUBLISHED` with `via: "publish_unlisted"` and **no**
+`DECISION_RECORDED`: the paper's final Decision stays its `keep_unlisted`, so total turnaround still ends
+there and never counts the time a paper waited Unlisted. Its optional note is prose and is not copied; it
+is kept on `records.UnlistedPublication`. To count papers published from Unlisted, select `PUBLISHED`
+rows whose `metadata.via` is `publish_unlisted`.
 
 ### Revisions and resubmission
 

@@ -156,6 +156,16 @@ export const DIALOGS: DialogCase[] = [
     open: press("Decline"), dialog: anyDialog,
   },
   {
+    id: "reject an account deletion request", screen: "account-deletion-requests",
+    sources: ["features/admin/AccountDeletionRequestsPage.tsx"],
+    open: press("Reject"), dialog: anyDialog,
+  },
+  {
+    id: "confirm an account deletion", screen: "account-deletion-requests",
+    sources: ["features/admin/AccountDeletionRequestsPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: press("Confirm deletion"), dialog: anyDialog,
+  },
+  {
     id: "decline a download request", screen: "download-requests", sources: ["features/admin/DownloadRequestsPage.tsx"],
     open: press("Decline"), dialog: anyDialog,
   },
@@ -198,6 +208,17 @@ export const DIALOGS: DialogCase[] = [
     dialog: anyDialog,
   },
   {
+    // RDCO publishes an Unlisted paper once its embargo is released (IR-878).
+    id: "publish an unlisted paper", screen: "paper-view", sources: ["features/records/paper-view/UnlistedCard.tsx"],
+    override: (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "completed", workflow_state: "completed", workflow_state_label: "Unlisted",
+        stage_label: "Unlisted", capabilities: ["cite", "publish_unlisted"], publish_unlisted: { blocked: null },
+      });
+    },
+    open: press("Publish to Discover"), dialog: anyDialog,
+  },
+  {
     id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
     override: (api) => {
       api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, workflow_state: "revision_requested", workflow_state_label: "Revision requested" });
@@ -225,6 +246,8 @@ export const DIALOGS: DialogCase[] = [
   consoleAction("extend a due date", "Extend due date", "seat", "features/review/ExtendDueDateDialog.tsx"),
   reviewAction("accept and publish a paper", "accept_publish", "Accept & publish…", "features/records/paper-view/DecisionDialog.tsx"),
   reviewAction("reject a paper", "reject", "Reject…", "features/records/paper-view/DecisionDialog.tsx"),
+  // Finish review (IR-875): the footer's one way to finish where `finish_review` is granted.
+  reviewAction("finish a review", "finish_review", "Finish review…", "features/records/paper-view/threads/FinishReviewDialog.tsx"),
   reviewAction("request a revision", "request_revision", "Request Revision…", "features/records/paper-view/RequestRevisionDialog.tsx"),
   reviewAction("clear a paper at an office", "office_review", "Clear…", "features/records/paper-view/OfficeReviewDialog.tsx"),
   reviewAction("record an office finding", "office_review", "Record finding…", "features/records/paper-view/OfficeReviewDialog.tsx"),

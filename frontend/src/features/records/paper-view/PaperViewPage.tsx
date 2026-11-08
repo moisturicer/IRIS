@@ -62,6 +62,7 @@ import { AskIrisFab } from "./AskIrisFab";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { EmbargoCard } from "./EmbargoCard";
+import { UnlistedCard } from "./UnlistedCard";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
@@ -718,7 +719,7 @@ export default function PaperViewPage() {
       ? "elsewhere"
       : can.has("open_review") && section !== "review"
         ? "open_review"
-        : section === "review" && REVIEW_ACTIONS.some((action) => can.has(action.capability))
+        : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
           ? "elsewhere"
           : hasPaper
             ? "view"
@@ -1236,6 +1237,7 @@ export default function PaperViewPage() {
                 {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
                 <PaperGovernance record={record} />
                 <EmbargoCard record={record} onChanged={reloadRecord} />
+                <UnlistedCard record={record} onChanged={reloadRecord} />
                 <PaperDocuments
                   files={record.files}
                   manageHref={participant ? `/records/${record.id}?section=review&documents=open` : null}

@@ -157,6 +157,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-replace-adviser": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
     "record-add-owner": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
     "record-withdraw": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
+    # ADR-047 §10 (IR-878): RDCO alone publishes an Unlisted paper later. A role
+    # gate before the lookup; `record` is in review, not Unlisted, so RDCO gets
+    # a 400 and the call changes nothing.
+    "record-publish-unlisted": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
@@ -507,8 +511,21 @@ ACCOUNTS = {
     "password-reset-confirm": Entry({"POST": _case(PUBLIC, data={
         "token": "x" * 43, "new_password": "Recovery-test-42", "confirm_password": "Recovery-test-42",
     })}),
+    # IR-643: verification follows the same contract. Neither signs anyone in.
+    "verification-resend": Entry({"POST": _case(PUBLIC, data={"email": "unknown@cit.edu"})}),
+    "verification-confirm": Entry({"POST": _case(PUBLIC, data={"token": "x" * 43})}),
     "user-list": Entry({"GET": _case(ACCOUNT_ADMINS)}),
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
+    # IR-785: a person asks about, makes or cancels their own deletion request;
+    # nothing is looked up by id, so every signed-in caller acts on their own.
+    "user-me-deletion-request": Entry({"GET": _case(SIGNED_IN), "POST": _case(SIGNED_IN, data={}),
+                                       "DELETE": _case(SIGNED_IN)}),
+    # ADR-051 §8: the System Admin alone decides; RDCO has no access.
+    "account-deletion-request-list": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
+    "account-deletion-request-confirm": Entry({"POST": _case(
+        SYSTEM_ADMIN_ONLY, kwargs={"pk": Ref("deletion_request")}, data={})}),
+    "account-deletion-request-reject": Entry({"POST": _case(
+        SYSTEM_ADMIN_ONLY, kwargs={"pk": Ref("deletion_request")}, data={"reason": "Matrix check."})}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                       for m in ("GET", "PUT", "PATCH")}),
     # IR-786: the caller's own data, whoever they are. No id to name, so there is

@@ -104,7 +104,8 @@ class MyResearchSerializer(serializers.ModelSerializer):
     def get_adviser_name(self, obj):
         if obj.adviser:
             return obj.adviser.get_full_name() or obj.adviser.email
-        return None
+        # A deleted Adviser's name, kept as plain text (IR-785).
+        return obj.adviser_name or None
 
     def get_workflow_state(self, obj):
         return self._facts(obj)["workflow_state"]
@@ -243,6 +244,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # stale dialog never decides into a changed record. A rendering hint;
     # `decide/` re-checks it.
     decision             = serializers.SerializerMethodField()
+    # RDCO's later publish of an Unlisted paper (ADR-047 §10, IR-878):
+    # `{blocked}` -- the embargo holding it back, or null -- to an RDCO member
+    # on an Unlisted paper, and `None` to everyone else. A rendering hint;
+    # `publish-unlisted/` re-checks it.
+    publish_unlisted     = serializers.SerializerMethodField()
     # What the viewer may be offered (ADR-032 §10, IR-418): `core.permissions`
     # assembles it from the blocks above. A rendering hint; every action
     # endpoint re-checks its own predicate, so the server stays authoritative.
@@ -386,6 +392,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return self._once(obj, "decision", lambda: decision_flags(obj, self._viewer()))
 
+    def get_publish_unlisted(self, obj):
+        from apps.records.unlisted import offer_payload
+
+        return self._once(obj, "publish_unlisted", lambda: offer_payload(obj, self._viewer()))
+
     def get_capabilities(self, obj):
         from core.permissions import record_capabilities
 
@@ -393,7 +404,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             obj, self._viewer(), workflow=self._workflow(obj),
             my_seats=self.get_my_seats(obj), routing=self.get_routing(obj),
             office_review=self.get_office_review(obj), revision=self.get_revision(obj),
-            decision=self.get_decision(obj),
+            decision=self.get_decision(obj), publish_unlisted=self.get_publish_unlisted(obj),
         )
 
     def get_readiness(self, obj):
@@ -553,7 +564,8 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def get_adviser_name(self, obj):
         if obj.adviser:
             return obj.adviser.get_full_name() or obj.adviser.email
-        return None
+        # A deleted Adviser's name, kept as plain text (IR-785).
+        return obj.adviser_name or None
 
     def _open_profile_ids(self, obj) -> set:
         from apps.accounts.public_profile import open_profile_ids
@@ -595,7 +607,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "review_claim", "is_participant", "routing",
-            "office_review", "revision", "decision", "capabilities", "readiness", "keywords",
+            "office_review", "revision", "decision", "publish_unlisted", "capabilities", "readiness", "keywords",
             "dpa_accepted", "dpa_accepted_at", "details_revision", "metadata_sources",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

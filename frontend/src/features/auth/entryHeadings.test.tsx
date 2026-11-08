@@ -20,7 +20,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
-import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/auth.store";
 import type { OwnRoleRequest } from "@/types/auth";
 
@@ -28,10 +27,10 @@ import { makeUser } from "@/test/authFixtures";
 
 import { renderScreen, screen } from "@/test/render";
 
-import EmailVerifyPage from "./EmailVerifyPage";
 import LoginPage from "./LoginPage";
 import { PendingApprovalPage } from "./PendingApprovalPage";
 import SignupPage from "./SignupPage";
+import VerifyEmailPage from "./VerifyEmailPage";
 
 /** The pending screen is shown only to a signed-in applicant (IR-537). */
 function renderStanding(roleRequest: OwnRoleRequest) {
@@ -72,17 +71,16 @@ const SCREENS: EntryScreen[] = [
   {
     name: "email verification",
     render: () => {
-      vi.spyOn(authApi, "activate").mockResolvedValue({ data: {} } as never);
-      // The screen reads its secret from the fragment (IR-928), so it is mounted on the real route.
-      window.history.replaceState(null, "", "/activate#uid=abc&token=def");
+      // The screen reads its secret from the fragment (ADR-045 §3), so it is mounted on the real route.
+      window.history.replaceState(null, "", "/verify-email#token=abc");
       renderScreen(
         <Routes>
-          <Route path="/activate" element={<EmailVerifyPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Routes>,
-        { route: "/activate#uid=abc&token=def" },
+        { route: "/verify-email#token=abc" },
       );
     },
-    title: "Email Verified",
+    title: "Verify your email",
   },
   {
     name: "pending approval",

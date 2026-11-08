@@ -12,11 +12,12 @@ LEFT, LINE = 72, 16
 
 
 def pdf(pages, *, running_head="Community Waste-to-Energy Feasibility", numbered=True,
-        size=letter) -> bytes:
+        size=letter, number_at=36, first_number=1) -> bytes:
     """A PDF from ``pages``: each a list of ``(kind, text)`` with kind
     ``heading`` (bold), ``plain`` (body font, e.g. a numbered or capitals
     heading), ``para`` (an indented paragraph, one item per line), ``table``
-    (rows of cells, ruled) or ``blank`` (a vertical gap)."""
+    (rows of cells, ruled) or ``blank`` (a vertical gap). Each page's number
+    is drawn ``number_at`` pt above the bottom, counting from ``first_number``."""
     out = BytesIO()
     c = canvas.Canvas(out, pagesize=size)
     width, height = size
@@ -42,7 +43,7 @@ def pdf(pages, *, running_head="Community Waste-to-Energy Feasibility", numbered
                 y -= LINE * 2
         if numbered:
             c.setFont(BODY, 10)
-            c.drawCentredString(width / 2, 36, str(number))
+            c.drawCentredString(width / 2, number_at, str(number + first_number - 1))
         c.showPage()
     c.save()
     return out.getvalue()
@@ -75,6 +76,32 @@ def two_columns(left_lines, right_lines, size=letter) -> bytes:
         for line in lines:
             c.drawString(x, y, line)
             y -= 14
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def columns_around(above, wide, below, size=letter) -> bytes:
+    """A two-column page with a block of full-width lines between its halves,
+    as a table set across both columns. ``above`` and ``below`` are each
+    ``(left_lines, right_lines)``."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    width, height = size
+    c.setFont(BODY, 11)
+    y = height - 90
+
+    def halves(pair, y):
+        for x, lines in ((LEFT, pair[0]), (width / 2 + 18, pair[1])):
+            for i, line in enumerate(lines):
+                c.drawString(x, y - 14 * i, line)
+        return y - 14 * max(len(pair[0]), len(pair[1])) - 10
+
+    y = halves(above, y)
+    for line in wide:
+        c.drawString(LEFT, y, line)
+        y -= 14
+    halves(below, y - 10)
     c.showPage()
     c.save()
     return out.getvalue()
@@ -213,6 +240,164 @@ def placed(pages, size=letter) -> bytes:
             c.setFont(font, font_size)
             c.drawString(x, y, text)
         c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def unruled_table(caption_lines, header, rows, size=letter) -> bytes:
+    """A heading and a paragraph, then a bold caption over ``caption_lines``,
+    a table with no rules (its bold ``header`` row and plain ``rows``, cells
+    at fixed columns far apart), then a second heading and paragraph."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 90
+    columns = (LEFT, LEFT + 160, LEFT + 300)
+
+    def para(heading):
+        nonlocal y
+        c.setFont(BOLD, 12)
+        c.drawString(LEFT, y, heading)
+        y -= 18
+        c.setFont(BODY, 11)
+        for line in ("The results below compare the groups on each concept that the survey",
+                     "asked about, and the table gives the test for each of them in turn."):
+            c.drawString(LEFT, y, line)
+            y -= 14
+        y -= 14
+
+    para("Results")
+    c.setFont(BOLD, 11)
+    for line in caption_lines:
+        c.drawString(LEFT, y, line)
+        y -= 14
+    y -= 6
+    for r, cells in enumerate([header] + rows):
+        c.setFont(BOLD if r == 0 else BODY, 11)
+        for x, cell in zip(columns, cells):
+            c.drawString(x, y, cell)
+        y -= 14
+    y -= 14
+    para("Discussion")
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def sized_headings(sections, heading_font=BODY, size=letter) -> bytes:
+    """``(heading, [body lines])`` sections whose headings are set 12 pt in
+    ``heading_font`` over a 10 pt body, as some journals mark their headings by
+    size and an italic or a font that isn't named bold."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 90
+    for heading, lines in sections:
+        c.setFont(heading_font, 12)
+        c.drawString(LEFT, y, heading)
+        y -= 18
+        c.setFont(BODY, 10)
+        for line in lines:
+            c.drawString(LEFT, y, line)
+            y -= 12
+        y -= 10
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def mixed_font_words(lines, size=letter) -> bytes:
+    """Lines whose pieces are drawn one after another with no gap, each piece
+    ``(font, text)`` or ``(font, text, pull)``, the next piece then drawn
+    ``pull`` points further left (a tightly justified line's narrow space).
+    Some publishers set ligatures, apostrophes and dashes in a second font,
+    inside a word."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 100
+    for pieces in lines:
+        x = LEFT
+        for font, text, *pull in pieces:
+            c.setFont(font, 11)
+            c.drawString(x, y, text)
+            x += c.stringWidth(text, font, 11) - (pull[0] if pull else 0)
+        y -= LINE
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def raised_bullets(intro, items, mark="o", font="Courier", rise=3, size=letter) -> bytes:
+    """A paragraph, then list ``items`` each led by ``mark`` in ``font`` drawn
+    ``rise`` pt above its text's baseline, as Word sets its second-level "o"
+    bullet in Courier New."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 100
+    c.setFont(BODY, 12)
+    c.drawString(LEFT, y, intro)
+    for item in items:
+        y -= 18
+        c.setFont(font, 12)
+        c.drawString(LEFT + 36, y + rise, mark)
+        c.setFont(BODY, 12)
+        c.drawString(LEFT + 54, y, item)
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def drawn_twice(heading, rows, size=letter) -> bytes:
+    """A bold heading over a ruled table, every character drawn twice in the
+    same place, as some exporters print a table."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    for _ in range(2):
+        c.setFont(BOLD, 12)
+        c.drawString(LEFT, size[1] - 90, heading)
+        _table(c, rows, size[1] - 120)
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def below_the_page(paragraph, hidden, size=letter) -> bytes:
+    """A paragraph on the page, then ``hidden`` lines and a ruled table drawn
+    below its bottom edge, where nothing shows, as Word left a chart's labels
+    in sample12."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    c.setFont(BODY, 12)
+    c.drawString(LEFT, size[1] - 100, paragraph)
+    y = -40
+    for line in hidden:
+        c.drawString(LEFT, y, line)
+        y -= 16
+    _table(c, [["CONTROL", "REACH"], ["43", "41"]], y)
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def white_boxed_columns(left_paragraphs, right_paragraphs, size=letter) -> bytes:
+    """Two columns of paragraphs, every line on an invisible box: filled white,
+    no border, as wide as its column, and starting at the indent on a
+    paragraph's first line. Some journal PDFs are exported this way, and the
+    boxes' edges then look like a table's grid."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    width, height = size
+    column = width / 2 - LEFT - 9
+    for x, paragraphs in ((LEFT, left_paragraphs), (width / 2 + 9, right_paragraphs)):
+        y = height - 90
+        for lines in paragraphs:
+            for i, line in enumerate(lines):
+                indent = 17 if i == 0 else 0
+                c.setFillColorRGB(1, 1, 1)
+                c.rect(x + indent, y - 3, column - indent, 13, stroke=0, fill=1)
+                c.setFillColorRGB(0, 0, 0)
+                c.setFont(BODY, 10)
+                c.drawString(x + indent, y, line)
+                y -= 13
+    c.showPage()
     c.save()
     return out.getvalue()
 

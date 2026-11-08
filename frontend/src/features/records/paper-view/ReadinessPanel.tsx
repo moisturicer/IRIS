@@ -22,6 +22,7 @@ const ACTION_WORDS: Record<string, string> = {
   open_documents: "Open Documents",
   show_party: "Show reviewers",
   route: "Request review",
+  show_threads: "Show threads",
 };
 
 /**

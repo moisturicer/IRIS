@@ -11,7 +11,9 @@ import {
 } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 import { CitationOverlay } from "./CitationOverlay";
-import { paintFindHits } from "./findHighlights";
+import { FIND_HIT_CURRENT_CLASS, paintFindHits } from "./findHighlights";
+import { passageFromRange, type Passage } from "./threads/passage";
+import { ThreadMarks, useReaderAnnotations, type ReaderMark } from "./threads/readerAnnotations";
 import type { FindHit } from "./findInPaper";
 import { PaperFind } from "./PaperFind";
 import {
@@ -155,6 +157,7 @@ function PdfPageView({
   pageNumber,
   scale,
   regions,
+  marks,
   hits,
   registerRef,
   onPaint,
@@ -165,6 +168,8 @@ function PdfPageView({
   pageNumber: number;
   scale: number;
   regions: Region[];
+  /** Review threads' highlights and pins (IR-875); empty outside Review. */
+  marks: ReaderMark[];
   hits: FindHit[];
   registerRef: (pageNumber: number, el: HTMLDivElement | null) => void;
   onPaint: (page: number, scale: number | null) => void;
@@ -188,6 +193,7 @@ function PdfPageView({
     >
       {live && page && <LivePageLayers page={page} scale={scale} hits={hits} onPaint={onPaint} />}
       <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
+      <ThreadMarks marks={marks} page={pageNumber} />
     </div>
   );
 }
@@ -291,6 +297,16 @@ function PaperPdfReaderSource({
     });
   }, []);
   const [findLanding, setFindLanding] = useState<{ page: number; region: RegionBand } | null>(null);
+  // Review's threads (IR-875): drawn only on the Version they quote, and a
+  // thread the workspace asks to show is landed on like a find match.
+  const annotations = useReaderAnnotations();
+  const shownVersion = version ?? annotations?.currentVersion ?? null;
+  const marks = useMemo(
+    () => (annotations?.marks ?? []).filter((m) => m.version === shownVersion),
+    [annotations?.marks, shownVersion],
+  );
+  const threadLanding = annotations?.landing ?? null;
+  const [commentable, setCommentable] = useState(false);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const paneRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -445,13 +461,92 @@ function PaperPdfReaderSource({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [findLanding, painted, scale]);
 
+  // A thread's passage, once its page is painted at this zoom (IR-875).
+  const landedThreadRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!threadLanding || landedThreadRef.current === threadLanding.key) return;
+    if (painted.get(threadLanding.page) !== scale) return;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (land(threadLanding.page, threadLanding, reduceMotion ? "auto" : "smooth")) {
+      landedThreadRef.current = threadLanding.key;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadLanding, painted, scale]);
+
+  /**
+   * The passage *Comment* would anchor to: the reader's text selection, else
+   * find's current match -- the keyboard's way to a passage, since a text
+   * layer can't be selected without a pointer (IR-875).
+   */
+  const currentPassage = (): Passage | null => {
+    const root = scrollAreaRef.current;
+    if (!root) return null;
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      if (root.contains(range.commonAncestorContainer)) return passageFromRange(range, root);
+    }
+    const current = root.querySelectorAll(`mark.${FIND_HIT_CURRENT_CLASS}`);
+    if (current.length === 0) return null;
+    const range = document.createRange();
+    range.setStartBefore(current[0]);
+    range.setEndAfter(current[current.length - 1]);
+    return passageFromRange(range, root);
+  };
+  const currentPassageRef = useRef(currentPassage);
+  currentPassageRef.current = currentPassage;
+  // Only a passage of a known Version can be anchored (ADR-032 §7).
+  const commentOn = shownVersion !== null ? annotations?.onComment ?? null : null;
+  const commentOnRef = useRef(commentOn);
+  commentOnRef.current = commentOn;
+  const onComment = useMemo(
+    () => (commentOn ? (passage: Passage) => commentOnRef.current?.(passage, shownVersion as number) : null),
+    // Stable while commenting stays possible on this Version.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [commentOn !== null, shownVersion],
+  );
+  const findMatch = find.open && find.targetPage !== null;
+
+  useEffect(() => {
+    if (!onComment) return;
+    const arm = () => setCommentable(currentPassageRef.current() !== null);
+    arm();
+    document.addEventListener("selectionchange", arm);
+    return () => document.removeEventListener("selectionchange", arm);
+  }, [onComment, findMatch, find.hitsByPage, painted]);
+
+  const comment = () => {
+    const passage = currentPassageRef.current();
+    if (passage && onComment) onComment(passage);
+  };
+  // C comments on the passage, as the prototype's reader does -- not while
+  // typing, and not under a dialog.
+  useEffect(() => {
+    if (!onComment) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "c" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (target?.closest('[role="dialog"],[role="alertdialog"]')) return;
+      // The reader's own key: from inside it, or from nowhere in particular,
+      // as after a pointer selection -- never from another control's focus.
+      if (target && target !== document.body && !paneRef.current?.contains(target)) return;
+      const passage = currentPassageRef.current();
+      if (!passage) return;
+      e.preventDefault();
+      onComment(passage);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onComment]);
+
   // A citation's page and find's are painted before the reader is moved
   // there (`liveWindow`'s pins), and loaded out of turn if the background
   // loader has not reached them yet.
   const targetPage = find.targetPage;
   const live = useMemo(
-    () => new Set(liveWindow(currentPage, lastVisiblePage, pageCount, [scrollToPage, targetPage])),
-    [currentPage, lastVisiblePage, pageCount, scrollToPage, targetPage],
+    () => new Set(liveWindow(currentPage, lastVisiblePage, pageCount, [scrollToPage, targetPage, threadLanding?.page ?? null])),
+    [currentPage, lastVisiblePage, pageCount, scrollToPage, targetPage, threadLanding?.page],
   );
   useEffect(() => {
     live.forEach(prioritize);
@@ -566,6 +661,21 @@ function PaperPdfReaderSource({
           >
             <SearchGlyph className="h-3.5 w-3.5" />
           </Button>
+          {onComment && (
+            <Button
+              variant={commentable ? "outline" : "ghost"}
+              size="sm"
+              onClick={comment}
+              // Pressing it must not drop the selection it comments on.
+              onMouseDown={(e) => e.preventDefault()}
+              disabled={!ready || !commentable}
+              aria-keyshortcuts="C"
+              title={commentable ? "Comment on this passage (C)" : "Select a passage, or find one, to comment on it"}
+            >
+              <i className="fas fa-comment-medical" aria-hidden />
+              Comment
+            </Button>
+          )}
         </div>
 
         {!fill && ready && (
@@ -630,6 +740,7 @@ function PaperPdfReaderSource({
               pageNumber={index + 1}
               scale={scale}
               regions={highlightRegions}
+              marks={marks}
               hits={find.hitsByPage.get(index + 1) ?? NO_HITS}
               registerRef={registerRef}
             />

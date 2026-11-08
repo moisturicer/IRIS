@@ -232,6 +232,20 @@ _Avoid_: Revision (the act that produces a Version, not the Version), file versi
 The private conversation on a submitted Record between its owners and everyone who has held a [[Seat]] on it, shown in its review timeline. Never mixed with [[Comment]]s.
 _Avoid_: Comments (the public thread), notes, chat.
 
+### Templates
+
+**Requirement**:
+A document a record type asks for, labelled Required or Optional, which RDCO sets. A submitted Record keeps its file for that requirement; the label informs and never stops a submission.
+_Avoid_: Upload slot (the code's name for it), checklist item, mandatory document.
+
+**Template**:
+A file people download and follow when preparing a document for a Record, such as a blank Release Form or a proposal format. RDCO attaches one to a [[Requirement]]; an [[Adviser]] can share their own for Proposals. What people produce from it is the document they submit.
+_Avoid_: Form (the filled-in document, not the file to follow), request template (that is a [[Request preset]]).
+
+**Request preset**:
+An office's saved list of documents, sent together as one document request. Deferred until an office shows it needs one (IR-118).
+_Avoid_: Request template, checklist, template.
+
 ### Comments
 
 **Comment**:
@@ -339,7 +353,7 @@ The Research and Development Coordinating Office, responsible for final approval
 _Avoid_: Admin, administrator.
 
 **System Admin**:
-The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments and publishing [[Notice]]s with RDCO. Nobody can ask for it; developers set up the first one.
+The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments with RDCO. It sees who published each [[Notice]] but does not publish one. Nobody can ask for it; developers set up the first one.
 _Avoid_: Admin (on its own), administrator, superuser.
 
 **Suspension**:
@@ -351,7 +365,7 @@ Removing a person from IRIS at their own request, once the System Admin confirms
 _Avoid_: Closure, close account, deactivate.
 
 **Notice**:
-The text a person answers to give Signup consent and AI consent. RDCO or the System Admin publishes each new version by pasting it, and a published version never changes.
+The text a person answers to give Signup consent and AI consent. RDCO alone publishes each new version by pasting it, and a published version never changes.
 _Avoid_: Terms, DPA terms, privacy policy (a document the university writes).
 
 **Signup consent**:

@@ -92,6 +92,12 @@ const DELETE_REQUEST = {
   reason: "Submitted by mistake.", status: "pending", reviewed_by: null, reviewed_at: null, created_at: when("11-04"),
 };
 
+const DELETION_REQUEST = {
+  id: 1, status: "pending", created_at: when("11-04"), decided_at: null, reason: "",
+  user: { id: 11, name: "Maria Cristina Dela Cruz-Santos", email: "maria.cristina@students.cit.edu", role: "Student" },
+  blockers: [], capabilities: { can_confirm: true, can_reject: true },
+};
+
 const AUDIT_EVENT = {
   id: 1, event_type: "LOGIN", user: 11, user_name: "Maria Cristina Dela Cruz-Santos",
   record: 101, record_title: LONG_TITLE, metadata: {}, created_at: when("11-05"),
@@ -128,21 +134,32 @@ export const SCREENS: Screen[] = [
     heading: "Create an Account",
     primary: (p) => p.getByRole("button", { name: "Continue to affiliation" }), primaryLabel: "Continue to affiliation",
   },
-  // IR-928: the secret is in the fragment and the page POSTs it in a body. The
-  // link is one the server refuses, so the screen is drawn in its failed state.
+  // ADR-045 (IR-643). Opening the link verifies nothing, so the screen is drawn
+  // before its one POST and needs no mock.
+  {
+    id: "verify-email", path: "/verify-email#token=abc", route: "/verify-email", role: null,
+    heading: "Verify your email",
+    primary: (p) => p.getByRole("button", { name: "Verify email" }), primaryLabel: "Verify email",
+  },
+  {
+    id: "verify-email-resend", path: "/verify-email/resend", route: "/verify-email/resend", role: null,
+    heading: "Send a new verification email",
+    primary: (p) => p.getByRole("button", { name: "Send verification email" }),
+    primaryLabel: "Send verification email",
+  },
+  // Both retired link shapes (IR-643, ADR-045 §8) land on the same guidance,
+  // with no request at all.
   {
     id: "activate", path: "/activate#uid=abc&token=def", route: "/activate", role: null,
-    mocks: (api) => api.on("POST", "/auth/activate/", { detail: "Invalid link" }, 400),
-    heading: "Verification Failed",
-    primary: (p) => p.getByRole("link", { name: "Register again" }), primaryLabel: "Register again",
+    heading: "This link can't be used",
+    primary: (p) => p.getByRole("link", { name: "Resend verification email" }),
+    primaryLabel: "Resend verification email",
   },
-  // The deprecated path shape of links emailed before IR-928 is still routed
-  // (until those tokens expire), so it keeps a row; it now POSTs too.
   {
     id: "activate-path", path: "/activate/abc/def", route: "/activate/:uidb64/:token", role: null,
-    mocks: (api) => api.on("POST", "/auth/activate/", { detail: "Invalid link" }, 400),
-    heading: "Verification Failed",
-    primary: (p) => p.getByRole("link", { name: "Register again" }), primaryLabel: "Register again",
+    heading: "This link can't be used",
+    primary: (p) => p.getByRole("link", { name: "Resend verification email" }),
+    primaryLabel: "Resend verification email",
   },
   {
     id: "password-forgot", path: "/password/forgot", route: "/password/forgot", role: null,
@@ -181,6 +198,8 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/library/saves/", { results: [] });
       api.on("GET", `/ai/records/${PAPER.id}/overview/`, { state: "not_indexed", overview: null });
       api.on("GET", `/records/${PAPER.id}/similar/`, { results: [] });
+      // Review threads (IR-875): the review workspace reads them beside the tracker.
+      api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
     }),
     heading: PAPER.title,
     primary: (p) => p.getByRole("button", { name: /Cite/ }).first(), primaryLabel: "Cite",
@@ -350,6 +369,13 @@ export const SCREENS: Screen[] = [
     heading: "Users",
     primary: (p) => p.getByRole("button", { name: "Filter" }), primaryLabel: "Filter",
     table: (p) => p.getByRole("table").first(),
+  },
+  {
+    id: "account-deletion-requests", path: "/admin/account-deletion-requests",
+    route: "/admin/account-deletion-requests", role: "System Admin",
+    mocks: wrap("System Admin", (api) => api.on("GET", "/users/deletion-requests/", paginated([DELETION_REQUEST]))),
+    heading: "Account Deletion Requests",
+    primary: (p) => p.getByRole("button", { name: "Confirm deletion" }), primaryLabel: "Confirm deletion",
   },
   {
     id: "audit-log", path: "/admin/audit", route: "/admin/audit", role: "System Admin",

@@ -149,6 +149,9 @@ def _thread_items(*, facts, routing, office_review, decision, revision, deciding
             text = f"{who} {_threads_said(row)}."
             if deciding and decision.get("party") == Party.RDCO and row["must_fix"]:
                 text += " A Decision now closes them, with your reason."
+            elif facts.get("owner") and party != OWNER and row["must_fix"]:
+                # Not a blocker yet: say why it does not contradict "nothing waits" (IR-875).
+                text += " It holds your next version only if they ask for a revision."
         items.append(_item(
             "open_thread", BLOCKER if holds_approval or holds_version else INFO, text,
             party=party or None, action=action,
@@ -213,6 +216,10 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
     if not deciding:
         closing = set()
 
+    # Parties whose open revision request the owner is already told about (IR-875):
+    # their seat stays open until a decision, so the card says what it waits for.
+    revision_asked = {r["party"] for r in revision.get(ResubmissionRequestState.OPEN.value) or []}
+
     for assignment in facts["assignments"]:
         party, label = assignment["party"], assignment["label"]
         if any(s["reviewer"] == viewer for s in assignment["seats"]):
@@ -228,8 +235,10 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
                 action=_action("claim", assignment["id"]) if claimable else _action("show_party", party),
             ))
             continue
+        waiting = " is reviewing, waiting for your revision." if facts.get("owner") and party in revision_asked \
+            else " is reviewing."
         items.append(_item(
-            "party_reviewing", INFO, f"{label} is reviewing.{_closing_suffix(party, closing)}", party=party,
+            "party_reviewing", INFO, f"{label}{waiting}{_closing_suffix(party, closing)}", party=party,
             actor_name=", ".join(s["name"] for s in assignment["seats"] if s["name"]) or None,
             since=assignment["opened_at"], action=_action("show_party", party),
         ))
@@ -274,6 +283,11 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
     elif review_claim:
         verdict = "waiting_on_you"
         headline = f"{review_claim['party_label']} has not claimed this review yet."
+    elif any(i["kind"] == "open_thread" and i["severity"] == BLOCKER for i in items):
+        # The owner's own blocker: an unanswered Must fix holds their next
+        # Version, so the headline can't say nothing waits on them (IR-875).
+        verdict = "waiting_on_you"
+        headline = "Answer the open Must fix threads before you submit your next version."
     else:
         verdict, headline = "none", "Nothing here waits on you."
     return {"verdict": verdict, "headline": headline, "items": items}

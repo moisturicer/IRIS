@@ -175,21 +175,29 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
 | **IR-833** | Publish fills in a reliable title and abstract from the PDF and never overwrites the author's edits — no FR- id; IR-830 decisions 14–18 | [details](traceability/IR-833.md) | **IMPLEMENTED** |
 | **IR-846** | Publish suggestions for a LlamaParse Manuscript come from LlamaExtract, each with its page, cited text and reported confidence — no FR- id; ADR-056 §15 within IR-830's contract | [details](traceability/IR-846.md) | **IMPLEMENTED** |
+| **IR-886** | The agent's search finds permitted Passages by meaning as well as by keyword, narrowed by Area, PSCED area, record type or years, with one read policy — under IR-712, ADR-049 (2026-11-07 amendment); no FR- id | [details](traceability/IR-886.md) | **PARTIAL** |
 | **IR-885** | A runtime question runs at deep depth unless the reader chooses ordinary | [details](traceability/IR-885.md) | **PARTIAL** |
 | **IR-884** | ADR-049 and the AI runtime spec are on `main`; IR-714's resume, export and review questions have owners | [details](traceability/IR-884.md) | **PARTIAL** |
 | **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
 | **IR-754** | A reader deliberately compacts an owned Conversation from Ask IRIS or Paper Chat as a run of its own, through IR-734's mechanism, and sees what happened — under IR-715, ADR-049 §19; no FR- id | [details](traceability/IR-754.md) | **PARTIAL** |
 | **IR-736** | A long-paper investigation continues across repeated compactions and safely rebuilds when native continuation state is incompatible — under IR-715, ADR-049 §19–20; no FR- id | [details](traceability/IR-736.md) | **PARTIAL** |
+| **IR-785** | A person asks to delete their account; the System Admin confirms it once nobody is waiting on them, erasing their details and private data and keeping the row — under IR-779, ADR-051 decisions 8–12, 28; no FR- id | [details](traceability/IR-785.md) | **PARTIAL** |
+| **IR-788** | The System Admin's Account Deletion Requests page shows blockers, and confirms or rejects from the API's capabilities — under IR-779, ADR-051 decisions 8–9; no FR- id | [details](traceability/IR-788.md) | **PARTIAL** |
 | **IR-928** | The verification link keeps its secret in the URL fragment and the page posts it in a body; links already emailed keep working for the 3 days their tokens live — from IR-829 (ASVS 8.3.1); no FR- id | [details](traceability/IR-928.md) | **PARTIAL** |
+| **IR-643** | Resend account verification email: single-use, 24-hour verification links on IR-642's durable recovery path, registration on the same path, and the old activation links retired — ADR-045; closes IR-937's removal; no FR- id | [details](traceability/IR-643.md) | **PARTIAL** |
 | **IR-784** | RDCO is told once, in the app, of a Student or Adviser role request when the person verifies their email; an unverified or repeated link alerts nobody — under IR-779, ADR-051 decision 20; no FR- id | [details](traceability/IR-784.md) | **PARTIAL** |
 | **IR-880** | A running AI-runtime investigation keeps reading under its reader's renewed grant, never widens scope, and still ends at the next read or admission once the reader stops reconnecting or loses access — under IR-713, ADR-049 §6, §9; no FR- id | [details](traceability/IR-880.md) | **PARTIAL** |
 | **IR-726** | A reader stops, reconnects with a journal cursor, or explicitly retries one AI-runtime investigation across worker races without duplicate delivery, continued admissions or a renewed allowance — under IR-713, ADR-049 §11; no FR- id | [details](traceability/IR-726.md) | **PARTIAL** |
 | **IR-752** | An operator builds a pending Embedding Space beside the active one, with space-keyed Record and Passage vectors, while readers keep searching the active space — under IR-716, ADR-049 §23; additive expand only, no activation (IR-739); no FR- id | [details](traceability/IR-752.md) | **PARTIAL** |
 | **IR-739** | An operator verifies and atomically promotes a complete Embedding Space pair (Record and Passage vectors), or rolls back to the previous revision, with readers and the `ai/` runtime moved onto space-keyed Record vectors and no revoked source resurrected — under IR-716, ADR-049 §23; no live provider, no production upgrade; no FR- id | [details](traceability/IR-739.md) | **PARTIAL** |
+| **IR-721** | After access changes a reader or reviewer cannot recover revoked research by reopening, reconnecting, replaying or opening a saved Conversation, and a review packet is judged again by the opening account's access — under IR-712, ADR-049 §15; no FR- id | [details](traceability/IR-721.md) | **PARTIAL** |
 | **IR-740** | IR-605 collects the dedicated runtime through its real authenticated routes under an explicit engine identity, and rescores old baselines with effective-condition preflight and a separate capability report — under IR-716, ADR-049 §24; no FR- id | [details](traceability/IR-740.md) | **PARTIAL** |
+| **IR-741** | The release-readiness manifest reports quality, safety, baseline, scenario, workload and cost evidence per gate and refuses to call missing, fake or incomparable evidence a pass — under IR-716, ADR-049 §25-§26; no FR- id | [details](traceability/IR-741.md) | **PARTIAL** |
 | **IR-882** | Every paper starts embargoed; Publish asks no embargo question; only the Adviser or RDCO date or release one, and RDCO publishes only a released paper — extends FR-M3-02 (stable label only); ADR-052 IR-879 amendment | [details](traceability/IR-882.md) | **IMPLEMENTED** |
 | **IR-871** | Each Version keeps its review text, read on campus with pdfplumber and no AI, whatever the embargo or consent; never chunked, embedded or retrieved, and served only under `may_read_review` — ADR-058 §1 as amended 2026-11-05; touches FR-M5-01 (stable label only); run on three Version pairs of real CIT-U papers | [details](traceability/IR-871.md) | **IMPLEMENTED** |
 | **IR-874** | Review threads, backend: anchored threads, *Must fix* and *Suggestion*, drafts sent by Finish review, *Comment only*, resolving and answering, and what an open *Must fix* blocks — ADR-032 §7 (2026-11-04, corrected 2026-11-06); no FR- id | [details](traceability/IR-874.md) | **IMPLEMENTED** |
+| **IR-875** | Review threads, frontend: comment on a selection or find match, the Threads tab, and the Finish review dialog, driven by server capabilities — ADR-032 §7 (2026-11-04, corrected and noted 2026-11-06); no FR- id | [details](traceability/IR-875.md) | **IMPLEMENTED** |
+| **IR-878** | RDCO publishes an Unlisted paper later, only once its embargo is released, and the history keeps its Decision as *kept unlisted* — ADR-047 §10, ADR-052 decision 14 as amended; no FR- id | [details](traceability/IR-878.md) | **IMPLEMENTED** |
 
 ### Non-functional
 
@@ -303,3 +311,40 @@ IR-754, which is implemented and reported as `capabilities.manual_compaction`. C
 publication evidence records 5,696 passing backend tests, 1,706 passing frontend
 tests and the isolated CI-equivalent setup. Automated standards/spec reviews were performed and
 their material findings addressed; independent human approval and CI remain required.
+
+### IR-889 — AI-runtime paid research disclosure (development proxy only)
+
+Research tool outcomes now retain their source revisions outside the provider
+payload. Tool messages, recalled Conversation state and subsequent model turns
+carry those dependencies through the agent loop. Persisted earlier answers with
+no source manifest are explicitly unverified and refused by the paid transport.
+The send guard now admits explicitly listed source revisions from public
+proxy or synthetic Records in an expiring IR-889 development manifest **through
+the recording provider**. Real vendor adapters remain closed until IR-827's
+account-specific no-training and retention evidence is recorded. Each
+physical attempt rechecks the running fence, reader grant, row-security read,
+Paper Chat scope, active chunk revision, non-IP origin and answered embargo.
+The exact model, endpoint, account digest and campaign must match the manifest;
+production and unconfigured deployments refuse. Changed, revoked, withheld,
+untagged and unverifiable prior content sends nothing. Capacity-withheld tool
+results become a fixed neutral marker with no source-dependent byte length;
+only trusted local control results may use an empty dependency set. Real institutional
+Records remain refused. Merged PR #534 records the development decision, while
+IR-791's canonical Contact-person answer and IR-827's OpenRouter account and
+eligible-endpoint policy evidence remain prerequisites. The exact Luna model
+also needs a verified capacity and conservative price before a smoke run.
+
+**Evidence (2026-11-05):** seventeen pure source-provenance and recording-provider
+tests passed, covering an allowed proxy payload, withheld/revoked/changed
+sources, retry rechecks, missing approval and production refusal. Changed
+Python files compiled and passed the repository's flake8 configuration.
+The AI runtime suite passed 59 tests; affected backend context and agent-loop
+contract tests passed 64 tests. Eight focused real-PostgreSQL tests then passed
+under the restricted runtime login: one approved source, five changed/withheld
+facts, one expired approval, and one search → read → final-answer run. A full
+backend run stopped on unrelated
+pre-existing local configuration (`AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT` in
+production-settings test); with it disabled, the next failure was in the
+already-dirty `apps.ai.tasks` chunking callback signature.
+No live vendor call, cost, or quality result is claimed. IR-889 remains
+blocked before real-paper and live-pilot criteria.

@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     RUNS_POLL_SECONDS: float | None = None
     # Worker wakeups only; empty means workers poll PostgreSQL.
     RUNS_REDIS_URL: str = ""
+    # Exact public-proxy source manifest for the IR-889 development pilot.
+    # Empty refuses every Record-dependent paid send.
+    RUNS_PROXY_SEND_APPROVAL: str = ""
+    RUNS_DEPLOYMENT_STAGE: str = "production"
+    # Agent search by meaning (IR-886): the Voyage key for query embeddings,
+    # and the rerank model, which stays off while empty. Both are admitted.
+    VOYAGE_API_KEY: str = ""
+    RUNS_RERANK_MODEL: str = ""
     # Provider admission (IR-725): Django's names, one shared campaign.
     # No defaults; unset refuses every paid attempt.
     AI_ADMISSION_CAMPAIGN: str = ""
@@ -83,6 +91,7 @@ class Settings(BaseSettings):
     AGENT_LLM_CAPABILITIES: str = ""
     AGENT_LLM_DATA_POLICY: str = ""
     AGENT_LLM_CAPACITIES: str = ""
+    AGENT_LLM_ROUTING: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

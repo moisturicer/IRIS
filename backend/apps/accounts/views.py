@@ -31,7 +31,10 @@ from .serializers import (
 from . import ai_answer
 from .models import DataNotice
 from .notice import answer_notice, answer_payload, notice_payload, requires_answer
-from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
+from .models import RecoveryPurpose
+from .recovery import service as recovery_service
+from .recovery.views import INVALID_LINK
+from .services import approve_role_request, decline_role_request
 
 #: RDCO's account acts leave a System Admin's account alone (ADR-051 §5).
 LEAVE_SYSTEM_ADMIN_ALONE = "A System Admin's account is managed only in Django's admin site."
@@ -74,8 +77,11 @@ class RegisterView(generics.CreateAPIView):
                 except Role.DoesNotExist:
                     pass  # Unknown role — skip silently
 
-            # Send email verification link (inside transaction so a crash rolls back the user)
-            send_verification_email(user, self.request)
+            # The verification email goes the resend's way (ADR-045 §6, IR-643):
+            # an intent committed with the account, mailed by a worker after
+            # commit, under the same limits. A rollback leaves no intent and
+            # sends nothing.
+            recovery_service.admit_request(RecoveryPurpose.EMAIL_VERIFICATION, user.email)
 
 
 class LoginView(APIView):
@@ -241,48 +247,34 @@ class LogoutView(APIView):
 
 class ActivateView(APIView):
     """
-    DEPRECATED (IR-928): the link as emailed before the token moved to the
-    fragment, `GET /auth/activate/<uid>/<token>/`. Kept only so those emails
-    work until their tokens expire -- Django's `PASSWORD_RESET_TIMEOUT`, 3 days
-    and not overridden here -- and so a bundle cached across the deploy still
-    works. Remove it, its URL, the SPA's `/activate/:uidb64/:token` route and
-    nginx's `/activate/` locations once 3 days have passed since IR-928 shipped,
-    or sooner with IR-643's single-use verification (ADR-045 §8). IR-937 tracks it.
+    RETIRED (IR-643, ADR-045 §8): `GET /auth/activate/<uid>/<token>/`, the
+    link shape emailed before IR-928. Verification links are single-use
+    `RecoveryToken`s now, so this verifies no one: it gives the recovery
+    contract's one "invalid link" answer, which points to a new email, and
+    changes nothing. No Django default-generator token is accepted anywhere.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def get(self, request, uidb64, token):
-        user = activate_user(uidb64, token)
-        if user:
-            return Response({"detail": "Account activated."})
-        return Response({"detail": "Invalid or expired link."}, status=status.HTTP_400_BAD_REQUEST)
+        response = Response(INVALID_LINK, status=status.HTTP_400_BAD_REQUEST)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class ActivateConfirmView(APIView):
     """
-    `POST /auth/activate/` with `{"uid", "token"}` (IR-928, ASVS 8.3.1).
-
-    What the verification page calls after reading the secret from the URL
-    fragment: the credentials travel in the body, never in a path or query.
-    One answer for every refusal, as `ActivateView` gives, so nothing says why a
-    link failed. A secret in the query string is not read. No authentication is
-    attempted, so a stale bearer token the browser still holds cannot turn a
-    valid link into a 401 (as the reset views, ADR-045 §2).
+    RETIRED (IR-643, ADR-045 §8): `POST /auth/activate/`, IR-928's body form
+    of the same old link. Kept answering, rather than removed, so a page
+    cached from before the change shows "request a new email" instead of a
+    404. Reads nothing it is sent and changes nothing.
     """
     authentication_classes = []
     permission_classes = [AllowAny]
     parser_classes = [JSONParser]
 
-    REFUSED = {"detail": "Invalid or expired link."}
-
     def post(self, request):
-        data = request.data
-        uid, token = (data.get("uid"), data.get("token")) if isinstance(data, dict) else (None, None)
-        user = activate_user(uid, token) if isinstance(uid, str) and isinstance(token, str) else None
-        if user:
-            response = Response({"detail": "Account activated."})
-        else:
-            response = Response(self.REFUSED, status=status.HTTP_400_BAD_REQUEST)
+        response = Response(INVALID_LINK, status=status.HTTP_400_BAD_REQUEST)
         response["Cache-Control"] = "no-store"
         return response
 
@@ -471,7 +463,8 @@ class InterestSuggestionsView(APIView):
 class UserListView(generics.ListAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAccountAdmin]
-    queryset           = User.objects.select_related("role").order_by("-date_joined")
+    # A deleted account leaves the Users page (ADR-051 §11, IR-785).
+    queryset           = User.objects.filter(deleted_at__isnull=True).select_related("role").order_by("-date_joined")
     # The default SearchFilter matches nothing until a view names its fields,
     # so the Users page's search box listed everyone (IR-478).
     search_fields      = ["email", "first_name", "last_name"]
@@ -501,7 +494,7 @@ class AdviserListView(generics.ListAPIView):
 class UserDetailView(generics.RetrieveUpdateAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAccountAdmin]
-    queryset           = User.objects.all()
+    queryset           = User.objects.filter(deleted_at__isnull=True)
 
     def update(self, request, *args, **kwargs):
         return _refuse_system_admin(self.get_object()) or super().update(request, *args, **kwargs)
@@ -650,7 +643,7 @@ class LockedUsersView(generics.ListAPIView):
         except ImportError:
             pass   # axes not installed — fall back to manual locks only
 
-        return User.objects.filter(q).select_related("role").distinct()
+        return User.objects.filter(q, deleted_at__isnull=True).select_related("role").distinct()
 
 
 class UnlockUserView(APIView):
@@ -846,3 +839,92 @@ class SystemSettingView(APIView):
                 setting.updated_by = request.user
                 setting.save()
         return Response(SystemSettingSerializer(setting).data)
+
+
+# ---- Account deletion (ADR-051 §8-§12, IR-785) ----------------------------
+
+def _deletion_refused(refused):
+    body = {"detail": refused.detail}
+    if refused.blockers:
+        body["blockers"] = [b.as_dict() for b in refused.blockers]
+    return Response(body, status=refused.status)
+
+
+class MyDeletionRequestView(APIView):
+    """
+    GET    /users/me/deletion-request/  the caller's latest request, or null
+    POST   /users/me/deletion-request/  ask for the caller's account to be deleted
+    DELETE /users/me/deletion-request/  cancel the pending one
+
+    Only ever the caller's own account, so there is no object to look up.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import AccountDeletionRequest
+        from .serializers import MyDeletionRequestSerializer
+
+        latest = AccountDeletionRequest.objects.filter(user=request.user).order_by("-created_at", "-pk").first()
+        return Response({"request": MyDeletionRequestSerializer(latest).data if latest else None})
+
+    def post(self, request):
+        from .deletion import service
+        from .serializers import MyDeletionRequestSerializer
+
+        try:
+            made = service.request_deletion(request.user)
+        except service.Refused as refused:
+            return _deletion_refused(refused)
+        return Response({"request": MyDeletionRequestSerializer(made).data}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        from .deletion import service
+        from .serializers import MyDeletionRequestSerializer
+
+        try:
+            cancelled = service.cancel_deletion(request.user)
+        except service.Refused as refused:
+            return _deletion_refused(refused)
+        return Response({"request": MyDeletionRequestSerializer(cancelled).data})
+
+
+class AccountDeletionRequestListView(generics.ListAPIView):
+    """GET /users/deletion-requests/ -- pending requests, each with its blockers. System Admin only."""
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
+    pagination_class   = LargeResultsPagination
+
+    def get_serializer_class(self):
+        from .serializers import AccountDeletionRequestSerializer
+        return AccountDeletionRequestSerializer
+
+    def get_queryset(self):
+        from .models import AccountDeletionRequest
+        return (
+            AccountDeletionRequest.objects.filter(status=RequestStatus.PENDING)
+            .select_related("user", "user__role").order_by("created_at", "pk")
+        )
+
+
+class AccountDeletionDecisionView(APIView):
+    """
+    POST /users/deletion-requests/<id>/confirm/
+    POST /users/deletion-requests/<id>/reject/  {"reason": "..."}
+
+    System Admin only, never on their own request. A request no longer pending
+    gets 409, and confirmation is refused with its blockers while any remain.
+    """
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
+    action = None
+
+    def post(self, request, pk):
+        from .deletion import service
+        from .serializers import AccountDeletionRequestSerializer
+
+        try:
+            if self.action == "confirm":
+                decided = service.confirm_deletion(pk, request.user)
+            else:
+                decided = service.reject_deletion(pk, request.user, request.data.get("reason"))
+        except service.Refused as refused:
+            return _deletion_refused(refused)
+        return Response(AccountDeletionRequestSerializer(decided, context={"request": request}).data)

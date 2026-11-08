@@ -7,6 +7,12 @@ urlpatterns = [
     path("me/",           views.MeView.as_view(),              name="user-me"),
     # ADR-054 (IR-791): change one's own AI answer. Not in `ALLOWED_WHILE_UNANSWERED`.
     path("me/ai-answer/", views.AiAnswerView.as_view(),        name="user-me-ai-answer"),
+    path("me/deletion-request/", views.MyDeletionRequestView.as_view(), name="user-me-deletion-request"),
+    path("deletion-requests/", views.AccountDeletionRequestListView.as_view(), name="account-deletion-request-list"),
+    path("deletion-requests/<int:pk>/confirm/",
+         views.AccountDeletionDecisionView.as_view(action="confirm"), name="account-deletion-request-confirm"),
+    path("deletion-requests/<int:pk>/reject/",
+         views.AccountDeletionDecisionView.as_view(action="reject"), name="account-deletion-request-reject"),
     path("me/data/",      views.PersonalDataExportView.as_view(), name="user-me-data"),
     path("me/photo/",     views.MePhotoView.as_view(),         name="user-me-photo"),
     path("interests/",    views.InterestSuggestionsView.as_view(), name="user-interest-suggestions"),

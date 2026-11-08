@@ -50,6 +50,9 @@ NO_AUTHENTICATION = frozenset({
     ("accounts", "password-reset-request"),
     ("accounts", "password-reset-confirm"),
     ("accounts", "auth-activate-confirm"),
+    ("accounts", "auth-activate"),
+    ("accounts", "verification-resend"),
+    ("accounts", "verification-confirm"),
 })
 
 

@@ -53,6 +53,9 @@ MANUSCRIPT_TOOL_VERSION = "research-3"
 #: research-3 plus recovery of original Turns after compaction (IR-735).
 RECOVERY_PROMPT_VERSION = "agent-research-4"
 RECOVERY_TOOL_VERSION = "research-4"
+#: research-4 with search by keyword and meaning, narrowed by metadata (IR-886).
+HYBRID_PROMPT_VERSION = "agent-research-5"
+HYBRID_TOOL_VERSION = "research-5"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -93,6 +96,11 @@ RECOVERY_INSTRUCTIONS = MANUSCRIPT_INSTRUCTIONS + (
     "again, and cite the passage handles it returns. If recovery is unavailable, say that you cannot "
     "confirm the detail."
 )
+HYBRID_INSTRUCTIONS = RECOVERY_INSTRUCTIONS + (
+    " search finds passages by meaning as well as by keyword, and can be narrowed by Area, PSCED area, "
+    "record type or completion years; its results are still a sample, never a complete list. When its "
+    "result says meaning search was not ok, say that the search matched keywords only."
+)
 #: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
 COMPACT_REQUEST = (
     "The reader asked to condense this conversation now. This is not a question and not the reader's "
@@ -113,9 +121,10 @@ PROMPTS = {
     (METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION): METADATA_INSTRUCTIONS,
     (MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION): MANUSCRIPT_INSTRUCTIONS,
     (RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION): RECOVERY_INSTRUCTIONS,
+    (HYBRID_PROMPT_VERSION, HYBRID_TOOL_VERSION): HYBRID_INSTRUCTIONS,
 }
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
-                          RECOVERY_TOOL_VERSION)
+                          RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -291,6 +300,18 @@ def _final(turn: ModelTurn) -> str:
         raise Unavailable(refused.code) from None
 
 
+def _screen(provider, pin):
+    """The admitted transport's source check, so results leave out what a send could not carry (IR-889)."""
+    eligible = getattr(provider, "eligible", None)
+    if eligible is None:
+        return None
+
+    async def screen(sources):
+        return await eligible(pin, sources)
+
+    return screen
+
+
 class _Run:
     """One run's investigation; nothing here outlives it."""
 
@@ -308,9 +329,12 @@ class _Run:
         version = agent.pin.tool_version
         self.investigation = Investigation(
             tools, clarify=not asked,
-            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION),
-            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION),
-            recovery=version == RECOVERY_TOOL_VERSION)
+            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
+                                 HYBRID_TOOL_VERSION),
+            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION),
+            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION),
+            hybrid=version == HYBRID_TOOL_VERSION,
+            screen=_screen(agent.provider, agent.pin))
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         # Whatever an earlier fence spent stays spent, the attempt it left uncertain included (IR-724).
@@ -366,7 +390,8 @@ class _Run:
             for n, call in enumerate(calls):
                 if self.investigation.tool_calls >= self.bounds.max_tool_calls:
                     # The exchange stays whole; the call is answered, not run.
-                    results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"})))
+                    results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"}),
+                                              control_only=True))
                     continue
                 room = self._room(history, results, calls[n:]) if call.name == READ_MANUSCRIPT.name else 0
                 outcome = await self.investigation.execute(call, room=room)
@@ -374,7 +399,8 @@ class _Run:
                     self._checked(outcome.clarification, clarification=True)
                     return self._result(outcome.clarification, (), kind="clarification")
                 progressed = progressed or outcome.progress
-                results.append(ToolResult(call.id, outcome.content))
+                results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
+                                          outcome.control_only))
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
             self.investigation.packed(history[len(history) - len(results):])
@@ -416,9 +442,12 @@ class _Run:
             history.append(compacting.render(handoff, self.investigation.papers, passages=False))
         for turn in self.prior:
             answer = DELIVERED_MARKER.sub("", turn.answer)
-            history += [User(compacting.reader(turn.question)), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
+            history += [User(compacting.reader(turn.question)),
+                        ModelTurn(items=(Text(answer),), stop=StopReason.END,
+                                  unverified_provenance=True)]
         if shown:
-            history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False)))
+            history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False),
+                                self.investigation.recalled_sources))
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history
@@ -528,7 +557,7 @@ class _Run:
             summary, previous=self.handoff, compacted=compacted, passages=self.investigation.passages,
             plan=self.investigation.plan,
             state={"shown": state.get("shown", ()), "selected": self._focus("selected"),
-                   "excluded": self._focus("excluded")})
+                   "excluded": self._focus("excluded")}, entries=cut.summary())
         through = max([self.handoff_through, *compacted])
         outcome, revision = await self.context.commit_handoff(Handoff(
             body=body, through_ordinal=through, turns=tuple(body["turns"]), sources=tuple(body["sources"]),

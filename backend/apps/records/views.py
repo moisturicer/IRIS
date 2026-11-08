@@ -22,7 +22,7 @@ from core.enums import (
     RecordTypeName,
     RequestStatus,
 )
-from . import embargo, ip_release, lifecycle, rdco_acts
+from . import embargo, ip_release, lifecycle, rdco_acts, unlisted
 from core.permissions import (
     IsAdmin,
     IsAuthor,
@@ -163,7 +163,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # RDCO's three acts on a paper in review (ADR-051 §10, IR-797): a role
         # gate before any lookup, so a refusal reads the same for a paper that
         # does not exist. What each does, and the lock it takes, is `rdco_acts`.
-        if self.action in ("replace_adviser", "add_owner", "rdco_withdraw"):
+        if self.action in ("replace_adviser", "add_owner", "rdco_withdraw", "publish_unlisted"):
             return [IsAuthenticated(), IsRDCO()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
@@ -503,6 +503,20 @@ class RecordViewSet(viewsets.ModelViewSet):
         record = self._paper_under_lock()
         body = request.data if isinstance(request.data, dict) else {}
         return Response(rdco_acts.withdraw(record, body.get("reason"), actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="publish-unlisted")
+    @transaction.atomic
+    def publish_unlisted(self, request, pk=None):
+        """
+        POST /records/<id>/publish-unlisted/  {"note": optional}
+
+        RDCO publishes an Unlisted paper once its embargo is released (ADR-047
+        §10, IR-878). An embargoed paper is refused with a 400 naming the
+        embargo; nothing about its review reopens.
+        """
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(unlisted.publish_unlisted(record, body.get("note", ""), actor=request.user))
 
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):

@@ -3,6 +3,7 @@
   "/",
   "/activate",
   "/activate/:uidb64/:token",
+  "/admin/account-deletion-requests",
   "/admin/audit",
   "/admin/users",
   "/ai",
@@ -27,5 +28,7 @@
   "/review/analytics",
   "/review/office",
   "/settings",
-  "/signup"
+  "/signup",
+  "/verify-email",
+  "/verify-email/resend"
 ]

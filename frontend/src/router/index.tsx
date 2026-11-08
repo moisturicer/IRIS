@@ -8,7 +8,8 @@ import { redirectRoutes } from "./redirects";
 // Auth pages
 import LoginPage         from "@/features/auth/LoginPage";
 import SignupPage        from "@/features/auth/SignupPage";
-import EmailVerifyPage   from "@/features/auth/EmailVerifyPage";
+import VerifyEmailPage from "@/features/auth/VerifyEmailPage";
+import ResendVerificationPage from "@/features/auth/ResendVerificationPage";
 import ForgotPasswordPage from "@/features/auth/ForgotPasswordPage";
 import ResetPasswordPage  from "@/features/auth/ResetPasswordPage";
 
@@ -45,6 +46,7 @@ const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage
 const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
+const AccountDeletionRequestsPage = lazy(() => import("@/features/admin/AccountDeletionRequestsPage"));
 
 export const routes: RouteObject[] = [{
   // The last resort (IR-745): a crash outside the shell's own boundary below,
@@ -53,10 +55,13 @@ export const routes: RouteObject[] = [{
   children: [
   { path: "/login",  element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
-  // IR-928: the secret is in the fragment. The path form is the deprecated shape of
-  // links emailed earlier; remove it once their tokens have expired (3 days).
-  { path: "/activate", element: <EmailVerifyPage /> },
-  { path: "/activate/:uidb64/:token", element: <EmailVerifyPage /> },
+  // ADR-045 (IR-643). Public: verifying never requires signing in.
+  { path: "/verify-email", element: <VerifyEmailPage /> },
+  { path: "/verify-email/resend", element: <ResendVerificationPage /> },
+  // Retired link shapes (IR-643, ADR-045 §8): the same page, which strips the
+  // address and offers a new email. Nothing on them verifies.
+  { path: "/activate", element: <VerifyEmailPage /> },
+  { path: "/activate/:uidb64/:token", element: <VerifyEmailPage /> },
   // ADR-045 (IR-642). Public: recovery must never require signing in.
   { path: "/password/forgot", element: <ForgotPasswordPage /> },
   { path: "/password/reset",  element: <ResetPasswordPage /> },
@@ -195,6 +200,15 @@ export const routes: RouteObject[] = [{
                 handle: { crumb: "Audit Log", width: "full" },
               },
             ],
+          },
+          {
+            // The System Admin alone (ADR-051 §8, IR-788).
+            element: <ProtectedRoute allowedRoles={rolesFor("accountDeletionRequests")} />,
+            children: [{
+              path: pathFor("accountDeletionRequests"),
+              element: <DeferredPage name="Account Deletion Requests"><AccountDeletionRequestsPage /></DeferredPage>,
+              handle: { crumb: "Account Deletions", width: "full" },
+            }],
           },
 
           // Any other address (IR-745). Behind sign-in like every app

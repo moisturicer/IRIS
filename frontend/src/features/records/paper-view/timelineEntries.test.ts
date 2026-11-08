@@ -325,6 +325,27 @@ describe("timelineEntries", () => {
     });
   });
 
+  it("shows RDCO's later publish of an Unlisted paper, with its note (IR-878)", () => {
+    const entries = timelineEntries(
+      tracker({
+        published_later: {
+          label: "RDCO Final", published_at: "2026-12-20T08:00:00Z", published_by_name: "Rosa Dela Cruz",
+          note: "The patent was filed on 18 December.",
+        },
+      }),
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: "published",
+      act: "Published it to Discover from Unlisted",
+      actor: "Rosa Dela Cruz",
+      party: "RDCO Final",
+      note: "The patent was filed on 18 December.",
+      at: "2026-12-20T08:00:00Z",
+    });
+  });
+
   it("shows each due-date extension, by hand or by a document pause, in time order", () => {
     const entries = timelineEntries(
       tracker({
@@ -406,6 +427,36 @@ describe("timelineEntries", () => {
 
   it("leaves comments out when the viewer may not read the review", () => {
     expect(timelineEntries(tracker({ review_comments: null }))).toEqual([]);
+  });
+
+  it("leaves the viewer's own drafts to Threads (IR-875)", () => {
+    const entries = timelineEntries(tracker({
+      review_comments: [comment({ id: 1 }), comment({ id: 2, is_draft: true })],
+    }));
+    expect(entries.map((e) => e.key)).toEqual(["comment-1"]);
+  });
+
+  it("names a thread's party and the page it is on", () => {
+    const [entry] = timelineEntries(tracker({
+      review_comments: [comment({ party: "itso", party_label: "ITSO", anchor: { version: 1, page: 9, quote: "94%" } })],
+    }));
+    expect([entry.party, entry.act]).toEqual(["ITSO", "Commented on p.9"]);
+  });
+
+  it("records a Comment only review as a review with no decision", () => {
+    const entries = timelineEntries(tracker({
+      review_rounds: [
+        { id: 4, party: "adviser", label: "Adviser", actor_name: "Ana Cruz", version: 3, verdict: "comment_only",
+          summary: "Getting there.", review: null, threads: 3, created_at: "2026-11-05T08:00:00Z" },
+        { id: 5, party: "adviser", label: "Adviser", actor_name: "Ana Cruz", version: 3, verdict: "request_revision",
+          summary: "Revise.", review: 12, threads: 1, created_at: "2026-11-06T08:00:00Z" },
+      ],
+    }));
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      key: "round-4", kind: "review", actor: "Ana Cruz", party: "Adviser",
+      act: "Reviewed v3: 3 comments, no decision", note: "Getting there.", version: 3,
+    });
   });
 });
 

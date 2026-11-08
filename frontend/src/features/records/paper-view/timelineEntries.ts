@@ -29,6 +29,7 @@ export type TimelineKind =
   | "version"
   | "reassignment"
   | "extension"
+  | "published"
   | "comment";
 
 export interface TimelineEntry {
@@ -212,6 +213,24 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
     });
   }
 
+  // RDCO published an Unlisted paper after its Decision (ADR-047 §10, IR-878).
+  // Who and the note are null to a viewer who may not read the review.
+  const later = tracker.published_later;
+  if (later) {
+    entries.push({
+      key: "published-later",
+      kind: "published",
+      at: later.published_at,
+      actor: later.published_by_name,
+      party: later.label,
+      act: "Published it to Discover from Unlisted",
+      status: null,
+      note: later.note || null,
+      details: [],
+      version: null,
+    });
+  }
+
   // A due date moved (ADR-043 §6): by a coordinator, with their reason, or by
   // IRIS for a document-request pause, whose wording is a fact, not a note.
   for (const h of tracker.assignment_deadline_history ?? []) {
@@ -231,8 +250,28 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
     }
   }
 
+  // A finished review that sent comments and took no decision (IR-874):
+  // every other verdict is already here as the review its service wrote.
+  for (const r of tracker.review_rounds ?? []) {
+    if (r.verdict !== "comment_only") continue;
+    const n = r.threads;
+    entries.push({
+      key: `round-${r.id}`,
+      kind: "review",
+      at: r.created_at,
+      actor: r.actor_name,
+      party: r.label,
+      act: `Reviewed${r.version ? ` v${r.version}` : ""}: ${n} comment${n === 1 ? "" : "s"}, no decision`,
+      status: null,
+      note: r.summary || null,
+      details: [],
+      version: r.version,
+    });
+  }
+
   // Null as `reviews` is, to a viewer who may not read the review (IR-479).
-  const comments = tracker.review_comments ?? [];
+  // The viewer's own drafts are theirs alone and wait in Threads (IR-875).
+  const comments = (tracker.review_comments ?? []).filter((c) => !c.is_draft);
   const roots = new Set(comments.filter((c) => c.reply_to === null).map((c) => c.id));
   const replies = new Map<number, ReviewComment[]>();
   for (const c of comments) {
@@ -248,8 +287,9 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       kind: "comment",
       at: c.created_at,
       actor: c.author_name,
-      party: null,
-      act: c.reply_to === null ? "Commented" : "Replied",
+      // A thread names its party and, when anchored, its page (IR-875).
+      party: c.reply_to === null ? c.party_label ?? null : null,
+      act: c.reply_to !== null ? "Replied" : c.anchor ? `Commented on p.${c.anchor.page}` : "Commented",
       status: null,
       note: c.body,
       details: [],

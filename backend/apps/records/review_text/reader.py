@@ -28,12 +28,13 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import statistics
 import sys
 import unicodedata
-from collections import Counter
+from collections import Counter, defaultdict
 
 #: Raise on any change that can alter what a stored text says.
-RULES_VERSION = 1
+RULES_VERSION = 2
 
 #: pdfplumber's default word gap (3 pt) is a 12 pt Times space, so a line that
 #: isn't justified came back as one word. Below a space's width (prototype finding 1).
@@ -55,6 +56,10 @@ HEADING_LINES = 3
 RAN_ON = 0.10
 #: The fewest lines a two-column band can be.
 MIN_COLUMN_LINES = 5
+# Blocks of full-width lines (a table, a figure) a two-column page may hold.
+MAX_BLOCKS = 2
+# Words a line each side of a gutter that make a band's columns prose.
+PROSE_WORDS = 3
 #: How far right of its column's left edge a line starts to be a first-line
 #: indent. A journal's 17 pt indent was missed at the prototype's 20.
 INDENT = 10
@@ -67,6 +72,21 @@ UNREADABLE_SHARE = 0.2
 #: A font size this many points off the paragraph's starts a new one: a
 #: footnote, caption or block quote is never glued into a body sentence.
 SIZE_BREAK = 1.0
+#: A short line this many points larger than the body is a heading (sample21:
+#: 12 pt headings over a 10 pt body, in fonts not named bold).
+HEADING_SIZE = 1.5
+#: A line whose middle is within this share of its column's width from the
+#: column's middle is centred.
+CENTRED = 0.15
+#: A heading's number on its own: "2.", "2.1", "IV.", "A.".
+HEADING_MARK = re.compile(r"\d{1,2}(\.\d{1,2})*\.?|[IVXLC]{1,6}\.?|[A-Z]\.")
+#: A caption's next line, this many line gaps below it at most, carries it on.
+CAPTION_GAP = 1.6
+#: Words further apart than this many times the font size are a table's
+#: cells, not one heading (sample14's unruled header rows).
+CELL_GAP = 1.5
+# The widest tab after a heading's number, in font sizes: 19 to 26 pt measured.
+TAB_GAP = 4
 
 SENTENCE_END = re.compile(r'(?<=[.!?])["”)]?\s+(?=[A-Z(“"])')
 ABBREVIATIONS = (
@@ -85,6 +105,8 @@ CAPTION = re.compile(r"^(table|figure|fig\.|plate|appendix)\s*[0-9A-Z]", re.I)
 DOT_LEADER = re.compile(r"(\.\s?){4,}|…{2,}")
 TRAILING_PAGE = re.compile(r"\s\d{1,3}$")
 PAGE_NUMBER = re.compile(r"[-–—\s]*\d{1,4}[-–—\s]*")
+# A word, not a number or a mark: two lowercase letters together.
+WORD = re.compile(r"[a-z]{2}")
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -141,7 +163,12 @@ def read(path, max_pages: int | None = None) -> dict:
                 pages.append(_read_page(page))
             _drop_running(pages)
             for p in pages:
-                p["columns"] = _columns(p.pop("words"), p["width"], p["height"], p["margin"])
+                # A counted page number leaves only once the columns are found,
+                # as they were found before it was dropped: sample19's tables
+                # under one read as columns without it.
+                counted = p.pop("counted")
+                p["columns"] = [[w for w in column if id(w) not in counted]
+                                for column in _columns(p.pop("words"), p["width"], p["height"], p["margin"])]
     except (PDFPasswordIncorrect, PDFEncryptionError) as exc:
         raise Encrypted from exc
     except (OverBudget, MemoryError, RecursionError):
@@ -163,6 +190,36 @@ def read(path, max_pages: int | None = None) -> dict:
         "sections": sections,
         "warnings": warnings,
     }
+
+
+def _join_touching(words, spaces=()):
+    """Rejoin a word split where its font changes: pdfplumber starts a new word
+    at every font change, and some publishers set ligatures, apostrophes and
+    dashes in a second font ("arti fi cial", "Nursing ' s"). Pieces in
+    different fonts, closer than a space, on the same line and in the same
+    size, with no space character between them (a tightly justified line can
+    set a space narrower than that), are one word, in the font of most of its
+    letters, so a bold heading is still found. ``spaces`` are the page's
+    space characters."""
+    def spaced(left, right):
+        # A narrow space can overlap the next letter, so it need only start in the gap.
+        return any(abs(s["top"] - right["top"]) < 2 and left["x1"] - 0.5 <= s["x0"] <= right["x0"] + 0.5
+                   for s in spaces)
+
+    out, last_font = [], None
+    for w in (w for line in _lines(words) for w in line):
+        prev = out[-1] if out else None
+        if (prev and w.get("fontname") != last_font and abs(prev["top"] - w["top"]) < 1
+                and -1 <= w["x0"] - prev["x1"] < X_TOLERANCE
+                and abs(float(prev.get("size") or 0) - float(w.get("size") or 0)) < 0.1
+                and not spaced(prev, w)):
+            font = prev["fontname"] if len(prev["text"]) >= len(w["text"]) else w["fontname"]
+            out[-1] = dict(prev, text=prev["text"] + w["text"], x1=w["x1"], fontname=font,
+                           bottom=max(prev["bottom"], w["bottom"]))
+        else:
+            out.append(w)
+        last_font = w.get("fontname")
+    return out
 
 
 def _join_small_caps(words):
@@ -191,18 +248,47 @@ def _unmapped_share(sections) -> float:
     return sum(1 for w in words if UNMAPPED.search(w)) / len(words) if words else 0.0
 
 
+WHITE = ((1,), (1, 1, 1), (0, 0, 0, 0))   # grey, RGB and CMYK
+
+
+def _visible(obj) -> bool:
+    """Whether a page object can be seen, for finding tables. A box filled
+    white with no border, or with neither fill nor border, is drawn behind
+    text by some exporters, one per line; its edges are no table's rules."""
+    if obj.get("object_type") != "rect" or obj.get("stroke"):
+        return True
+    if not obj.get("fill"):
+        return False
+    colour = obj.get("non_stroking_color")
+    if colour is None:
+        return True   # no colour given fills black
+    colour = tuple(colour) if isinstance(colour, (list, tuple)) else (colour,)
+    try:
+        return tuple(round(float(v), 3) for v in colour) not in WHITE
+    except (TypeError, ValueError):
+        return True   # a pattern or a named colour: assume it shows
+
+
 def _read_page(page) -> dict:
     number, width, height = page.page_number, float(page.width), float(page.height)
+    # A character drawn twice in one place, same font and size, is read once:
+    # sample12 v3 prints a table twice over itself ("CONTROL CONTROL").
+    page = page.dedupe_chars()
+    # Nothing drawn wholly outside the page shows: sample12 left a chart's
+    # labels and a table below its bottom edge.
+    page = page.crop(page.bbox)
     words = page.extract_words(extra_attrs=["fontname", "size"], keep_blank_chars=False,
                                x_tolerance=X_TOLERANCE)
     for w in words:
         w["text"] = _clean(w["text"])
         w["page"] = number
-    words = _join_small_caps([w for w in words if w["text"].strip()])
+    spaces = [c for c in page.chars if c["text"].isspace()]
+    words = _join_small_caps(_join_touching([w for w in words if w["text"].strip()], spaces))
     # Only a grid of two columns or more is a table. A stack of one-cell boxes
     # is a bordered or shaded paragraph (Word draws one box per line), whose
     # text reads as ordinary lines, not as one "row" per line.
-    tables = [t for t in page.find_tables() if max((len(r) for r in t.extract()), default=0) >= 2]
+    tables = [t for t in page.filter(_visible).find_tables()
+              if max((len(r) for r in t.extract()), default=0) >= 2]
     boxes = [t.bbox for t in tables]
 
     def inside(w):
@@ -243,12 +329,34 @@ def _drop_running(pages):
     for p in pages:
         counts.update({signature(line) for line in band_lines(p)})
     repeated = {t for t, n in counts.items() if n >= max(3, len(pages) // 2)}
+    counted = _counted_page_numbers(pages)
     for p in pages:
         drop = {id(w) for line in band_lines(p)
                 if not CHAPTER.fullmatch(_line_text(line).strip())
                 and (signature(line) in repeated or PAGE_NUMBER.fullmatch(_line_text(line)))
                 for w in line}
+        p["counted"] = counted.get(p["number"], set())
         p["words"] = [w for w in p["words"] if id(w) not in drop]
+
+
+def _counted_page_numbers(pages):
+    """Bare numbers anywhere on the page that sit at the same height on most
+    pages (at least three) and count up by one with the page, as a journal's
+    827, 828, ... printed above the bottom band. A number in a table or the
+    body does not count up in step, so it is never taken. Returns page number
+    to the ids of its words to drop."""
+    found = defaultdict(list)
+    for index, p in enumerate(pages):
+        for line in _lines(p["words"]):
+            text = _line_text(line).strip(" -–—")
+            if text.isdigit() and len(text) <= 4:
+                found[(round(line[0]["top"] / 4), int(text) - index)].append((p["number"], line))
+    drop = defaultdict(set)
+    for hits in found.values():
+        if len({n for n, _ in hits}) >= max(3, len(pages) // 2):
+            for number, line in hits:
+                drop[number] |= {id(w) for w in line}
+    return drop
 
 
 def _lines(words):
@@ -258,7 +366,18 @@ def _lines(words):
             lines[-1].append(w)
         else:
             lines.append([w])
-    return [sorted(line, key=lambda w: w["x0"]) for line in lines]
+    lines = [sorted(line, key=lambda w: w["x0"]) for line in lines]
+    # A lone list mark set higher than its text (Word's Courier "o" sits
+    # 2.6 pt up) joins the line to its right that its height overlaps.
+    joined = []
+    for line in lines:
+        mark = joined[-1] if joined and len(joined[-1]) == 1 and _is_mark(joined[-1][0]) else None
+        if (mark and mark[0]["top"] < line[0]["top"] < mark[0]["bottom"]
+                and line[0]["x0"] > mark[0]["x1"]):
+            joined[-1] = mark + line
+        else:
+            joined.append(line)
+    return joined
 
 
 def _columns(words, width, height, margin):
@@ -270,6 +389,12 @@ def _columns(words, width, height, margin):
     between them, which must be at least `MIN_COLUMN_LINES` lines tall, so
     two lines of prose that happen to share a gap are never columns. Spanning lines are read whole, with the left column; the
     rest split at the gutter. With none, the page is one column.
+
+    More spanning lines than that are allowed when they stand together in at
+    most `MAX_BLOCKS` blocks, as a table or figure set across both columns
+    does, and at least `MIN_COLUMN_LINES` lines on each side of the gutter
+    remain. The page then reads in bands: both columns above a block, the
+    block, both columns below.
     """
     body = [w for w in words if margin < w["top"] < height - margin]
     if len(body) < 20:
@@ -287,23 +412,66 @@ def _columns(words, width, height, margin):
         # Only spanning lines inside the columns' height interrupt them.
         band = [line for line in lines if min(right_tops) <= line[0]["top"] <= max(right_tops)]
         inside = sum(1 for line in crossing if min(right_tops) <= line[0]["top"] <= max(right_tops))
-        if (len(band) < MIN_COLUMN_LINES or inside > 0.1 * len(band)
-                or (best and inside >= best[0])):
+        banded = inside > 0.1 * len(band)
+        if (len(band) < MIN_COLUMN_LINES or (best and inside >= best[0])
+                or (banded and not _blocks_between_columns(band, span, x))):
             continue
         left_words = [w for w in body if id(w) not in span and w["x1"] <= x]
         if left_words and all(LIST_NUMBER.fullmatch(w["text"]) or w["text"].isdigit() for w in left_words):
             continue   # a strip of "[18]" labels, or section or line numbers, is no column
+        right_lines = _lines([w for w in body if id(w) not in span and w["x0"] >= x])
+        if statistics.median(sum(1 for w in line if WORD.search(w["text"])) for line in right_lines) < 1:
+            continue   # a table's number columns beside its labels are no page column
         left = len(left_words)
         if left > 10 and len(right_tops) > 10:
-            best = (inside, x, span)
+            best = (inside, x, span, banded, (min(right_tops), max(right_tops)))
             if not inside:
                 break
     if best is None:
         return [words]
-    _, x, span = best
+    _, x, span, banded, (low, high) = best
+    if banded:
+        return _bands(words, x, span, low, high)
     in_body = lambda w: margin < w["top"] < height - margin  # noqa: E731
     return [[w for w in words if id(w) in span or not in_body(w) or w["x1"] <= x],
             [w for w in words if id(w) not in span and in_body(w) and w["x0"] >= x]]
+
+
+def _blocks_between_columns(band, span, x) -> bool:
+    """Do a band's spanning lines stand together, a block or two across both
+    columns, beside split lines of prose on both sides? Lines of one-column
+    prose cross a gutter scattered, not in blocks, and a table or chart beside
+    a paragraph has few words a line on one side (3 to 10 in columns measured
+    across the samples, 2 or fewer beside a table)."""
+    crossing = [id(line[0]) in span for line in band]
+    blocks = sum(1 for i, c in enumerate(crossing) if c and (i == 0 or not crossing[i - 1]))
+    split = [line for line, c in zip(band, crossing) if not c]
+    if blocks > MAX_BLOCKS or len(split) < 2 * MIN_COLUMN_LINES or len(split) < len(band) / 2:
+        return False
+
+    def words_a_line(side):
+        return statistics.median(sum(1 for w in line if side(w) and WORD.search(w["text"])) for line in split)
+    return (words_a_line(lambda w: w["x1"] <= x) >= PROSE_WORDS
+            and words_a_line(lambda w: w["x0"] >= x) >= PROSE_WORDS)
+
+
+def _bands(words, x, span, low, high):
+    """A page read in bands: above the columns and each spanning block read
+    whole, each stretch of split lines as its left column, then its right."""
+    pieces = []   # [split?, words]
+    for line in _lines(words):
+        split = low <= line[0]["top"] <= high and id(line[0]) not in span
+        if pieces and pieces[-1][0] == split:
+            pieces[-1][1].extend(line)
+        else:
+            pieces.append([split, list(line)])
+    columns = []
+    for split, piece in pieces:
+        if split:
+            columns += [[w for w in piece if w["x1"] <= x], [w for w in piece if w["x0"] >= x]]
+        else:
+            columns.append(piece)
+    return [column for column in columns if column]
 
 
 def _column_left(lines) -> float:
@@ -330,13 +498,15 @@ SYMBOL_FONTS = ("wingdings", "webdings", "symbol", "zapfdingbats", "dingbats")
 def _is_mark(word) -> bool:
     """A single list mark: a bullet character, a private-use character (Word's
     default Symbol bullet reads as U+F0B7), any one character in a symbol font,
-    or one glyph with no character behind it ("(cid:127)")."""
+    an "o" in Courier (Word's second level), or one glyph with no character behind it ("(cid:127)")."""
     text = word["text"]
     if UNMAPPED.fullmatch(text):
         return True   # a lone glyph with no character, as a bullet's font often has
     if len(text) != 1:
         return False
     font = (word.get("fontname") or "").lower()
+    if text == "o" and "courier" in font:
+        return True   # Word's second-level bullet
     return text in BULLETS or 0xE000 <= ord(text) <= 0xF8FF or any(f in font for f in SYMBOL_FONTS)
 
 
@@ -360,6 +530,20 @@ def _ends_entry(word) -> bool:
     mark (before any closing quote or bracket), or a web address, as a
     reference entry ends on its DOI."""
     return bool(re.search(r"[.!?][\"”’')\]]*$", word) or URL.search(word))
+
+
+#: A table of contents' dot leader: four or more dots or ellipses, spaces
+#: allowed between them ("…… ..... ").
+LEADER = re.compile(r"(?:[.…·]\s*){4,}")
+#: A contents entry's line: a leader, then the page number it points to.
+CONTENTS_ENTRY = re.compile(r"(?:[.…·]\s*){4,}(\d{1,4}|[ivxlcdm]{1,6})\s*$", re.I)
+
+
+def _url_broken(word) -> bool:
+    """Does ``word`` end a line inside a web address, cut at a hyphen, slash
+    or underscore, as "https://doi.org/10.1088/1755-" over "1315/1067/1/012044"?
+    A full stop isn't one: an entry ends on its address and a full stop."""
+    return bool(URL.search(word)) and word.endswith(("-", "/", "_"))
 
 
 def _continues_text(word) -> bool:
@@ -420,10 +604,56 @@ def _wordy(text) -> bool:
     return sum(c.isalpha() for c in text) >= 4 and len(words) * 2 >= len(tokens)
 
 
-def _is_heading(line):
-    """Bold, or numbered, or in capitals, and shaped like a heading."""
+BOLD_NAME = re.compile(r"bold|black|heavy|semibold|demi|[.,+\-_](b|bd|bi)$", re.I)
+
+
+def is_bold(fontname) -> bool:
+    """Whether a font's name says bold: "Arial-BoldMT", "Calibri,Bold",
+    "Helvetica-Black", or a short suffix as "…AdvOTab3e3698.B" or "-BI"."""
+    return bool(BOLD_NAME.search(fontname or ""))
+
+
+def _bold_capitals(line, text) -> bool:
+    letters = [c for c in text if c.isalpha()]
+    return (len(letters) >= 4 and all(c.isupper() for c in letters)
+            and all(is_bold(w.get("fontname")) for w in line))
+
+
+def _has_cells(line) -> bool:
+    """Whether a line's words stand apart as a table's cells do: a gap wider
+    than `CELL_GAP` times the font size, where a heading has only spaces."""
+    size = _size(line) or 10
+    words = sorted(line, key=lambda w: w["x0"])
+    if words and HEADING_MARK.fullmatch(words[0]["text"]):
+        # A heading's number may sit a tab away, "2.  RELATED LITERATURE",
+        # but no farther: "2.91" and "Effective" 134 pt apart are cells.
+        if len(words) > 1 and words[1]["x0"] - words[0]["x1"] > TAB_GAP * size:
+            return True
+        words = words[1:]
+    return any(b["x0"] - a["x1"] > CELL_GAP * size for a, b in zip(words, words[1:]))
+
+
+def _heading_words(text) -> bool:
+    """Whether a larger line reads as a heading's words, not a formula (a math
+    symbol or a Greek letter) or an author line (an asterisk, three commas, or
+    a bare number marking an affiliation)."""
+    if any(unicodedata.category(c) == "Sm" or "Ͱ" <= c <= "Ͽ" for c in text):
+        return False
+    if "*" in text or text.count(",") >= 3:
+        return False
+    return not any(t.isdigit() for t in text.split())
+
+
+def _is_heading(line, body_size=None):
+    """Bold, or numbered, or in capitals, or larger than the body (``body_size``),
+    and shaped like a heading."""
     text = _line_text(line).strip()
     if not text or len(text) > 100 or text.endswith((".", ",", ";", ":", "?", "!")):
+        return False
+    if body_size and _size(line) < body_size - HEADING_SIZE and not _bold_capitals(line, text):
+        # Set smaller than the body: a table's cell, as "3.23 Agree" (sample25).
+        # Bold capitals are a heading at any size: a questionnaire set small
+        # throughout keeps "II. ATTENDANCE HISTORY" (sample6).
         return False
     if CHAPTER.fullmatch(text):
         return True   # all numbering, which `_wordy` would strip to nothing
@@ -434,11 +664,15 @@ def _is_heading(line):
         return False   # a bold word in mid-sentence, alone on its line
     if DOT_LEADER.search(text) or CAPTION.match(text):
         return False   # a table-of-contents line, or a caption
-    if all("bold" in (w.get("fontname") or "").lower() for w in line):
+    if _has_cells(line):
+        return False   # an unruled table's row, its cells far apart
+    if all(is_bold(w.get("fontname")) for w in line):
         return True
     words = text.split()
     if len(words) > 12 or (TRAILING_PAGE.search(text) and not CHAPTER.fullmatch(text)):
         return False
+    if body_size and _size(line) >= body_size + HEADING_SIZE and _heading_words(text):
+        return True   # set larger than the body, as some journals mark headings
     if CHAPTER.fullmatch(text) or MULTI_LEVEL.match(text):
         return True
     single = SINGLE_LEVEL.match(text)
@@ -503,17 +737,21 @@ def _structure(pages):
     # How often the paper spells each word, to decide whether a line-end
     # hyphen is a compound's own (`_keeps_hyphen`).
     known = Counter(_word(w["text"]) for it in lines for w in it[2])
+    sizes = Counter(round(float(w.get("size") or 0), 1) for it in lines for w in it[2])
+    body_size = sizes.most_common(1)[0][0] if sizes else None
 
     sections = [{"heading": "", "page": 1, "passages": []}]
     para, paragraph, para_size, hang, prev_line, body_x = [], [0], [None], [None], [None], [None]
     last_body = [None]   # the body margin of the latest paragraph, kept across columns
     first_x = [None]     # where the current paragraph's first line began
     last_top, pending_chapter, prev_heading = None, None, None
+    caption = [None]     # the latest caption line: (page, column, top, font)
 
     def flush():
         if para:
             paragraph[0] += 1
-            sections[-1]["passages"].extend(_sentences(para, known, paragraph[0], pages))
+            sections[-1]["passages"].extend(_sentences(
+                para, known, paragraph[0], pages, whole=_is_references(sections[-1]["heading"])))
             para.clear()
 
     for it in stream:
@@ -534,7 +772,21 @@ def _structure(pages):
                        and not para and not sections[-1]["passages"]
                        and sections[-1]["heading"].endswith("-") and text[:1].islower()
                        and _continues(sections[-1], line))
-        if hyphen_wrap or _is_heading(line):
+        # A caption carried onto the lines below it, in its own font: sample23's
+        # "Table 3. … Key Concepts of" over "Sustainability". No heading.
+        after_caption = (caption[0] is not None and caption[0][:2] == (page, column)
+                         and 0 < top - caption[0][2] <= CAPTION_GAP * line_gap
+                         and _font(line) == caption[0][3])
+        caption[0] = ((page, column, top, _font(line))
+                      if CAPTION.match(text.strip()) or after_caption else None)
+        # A heading starts at its column's left or is centred in it. A short
+        # line off to the right is a table's cell: sample13's stacked
+        # "Standard" over "Deviation".
+        span = max(column_right - column_left, 1)
+        middle = (line[0]["x0"] + line[-1]["x1"]) / 2
+        off_right = (line[0]["x0"] > column_left + span / 2
+                     and abs(middle - (column_left + column_right) / 2) > CENTRED * span)
+        if not after_caption and not off_right and (hyphen_wrap or _is_heading(line, body_size)):
             flush()
             if CHAPTER.fullmatch(text.strip()):
                 pending_chapter = (text.strip(), page)
@@ -624,10 +876,15 @@ def _structure(pages):
         if _continues_text(line[0]["text"]):
             indented = False
         indented = indented or outdented
+        # A web address cut at "-" or "/" carries on, wherever its tail starts.
+        if prev_line[0] is not None and _url_broken(prev_line[0][4]):
+            indented = False
         gap = bool(para) and last_top is not None and page == para[-1][1] and top - last_top > line_gap * 1.6
         size = _size(line)
         resized = bool(para) and para_size[0] is not None and abs(size - para_size[0]) > SIZE_BREAK
-        if para and (bullet_x is not None or indented or gap or resized):
+        # A line ending in a leader and a page number is one contents entry.
+        after_entry = prev_line[0] is not None and prev_line[0][7]
+        if para and (bullet_x is not None or indented or gap or resized or after_entry):
             flush()
         if not para:
             para_size[0] = size
@@ -646,7 +903,8 @@ def _structure(pages):
             last_body[0] = (x, x - column_left)   # the margin, and its offset in its column
         para.extend((w["text"], page, w) for w in line)
         para.append(("\n", page, None))
-        prev_line[0] = (page, column, x, line[-1]["x1"], line[-1]["text"], column_right, column_left)
+        prev_line[0] = (page, column, x, line[-1]["x1"], line[-1]["text"], column_right, column_left,
+                        bool(CONTENTS_ENTRY.search(_line_text(line))))
         last_top = top
     flush()
     if pending_chapter:
@@ -713,7 +971,18 @@ def _unreliable(sections) -> list:
     return reasons
 
 
-def _sentences(para, known, paragraph, pages):
+REFERENCE_HEADINGS = {"references", "reference", "reference list", "list of references", "references cited",
+                      "bibliography", "literature cited", "works cited", "sources"}
+
+
+def _is_references(heading) -> bool:
+    """Whether a section heading opens a reference list, numbered or not."""
+    return NUMBERING.sub("", heading or "").strip(" .:").lower() in REFERENCE_HEADINGS
+
+
+def _sentences(para, known, paragraph, pages, whole=False):
+    """A paragraph's sentences, or the paragraph as one passage when ``whole``:
+    a reference entry, whose "(2024)." and "J. Clean. Prod." end no sentence."""
     # Join lines; repair a word hyphenated across a line break.
     tokens = []   # (text, [words])
     i = 0
@@ -723,6 +992,12 @@ def _sentences(para, known, paragraph, pages):
             i += 1
             continue
         nxt = para[i + 2] if i + 2 < len(para) and para[i + 1][0] == "\n" else None
+        if nxt and _url_broken(t):
+            # The address goes on with no space, its hyphen kept: most DOIs
+            # hold one ("1755-1315"), and a reader can't tell the rest apart.
+            tokens.append((t + nxt[0], [w, nxt[2]]))
+            i += 3
+            continue
         if t.endswith("-") and len(t) > 1 and nxt and nxt[0][:1].isalpha():
             head, tail = t[:-1], nxt[0]
             if _keeps_hyphen(head, tail, known):
@@ -734,6 +1009,9 @@ def _sentences(para, known, paragraph, pages):
             continue
         tokens.append((t, [w]))
         i += 1
+
+    if CONTENTS_ENTRY.search(" ".join(t for t, _ in tokens)):
+        tokens, whole = _collapse_leader(tokens), True
 
     text, spans = "", []
     for t, ws in tokens:
@@ -752,7 +1030,8 @@ def _sentences(para, known, paragraph, pages):
         return not re.search(r"(^|\s)[A-Z]\.$", before)
 
     out, start = [], 0
-    for end in [m.end() for m in SENTENCE_END.finditer(text) if splits_here(m)] + [len(text)]:
+    ends = [] if whole else [m.end() for m in SENTENCE_END.finditer(text) if splits_here(m)]
+    for end in ends + [len(text)]:
         chunk = text[start:end].strip()
         if chunk:
             ws = [w for s, e, wl in spans if s < end and e > start for w in wl if w]
@@ -761,6 +1040,27 @@ def _sentences(para, known, paragraph, pages):
                         "paragraph": paragraph, "kind": "sentence",
                         "regions": _normalize(boxes, pages)})
         start = end
+    return out
+
+
+def _collapse_leader(tokens):
+    """A contents entry's leader as one "…". Tokens of dots alone join it, and
+    a title word with dots on its end ("Summary……") gives the leader its dots."""
+    out, leader = [], None
+    for t, ws in tokens:
+        if re.fullmatch(r"[.…·]+", t):
+            leader = leader or ("…", [])
+            leader[1].extend(ws)
+            continue
+        if leader is not None:
+            out.append(leader)
+            leader = None
+        head = LEADER.sub("", t)
+        out.append((head or t, ws))
+        if head and head != t:
+            leader = ("…", [])
+    if leader is not None:
+        out.append(leader)
     return out
 
 

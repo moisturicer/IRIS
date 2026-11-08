@@ -16,6 +16,14 @@ interface RouteDialogProps {
   onClose: () => void;
   /** Routed: the offices it went to, for the bar to announce. */
   onRouted: (officeLabels: string[]) => void;
+  /**
+   * Sends the choice another way: *Finish review*'s Accept & send to RDCO
+   * goes through `finish-review/`, so the reviewer's drafts go with it
+   * (IR-875). Absent, the dialog posts to the routing endpoints itself.
+   */
+  send?: (body: RouteRequest) => Promise<unknown>;
+  /** The reason to start from: Finish review's summary. */
+  initialReason?: string;
 }
 
 /** What the reviewer chose for one office: ticked, and whom (if anyone) to nominate. */
@@ -37,13 +45,13 @@ interface Choice {
  * Adding a colleague from your own office is a different act (ADR-032 §4) and
  * is not here.
  */
-export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRouted }: RouteDialogProps) {
+export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRouted, send, initialReason = "" }: RouteDialogProps) {
   const ids = useId();
   const [options, setOptions] = useState<RouteOptions | null>(null);
   const [loadFailed, setLoadFailed] = useState<string | null>(null);
   const [choices, setChoices] = useState<Partial<Record<Party, Choice>>>({});
   const [suggested, setSuggested] = useState<string[]>([]);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(initialReason);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -92,7 +100,7 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
       }),
     };
     try {
-      await (accepting ? recordsApi.acceptAndRoute(recordId, body) : recordsApi.route(recordId, body));
+      await (send ? send(body) : accepting ? recordsApi.acceptAndRoute(recordId, body) : recordsApi.route(recordId, body));
       onRouted(ticked.map((t) => t.label));
     } catch (err) {
       // The typed reason and choices stay, so the router fixes and resends.

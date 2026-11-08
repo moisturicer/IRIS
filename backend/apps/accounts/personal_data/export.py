@@ -61,7 +61,7 @@ def _paper(record_id, titles: dict[int, str]) -> dict:
 # -- account ------------------------------------------------------------------
 
 def account(user) -> dict:
-    from apps.accounts.models import AdviserProfile, RoleRequest, StudentProfile
+    from apps.accounts.models import AccountDeletionRequest, AdviserProfile, RoleRequest, StudentProfile
 
     data = {
         "id": user.pk,
@@ -110,6 +110,17 @@ def account(user) -> dict:
             "reviewed_at": row.reviewed_at,
         }
         for row in RoleRequest.objects.filter(user=user).select_related("requested_role").order_by("id")
+    ]
+    # Their own requests to delete the account (IR-785). Who decided is left
+    # out, as with role requests; a rejection's reason is theirs to read.
+    data["deletion_requests"] = [
+        {
+            "status": row.status,
+            "created_at": row.created_at,
+            "decided_at": row.decided_at,
+            "reason": row.reason,
+        }
+        for row in AccountDeletionRequest.objects.filter(user=user).order_by("id")
     ]
     return data
 

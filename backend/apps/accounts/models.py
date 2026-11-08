@@ -111,6 +111,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     #: sign-in on every device at once. Change it only through
     #: `apps.accounts.credentials.set_password_and_invalidate`.
     credential_version = models.PositiveIntegerField(default=0)
+    #: When a System Admin confirmed this account's deletion (ADR-051 §11,
+    #: IR-785). The row is kept, because deleting it would cascade into
+    #: ownership and review history; its personal details are erased and it
+    #: can't sign in. Null on every live account.
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     # -- Profile (IR-695, spec IR-694). Every one of these is optional and the
     # person's alone to edit; `apps.accounts.profile` holds the rules.
@@ -506,3 +511,37 @@ class RecoveryAttempt(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["bucket", "at"])]
+
+
+class AccountDeletionRequest(models.Model):
+    """
+    A person asks for their account to be deleted, and a System Admin confirms
+    or rejects it (ADR-051 §8-§9, IR-785).
+
+    `APPROVED` is a confirmed deletion and `DECLINED` a rejection, which always
+    carries the reason the person is told. `CANCELLED` is the person withdrawing
+    it while pending. A person holds at most one pending request.
+    """
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name="deletion_requests")
+    status     = models.CharField(
+        max_length=10, choices=RequestStatus.choices, default=RequestStatus.PENDING,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="decided_deletion_requests",
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    #: Why a System Admin rejected it. Blank otherwise.
+    reason     = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"], condition=models.Q(status=RequestStatus.PENDING),
+                name="one_pending_account_deletion_request",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Deletion of user {self.user_id} ({self.status})"

@@ -4,6 +4,8 @@
 
 **Accepted** — 2026-11-01 by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado (IR-780, spec IR-779). The decisions come from design sessions with Hermoine Zozobrado on 2026-11-01. IR-781 builds decisions 1 to 6, with decisions 4 and 5 amended below. The rest isn't built yet.
 
+**Amended by [ADR-063](063-rdco-sets-requirements-and-templates.md), 2026-11-08:** only RDCO publishes a Notice. Decision 16's "or the System Admin", the System Admin's share in publishing notices and the shared `/notices` page no longer apply; Notices are published from RDCO's Setup page, and the System Admin sees each publication in the Audit Log. Decision 17 stands.
+
 **Partly replaced by [ADR-054](054-each-person-answers-whether-ai-may-use-their-papers.md), 2026-11-02:** Submission consent is gone. Decision 14's per-paper half, the last sentence of decision 15, decision 16's submission notice and the first half of decision 18 no longer apply.
 
 It reverses IR-165's choice that `admin@cit.edu` holds no application role, though not IR-165's rule that `is_superuser` grants nothing in the API. It changes [ADR-050](050-calls-for-papers-and-rdco-confirmation.md) decision 15, gives "system administrator" in [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) a meaning, widens [ADR-029](029-proposal-similarity-and-collaboration.md)'s choice of Contact person from Proposals to every paper, and answers IR-705's open decision.

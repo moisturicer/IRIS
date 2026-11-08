@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-02. The decisions are Hermoine Zozobrado's, from a design session under IR-836. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Not built yet. No CIT-U data protection officer's review is recorded (IR-123).
+**Accepted on merge** — 2026-11-02. The decisions are Hermoine Zozobrado's, from a design session under IR-836. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. **Partly built (corrected 2026-11-07, IR-968):** the answer at sign-up and after each new notice, by IR-789. A paper keeping its Contact person's answer for the disclosure check (IR-791, in progress), the AI saying an owner did not consent (IR-792) and the Settings view (IR-793) are not built yet. No CIT-U data protection officer's review is recorded (IR-123).
 
 It replaces [ADR-051](051-system-admin-account-deletion-and-consent.md)'s Submission consent: decision 14's per-paper half, the last sentence of decision 15, decision 16's submission notice and the first half of decision 18. Everything else in ADR-051 stands, including that withdrawing Signup consent means account deletion. It changes which fact supplies the consent input to [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate.
 

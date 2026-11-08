@@ -1,6 +1,6 @@
 """The indexing authority reads the paper's stored AI answer (IR-791, ADR-054).
 
-`records/0034` adds `Record.ai_consent`, the Contact person's answer copied onto
+`records/0036` adds `Record.ai_consent`, the Contact person's answer copied onto
 the paper when its draft was created. The disclosure gate in Python now reads it,
 so the two Postgres functions the AI runtime asks ("may this paper be a source?")
 must read it too -- left on `dpa_accepted_at`, which nothing stamps any more, they
@@ -41,7 +41,7 @@ END $$"""
 class Migration(migrations.Migration):
     dependencies = [
         ("publication", "0009_embargoed_by_default"),
-        ("records", "0034_record_ai_consent"),
+        ("records", "0036_record_ai_consent"),
     ]
     operations = [
         migrations.RunSQL(GRANT, migrations.RunSQL.noop),

@@ -14,7 +14,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('records', '0033_version_review_text'),
+        ('records', '0035_record_adviser_name'),
     ]
 
     operations = [
