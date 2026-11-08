@@ -65,6 +65,8 @@ def _bearer(user, *, start=None, clock=time.monotonic, idle_seconds=15 * 60):
     The app refuses a token without a session (ADR-045 §4), and a session idle
     for thirty minutes ends, so one left unused for fifteen is replaced.
     """
+    from rest_framework_simplejwt.utils import aware_utcnow
+
     if start is None:
         from apps.accounts.sessions import start_session as start
     state = {"refresh": None, "used": None}
@@ -73,6 +75,8 @@ def _bearer(user, *, start=None, clock=time.monotonic, idle_seconds=15 * 60):
         if state["refresh"] is None or clock() - state["used"] > idle_seconds:
             state["refresh"] = start(user)
         state["used"] = clock()
+        # simplejwt dates an access token from its refresh token's birth; date it now.
+        state["refresh"].current_time = aware_utcnow()
         return {"Authorization": f"Bearer {state['refresh'].access_token}"}
     return headers
 

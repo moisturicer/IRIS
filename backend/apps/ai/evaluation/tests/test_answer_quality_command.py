@@ -223,3 +223,23 @@ def test_preflight_refuses_rate_limits_the_run_would_hit(settings):
     assert any("ai_query" in p for p in problems)
     rates.update(ai_query="100000/hour", user="100000/hour")
     assert _throttle_problems(turns=120) == []
+
+
+def test_a_token_minted_late_in_a_session_is_not_already_expired():
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+    from rest_framework_simplejwt.utils import aware_utcnow, datetime_to_epoch
+
+    from apps.ai.management.commands.eval_answer_quality import _bearer
+
+    def start(user):
+        refresh = RefreshToken()
+        refresh["user_id"], refresh["sid"] = user.id, "s0"
+        refresh.current_time = aware_utcnow() - timedelta(minutes=40)
+        return refresh
+
+    headers = _bearer(SimpleNamespace(id=7, pk=7), start=start)
+    token = AccessToken(headers()["Authorization"].removeprefix("Bearer "))
+    assert token["exp"] > datetime_to_epoch(aware_utcnow())
