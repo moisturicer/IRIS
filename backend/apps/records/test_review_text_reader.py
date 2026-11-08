@@ -203,6 +203,33 @@ def test_numbers_beside_prose_around_a_wide_block_are_no_columns(read):
     assert "row 1 label of the survey results goes on 11 Agree" in joined
 
 
+def test_a_web_address_tail_in_capitals_is_no_heading(read):
+    # test1: an address cut at "HABITS-" went on as "OF-YOUTH-IN-OMAN", which
+    # the capitals rule took for a heading, and every later entry fell under it.
+    page = [(72, "Times-Bold", 12, "REFERENCES"),
+            (72, BODY, 12, "Chavali, K. (2020). Saving and spending habits of youth in Oman. Journal"),
+            (108, BODY, 12, "of Critical Reviews. https://www.example.org/paper/SAVING-AND-SPENDING-HABITS-"),
+            (108, BODY, 12, "OF-YOUTH-IN-OMAN"),
+            (72, BODY, 12, "Kotler, P. (2019). Principles of marketing. Pearson Education.")]
+    reading = read(placed([page]))
+    assert keys(reading) == ["references"]
+    assert texts(reading)[0].endswith("https://www.example.org/paper/SAVING-AND-SPENDING-HABITS-OF-YOUTH-IN-OMAN")
+    assert texts(reading)[1] == "Kotler, P. (2019). Principles of marketing. Pearson Education."
+
+
+def test_an_entry_after_an_address_ending_in_a_slash_starts_at_the_margin(read):
+    # test1: "Baron, R. (2008)..." back at the margin after an address ending
+    # ".../12/" was read as that address's tail, glued to the entry before.
+    page = [(72, "Times-Bold", 12, "REFERENCES"),
+            (72, BODY, 12, "Andres, K. (2022). Spending habits of senior high school learners during the pandemic. Animo"),
+            (108, BODY, 12, "Repository. https://animorepository.dlsu.edu.ph/conf/2022/bus_research/12/"),
+            (72, BODY, 12, "Baron, R. (2008). Distraction-conflict theory: Progress and problems in the study of attention and its"),
+            (108, BODY, 12, "limits. Retrieved from https://www.example.org/baron")]
+    found = texts(read(placed([page])))
+    assert found[0].endswith("bus_research/12/")
+    assert found[1].startswith("Baron, R. (2008).")
+
+
 def test_an_unruled_tables_number_columns_are_not_a_page_column(read):
     # sample19 and a dozen others: on a one-column page, the gap between a
     # table's labels and its numbers was taken for a gutter, so every label
@@ -414,6 +441,16 @@ def test_about_as_many_headings_as_sentences_is_not_trusted():
 def test_one_heading_over_and_over_is_not_trusted():
     repeated = _sectioned(("journal", 9), *[(f"journal#{n}", 9) for n in range(2, 7)], ("methods", 9))
     assert "repeated_headings" in reader._unreliable(repeated)
+
+
+@pytest.mark.parametrize("back", ["appendices", "appendix a", "curriculum vitae"])
+def test_headings_repeated_in_the_appendices_are_trusted(back):
+    # test1: each researcher's CV repeats "Personal Information" and
+    # "Personal Statement", and the whole thesis read as one section.
+    cvs = [(f"personal information#{n}" if n > 1 else "personal information", 1) for n in range(1, 12)]
+    cvs += [(f"personal statement#{n}" if n > 1 else "personal statement", 3) for n in range(1, 9)]
+    thesis = _sectioned(*[(f"chapter heading {n}", 6) for n in range(30)], (back, 0), *cvs)
+    assert reader._unreliable(thesis) == []
 
 
 def test_headings_over_mostly_nothing_are_not_trusted():

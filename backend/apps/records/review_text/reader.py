@@ -786,7 +786,15 @@ def _structure(pages):
         middle = (line[0]["x0"] + line[-1]["x1"]) / 2
         off_right = (line[0]["x0"] > column_left + span / 2
                      and abs(middle - (column_left + column_right) / 2) > CENTRED * span)
-        if not after_caption and not off_right and (hyphen_wrap or _is_heading(line, body_size)):
+        # A line carrying on a web address cut at its end is the address's tail,
+        # unless it steps back out to where a hanging entry began: an address
+        # may end on "/", and the next entry then opens at the margin (test1).
+        began = first_x[0]
+        back_at_start = (began is not None and began[:2] == (page, column) and began[3] is not None
+                         and began[3] < -INDENT and line[0]["x0"] <= began[2] + 3)
+        url_tail = prev_line[0] is not None and _url_broken(prev_line[0][4]) and not back_at_start
+        if (not after_caption and not off_right and not url_tail
+                and (hyphen_wrap or _is_heading(line, body_size))):
             flush()
             if CHAPTER.fullmatch(text.strip()):
                 pending_chapter = (text.strip(), page)
@@ -877,7 +885,7 @@ def _structure(pages):
             indented = False
         indented = indented or outdented
         # A web address cut at "-" or "/" carries on, wherever its tail starts.
-        if prev_line[0] is not None and _url_broken(prev_line[0][4]):
+        if url_tail:
             indented = False
         gap = bool(para) and last_top is not None and page == para[-1][1] and top - last_top > line_gap * 1.6
         size = _size(line)
@@ -951,6 +959,10 @@ def _finish(sections, pages):
     return out, warnings
 
 
+#: A heading that opens a paper's appendices.
+BACK_MATTER = re.compile(r"(appendix|appendices|annex|curriculum vitae)\b")
+
+
 def _unreliable(sections) -> list:
     """Why these sections can't be trusted, or nothing. Each reason is a shape
     no paper's real headings take: none at all, about as many headings as
@@ -964,7 +976,9 @@ def _unreliable(sections) -> list:
         return reasons
     if len(headed) > 10 and len(headed) * 3 > passages:
         reasons.append("too_many_headings")
-    if sum(1 for s in headed if "#" in s["key"]) > max(3, len(headed) // 5):
+    # Appendices repeat headings by design: one CV, one form per person.
+    back = next((i for i, s in enumerate(headed) if BACK_MATTER.match(s["key"])), len(headed))
+    if sum(1 for s in headed[:back] if "#" in s["key"]) > max(3, len(headed) // 5):
         reasons.append("repeated_headings")
     if len(headed) > 4 and sum(1 for s in headed if not s["passages"]) * 2 > len(headed):
         reasons.append("mostly_empty_sections")
