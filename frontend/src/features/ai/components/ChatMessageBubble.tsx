@@ -72,8 +72,11 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
   );
 }
 
-/** A queued question that ended unanswered, and the way to ask it again. */
-function RunEndedNotice({ onRetry, disabled }: { onRetry?: () => void; disabled?: boolean }) {
+/**
+ * The way to ask a question again: for a queued run that ended unanswered
+ * (IR-548), and for an answer that was cut off before it finished (IR-907).
+ */
+function RetryButton({ onRetry, disabled }: { onRetry?: () => void; disabled?: boolean }) {
   if (!onRetry) return null;
   return (
     <div className="mt-2">
@@ -176,9 +179,17 @@ export function ChatMessageBubble({
         )}
         {!isUser && message.degraded && <DegradedNotice subject="answer" />}
         {!isUser && message.widened && <ScopeNotice />}
-        {!isUser && message.partial && !message.endedRun && <PartialAnswerNotice />}
+        {!isUser && message.partial && !message.endedRun && (
+          <>
+            <PartialAnswerNotice />
+            {/* Only a reply that knows its question can be asked again. */}
+            {message.question && (
+              <RetryButton onRetry={onRetry ? () => onRetry(message) : undefined} disabled={retryDisabled} />
+            )}
+          </>
+        )}
         {!isUser && message.endedRun && (
-          <RunEndedNotice
+          <RetryButton
             onRetry={onRetry ? () => onRetry(message) : undefined}
             disabled={retryDisabled}
           />

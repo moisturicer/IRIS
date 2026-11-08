@@ -4,7 +4,8 @@
 // itself, so each case chooses exactly where the stream stops:
 //
 //   request-bound   no `run_queued`: the connection is the answer. Cut after some text,
-//                   the reader keeps what arrived and is told it was cut off.
+//                   the reader keeps what arrived, is told it was cut off, and Retry
+//                   asks the same question again (IR-907).
 //   queued run      `run_queued` names a run (IR-544). A dropped connection reconnects from
 //                   the last event id; a run that ENDS unanswered (`run_failed`,
 //                   `run_cancelled`) says so and offers Retry (IR-548), which starts a new
@@ -77,7 +78,7 @@ test.describe("a slow answer", () => {
 });
 
 test.describe("a request-bound answer (no queued run)", () => {
-  test("cut off after some text: keeps the text, says it was cut off, and the reader can ask again", async ({ page, api }) => {
+  test("cut off after some text: keeps the text, says it was cut off, and Retry asks the same question again", async ({ page, api }) => {
     await openChat(page, api);
     api.on("POST", "/ai/ask/stream/", stream(
       frame("text_delta", { text: "Capacitive probes were used" }),
@@ -90,12 +91,21 @@ test.describe("a request-bound answer (no queued run)", () => {
     await expect(page.getByText(QUESTION, { exact: true })).toBeVisible();
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeEnabled();
     await expect(page.getByRole("status").filter({ hasText: /Waiting|Thinking|Preparing/ })).toHaveCount(0);
+    // Nothing asked again by itself.
+    expect(times(api, "POST /ai/ask/stream/")).toBe(1);
 
-    // Asking again is the way on, and it works.
-    api.on("POST", "/ai/ask/stream/", stream(DONE("Capacitive probes and tensiometers.", 12)));
-    await ask(page, "Please try that again.");
+    // Retry (IR-907): the same question, sent as a new one, and it answers.
+    let asked: string | undefined;
+    api.on("POST", "/ai/ask/stream/", (route: Route, request: Request) => {
+      asked = (request.postDataJSON() as { question?: string }).question;
+      return stream(DONE("Capacitive probes and tensiometers.", 12))(route);
+    });
+    await retryButton(page).click();
     await expect(page.getByText("Capacitive probes and tensiometers.")).toBeVisible();
+    expect(asked).toBe(QUESTION);
     expect(times(api, "POST /ai/ask/stream/")).toBe(2);
+    // The cut-off answer stays as history; only the latest answer can be retried.
+    await expect(retryButton(page)).toHaveCount(0);
   });
 
   test("cut off before any text: says the answer was interrupted", async ({ page, api }) => {
@@ -109,6 +119,7 @@ test.describe("a request-bound answer (no queued run)", () => {
     await expect(page.getByText("This answer was cut off before it finished — it may be incomplete.")).toBeVisible();
     await expect(page.getByText(QUESTION, { exact: true })).toBeVisible();
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeEnabled();
+    await expect(retryButton(page)).toBeEnabled();
   });
 
   test("the request fails with a server error: says so, keeps the question, and the reader can ask again", async ({ page, api }) => {
@@ -175,6 +186,7 @@ test.describe("a queued run", () => {
 
     await expect(page.getByText("This answer was cut off before it finished — it may be incomplete.")).toBeVisible();
     await expect(page.getByText("Capacitive probes")).toBeVisible();
+    await expect(retryButton(page)).toBeEnabled();
     // A bounded number of tries, then it stops: the page is not left reconnecting for ever.
     const tries = times(api, "GET /ai/ask/runs/r1/stream/");
     expect(tries).toBeGreaterThan(0);

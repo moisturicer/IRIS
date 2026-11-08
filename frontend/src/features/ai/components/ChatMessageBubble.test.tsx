@@ -160,6 +160,42 @@ describe("a cited answer", () => {
     expect(screen.getByText(/cut off before it finished/i)).toBeTruthy();
   });
 
+  it("offers Retry on a cut-off reply that knows its question, and Retry hands the reply back (IR-907)", async () => {
+    const onRetry = vi.fn();
+    const message = assistantMessage({ partial: true, question: "What sensors were used?" });
+    renderScreen(<ChatMessageBubble message={message} onRetry={onRetry} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(onRetry).toHaveBeenCalledWith(message);
+  });
+
+  it("offers no Retry on a cut-off reply with no question to ask again, or with nobody to handle it (IR-907)", () => {
+    const { unmount } = renderScreen(
+      <ChatMessageBubble message={assistantMessage({ partial: true })} onRetry={vi.fn()} />,
+    );
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    unmount();
+
+    renderScreen(<ChatMessageBubble message={assistantMessage({ partial: true, question: "Q?" })} />);
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.getByText(/cut off before it finished/i)).toBeTruthy();
+  });
+
+  it("disables Retry on a cut-off reply while another answer is in flight (IR-907)", () => {
+    renderScreen(
+      <ChatMessageBubble message={assistantMessage({ partial: true, question: "Q?" })} onRetry={vi.fn()} retryDisabled />,
+    );
+
+    expect(screen.getByRole("button", { name: "Retry" })).toBeDisabled();
+  });
+
+  it("offers no Retry on a complete reply (IR-907)", () => {
+    renderScreen(<ChatMessageBubble message={assistantMessage({ question: "Q?" })} onRetry={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
   it("says nothing about being cut off for a complete answer", () => {
     renderScreen(<ChatMessageBubble message={assistantMessage()} />);
 

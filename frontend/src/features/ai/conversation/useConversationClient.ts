@@ -337,12 +337,20 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
   /**
    * Retries the queued question `message` stands for as a new run (IR-548).
    * Throws when the server refuses it, for the page to say so.
+   *
+   * An answer that was cut off has no run to retry: its question is asked
+   * again as a new one (IR-907), with the same scope. The server stored the
+   * cut-off Turn, so this is a new question and a new Turn, never a replay.
    */
   const retry = useCallback(
     async (message: ChatMessage) => {
       const run = message.endedRun;
       const id = activeRef.current;
-      if (!run || id === null || flights.current.has(id)) return;
+      if (id === null || flights.current.has(id)) return;
+      if (!run) {
+        if (message.partial && message.question) void send(message.question, { widen: message.widened });
+        return;
+      }
       const { data } = await aiApi.retryRun(run.id);
       // The notice stays; only its Retry goes, since a second one would
       // return this same retry anyway.
@@ -352,7 +360,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
       }));
       void answer(id, message.question ?? "", (signal) => aiApi.resumeAskRun(data.run_id, 0, signal), data.run_id);
     },
-    [answer, updateThread],
+    [answer, send, updateThread],
   );
 
   /** Asks the server to stop the run the Conversation on screen is waiting for. */

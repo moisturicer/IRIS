@@ -830,6 +830,53 @@ describe("owned conversation URLs (IR-548)", () => {
     expect(screen.queryByRole("button", { name: /retry/i })).toBeNull();
   });
 
+  it("retries a cut-off answer by asking the same question again, and shows the new answer (IR-907)", async () => {
+    // The stream ends after some text and with no `done`: a request-bound answer cut off.
+    askStream
+      .mockImplementationOnce(() => (async function* () {
+        yield { event: "text_delta", data: { text: "Capacitive probes were" } };
+      })())
+      .mockImplementationOnce(() => doneStreamOf({ answer: "Capacitive probes were used." }));
+
+    renderScreen(<RAGChatPage />);
+    await userEvent.type(await screen.findByRole("textbox", { name: /ask a follow-up/i }), "What sensors were used?");
+    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    expect(await screen.findByText(/cut off before it finished/i)).toBeTruthy();
+    expect(screen.getByText("Capacitive probes were")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText("Capacitive probes were used.")).toBeTruthy();
+    expect(askStream).toHaveBeenCalledTimes(2);
+    expect(askStream.mock.calls[1][0]).toBe("What sensors were used?");
+    // The cut-off answer stays as history, but only the latest answer can be retried.
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(retryRun).not.toHaveBeenCalled();
+  });
+
+  it("offers Retry only on the latest cut-off answer (IR-907)", async () => {
+    askStream
+      .mockImplementationOnce(() => (async function* () {
+        yield { event: "text_delta", data: { text: "First, cut" } };
+      })())
+      .mockImplementationOnce(() => (async function* () {
+        yield { event: "text_delta", data: { text: "Second, cut" } };
+      })());
+
+    renderScreen(<RAGChatPage />);
+    const box = await screen.findByRole("textbox", { name: /ask a follow-up/i });
+    await userEvent.type(box, "First question");
+    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await screen.findByText("First, cut");
+    await userEvent.type(screen.getByRole("textbox", { name: /ask a follow-up/i }), "Second question");
+    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await screen.findByText("Second, cut");
+
+    expect(screen.getAllByText(/cut off before it finished/i)).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Retry" })).toHaveLength(1);
+  });
+
   it("keeps a Record's conversation and its draft under the conversation's address", async () => {
     create.mockResolvedValue({ data: detail({ id: 4, record: 5 }) });
     get.mockResolvedValue({ data: detail({ id: 4, record: 5 }) });

@@ -50,3 +50,12 @@ export function turnToMessages(turn: ConversationTurn): ChatMessage[] {
     },
   ];
 }
+
+/**
+ * A cut-off answer is retried by asking its question again, which lands at the
+ * end of the transcript: so only the latest one offers it (IR-907). A run that
+ * ended unanswered keeps its own Retry wherever it is (IR-548).
+ */
+export function retryOffered(message: ChatMessage, latestId: string | undefined): boolean {
+  return !(message.partial && !message.endedRun) || message.id === latestId;
+}
