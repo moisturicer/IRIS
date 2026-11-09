@@ -1,6 +1,6 @@
 # AI runtime limits: proposal for approval
 
-**Status: Partly decided. Approver: Jive Tyler I. Revalde.** Drafted by an AI agent for IR-1002 on 2026-11-09. The capacity values are **assumed**, by the approver's decision of 2026-11-09, until IR-755 measures them (see [Decision](#decision)). The per-run budget (options A and B) is still a proposal. Every limit stays as each deployment's `.env` sets it, and the code refuses to start when one is missing.
+**Status: Partly decided. Approver: Jive Tyler I. Revalde.** Drafted by an AI agent for IR-1002 on 2026-11-09. The capacity values are **assumed**, by the approver's decision of 2026-11-09, until IR-755 measures them (see [Decision](#decision)). The per-run budget is option A, approved on 2026-11-09. Every limit stays as each deployment's `.env` sets it, and the code refuses to start when one is missing.
 
 Every limit below is required. None has a default in code (ADR-049, ADR-041). The development values were chosen one session at a time; this page puts them in one place and fits them together.
 
@@ -28,7 +28,7 @@ These are ceilings, not what a run usually spends. In development, a plain quest
 
 **Options**
 
-| | A. Raise the run allowance (recommended) | B. Compact earlier |
+| | A. Raise the run allowance (**approved**) | B. Compact earlier |
 |---|---|---|
 | Change | `RUNS_MAX_INPUT_TOKENS` 3,000,000; `RUNS_MAX_COST_USD` 0.60; `RUNS_MAX_ATTEMPTS` 20 | `RUNS_AGENT_COMPACTION.threshold_tokens` 100,000; allowance unchanged |
 | Gain | Long conversations keep up to 200K of exact earlier text and still finish a deep run | No budget change; each call is cheaper |
@@ -44,10 +44,10 @@ Only one allowance exists. `RunLimits.allowance()` is the same for both depths, 
 
 | Name | Development | Proposed | Guards |
 |---|---|---|---|
-| `RUNS_MAX_INPUT_TOKENS` | 700,000 | **3,000,000** | Total input across a run's calls (option A) |
+| `RUNS_MAX_INPUT_TOKENS` | 700,000 | **3,000,000**, approved | Total input across a run's calls (option A) |
 | `RUNS_MAX_OUTPUT_TOKENS` | 100,000 | | Total output. Calls settle to their actual output, which is far below the 32K cap |
-| `RUNS_MAX_COST_USD` | 0.35 | **0.60** | One run's spend (option A) |
-| `RUNS_MAX_ATTEMPTS` | 14 | **20** | Paid calls per run: 13 for deep, plus up to 2 compaction summaries and transient retries |
+| `RUNS_MAX_COST_USD` | 0.35 | **0.60**, approved | One run's spend (option A) |
+| `RUNS_MAX_ATTEMPTS` | 14 | **20**, approved | Paid calls per run: 13 for deep, plus up to 2 compaction summaries and transient retries |
 | `RUNS_DEADLINE_SECONDS` | 120 | | An ordinary run's wall clock |
 | `RUNS_DEEP_DEADLINE_SECONDS` | 600 | | A deep run's wall clock |
 | `RUNS_LEASE_SECONDS` | 210 | | How long a worker holds a run before another may take it over |
@@ -89,7 +89,7 @@ Only one allowance exists. `RunLimits.allowance()` is the same for both depths, 
 | Name | Development | Proposed | Guards |
 |---|---|---|---|
 | `AGENT_LLM_PROMPT_CACHE` | off | decided in ADR-049's IR-953 amendment | Sends a per-run prompt-cache key |
-| `RUNS_QUERY_VECTOR_CACHE` | off | decided in ADR-049's IR-953 amendment | Reuses a query's embedding within one run |
+| `RUNS_QUERY_VECTOR_CACHE` | off | **on**, approved | Reuses a query's embedding within one run |
 | `RUNS_AGENT_TOOL_CONCURRENCY` | unset (1) | **4**, assumed | Read-only calls in one tool group fetched at once (IR-1003, approved). 4 matches an ordinary run's tool-call limit. At 8 runs per worker, that is up to 32 extra database connections per worker |
 
 `RUNS_DEPLOYMENT_STAGE` and `RUNS_PROXY_SEND_APPROVAL` are left out: IR-996 deletes them.
@@ -104,5 +104,7 @@ The values marked "assumed" control how many readers IRIS serves at once. Nobody
 |---|---|---|
 | 2026-11-09 | Capacity limits are assumed at their development values until IR-755 measures them: `RUNS_MAX_QUEUED`, `RUNS_WORKER_CONCURRENCY`, `RUNS_DEEP_CONCURRENCY`, `AI_ADMISSION_LANE_CONCURRENCY`, `AI_ADMISSION_ACCOUNT_CONCURRENCY`, and the new `RUNS_AGENT_TOOL_CONCURRENCY` at 4 | Jive Tyler I. Revalde, in chat |
 | 2026-11-09 | Concurrent tool calls approved (ADR-049, IR-953 amendment, item 4) | Jive Tyler I. Revalde, in chat |
-| open | Option A or B for the per-run budget | Jive Tyler I. Revalde |
+| 2026-11-09 | Option A: `RUNS_MAX_INPUT_TOKENS` 3,000,000, `RUNS_MAX_COST_USD` 0.60, `RUNS_MAX_ATTEMPTS` 20 | Jive Tyler I. Revalde, in chat |
+| 2026-11-09 | `RUNS_QUERY_VECTOR_CACHE` on | Jive Tyler I. Revalde, in chat |
+| 2026-11-09 | Paid measurement runs wait until IR-1004 is implemented | Jive Tyler I. Revalde, in chat |
 | open | A production campaign name and ceiling | Jive Tyler I. Revalde |
