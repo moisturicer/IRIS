@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import secrets
+from contextvars import ContextVar
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from types import SimpleNamespace
@@ -374,6 +375,11 @@ class _Refused(Exception):
         self.reason = reason
 
 
+#: Inside a concurrent tool group, set when every earlier call has committed (IR-1003).
+#: A call waits on it before writing its journal entry, so entries keep call order.
+EARLIER_COMMITTED: ContextVar = ContextVar("research_earlier_committed", default=None)
+
+
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
                  scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None,
@@ -448,6 +454,9 @@ class ResearchTools:
             async with self._session() as conn:
                 result = await body(conn)
                 coverage = result.coverage
+                earlier = EARLIER_COMMITTED.get()
+                if earlier is not None:
+                    await earlier.wait()
                 await RunStore._journal(conn, self.run_id, "tool", {
                     "tool": name, "status": result.status, "returned": coverage.returned,
                     "total": coverage.total, "truncated": coverage.truncated,

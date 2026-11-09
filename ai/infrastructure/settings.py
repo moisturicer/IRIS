@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     RUNS_REDIS_URL: str = ""
     # Optional (IR-953): "on" reuses a query's embedding within one run; blank is off.
     RUNS_QUERY_VECTOR_CACHE: str = ""
+    # Optional (IR-1003): read-only calls in one tool group fetched at once; blank is 1.
+    RUNS_AGENT_TOOL_CONCURRENCY: str = ""
     # Exact public-proxy source manifest for the IR-889 development pilot.
     # Empty refuses every Record-dependent paid send.
     RUNS_PROXY_SEND_APPROVAL: str = ""
