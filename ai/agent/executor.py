@@ -175,8 +175,11 @@ class AgentExecutor:
 
     def __init__(self, provider: LLMProvider, pin: Pin, reserves: Reserves, *,
                  profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None,
-                 compaction: Optional[Compaction] = None):
+                 compaction: Optional[Compaction] = None, enforce_checks: bool = True):
         self.provider = provider
+        #: True refuses, repairs or trims a draft that fails the checks. False delivers it: the
+        #: findings are logged, and only a citation to a passage that cannot be bound is dropped.
+        self.enforce_checks = enforce_checks
         self.pin = pin
         self.reserves = reserves
         #: None never compacts: a full window then closes research, as before (IR-734).
@@ -721,13 +724,15 @@ class _Run:
             raise Unavailable("run_ended")
         sink = stream.active()
         if sink is not None:
-            await sink.attempt(phase)
+            await sink.attempt(phase, live=not self.agent.enforce_checks)
         send = self.agent.summarize if phase == "compact" else self.agent.send
         try:
             # The run's deadline bounds every send, admitted or not.
             turn = await asyncio.wait_for(send(request), max(0.0, self.deadline - time.monotonic()))
         except asyncio.TimeoutError:
             raise Unavailable("deadline") from None
+        if sink is not None:
+            await sink.settle(turn.stop is not StopReason.TOOLS)
         self.steps += phase == "gather"
         self.budget.spend(turn, status.occupancy_tokens, request.max_output_tokens)
         return turn
@@ -738,6 +743,10 @@ class _Run:
         found = self._findings(text)
         if not found:
             return await self._commit(text)
+        if not self.agent.enforce_checks:
+            # Advisory: the answer stands as written, minus citations that cannot be bound to a source.
+            log.info("agent draft findings (delivered): %s", ",".join(sorted(found)))
+            return await self._commit(assurance.bindable(text, self.investigation, excluded=self._focus("excluded")))
         log.info("agent draft refused: %s", ",".join(sorted(found)))
         # A source that changed since it was read fences delivery; it is never repaired around.
         await self._recheck(text)
@@ -823,6 +832,9 @@ class _Run:
     def _checked(self, text: str, *, clarification: bool = False) -> None:
         """A clarification or a salvaged answer that fails a check is never delivered."""
         failures = sorted(self._findings(text, clarification=clarification))
+        if failures and not self.agent.enforce_checks:
+            log.info("agent draft findings (delivered): %s", ",".join(failures))
+            return
         if failures:
             log.info("agent draft refused: %s", ",".join(failures))
             raise Unavailable("invalid_draft")

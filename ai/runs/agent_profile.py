@@ -33,6 +33,8 @@ class AgentProfile:
     limits: Limits
     #: None never compacts (IR-734).
     compaction: Optional[Compaction] = None
+    #: "advisory" delivers the answer as written; "enforce" repairs or trims one that fails the checks.
+    checks: str = "advisory"
 
 
 def _json(values, name, shape: str):
@@ -92,6 +94,9 @@ def read(values) -> AgentProfile:
         if not compaction.fits(provider.capacities[model], reserves):
             raise NotConfigured("RUNS_AGENT_COMPACTION leaves no room to summarize or finish"
                                 " under RUNS_AGENT_MODEL's capacity")
+    checks = str(getattr(values, "RUNS_AGENT_CHECKS", "") or "advisory").strip().lower()
+    if checks not in ("advisory", "enforce"):
+        raise NotConfigured("RUNS_AGENT_CHECKS must be advisory or enforce")
     pin = Pin(
         model=model, endpoint=provider.endpoint, adapter=OpenAICompatibleAgentProvider.adapter,
         dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=CHAT_PROMPT_VERSION,
@@ -99,7 +104,7 @@ def read(values) -> AgentProfile:
         state_version=runs_config.SCHEMA, data_policy=provider.data_policy,
     )
     return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits,
-                        compaction=compaction)
+                        compaction=compaction, checks=checks)
 
 
 def executor(profile: AgentProfile, dsn: str, *, provider=None):
@@ -115,7 +120,8 @@ def executor(profile: AgentProfile, dsn: str, *, provider=None):
     inner = provider if provider is not None else OpenAICompatibleAgentProvider(profile.provider)
     admitted = AdmittedAgentProvider(inner, Ledger(dsn, profile.limits), purpose=PURPOSE)
     return AgentExecutor(admitted, profile.pin, profile.reserves, profiles=profile.bounds,
-                         price=profile.limits.prices[profile.pin.model], compaction=profile.compaction)
+                         price=profile.limits.prices[profile.pin.model], compaction=profile.compaction,
+                         enforce_checks=profile.checks == "enforce")
 
 
 def selected(values) -> Optional[AgentProfile]:

@@ -1,11 +1,12 @@
 """The answer as the model writes it, relayed to the reader token by token.
 
-The worker publishes each text piece of a model attempt to a Redis stream per
-run; the gateway replays it to the reader over server-sent events. A draft is
-unchecked: the committed Turn replaces it, and may differ when the answer
-checks repair it. Passage handles become the same [1], [2] numbers the final
-answer uses. Without Redis nothing is published and the reader waits for the
-Turn, as before.
+The worker publishes the answer's text to a Redis stream per run; the gateway
+replays it to the reader over server-sent events. Only the answer is shown:
+the closing attempt streams as it is written, and a research turn's text is
+held until that turn is known to be the answer, so a preamble before a tool
+call is never shown. Passage handles become the same [1], [2] numbers the
+committed Turn uses. Without Redis nothing is published and the reader waits
+for the Turn, as before.
 """
 
 from __future__ import annotations
@@ -26,8 +27,10 @@ MAX_EVENTS = 20_000
 HANDLE = re.compile(r"\[(P[0-9a-f]{20})\]")
 #: The longest prefix of a handle still being written: held back until it completes.
 PARTIAL = re.compile(r"\[(P[0-9a-f]{0,20})?$")
-#: Phases whose text may be the answer; a compaction's summary is never shown.
-SHOWN_PHASES = ("gather", "final", "repair")
+#: The closing attempt is the answer from its first word; a research turn's text is
+#: held until the turn ends without calling a tool. Nothing else is ever shown.
+LIVE_PHASES = ("final",)
+HELD_PHASES = ("gather",)
 
 _sink: ContextVar[Optional["DraftSink"]] = ContextVar("iris_draft_sink", default=None)
 
@@ -44,7 +47,9 @@ class DraftSink:
         self.run_id = str(run_id)
         self.numbering: dict[str, int] = {}
         self.held = ""
-        self.shown = True
+        #: "live" publishes as it arrives, "hold" keeps it for `settle`, "off" drops it.
+        self.mode = "off"
+        self.kept: list[str] = []
 
     async def _add(self, event: dict) -> None:
         try:
@@ -53,12 +58,10 @@ class DraftSink:
         except Exception:  # A lost piece costs the live view, never the answer.
             log.debug("draft publish failed for run %s", self.run_id, exc_info=True)
 
-    async def attempt(self, phase: str) -> None:
-        """A new model attempt starts: its text replaces the previous attempt's."""
-        self.shown = phase in SHOWN_PHASES
-        self.numbering, self.held = {}, ""
-        if self.shown:
-            await self._add({"t": "reset", "phase": phase})
+    async def attempt(self, phase: str, *, live: bool = True) -> None:
+        """A new model attempt starts. With `live` off nothing of it is ever published."""
+        self.mode = "off" if not live else "live" if phase in LIVE_PHASES else "hold" if phase in HELD_PHASES else "off"
+        self.numbering, self.held, self.kept = {}, "", []
 
     def _number(self, match: re.Match) -> str:
         handle = match.group(1)
@@ -67,8 +70,14 @@ class DraftSink:
         return f"[{self.numbering[handle]}]"
 
     async def text(self, piece: str) -> None:
-        if not self.shown or not piece:
+        if not piece:
             return
+        if self.mode == "hold":
+            self.kept.append(piece)
+        elif self.mode == "live":
+            await self._publish(piece)
+
+    async def _publish(self, piece: str) -> None:
         text = self.held + piece
         partial = PARTIAL.search(text)
         self.held = partial.group(0) if partial else ""
@@ -76,8 +85,16 @@ class DraftSink:
         if visible:
             await self._add({"t": "text", "d": visible})
 
+    async def settle(self, answer: bool) -> None:
+        """The attempt ended. A held research turn that was the answer is published now; otherwise it is dropped."""
+        kept, self.kept = self.kept, []
+        if self.mode == "hold" and answer:
+            for piece in kept:
+                await self._publish(piece)
+        self.mode = "off"
+
     async def end(self) -> None:
-        if self.shown and self.held:
+        if self.held:
             await self._add({"t": "text", "d": HANDLE.sub(self._number, self.held)})
         self.held = ""
         await self._add({"t": "end"})

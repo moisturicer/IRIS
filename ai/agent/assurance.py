@@ -260,6 +260,14 @@ def reading_coverage(citations, investigation: Investigation) -> list[dict]:
     } for revision, read in investigation.readings.items() if revision in cited_revisions]
 
 
+def bindable(text: str, investigation: Investigation, *, excluded=()) -> str:
+    """`text` without citations that name no passage of this run or a paper the reader ruled out."""
+    def keep(match: re.Match) -> str:
+        passage = investigation.passages.get(match.group(1))
+        return match.group(0) if passage is not None and passage.record_id not in excluded else ""
+    return re.sub(r"[ 	]{2,}", " ", CITE.sub(keep, text)).strip()
+
+
 def deliver(text: str, investigation: Investigation) -> tuple[str, tuple[Citation, ...]]:
     """Handles become [1], [2], ... in first-appearance order, each bound to its source."""
     handles = cited(text)

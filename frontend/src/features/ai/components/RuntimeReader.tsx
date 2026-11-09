@@ -14,6 +14,7 @@ import { ReasoningBar } from "./ReasoningBar";
 import { TokenUsageMeter } from "./TokenUsageMeter";
 import { conversationTotals, toMessages, useCitedRecords } from "../runtime/messages";
 import { useDraft } from "../runtime/useDraft";
+import { useTypewriter } from "../runtime/useTypewriter";
 
 const DEPTHS: readonly ModelPillOption<Depth>[] = [
   { value: "ordinary", short: "Standard", label: "Standard", description: "A shorter search for a quicker answer", icon: "far fa-lightbulb" },
@@ -46,9 +47,6 @@ export function ResearchProgress({ run }: { run: ReaderRun }) {
       summary is never used as a source for exact details.</p>}
   </section>;
 }
-
-/** Text compared without spacing or citation markers, which the checks renumber. */
-const squash = (text: string) => text.replace(/\[\d+\]/g, "").replace(/\s+/g, " ").trim();
 
 const COMPACTION_HELP = "Condenses older answers into a summary to make room. Original answers are kept.";
 
@@ -327,9 +325,13 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const centered = !conversation?.runs.length && !run && !busy && !error;
   const records = useCitedRecords(conversation);
   const live = useDraft(run, recordId);
-  // What each run streamed, to say when the checked answer differs from what the reader watched.
+  // What each run streamed, kept on screen until the saved answer takes over.
   const streamed = useRef<Record<string, string>>({});
   if (run && live.text) streamed.current[run.id] = live.text;
+  // The answer types out as it arrives; the saved answer takes over only once it has finished.
+  const draftTarget = run ? live.text || streamed.current[run.id] || "" : "";
+  const typed = useTypewriter(draftTarget, run?.id);
+  const writing = !!run && !!draftTarget && !typed.done && (run.state === "running" || run.state === "completed");
   const messages = useMemo(() => toMessages(conversation, run, records), [conversation, run, records]);
   const usage = useMemo(() => conversationTotals(conversation, run), [conversation, run]);
   const latestAnswer = [...messages].reverse().find(m => m.role === "assistant" && !m.endedRun);
@@ -348,7 +350,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   // Follows the newest text while the reader is at the bottom; scrolling up lets go until they return.
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
-  const followKey = `${messages.length}:${run?.state}:${run?.activity?.label}:${run?.activity?.step?.label}:${live.text.length}`;
+  const followKey = `${messages.length}:${run?.state}:${run?.activity?.label}:${run?.activity?.step?.label}:${typed.text.length}:${writing}`;
   const column = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const box = scroller.current;
@@ -377,20 +379,15 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
           const current = item.id === run?.id ? run : item;
           if (compactionRun(item)) return <CompactionStatus key={item.id} run={current} />;
           return <div key={item.id} className="space-y-5">
-            {messages.filter(m => m.id === `q:${item.id}` || m.id === `a:${item.id}`).map(m => <div key={m.id}>
+            {messages.filter(m => m.id === `q:${item.id}` || (m.id === `a:${item.id}` && !(writing && item.id === run?.id))).map(m => <div key={m.id}>
               <ChatMessageBubble message={m} compact={dense} inlineSources
                 sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources} />
-              {m.role === "assistant" && !m.endedRun && streamed.current[item.id]
-                && squash(streamed.current[item.id]) !== squash(m.content)
-                && <p className={cn("mt-1 text-[12px] italic text-stone-500", dense ? "pl-9" : "pl-11")}>
-                  Revised after checking its citations.</p>}
             </div>)}
             {(() => {
               // The streamed draft stays up until the checked answer lands, so it never blinks out between the two.
               const isLatest = item.id === run?.id;
-              const draftText = isLatest ? live.text || streamed.current[item.id] || "" : "";
               const hasAnswer = messages.some(m => m.id === `a:${item.id}`);
-              const showDraft = !!draftText && !hasAnswer && (current.state === "running" || current.state === "completed");
+              const showDraft = isLatest && !!draftTarget && (writing || !hasAnswer) && (current.state === "running" || current.state === "completed");
               if (!activeRun(current) && !showDraft) return null;
               const active = activeRun(current);
               return <div className={cn("flex", dense ? "gap-2.5" : "gap-3")}>
@@ -403,8 +400,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
                       label: current.state === "queued" ? "Waiting to start" : "Thinking",
                       since: current.created_at ?? new Date().toISOString(), step: null }}
                     runStartedAt={current.created_at} />}
-                  {showDraft && <CitationText text={draftText} citations={[]} streaming={active}
-                    className={cn(ANSWER_MARKDOWN, active && CHAT_STREAM_CARET, active && "mt-3", dense ? "text-sm" : "text-md")} />}
+                  {showDraft && <CitationText text={typed.text} citations={[]} streaming={!typed.done || active}
+                    className={cn(ANSWER_MARKDOWN, (active || !typed.done) && CHAT_STREAM_CARET, active && "mt-3", dense ? "text-sm" : "text-md")} />}
                   {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
                 </div>
               </div>;
