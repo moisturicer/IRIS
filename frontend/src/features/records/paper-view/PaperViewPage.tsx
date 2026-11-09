@@ -210,17 +210,6 @@ function LoadingSkeleton() {
 const META_PILL = "inline-flex min-h-5 items-center rounded-full px-2.5 text-2xs font-semibold leading-4";
 const META_CHIP = cn(META_PILL, "ring-1 ring-inset ring-stone-300 text-stone-700");
 
-/** Initials for the byline's mark. */
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
  *
