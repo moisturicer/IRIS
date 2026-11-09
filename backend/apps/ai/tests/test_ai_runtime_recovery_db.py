@@ -228,16 +228,14 @@ def test_a_takeover_does_not_renew_the_runs_allowance(runtime):
     assert (held[0].state, held[0].charge_attempts) == ("open", 1)
 
 
-def withheld_resumed(payload):
-    # IR-995: the restored step is a bare withheld status, so it may be sent; no Record text is.
+def resumed_whole(payload):
+    # IR-996: the restored step reaches the model whole; nothing is checked at send time.
     assert call_ids(payload) == ["s1"], call_ids(payload)
-    assert tool_messages(payload)["s1"]["reason"] == "withheld"
-    assert FLOOD not in json.dumps(payload) and "Flood forecasting" not in json.dumps(payload)
-    return reply("No paper that could be shared answers this.")
+    assert "Flood forecasting" in json.dumps(tool_messages(payload)["s1"])
+    return reply("The flood paper answers this.")
 
 
-def test_an_admitted_run_resumed_today_sends_its_withheld_step_without_record_text(runtime):
-    """IR-725's guard withheld the evidence; since IR-995 the resumed run answers without it."""
+def test_an_admitted_run_resumed_today_sends_its_restored_step_whole(runtime):
     paper("Flood forecasting", {4: [("Methods", FLOOD)]})
     grant = session(make_user("recover-withheld@cit.edu"))
     queued = queue(worker(runtime, limits=ROOMY), grant, "recover-withheld")
@@ -247,7 +245,7 @@ def test_an_admitted_run_resumed_today_sends_its_withheld_step_without_record_te
     dead = [r.id for r in reservations(queued["id"])]
     lease_lapses(queued["id"])
 
-    vendor = Vendor(withheld_resumed)
+    vendor = Vendor(resumed_whole)
     assert run(worker(runtime, vendor, limits=ROOMY).run_next())
     assert events(queued["id"], "recovery") == [{"outcome": "resumed", "step": 1}]
     assert len(vendor.requests) == 1

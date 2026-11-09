@@ -12,7 +12,6 @@ import json
 from dataclasses import dataclass, fields
 from typing import Mapping, Optional
 
-from ai.admission.guard import NO_TRAINING
 from ai.admission.limits import Limits, NotConfigured, read as read_limits
 from ai.agent.budget import Bounds, profiles as checked_profiles
 from ai.agent.compaction import Compaction
@@ -70,8 +69,6 @@ def read(values) -> AgentProfile:
     if missing:
         raise NotConfigured(", ".join(missing))
     provider = agent_config.read(values)
-    if provider.data_policy != NO_TRAINING:
-        raise NotConfigured(f"AGENT_LLM_DATA_POLICY must be {NO_TRAINING}")
     limits = read_limits(values)
     if RESEARCH_LANE not in limits.lanes:
         raise NotConfigured(f"AI_ADMISSION_LANE_CONCURRENCY must name the {RESEARCH_LANE} lane")

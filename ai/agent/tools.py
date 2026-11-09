@@ -13,15 +13,15 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass, field, replace
-from typing import Awaitable, Callable, Optional
+from dataclasses import dataclass, field
+from typing import Optional
 
 import asyncpg
 
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
 from ai.research.tools import (
-    NO_MATCH, OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence, valid_filters,
+    OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence, valid_filters,
 )
 
 log = logging.getLogger(__name__)
@@ -110,7 +110,7 @@ HYBRID_SEARCH = ToolSpec(
         "year_from": _YEAR, "year_to": _YEAR,
     }, ["query"]))
 #: Search signal outcomes the model is shown; any other reason is shown as unavailable.
-SIGNALS = ("ok", "off", "provider_gated", "provider_failed", "embedding_space_changed", "withheld")
+SIGNALS = ("ok", "off", "provider_gated", "provider_failed", "embedding_space_changed")
 
 READ_MANUSCRIPT = ToolSpec(
     "read_manuscript",
@@ -283,10 +283,6 @@ class Investigation:
     #: Tools that failed during the run, in order of first failure (IR-731).
     outages: list[str] = field(default_factory=list)
     recalled_sources: frozenset = frozenset()
-    #: Which of a result's sources a send may carry (IR-889); the rest never reaches the model.
-    screen: Optional[Callable[[frozenset], Awaitable[frozenset]]] = None
-    #: Sources left out of results because a send could not carry them.
-    withheld: int = 0
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
@@ -350,12 +346,12 @@ class Investigation:
             if spec is LIST_RECORDS:
                 return self._listed(await self.research.list_records(args))
             if spec is READ_MANUSCRIPT:
-                return self._evidence(await self._screened(await self._read(args, room)), call.id)
+                return self._evidence(await self._read(args, room), call.id)
             if spec is RECOVER_TURN:
                 if not _int(args["turn"]):
                     raise InvalidArguments
-                return self._evidence(await self._screened(await self.research.recover_turn(args["turn"])))
-            return self._evidence(await self._screened(await self._research(spec, args)))
+                return self._evidence(await self.research.recover_turn(args["turn"]))
+            return self._evidence(await self._research(spec, args))
         except InvalidArguments:
             return Outcome(json.dumps({"error": "invalid_arguments"}), control_only=True)
         except asyncpg.InsufficientPrivilegeError:
@@ -368,45 +364,6 @@ class Investigation:
                 self.outages.append(spec.name)
             return Outcome(json.dumps({"status": UNAVAILABLE, "reason": TOOL_UNAVAILABLE}), control_only=True)
 
-    async def _screened(self, result: Evidence) -> Evidence:
-        """`result` without the sources a send could not carry, so one ineligible hit does not end the run."""
-        sources = result.dependencies
-        if self.screen is None or not sources:
-            return result
-        try:
-            allowed = await self.screen(sources)
-        except Exception:
-            # Fail closed: show nothing; the send's own guard check ends the run if it must.
-            log.warning("source screen failed", exc_info=True)
-            allowed = frozenset()
-        if allowed == sources:
-            return result
-        self.withheld += len(sources - allowed)
-
-        def kept(ref):
-            return ref.source is None or ref.source in allowed
-
-        passages = tuple(p for p in result.passages if p.source in allowed)
-        whole = result.reading is not None or bool(result.sections) or result.turn is not None
-        dropped_whole = whole and bool(sources - allowed)
-        trimmed = replace(
-            result,
-            records=tuple(r for r in result.records if kept(r)),
-            matches=tuple(replace(m, records=tuple(r for r in m.records if kept(r))) for m in result.matches),
-            passages=() if dropped_whole else passages,
-            sections=() if dropped_whole else result.sections,
-            reading=None if dropped_whole else result.reading,
-            turn=None if dropped_whole else result.turn,
-            coverage=replace(result.coverage, returned=max(
-                0, result.coverage.returned - (len(result.passages) - len(passages)))),
-            dependencies=frozenset() if dropped_whole else allowed,
-            # Tells the model some matches were left out, never which (IR-995).
-            reason=result.reason or "withheld",
-        )
-        if not (trimmed.passages or trimmed.records or trimmed.matches or trimmed.sections
-                or trimmed.reading or trimmed.turn):
-            return replace(trimmed, status=NO_MATCH, reason="withheld", dependencies=frozenset())
-        return trimmed
 
     async def _research(self, spec: ToolSpec, args: dict) -> Evidence:
         if spec is HYBRID_SEARCH:
@@ -485,8 +442,7 @@ class Investigation:
             self.papers.setdefault(record.record_id, (record.handle, record.title))
             new = new or ("paper", record.record_id) not in self.seen
             self.seen.add(("paper", record.record_id))
-        # A miss names no paper, so it is sent as a bare status the guard can pass (IR-995).
-        if result.matches and result.records:
+        if result.matches:
             body["matches"] = [{
                 "reference": m.reference, "kind": m.kind, "match": m.match,
                 **({"basis": m.basis} if m.basis else {}),
