@@ -402,8 +402,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
                     activity={current.activity ?? { phase: current.state === "queued" ? "waiting" : "working",
                       label: current.state === "queued" ? "Waiting to start" : "Thinking",
                       since: current.created_at ?? new Date().toISOString(), step: null }}
-                    runStartedAt={current.created_at}
-                    onStop={isLatest && !busy ? () => void stop() : undefined} />}
+                    runStartedAt={current.created_at} />}
                   {showDraft && <CitationText text={draftText} citations={[]} streaming={active}
                     className={cn(ANSWER_MARKDOWN, active && CHAT_STREAM_CARET, active && "mt-3", dense ? "text-sm" : "text-md")} />}
                   {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
@@ -433,6 +432,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       <p id="compact-help" className="min-w-0 flex-1 basis-56 text-xs text-stone-600">{COMPACTION_HELP}</p>
     </div>}
     <ChatInput centered={centered} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
+      onStop={run && activeRun(run) && !compactionRun(run) && !busy ? () => void stop() : undefined}
       maxLength={4000}
       placeholder={recordId ? "Ask about this paper…" : "Ask about the research corpus…"}
       disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"}>

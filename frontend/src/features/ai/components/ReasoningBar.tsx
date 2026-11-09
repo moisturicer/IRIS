@@ -27,11 +27,10 @@ function useSeconds(since: string | undefined): string | null {
  * The live phase of a run, as a thread down the margin: what IRIS is doing now,
  * for how long, and the last thing it did. Only the phase is announced.
  */
-export function ReasoningBar({ activity, runStartedAt, onStop, compact = false }: {
+export function ReasoningBar({ activity, runStartedAt, compact = false }: {
   activity: ReaderActivity;
   /** When the run started; the clock counts the whole run, not one phase. */
   runStartedAt?: string;
-  onStop?: () => void;
   compact?: boolean;
 }) {
   const elapsed = useSeconds(runStartedAt ?? activity.since);
@@ -48,10 +47,6 @@ export function ReasoningBar({ activity, runStartedAt, onStop, compact = false }
           {activity.label}
         </span>
         {elapsed && <span className="font-mono text-[11px] tabular-nums text-stone-400">{elapsed}</span>}
-        {onStop && <button type="button" onClick={onStop} aria-label="Stop research"
-          className="ml-auto text-[12px] font-medium text-stone-500 underline-offset-2 hover:text-brand hover:underline">
-          Stop
-        </button>}
       </div>
       {step && <div key={`${step.kind}:${step.label}`} className="mt-1.5 motion-safe:animate-fade-in-up">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-0.5 text-[12px] font-medium text-brand">

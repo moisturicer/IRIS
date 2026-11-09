@@ -222,9 +222,9 @@ export function ChatMessageBubble({
           </div>
         )}
         {!isUser && inlineSources && expanded && (
-          <div className="mt-2 origin-top rounded-xl border border-stone-200 bg-stone-50/60 motion-safe:animate-[sources-open_260ms_cubic-bezier(0.2,0.8,0.2,1)]">
+          <div className="mt-2 origin-top border-t border-stone-200 pt-2.5 motion-safe:animate-[sources-open_260ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <SourcePassages citations={message.citations ?? []} sources={message.sources ?? []} answered
-              className="space-y-2.5 p-3" />
+              className="-mx-2" />
           </div>
         )}
       </div>

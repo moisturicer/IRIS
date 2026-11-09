@@ -20,11 +20,13 @@ interface ChatInputProps {
    */
   draft?: string;
   onDraftChange?: (text: string) => void;
+  /** While an answer is being written, the send button becomes this stop button. */
+  onStop?: () => void;
 }
 
 const ATTACH_CLOSED = "Attaching files is not available yet";
 
-export function ChatInput({ onSend, disabled, sendDisabled, children, placeholder, label, draft, onDraftChange, maxLength, centered = false }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, sendDisabled, children, placeholder, label, draft, onDraftChange, maxLength, onStop, centered = false }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
   const text = draft ?? ownText;
   const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
@@ -79,7 +81,17 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
           </button>
           {children}
         </div>
-        <button
+        {onStop ? <button
+          type="button"
+          onClick={onStop}
+          className={`${CHAT_COMPOSER_ICON} col-start-2 row-start-2 self-start bg-brand text-white
+            hover:bg-brand-light active:scale-95 motion-reduce:active:scale-100
+            transition-[background-color,transform] duration-150 motion-reduce:transition-none ${FOCUS_RING}`}
+          aria-label="Stop research"
+          title="Stop"
+        >
+          <span aria-hidden className="size-3 rounded-[3px] bg-current" />
+        </button> : <button
           type="submit"
           disabled={disabled || sendDisabled || !text.trim()}
           className={`${CHAT_COMPOSER_ICON} col-start-2 row-start-2 self-start bg-brand text-white
@@ -89,7 +101,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
           aria-label="Send message"
         >
           <i className="fas fa-arrow-up text-sm" aria-hidden />
-        </button>
+        </button>}
       </div>
       <AskIrisNotice className={`text-center mt-1.5 ${CHAT_COLUMN}`} />
     </form>
