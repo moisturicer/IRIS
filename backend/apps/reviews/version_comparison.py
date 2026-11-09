@@ -13,6 +13,7 @@ from apps.records.review_text import readings, store
 
 from . import comparison
 from .models import ReviewRound
+from .threads import published
 
 PREPARING_MESSAGE = "Preparing the comparison…"
 UNAVAILABLE_MESSAGE = "This comparison isn't available right now."
@@ -84,6 +85,42 @@ def _notice_message(notice, old, new) -> str:
             f"been read. Check {which} passages against the PDF before relying on them.")
 
 
+def _section_of(result, side, reading, thread):
+    """Which of the comparison's sections ``thread``'s passage is in, on the
+    ``side`` ("from" or "to") its Version is: by its quote in the reading
+    compared, then by its page. None when compared by page."""
+    if result["mode"] != "sections":
+        return None
+    keys = [s[side]["key"] if s[side] else None for s in result["sections"]]
+    places = comparison.appears_in(reading, thread.anchor_quote) if thread.anchor_quote else []
+    on_page = [p for p in places if any(x["page"] == thread.anchor_page for x in p)]
+    for place in on_page or places:
+        if place[0]["section"] in keys:
+            return keys.index(place[0]["section"])
+    # The quote wasn't found (an earlier reader's reading can differ a little):
+    # the section on that side that starts last at or before its page.
+    best, start = None, 0
+    for i, section in enumerate(result["sections"]):
+        heading = section[side]
+        page = heading and heading["page"]
+        if page and thread.anchor_page and start <= page <= thread.anchor_page:
+            best, start = i, page
+    return best
+
+
+def _threads(record, old, new, readings_, result) -> list:
+    """The sent threads on either Version compared, each placed under its
+    section (ADR-058 §3: earlier threads listed under their section). Anyone
+    who may read the review may read a sent thread; drafts are left out."""
+    sides = {old.pk: ("from", readings_[0]), new.pk: ("to", readings_[1])}
+    out = []
+    for thread in published(record).filter(anchor_version__in=[old, new]).order_by("pk"):
+        side, reading = sides[thread.anchor_version_id]
+        out.append({"thread": thread.pk, "side": side, "page": thread.anchor_page,
+                    "section": _section_of(result, side, reading, thread)})
+    return out
+
+
 def payload(record, user, old_number=None, new_number=None) -> dict:
     """The comparison as `GET /records/<id>/versions/compare/` serves it."""
     old, new = choose(record, user, old_number, new_number)
@@ -101,7 +138,9 @@ def payload(record, user, old_number=None, new_number=None) -> dict:
         said = (store.message(version, version.review_text) if version.manuscript
                 else f"v{version.number} has no manuscript, so it can't be compared.")
         return {**body, "message": said}
-    result = comparison.compare(_reading(pair.old), _reading(pair.new))
+    compared = _reading(pair.old), _reading(pair.new)
+    result = comparison.compare(*compared)
     for notice in result["notices"]:
         notice["message"] = _notice_message(notice, old, new)
+    result["threads"] = _threads(record, old, new, compared, result)
     return {**body, "message": None, **result}

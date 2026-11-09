@@ -7,7 +7,7 @@ import type {
   ThreadSeverity, ThreadAnchor, FinishReviewRequest,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
-  DiscoverInterests, ForYouPage, MetadataSuggestions,
+  DiscoverInterests, ForYouPage, MetadataSuggestions, VersionComparisonPayload,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -229,6 +229,13 @@ export const recordsApi = {
    */
   downloadCopy:   (id: number) =>
     apiClient.get<Blob>(`/records/${id}/download/`, { responseType: "blob" }),
+  /**
+   * Two Versions compared (ADR-058 §3, IR-873). Without a pair, the server
+   * picks this reviewer's last finished Version → latest. A 400 says why a
+   * pair can't be compared.
+   */
+  compareVersions: (id: number, pair?: { from: number; to: number }, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<VersionComparisonPayload>(`/records/${id}/versions/compare/`, { params: pair, signal: options.signal }),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   // Submitting asks no consent (ADR-054, IR-791): the paper carries its Contact
   // person's AI answer from the moment its draft was created.

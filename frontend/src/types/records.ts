@@ -875,6 +875,92 @@ export interface PageRegion {
   bottom: number;
 }
 
+/**
+ * Two Versions compared (ADR-058 §3 as amended 2026-11-08, IR-873):
+ * `GET /records/<id>/versions/compare/`. Both sides are read by one reader,
+ * and no field names it. Only `ready` carries the comparison itself.
+ */
+export type ComparisonState = "ready" | "preparing" | "unavailable" | "no_text";
+export type ChangeKind = "changed" | "added" | "removed" | "moved";
+
+/** One side of a change: the passage, its section key and where it is. */
+export interface ChangeSide {
+  section: string;
+  text:    string;
+  page:    number;
+  regions: PageRegion[];
+}
+
+export interface VersionChange {
+  kind:      ChangeKind;
+  /** `tentative`: possibly text the reader missed, not an edit. */
+  certainty: "established" | "tentative";
+  from:      ChangeSide | null;
+  to:        ChangeSide | null;
+  /** A changed passage's words, in order, the differing ones marked. */
+  words?:    { op: "equal" | "delete" | "insert"; text: string }[];
+}
+
+export interface SectionHeading {
+  key:     string;
+  heading: string;
+  page:    number | null;
+}
+
+export interface ChangeCounts {
+  changed: number;
+  added:   number;
+  removed: number;
+  moved:   number;
+}
+
+export interface SectionComparison {
+  status:  "unchanged" | "changed" | "added" | "removed";
+  renamed: boolean;
+  moved:   boolean;
+  from:    SectionHeading | null;
+  to:      SectionHeading | null;
+  changes: VersionChange[];
+  counts:  ChangeCounts;
+}
+
+export interface ComparisonNotice {
+  code:    "sections_unidentified" | "may_be_unreliable";
+  side:    "from" | "to";
+  message: string;
+}
+
+export interface DocumentComparison {
+  slot:   string;
+  status: "unchanged" | "replaced" | "added" | "removed";
+  from:   number | null;
+  to:     number | null;
+}
+
+/** A sent thread on either Version, placed under a section (or null, by page). */
+export interface PlacedThread {
+  thread:  number;
+  side:    "from" | "to";
+  page:    number | null;
+  section: number | null;
+}
+
+export interface VersionComparisonPayload {
+  state:     ComparisonState;
+  /** What to tell the reviewer; null when ready. */
+  message:   string | null;
+  from:      number;
+  to:        number;
+  documents: DocumentComparison[];
+  mode?:     "sections" | "pages";
+  sections?: SectionComparison[];
+  /** By page: every change, in order. */
+  changes?:  VersionChange[];
+  notices?:  ComparisonNotice[];
+  counts?:   ChangeCounts & { sections_renamed: number; sections_moved: number };
+  threads?:  PlacedThread[];
+}
+
 /** A passage of one Version: where an anchored thread points. */
 export interface ThreadAnchor {
   version:  number;

@@ -1186,6 +1186,7 @@ export default function PaperViewPage() {
                 authorView={userIsOwner}
                 onOpenReview={openReview}
                 onBarInset={setReviewBarInset}
+                onShowVersion={chooseVersion}
                 can={can}
                 reader={recordHasPaper(record) ? reader() : null}
                 timelineVersion={trackerVersion}
