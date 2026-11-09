@@ -3,11 +3,18 @@ import { Link } from "react-router-dom";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { personPath } from "@/lib/access";
 import { cn } from "@/lib/utils";
+
+type PersonRole = "Author" | "Adviser";
+const ROLE_AVATAR_STYLES: Record<PersonRole, string> = {
+  Author: "bg-brand",
+  Adviser: "bg-stone-700",
+};
+
 /** A compact author/adviser chip. A profile link is rendered only when the API allows it. */
 export function PersonChip({ id, name, role, hasProfile = false }: {
   id?: number;
   name: string;
-  role: "Author" | "Adviser";
+  role: PersonRole;
   hasProfile?: boolean;
 }) {
   const classes = cn(
@@ -21,7 +28,7 @@ export function PersonChip({ id, name, role, hasProfile = false }: {
       <span
         className={cn(
           "w-6 h-6 shrink-0 rounded-full text-white text-3xs font-bold flex items-center justify-center",
-          role === "Adviser" ? "bg-stone-700" : "bg-brand",
+          ROLE_AVATAR_STYLES[role],
         )}
         aria-hidden
       >
