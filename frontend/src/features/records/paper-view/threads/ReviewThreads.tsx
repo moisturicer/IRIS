@@ -359,17 +359,16 @@ function WhereNow({ root }: { root: ReviewComment }) {
  */
 function SuggestedWording({ root }: { root: ReviewComment }) {
   const ids = useId();
-  const place = root.place;
-  const accepted = root.answer?.kind === "addressed";
+  const check = root.wording_check;
   return (
     <section aria-labelledby={`${ids}-wording`} className="rounded bg-stone-50 px-2 py-1.5 space-y-0.5">
       <p id={`${ids}-wording`} className="text-2xs font-semibold text-stone-600">Suggested wording</p>
       <p className="text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
-      {accepted && place && (
+      {check && (
         <p className="text-2xs text-stone-700">
-          {place.suggestion_page != null
-            ? `Suggested wording found on p. ${place.suggestion_page} of v${place.version}.`
-            : `Suggested wording not found in v${place.version}.`}
+          {check.page != null
+            ? `Suggested wording found on p. ${check.page} of v${check.version}.`
+            : `Suggested wording not found in v${check.version}.`}
         </p>
       )}
     </section>

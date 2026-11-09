@@ -119,6 +119,17 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     "conversation", "threads", ...(comparable ? ["changes" as const] : []), ...(folded ? ["details" as const] : []),
   ];
   const latest = versions[versions.length - 1]?.number ?? null;
+  // A reviewer looking again at a new Version reads the response it was
+  // submitted with first (ADR-032 §7, IR-876): once per letter, so a later
+  // tab choice is the reviewer's own.
+  const letterVersion = tw.panel.letter?.version ?? null;
+  const reviewing = finishing || unopened;
+  const ledWithLetter = useRef<number | null>(null);
+  useEffect(() => {
+    if (!reviewing || letterVersion === null || letterVersion !== latest || ledWithLetter.current === letterVersion) return;
+    ledWithLetter.current = letterVersion;
+    setTab("threads");
+  }, [reviewing, letterVersion, latest]);
   // Fetched only once opened, then kept, so its choices survive a tab switch.
   const [changesOpened, setChangesOpened] = useState(false);
   useEffect(() => {

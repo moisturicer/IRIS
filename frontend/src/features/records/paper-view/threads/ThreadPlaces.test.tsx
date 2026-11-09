@@ -115,12 +115,18 @@ describe("suggested wording", () => {
 
   it("once accepted, the next Version says whether the wording is there", () => {
     const accepted = { kind: "addressed" as const, note: "Accepted the suggested wording.", by: "Juan", at: null };
-    const { unmount } = setup([suggested({ answer: accepted, place: place({ suggestion_page: 4 }) })]);
-    expect(within(card()).getByText("Suggested wording found on p. 4 of v2.")).toBeInTheDocument();
+    const { unmount } = setup([suggested({ answer: accepted, wording_check: { version: 3, page: 4 } })]);
+    expect(within(card()).getByText("Suggested wording found on p. 4 of v3.")).toBeInTheDocument();
     unmount();
 
-    setup([suggested({ answer: accepted, place: place({ suggestion_page: null }) })]);
-    expect(within(card()).getByText("Suggested wording not found in v2.")).toBeInTheDocument();
+    setup([suggested({ answer: accepted, wording_check: { version: 3, page: null } })]);
+    expect(within(card()).getByText("Suggested wording not found in v3.")).toBeInTheDocument();
+  });
+
+  it("says nothing about the wording until a Version comes after it was accepted", () => {
+    const accepted = { kind: "addressed" as const, note: "Accepted the suggested wording.", by: "Juan", at: null };
+    setup([suggested({ answer: accepted, place: place({ suggestion_page: null }), wording_check: null })]);
+    expect(within(card()).queryByText(/Suggested wording (found|not found)/)).not.toBeInTheDocument();
   });
 
   it("a reviewer can suggest wording when commenting on a passage", async () => {

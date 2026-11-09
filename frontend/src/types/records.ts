@@ -887,6 +887,12 @@ export interface ReviewComment {
   place?:                ThreadPlace | null;
   /** The Version from which the thread is Outdated, or null (IR-876). */
   outdated_since?:       number | null;
+  /**
+   * Accepted wording looked for in the first Version placed after it was
+   * accepted: its page there, or a null page when it isn't. Null until
+   * such a Version exists (IR-876).
+   */
+  wording_check?:        { version: number; page: number | null } | null;
   /** Severity changes, resolving and reopening, oldest first. Empty on a draft. */
   events?:               ThreadEvent[];
   /*
