@@ -31,6 +31,7 @@ import shutil
 import tempfile
 
 import pytest
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.test import override_settings
@@ -425,6 +426,9 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             record = getattr(self, state)()
             for name, user in self.viewers().items():
                 with self.subTest(state=state, viewer=name):
+                    # One cell's probes are a matrix, not a person: start each with
+                    # no request counts, as the access runner does (IR-999).
+                    cache.clear()
                     code, detail = self._offer(record, user)
                     expected = row[name]
                     if expected is None:
