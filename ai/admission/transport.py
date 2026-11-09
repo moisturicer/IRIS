@@ -82,6 +82,7 @@ class AdmittedAgentProvider(LLMProvider):
             with scope.admitted_send():
                 turn = await asyncio.wait_for(self.provider.converse(request), ticket.timeout_seconds)
             usage.input_tokens, usage.output_tokens = turn.input_tokens, turn.output_tokens
+            usage.cached_input_tokens = turn.cached_input_tokens
             usage.model = request.pin.model
             # The papers the turn drew on, kept as its label for later follow-ups (IR-994).
             sources = frozenset(s for e in request.history for s in getattr(e, "dependencies", ()))

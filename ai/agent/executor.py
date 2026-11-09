@@ -32,9 +32,11 @@ from ai.agent.context import (
 from ai.agent.protocol import (
     AgentRequest, ModelTurn, NotFinal, Pin, StopReason, Text, ToolGroup, ToolResult, User, final_answer,
 )
-from ai.agent.tools import ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded
+from ai.agent.tools import (
+    ASK_CLARIFICATION, ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded,
+)
 from ai.domain.ports import LLMProvider, ProviderRejected, TransientProviderError, UnsupportedCapability
-from ai.research.tools import OK
+from ai.research.tools import EARLIER_COMMITTED, OK
 from ai.runs import config as runs_config
 from ai.runs.executor import Compacted, Result, RunContext, Unavailable
 
@@ -170,7 +172,11 @@ class AgentExecutor:
 
     def __init__(self, provider: LLMProvider, pin: Pin, reserves: Reserves, *,
                  profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None,
-                 compaction: Optional[Compaction] = None):
+                 compaction: Optional[Compaction] = None, tool_concurrency: int = 1):
+        if type(tool_concurrency) is not int or tool_concurrency < 1:
+            raise ValueError("tool_concurrency must be a positive integer")
+        #: Read-only calls in one tool group fetched at once; 1 runs them one by one (IR-1003).
+        self.tool_concurrency = tool_concurrency
         self.provider = provider
         self.pin = pin
         self.reserves = reserves
@@ -332,6 +338,58 @@ def _carried(history) -> frozenset:
 
 
 
+class _Fetches:
+    """A tool group's read-only fetches, started together and folded in call order (IR-1003).
+
+    Each fetch runs under a shared cap. Its journal entry waits until every
+    earlier call has committed, so the journal reads as a sequential run would.
+    Fetches start only for calls a sequential run would reach: within the tool
+    limit and before the first clarification. Fewer than two starts none.
+    """
+
+    def __init__(self, investigation, calls, *, cap: int, limit: int):
+        self.committed = [asyncio.Event() for _ in calls]
+        self.tasks: dict[int, asyncio.Task] = {}
+        if cap < 2:
+            return
+        started = {}
+        for n, call in enumerate(calls[:max(0, limit)]):
+            if call.name == ASK_CLARIFICATION.name:
+                break
+            fetch = investigation.fetcher(call)
+            if fetch is not None:
+                started[n] = fetch
+        if len(started) < 2:
+            for fetch in started.values():
+                fetch.close()
+            return
+        gate = asyncio.Semaphore(cap)
+        # Created in call order, so an earlier fetch always takes a slot first.
+        for n, fetch in started.items():
+            self.tasks[n] = asyncio.create_task(self._run(n, fetch, gate))
+
+    async def _run(self, n, fetch, gate):
+        token = EARLIER_COMMITTED.set(self.committed[n - 1] if n else None)
+        try:
+            async with gate:
+                return await fetch
+        finally:
+            EARLIER_COMMITTED.reset(token)
+            self.committed[n].set()
+
+    def take(self, n):
+        return self.tasks.pop(n, None)
+
+    def done(self, n) -> None:
+        self.committed[n].set()
+
+    def cancel(self) -> None:
+        """Whatever the fold did not reach: a sequential run would never have made it."""
+        for task in self.tasks.values():
+            task.cancel()
+        self.tasks.clear()
+
+
 class _Run:
     """One run's investigation; nothing here outlives it."""
 
@@ -414,21 +472,28 @@ class _Run:
             calls = [c for item in turn.items if isinstance(item, ToolGroup) for c in item.calls]
             results = []
             progressed = False
-            for n, call in enumerate(calls):
-                if self.investigation.tool_calls >= self.bounds.max_tool_calls:
-                    # The exchange stays whole; the call is answered, not run.
-                    results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"}),
-                                              control_only=True))
-                    continue
-                room = self._room(history, results, calls[n:]) if call.name == READ_MANUSCRIPT.name else 0
-                outcome = await self.investigation.execute(call, room=room)
-                if outcome.clarification is not None:
-                    self._checked(outcome.clarification, clarification=True)
-                    self.carried_sources = _carried([*history, *results])
-                    return self._result(outcome.clarification, (), kind="clarification")
-                progressed = progressed or outcome.progress
-                results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
-                                          outcome.control_only, outcome.metadata_only))
+            fetches = _Fetches(self.investigation, calls, cap=self.agent.tool_concurrency,
+                               limit=self.bounds.max_tool_calls - self.investigation.tool_calls)
+            try:
+                for n, call in enumerate(calls):
+                    if self.investigation.tool_calls >= self.bounds.max_tool_calls:
+                        # The exchange stays whole; the call is answered, not run.
+                        results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"}),
+                                                  control_only=True))
+                        fetches.done(n)
+                        continue
+                    room = self._room(history, results, calls[n:]) if call.name == READ_MANUSCRIPT.name else 0
+                    outcome = await self.investigation.execute(call, room=room, fetched=fetches.take(n))
+                    fetches.done(n)
+                    if outcome.clarification is not None:
+                        self._checked(outcome.clarification, clarification=True)
+                        self.carried_sources = _carried([*history, *results])
+                        return self._result(outcome.clarification, (), kind="clarification")
+                    progressed = progressed or outcome.progress
+                    results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
+                                              outcome.control_only, outcome.metadata_only))
+            finally:
+                fetches.cancel()
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
             self.investigation.packed(history[len(history) - len(results):])
