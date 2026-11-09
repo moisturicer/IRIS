@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -137,6 +138,33 @@ DISPATCH_LOCK = "iris_ai.dispatch"
 
 #: A Paper Chat grant ($2) reaches only its own Record's Conversations (IR-719).
 IN_SCOPE = "($2::bigint IS NULL OR scope_record_id = $2)"
+#: A paper title as the agent marks it in an answer.
+TITLE = re.compile(r"«([^«»\n]{3,300})»")
+
+
+def regions(bboxes, page_sizes) -> list[dict]:
+    """A passage's rectangles as fractions of its page, for the reader's highlight; [] when unknown."""
+    try:
+        boxes = json.loads(bboxes) if isinstance(bboxes, str) else (bboxes or [])
+        sizes = json.loads(page_sizes) if isinstance(page_sizes, str) else (page_sizes or {})
+    except ValueError:
+        return []
+    out = []
+    for box in boxes:
+        try:
+            page = int(box["page"])
+            left, top, right, bottom = (float(box[k]) for k in ("left", "top", "right", "bottom"))
+            width, height = (float(v) for v in sizes[str(page)])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if box.get("degenerate") or right <= left or bottom <= top or width <= 0 or height <= 0:
+            continue
+        clamp = lambda v: min(1.0, max(0.0, v))  # noqa: E731
+        out.append({"page": page, "left": clamp(left / width), "top": clamp(top / height),
+                    "right": clamp(right / width), "bottom": clamp(bottom / height)})
+    return out
+
+
 #: Tools that read a paper's text, as opposed to searching or counting.
 READING_TOOLS = ("read_manuscript", "read_page", "open_passage", "outline", "recover_turn")
 
@@ -1032,11 +1060,28 @@ class RunStore:
                     conversation_id,
                 )
                 citations = await conn.fetch(
-                    """SELECT c.turn_id, c.position, c.record_id, c.page, c.quote, c.revision
+                    """SELECT c.turn_id, c.position, c.record_id, c.page, c.quote, c.revision,
+                              d.bboxes, cs.page_sizes
                          FROM iris_ai.citation c JOIN iris_ai.turn t ON t.id = c.turn_id
+                         LEFT JOIN public.ai_chunkset cs
+                           ON split_part(c.revision, ':', 1) ~ '^[0-9]+$'
+                          AND cs.id = split_part(c.revision, ':', 1)::bigint
+                         LEFT JOIN LATERAL (SELECT d.bboxes FROM public.ai_documentchunk d
+                                             WHERE d.chunk_set_id = cs.id AND d.content = c.quote
+                                             LIMIT 1) d ON true
                         WHERE t.conversation_id = $1 ORDER BY c.turn_id, c.position""",
                     conversation_id,
                 )
+                # Papers an answer names in «guillemets», linked only when the reader can read them.
+                named = sorted({title.strip() for t in turns for title in TITLE.findall(t["answer"] or "")})
+                papers = await conn.fetch(
+                    """SELECT DISTINCT ON (lower(r.title)) r.id, r.title FROM public.records_record r
+                        WHERE lower(r.title) = ANY($1::text[])
+                          AND EXISTS (SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.record_id = r.id)
+                        ORDER BY lower(r.title), r.id""",
+                    [n.lower() for n in named],
+                ) if named else []
+                by_title = {row["title"].lower(): row["id"] for row in papers}
                 run_ids = await conn.fetch(
                     "SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1 ORDER BY created_at, id",
                     conversation_id,
@@ -1046,7 +1091,7 @@ class RunStore:
         for c in citations:
             by_turn.setdefault(c["turn_id"], []).append(
                 {"record_id": c["record_id"], "page": c["page"], "quote": c["quote"],
-                 "revision": c["revision"]}
+                 "revision": c["revision"], "regions": regions(c["bboxes"], c["page_sizes"])}
             )
         return {
             "id": str(conversation_id),
@@ -1062,6 +1107,9 @@ class RunStore:
                 "pinned": t["pinned"],
                 "citations": by_turn.get(t["id"], []) if t["sources_available"] else [],
                 "facts": shown_facts(t["facts"]) if t["sources_available"] else [],
+                "papers": [{"title": title, "record_id": by_title[title.lower()]}
+                           for title in dict.fromkeys(m.strip() for m in TITLE.findall(t["answer"] or ""))
+                           if title.lower() in by_title] if t["sources_available"] else [],
             } for t in turns],
         }
 

@@ -13,8 +13,13 @@ export type ChatRole = "user" | "assistant";
 /** How a queued run ended without its answer (IR-548). */
 export type EndedRunState = "cancelled" | "failed" | "expired";
 
+/** A paper an answer names by title, and the record it links to. */
+export interface NamedPaper { title: string; record_id: number }
+
 export interface ChatMessage {
   turnId?: number;
+  /** Papers named in «guillemets» that link to their overview. */
+  papers?: NamedPaper[];
   listing?: AnswerListing;
   comparison?: AnswerComparison;
   question?: string;

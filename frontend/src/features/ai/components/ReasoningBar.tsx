@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const STEP_ICONS: Record<NonNullable<ReaderActivity["step"]>["kind"], string> = {
   read: "fas fa-book-open",
   search: "fas fa-magnifying-glass",
-  catalogue: "fas fa-list-ul",
+  catalogue: "fas fa-layer-group",
   recall: "fas fa-clock-rotate-left",
 };
 
@@ -23,7 +23,10 @@ function useSeconds(since: string | undefined): string | null {
   return seconds < 60 ? `${seconds.toFixed(1)}s` : `${Math.floor(seconds / 60)}m ${String(Math.floor(seconds % 60)).padStart(2, "0")}s`;
 }
 
-/** The live phase of a run: what it is doing now, how long it has been at it, and its latest step. */
+/**
+ * The live phase of a run, as a thread down the margin: what IRIS is doing now,
+ * for how long, and the last thing it did. Only the phase is announced.
+ */
 export function ReasoningBar({ activity, runStartedAt, onStop, compact = false }: {
   activity: ReaderActivity;
   /** When the run started; the clock counts the whole run, not one phase. */
@@ -34,24 +37,29 @@ export function ReasoningBar({ activity, runStartedAt, onStop, compact = false }
   const elapsed = useSeconds(runStartedAt ?? activity.since);
   const step = activity.step;
   return (
-    <section aria-label="Research progress"
-      className={cn("rounded-xl border border-stone-200 bg-stone-50/80 text-stone-700 motion-safe:animate-fade-in",
-        compact ? "text-[13px]" : "text-sm")}>
-      <div className="flex items-center gap-2 px-3 py-2">
-        <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-brand/25 border-t-brand animate-spin motion-reduce:animate-none" />
-        <span role="status" aria-live="polite" className="font-semibold text-stone-900">{activity.label}…</span>
-        {elapsed && <span className="tabular-nums text-stone-500">{elapsed}</span>}
-        <span className="flex-1" />
-        {onStop && <button type="button" onClick={onStop}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-medium text-stone-600 hover:bg-stone-200/60 hover:text-stone-900">
-          <i className="fas fa-stop text-[9px]" aria-hidden />Stop
+    <section aria-label="Research progress" className={cn("relative pl-4", compact ? "text-[13px]" : "text-sm")}>
+      {/* The thread: a quiet rule with a pulse travelling down it while IRIS works. */}
+      <span aria-hidden className="absolute inset-y-0.5 left-0 w-[2px] overflow-hidden rounded-full bg-brand/15">
+        <span className="absolute inset-x-0 h-1/2 bg-gradient-to-b from-transparent via-brand to-transparent motion-safe:animate-[iris-thread_1.6s_ease-in-out_infinite]" />
+      </span>
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <span key={activity.label} role="status" aria-live="polite"
+          className={cn("font-display italic text-stone-900 motion-safe:animate-fade-in", compact ? "text-[15px]" : "text-[17px]")}>
+          {activity.label}
+        </span>
+        {elapsed && <span className="font-mono text-[11px] tabular-nums text-stone-400">{elapsed}</span>}
+        {onStop && <button type="button" onClick={onStop} aria-label="Stop research"
+          className="ml-auto text-[12px] font-medium text-stone-500 underline-offset-2 hover:text-brand hover:underline">
+          Stop
         </button>}
       </div>
-      {step && <div key={`${step.kind}:${step.label}`} className="border-t border-stone-200 px-3 py-2 motion-safe:animate-fade-in-up">
-        <p className="flex items-center gap-2 font-medium text-brand">
-          <i className={cn(STEP_ICONS[step.kind], "w-4 text-center text-[12px]")} aria-hidden />{step.label}
-        </p>
-        {step.detail.map(title => <p key={title} className="mt-0.5 pl-6 text-stone-600 [overflow-wrap:anywhere]">{title}</p>)}
+      {step && <div key={`${step.kind}:${step.label}`} className="mt-1.5 motion-safe:animate-fade-in-up">
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-0.5 text-[12px] font-medium text-brand">
+          <i className={cn(STEP_ICONS[step.kind], "text-[10px]")} aria-hidden />{step.label}
+        </span>
+        {step.detail.length > 0 && <ul className="mt-1 space-y-0.5 text-[12px] text-stone-500">
+          {step.detail.map(title => <li key={title} className="truncate">{title}</li>)}
+        </ul>}
       </div>}
     </section>
   );

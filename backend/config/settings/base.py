@@ -209,6 +209,9 @@ REST_FRAMEWORK = {
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
         "ai_overview": "600/hour",
+        # The runtime edge's grant check runs once per Ask IRIS request, and a
+        # live answer polls about once a second (IR-957).
+        "ai_runtime_edge": throttle_rate("API_THROTTLE_AI_RUNTIME_EDGE", "10000/hour"),
     },
 }
 

@@ -21,6 +21,7 @@ import time
 from dataclasses import replace
 from typing import Mapping, Optional
 
+from ai.runs import stream
 from ai.admission.errors import AdmissionDenied
 from ai.admission.limits import Price
 from ai.agent import assurance, checkpoint, compaction as compacting
@@ -718,6 +719,9 @@ class _Run:
         # Recorded before sending; a stopped run admits no further attempt.
         if not await self.tools.journal("model", {"purpose": PURPOSE, "phase": phase, "step": self.steps + 1}):
             raise Unavailable("run_ended")
+        sink = stream.active()
+        if sink is not None:
+            await sink.attempt(phase)
         send = self.agent.summarize if phase == "compact" else self.agent.send
         try:
             # The run's deadline bounds every send, admitted or not.

@@ -23,6 +23,8 @@ import { breakLongRuns } from "./runLimit";
  */
 
 const CITATION_SCHEME = "iris-citation:";
+/** A paper named in «guillemets» that the reader can open. */
+const PAPER_SCHEME = "iris-paper:";
 const PENDING = "pending";
 
 /** Canonical, post-`parse_citations` markers: `[1]`, never `[1,2]` or `【1】`. */
@@ -36,7 +38,17 @@ const STREAMING_MARKER =
 /** `react-markdown` sanitizes unknown link schemes away by default -- pass
  *  ours through, everything else still gets the library's own sanitizing. */
 function urlTransform(url: string): string {
-  return url.startsWith(CITATION_SCHEME) ? url : defaultUrlTransform(url);
+  return url.startsWith(CITATION_SCHEME) || url.startsWith(PAPER_SCHEME) ? url : defaultUrlTransform(url);
+}
+
+/** «Title» becomes a link to that paper's overview, for the papers the server matched. */
+function linkPapers(text: string, papers: readonly { title: string; record_id: number }[]): string {
+  if (papers.length === 0) return text;
+  const byTitle = new Map(papers.map(p => [p.title.trim().toLowerCase(), p.record_id]));
+  return text.replace(/«([^«»\n]{3,300})»/g, (whole, title: string) => {
+    const id = byTitle.get(title.trim().toLowerCase());
+    return id ? `[${whole.replace(/[[\]]/g, "\\$&")}](${PAPER_SCHEME}${id})` : whole;
+  });
 }
 
 function toMarkdownLinks(text: string, streaming: boolean): string {
@@ -102,10 +114,12 @@ interface CitationTextProps {
   streaming?: boolean;
   /** Markers are page numbers (the AI Overview): show them as "p8". */
   pageMarkers?: boolean;
+  /** Papers named in the text that link to their overview. */
+  papers?: readonly { title: string; record_id: number }[];
   className?: string;
 }
 
-export function CitationText({ text, citations, streaming = false, pageMarkers = false, className }: CitationTextProps) {
+export function CitationText({ text, citations, streaming = false, pageMarkers = false, papers = [], className }: CitationTextProps) {
   const byMarker = new Map(citations.map((citation) => [citation.marker, citation]));
 
   function CitationLink({ href, children }: ComponentPropsWithoutRef<"a">) {
@@ -113,6 +127,15 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
     // `data:`, ...). An `<a href="">` would still be a live link back to this
     // page in a new tab, so the words stay and the link goes (IR-917).
     if (!href) return <span>{children}</span>;
+
+    if (href.startsWith(PAPER_SCHEME)) {
+      return (
+        <Link to={`/records/${href.slice(PAPER_SCHEME.length)}`}
+          className="font-medium text-brand decoration-brand/30 underline-offset-2 hover:underline">
+          {children}
+        </Link>
+      );
+    }
 
     if (!href.startsWith(CITATION_SCHEME)) {
       return (
@@ -151,7 +174,7 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
         }}
         urlTransform={urlTransform}
       >
-        {toMarkdownLinks(breakLongRuns(text), streaming)}
+        {toMarkdownLinks(linkPapers(breakLongRuns(text), streaming ? [] : papers), streaming)}
       </ReactMarkdown>
     </div>
   );

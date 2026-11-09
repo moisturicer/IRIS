@@ -5,13 +5,15 @@ import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retrya
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { ChatInput } from "./ChatInput";
-import { CHAT_COLUMN, CHAT_OPENING } from "./answerLayout";
+import { ANSWER_MARKDOWN, CHAT_COLUMN, CHAT_OPENING, CHAT_STREAM_CARET } from "./answerLayout";
+import { CitationText } from "./CitationText";
 import { ModelPill, type ModelPillOption } from "./ModelPill";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AskIrisMark } from "./AskIrisIcons";
 import { ReasoningBar } from "./ReasoningBar";
 import { TokenUsageMeter } from "./TokenUsageMeter";
 import { conversationTotals, toMessages, useCitedRecords } from "../runtime/messages";
+import { useDraft } from "../runtime/useDraft";
 
 const DEPTHS: readonly ModelPillOption<Depth>[] = [
   { value: "ordinary", short: "Standard", label: "Standard", description: "A shorter search for a quicker answer", icon: "far fa-lightbulb" },
@@ -44,6 +46,9 @@ export function ResearchProgress({ run }: { run: ReaderRun }) {
       summary is never used as a source for exact details.</p>}
   </section>;
 }
+
+/** Text compared without spacing or citation markers, which the checks renumber. */
+const squash = (text: string) => text.replace(/\[\d+\]/g, "").replace(/\s+/g, " ").trim();
 
 const COMPACTION_HELP = "Condenses older answers into a summary to make room. Original answers are kept.";
 
@@ -110,11 +115,13 @@ interface Props {
   onSelectSources?: (message: ChatMessage) => void;
   /** The newest answer, each time one lands: a page shows its sources. */
   onAnswered?: (message: ChatMessage) => void;
+  /** Paper Chat's this-paper / all-papers switch, shown beside the depth. */
+  scopeToggle?: { allPapers: boolean; onChange: (allPapers: boolean) => void };
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
-  selectedId = null, onSelectSources, onAnswered }: Props) {
+  selectedId = null, onSelectSources, onAnswered, scopeToggle }: Props) {
   const api = useMemo(() => runtimeReader(recordId), [recordId]);
   const [conversation, setConversation] = useState<ReaderConversation>();
   const [run, setRun] = useState<ReaderRun>();
@@ -319,6 +326,10 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
 
   const centered = !conversation?.runs.length && !run && !busy && !error;
   const records = useCitedRecords(conversation);
+  const live = useDraft(run, recordId);
+  // What each run streamed, to say when the checked answer differs from what the reader watched.
+  const streamed = useRef<Record<string, string>>({});
+  if (run && live.text) streamed.current[run.id] = live.text;
   const messages = useMemo(() => toMessages(conversation, run, records), [conversation, run, records]);
   const usage = useMemo(() => conversationTotals(conversation, run), [conversation, run]);
   const latestAnswer = [...messages].reverse().find(m => m.role === "assistant" && !m.endedRun);
@@ -334,19 +345,46 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const runs = [...(conversation?.runs ?? [])];
   if (run && !runs.some(item => item.id === run.id)) runs.push(run);
 
+  // Follows the newest text while the reader is at the bottom; scrolling up lets go until they return.
+  const scroller = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  const followKey = `${messages.length}:${run?.state}:${run?.activity?.label}:${run?.activity?.step?.label}:${live.text.length}`;
+  const column = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = scroller.current;
+    if (box && pinned.current) box.scrollTop = box.scrollHeight;
+  }, [followKey]);
+  // Late growth -- source cards, math, a revised answer -- keeps the bottom in view too.
+  useEffect(() => {
+    const box = scroller.current;
+    const inner = column.current;
+    if (!box || !inner || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => { if (pinned.current) box.scrollTop = box.scrollHeight; });
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, []);
+
   return <div className={`flex h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : ""}`}>
-    <div className={cn(dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
+    <div ref={scroller} onScroll={e => {
+      const box = e.currentTarget;
+      pinned.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    }} className={cn(dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
       centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin")}>
-      <div className={cn(dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
+      <div ref={column} className={cn(dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
         {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
           {recordId ? "Ask about this paper." : "What would you like to investigate?"}</p>}
         {runs.map(item => {
           const current = item.id === run?.id ? run : item;
           if (compactionRun(item)) return <CompactionStatus key={item.id} run={current} />;
           return <div key={item.id} className="space-y-5">
-            {messages.filter(m => m.id === `q:${item.id}` || m.id === `a:${item.id}`).map(m =>
-              <ChatMessageBubble key={m.id} message={m} compact={dense}
-                sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources} />)}
+            {messages.filter(m => m.id === `q:${item.id}` || m.id === `a:${item.id}`).map(m => <div key={m.id}>
+              <ChatMessageBubble message={m} compact={dense} inlineSources
+                sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources} />
+              {m.role === "assistant" && !m.endedRun && streamed.current[item.id]
+                && squash(streamed.current[item.id]) !== squash(m.content)
+                && <p className={cn("mt-1 text-[12px] italic text-stone-500", dense ? "pl-9" : "pl-11")}>
+                  Revised after checking its citations.</p>}
+            </div>)}
             {activeRun(current) && <div className={cn("flex", dense ? "gap-2.5" : "gap-3")}>
               <div className={cn("rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand", dense ? "w-7 h-7" : "w-8 h-8")}>
                 <AskIrisMark className={dense ? "w-4 h-4" : "w-[18px] h-[18px]"} />
@@ -358,6 +396,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
                     since: current.created_at ?? new Date().toISOString(), step: null }}
                   runStartedAt={current.created_at}
                   onStop={item.id === run?.id && !busy ? () => void stop() : undefined} />
+                {item.id === run?.id && live.text && <CitationText text={live.text} citations={[]} streaming
+                  className={cn(ANSWER_MARKDOWN, CHAT_STREAM_CARET, "mt-3", dense ? "text-sm" : "text-md")} />}
                 {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
               </div>
             </div>}
@@ -389,7 +429,16 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"}>
       <ModelPill name="Research depth" value={depth} options={DEPTHS} onChange={setDepth}
         note="IRIS chooses the model for each answer." />
-      {usage.latest && <TokenUsageMeter usage={usage.latest} totals={usage.totals} />}
+      {scopeToggle && <button type="button" onClick={() => scopeToggle.onChange(!scopeToggle.allPapers)}
+        aria-pressed={scopeToggle.allPapers}
+        aria-label={scopeToggle.allPapers ? "Searching all papers. Search only this paper" : "Searching this paper. Search all papers"}
+        title={scopeToggle.allPapers ? "All papers" : "This paper"}
+        className={cn("inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-brand",
+          scopeToggle.allPapers ? "bg-brand text-white hover:bg-brand-dark" : "text-stone-600 hover:bg-stone-100")}>
+        <i aria-hidden className={cn("text-[11px]", scopeToggle.allPapers ? "fas fa-layer-group" : "far fa-file-lines")} />
+        {scopeToggle.allPapers ? "All papers" : "This paper"}
+      </button>}
+      {usage.latest && <TokenUsageMeter usage={usage.latest} />}
     </ChatInput>
   </div>;
 }

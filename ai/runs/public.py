@@ -203,9 +203,9 @@ def conversation(snapshot, *, manual_compaction=False, reserved_tokens=None):
                  for item in snapshot["runs"]],
         "turns": [{**{key: turn[key] for key in (
             "id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations",
-        )}, "facts": turn.get("facts", []),
+        )}, "facts": turn.get("facts", []), "papers": turn.get("papers", []),
             **({} if available[turn["run_id"]] else {
                 "answer": "This answer is unavailable because its sources changed or are no longer readable.",
-                "citations": [], "facts": [],
+                "citations": [], "facts": [], "papers": [],
             })} for turn in snapshot["turns"]],
     }

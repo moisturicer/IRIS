@@ -7,6 +7,7 @@ Outcomes: 404 missing or foreign, 409 `ended`, 403 `unauthorized`,
 from django.http import Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.ai.grants import config, database, issue, reads
@@ -87,10 +88,17 @@ class ReaderSessionGrantView(APIView):
             lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
 
 
+class RuntimeEdgeThrottle(UserRateThrottle):
+    """Every runtime request passes this check, polling included: a budget of its own, per reader."""
+
+    scope = "ai_runtime_edge"
+
+
 class RuntimeEdgeGrantView(APIView):
     """Authenticate a same-origin nginx subrequest; no service credential leaves nginx."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [RuntimeEdgeThrottle]
 
     def get(self, request):
         raw = request.headers.get("X-IRIS-Record")

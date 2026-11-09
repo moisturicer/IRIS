@@ -15,13 +15,13 @@ import uuid
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from ai.runs import config as runs_config
 from ai.runs.service import RunService
 from ai.runs.store import Busy, Conflict, NotFound, Unauthorized
-from ai.runs import public
+from ai.runs import public, stream
 
 router = APIRouter()
 
@@ -144,6 +144,60 @@ async def run_status(
         snapshot = await s.store.status(grant, run_id, reader_projection=bool(protocol))
         return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact, reserved_tokens=_reserved(s), after=after)
                             if protocol else snapshot)
+
+    return await _call(service, act, protocol)
+
+
+@router.get("/runs/{run_id}/draft")
+async def stream_draft(
+    run_id: uuid.UUID,
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
+):
+    """The answer as it is being written, as server-sent events, from its first piece.
+
+    Each event is `{"t": "reset"}` (a new attempt replaces the text so far),
+    `{"t": "text", "d": "..."}` or `{"t": "end"}`. Unchecked: the committed
+    Turn is the answer. Reader protocol only; 204 when drafts are not published.
+    """
+    if protocol is None:
+        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
+
+    async def act(s: RunService):
+        await s.store.status(grant, run_id)  # owned by this reader, or NotFound / Unauthorized
+        if s.drafts is None:
+            return Response(status_code=204)
+
+        async def events():
+            last = "0"
+            idle = 0.0
+            while True:
+                try:
+                    found = await s.drafts.xread({stream.key(run_id): last}, block=2000, count=200)
+                except (TimeoutError, OSError):
+                    found = []
+                if not found:
+                    idle += 2
+                    # Nothing for a while: end once the run has, and keep the connection alive meanwhile.
+                    run = await s.store.status(grant, run_id)
+                    if run["state"] not in ("queued", "running") or idle > 900:
+                        yield "data: {\"t\": \"end\"}\n\n"
+                        return
+                    yield ": keep-alive\n\n"
+                    continue
+                idle = 0.0
+                for _key, entries in found:
+                    for entry_id, fields in entries:
+                        last = entry_id.decode() if isinstance(entry_id, bytes) else entry_id
+                        raw = fields.get(b"e") or fields.get("e")
+                        text = raw.decode() if isinstance(raw, bytes) else raw
+                        yield f"data: {text}\n\n"
+                        if '"t": "end"' in text:
+                            return
+
+        return StreamingResponse(events(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
     return await _call(service, act, protocol)
 

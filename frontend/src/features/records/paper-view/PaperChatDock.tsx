@@ -134,10 +134,15 @@ export function PaperChatPanel(props: PaperChatPanelProps) {
 
 function RuntimePaperChatPanel(props: PaperChatPanelProps) {
   const userId = useAuthStore(s => s.user?.id);
-  const storageKey = `iris-runtime-paper:${userId}:${props.record.id}`;
+  // Research kept to this paper, or across every paper the reader can read: each its own conversation.
+  const [allPapers, setAllPapers] = useState(false);
+  const storageKey = `iris-runtime-paper:${userId}:${props.record.id}${allPapers ? ":all" : ""}`;
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     try { return sessionStorage.getItem(storageKey) ?? undefined; } catch { return undefined; }
   });
+  useEffect(() => {
+    try { setConversationId(sessionStorage.getItem(storageKey) ?? undefined); } catch { setConversationId(undefined); }
+  }, [storageKey]);
   const [fresh, setFresh] = useState(0);
   const [recent, setRecent] = useState<ReaderConversationSummary[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
@@ -203,7 +208,9 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
     </div>
 
     <div className={props.minimized ? "hidden" : "min-h-0 flex-1"}>
-      <RuntimeReader key={`${conversationId ?? "new"}:${fresh}`} dense conversationId={conversationId} recordId={props.record.id}
+      <RuntimeReader key={`${allPapers}:${conversationId ?? "new"}:${fresh}`} dense conversationId={conversationId}
+        recordId={allPapers ? undefined : props.record.id}
+        scopeToggle={{ allPapers, onChange: next => { setRecentOpen(false); setAllPapers(next); } }}
         initialDraft={props.draft} onDraftChange={props.onDraftChange} onConversation={remember} />
     </div>
   </aside>;

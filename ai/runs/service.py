@@ -17,6 +17,7 @@ from ai.admission import scope as admission
 from ai.agent.budget import Bounds
 from ai.research.tools import ResearchTools
 from ai.runs import config as runs_config
+from ai.runs import stream
 from ai.runs.dispatch import Notifier, PollingNotifier
 from ai.runs.executor import Compacted, Executor, RunContext, Unavailable
 from ai.runs.store import Claim, Fenced, RunStore
@@ -41,6 +42,8 @@ class RunService:
         self.executors = {e.name: e for e in (*serves, executor)}
         self.notifier = notifier or PollingNotifier()
         self.worker = f"worker-{uuid.uuid4().hex[:12]}"
+        #: Where live drafts go (Redis); None publishes nothing.
+        self.drafts = stream.client_for(getattr(cfg, "redis_url", "") or "")
 
     def pinned(self, depth: str = "ordinary", executor: Executor | None = None) -> dict:
         """What fixes a run's interpretation, persisted at admission."""
@@ -217,12 +220,14 @@ class RunService:
             log.info("run %s unavailable: cannot_compact", run_id)
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
+        # The answer as it is written, for the reader to watch; replaced by the checked Turn.
+        sink = stream.DraftSink(self.drafts, run_id) if self.drafts is not None else None
         try:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id,
                                   embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger,
                                   reranker=self.reranker, guard=self.send_guard, follow_stored_grant=True)
             # Every provider attempt inside is admitted against this run (IR-725).
-            with admission.bound(admission.RunBinding(run_id, claim.fence)):
+            with admission.bound(admission.RunBinding(run_id, claim.fence)), stream.bound(sink):
                 if compacting:
                     result = await executor.compact(tools, self._context(claim, bounds))
                 elif getattr(executor, "takes_context", False):
@@ -230,13 +235,19 @@ class RunService:
                 else:
                     result = await executor.answer(claim.question, tools)
         except Unavailable as refused:
+            if sink is not None:
+                await sink.end()
             # Operators get the code; readers only see `unavailable`.
             log.info("run %s unavailable: %s", run_id, refused.code)
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
         except Exception:
+            if sink is not None:
+                await sink.end()
             await self.store.fail(run_id, claim.fence, "executor_failed")
             return
+        if sink is not None:
+            await sink.end()
         try:
             if isinstance(result, Compacted):
                 await self.store.commit_compaction(run_id, claim.fence, result)

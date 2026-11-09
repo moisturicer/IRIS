@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { ChatMessage } from "@/types/chat";
 import { CitationTurnContext } from "@/lib/citedPage";
@@ -15,6 +16,7 @@ import {
   ScopeNotice,
 } from "./PassageQuote";
 import { ReasoningSummary } from "./ReasoningSummary";
+import { SourcePassages } from "./SourceContextPanel";
 import "highlight.js/styles/github.min.css";
 
 interface ChatMessageBubbleProps {
@@ -33,6 +35,8 @@ interface ChatMessageBubbleProps {
   sourcesSelected?: boolean;
   /** Show this answer's sources. Absent where there is no sources panel. */
   onSelectSources?: (message: ChatMessage) => void;
+  /** The sources open beneath the answer itself, rather than in a panel. */
+  inlineSources?: boolean;
 }
 
 /**
@@ -47,6 +51,7 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
+      aria-expanded={selected}
       aria-label={`${label} for this answer`}
       className={cn(
         "inline-flex items-center gap-2 min-h-8 px-2 -ml-2 rounded-lg text-small font-medium transition-colors",
@@ -68,6 +73,7 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
         ))}
       </span>
       {label}
+      <i aria-hidden className={cn("fas fa-chevron-down text-[9px] transition-transform duration-200", selected && "rotate-180")} />
     </button>
   );
 }
@@ -104,9 +110,10 @@ function RetryButton({ onRetry, disabled }: { onRetry?: () => void; disabled?: b
  * widget — the avatar is still what tells the two apart.
  */
 export function ChatMessageBubble({
-  message, compact = false, retryDisabled, onRetry, sourcesSelected = false, onSelectSources,
+  message, compact = false, retryDisabled, onRetry, sourcesSelected = false, onSelectSources, inlineSources = false,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
+  const [expanded, setExpanded] = useState(false);
   const markers = [...new Set((message.citations ?? []).map((citation) => citation.marker))];
 
   return (
@@ -156,6 +163,7 @@ export function ChatMessageBubble({
           <CitationText
             text={message.content}
             citations={message.citations ?? []}
+            papers={message.papers}
             className={ANSWER_MARKDOWN}
           />
         ) : null}
@@ -197,7 +205,10 @@ export function ChatMessageBubble({
 
         {!isUser && (
           <div className="mt-1.5 flex items-center gap-2 motion-safe:animate-fade-in-up">
-            {onSelectSources && markers.length > 0 && (
+            {inlineSources && markers.length > 0 && (
+              <SourcesButton markers={markers} selected={expanded} onSelect={() => setExpanded(v => !v)} />
+            )}
+            {!inlineSources && onSelectSources && markers.length > 0 && (
               <SourcesButton
                 markers={markers}
                 selected={sourcesSelected}
@@ -208,6 +219,12 @@ export function ChatMessageBubble({
             <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-200">
               <CopyButton text={message.content} label="Copy answer" />
             </div>
+          </div>
+        )}
+        {!isUser && inlineSources && expanded && (
+          <div className="mt-2 origin-top rounded-xl border border-stone-200 bg-stone-50/60 motion-safe:animate-[sources-open_260ms_cubic-bezier(0.2,0.8,0.2,1)]">
+            <SourcePassages citations={message.citations ?? []} sources={message.sources ?? []} answered
+              className="space-y-2.5 p-3" />
           </div>
         )}
       </div>

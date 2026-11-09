@@ -33,8 +33,8 @@ export function useCitedRecords(conversation: ReaderConversation | undefined) {
 
 function citations(turn: Turn, records: Record<number, SemanticSearchResult>): Citation[] {
   return turn.citations.map((c, index) => ({
-    marker: index + 1, chunk_id: 0, record_id: c.record_id, record_title: records[c.record_id]?.title ?? `Paper ${c.record_id}`,
-    page: c.page, text: c.quote, context_path: [], regions: [],
+    marker: index + 1, chunk_id: index, record_id: c.record_id, record_title: records[c.record_id]?.title ?? `Paper ${c.record_id}`,
+    page: c.page, text: c.quote, context_path: [], regions: c.regions ?? [],
   }));
 }
 
@@ -61,7 +61,7 @@ export function toMessages(conversation: ReaderConversation | undefined, live: R
     if (turn) {
       const cited = citations(turn, records);
       out.push({ id: `a:${run.id}`, role: "assistant", content: turn.answer, question: run.question,
-        citations: cited, sources: [...new Map(cited.map(c => [c.record_id, records[c.record_id]])).values()].filter(Boolean),
+        citations: cited, papers: turn.papers ?? [], sources: [...new Map(cited.map(c => [c.record_id, records[c.record_id]])).values()].filter(Boolean),
         createdAt: at });
     } else if (ENDED_TEXT[run.state]) {
       const ended = ENDED[run.state];

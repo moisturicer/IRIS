@@ -27,6 +27,8 @@ export interface ReaderRun {
   context: null | { estimated: true; used_tokens: number; capacity_tokens: number };
   /** What the run is doing now: a coarse phase and its latest step. Null once it ends. */
   activity?: null | ReaderActivity;
+  /** The answer as the model is writing it, before it is checked; absent once the Turn commits. */
+  draft?: string;
   /** Tokens the provider reported for this run's model calls. */
   usage?: null | ReaderUsage;
   /** Older context condensed into a summary; the original Turns stay (IR-735). Absent from older servers. */
@@ -58,7 +60,9 @@ export interface ReaderConversation {
   revision: number;
   runs: ReaderRun[];
   turns: { id: string; run_id: string; ordinal: number; question: string; answer: string; kind: string;
-    citations: { record_id: number; page: number; quote: string; revision: string }[] }[];
+    citations: { record_id: number; page: number; quote: string; revision: string;
+      regions?: { page: number; left: number; top: number; right: number; bottom: number }[] }[];
+    papers?: { title: string; record_id: number }[] }[];
 }
 
 export const activeRun = (run: ReaderRun) => run.state === "queued" || run.state === "running";

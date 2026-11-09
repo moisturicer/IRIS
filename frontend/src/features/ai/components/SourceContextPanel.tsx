@@ -83,14 +83,16 @@ export function SourcePassages({
   citations,
   sources,
   answered = false,
+  className = "flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5",
 }: Pick<SourceContextPanelProps, "citations" | "sources"> & {
+  className?: string;
   /** Whether there is an answer at all: one that cited nothing says so. */
   answered?: boolean;
 }) {
   const cardFor = (recordId: number) => sources.find((s) => s.id === recordId);
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5">
+    <div className={className}>
       {citations.length === 0 && (
         <p className="text-[14px] text-stone-500 text-center py-8 px-2">
           {answered

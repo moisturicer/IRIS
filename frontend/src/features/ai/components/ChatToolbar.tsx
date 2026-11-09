@@ -3,11 +3,7 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 interface ChatToolbarProps {
   sessionTitle:     string;
   historyOpen:      boolean;
-  sourcesOpen:      boolean;
-  sourcesAvailable: boolean;
   onToggleHistory:  () => void;
-  onToggleSources:  () => void;
-  onNewChat:        () => void;
   /**
    * History and sources open as drawers over the answer rather than beside it
    * (IR-570): the toggles say they open a dialog, and take a full 44px touch
@@ -19,11 +15,7 @@ interface ChatToolbarProps {
 export function ChatToolbar({
   sessionTitle,
   historyOpen,
-  sourcesOpen,
-  sourcesAvailable,
   onToggleHistory,
-  onToggleSources,
-  onNewChat,
   asDrawers = false,
 }: ChatToolbarProps) {
   const touch = asDrawers ? "min-w-11 min-h-11 justify-center" : "";
@@ -57,37 +49,6 @@ export function ChatToolbar({
         <p className="text-[15px] font-semibold text-stone-900 truncate">{sessionTitle}</p>
       </div>
 
-      {/* With drawers, New chat lives in the history drawer instead (IR-570). */}
-      {!asDrawers && (
-        <button
-          type="button"
-          onClick={onNewChat}
-          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold
-            text-stone-600 hover:bg-stone-50 border border-stone-200"
-        >
-          <i className="fas fa-plus text-[11px]" aria-hidden />
-          New chat
-        </button>
-      )}
-
-      <button
-        type="button"
-        onClick={onToggleSources}
-        disabled={!sourcesAvailable}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[14px] font-semibold transition-colors ${touch}
-          ${sourcesOpen && sourcesAvailable
-            ? "bg-[#6B0F12]/10 text-[#6B0F12] ring-1 ring-[#6B0F12]/20"
-            : "text-stone-600 hover:bg-stone-50 border border-stone-200"
-          }
-          disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent`}
-        aria-pressed={asDrawers ? undefined : sourcesOpen}
-        aria-haspopup={asDrawers ? "dialog" : undefined}
-        aria-label={sourcesOpen ? "Hide sources" : "Show sources"}
-        title={sourcesAvailable ? (sourcesOpen ? "Hide sources" : "Show sources") : "Sources appear after IRIS responds"}
-      >
-        <i className="fas fa-layer-group text-[12px]" aria-hidden />
-        <span className="hidden sm:inline">Sources</span>
-      </button>
 
       {/* Phones only: Ask IRIS fills the window, so AppShell draws no phone bar
           here, and this is where the bell goes instead. On a desktop the bell

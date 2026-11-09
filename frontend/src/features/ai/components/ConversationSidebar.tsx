@@ -7,6 +7,7 @@ interface ConversationSidebarProps {
   activeId:         string | null;
   open:             boolean;
   onDelete:         (id: string) => void;
+  onNewChat:        () => void;
 }
 
 export function ConversationSidebar({
@@ -14,6 +15,7 @@ export function ConversationSidebar({
   activeId,
   open,
   onDelete,
+  onNewChat,
 }: ConversationSidebarProps) {
   return (
     <aside
@@ -43,6 +45,9 @@ export function ConversationSidebar({
           Chat history
         </span>
       </div>
+      <div className="px-3 pt-3">
+        <NewChatButton onClick={onNewChat} />
+      </div>
 
       <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={onDelete} />
 
@@ -60,7 +65,7 @@ export function ConversationHistoryList({
   conversations,
   activeId,
   onDelete,
-}: Omit<ConversationSidebarProps, "open">) {
+}: Omit<ConversationSidebarProps, "open" | "onNewChat">) {
   return (
     <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-2 space-y-1">
       {conversations.length === 0 ? (
@@ -108,5 +113,16 @@ export function ConversationHistoryList({
         })
       )}
     </nav>
+  );
+}
+
+/** Starts a new conversation; heads the history list wherever it is shown. */
+export function NewChatButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-brand px-3 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-dark focus-visible:outline-brand">
+      <i className="fas fa-plus text-[11px]" aria-hidden />
+      New chat
+    </button>
   );
 }
