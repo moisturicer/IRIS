@@ -80,6 +80,8 @@ class RunsConfig:
     dispatch: Dispatch
     #: Wakeups only; empty means workers poll.
     redis_url: str = ""
+    #: Reuse a query's embedding within one run (IR-953); off unless RUNS_QUERY_VECTOR_CACHE=on.
+    query_vector_cache: bool = False
 
 
 def problems(values) -> list[str]:
@@ -98,6 +100,8 @@ def problems(values) -> list[str]:
     slots = getattr(values, "RUNS_WORKER_CONCURRENCY", None)
     if deep and slots and deep >= slots:
         found.append("RUNS_DEEP_CONCURRENCY must be below RUNS_WORKER_CONCURRENCY")
+    if str(getattr(values, "RUNS_QUERY_VECTOR_CACHE", "") or "").strip() not in ("", "off", "on"):
+        found.append("RUNS_QUERY_VECTOR_CACHE must be on or off")
     return found
 
 
@@ -127,4 +131,5 @@ def read(values) -> RunsConfig:
             poll_seconds=values.RUNS_POLL_SECONDS,
         ),
         redis_url=getattr(values, "RUNS_REDIS_URL", ""),
+        query_vector_cache=str(getattr(values, "RUNS_QUERY_VECTOR_CACHE", "") or "").strip() == "on",
     )

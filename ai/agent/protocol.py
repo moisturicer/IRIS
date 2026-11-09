@@ -61,6 +61,8 @@ class ModelTurn:
     reasoned: bool = False
     input_tokens: int | None = None
     output_tokens: int | None = None
+    #: Prompt tokens the provider served from its cache; part of `input_tokens` (IR-953).
+    cached_input_tokens: int | None = None
     #: Sources carried by text or opaque state derived from earlier evidence.
     dependencies: frozenset = frozenset()
     #: A persisted turn whose source manifest does not exist cannot be resent.

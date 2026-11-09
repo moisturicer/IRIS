@@ -86,6 +86,9 @@ class ProviderReservation(models.Model):
     charge_output_tokens = models.BigIntegerField()
     charge_cost_micros = models.BigIntegerField()
     charge_active_ms = models.BigIntegerField()
+    #: Of the charged input, what the vendor served from its prompt cache; null when
+    #: unreported. Recorded for measurement only: the charge is never discounted (IR-953).
+    cached_input_tokens = models.BigIntegerField(null=True, blank=True)
     #: 1 while it counts as a physical attempt; 0 once released unsent.
     charge_attempts = models.PositiveSmallIntegerField(default=1)
     #: The runtime that wrote the row and alone settles it (IR-725).

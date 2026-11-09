@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     RUNS_POLL_SECONDS: float | None = None
     # Worker wakeups only; empty means workers poll PostgreSQL.
     RUNS_REDIS_URL: str = ""
+    # Optional (IR-953): "on" reuses a query's embedding within one run; blank is off.
+    RUNS_QUERY_VECTOR_CACHE: str = ""
     # Exact public-proxy source manifest for the IR-889 development pilot.
     # Empty refuses every Record-dependent paid send.
     RUNS_PROXY_SEND_APPROVAL: str = ""
@@ -92,6 +94,8 @@ class Settings(BaseSettings):
     AGENT_LLM_DATA_POLICY: str = ""
     AGENT_LLM_CAPACITIES: str = ""
     AGENT_LLM_ROUTING: str = ""
+    # Optional (IR-953): "run" sends a per-run prompt_cache_key; blank or "off" sends none.
+    AGENT_LLM_PROMPT_CACHE: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

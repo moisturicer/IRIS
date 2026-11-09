@@ -49,7 +49,7 @@ LEDGER_TABLES = {
                            " charged_cost_micros, charged_active_ms",
     "ai_providerreservation": "state, settled_at, sent, usage_reported, charge_attempts,"
                               " charge_input_tokens, charge_output_tokens, charge_cost_micros,"
-                              " charge_active_ms",
+                              " charge_active_ms, cached_input_tokens",
 }
 # Non-content metadata is read-only, without per-reader row filtering.
 RUNTIME_METADATA_TABLES = (

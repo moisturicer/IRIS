@@ -377,7 +377,8 @@ class _Refused(Exception):
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
                  scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None,
-                 reranker=None, guard=None, follow_stored_grant: bool = False):
+                 reranker=None, guard=None, follow_stored_grant: bool = False,
+                 cache_query_vectors: bool = False):
         self.dsn = dsn
         self.grant = grant
         self.run_id = run_id
@@ -393,6 +394,9 @@ class ResearchTools:
         # A worker's tools read under the grant the run holds *now*, so a reader's
         # reconnect reaches a run already in progress (IR-880). Off, `grant` is the authority.
         self.follow_stored_grant = follow_stored_grant
+        #: (space id, query) -> vector, for this run alone; never shared (IR-953).
+        self.cache_query_vectors = cache_query_vectors
+        self._vectors: dict = {}
 
     async def _grant(self, conn) -> str | None:
         """The grant this call reads under: the run's stored one when following it (IR-880).
@@ -1195,6 +1199,10 @@ class ResearchTools:
                 pinned = await space(conn, provider)
             if self.space_id is not None and pinned["id"] != self.space_id:
                 return None, SPACE_CHANGED
+            cached = self._vectors.get((pinned["id"], query)) if self.cache_query_vectors else None
+            if cached is not None:
+                # The same text in the same space: no second admitted, paid embedding.
+                return cached, None
             ticket = await ledger.admit(Request(
                 operation="embed", purpose="query", purpose_version="query-1", lane="research",
                 account=provider.account, models=(provider.model,), input_tokens=estimate_tokens(query),
@@ -1216,6 +1224,8 @@ class ResearchTools:
         except AdmissionDenied as refused:
             return None, refused.reason
         self.space_id = pinned["id"]
+        if self.cache_query_vectors:
+            self._vectors[(pinned["id"], query)] = vector
         return vector, None
 
     async def _candidates(self, conn, query: str, params: list, vector) -> dict:

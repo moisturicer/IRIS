@@ -108,6 +108,7 @@ class AdmittedAgentProvider(LLMProvider):
             with scope.admitted_send():
                 turn = await asyncio.wait_for(self.provider.converse(request), ticket.timeout_seconds)
             usage.input_tokens, usage.output_tokens = turn.input_tokens, turn.output_tokens
+            usage.cached_input_tokens = turn.cached_input_tokens
             usage.model = request.pin.model
             sources = frozenset().union(*(e.dependencies for e in evidence)) if evidence else frozenset()
             return replace(turn, dependencies=sources) if sources else turn
