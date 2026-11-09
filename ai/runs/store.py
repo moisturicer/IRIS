@@ -21,6 +21,7 @@ fenced. Attempt accounting carries no content and is kept.
 from __future__ import annotations
 
 import hashlib
+import base64
 import json
 import re
 import uuid
@@ -138,6 +139,8 @@ DISPATCH_LOCK = "iris_ai.dispatch"
 
 #: A Paper Chat grant ($2) reaches only its own Record's Conversations (IR-719).
 IN_SCOPE = "($2::bigint IS NULL OR scope_record_id = $2)"
+#: A grant with no Record scope reads every readable paper.
+NO_SCOPE = 0
 #: A paper title as the agent marks it in an answer.
 TITLE = re.compile(r"«([^«»\n]{3,300})»")
 
@@ -276,6 +279,16 @@ class RunStore:
             raise Unauthorized from None
 
     @staticmethod
+    def _stored_scope(token: str | None) -> int:
+        """The Record scope a stored grant was issued for, or NO_SCOPE. Read from our own signed value."""
+        try:
+            part = (token or "").split(".")[2]
+            rec = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))).get("rec")
+            return int(rec) if rec is not None else NO_SCOPE
+        except (IndexError, ValueError, TypeError, AttributeError):
+            return NO_SCOPE - 1
+
+    @staticmethod
     def _reader(claims: dict) -> tuple[int, int | None]:
         scope = claims.get("rec")
         return int(claims["sub"]), int(scope) if scope is not None else None
@@ -391,8 +404,9 @@ class RunStore:
             )
             if found is None:
                 raise NotFound
-            # Paper Chat stays on its Record; widening is a new Conversation.
-            if found["scope_record_id"] != scope:
+            # Paper Chat may widen to every readable paper and back, in the same Conversation; it
+            # never moves to another Record, and a general Conversation never narrows to one.
+            if scope is not None and found["scope_record_id"] != scope:
                 raise Conflict("scope_mismatch")
             revision = found["revision"]
             if base_revision != revision:
@@ -456,8 +470,8 @@ class RunStore:
             "SELECT revision, scope_record_id FROM iris_ai.conversation WHERE id = $1",
             original["conversation_id"],
         )
-        # Paper Chat stays on its Record; the retry reads under this grant, so it must match.
-        if conversation["scope_record_id"] != scope:
+        # The retry reads under this grant: its Record, or wider, never another Record.
+        if scope is not None and conversation["scope_record_id"] != scope:
             raise Conflict("scope_mismatch")
         existing = await conn.fetchrow(
             f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE reader_id = $1 AND request_key = $2",
@@ -552,7 +566,7 @@ class RunStore:
         try:
             async with conn.transaction():
                 reader, scope = await self._principal(conn, row["reader_grant"])
-                if reader != row["reader_id"] or scope != row["scope_record_id"]:
+                if reader != row["reader_id"] or (scope is not None and scope != row["scope_record_id"]):
                     raise Unauthorized
         except Unauthorized:
             await self._end(conn, run_id, "failed", "authorization_expired", move_fence=True)
@@ -612,7 +626,7 @@ class RunStore:
             run_key(run_id),
         )
         return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"],
-                     scope_record_id=row["scope_record_id"], run_id=run_id,
+                     scope_record_id=scope, run_id=run_id,
                      grant=row["reader_grant"], depth=row["depth"], allowance=row["allowance"],
                      remaining_seconds=float(row["remaining"]),
                      prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"], t["ordinal"],
@@ -773,7 +787,7 @@ class RunStore:
                         reader, scope = await self._principal(conn, run["reader_grant"])
                 except Unauthorized:
                     return "stale", None
-                if reader != run["reader_id"] or scope != run["scope_record_id"]:
+                if reader != run["reader_id"] or (scope is not None and scope != run["scope_record_id"]):
                     return "stale", None
                 revision = await conn.fetchval(
                     "SELECT coalesce(max(revision), 0) + 1 FROM iris_ai.conversation_handoff"
@@ -923,16 +937,16 @@ class RunStore:
                 claims = await self._verify(conn, grant)
                 reader, scope = self._reader(claims)
                 await self._owned_run(conn, reader, scope, run_id)
-                # Only a grant of exactly the Conversation's scope renews,
-                # so a reconnect never widens what the run reads.
-                await conn.execute(
-                    """UPDATE iris_ai.ask_run r SET reader_grant = $2, grant_expires_at = to_timestamp($3)
-                         FROM iris_ai.conversation c
-                        WHERE r.id = $1 AND c.id = r.conversation_id AND r.state = ANY($4)
-                          AND c.scope_record_id IS NOT DISTINCT FROM $5::bigint
-                          AND r.grant_expires_at < to_timestamp($3)""",
-                    run_id, grant, claims["exp"], list(ACTIVE), scope,
-                )
+                # Only a grant of exactly the scope the run started with renews,
+                # so a reconnect never widens (or narrows) what the run reads.
+                started = await conn.fetchval("SELECT reader_grant FROM iris_ai.ask_run WHERE id = $1", run_id)
+                if self._stored_scope(started) == (scope if scope is not None else NO_SCOPE):
+                    await conn.execute(
+                        """UPDATE iris_ai.ask_run r SET reader_grant = $2, grant_expires_at = to_timestamp($3)
+                            WHERE r.id = $1 AND r.state = ANY($4)
+                              AND r.grant_expires_at < to_timestamp($3)""",
+                        run_id, grant, claims["exp"], list(ACTIVE),
+                    )
                 return await self._projection(conn, run_id, reader=reader_projection)
 
     @staticmethod

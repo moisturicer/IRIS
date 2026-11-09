@@ -772,11 +772,11 @@ class _Run:
                 draft, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
             if kept:
                 return await self._commit(f"{kept}\n\n{assurance.LIMITATION}")
-        # Nothing stands on its own. The answer is still delivered, never refused over a check: minus
-        # citations that bind to no source, with what could not be matched noted under it.
-        text = assurance.bindable(drafts[0], self.investigation, excluded=self._focus("excluded"))
-        note = self._note(found)
-        return await self._commit(f"{text}\n\n{note}" if note else text)
+        # Nothing stands on its own. The answer is still delivered, never refused over a check: each
+        # sentence that fails is kept, minus citations that bind to no source, and marked as not established.
+        text = assurance.qualified(drafts[0], self.investigation, prior=self.prior,
+                                   excluded=self._focus("excluded"))
+        return await self._commit(text or assurance.UNESTABLISHED)
 
     def _note(self, found: dict) -> str:
         """The numbers and titles a delivered answer states that no passage supports, as one line."""

@@ -114,13 +114,18 @@ interface Props {
   /** The newest answer, each time one lands: a page shows its sources. */
   onAnswered?: (message: ChatMessage) => void;
   /** Paper Chat's this-paper / all-papers switch, shown beside the depth. */
-  scopeToggle?: { allPapers: boolean; onChange: (allPapers: boolean) => void };
+  scopeToggle?: { allPapers: boolean; onChange: (allPapers: boolean) => void; locked?: boolean };
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
   selectedId = null, onSelectSources, onAnswered, scopeToggle }: Props) {
-  const api = useMemo(() => runtimeReader(recordId), [recordId]);
+  // The research scope: this paper, or every paper once the reader widens. Read on each request, so
+  // widening continues the same conversation instead of starting another.
+  const scope = scopeToggle?.allPapers ? undefined : recordId;
+  const scopeNow = useRef(scope);
+  scopeNow.current = scope;
+  const api = useMemo(() => runtimeReader(() => scopeNow.current), []);
   const [conversation, setConversation] = useState<ReaderConversation>();
   const [run, setRun] = useState<ReaderRun>();
   const [depth, setDepth] = useState<Depth>("ordinary");
@@ -324,7 +329,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
 
   const centered = !conversation?.runs.length && !run && !busy && !error;
   const records = useCitedRecords(conversation);
-  const live = useDraft(run, recordId);
+  const live = useDraft(run, scope);
   // What each run streamed, kept on screen until the saved answer takes over.
   const streamed = useRef<Record<string, string>>({});
   if (run && live.text) streamed.current[run.id] = live.text;
@@ -374,7 +379,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin")}>
       <div ref={column} className={cn(dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
         {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
-          {recordId ? "Ask about this paper." : "What would you like to investigate?"}</p>}
+          {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
         {runs.map(item => {
           const current = item.id === run?.id ? run : item;
           if (compactionRun(item)) return <CompactionStatus key={item.id} run={current} />;
@@ -431,14 +436,15 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     <ChatInput centered={centered} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
       onStop={run && activeRun(run) && !compactionRun(run) && !busy ? () => void stop() : undefined}
       maxLength={4000}
-      placeholder={recordId ? "Ask about this paper…" : "Ask about the research corpus…"}
-      disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"}>
+      placeholder={scope ? "Ask about this paper…" : "Ask about the research corpus…"}
+      disabled={busy || !!error || !!(run && activeRun(run))} label={scope ? "Ask about this paper" : "Ask about the research corpus"}>
       <ModelPill name="Research depth" value={depth} options={DEPTHS} onChange={setDepth}
         note="IRIS chooses the model for each answer." />
       {scopeToggle && <button type="button" onClick={() => scopeToggle.onChange(!scopeToggle.allPapers)}
+        disabled={scopeToggle.locked}
         aria-pressed={scopeToggle.allPapers}
         aria-label={scopeToggle.allPapers ? "Searching all papers. Search only this paper" : "Searching this paper. Search all papers"}
-        title={scopeToggle.allPapers ? "All papers" : "This paper"}
+        title={scopeToggle.locked ? "This chat started across all papers" : scopeToggle.allPapers ? "All papers" : "This paper"}
         className={cn("inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-brand",
           scopeToggle.allPapers ? "bg-brand text-white hover:bg-brand-dark" : "text-stone-600 hover:bg-stone-100")}>
         <i aria-hidden className={cn("text-[11px]", scopeToggle.allPapers ? "fas fa-layer-group" : "far fa-file-lines")} />

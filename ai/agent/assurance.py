@@ -261,6 +261,29 @@ def reading_coverage(citations, investigation: Investigation) -> list[dict]:
     } for revision, read in investigation.readings.items() if revision in cited_revisions]
 
 
+QUALIFIER = "(the sources read do not establish this)"
+UNESTABLISHED = "The sources IRIS read do not establish an answer to this question."
+
+
+def qualified(text: str, investigation: Investigation, *, prior=(), excluded=()) -> str:
+    """`text` with every sentence that fails the checks kept but marked as not established.
+
+    Citations that bind to no passage are removed from such a sentence first; a sentence
+    that passes keeps its citations untouched.
+    """
+    out = []
+    for line in _LINE.split(text.strip()):
+        units = []
+        for unit in _sentences(line):
+            if not check(unit, investigation, prior=prior, excluded=excluded):
+                units.append(unit)
+                continue
+            cleaned = bindable(unit, investigation, excluded=excluded)
+            units.append(f"{cleaned} {QUALIFIER}" if cleaned else cleaned)
+        out.append(" ".join(u for u in units if u))
+    return "\n".join(line for line in out if line)
+
+
 def unmatched_note(found: dict[str, list[str]]) -> str:
     """One line naming the numbers and paper titles a delivered answer states that no passage supports."""
     items = list(found.get("unsupported_number", [])) + [f"\u201c{item}\u201d" for item in found.get("unknown_title", [])]

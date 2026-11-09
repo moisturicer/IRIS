@@ -141,13 +141,21 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
   const userId = useAuthStore(s => s.user?.id);
   // Research kept to this paper, or across every paper the reader can read: each its own conversation.
   const [allPapers, setAllPapers] = useState(false);
-  const storageKey = `iris-runtime-paper:${userId}:${props.record.id}${allPapers ? ":all" : ""}`;
+  const storageKey = `iris-runtime-paper:${userId}:${props.record.id}`;
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     try { return sessionStorage.getItem(storageKey) ?? undefined; } catch { return undefined; }
   });
   useEffect(() => {
     try { setConversationId(sessionStorage.getItem(storageKey) ?? undefined); } catch { setConversationId(undefined); }
   }, [storageKey]);
+  // A chat that began across all papers cannot narrow to this one; a chat that began on this paper can widen and narrow freely.
+  const [startedAll, setStartedAll] = useState(() => {
+    try { return sessionStorage.getItem(`${storageKey}:all`) === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { setStartedAll(sessionStorage.getItem(`${storageKey}:all`) === "1"); } catch { setStartedAll(false); }
+  }, [storageKey]);
+  const locked = !!conversationId && startedAll;
   const [fresh, setFresh] = useState(0);
   const [recent, setRecent] = useState<ReaderConversationSummary[]>([]);
   const [recentOpen, setRecentOpen] = useState(false);
@@ -163,8 +171,17 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
   }, [api, props.record.id, conversationId]);
 
   const remember = (id: string | undefined) => {
+    if (id && !conversationId) setStartedAll(allPapers);
     setConversationId(id);
-    try { if (id) sessionStorage.setItem(storageKey, id); else sessionStorage.removeItem(storageKey); } catch { /* optional */ }
+    try {
+      if (id) {
+        sessionStorage.setItem(storageKey, id);
+        if (!conversationId) sessionStorage.setItem(`${storageKey}:all`, allPapers ? "1" : "0");
+      } else {
+        sessionStorage.removeItem(storageKey);
+        sessionStorage.removeItem(`${storageKey}:all`);
+      }
+    } catch { /* optional */ }
   };
   const newChat = () => { setRecentOpen(false); remember(undefined); setFresh(n => n + 1); };
 
@@ -214,9 +231,9 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
     </div>
 
     <div className={props.minimized ? "hidden" : "min-h-0 flex-1"}>
-      <RuntimeReader key={`${allPapers}:${conversationId ?? "new"}:${fresh}`} dense conversationId={conversationId}
-        recordId={allPapers ? undefined : props.record.id}
-        scopeToggle={{ allPapers, onChange: next => { setRecentOpen(false); setAllPapers(next); } }}
+      <RuntimeReader key={`${conversationId ?? "new"}:${fresh}`} dense conversationId={conversationId}
+        recordId={props.record.id}
+        scopeToggle={{ allPapers: allPapers || locked, locked, onChange: next => { setRecentOpen(false); setAllPapers(next); } }}
         initialDraft={props.draft} onDraftChange={props.onDraftChange} onConversation={remember} />
     </div>
   </aside>;

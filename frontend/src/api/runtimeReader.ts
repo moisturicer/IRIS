@@ -83,29 +83,33 @@ function checked<T extends { protocol: string }>(data: T): T {
 }
 
 /** Same-origin edge injects server credentials; none are held by the browser. */
-export function runtimeReader(recordId?: number) {
-  const config = { baseURL: "/api/v1", headers: { "X-IRIS-Protocol": READER_PROTOCOL,
-    ...(recordId ? { "X-IRIS-Record": String(recordId) } : {}) } };
+export function runtimeReader(scope?: number | (() => number | undefined)) {
+  // A function is read on every request, so one reader can widen from a paper to all papers.
+  const config = () => {
+    const recordId = typeof scope === "function" ? scope() : scope;
+    return { baseURL: "/api/v1", headers: { "X-IRIS-Protocol": READER_PROTOCOL,
+      ...(recordId ? { "X-IRIS-Record": String(recordId) } : {}) } };
+  };
   const base = "/ai/runtime";
   return {
     async submit(question: string, depth: Depth, key: string, conversation?: ReaderConversation) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs`, {
         question, depth, ...(conversation ? { conversation_id: conversation.id, base_revision: conversation.revision } : {}),
-      }, { ...config, headers: { ...config.headers, "Idempotency-Key": key } });
+      }, { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },
     async status(id: string) {
-      const { data } = await apiClient.get<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}`, config);
+      const { data } = await apiClient.get<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}`, config());
       return checked(data);
     },
     async stop(id: string) {
-      const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/cancel`, {}, config);
+      const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/cancel`, {}, config());
       return checked(data);
     },
     /** Ask again after a run ended without an answer: a new run linked to the first; the key makes a repeated click one request. */
     async retry(id: string, key: string) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/retry`, {},
-        { ...config, headers: { ...config.headers, "Idempotency-Key": key } });
+        { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },
     /** Condense an owned conversation as a run of its own; the key makes a repeated click one request. */
@@ -113,19 +117,19 @@ export function runtimeReader(recordId?: number) {
       const { data } = await apiClient.post<ReaderRun>(
         `${base}/conversations/${encodeURIComponent(conversation.id)}/compact`,
         { base_revision: conversation.revision },
-        { ...config, headers: { ...config.headers, "Idempotency-Key": key } });
+        { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },
     async list() {
       const { data } = await apiClient.get<{ protocol: string; conversations: ReaderConversationSummary[] }>(
-        `${base}/conversations`, config);
+        `${base}/conversations`, config());
       return checked(data).conversations;
     },
     async remove(id: string) {
-      await apiClient.delete(`${base}/conversations/${encodeURIComponent(id)}`, config);
+      await apiClient.delete(`${base}/conversations/${encodeURIComponent(id)}`, config());
     },
     async reopen(id: string) {
-      const { data } = await apiClient.get<ReaderConversation>(`${base}/conversations/${encodeURIComponent(id)}`, config);
+      const { data } = await apiClient.get<ReaderConversation>(`${base}/conversations/${encodeURIComponent(id)}`, config());
       return checked(data);
     },
   };
