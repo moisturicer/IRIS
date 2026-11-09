@@ -55,6 +55,8 @@ def production():
         # Who may register is required in production (IR-660).
         "REGISTRATION_EMAIL_DOMAINS": "cit.edu",
         "TRUSTED_PROXY_COUNT": "2",
+        # The sign-in lockout is required in production (IR-1001).
+        "AXES_ENABLED": "True",
         # Recovery transport (IR-642) is required in production too.
         "FRONTEND_URL": "https://iris.example.edu",
         "EMAIL_HOST": "smtp.example.edu",

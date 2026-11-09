@@ -225,6 +225,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-S5 | Audit immutability | [details](traceability/NFR-S5.md) | **VERIFIED** |
 | NFR-S6 | Account protection | [details](traceability/NFR-S6.md) | **PARTIAL** |
 | **IR-999** | Soft rate limits: each budget has a per-minute burst whose refusal clears in under a minute, and a daily backstop; extends NFR-S6 (IR-661) | [details](traceability/IR-999.md) | **IMPLEMENTED** |
+| **IR-1001** | Production refuses to start with the sign-in lockout off; development keeps it off by default (IR-865); extends NFR-S6 | [details](traceability/IR-1001.md) | **IMPLEMENTED** |
 | NFR-P1 | 100 concurrent sessions | [details](traceability/NFR-P1.md) | **NOT STARTED** |
 | NFR-P2…P5 | Performance and processing | [details](traceability/NFR-P2-P5.md) | **NOT STARTED** |
 | NFR-R1 | Uptime | [details](traceability/NFR-R1.md) | **NOT STARTED** |

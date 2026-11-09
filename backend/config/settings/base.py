@@ -1316,9 +1316,9 @@ REGISTRATION_EMAIL_DOMAINS = config("REGISTRATION_EMAIL_DOMAINS", default="", ca
 
 # ---- Axes (brute force protection) --------------------------------------
 
-# Off for now (IR-865): the lockout got in the way of development. AXES_ENABLED=True
-# turns it back on with no code change, and it must be on before launch. Until then
-# only the per-address sign-in throttle (API_THROTTLE_LOGIN) limits guessing.
+# Off by default (IR-865): the lockout got in the way of development. AXES_ENABLED=True
+# turns it back on with no code change. Production refuses to start without it
+# (IR-1001); with it off, only the per-address sign-in throttles limit guessing.
 AXES_ENABLED = config("AXES_ENABLED", default=False, cast=bool)
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
