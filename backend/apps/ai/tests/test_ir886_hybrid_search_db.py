@@ -297,44 +297,17 @@ def two_proxy_papers(space):
     return first, second
 
 
-def test_reranking_sends_nothing_unless_the_send_guard_admits_every_candidate(research, space):
-    reader = make_user("hybrid-rerank-closed@cit.edu")
+def test_a_rerank_reorders_the_fused_candidates_and_is_charged_to_the_run(research, space):
+    # IR-996: every candidate is sent to the reranker; no approval is consulted.
+    reader = make_user("hybrid-rerank-open@cit.edu")
     two_proxy_papers(space)
     reranker = RecordingReranker()
 
     async def script(tools):
         await tools.hybrid_search("flooding")
 
-    ((_, found),) = run(research, reader, script, request="hybrid-rerank-closed-1",
-                        embedder=QueryEmbedder({"flooding": axis(0)}), reranker=reranker)
-    assert dict(found.signals)["rerank"] == "withheld"
-    assert reranker.calls == []
-    assert len(found.passages) == 2
-    assert not ProviderReservation.objects.filter(operation="rerank").exists()
-
-
-def test_an_admitted_rerank_reorders_the_fused_candidates_and_is_charged_to_the_run(research, space):
-    from datetime import timedelta
-
-    from django.utils import timezone
-
-    from ai.admission.guard import ProxyApproval, SendGuard
-    from ai.research.tools import Source
-
-    reader = make_user("hybrid-rerank-open@cit.edu")
-    first, second = two_proxy_papers(space)
-    sources = frozenset(Source(r.pk, cs.pk, cs.extraction_hash) for r in (first, second)
-                        for cs in r.chunk_sets.filter(is_active=True))
-    reranker = RecordingReranker()
-    approval = ProxyApproval("IR-889", reranker.model, reranker.endpoint, reranker.account, "ir725-test",
-                             timezone.now() + timedelta(hours=1), sources)
-
-    async def script(tools):
-        await tools.hybrid_search("flooding")
-
     ((_, found),) = run(research, reader, script, request="hybrid-rerank-open-1",
-                        embedder=QueryEmbedder({"flooding": axis(0)}), reranker=reranker,
-                        send_guard=SendGuard(research[1]["dsn"], approval, stage="development"))
+                        embedder=QueryEmbedder({"flooding": axis(0)}), reranker=reranker)
     assert dict(found.signals)["rerank"] == "ok"
     (query, texts), = reranker.calls
     assert query == "flooding" and texts == ["flooding first", "flooding second"]

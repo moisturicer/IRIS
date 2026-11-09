@@ -175,3 +175,7 @@ FR-M3-03 (embeddings) · FR-M4-01 (RAG chatbot) · FR-M8-03 (embedding index adm
 ## Related Tasks
 
 `R-03`, `R-04` (revised) · a new task for the `EmbeddingSpace` migration · the `DisclosurePolicy` module.
+
+## Amendment — 2026-11-09 (IR-996)
+
+No code requires a vendor no-training policy any more: the vendor's data terms are the developer's configuration choice. See [ADR-049](049-dedicated-ai-runtime-and-local-research.md) §Amendment — 2026-11-09 (IR-996).

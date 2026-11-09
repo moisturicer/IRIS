@@ -121,15 +121,11 @@ CHAT_INSTRUCTIONS = LISTING_INSTRUCTIONS + (
     "clarifying question only when searching cannot settle it. For which papers do something, search "
     "more than once with different wording and name every paper that fits. When resolve_papers returns "
     "close matches, use the one that is clearly the paper meant and name it; ask only when none clearly "
-    "fits. A result whose reason is withheld left out passages from papers that cannot be shared now: "
-    "answer from the rest and say the answer may be incomplete. When a filter value is unknown, call "
+    "fits. When a filter value is unknown, call "
     "count_records grouped by that field to see the valid names, then try again."
 )
 #: Opens a Paper Chat under research-7: the one paper every question is about (IR-995).
 PAPER_CHAT_PREFIX = "[IRIS paper chat] This conversation is about one paper: "
-#: Sent in place of an earlier answer that drew on a source the send may no longer carry (IR-994).
-WITHHELD_ANSWER = "[This earlier answer is withheld: a paper it drew on can no longer be shared.]"
-WITHHELD_SUMMARY = "[The summary of earlier turns is withheld: a paper it drew on can no longer be shared.]"
 #: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
 COMPACT_REQUEST = (
     "The reader asked to condense this conversation now. This is not a question and not the reader's "
@@ -342,17 +338,6 @@ def _carried(history) -> frozenset:
     return frozenset(s for entry in history for s in getattr(entry, "dependencies", ()))
 
 
-def _screen(provider, pin):
-    """The admitted transport's source check, so results leave out what a send could not carry (IR-889)."""
-    eligible = getattr(provider, "eligible", None)
-    if eligible is None:
-        return None
-
-    async def screen(sources):
-        return await eligible(pin, sources)
-
-    return screen
-
 
 class _Run:
     """One run's investigation; nothing here outlives it."""
@@ -378,8 +363,7 @@ class _Run:
             recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
                                  CHAT_TOOL_VERSION),
             hybrid=version in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            listing=version in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            screen=_screen(agent.provider, agent.pin))
+            listing=version in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION))
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
         self.chat = version == CHAT_TOOL_VERSION
         self.repairs = 2
@@ -495,14 +479,9 @@ class _Run:
         if handoff:
             # Earlier Turns arrive compacted (IR-734).
             summary = compacting.render(handoff, self.investigation.papers, passages=False)
-            screened = self.investigation.screen is not None
-            if screened and (summary.unverified_provenance or not await self._sendable(summary.dependencies)):
-                summary = User(WITHHELD_SUMMARY)
             history.append(summary)
         for turn in self.prior:
             answer, sources = DELIVERED_MARKER.sub("", turn.answer), frozenset(turn.sources)
-            if not await self._sendable(sources):
-                answer, sources = WITHHELD_ANSWER, frozenset()
             history += [User(compacting.reader(turn.question)),
                         ModelTurn(items=(Text(answer),), stop=StopReason.END, dependencies=sources)]
         if shown:
@@ -512,23 +491,11 @@ class _Run:
             handle, title = self.investigation.papers[scope]
             note = User(PAPER_CHAT_PREFIX + json.dumps({"paper": handle, "title": title}, ensure_ascii=False),
                         self.investigation.recalled_sources)
-            # A paper the send may not carry is not named; its tools refuse it anyway.
-            if await self._sendable(note.dependencies):
-                history.append(note)
+            history.append(note)
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history
 
-    async def _sendable(self, sources: frozenset) -> bool:
-        """Whether a send may carry every one of `sources`; a failed check withholds (IR-994)."""
-        screen = self.investigation.screen
-        if not sources or screen is None:
-            return True
-        try:
-            return await screen(sources) == sources
-        except Exception:
-            log.warning("source screen failed", exc_info=True)
-            return False
 
     async def _resume(self) -> Optional[tuple[list, int]]:
         """The Conversation an earlier fence completed, verified now; None to start afresh (IR-724).

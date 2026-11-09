@@ -1,7 +1,6 @@
-"""The guard withholds instead of ending a run; Paper Chat names its paper; two repairs (IR-995).
+"""A missed name does not end a run; Paper Chat names its paper; two repairs (IR-995).
 
-The executor with a recording model whose transport applies the guard's own
-provenance check to every request, as the admitted transport does before a paid send.
+Since IR-996 nothing is checked at send time, so search results reach the model whole.
 """
 
 import dataclasses
@@ -20,7 +19,7 @@ from .test_ai_runtime_agent_loop_contract import (  # noqa: E402
     FLOOD, PIN, PROFILES, Corpus, call, context, handle, models, reply, run, tools,
 )
 from .test_ai_runtime_context_contract import RESERVES  # noqa: E402
-from .test_ai_runtime_followups_contract import FLOOD_SOURCE, PIN_2, PIN_6, screened, sent_text  # noqa: E402
+from .test_ai_runtime_followups_contract import PIN_2, PIN_6, screened, sent_text  # noqa: E402
 
 PIN_7 = dataclasses.replace(PIN, prompt_version="agent-research-7", tool_version="research-7")
 
@@ -31,13 +30,13 @@ def answer(provider, pin, corpus=None, question="Which paper predicts floods?"):
     return run(agent.answer(question, corpus, context())), corpus
 
 
-def test_a_search_whose_only_paper_cannot_be_sent_is_withheld_and_the_run_answers():
-    provider = screened(tools(call("s", "search", query="flood")), reply("General background."),
-                        withdrawn=[FLOOD_SOURCE])
+def test_a_search_result_reaches_the_model_whole():
+    # IR-996: no screen trims or withholds a tool result.
+    provider = screened(tools(call("s", "search", query="flood")), reply("General background."))
     result, _ = answer(provider, PIN_2)
     assert result.answer == "General background."
     shown = next(m for m in provider.requests[1]["messages"] if m.get("tool_call_id") == "s")
-    assert json.loads(shown["content"])["reason"] == "withheld" and FLOOD not in sent_text(provider.requests[1])
+    assert "reason" not in json.loads(shown["content"]) and FLOOD in sent_text(provider.requests[1])
 
 
 class Unnamed(Corpus):
@@ -70,12 +69,6 @@ def test_earlier_pins_and_unscoped_chats_add_no_paper_note():
         provider = screened(reply("General background."))
         answer(provider, pin, corpus)
         assert PAPER_CHAT_PREFIX not in sent_text(provider.requests[0])
-
-
-def test_a_paper_the_send_cannot_carry_is_not_named():
-    provider = screened(reply("General background."), withdrawn=[FLOOD_SOURCE])
-    result, _ = answer(provider, PIN_7, Chat())
-    assert PAPER_CHAT_PREFIX not in sent_text(provider.requests[0]) and result.answer == "General background."
 
 
 class Searchable(Corpus):

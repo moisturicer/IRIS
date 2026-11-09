@@ -191,3 +191,13 @@ Both vector reads order the rows of the policy-filtered `research_vectors` / `re
 7. **Rollback is a revert** of IR-957's commit. Unapply `ai/0044` first (`manage.py migrate ai 0043`). Its reverse does nothing, so retired runs stay ended, as they would have once their deadline passed.
    - **Gain:** one answer path, and the measured gains reach readers: 85.2% correct against 36.1%, citation support 73.5% against 26.8%.
    - **Cost:** two readers with different access are answered worse than Django did (F12). Readers lose Django's conversation history sidebar, comparison picker and "All papers" widen. Earlier conversations open read-only.
+
+## Amendment — 2026-11-09 (IR-996): no runtime guards
+
+**Status: Decided by Jive Tyler I. Revalde, owner, in chat on 2026-11-09, and recorded here at his direction.** This supersedes the IR-889 amendment (2026-11-05), IR-725's withholding of Record evidence, and the send-time parts of the IR-994 and IR-995 amendments.
+
+1. **Disclosure is decided once, at indexing.** A paper that is embargoed, unreleased IP or without the contact person's AI consent (`apps.ai.policy.disclosure.may_disclose`) is never indexed, so it never appears in AI search. Nothing rechecks it at send time, in development or production.
+2. **No send guard.** `ai/admission/guard.py`, the IR-889 proxy send approval (`RUNS_PROXY_SEND_APPROVAL`, `RUNS_DEPLOYMENT_STAGE`) and the per-result source screen are deleted. Tool results reach the model complete and unmodified; nothing is refused, trimmed or withheld for disclosure. Earlier answers and compacted summaries are always sent. Query embeddings and reranking send without a check.
+3. **The vendor's data terms are the developer's choice, not a coded rule.** No code requires a "no-training" policy: `AGENT_LLM_DATA_POLICY` is an optional label, Voyage clients take no policy, and Django's configured-model check and figure-description vendor check no longer look at data terms. This supersedes ADR-015's no-training precondition for the AI runtime and ADR-036's uniform no-training rule as a startup or send check.
+4. **Kept:** reader visibility inside the research tools (a reader still reads only what PostgreSQL row security lets them), the spending ledger, and the indexing disclosure gate.
+   - **Gain:** every indexed paper is usable; no approvals to maintain; no withheld or refused results. **Cost:** a paper whose status changes after indexing stays indexed until it is re-indexed, and its text can be sent; a run cancelled or revoked between admission and send may make one more paid call; nothing in code stops a vendor that trains on data from being configured.

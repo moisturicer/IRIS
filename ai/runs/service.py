@@ -28,12 +28,11 @@ log = logging.getLogger(__name__)
 class RunService:
     def __init__(self, store: RunStore, cfg: runs_config.RunsConfig, executor: Executor,
                  notifier: Notifier | None = None, *, serves=(), embedding_provider=None,
-                 embedding_ledger=None, reranker=None, send_guard=None):
+                 embedding_ledger=None, reranker=None):
         self.embedding_provider = embedding_provider
         self.embedding_ledger = embedding_ledger
-        #: Optional search reranking and the guard its sends pass (IR-886).
+        #: Optional search reranking (IR-886).
         self.reranker = reranker
-        self.send_guard = send_guard
         self.store = store
         self.cfg = cfg
         #: What new runs are pinned to.
@@ -199,7 +198,7 @@ class RunService:
         try:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id,
                                   embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger,
-                                  reranker=self.reranker, guard=self.send_guard, follow_stored_grant=True)
+                                  reranker=self.reranker, follow_stored_grant=True)
             # Every provider attempt inside is admitted against this run (IR-725).
             with admission.bound(admission.RunBinding(run_id, claim.fence)), stream.bound(sink):
                 if compacting:

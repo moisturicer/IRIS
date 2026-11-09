@@ -62,8 +62,6 @@ class Settings(BaseSettings):
     RUNS_REDIS_URL: str = ""
     # Exact public-proxy source manifest for the IR-889 development pilot.
     # Empty refuses every Record-dependent paid send.
-    RUNS_PROXY_SEND_APPROVAL: str = ""
-    RUNS_DEPLOYMENT_STAGE: str = "production"
     # Agent search by meaning (IR-886): the Voyage key for query embeddings,
     # and the rerank model, which stays off while empty. Both are admitted.
     VOYAGE_API_KEY: str = ""
