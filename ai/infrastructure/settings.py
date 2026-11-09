@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     RUNS_POLL_SECONDS: float | None = None
     # Worker wakeups only; empty means workers poll PostgreSQL.
     RUNS_REDIS_URL: str = ""
-    # Optional (IR-953): "on" reuses a query's embedding within one run; blank is off.
+    # Optional (IR-953): reuses a query's embedding within one run; blank is on, "off" disables.
     RUNS_QUERY_VECTOR_CACHE: str = ""
     # Optional (IR-1003): read-only calls in one tool group fetched at once; blank is 1.
     RUNS_AGENT_TOOL_CONCURRENCY: str = ""

@@ -86,9 +86,12 @@ def test_the_prompt_cache_is_off_unless_set_and_refuses_anything_else():
         agent_config.read(declared(AGENT_LLM_PROMPT_CACHE="always"))
 
 
-def test_the_query_vector_cache_is_off_unless_on_and_refuses_anything_else():
+def test_the_query_vector_cache_is_on_unless_off_and_refuses_anything_else():
     def problems(value):
         return [p for p in runs_config.problems(SimpleNamespace(RUNS_QUERY_VECTOR_CACHE=value))
                 if "RUNS_QUERY_VECTOR_CACHE" in p]
     assert problems("") == problems("on") == problems("off") == []
     assert problems("yes")
+    on = runs_config.query_vector_cache
+    assert on(SimpleNamespace(RUNS_QUERY_VECTOR_CACHE="")) and on(SimpleNamespace(RUNS_QUERY_VECTOR_CACHE="on"))
+    assert not on(SimpleNamespace(RUNS_QUERY_VECTOR_CACHE="off"))

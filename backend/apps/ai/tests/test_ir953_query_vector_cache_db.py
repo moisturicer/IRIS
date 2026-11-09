@@ -75,7 +75,7 @@ def test_the_same_query_twice_in_one_run_is_embedded_and_paid_for_once(research,
     assert (found.pk, 7) in [(p.record_id, p.page) for p in second.passages]
 
 
-def test_off_by_default_every_search_embeds_again(research, space):
+def test_turned_off_every_search_embeds_again(research, space):
     reader = make_user("vector-cache-off@cit.edu")
     corpus(space)
     embedder = QueryEmbedder({"inundation": axis(0)})
