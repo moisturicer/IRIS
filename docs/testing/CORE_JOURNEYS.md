@@ -27,11 +27,12 @@ the fronting proxy would, and follows emailed links' paths on the plain-HTTP
 address. Mail goes to Mailpit inside the stack. The Turnaround is
 demonstration data, not an agreed value. The inactivity-expiry check runs in
 a separate short pass with `SESSION_IDLE_TIMEOUT_MINUTES=2`, because the
-server enforces the 30-minute default. DRF's general request throttles are
-raised to 20000/day for the run: through nginx every signed-out request comes
-from one address, and the 100/day default runs out partway through one full
-run. No acceptance criterion measures them; the lockout under test (axes,
-three failures) is unchanged. These two are the only settings that differ.
+server enforces the 30-minute default. DRF's per-minute request bursts
+(IR-999) are raised to 6000/minute for the run: through nginx every signed-out
+request comes from one address, and a run is faster than a person. The daily
+backstops keep their defaults. No acceptance criterion measures them; the
+lockout under test (axes, three failures) is unchanged. These two are the only
+settings that differ.
 
 ## Statuses
 

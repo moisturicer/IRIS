@@ -362,7 +362,7 @@ def read(**overrides):
 
 @pytest.mark.parametrize("name", [
     "AGENT_LLM_ENDPOINT", "AGENT_LLM_API_KEY", "AGENT_LLM_MODELS", "AGENT_LLM_CAPABILITIES",
-    "AGENT_LLM_DATA_POLICY", "AGENT_LLM_CAPACITIES",
+    "AGENT_LLM_CAPACITIES",
 ])
 def test_every_declaration_is_required_and_its_absence_is_named(name):
     from ai.admission.limits import NotConfigured
@@ -371,6 +371,11 @@ def test_every_declaration_is_required_and_its_absence_is_named(name):
         read(**{name: ""})
     assert name in str(missing.value)
     assert API_KEY not in str(missing.value)
+
+
+def test_the_data_policy_may_be_left_blank():
+    # IR-996: the vendor's data terms are the developer's choice, not a required declaration.
+    assert read(AGENT_LLM_DATA_POLICY="").data_policy == ""
 
 
 @pytest.mark.parametrize("capacities", [

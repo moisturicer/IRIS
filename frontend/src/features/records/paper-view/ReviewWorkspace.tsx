@@ -43,6 +43,11 @@ export interface ReviewWorkspaceProps {
    * of the screen, so the page hands this to the reader as `bottomInset`.
    */
   onBarInset?: (px: number) => void;
+  /**
+   * Show Version `n` in the reader, or the current paper for null (IR-873):
+   * the Changes tab's *Show in paper* opens the Version a change is in.
+   */
+  onShowVersion?: (n: number | null) => void;
 }
 
 export function ReviewWorkspace(props: ReviewWorkspaceProps) {

@@ -184,7 +184,8 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-886** | The agent's search finds permitted Passages by meaning as well as by keyword, narrowed by Area, PSCED area, record type or years, with one read policy — under IR-712, ADR-049 (2026-11-07 amendment); no FR- id | [details](traceability/IR-886.md) | **PARTIAL** |
 | **IR-994** | The runtime agent answers follow-ups, exact counts and complete listings: earlier answers carry their sources, and counts and title lists pass the send guard as metadata — under IR-955, ADR-049 (2026-11-08 amendment); no FR- id | [details](traceability/IR-994.md) | **PARTIAL** |
 | **IR-995** | A withheld or unmatched result no longer ends an agent run; titles and category names match whatever their case or punctuation; Paper Chat names its paper; two answer repairs under `research-7` — under IR-955, ADR-049 (2026-11-09 amendment); no FR- id | [details](traceability/IR-995.md) | **PARTIAL** |
-| **IR-953, IR-1003** | Prompt-cache hits recorded per attempt; off-by-default per-run cache key and query-vector cache; a tool group's read-only calls fetched concurrently and folded in call order — under IR-712, ADR-049 (IR-953 amendment); no FR- id | [details](traceability/IR-953.md) | **PARTIAL** |
+| **IR-996** | No runtime guards: disclosure is decided once at indexing; the AI runtime's send guard, IR-889 approval and source screen are removed, tool results reach the model whole, and no code requires a vendor no-training policy — under IR-955, ADR-049 (2026-11-09 IR-996 amendment); no FR- id | [details](traceability/IR-996.md) | **PARTIAL** |
+| **IR-953, IR-1003** | Prompt-cache hits recorded per attempt; a per-run query-vector cache (on) and prompt-cache key (off); a tool group's read-only calls fetched concurrently and folded in call order — under IR-712, ADR-049 (IR-953 amendment); no FR- id | [details](traceability/IR-953.md) | **PARTIAL** |
 | **IR-885** | A runtime question runs at deep depth unless the reader chooses ordinary | [details](traceability/IR-885.md) | **PARTIAL** |
 | **IR-884** | ADR-049 and the AI runtime spec are on `main`; IR-714's resume, export and review questions have owners | [details](traceability/IR-884.md) | **PARTIAL** |
 | **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
@@ -213,6 +214,8 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-874** | Review threads, backend: anchored threads, *Must fix* and *Suggestion*, drafts sent by Finish review, *Comment only*, resolving and answering, and what an open *Must fix* blocks — ADR-032 §7 (2026-11-04, corrected 2026-11-06); no FR- id | [details](traceability/IR-874.md) | **IMPLEMENTED** |
 | **IR-875** | Review threads, frontend: comment on a selection or find match, the Threads tab, and the Finish review dialog, driven by server capabilities — ADR-032 §7 (2026-11-04, corrected and noted 2026-11-06); no FR- id | [details](traceability/IR-875.md) | **IMPLEMENTED** |
 | **IR-878** | RDCO publishes an Unlisted paper later, only once its embargo is released, and the history keeps its Decision as *kept unlisted* — ADR-047 §10, ADR-052 decision 14 as amended; no FR- id | [details](traceability/IR-878.md) | **IMPLEMENTED** |
+| **IR-873** | Two Versions compared section by section, both read by one reader, never naming it, in the reviewer's Changes tab — ADR-058 §3 as amended 2026-11-08; FR-M5-01 (label only) | [details](traceability/IR-873.md) | **IMPLEMENTED** |
+| **IR-876** | A thread follows its passage into later Versions and goes Outdated where it changed; suggested wording; the response to reviewers frozen onto each Version — ADR-032 §7 and its IR-876 build notes; no FR- id | [details](traceability/IR-876.md) | **IN PROGRESS** |
 
 ### Non-functional
 
@@ -224,6 +227,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-S4 | Server-side authorization | [details](traceability/NFR-S4.md) | **PARTIAL** |
 | NFR-S5 | Audit immutability | [details](traceability/NFR-S5.md) | **VERIFIED** |
 | NFR-S6 | Account protection | [details](traceability/NFR-S6.md) | **PARTIAL** |
+| **IR-999** | Soft rate limits: each budget has a per-minute burst whose refusal clears in under a minute, and a daily backstop; extends NFR-S6 (IR-661) | [details](traceability/IR-999.md) | **IMPLEMENTED** |
 | NFR-P1 | 100 concurrent sessions | [details](traceability/NFR-P1.md) | **NOT STARTED** |
 | NFR-P2…P5 | Performance and processing | [details](traceability/NFR-P2-P5.md) | **NOT STARTED** |
 | NFR-R1 | Uptime | [details](traceability/NFR-R1.md) | **NOT STARTED** |

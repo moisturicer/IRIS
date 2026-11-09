@@ -116,7 +116,8 @@ class Pin:
 
     def __post_init__(self):
         for name, value in asdict(self).items():
-            if name != "requires" and not value:
+            # The data policy is an optional label for the vendor's terms (IR-996).
+            if name not in ("requires", "data_policy") and not value:
                 raise ValueError(f"pin {name} is required")
 
     def as_dict(self) -> dict:

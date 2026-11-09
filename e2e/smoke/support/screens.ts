@@ -211,6 +211,8 @@ export const SCREENS: Screen[] = [
       api.on("GET", `/records/${PAPER.id}/similar/`, { results: [] });
       // Review threads (IR-875): the review workspace reads them beside the tracker.
       api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
+      // The response to reviewers (IR-876), read beside the threads.
+      api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
     }),
     heading: PAPER.title,
     primary: (p) => p.getByRole("button", { name: /Cite/ }).first(), primaryLabel: "Cite",

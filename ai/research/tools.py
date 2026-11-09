@@ -16,7 +16,6 @@ import secrets
 from contextvars import ContextVar
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from types import SimpleNamespace
 
 import asyncpg
 
@@ -383,7 +382,7 @@ EARLIER_COMMITTED: ContextVar = ContextVar("research_earlier_committed", default
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
                  scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None,
-                 reranker=None, guard=None, follow_stored_grant: bool = False,
+                 reranker=None, follow_stored_grant: bool = False,
                  cache_query_vectors: bool = False):
         self.dsn = dsn
         self.grant = grant
@@ -392,9 +391,8 @@ class ResearchTools:
         self.scope = scope_record_id
         self.embedding_provider = embedding_provider
         self.embedding_ledger = embedding_ledger
-        #: Off when None (IR-886); admitted through `embedding_ledger` and sent only past `guard`.
+        #: Off when None (IR-886); admitted through `embedding_ledger`.
         self.reranker = reranker
-        self.guard = guard
         #: The Embedding Space this run's first semantic search read; a later one must match (IR-886).
         self.space_id: int | None = None
         # A worker's tools read under the grant the run holds *now*, so a reader's
@@ -1080,9 +1078,7 @@ class ResearchTools:
         if not isinstance(query, str) or not query.strip():
             return ToolResult.unavailable("invalid_argument")
         import asyncio
-        from types import SimpleNamespace
         from ai.admission.errors import AdmissionDenied
-        from ai.admission.guard import SendGuard
         from ai.admission.ledger import Request, Usage, estimate_tokens
         from ai.admission.scope import RunBinding
         from ai.ingestion.indexing import checked_vectors, space
@@ -1097,7 +1093,6 @@ class ResearchTools:
                 output_tokens=0), binding)
             usage = Usage()
             try:
-                await SendGuard(self.dsn).check(binding, SimpleNamespace(data_policy=provider.data_policy))
                 usage.sent = True
                 response = await asyncio.wait_for(provider.embed([query], input_type="query"), ticket.timeout_seconds)
                 vector = checked_vectors(response.vectors, 1, provider.dimensions)[0]
@@ -1218,7 +1213,6 @@ class ResearchTools:
                 output_tokens=0), binding)
             usage = Usage()
             try:
-                await self._guard().check(binding, SimpleNamespace(data_policy=provider.data_policy))
                 usage.sent = True
                 try:
                     response = await asyncio.wait_for(provider.embed([query], input_type="query"),
@@ -1266,11 +1260,7 @@ class ResearchTools:
         return found
 
     async def _reranked(self, query: str, rows: list) -> tuple[list, str]:
-        """`rows` in the reranker's order, or unchanged with why not (IR-886).
-
-        Passage text goes to the vendor only when the send guard admits every
-        candidate's source; otherwise none is sent.
-        """
+        """`rows` in the reranker's order, or unchanged with why not (IR-886)."""
         reranker, ledger = self.reranker, self.embedding_ledger
         if reranker is None or ledger is None:
             return rows, OFF
@@ -1282,13 +1272,7 @@ class ResearchTools:
 
         binding = RunBinding(self.run_id, self.fence)
         texts = [r["content"] for r in rows]
-        sources = frozenset(Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]) for r in rows)
         try:
-            limits = getattr(ledger, "limits", None)
-            policy = {"account": reranker.account, "campaign": limits.campaign_key if limits else None,
-                      "price": limits.prices.get(reranker.model) if limits else None}
-            if await self._guard().eligible(binding, reranker, sources, **policy) != sources:
-                return rows, "withheld"
             ticket = await ledger.admit(Request(
                 operation="rerank", purpose="query", purpose_version="query-1", lane="research",
                 account=reranker.account, models=(reranker.model,),
@@ -1310,10 +1294,6 @@ class ResearchTools:
         except AdmissionDenied as refused:
             return rows, refused.reason
         return [rows[n] for n in order], OK
-
-    def _guard(self):
-        from ai.admission.guard import SendGuard
-        return self.guard or SendGuard(self.dsn)
 
     async def _call_on_handle(self, name: str, body) -> ToolResult:
         """`_call` in a savepoint; a refused handle is journalled like any outcome."""

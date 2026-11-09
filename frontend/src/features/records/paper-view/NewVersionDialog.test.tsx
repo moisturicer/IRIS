@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, waitFor } from "@/test/render";
+import { renderScreen, screen, waitFor, within } from "@/test/render";
 import type { NewVersionHint } from "@/types/records";
 
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
@@ -85,5 +85,47 @@ describe("NewVersionDialog", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Nothing has changed since IERC asked for a revision.");
     expect(onDone).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Submit new version" })).toBeInTheDocument();
+  });
+});
+
+describe("the response to reviewers (IR-876)", () => {
+  const entry = (over: Partial<NonNullable<NewVersionHint["letter"]>[number]>) => ({
+    thread: 1, party: "ierc", party_label: "IERC", severity: "must_fix" as const,
+    comment: "Add the consent form.", version: 2, page: 4, quote: "consent", answer: null, note: "", ...over,
+  });
+  const LETTER: NewVersionHint = {
+    ...HINT,
+    letter: [
+      entry({ thread: 1, answer: "addressed", note: "Appendix C." }),
+      entry({ thread: 2, severity: "suggestion", comment: "Consider a diagram.", answer: null }),
+      entry({ thread: 3, severity: "suggestion", comment: "Shorten the title.", answer: "declined", note: "The college requires it." }),
+    ],
+  };
+
+  it("shows the letter the version will carry, each answer as given", async () => {
+    const { view } = open(LETTER);
+
+    const letter = screen.getByRole("region", { name: "Response to reviewers" });
+    const items = within(letter).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(items[0]).toHaveTextContent("Must fix");
+    expect(items[0]).toHaveTextContent("Add the consent form.");
+    expect(items[0]).toHaveTextContent("Addressed: Appendix C.");
+    expect(items[1]).toHaveTextContent("No answer given");
+    expect(items[2]).toHaveTextContent("Declined: The college requires it.");
+    await expectNoBlockingA11yViolations(view.container);
+  });
+
+  it("holds Submit, saying why, while a Must fix has no answer", () => {
+    open({ ...LETTER, blocked: "Answer each open Must fix thread first: 1 thread from IERC." });
+
+    const submit = screen.getByRole("button", { name: "Submit v3" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAccessibleDescription("Answer each open Must fix thread first: 1 thread from IERC.");
+  });
+
+  it("says nothing about a letter when the version answers no thread", () => {
+    open({ ...HINT, letter: [] });
+    expect(screen.queryByRole("region", { name: "Response to reviewers" })).not.toBeInTheDocument();
   });
 });

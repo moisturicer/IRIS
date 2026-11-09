@@ -86,6 +86,12 @@ MAX_TOP_K = 20
 #: (`components/PassageQuote.DegradedNotice`).
 
 
+class AIQueryBurstThrottle(UserRateThrottle):
+    """Ask IRIS's per-minute burst (IR-999); `AIQueryThrottle` is its daily backstop."""
+
+    scope = "ai_query_burst"
+
+
 class AIQueryThrottle(UserRateThrottle):
     """Retrieval hits the DB and may hit a paid provider — cap it per user."""
 
@@ -285,7 +291,7 @@ class ChatQueryView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    throttle_classes = [AIQueryThrottle]
+    throttle_classes = [AIQueryBurstThrottle, AIQueryThrottle]
 
     def post(self, request):
         public_mode = public_protocol.requested(request)
@@ -449,7 +455,7 @@ class ChatStreamView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    throttle_classes = [AIQueryThrottle]
+    throttle_classes = [AIQueryBurstThrottle, AIQueryThrottle]
 
     def post(self, request):
         from apps.ai import durable
@@ -611,7 +617,7 @@ class RunRetryView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    throttle_classes = [AIQueryThrottle]
+    throttle_classes = [AIQueryBurstThrottle, AIQueryThrottle]
 
     def post(self, request, pk):
         from apps.ai import durable
@@ -665,7 +671,7 @@ class SemanticSearchView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    throttle_classes = [AIQueryThrottle]
+    throttle_classes = [AIQueryBurstThrottle, AIQueryThrottle]
 
     def post(self, request):
         query = (request.data.get("query") or "").strip()

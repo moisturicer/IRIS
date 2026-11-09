@@ -31,6 +31,7 @@ ROLE_MODULES = frozenset({
     "test_ir740_runtime_collection_db.py",
     "test_ir739_runtime_record_vectors_db.py",
     "test_ir886_hybrid_search_db.py",
+    "test_ir953_cached_tokens_db.py", "test_ir953_query_vector_cache_db.py",
 })
 
 

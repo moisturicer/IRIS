@@ -87,7 +87,6 @@ async def space(conn, provider):
         or row["dimensions"] != provider.dimensions
         or row["dimensions"] != 1024
         or row["metric"] != "cosine"
-        or provider.data_policy != "no-training"
     ):
         raise AdmissionDenied("incompatible_embedding_space")
     return row

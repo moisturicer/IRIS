@@ -19,7 +19,6 @@ REQUIRED = (
     "AGENT_LLM_API_KEY",
     "AGENT_LLM_MODELS",
     "AGENT_LLM_CAPABILITIES",
-    "AGENT_LLM_DATA_POLICY",
     "AGENT_LLM_CAPACITIES",
 )
 #: Every `Capacity` field must be stated; `max_reasoning_tokens` may be null.
