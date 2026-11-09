@@ -52,6 +52,27 @@ export interface Collaborator {
   shared_papers:  number;
 }
 
+/** A public account returned by Discover people search (IR-697). */
+export interface PeopleSearchResult {
+  id: number;
+  first_name: string;
+  middle_initial: string;
+  last_name: string;
+  role_label: string;
+  college_name: string;
+  department_name: string;
+  course_name: string;
+  photo_url: string | null;
+  published_paper_count: number;
+}
+
+/** The paged response used by Discover's people directory. */
+export interface PeopleSearchPage {
+  count: number;
+  next: string | null;
+  results: PeopleSearchResult[];
+}
+
 /** One page of a list: `next` is `null` on the last. Totals are not sent. */
 export interface ProfilePage<T> {
   next:    string | null;

@@ -29,6 +29,7 @@ import {
   type DiscoverSort,
 } from "./DiscoverFilterBar";
 import { DiscoverResultCard } from "./DiscoverResultCard";
+import { DiscoverPeopleResults } from "./DiscoverPeopleResults";
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
 import { DiscoverTabs } from "./DiscoverTabs";
 import { MyFeeds } from "./MyFeeds";
@@ -158,6 +159,7 @@ export default function DiscoverPage() {
   }, [query.q]);
 
   const [tab, setTab] = useState("research");
+  const [discoverView, setDiscoverView] = useState<"papers" | "people">("papers");
   const [columns, setColumns] = useState<ColumnCount>(readColumns);
   const chooseColumns = (value: ColumnCount) => {
     setColumns(value);
@@ -619,6 +621,16 @@ export default function DiscoverPage() {
 
   const research = (
     <>
+      <div role="group" aria-label="Discover results" className="mt-4 inline-flex h-10 items-center rounded-lg border border-stone-200 bg-stone-100 p-0.5">
+        {([ ["papers", "Papers"], ["people", "People"] ] as const).map(([value, label]) => (
+          <button key={value} type="button" aria-pressed={discoverView === value} onClick={() => setDiscoverView(value)}
+            className={cn("h-full rounded-md px-4 text-small font-semibold", COLOUR_TRANSITION, FOCUS_RING, discoverView === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-white")}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {discoverView === "people" ? <DiscoverPeopleResults query={activeQuery} /> : (
+      <>
       <div className="mt-4 flex flex-wrap items-center gap-1.5 sm:gap-2">
         <div role="group" aria-label="Discover feed" className="inline-flex h-11 shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0.5 shadow-[inset_0_1px_2px_rgb(41_37_36/0.12)]">
           {([["for_you", "For you"], ["latest", "Latest"], ["trending", "Trending"]] as const).map(([value, label]) => (
@@ -744,6 +756,8 @@ export default function DiscoverPage() {
         </div>
       )}
 
+      <DiscoverPeopleResults query={activeQuery} preview onSeeAll={() => setDiscoverView("people")} />
+
       <p aria-live="polite" className="sr-only">
         {/* No count over an empty state: its own message already says so. */}
         {loading || !totalCount ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
@@ -836,6 +850,8 @@ export default function DiscoverPage() {
         </>
       )}
       </div>
+      </>
+      )}
     </>
   );
 
