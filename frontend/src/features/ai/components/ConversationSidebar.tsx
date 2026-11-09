@@ -8,6 +8,7 @@ interface ConversationSidebarProps {
   open:             boolean;
   onDelete:         (id: string) => void;
   onNewChat:        () => void;
+  onCollapse:       () => void;
 }
 
 export function ConversationSidebar({
@@ -16,6 +17,7 @@ export function ConversationSidebar({
   open,
   onDelete,
   onNewChat,
+  onCollapse,
 }: ConversationSidebarProps) {
   return (
     <aside
@@ -31,22 +33,16 @@ export function ConversationSidebar({
       aria-label="Chat history"
       aria-hidden={!open}
     >
-      <div className="w-[min(100vw,280px)] sm:w-[260px] flex flex-col h-full">
-      {/* One collapse control only — it lives in ChatToolbar, beside the chat
-          title. A second copy here made the same action appear twice.
-
+      <div className="w-[min(100vw,280px)] sm:w-[260px] flex flex-col h-full min-h-0">
+      {/* New chat and the collapse control sit together at the head of the list.
           min-h-[56px] is shared with ChatToolbar so the two border-b rules meet
-          as one continuous line across the split. Without it this header was
-          41px against the toolbar's 55px (its title block is two lines) and the
-          rule visibly stepped down at the divider. px-5 lines the label up with
-          the conversation titles below, which sit at nav px-2 + button px-3. */}
-      <div className="flex items-center gap-2 px-5 py-2 min-h-[56px] border-b border-stone-200/80">
-        <span className="text-[13px] font-bold uppercase tracking-wider text-stone-500 flex-1">
-          Chat history
-        </span>
-      </div>
-      <div className="px-3 pt-3">
+          as one continuous line across the split. */}
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2 min-h-[56px] border-b border-stone-200/80">
         <NewChatButton onClick={onNewChat} />
+        <button type="button" onClick={onCollapse} aria-label="Hide chat history" title="Hide history"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800">
+          <i className="fas fa-angles-left text-[13px]" aria-hidden />
+        </button>
       </div>
 
       <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={onDelete} />
@@ -65,9 +61,9 @@ export function ConversationHistoryList({
   conversations,
   activeId,
   onDelete,
-}: Omit<ConversationSidebarProps, "open" | "onNewChat">) {
+}: Omit<ConversationSidebarProps, "open" | "onNewChat" | "onCollapse">) {
   return (
-    <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-2 space-y-1">
+    <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-2 py-2 space-y-1">
       {conversations.length === 0 ? (
         <p className="px-3 py-6 text-[13px] text-stone-500 text-center">
           Your past chats will appear here.
@@ -84,7 +80,7 @@ export function ConversationHistoryList({
                 aria-current={active ? "page" : undefined}
                 className={`block w-full text-left rounded-xl px-3 py-2.5 transition-all
                   ${active
-                    ? "bg-brand-50 ring-1 ring-brand-200 text-brand"
+                    ? "bg-stone-200/70 text-stone-900"
                     : "text-stone-700 hover:bg-stone-50"
                   }`}
               >
@@ -120,7 +116,7 @@ export function ConversationHistoryList({
 export function NewChatButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
-      className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-brand px-3 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-dark focus-visible:outline-brand">
+      className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-3 text-[14px] font-semibold text-white transition-colors hover:bg-brand-dark">
       <i className="fas fa-plus text-[11px]" aria-hidden />
       New chat
     </button>

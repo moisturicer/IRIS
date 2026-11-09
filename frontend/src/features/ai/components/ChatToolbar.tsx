@@ -25,7 +25,9 @@ export function ChatToolbar({
   // naturally taller, and the divider visibly stepped down at the split.
   return (
     <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 min-h-[56px] border-b border-stone-200/80">
-      <button
+      {/* Beside the list the collapse control lives in the sidebar itself; here
+          it is only the way back in, or the way to the drawer on a narrow page. */}
+      {(asDrawers || !historyOpen) && <button
         type="button"
         onClick={onToggleHistory}
         className={`inline-flex items-center p-2 rounded-lg text-[13px] transition-colors ${touch}
@@ -40,7 +42,7 @@ export function ChatToolbar({
         title={historyOpen ? "Hide history" : "Show history"}
       >
         <i className={historyOpen ? "fas fa-angles-left" : "fas fa-bars-staggered"} aria-hidden />
-      </button>
+      </button>}
 
       <div className="min-w-0 flex-1 px-1">
         <p className="text-[12px] font-semibold uppercase tracking-wider text-stone-600 truncate">

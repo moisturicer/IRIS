@@ -364,7 +364,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     return () => observer.disconnect();
   }, []);
 
-  return <div className={`flex h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : ""}`}>
+  return <div className={`flex h-full max-h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : "overflow-hidden"}`}>
     <div ref={scroller} onScroll={e => {
       const box = e.currentTarget;
       pinned.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
@@ -385,22 +385,31 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
                 && <p className={cn("mt-1 text-[12px] italic text-stone-500", dense ? "pl-9" : "pl-11")}>
                   Revised after checking its citations.</p>}
             </div>)}
-            {activeRun(current) && <div className={cn("flex", dense ? "gap-2.5" : "gap-3")}>
-              <div className={cn("rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand", dense ? "w-7 h-7" : "w-8 h-8")}>
-                <AskIrisMark className={dense ? "w-4 h-4" : "w-[18px] h-[18px]"} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <ReasoningBar compact={dense}
-                  activity={current.activity ?? { phase: current.state === "queued" ? "waiting" : "working",
-                    label: current.state === "queued" ? "Waiting to start" : "Thinking",
-                    since: current.created_at ?? new Date().toISOString(), step: null }}
-                  runStartedAt={current.created_at}
-                  onStop={item.id === run?.id && !busy ? () => void stop() : undefined} />
-                {item.id === run?.id && live.text && <CitationText text={live.text} citations={[]} streaming
-                  className={cn(ANSWER_MARKDOWN, CHAT_STREAM_CARET, "mt-3", dense ? "text-sm" : "text-md")} />}
-                {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
-              </div>
-            </div>}
+            {(() => {
+              // The streamed draft stays up until the checked answer lands, so it never blinks out between the two.
+              const isLatest = item.id === run?.id;
+              const draftText = isLatest ? live.text || streamed.current[item.id] || "" : "";
+              const hasAnswer = messages.some(m => m.id === `a:${item.id}`);
+              const showDraft = !!draftText && !hasAnswer && (current.state === "running" || current.state === "completed");
+              if (!activeRun(current) && !showDraft) return null;
+              const active = activeRun(current);
+              return <div className={cn("flex", dense ? "gap-2.5" : "gap-3")}>
+                <div className={cn("rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand", dense ? "w-7 h-7" : "w-8 h-8")}>
+                  <AskIrisMark className={dense ? "w-4 h-4" : "w-[18px] h-[18px]"} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  {active && <ReasoningBar compact={dense}
+                    activity={current.activity ?? { phase: current.state === "queued" ? "waiting" : "working",
+                      label: current.state === "queued" ? "Waiting to start" : "Thinking",
+                      since: current.created_at ?? new Date().toISOString(), step: null }}
+                    runStartedAt={current.created_at}
+                    onStop={isLatest && !busy ? () => void stop() : undefined} />}
+                  {showDraft && <CitationText text={draftText} citations={[]} streaming={active}
+                    className={cn(ANSWER_MARKDOWN, active && CHAT_STREAM_CARET, active && "mt-3", dense ? "text-sm" : "text-md")} />}
+                  {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
+                </div>
+              </div>;
+            })()}
           </div>;
         })}
         {busy && !run && <p role="status" className="text-sm text-stone-600">Connecting to Ask IRIS…</p>}

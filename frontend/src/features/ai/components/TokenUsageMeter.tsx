@@ -10,25 +10,47 @@ export function shortTokens(n: number): string {
 }
 
 const SEGMENTS = 12;
+const SPAN = 360 / SEGMENTS;
+const GAP = 7;
 
-/** A row of ticks, filled by share: the conversation's working memory at a glance. */
-function Ticks({ used, reserved, className }: { used: number; reserved: number; className?: string }) {
-  const filled = used > 0 ? Math.max(1, Math.round(used * SEGMENTS)) : 0;
+const point = (r: number, degrees: number, centre: number) => {
+  const a = ((degrees - 90) * Math.PI) / 180;
+  return `${(centre + r * Math.cos(a)).toFixed(2)} ${(centre + r * Math.sin(a)).toFixed(2)}`;
+};
+/** An arc of the ring from one angle to another, clockwise from twelve o'clock. */
+const arc = (r: number, from: number, to: number, centre: number) =>
+  `M ${point(r, from, centre)} A ${r} ${r} 0 0 1 ${point(r, to, centre)}`;
+
+/**
+ * IRIS's working-memory ring: twelve beads set round a bezel like a watch face,
+ * filled clockwise from the top as the conversation takes up the model's
+ * context. The beads at the end the answer is kept free for are drawn lighter.
+ */
+function Ring({ used, reserved, size, stroke }: { used: number; reserved: number; size: number; stroke: number }) {
+  const centre = size / 2;
+  const r = centre - stroke / 2 - 0.5;
   const held = Math.round(reserved * SEGMENTS);
   return (
-    <span aria-hidden className={cn("flex items-end gap-[2px]", className)}>
+    <svg aria-hidden width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
       {Array.from({ length: SEGMENTS }, (_, i) => {
-        const fromEnd = SEGMENTS - i;
-        return <span key={i} className={cn("w-[3px] rounded-[1px] transition-colors duration-300",
-          i < filled ? "h-3 bg-brand" : fromEnd <= held ? "h-2 bg-brand/30" : "h-2 bg-stone-300")} />;
+        const from = i * SPAN + GAP / 2;
+        const to = (i + 1) * SPAN - GAP / 2;
+        const fill = Math.max(0, Math.min(1, used * SEGMENTS - i));
+        const reservedBead = SEGMENTS - i <= held;
+        return <g key={i} fill="none" strokeLinecap="round" strokeWidth={stroke}>
+          <path d={arc(r, from, to, centre)}
+            className={reservedBead ? "stroke-brand/25" : "stroke-stone-300"} />
+          {fill > 0 && <path d={arc(r, from, from + (to - from) * fill, centre)}
+            className="stroke-brand" />}
+        </g>;
       })}
-    </span>
+    </svg>
   );
 }
 
 /**
  * How much of the model's context the latest step used, as the provider
- * reported it. A tick gauge in the composer; the reading on hover or focus.
+ * reported it. A ring in the composer; the reading on hover or focus.
  */
 export function TokenUsageMeter({ usage }: { usage: ReaderUsage }) {
   const [hovered, setHovered] = useState(false);
@@ -46,17 +68,22 @@ export function TokenUsageMeter({ usage }: { usage: ReaderUsage }) {
       <button type="button" aria-describedby={open ? tipId : undefined} aria-label={`Working memory ${percent}% used`}
         onFocus={() => setHovered(true)} onBlur={() => { setHovered(false); setPinned(false); }}
         onClick={() => setPinned(v => !v)} onKeyDown={e => { if (e.key === "Escape") { setPinned(false); setHovered(false); } }}
-        className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium tabular-nums text-stone-500 hover:bg-stone-100 focus-visible:outline-brand">
-        <Ticks used={share} reserved={0} />
-        {percent}%
+        className="inline-flex size-8 items-center justify-center rounded-full transition-colors hover:bg-stone-100">
+        <Ring used={share} reserved={0} size={20} stroke={3} />
       </button>
       {open && <span id={tipId} role="tooltip"
-        className="absolute bottom-full left-0 z-30 mb-2 w-60 rounded-lg border-l-[3px] border-brand bg-white px-3 py-2.5 text-left shadow-card-md motion-safe:animate-fade-in-up">
-        <span className="block font-display text-[15px] text-stone-900">Working memory</span>
-        <Ticks used={share} reserved={Math.min(1 - share, reserved / capacity)} className="mt-2" />
-        <span className="mt-2 block text-[12px] leading-snug text-stone-600">
-          The last step read <strong className="font-semibold text-stone-800">{shortTokens(used)}</strong> of{" "}
-          {shortTokens(capacity)} tokens{reserved > 0 && <>, with {shortTokens(reserved)} kept free for the answer</>}.
+        className={cn("absolute bottom-full left-0 z-30 mb-2 flex w-64 items-center gap-3.5 rounded-xl border border-stone-200 bg-white p-3.5 text-left shadow-card-md",
+          "motion-safe:animate-fade-in-up")}>
+        <span className="relative inline-flex shrink-0">
+          <Ring used={share} reserved={Math.min(1 - share, reserved / capacity)} size={52} stroke={5} />
+          <span className="absolute inset-0 flex items-center justify-center font-display text-[15px] tabular-nums text-stone-900">{percent}%</span>
+        </span>
+        <span className="min-w-0">
+          <span className="block font-display text-[15px] leading-tight text-stone-900">Working memory</span>
+          <span className="mt-1 block text-[12px] leading-snug text-stone-600">
+            The last step read <strong className="font-semibold text-stone-800">{shortTokens(used)}</strong> of{" "}
+            {shortTokens(capacity)} tokens{reserved > 0 && <>, with {shortTokens(reserved)} kept free for the answer</>}.
+          </span>
         </span>
       </span>}
     </span>

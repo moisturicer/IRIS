@@ -18,6 +18,8 @@ export function useDraft(run: ReaderRun | undefined, recordId?: number) {
     const controller = new AbortController();
     let buffer = "";
     let draft = "";
+    // A new attempt (a repair after the checks) keeps the last text on screen until its first words arrive.
+    let replace = false;
     const show = (next: string) => { draft = next; latest.current = next; setText(next); };
     show("");
     void (async () => {
@@ -46,8 +48,11 @@ export function useDraft(run: ReaderRun | undefined, recordId?: number) {
             if (!data) continue;
             try {
               const event = JSON.parse(data) as { t: string; d?: string };
-              if (event.t === "reset") show("");
-              else if (event.t === "text" && event.d) show(draft + event.d);
+              if (event.t === "reset") replace = draft !== "";
+              else if (event.t === "text" && event.d) {
+                show((replace ? "" : draft) + event.d);
+                replace = false;
+              }
               else if (event.t === "end") return;
             } catch { /* a malformed frame costs one piece of the live view */ }
           }

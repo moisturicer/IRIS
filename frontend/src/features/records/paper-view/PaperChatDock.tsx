@@ -8,7 +8,12 @@ import { RuntimeReader } from "@/features/ai/components/RuntimeReader";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { Button } from "@/components/ui";
 import { RecentChats } from "./RecentChats";
-import { CONTROL_BASE, CONTROL_ON } from "./controls";
+import { CONTROL_BASE } from "./controls";
+
+/** A square icon control in the panel's header: quiet at rest, a grey wash on hover. */
+const ICON_BUTTON =
+  "relative inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-stone-600 transition-colors " +
+  "hover:bg-stone-200 hover:text-stone-900 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent";
 
 export const PANEL_WIDTH_KEY = "iris_ask_iris_width";
 
@@ -187,6 +192,16 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
         <h2 id={headingId} className="font-display text-xl font-semibold leading-none text-stone-900">Ask IRIS</h2>
         <span className="rounded border border-stone-300 px-1 text-3xs font-semibold uppercase tracking-wider text-stone-600">AI</span>
         <span className="flex-1" />
+        <button type="button" onClick={() => setRecentOpen(v => !v)} aria-expanded={recentOpen} disabled={recent.length === 0}
+          aria-label={recent.length > 0 ? `Recent chats (${recent.length})` : "Recent chats"}
+          title={recent.length > 0 ? `Recent chats (${recent.length})` : "No recent chats yet"}
+          className={cn(ICON_BUTTON, recentOpen && "bg-stone-200 text-stone-900")}>
+          <i className="fas fa-clock-rotate-left text-[13px]" aria-hidden />
+          {recent.length > 0 && <span aria-hidden className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-semibold leading-4 text-white">{recent.length}</span>}
+        </button>
+        <button type="button" onClick={newChat} aria-label="New chat" title="New chat" className={ICON_BUTTON}>
+          <i className="fas fa-plus text-[13px]" aria-hidden />
+        </button>
         <Button variant="ghost" size="icon" onClick={props.onClose} aria-label="Close Ask IRIS" className="-mr-2">
           <i className="fas fa-xmark" aria-hidden />
         </Button>
@@ -194,15 +209,6 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
       <p className="mt-2 truncate text-2xs text-stone-600">{props.record.title}</p>
       {props.viewingVersion != null && <p className="mt-1 text-2xs text-stone-700">
         Answers are about the current version, not v{props.viewingVersion}.</p>}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setRecentOpen(v => !v)} aria-expanded={recentOpen} disabled={recent.length === 0}
-          className={cn("px-3", CONTROL_BASE, CONTROL_ON)}>
-          Recent chats{recent.length > 0 ? ` (${recent.length})` : ""}
-        </button>
-        <button type="button" onClick={newChat} className={cn("px-3", CONTROL_BASE, CONTROL_ON)}>
-          <i className="fas fa-plus text-2xs" aria-hidden />New chat
-        </button>
-      </div>
       {recentOpen && <RecentChats className="mt-2 max-h-48 overflow-y-auto" chats={recent} activeId={conversationId ?? null}
         onChoose={chat => { setRecentOpen(false); remember(chat.id); }} />}
     </div>

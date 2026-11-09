@@ -95,12 +95,12 @@ function RuntimeAskPage() {
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
     <div className="relative flex min-h-0 min-w-0 flex-1" {...(drawer ? { inert: "" } : {})}>
       {!asDrawers && <ConversationSidebar conversations={conversations} activeId={conversationId ?? null}
-        open={historyOpen} onNewChat={newChat}
+        open={historyOpen} onNewChat={newChat} onCollapse={() => toggle("history")}
         onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
-      <div className="relative flex min-w-0 flex-1 flex-col bg-surface">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
         <ChatToolbar sessionTitle={title} historyOpen={shown("history")}
           onToggleHistory={() => toggle("history")} asDrawers={asDrawers} />
-        <div className="min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
           <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
             initialDraft={conversationId ? undefined : draft ?? undefined}
             onAnswered={() => void refreshList()}
@@ -114,7 +114,7 @@ function RuntimeAskPage() {
 
     {drawer === "history" && <ChatDrawer title="Chat history" side="start" closeLabel="Close chat history"
       onClose={() => setDrawer(null)} returnTo={drawerOpener.current}>
-      <div className="shrink-0 px-3 pt-3">
+      <div className="flex shrink-0 px-3 pt-3">
         <NewChatButton onClick={() => { setDrawer(null); newChat(); }} />
       </div>
       <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null}

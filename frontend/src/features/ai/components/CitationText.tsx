@@ -43,12 +43,12 @@ function urlTransform(url: string): string {
 
 /** «Title» becomes a link to that paper's overview, for the papers the server matched. */
 function linkPapers(text: string, papers: readonly { title: string; record_id: number }[]): string {
-  if (papers.length === 0) return text;
   const byTitle = new Map(papers.map(p => [p.title.trim().toLowerCase(), p.record_id]));
-  return text.replace(/«([^«»\n]{3,300})»/g, (whole, title: string) => {
+  // The guillemets mark a title for the answer checks; the reader sees the title alone.
+  return text.replace(/«([^«»\n]{3,300})»/g, (_whole, title: string) => {
     const id = byTitle.get(title.trim().toLowerCase());
-    return id ? `[${whole.replace(/[[\]]/g, "\\$&")}](${PAPER_SCHEME}${id})` : whole;
-  });
+    return id ? `[${title.replace(/[[\]]/g, "\\$&")}](${PAPER_SCHEME}${id})` : title;
+  }).replace(/[«»]/g, "");
 }
 
 function toMarkdownLinks(text: string, streaming: boolean): string {

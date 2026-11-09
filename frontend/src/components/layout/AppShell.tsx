@@ -113,7 +113,7 @@ export function AppShell() {
   // shows them the pending screen instead (IR-537).
 
   return (
-    <div className="flex min-h-screen bg-canvas font-sans">
+    <div className={cn("flex bg-canvas font-sans", isAskIris ? "h-dvh overflow-hidden" : "min-h-screen")}>
       {sidebarOpen && (
         // A pointer target only: the drawer's own Close menu button and Escape
         // are the keyboard route, so this is kept out of the tab order and the
@@ -139,6 +139,8 @@ export function AppShell() {
         {...(drawerOpen ? { inert: "" } : {})}
         className={cn(
           "flex flex-col flex-1 min-w-0 transition-shell duration-200 ease-out motion-reduce:transition-none",
+          // Ask IRIS fills the window; its own panes scroll, so the page never does.
+          isAskIris && "min-h-0",
           // The sidebar's own widths: w-60, or the w-16 rail.
           collapsed ? "md:ml-16" : "md:ml-60",
         )}
@@ -150,7 +152,7 @@ export function AppShell() {
             descendant inert. No overflow value at all, not `overflow-x-clip`:
             a wide table with no scroll wrapper of its own must stay reachable
             by scrolling the window sideways, not be cut off. */}
-        <main className={cn("flex-1", isFullBleed ? "p-0" : "p-4 sm:p-7")}>
+        <main className={cn("flex-1", isFullBleed ? "p-0" : "p-4 sm:p-7", isAskIris && "min-h-0")}>
           {isFullBleed ? (
             <Outlet />
           ) : (
