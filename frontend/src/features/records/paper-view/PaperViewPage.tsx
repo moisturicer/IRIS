@@ -1172,10 +1172,10 @@ export default function PaperViewPage() {
 
                 <RelatedWorks recordId={record.id} />
 
-                {/* Public discussion (IR-420, spec §8): drawn, not yet open. */}
-                <CommentsSection
-                  viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null}
-                />
+                {/* Public comments belong to published papers' Overview only. */}
+                {record.pipeline_status === "published" && (
+                  <CommentsSection recordId={record.id} viewerId={user?.id ?? null} />
+                )}
                 </div>
               </>
             )}

@@ -8,6 +8,7 @@ import type {
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
   DiscoverInterests, ForYouPage, MetadataSuggestions,
+  PublicComment, PublicCommentReportReason, PublicCommentsResponse,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -94,6 +95,21 @@ export const recordsApi = {
    */
   finishReview: (id: number, body: FinishReviewRequest) =>
     apiClient.post<RecordTracker>(`/records/${id}/finish-review/`, body),
+
+  /** Public comments on a published paper (ADR-032 §7, IR-690). */
+  publicComments: (id: number) =>
+    apiClient.get<PublicCommentsResponse>(`/records/${id}/comments/`),
+  postPublicComment: (id: number, body: { body: string; reply_to?: number }) =>
+    apiClient.post<PublicComment>(`/records/${id}/comments/`, body),
+  editPublicComment: (id: number, commentId: number, body: { body: string }) =>
+    apiClient.patch<PublicComment>(`/records/${id}/comments/${commentId}/`, body),
+  deletePublicComment: (id: number, commentId: number) =>
+    apiClient.delete<void>(`/records/${id}/comments/${commentId}/`),
+  reportPublicComment: (
+    id: number,
+    commentId: number,
+    body: { reason: PublicCommentReportReason; note?: string },
+  ) => apiClient.post<void>(`/records/${id}/comments/${commentId}/reports/`, body),
 
   /** Document requests on a record, oldest first (ADR-022 §5, IR-262). */
   documentRequests: (id: number) =>

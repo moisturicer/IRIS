@@ -199,6 +199,7 @@ vi.mock("@/api/records", () => ({
     manuscriptBlob: vi.fn(() => Promise.resolve({ data: new Blob(["pdf"]) })),
     versionManuscriptBlob: vi.fn(() => Promise.resolve({ data: new Blob(["pdf"]) })),
     detail:           vi.fn(() => Promise.resolve({ data: shownRecord })),
+    publicComments:   vi.fn(() => Promise.resolve({ data: { comments: [], count: 0 } })),
     incrementAccess:  vi.fn(() => Promise.resolve({ data: {} })),
     similar:          vi.fn(() => Promise.resolve({ data: { results: [] } })),
     // The Novelty check loads itself; its behaviour is
@@ -1845,6 +1846,18 @@ describe("the sections follow the capabilities (IR-411)", () => {
 
     await waitForRecord(record.title);
     expect(tabNames()).toEqual(["Overview", "Paper"]);
+    expect(await screen.findByRole("heading", { name: "Comments (0)" })).toBeInTheDocument();
+    expect(vi.mocked(recordsApi.publicComments)).toHaveBeenCalledWith(RECORD_ID);
+  });
+
+  it("does not request or show public comments on an unpublished Proposal", async () => {
+    shownRecord = approvedProposal;
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(approvedProposal.title);
+    expect(screen.queryByRole("heading", { name: /Comments/ })).not.toBeInTheDocument();
+    expect(vi.mocked(recordsApi.publicComments)).not.toHaveBeenCalled();
   });
 
   // Changed on purpose by IR-879 (ADR-032 §10, 2026-11-04): a participant
