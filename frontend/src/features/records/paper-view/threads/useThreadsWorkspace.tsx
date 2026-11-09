@@ -10,6 +10,7 @@ import type { PageRegion, Party, RecordDetail } from "@/types/records";
 import { RouteDialog } from "../RouteDialog";
 import { FinishReviewDialog } from "./FinishReviewDialog";
 import { ReaderAnnotationsContext, type ReaderAnnotations, type ReaderMark } from "./readerAnnotations";
+import { useNewestResponseLetter } from "./ResponseLetter";
 import type { CommentTarget, ReviewThreadsProps } from "./ReviewThreads";
 import { SEVERITY_WORDS, countLabel, type Thread } from "./threadModel";
 import { useReviewThreads } from "./useReviewThreads";
@@ -34,6 +35,7 @@ interface Options {
  */
 export function useThreadsWorkspace({ record, can, onChanged, showThreads, showPaper, announce }: Options) {
   const threads = useReviewThreads(record.id, record.readiness !== null);
+  const letter = useNewestResponseLetter(record.id, record.readiness !== null);
   const userId = useAuthStore((s) => s.user?.id ?? null);
   const [composing, setComposing] = useState<CommentTarget | null>(null);
   // A party, or "owner" for the authors: Readiness's `show_threads` target.
@@ -49,21 +51,21 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     setFocus({ id: t.root.id, key: Date.now() });
   };
   const showInPaper = (t: Thread) => {
-    const a = t.root.anchor;
-    if (!a) return;
-    const first = (a.regions ?? []).find((r) => r.page === a.page);
+    const at = whereShown(t, currentVersion);
+    if (!at) return;
+    const first = at.regions.find((r) => r.page === at.page);
     showPaper?.();
-    setLanding({ page: a.page, top: first?.top ?? 0, bottom: first?.bottom ?? 0, key: Date.now() });
+    setLanding({ page: at.page, top: first?.top ?? 0, bottom: first?.bottom ?? 0, key: Date.now() });
   };
 
   const annotations = useMemo<ReaderAnnotations>(() => {
     const mark = (t: Thread, pending: boolean): ReaderMark | null => {
-      const a = t.root.anchor;
-      if (!a || !(a.regions ?? []).length) return null;
+      const a = whereShown(t, currentVersion);
+      if (!a || !a.regions.length) return null;
       const label = [pending ? `Draft ${t.pin}` : `Thread ${t.pin}`, t.root.party_label,
         t.root.severity ? SEVERITY_WORDS[t.root.severity] : null]
         .filter(Boolean).join(", ");
-      return { key: `t${t.root.id}`, pin: t.pin, version: a.version, regions: a.regions ?? [], label, pending,
+      return { key: `t${t.root.id}`, pin: t.pin, version: a.version, regions: a.regions, label, pending,
         onActivate: () => openThread(t) };
     };
     return {
@@ -88,7 +90,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     recordId: record.id, can, threads,
     viewer: { userId, party: record.revision?.party ?? null },
     composing, onCompose: setComposing, onChanged, onShowInPaper: showInPaper,
-    party, onClearParty: () => setParty(null), focus,
+    party, onClearParty: () => setParty(null), focus, letter,
   };
 
   const done = (outcome: string) => {
@@ -148,4 +150,19 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     ),
     dialogs,
   };
+}
+
+/**
+ * Where a thread's passage is shown: in the Version on screen when the
+ * thread was found or followed there (IR-876), else on its own anchor.
+ */
+export function whereShown(t: Thread, currentVersion: number | null):
+  { version: number; page: number; regions: PageRegion[] } | null {
+  const a = t.root.anchor;
+  if (!a) return null;
+  const p = t.root.place;
+  if (p && p.version === currentVersion && p.outcome !== "removed" && p.page != null) {
+    return { version: p.version, page: p.page, regions: p.regions ?? [] };
+  }
+  return { version: a.version, page: a.page, regions: a.regions ?? [] };
 }

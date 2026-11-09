@@ -1074,7 +1074,6 @@ export default function PaperViewPage() {
                         <button
                           type="button"
                           onClick={() => setNewVersionOpen(true)}
-                          disabled={record.revision.new_version.blocked != null}
                           aria-describedby={record.revision.new_version.blocked ? "new-version-blocked" : undefined}
                           className={cn(PILL_PRIMARY, "mt-3")}
                         >

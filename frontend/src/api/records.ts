@@ -7,7 +7,7 @@ import type {
   ThreadSeverity, ThreadAnchor, FinishReviewRequest,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
-  DiscoverInterests, ForYouPage, MetadataSuggestions, VersionComparisonPayload,
+  DiscoverInterests, ForYouPage, MetadataSuggestions, VersionComparisonPayload, ResponseLetter,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -63,7 +63,7 @@ export const recordsApi = {
    */
   postReviewComment: (
     id: number,
-    body: { body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor },
+    body: { body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor; suggestion?: string },
   ) => apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
   /** Its author edits a comment; a changed body is marked edited. */
   editReviewComment: (id: number, commentId: number, body: { body: string }) =>
@@ -87,6 +87,12 @@ export const recordsApi = {
   /** An owner answers a reviewer's thread: Addressed, saying where, or Declined, with a reason. */
   answerThread: (id: number, threadId: number, body: { answer: "addressed" | "declined"; note: string }) =>
     apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/answer/`, body),
+  /**
+   * The response to reviewers each Version was submitted with, newest first,
+   * frozen then (ADR-032 §7, IR-876). The viewer's own party comes first.
+   */
+  responseLetters: (id: number) =>
+    apiClient.get<ResponseLetter[]>(`/records/${id}/response-letters/`),
   /**
    * A Seat holder sends their drafts with a summary and a verdict, in one act
    * (ADR-032 §7, IR-874). Each verdict keeps its own service's refusals; a
