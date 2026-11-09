@@ -188,6 +188,12 @@ RECORDS: dict[str, Entry | Shadowed] = {
             kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
         ),
     }),
+    # Comparing two Versions is review material too (ADR-058 §3 and §4,
+    # IR-873). The world's record has one Version, so a reader it admits gets
+    # the 400 that says there is nothing to compare: still not a refusal.
+    "record-version-compare": Entry({
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
+    }),
     "record-similar": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     # ADR-029: novelty results belong only to the Proposal's owner.
     "record-related-research": Entry({

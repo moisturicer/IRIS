@@ -759,6 +759,45 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "private, no-store"
         return response
 
+    @action(
+        detail=True, methods=["get"],
+        url_path=r"versions/compare", url_name="version-compare",
+    )
+    def version_compare(self, request, pk=None):
+        """
+        GET /records/<id>/versions/compare/?from=N&to=M -- what changed between
+        two Versions (ADR-058 §3 as amended 2026-11-08, IR-873). Without
+        `from` and `to`: the Version this reviewer last finished a review on
+        -> latest, or previous -> latest.
+
+        Review material: a viewer `may_read_review` refuses gets the 404 a
+        missing paper gets, before any question about the pair. Its `state`
+        is `ready`, `preparing` (a reading is still being made), `unavailable`
+        or `no_text`, each with what to tell the reviewer, and never the
+        reader. Audited as reading the two Versions' text is.
+        """
+        from core.permissions import may_read_review
+
+        from apps.reviews import version_comparison
+
+        record = self.get_object()
+        if not may_read_review(request.user, record):
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            body = version_comparison.payload(
+                record, request.user,
+                request.query_params.get("from"), request.query_params.get("to"),
+            )
+        except version_comparison.BadPair as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        create_audit_event(
+            "DOWNLOAD", request.user, record=record,
+            metadata={"source": "version_comparison", "from": body["from"], "to": body["to"]},
+        )
+        response = Response(body)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
     @action(detail=True, methods=["get"])
     def similar(self, request, pk=None):
         """
