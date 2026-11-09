@@ -6,7 +6,7 @@ import { as, ok, signInBrowser, type Client } from "../support/api";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
 import { A11yLedger } from "../support/a11y";
 import { newStudent } from "../support/people";
-import { claimAndOpen, createDraft, newVersion, requestRevision, reviseAbstract, submit, tracker } from "../support/workflow";
+import { claimAndOpen, createDraft, newVersion, requestRevision, reviseAbstract, sendComments, submit, tracker } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
 
@@ -32,6 +32,10 @@ test("a comment and its reply are bound to the Version they were made on", async
   const c = await adviser.act(`/records/${recordId}/review-comments/`, { body: "Chapter 3's sample size needs a justification." });
   firstComment = c.id;
   expect(c.version).toBe(1);
+  // The Adviser's comment is a draft until their review is finished (IR-874);
+  // the owner can't see it, or reply to it, before then.
+  expect(c.is_draft).toBe(true);
+  await sendComments(adviser, recordId, "One question on Chapter 3.");
   const reply = await student.act(`/records/${recordId}/review-comments/`, { body: "Added a power analysis.", reply_to: firstComment });
   expect(reply.reply_to).toBe(firstComment);
   expect(reply.version).toBe(1);
@@ -65,6 +69,7 @@ test("history keeps both Versions and each comment's Version", async () => {
   await claimAndOpen(adviser, recordId, "adviser");
   const later = await adviser.act(`/records/${recordId}/review-comments/`, { body: "Thank you, resolved." });
   expect(later.version).toBe(2);
+  await sendComments(adviser, recordId, "Resolved.");
 
   const t = await tracker(student, recordId);
   expect((t.versions as any[]).map((v) => v.number)).toEqual([1, 2]);

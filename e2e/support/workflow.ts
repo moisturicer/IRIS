@@ -146,6 +146,14 @@ export async function requestRevision(reviewer: Client, recordId: number, reason
   return reviewer.act(`/records/${recordId}/request-revision/`, { reason });
 }
 
+/**
+ * A seated reviewer's comments are drafts until they finish their review
+ * (IR-874). *Comment only* sends them and leaves the Seat open.
+ */
+export async function sendComments(reviewer: Client, recordId: number, summary: string) {
+  return reviewer.act(`/records/${recordId}/finish-review/`, { verdict: "comment_only", summary });
+}
+
 /** Change a detail, which is what a new Version answers a revision with when no file changed (IR-273). */
 export async function reviseAbstract(owner: Client, recordId: number, note: string) {
   const detail = await owner.json(`/records/${recordId}/`);

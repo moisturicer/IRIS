@@ -21,6 +21,14 @@ const last = `Lifecycle${letters(5)}`;
 const RECOVERED = "Recovered-Pass-2026!";
 /** A session opened before the reset; the reset must end it. */
 let earlierRefresh = "";
+/**
+ * Recovery mail is one message per address per RECOVERY_COOLDOWN_SECONDS,
+ * across every purpose (ADR-045; `recovery/limits.py`). This stack keeps the
+ * default of 60 s, so a reset asked for seconds after the verification mail
+ * is suppressed, with the same "Check your email" answer. The run waits it out.
+ */
+const MAIL_COOLDOWN_MS = 60_000;
+let verificationAskedAt = 0;
 
 test("register through the three-step form", async ({ page }, testInfo) => {
   await page.goto("/signup");
@@ -45,6 +53,7 @@ test("register through the three-step form", async ({ page }, testInfo) => {
   await page.getByRole("checkbox", { name: /I have read the data notice/ }).check();
   await page.getByRole("group", { name: "May AI use your papers?" }).getByRole("radio", { name: "Yes" }).check();
   await page.getByRole("button", { name: "Register" }).click();
+  verificationAskedAt = Date.now();
 
   // The confirmation, not the form's own echo of the address: "Check your
   // details" on the last step also shows the email, so matching the address
@@ -109,6 +118,9 @@ test("three wrong passwords lock the account, and the screen says what the serve
 });
 
 test("recovery by emailed link sets a new password and ends old sessions", async ({ page }) => {
+  test.setTimeout(240_000);
+  const cooling = verificationAskedAt + MAIL_COOLDOWN_MS + 2_000 - Date.now();
+  if (cooling > 0) await page.waitForTimeout(cooling);
   await page.goto("/password/forgot");
   await page.getByLabel("Email Address").fill(email);
   await page.getByRole("button", { name: /send|reset|continue/i }).click();
