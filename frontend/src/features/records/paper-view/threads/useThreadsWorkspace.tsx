@@ -5,7 +5,7 @@ import { recordsApi } from "@/api/records";
 import type { Capability } from "@/features/records/capabilities";
 import { joinLabels } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import type { Party, RecordDetail } from "@/types/records";
+import type { PageRegion, Party, RecordDetail } from "@/types/records";
 
 import { RouteDialog } from "../RouteDialog";
 import { FinishReviewDialog } from "./FinishReviewDialog";
@@ -134,6 +134,14 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
       showThreads();
     },
     finish: () => setFinishing(true),
+    /** Open one thread in the Threads tab (the Changes tab's thread links). */
+    openThread,
+    /** Show the paper and land on this page's band (the Changes tab's *Show in paper*). */
+    showPlace: (page: number, regions: readonly PageRegion[]) => {
+      const first = regions.find((r) => r.page === page);
+      showPaper?.();
+      setLanding({ page, top: first?.top ?? 0, bottom: first?.bottom ?? 0, key: Date.now() });
+    },
     /** Wrap the reader so it draws the pins and offers Comment. */
     wrapReader: (reader: ReactNode) => (
       <ReaderAnnotationsContext.Provider value={annotations}>{reader}</ReaderAnnotationsContext.Provider>

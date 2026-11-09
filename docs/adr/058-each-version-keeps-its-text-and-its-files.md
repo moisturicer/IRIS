@@ -139,6 +139,8 @@ The reader will keep gaining rules (IR-992 collects them), and a library upgrade
     
     IR-873 asks only for the removed case, with the notice added to.
 12. **A text not yet read when the reader changes is still its Version's own.** A read always runs the reader deployed then, so a `pending` or `unavailable` text asked for under an earlier reader reads *preparing*, is queued again if lost, and is never treated as no text.
+13. **Earlier threads are placed by the server, in the comparison's own readings** (IR-873 part 2). A sent thread anchored to either Version compared is listed with the section its quote is found in, searched in the reading the comparison used (`appears_in`). If the quote isn't found there, it goes to the section on that side that starts last at or before the thread's page; by page it is listed with no section. A thread is anchored to its Version's original reading, which a re-read can split differently, so placing it in the browser by section key could put it in the wrong place. Drafts are left out, and threads on other Versions aren't listed.
+14. **The Changes tab is the reviewer's** (IR-873 part 2): it sits in the review pane beside Conversation and Threads, only with two Versions or more, and asks for a comparison only once opened. *Show in paper* opens the Version the change is in and lands on its page, using the same landing as a thread. The author's review workspace doesn't have the tab yet. The look is a first version for the frontend lead to change.
 
 *Rejected alternatives:*
 

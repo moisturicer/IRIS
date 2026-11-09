@@ -17,7 +17,7 @@ from apps.records.models import Record, ReviewText, ReviewTextState
 from apps.records.review_text import deployed_reader, reader, readings, sandbox
 from apps.records.review_text.testing import blank, in_process_sandbox
 from apps.records.test_review_text import SANDBOX, V2, ReviewTextTestBase
-from apps.reviews.models import ReviewRound
+from apps.reviews.models import ReviewComment, ReviewRound
 from core.enums import Party, PipelineStatus, ReviewVerdict
 
 NEXT_READER = "review-reader-99/pdfplumber-test"
@@ -237,6 +237,27 @@ class CompareEndpointTests(ComparisonTestBase):
         body = self.get(record, self.ierc).data
         self.assertEqual((body["from"], body["to"]), (1, 3))
         self.assertEqual(self.get(record, self.ierc, **{"from": 3, "to": 2}).data["from"], 2)
+
+    def test_sent_threads_on_either_version_are_listed_under_their_section(self):
+        record, v1, v2 = self.two_versions()
+
+        def thread(version, page, quote, **extra):
+            return ReviewComment.objects.create(
+                record=record, author=self.ierc, body="Why?", party=Party.IERC, version=version,
+                anchor_version=version, anchor_page=page, anchor_quote=quote, **extra).pk
+
+        background = thread(v1, 2, "Metro Cebu generates about 2,000 tonnes")
+        problem = thread(v2, 2, "two plants are feasible")
+        by_page = thread(v1, 3, "words no reading has")       # falls back to its page
+        thread(v1, 2, "Metro Cebu", is_draft=True)            # a draft is nobody else's yet
+        body = self.get(record).data
+        keys = {i: (s["from"] or s["to"])["key"] for i, s in enumerate(body["sections"])}
+        placed = {t["thread"]: (t["side"], keys.get(t["section"])) for t in body["threads"]}
+        self.assertEqual(placed, {
+            background: ("from", "background of the study"),
+            problem: ("to", "statement of the problem"),
+            by_page: ("from", "review of related literature"),
+        })
 
     def test_a_pair_that_cant_be_compared_is_refused_saying_why(self):
         record = self.thesis(Party.IERC)
