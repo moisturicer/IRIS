@@ -14,7 +14,8 @@ for (const dialog of DIALOGS) {
     await openScreen(page, api, {
       ...screen, path: dialog.path ?? screen.path, role: dialog.role ?? screen.role,
     }, { override: dialog.override });
-    await expect(page.getByRole("heading", { name: screen.heading }).first()).toBeVisible();
+    // The first load of a lazily loaded screen can take longer than an assertion's default 7.5 s on a busy runner.
+    await expect(page.getByRole("heading", { name: screen.heading }).first()).toBeVisible({ timeout: 20_000 });
     await page.waitForLoadState("networkidle");
 
     await dialog.open(page);
