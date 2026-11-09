@@ -406,7 +406,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
                       since: current.created_at ?? new Date().toISOString(), step: null }}
                     runStartedAt={current.created_at} />}
                   {showDraft && <CitationText text={typed.text} citations={[]} streaming={!typed.done || active}
-                    className={cn(ANSWER_MARKDOWN, (active || !typed.done) && CHAT_STREAM_CARET, active && "mt-3", dense ? "text-sm" : "text-md")} />}
+                    className={cn(ANSWER_MARKDOWN, (active || !typed.done) && CHAT_STREAM_CARET, !typed.done && "answer-typing", active && "mt-3", dense ? "text-sm" : "text-md")} />}
                   {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
                 </div>
               </div>;

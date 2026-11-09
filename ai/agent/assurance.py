@@ -272,6 +272,14 @@ QUALIFIER = "(the sources read do not establish this)"
 UNESTABLISHED = "The sources IRIS read do not establish an answer to this question."
 
 
+def _claims(text: str, investigation: Investigation, *, prior=(), excluded=()) -> bool:
+    """Whether `text` still fails a check, ignoring a whole number no larger than the papers read (a list count)."""
+    found = dict(findings(text, investigation, prior=prior, excluded=excluded))
+    listed = len(investigation.papers)
+    numbers_left = [n for n in found.pop("unsupported_number", []) if not (n.isdigit() and 0 < int(n) <= listed)]
+    return bool(numbers_left or found)
+
+
 def qualified(text: str, investigation: Investigation, *, prior=(), excluded=()) -> str:
     """`text` whole: citations that bind to no passage are removed, and a sentence that still fails
     the checks without them (an unsupported number or title) is kept but marked as not established.
@@ -285,7 +293,7 @@ def qualified(text: str, investigation: Investigation, *, prior=(), excluded=())
                 continue
             cleaned = bindable(unit, investigation, excluded=excluded)
             # A bad citation alone is just removed; the sentence is qualified only if it still fails.
-            still = cleaned and check(cleaned, investigation, prior=prior, excluded=excluded)
+            still = cleaned and _claims(cleaned, investigation, prior=prior, excluded=excluded)
             units.append(f"{cleaned} {QUALIFIER}" if still else cleaned)
         out.append(" ".join(u for u in units if u))
     return "\n".join(line for line in out if line)
