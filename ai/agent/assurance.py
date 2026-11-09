@@ -138,25 +138,32 @@ def check(text: str, investigation: Investigation, *, prior=(), excluded=()) -> 
 #: What the model is told to fix, per rule; the codes themselves never reach it or the reader.
 _FEEDBACK = {
     "unknown_citation": "Cite only passage handles this conversation returned, in square brackets, "
-                        "and use no other brackets. Not valid: {items}.",
-    "excluded_citation": "The reader ruled out the papers behind {items}; do not cite them.",
+                        "and use no other brackets. Not valid: {items}. If a passage you read supports "
+                        "the claim, cite that one; otherwise remove the claim or say the sources read "
+                        "do not establish it.",
+    "excluded_citation": "The reader ruled out the papers behind {items}; do not cite them. Remove "
+                         "what only they supported.",
     "unsupported_number": "These numbers are not stated in the passages you cited, their pages, the paper "
-                          "titles or the search coverage: {items}. Correct each one from a passage you "
-                          "cite, or leave it out.",
-    "unknown_title": "These are not titles of papers you read: {items}. Name only papers this "
-                     "conversation returned, exactly as titled.",
+                          "titles or the search coverage: {items}. If a passage you read states the "
+                          "number, cite it; otherwise remove the number, or say the sources read do not "
+                          "give it.",
+    "unknown_title": "These are not titles of papers you read: {items}. If you read the paper, give its "
+                     "exact title; otherwise name only papers this conversation returned, or say the "
+                     "sources read do not establish it.",
     "outage_absence": "A research step failed, so its result is unknown, not empty; do not say that "
                       "nothing matched, such as {items}. Say what could not be checked instead.",
     "completeness_overclaim": "A search returns a sample of matching passages, never the whole "
-                              "repository; remove claims of completeness such as {items}. State a "
-                              "total only in the sentence giving the exact figure count_records returned.",
+                              "repository; qualify claims of completeness such as {items} as what "
+                              "the search found. State a total only in the sentence giving the exact "
+                              "figure count_records returned.",
 }
 _ITEMS = 8
 _ITEM_CHARS = 80
 REPAIR_NOTE = (
-    "[IRIS validation] Your draft failed these checks. Rewrite the whole answer once. Keep everything "
-    "that is supported, with its citation, and change or remove only the listed items. Do not refuse, "
-    "shorten the answer or say it cannot be given; answer as fully as the passages allow. This is your last turn."
+    "[IRIS validation] Your draft failed these checks. Rewrite the whole answer once. For each item: "
+    "correct it if a passage you read supports it; otherwise remove the claim, qualify it, or say the "
+    "sources read do not establish it. Keep everything else, with its citations. Do not refuse or "
+    "shorten the answer as a whole; answer as fully as the passages allow. This is your last turn."
 )
 
 
@@ -170,7 +177,7 @@ def feedback(found: dict[str, list[str]]) -> str:
 
 
 _LEADING_CITES = re.compile(r"(?:\[P[0-9a-f]{20}\]\s*)+")
-LIMITATION = "Part of the drafted answer could not be checked against its sources and was left out."
+LIMITATION = "The sources IRIS read do not establish the rest of what was drafted, so it is left out."
 
 
 #: What each tool does, in the reader's words, for the outage limitation (IR-731).
@@ -266,10 +273,8 @@ UNESTABLISHED = "The sources IRIS read do not establish an answer to this questi
 
 
 def qualified(text: str, investigation: Investigation, *, prior=(), excluded=()) -> str:
-    """`text` with every sentence that fails the checks kept but marked as not established.
-
-    Citations that bind to no passage are removed from such a sentence first; a sentence
-    that passes keeps its citations untouched.
+    """`text` whole: citations that bind to no passage are removed, and a sentence that still fails
+    the checks without them (an unsupported number or title) is kept but marked as not established.
     """
     out = []
     for line in _LINE.split(text.strip()):
@@ -279,7 +284,9 @@ def qualified(text: str, investigation: Investigation, *, prior=(), excluded=())
                 units.append(unit)
                 continue
             cleaned = bindable(unit, investigation, excluded=excluded)
-            units.append(f"{cleaned} {QUALIFIER}" if cleaned else cleaned)
+            # A bad citation alone is just removed; the sentence is qualified only if it still fails.
+            still = cleaned and check(cleaned, investigation, prior=prior, excluded=excluded)
+            units.append(f"{cleaned} {QUALIFIER}" if still else cleaned)
         out.append(" ".join(u for u in units if u))
     return "\n".join(line for line in out if line)
 
@@ -291,7 +298,7 @@ def unmatched_note(found: dict[str, list[str]]) -> str:
         return ""
     shown = ", ".join(item[:_ITEM_CHARS] for item in items[:5])
     more = f" and {len(items) - 5} more" if len(items) > 5 else ""
-    return f"*Not matched to the passages IRIS read: {shown}{more}.*"
+    return f"*The sources IRIS read do not establish: {shown}{more}.*"
 
 
 def bindable(text: str, investigation: Investigation, *, excluded=()) -> str:

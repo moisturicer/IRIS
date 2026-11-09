@@ -3,9 +3,9 @@
 The same model turns search, read, plan and draft, keeping every exchange
 in order. Bounds close research while the final answer and one repair still
 fit; the final turn keeps the tools declared with `tool_choice: none`. Only
-a checked, completed answer is delivered: a failing draft is repaired once in
-the same Conversation, and a failing repair keeps only what each sentence's
-own citations support, or nothing. A changed source is never repaired
+a checked, completed answer is delivered: a failing draft is repaired up to
+twice in the same Conversation, and if it still fails the latest draft goes out
+whole, minus citations that name no source. A changed source is never repaired
 around; it fences delivery. The pin is checked against what
 this code and the provider support before anything is sent; a mismatch is
 `unavailable`, never a substitute model or dialect.
@@ -382,7 +382,7 @@ class _Run:
             screen=_screen(agent.provider, agent.pin))
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
         self.chat = version == CHAT_TOOL_VERSION
-        self.repairs = 2 if self.chat else 1
+        self.repairs = 2
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         #: Sources the history carried when the answer was written (IR-994).
@@ -766,14 +766,8 @@ class _Run:
             if not found:
                 return await self._commit(text_now)
             log.info("agent repair refused: %s", ",".join(sorted(found)))
-        # Out of repairs: what each sentence supports on its own is kept, and the gap is said.
-        for draft in drafts:
-            kept = draft and assurance.supported_units(
-                draft, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
-            if kept:
-                return await self._commit(f"{kept}\n\n{assurance.LIMITATION}")
-        # Nothing stands on its own. The answer is still delivered, never refused over a check: each
-        # sentence that fails is kept, minus citations that bind to no source, and marked as not established.
+        # Out of repairs: the latest draft is delivered whole, never trimmed or refused. Citations that bind
+        # to no source are removed; a sentence still stating an unsupported number or title is marked as such.
         text = assurance.qualified(drafts[0], self.investigation, prior=self.prior,
                                    excluded=self._focus("excluded"))
         return await self._commit(text or assurance.UNESTABLISHED)
