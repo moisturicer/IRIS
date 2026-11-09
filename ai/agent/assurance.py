@@ -154,8 +154,9 @@ _FEEDBACK = {
 _ITEMS = 8
 _ITEM_CHARS = 80
 REPAIR_NOTE = (
-    "[IRIS validation] Your draft was not delivered because it failed these checks. Rewrite the whole "
-    "answer once, keeping every supported finding with its citation. This is your last turn."
+    "[IRIS validation] Your draft failed these checks. Rewrite the whole answer once. Keep everything "
+    "that is supported, with its citation, and change or remove only the listed items. Do not refuse, "
+    "shorten the answer or say it cannot be given; answer as fully as the passages allow. This is your last turn."
 )
 
 

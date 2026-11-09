@@ -750,11 +750,7 @@ class _Run:
             # Advisory: the answer stands as written, minus citations that cannot be bound to a source.
             log.info("agent draft findings (delivered): %s", ",".join(sorted(found)))
             text = assurance.bindable(text, self.investigation, excluded=self._focus("excluded"))
-            # A whole number no larger than the papers read is a position in a list, not a claim.
-            listed = len(self.investigation.papers)
-            shown = {**found, "unsupported_number": [n for n in found.get("unsupported_number", [])
-                                                     if not (n.isdigit() and 0 < int(n) <= listed)]}
-            note = assurance.unmatched_note(shown) if self.agent.checks == "flag" else ""
+            note = self._note(found) if self.agent.checks == "flag" else ""
             return await self._commit(f"{text}\n\n{note}" if note else text)
         log.info("agent draft refused: %s", ",".join(sorted(found)))
         # A source that changed since it was read fences delivery; it is never repaired around.
@@ -775,10 +771,20 @@ class _Run:
             kept = draft and assurance.supported_units(
                 draft, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
             if kept:
-                partial = f"{kept}\n\n{assurance.LIMITATION}"
-                self._checked(partial)
-                return await self._commit(partial)
-        raise Unavailable("invalid_draft")
+                return await self._commit(f"{kept}\n\n{assurance.LIMITATION}")
+        # Nothing stands on its own. The answer is still delivered, never refused over a check: minus
+        # citations that bind to no source, with what could not be matched noted under it.
+        text = assurance.bindable(drafts[0], self.investigation, excluded=self._focus("excluded"))
+        note = self._note(found)
+        return await self._commit(f"{text}\n\n{note}" if note else text)
+
+    def _note(self, found: dict) -> str:
+        """The numbers and titles a delivered answer states that no passage supports, as one line."""
+        # A whole number no larger than the papers read is a position in a list, not a claim.
+        listed = len(self.investigation.papers)
+        shown = {**found, "unsupported_number": [n for n in found.get("unsupported_number", [])
+                                                 if not (n.isdigit() and 0 < int(n) <= listed)]}
+        return assurance.unmatched_note(shown)
 
     async def _repair(self, history: list, found) -> Optional[tuple[str, list]]:
         """One more turn in the same Conversation and the history ending with it; None if it cannot."""
@@ -801,6 +807,10 @@ class _Run:
         if self.investigation.outages:
             # Said by the application, not left to the model; it is part of the stored Turn (IR-731).
             answer = f"{answer}\n\n{assurance.outage_limitation(self.investigation.outages)}"
+        sink = stream.active()
+        if sink is not None and self.agent.enforce_checks:
+            # The answer is only known once the checks are done, so it is shown now, whole, and typed out by the page.
+            await sink.final(answer)
         return self._result(answer, citations)
 
     async def _recheck(self, text: str) -> None:
@@ -839,14 +849,10 @@ class _Run:
                                   clarification=clarification)
 
     def _checked(self, text: str, *, clarification: bool = False) -> None:
-        """A clarification or a salvaged answer that fails a check is never delivered."""
+        """Logs what a clarification fails; a check never refuses an answer, only a changed source does."""
         failures = sorted(self._findings(text, clarification=clarification))
-        if failures and not self.agent.enforce_checks:
-            log.info("agent draft findings (delivered): %s", ",".join(failures))
-            return
         if failures:
-            log.info("agent draft refused: %s", ",".join(failures))
-            raise Unavailable("invalid_draft")
+            log.info("agent draft findings (delivered): %s", ",".join(failures))
 
     def _result(self, answer: str, citations, *, kind: str = "answer") -> Result:
         previous = self.context.state or {}

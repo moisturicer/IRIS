@@ -93,6 +93,12 @@ class DraftSink:
                 await self._publish(piece)
         self.mode = "off"
 
+    async def final(self, text: str) -> None:
+        """The committed answer, shown whole when checks decided its text; the page types it out."""
+        self.numbering, self.held, self.kept, self.mode = {}, "", [], "off"
+        if text:
+            await self._add({"t": "text", "d": text})
+
     async def end(self) -> None:
         if self.held:
             await self._add({"t": "text", "d": HANDLE.sub(self._number, self.held)})

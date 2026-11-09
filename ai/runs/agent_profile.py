@@ -33,8 +33,8 @@ class AgentProfile:
     limits: Limits
     #: None never compacts (IR-734).
     compaction: Optional[Compaction] = None
-    #: "flag" delivers the answer and notes what it could not match; "advisory" only logs; "enforce" repairs or trims.
-    checks: str = "flag"
+    #: "enforce" repairs or trims a failing draft; "flag" delivers it and notes what it could not match; "advisory" only logs.
+    checks: str = "enforce"
 
 
 def _json(values, name, shape: str):
@@ -94,9 +94,9 @@ def read(values) -> AgentProfile:
         if not compaction.fits(provider.capacities[model], reserves):
             raise NotConfigured("RUNS_AGENT_COMPACTION leaves no room to summarize or finish"
                                 " under RUNS_AGENT_MODEL's capacity")
-    checks = str(getattr(values, "RUNS_AGENT_CHECKS", "") or "flag").strip().lower()
-    if checks not in ("flag", "advisory", "enforce"):
-        raise NotConfigured("RUNS_AGENT_CHECKS must be flag, advisory or enforce")
+    checks = str(getattr(values, "RUNS_AGENT_CHECKS", "") or "enforce").strip().lower()
+    if checks not in ("enforce", "flag", "advisory"):
+        raise NotConfigured("RUNS_AGENT_CHECKS must be enforce, flag or advisory")
     pin = Pin(
         model=model, endpoint=provider.endpoint, adapter=OpenAICompatibleAgentProvider.adapter,
         dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=CHAT_PROMPT_VERSION,
