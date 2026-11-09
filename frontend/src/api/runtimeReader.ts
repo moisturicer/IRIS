@@ -13,6 +13,8 @@ export interface ReaderRun {
   question: string;
   base_revision: number;
   version: number;
+  created_at?: string;
+  finished_at?: string | null;
   depth: Depth;
   awaiting_reader: boolean;
   sources_available: boolean;
@@ -23,10 +25,33 @@ export interface ReaderRun {
   cursor?: number;
   plan: null | { revision: number; steps: { id: string; title: string; status: "pending" | "in_progress" | "done" | "blocked" }[] };
   context: null | { estimated: true; used_tokens: number; capacity_tokens: number };
+  /** What the run is doing now: a coarse phase and its latest step. Null once it ends. */
+  activity?: null | ReaderActivity;
+  /** Tokens the provider reported for this run's model calls. */
+  usage?: null | ReaderUsage;
   /** Older context condensed into a summary; the original Turns stay (IR-735). Absent from older servers. */
   compaction?: null | { compactions: number; turns_compacted: number; last: "compacted" | "kept" };
   capabilities: { manual_compaction: boolean };
 }
+export interface ReaderActivity {
+  phase: "waiting" | "working";
+  label: string;
+  /** When this phase began (ISO). */
+  since: string;
+  step: null | { kind: "read" | "search" | "catalogue" | "recall"; label: string; detail: string[] };
+}
+export interface ReaderUsage {
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  /** The latest call's prompt: how full the model's context window is. */
+  context_tokens: number;
+  capacity_tokens: number | null;
+  /** Held back for the answer. */
+  reserved_tokens: number | null;
+}
+export interface ReaderConversationSummary { id: string; title: string; record_id: number | null; updated_at: string }
 export interface ReaderConversation {
   protocol: typeof READER_PROTOCOL;
   id: string;
@@ -86,6 +111,14 @@ export function runtimeReader(recordId?: number) {
         { base_revision: conversation.revision },
         { ...config, headers: { ...config.headers, "Idempotency-Key": key } });
       return checked(data);
+    },
+    async list() {
+      const { data } = await apiClient.get<{ protocol: string; conversations: ReaderConversationSummary[] }>(
+        `${base}/conversations`, config);
+      return checked(data).conversations;
+    },
+    async remove(id: string) {
+      await apiClient.delete(`${base}/conversations/${encodeURIComponent(id)}`, config);
     },
     async reopen(id: string) {
       const { data } = await apiClient.get<ReaderConversation>(`${base}/conversations/${encodeURIComponent(id)}`, config);

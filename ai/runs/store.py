@@ -137,6 +137,8 @@ DISPATCH_LOCK = "iris_ai.dispatch"
 
 #: A Paper Chat grant ($2) reaches only its own Record's Conversations (IR-719).
 IN_SCOPE = "($2::bigint IS NULL OR scope_record_id = $2)"
+#: Tools that read a paper's text, as opposed to searching or counting.
+READING_TOOLS = ("read_manuscript", "read_page", "open_passage", "outline", "recover_turn")
 
 
 class NotFound(Exception):
@@ -917,10 +919,24 @@ class RunStore:
             run_id,
         )
         events = await conn.fetch(
-            "SELECT sequence, name, data FROM iris_ai.run_event WHERE run_id = $1 ORDER BY sequence",
+            "SELECT sequence, name, data, created_at FROM iris_ai.run_event WHERE run_id = $1 ORDER BY sequence",
             run_id,
         )
         retried_by = await conn.fetchval("SELECT id FROM iris_ai.ask_run WHERE retry_of = $1", run_id)
+        # What the model calls actually used, as the provider reported it.
+        attempts = await conn.fetch(
+            """SELECT charge_input_tokens, charge_output_tokens, charge_cost_micros
+                 FROM public.ai_providerreservation
+                WHERE run_key = $1 AND operation = 'llm' AND sent AND usage_reported ORDER BY id""",
+            run_key(run_id),
+        )
+        usage = {
+            "calls": len(attempts),
+            "input_tokens": sum(a["charge_input_tokens"] for a in attempts),
+            "output_tokens": sum(a["charge_output_tokens"] for a in attempts),
+            "cost_usd": sum(a["charge_cost_micros"] for a in attempts) / 1_000_000,
+            "last_input_tokens": attempts[-1]["charge_input_tokens"] if attempts else 0,
+        }
         evidence = {}
         if reader:
             # Recheck every evidence dependency under begin_research's live RLS,
@@ -952,6 +968,18 @@ class RunStore:
                 f" AND NOT ({CURRENT_SOURCE_TURN}))",
                 run_id,
             )
+            # Titles of the papers this run has read, for the reader's live phase.
+            read = [source for event in events
+                    if event["name"] == "tool" and event["data"].get("tool") in READING_TOOLS
+                    for source in event["data"].get("sources", [])]
+            chunksets = list(dict.fromkeys(int(s.split(":", 1)[0]) for s in read if s.split(":", 1)[0].isdigit()))
+            titles = await conn.fetch(
+                "SELECT cs.id, r.title FROM iris_ai.research_chunksets() cs"
+                " JOIN public.records_record r ON r.id = cs.record_id WHERE cs.id = ANY($1::bigint[])",
+                chunksets,
+            ) if chunksets else []
+            by_id = {row["id"]: row["title"] for row in titles}
+            evidence["read_titles"] = list(dict.fromkeys(by_id[c] for c in chunksets if c in by_id))
             evidence["sources_available"] = (
                 {row["revision"] for row in current} == dependencies and not counted_unreadable
                 and carried_current)
@@ -980,7 +1008,8 @@ class RunStore:
             "queued_seconds": float(run["queued_seconds"]),
             "latency_seconds": (float(run["latency_seconds"])
                                 if run["latency_seconds"] is not None else None),
-            "events": [dict(e) for e in events],
+            "usage": usage,
+            "events": [{**dict(e), "created_at": e["created_at"].isoformat()} for e in events],
         }
 
     async def reopen(self, grant, conversation_id, *, include_runs=False) -> dict:
@@ -1035,6 +1064,27 @@ class RunStore:
                 "facts": shown_facts(t["facts"]) if t["sources_available"] else [],
             } for t in turns],
         }
+
+    async def list_conversations(self, grant, *, limit=50) -> list[dict]:
+        """The reader's recent Conversations, newest activity first, titled by their first question."""
+        async with self._connect() as conn:
+            async with conn.transaction(isolation="repeatable_read"):
+                reader, scope = await self._principal(conn, grant)
+                rows = await conn.fetch(
+                    f"""SELECT c.id, c.scope_record_id, c.created_at,
+                               (SELECT r.question FROM iris_ai.ask_run r
+                                 WHERE r.conversation_id = c.id AND r.question <> ''
+                                 ORDER BY r.created_at LIMIT 1) AS title,
+                               coalesce((SELECT max(r.created_at) FROM iris_ai.ask_run r
+                                          WHERE r.conversation_id = c.id), c.created_at) AS updated_at
+                          FROM iris_ai.conversation c
+                         WHERE c.reader_id = $1 AND c.deleted_at IS NULL
+                           AND ($2::bigint IS NULL OR c.scope_record_id = $2)
+                         ORDER BY updated_at DESC LIMIT $3""",
+                    reader, scope, limit,
+                )
+        return [{"id": str(r["id"]), "title": r["title"] or "", "record_id": r["scope_record_id"],
+                 "updated_at": r["updated_at"].isoformat()} for r in rows]
 
     async def delete_conversation(self, grant, conversation_id) -> None:
         async with self._connect() as conn:

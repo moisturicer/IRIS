@@ -1,9 +1,14 @@
-import { useId, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from "react";
+import { useEffect, useId, useMemo, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from "react";
 import type { RecordDetail } from "@/types/records";
 import type { AnswerReturn } from "@/lib/citedPage";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
+import { runtimeReader, type ReaderConversationSummary } from "@/api/runtimeReader";
 import { RuntimeReader } from "@/features/ai/components/RuntimeReader";
+import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
+import { Button } from "@/components/ui";
+import { RecentChats } from "./RecentChats";
+import { CONTROL_BASE, CONTROL_ON } from "./controls";
 
 export const PANEL_WIDTH_KEY = "iris_ask_iris_width";
 
@@ -133,31 +138,73 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     try { return sessionStorage.getItem(storageKey) ?? undefined; } catch { return undefined; }
   });
+  const [fresh, setFresh] = useState(0);
+  const [recent, setRecent] = useState<ReaderConversationSummary[]>([]);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const api = useMemo(() => runtimeReader(props.record.id), [props.record.id]);
   const headingId = useId();
+
+  // The reader's own chats about this paper. A failure shows none.
+  useEffect(() => {
+    let cancelled = false;
+    void api.list().then(items => { if (!cancelled) setRecent(items.filter(c => c.record_id === props.record.id)); })
+      .catch(() => { if (!cancelled) setRecent([]); });
+    return () => { cancelled = true; };
+  }, [api, props.record.id, conversationId]);
+
+  const remember = (id: string | undefined) => {
+    setConversationId(id);
+    try { if (id) sessionStorage.setItem(storageKey, id); else sessionStorage.removeItem(storageKey); } catch { /* optional */ }
+  };
+  const newChat = () => { setRecentOpen(false); remember(undefined); setFresh(n => n + 1); };
+
   return <aside ref={props.panelRef} style={props.style} tabIndex={-1} aria-labelledby={headingId}
     role={props.modal ? "dialog" : undefined} aria-modal={props.modal || undefined}
-    className={cn("bg-canvas flex flex-col overflow-hidden", props.className)}>
+    className={cn("bg-canvas flex flex-col overflow-hidden focus:outline-none motion-safe:animate-panel-in", props.className)}>
     {props.resize && !props.minimized && <ResizeEdge {...props.resize} />}
     {props.minimized && <button type="button" onClick={props.onRestore} aria-label="Ask IRIS: back to the answer"
-      className="min-h-14 px-4 text-left">Ask IRIS: back to the answer</button>}
-    <header className="flex items-start justify-between gap-3 border-b border-stone-200 p-4" hidden={props.minimized}>
-      <div className="min-w-0">
-        {props.onBackToPaper && <button type="button" onClick={props.onBackToPaper}
-          className="reading-split:hidden -ml-2 mb-1 inline-flex min-h-11 items-center gap-1 px-2 text-sm text-brand">
-          <i className="fas fa-arrow-left text-2xs" aria-hidden />Back to paper
-        </button>}
-        <h2 id={headingId} className="font-display text-xl text-stone-900">Ask IRIS</h2>
-        <p className="text-sm text-stone-600 break-words">{props.record.title}</p>
-        <p className="text-xs text-stone-500">Research stays within this paper.</p></div>
-      <button type="button" aria-label="Close Ask IRIS" className="min-h-11 px-2 text-sm" onClick={props.onClose}>Close</button>
-    </header>
-    {props.viewingVersion != null && <p className="px-4 py-2 text-xs text-stone-600">Answers are about the current version, not v{props.viewingVersion}.</p>}
+      className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left transition-colors duration-200 hover:bg-stone-100">
+      <AskIrisMark className="h-5 w-5 shrink-0 text-brand" />
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-lg font-semibold leading-tight text-stone-900">Ask IRIS</span>
+        <span className="block truncate text-2xs text-stone-500">Back to the answer</span>
+      </span>
+      <i className="fas fa-chevron-up text-xs text-stone-500" aria-hidden />
+    </button>}
+
+    <div className="shrink-0 border-b border-stone-200 bg-stone-100 px-4 pb-3 pt-3" hidden={props.minimized}>
+      {props.onBackToPaper && <button type="button" onClick={props.onBackToPaper}
+        className={cn("reading-split:hidden -ml-2 mb-1 px-2 text-brand", CONTROL_BASE)}>
+        <i className="fas fa-arrow-left text-2xs" aria-hidden />Back to paper
+      </button>}
+      <div className="flex items-center gap-2">
+        <AskIrisMark className="h-5 w-5 shrink-0 text-brand" />
+        <h2 id={headingId} className="font-display text-xl font-semibold leading-none text-stone-900">Ask IRIS</h2>
+        <span className="rounded border border-stone-300 px-1 text-3xs font-semibold uppercase tracking-wider text-stone-600">AI</span>
+        <span className="flex-1" />
+        <Button variant="ghost" size="icon" onClick={props.onClose} aria-label="Close Ask IRIS" className="-mr-2">
+          <i className="fas fa-xmark" aria-hidden />
+        </Button>
+      </div>
+      <p className="mt-2 truncate text-2xs text-stone-600">{props.record.title}</p>
+      {props.viewingVersion != null && <p className="mt-1 text-2xs text-stone-700">
+        Answers are about the current version, not v{props.viewingVersion}.</p>}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setRecentOpen(v => !v)} aria-expanded={recentOpen} disabled={recent.length === 0}
+          className={cn("px-3", CONTROL_BASE, CONTROL_ON)}>
+          Recent chats{recent.length > 0 ? ` (${recent.length})` : ""}
+        </button>
+        <button type="button" onClick={newChat} className={cn("px-3", CONTROL_BASE, CONTROL_ON)}>
+          <i className="fas fa-plus text-2xs" aria-hidden />New chat
+        </button>
+      </div>
+      {recentOpen && <RecentChats className="mt-2 max-h-48 overflow-y-auto" chats={recent} activeId={conversationId ?? null}
+        onChoose={chat => { setRecentOpen(false); remember(chat.id); }} />}
+    </div>
+
     <div className={props.minimized ? "hidden" : "min-h-0 flex-1"}>
-      <RuntimeReader conversationId={conversationId} recordId={props.record.id}
-        initialDraft={props.draft} onDraftChange={props.onDraftChange} onConversation={id => {
-        setConversationId(id);
-        try { sessionStorage.setItem(storageKey, id); } catch { /* optional address convenience */ }
-      }} />
+      <RuntimeReader key={`${conversationId ?? "new"}:${fresh}`} dense conversationId={conversationId} recordId={props.record.id}
+        initialDraft={props.draft} onDraftChange={props.onDraftChange} onConversation={remember} />
     </div>
   </aside>;
 }

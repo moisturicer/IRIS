@@ -83,6 +83,29 @@ async def _call(service, action, protocol=None):
         return JSONResponse({"status": "busy", **({} if protocol else {"reason": busy.reason})}, status_code=503)
 
 
+def _reserved(s) -> int | None:
+    """Tokens the agent holds back for its answer, shown beside the context it used."""
+    reserves = getattr(s.executor, "reserves", None)
+    return (reserves.output_tokens + reserves.reasoning_tokens) if reserves else None
+
+
+@router.get("/conversations")
+async def list_conversations(
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
+):
+    """The reader's recent Conversations, for the history list. Reader protocol only."""
+    if protocol is None:
+        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
+
+    async def act(s: RunService):
+        items = await s.store.list_conversations(grant)
+        return JSONResponse({"protocol": public.PROTOCOL, "conversations": items})
+
+    return await _call(service, act, protocol)
+
+
 @router.post("/runs")
 async def submit_run(
     body: SubmitRequest,
@@ -99,7 +122,7 @@ async def submit_run(
         )
         if protocol:
             run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=s.can_compact) if protocol else run,
+        return JSONResponse(public.run(run, manual_compaction=s.can_compact, reserved_tokens=_reserved(s)) if protocol else run,
                             status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
@@ -119,7 +142,7 @@ async def run_status(
 
     async def act(s: RunService):
         snapshot = await s.store.status(grant, run_id, reader_projection=bool(protocol))
-        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact, after=after)
+        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact, reserved_tokens=_reserved(s), after=after)
                             if protocol else snapshot)
 
     return await _call(service, act, protocol)
@@ -143,7 +166,7 @@ async def retry_run(
         run, created = await s.retry(grant, run_id, key=idempotency_key)
         if protocol:
             run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=s.can_compact) if protocol else run,
+        return JSONResponse(public.run(run, manual_compaction=s.can_compact, reserved_tokens=_reserved(s)) if protocol else run,
                             status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
@@ -158,7 +181,7 @@ async def cancel_run(
 ):
     async def act(s: RunService):
         snapshot = await s.store.cancel(grant, run_id, reader_projection=bool(protocol))
-        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact) if protocol else snapshot)
+        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact, reserved_tokens=_reserved(s)) if protocol else snapshot)
 
     return await _call(service, act, protocol)
 
@@ -172,7 +195,7 @@ async def reopen_conversation(
 ):
     async def act(s: RunService):
         snapshot = await s.store.reopen(grant, conversation_id, include_runs=bool(protocol))
-        return JSONResponse(public.conversation(snapshot, manual_compaction=s.can_compact) if protocol else snapshot)
+        return JSONResponse(public.conversation(snapshot, manual_compaction=s.can_compact, reserved_tokens=_reserved(s)) if protocol else snapshot)
 
     return await _call(service, act, protocol)
 
@@ -203,7 +226,7 @@ async def compact_conversation(
             grant, key=idempotency_key, conversation_id=conversation_id, base_revision=body.base_revision,
         )
         run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=True), status_code=201 if created else 200)
+        return JSONResponse(public.run(run, manual_compaction=True, reserved_tokens=_reserved(s)), status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
 

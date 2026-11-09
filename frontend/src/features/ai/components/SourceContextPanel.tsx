@@ -1,0 +1,141 @@
+import type { ChatCitation, SemanticSearchResult } from "@/types/ai";
+import { hasCitationQuote } from "@/lib/citedPage";
+import { OpenPassageLink, PassageQuote } from "./PassageQuote";
+import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
+
+interface SourceContextPanelProps {
+  open:       boolean;
+  /**
+   * The question of the answer these passages belong to: the selected one,
+   * which is the latest until the reader picks another (IR-562). `null`
+   * before anything has been answered.
+   */
+  question?:  string | null;
+  /**
+   * The Passages the selected reply cited, in marker order. A reopened
+   * Conversation's reply (IR-298) carries only the pointer — record, chunk,
+   * page — until IR-299 re-resolves the quote and title at read time.
+   */
+  citations:  ChatCitation[];
+  /** The Record cards those Passages came from, as the answer returned them. */
+  sources:    SemanticSearchResult[];
+  onClose:    () => void;
+}
+
+/**
+ * What the selected answer was grounded in: the quote, the page, and whose
+ * work it is. It names the answer it describes, so it can never be read as
+ * evidence for a different one (IR-562).
+ *
+ * **Nothing is fetched here any more (IR-284).** The panel used to request one
+ * `RecordDetail` per citation, which meant a spinner, an N+1 and a card that
+ * could disagree with the answer it sat beside. The ask response now carries
+ * the Passages and the Record cards together, so this renders what it was
+ * handed.
+ *
+ * A Passage is shown before its record card, deliberately: the quote is the
+ * evidence, and the card is who said it.
+ *
+ * Lightened for IR-329: flat list rows, not bordered cards -- chips in the
+ * answer text carry citation detail now, this is just a reference list.
+ */
+export function SourceContextPanel({ open, question = null, citations, sources, onClose }: SourceContextPanelProps) {
+  return (
+    <aside
+      // Collapses by width, matching `ConversationSidebar`'s own transition,
+      // rather than mounting/unmounting instantly.
+      className={`shrink-0 flex flex-col border-l border-stone-200/80 bg-canvas
+        overflow-hidden transition-[width] duration-200 ease-out
+        ${open ? "w-[min(100%,320px)] sm:w-[300px]" : "w-0 border-l-0 invisible"}`}
+      aria-label="Referenced passages"
+      aria-hidden={!open}
+    >
+      <div className="w-[min(100vw,320px)] sm:w-[300px] flex flex-col h-full">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60">
+        <div className="min-w-0">
+          <h2 className="text-[14px] font-bold text-stone-800">Referenced passages</h2>
+          <p className="text-[12px] text-stone-500 mt-0.5 line-clamp-2">
+            {question ? <>For “{question}”</> : "The exact text behind the answer"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+          aria-label="Hide sources panel"
+        >
+          <i className="fas fa-xmark text-[14px]" aria-hidden />
+        </button>
+      </div>
+
+      <SourcePassages citations={citations} sources={sources} answered={question !== null} />
+      </div>
+    </aside>
+  );
+}
+
+/**
+ * The passages one answer cited, quote first and then whose work it is.
+ * Beside the answer on a wide page, and in the sources drawer on a phone
+ * (IR-570), so the two cannot show them differently.
+ */
+export function SourcePassages({
+  citations,
+  sources,
+  answered = false,
+}: Pick<SourceContextPanelProps, "citations" | "sources"> & {
+  /** Whether there is an answer at all: one that cited nothing says so. */
+  answered?: boolean;
+}) {
+  const cardFor = (recordId: number) => sources.find((s) => s.id === recordId);
+
+  return (
+    <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5">
+      {citations.length === 0 && (
+        <p className="text-[14px] text-stone-500 text-center py-8 px-2">
+          {answered
+            ? "This answer cited no passages."
+            : "Ask a question to see the passages IRIS used in its answer."}
+        </p>
+      )}
+
+      {citations.map((citation) => {
+        const card = cardFor(citation.record_id);
+        const hasQuote = hasCitationQuote(citation);
+
+        return (
+          <article
+            key={`${citation.chunk_id}-${citation.marker}`}
+            className="pb-2.5 border-b border-stone-100 last:border-b-0 last:pb-0"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-[14px] font-semibold text-stone-900 leading-snug line-clamp-2">
+                <span aria-hidden className="text-[#6B0F12] mr-1">[{citation.marker}]</span>
+                {card?.title ?? (hasQuote ? citation.record_title : "Source")}
+              </h3>
+              {citation.page != null && (
+                <span className="shrink-0 text-[11px] font-semibold text-stone-400">
+                  Page {citation.page}
+                </span>
+              )}
+            </div>
+            {card && <>
+              <p className={`text-[12px] text-stone-500 mt-0.5 line-clamp-1 ${card.authors?.trim() ? "" : "italic"}`}>
+                {card.authors?.trim() || "Authors not recorded"}
+              </p>
+              <ResearchOriginBadge origin={card.origin} />
+            </>}
+
+            {hasQuote && <PassageQuote text={citation.text} className="mt-1" />}
+
+            <OpenPassageLink
+              citation={citation}
+              title={card?.title ?? (hasQuote ? undefined : "the source")}
+              className="mt-1.5"
+            />
+          </article>
+        );
+      })}
+    </div>
+  );
+}

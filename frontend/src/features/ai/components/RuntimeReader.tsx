@@ -2,13 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
+import type { ChatMessage } from "@/types/chat";
+import { cn } from "@/lib/utils";
 import { ChatInput } from "./ChatInput";
-import { CHAT_OPENING } from "./answerLayout";
+import { CHAT_COLUMN, CHAT_OPENING } from "./answerLayout";
 import { ModelPill, type ModelPillOption } from "./ModelPill";
+import { ChatMessageBubble } from "./ChatMessageBubble";
+import { AskIrisMark } from "./AskIrisIcons";
+import { ReasoningBar } from "./ReasoningBar";
+import { TokenUsageMeter } from "./TokenUsageMeter";
+import { conversationTotals, toMessages, useCitedRecords } from "../runtime/messages";
 
 const DEPTHS: readonly ModelPillOption<Depth>[] = [
-  { value: "deep", short: "Thorough", label: "Thorough research", description: "Searches and reads more before answering", icon: "fas fa-book-open-reader" },
   { value: "ordinary", short: "Standard", label: "Standard", description: "A shorter search for a quicker answer", icon: "far fa-lightbulb" },
+  { value: "deep", short: "Thorough", label: "Thorough research", description: "Searches and reads more before answering", icon: "fas fa-book-open-reader" },
 ];
 
 const STATES: Record<ReaderRun["state"], string> = {
@@ -32,9 +39,6 @@ export function ResearchProgress({ run }: { run: ReaderRun }) {
       </ol>
       <p className="mt-2 text-xs">Task status is the assistant’s assessment of its work.</p>
     </>}
-    <p className="mt-2 text-xs">{run.context
-      ? `Estimated context: ${run.context.used_tokens.toLocaleString()} of ${run.context.capacity_tokens.toLocaleString()} tokens`
-      : "Context estimate unavailable"}</p>
     {run.compaction && run.compaction.compactions > 0 && <p className="mt-1 text-xs">
       Earlier conversation was condensed into a summary to make room. The original answers are kept, and a
       summary is never used as a source for exact details.</p>}
@@ -63,9 +67,6 @@ export function CompactionStatus({ run }: { run: ReaderRun }) {
     {done && run.compaction?.last === "kept" && <p>Your conversation is unchanged.</p>}
     {(run.state === "failed" || run.state === "expired" || run.state === "cancelled") && <p>Your conversation is unchanged.</p>}
     {run.state === "conflict" && <p>Reconnect, then compact again.</p>}
-    {run.state !== "deleted" && <p className="mt-2 text-xs">{run.context
-      ? `Estimated context: ${run.context.used_tokens.toLocaleString()} of ${run.context.capacity_tokens.toLocaleString()} tokens`
-      : "Context estimate unavailable"}</p>}
   </section>;
 }
 
@@ -102,14 +103,22 @@ interface Props {
   /** The unsent draft as it changes, so a page can keep it across a close (IR-569). */
   onDraftChange?: (draft: string) => void;
   onConversation?: (id: string) => void;
+  /** The narrow Paper Chat density. */
+  dense?: boolean;
+  /** The answer whose sources a page's panel shows, and how to pick one. */
+  selectedId?: string | null;
+  onSelectSources?: (message: ChatMessage) => void;
+  /** The newest answer, each time one lands: a page shows its sources. */
+  onAnswered?: (message: ChatMessage) => void;
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
-export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation }: Props) {
+export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
+  selectedId = null, onSelectSources, onAnswered }: Props) {
   const api = useMemo(() => runtimeReader(recordId), [recordId]);
   const [conversation, setConversation] = useState<ReaderConversation>();
   const [run, setRun] = useState<ReaderRun>();
-  const [depth, setDepth] = useState<Depth>("deep");
+  const [depth, setDepth] = useState<Depth>("ordinary");
   const [draft, setDraft] = useState(initialDraft ?? "");
   const reportDraft = useRef(onDraftChange);
   reportDraft.current = onDraftChange;
@@ -309,32 +318,52 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     && !activeRun(run) && run.capabilities?.manual_compaction === true;
 
   const centered = !conversation?.runs.length && !run && !busy && !error;
+  const records = useCitedRecords(conversation);
+  const messages = useMemo(() => toMessages(conversation, run, records), [conversation, run, records]);
+  const usage = useMemo(() => conversationTotals(conversation, run), [conversation, run]);
+  const latestAnswer = [...messages].reverse().find(m => m.role === "assistant" && !m.endedRun);
+  const answered = useRef(onAnswered);
+  answered.current = onAnswered;
+  const answeredKey = latestAnswer ? `${latestAnswer.id}:${latestAnswer.sources?.length ?? 0}` : "";
+  useEffect(() => {
+    if (latestAnswer) answered.current?.(latestAnswer);
+    // Once per answer, and again when its paper cards arrive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answeredKey]);
+
+  const runs = [...(conversation?.runs ?? [])];
+  if (run && !runs.some(item => item.id === run.id)) runs.push(run);
 
   return <div className={`flex h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : ""}`}>
-    <div className={`px-4 py-6 sm:px-6 ${centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto"}`}>
-      <div className="mx-auto max-w-3xl space-y-6">
-        {centered && <p className="font-display text-2xl text-stone-900">What would you like to investigate?</p>}
-        {conversation?.runs.map(item => {
-          const turn = conversation.turns.find(t => t.run_id === item.id);
+    <div className={cn(dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
+      centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin")}>
+      <div className={cn(dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
+        {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
+          {recordId ? "Ask about this paper." : "What would you like to investigate?"}</p>}
+        {runs.map(item => {
           const current = item.id === run?.id ? run : item;
           if (compactionRun(item)) return <CompactionStatus key={item.id} run={current} />;
-          return <article key={item.id} aria-label="Research question" className="min-w-0 space-y-4">
-            <p className="font-medium text-stone-900 [overflow-wrap:anywhere]">{item.question}</p>
-            <ResearchProgress run={current} />
-            {turn && <div className="space-y-3">
-              <p className="whitespace-pre-wrap leading-relaxed text-stone-800 [overflow-wrap:anywhere]">{turn.answer}</p>
-              {turn.citations.length > 0 && <ol aria-label="Cited passages" className="space-y-3 text-sm">
-                {turn.citations.map((citation, index) => <li key={index}>
-                  <Link className="text-brand underline" to={`/records/${citation.record_id}?page=${citation.page}`}>[{index + 1}] Page {citation.page}</Link>
-                  <blockquote className="mt-1 border-l border-stone-300 pl-3 text-stone-600 [overflow-wrap:anywhere]">{citation.quote}</blockquote>
-                </li>)}
-              </ol>}
+          return <div key={item.id} className="space-y-5">
+            {messages.filter(m => m.id === `q:${item.id}` || m.id === `a:${item.id}`).map(m =>
+              <ChatMessageBubble key={m.id} message={m} compact={dense}
+                sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources} />)}
+            {activeRun(current) && <div className={cn("flex", dense ? "gap-2.5" : "gap-3")}>
+              <div className={cn("rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand", dense ? "w-7 h-7" : "w-8 h-8")}>
+                <AskIrisMark className={dense ? "w-4 h-4" : "w-[18px] h-[18px]"} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <ReasoningBar compact={dense}
+                  activity={current.activity ?? { phase: current.state === "queued" ? "waiting" : "working",
+                    label: current.state === "queued" ? "Waiting to start" : "Thinking",
+                    since: current.created_at ?? new Date().toISOString(), step: null }}
+                  runStartedAt={current.created_at}
+                  onStop={item.id === run?.id && !busy ? () => void stop() : undefined} />
+                {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
+              </div>
             </div>}
-          </article>;
+          </div>;
         })}
-        {run && !conversation?.runs.some(item => item.id === run.id)
-          && (compactionRun(run) ? <CompactionStatus run={run} /> : <ResearchProgress run={run} />)}
-        {busy && !run && <p role="status">Connecting to Ask IRIS…</p>}
+        {busy && !run && <p role="status" className="text-sm text-stone-600">Connecting to Ask IRIS…</p>}
         {error && <div role="alert" className="space-y-2 text-sm text-stone-700">
           <p>{error.message}</p>
           {error.retry && <button type="button" disabled={busy} onClick={() => void reconnect()} className="min-h-11 underline text-brand">Reconnect</button>}
@@ -343,9 +372,9 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         {canRetry && <button type="button" onClick={() => void retryRun()}
           className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
           Try this question again</button>}
-        {run && activeRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
+        {run && activeRun(run) && compactionRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
           className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
-          {compactionRun(run) ? "Stop compaction" : "Stop research"}</button>}
+          Stop compaction</button>}
       </div>
     </div>
     {canCompact && <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-2 text-sm text-stone-700">
@@ -360,6 +389,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"}>
       <ModelPill name="Research depth" value={depth} options={DEPTHS} onChange={setDepth}
         note="IRIS chooses the model for each answer." />
+      {usage.latest && <TokenUsageMeter usage={usage.latest} totals={usage.totals} />}
     </ChatInput>
   </div>;
 }
