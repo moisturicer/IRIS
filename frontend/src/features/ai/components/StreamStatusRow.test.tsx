@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen } from "@/test/render";
-import type { StreamingState } from "../conversation/answerStream";
+import type { StreamingState } from "../conversation/streamingState";
 
 import { StreamStatusRow, formatElapsed } from "./StreamStatusRow";
 

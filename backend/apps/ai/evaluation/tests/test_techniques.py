@@ -40,8 +40,9 @@ ADR_033_TECHNIQUES = {
     "token_budget",
 }
 
-# ADR-035 §1 registers the evidence decision under the same convention (IR-466).
-REGISTERED = ADR_033_TECHNIQUES | {"evidence_decision"}
+# ADR-035 §1's evidence decision was registered here too, until IR-957
+# retired the shadow it switched.
+REGISTERED = ADR_033_TECHNIQUES
 
 
 # -- the registry -------------------------------------------------------------

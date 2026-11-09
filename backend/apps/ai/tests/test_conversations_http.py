@@ -18,19 +18,15 @@ import pytest
 from django.urls import reverse
 
 from apps.ai.composition import use_composition_root
+from apps.ai.answers.citations import GENERATED, NO_SOURCES, PARTIAL, UNAVAILABLE
 from apps.ai.models import Conversation, Turn
 from apps.records.models import Record
-from core.enums import PipelineStatus
 from core.permissions import ROLE_ADVISER, ROLE_IERC, ROLE_KTTO
 
 from .corpus import (
     FLOOD_QUESTION,
     FLOOD_TEXT,
     POND_TEXT,
-    _BrokenLLM,
-    _CutOffLLM,
-    ask,
-    ask_stream,
     make_record,
     make_user,
     root_with,
@@ -51,8 +47,38 @@ def conversation_url(pk):
     return reverse("ai-conversation-detail", args=[pk])
 
 
+class _Reply:
+    """What the retired endpoints used to answer, built from stored rows (IR-957)."""
+
+    def __init__(self, status_code, body):
+        self.status_code, self._body = status_code, body
+
+    def json(self):
+        return self._body
+
+
 def start(client, **body):
-    return client.post(conversations_url(), body, format="json")
+    """A Conversation for the signed-in caller. `POST /ai/conversations/` is gone,
+    so this writes the row the way the old endpoint did."""
+    user = client.handler._force_user
+    record = Record.objects.filter(pk=body["record"]).first() if body.get("record") else None
+    conversation = Conversation.objects.create(
+        user=user, record=record, title=body.get("title", ""))
+    return _Reply(201, {"id": conversation.pk, "title": conversation.title,
+                        "record": conversation.record_id})
+
+
+def ask(client, question, conversation_id, **_):
+    """One answered Turn citing the first live chunk, as Django's answer path stored it."""
+    from apps.ai.models import DocumentChunk, TurnCitation
+
+    conversation = Conversation.objects.get(pk=conversation_id)
+    chunk = DocumentChunk.objects.filter(deleted_at__isnull=True).order_by("pk").first()
+    turn = Turn.objects.create(conversation=conversation, question=question,
+                               answer="Rainfall gauges [1].", state="generated")
+    TurnCitation.objects.create(turn=turn, marker=1, record_id=chunk.record_id,
+                                chunk=chunk, page=chunk.source_page)
+    return _Reply(200, {})
 
 
 def _without_pk(response, pk):
@@ -64,53 +90,6 @@ def _without_pk(response, pk):
 
 
 class StartingAConversationTests:
-    def test_a_conversation_is_created_for_the_caller_and_listed_back(
-        self, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        client = client_for(reader)
-
-        created = start(client, title="Flooding")
-        assert created.status_code == 201
-        assert created.json()["title"] == "Flooding"
-        assert created.json()["record"] is None
-
-        listed = client.get(conversations_url()).json()
-        assert [c["id"] for c in listed] == [created.json()["id"]]
-
-    def test_a_conversation_can_be_scoped_to_a_record(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-
-        body = start(client_for(reader), record=flood.pk).json()
-
-        assert body["record"] == flood.pk
-        assert body["record_title"] == "Flood Prediction"
-
-    def test_a_record_the_caller_cannot_read_cannot_be_scoped_to(
-        self, embedder, space, client_for
-    ):
-        """Scoping to a hidden draft would confirm it exists, so the refusal
-        is the same one a missing record gets."""
-        author = make_user("author@cit.edu")
-        stranger = make_user("stranger@cit.edu")
-        hidden = make_record(title="Hidden Draft", text=FLOOD_TEXT, owner=author,
-                             status=PipelineStatus.DRAFT, embedder=embedder,
-                             space=space)
-
-        refused = start(client_for(stranger), record=hidden.pk)
-        missing = start(client_for(stranger), record=hidden.pk + 10_000)
-
-        assert refused.status_code == missing.status_code == 400
-        # Identical but for the id the caller supplied, which it already knew.
-        # Anything else in the wording would be the existence check this
-        # refusal exists to withhold.
-        assert _without_pk(refused, hidden.pk) == _without_pk(
-            missing, hidden.pk + 10_000
-        )
 
     def test_listing_can_be_filtered_to_the_conversation_for_one_record(
         self, embedder, space, client_for
@@ -160,162 +139,6 @@ class StartingAConversationTests:
 # -- asking inside a conversation ---------------------------------------------
 
 
-class AppendingTurnsTests:
-    def test_asking_with_a_conversation_id_stores_the_question_and_answer(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            answered = ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
-
-        assert answered.status_code == 200
-        assert answered.json()["conversation_id"] == conversation_id
-
-        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        assert turn["question"] == FLOOD_QUESTION
-        assert turn["answer"] == answered.json()["answer"]
-        assert turn["state"] == "generative"
-
-    def test_a_stored_turn_keeps_the_citations_the_answer_used(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            live = ask(client, FLOOD_QUESTION,
-                       conversation_id=conversation_id).json()
-
-        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        stored, = turn["citations"]
-        live_citation, = live["citations"]
-        assert stored["record_id"] == flood.pk
-        assert stored["chunk_id"] == live_citation["chunk_id"]
-        assert stored["page"] == 4
-        assert stored["marker"] == 1
-
-    def test_a_stored_citation_holds_no_passage_text(
-        self, embedder, space, client_for
-    ):
-        """A stored citation is a pointer, never text (IR-294). Text frozen
-        into history outlives the permission that allowed it."""
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
-
-        from apps.ai.models import TurnCitation
-
-        stored, = TurnCitation.objects.all()
-        assert "rainfall gauge" not in str(stored.__dict__)
-
-    def test_a_citation_to_a_record_the_reader_can_no_longer_see_is_dropped(
-        self, embedder, space, client_for
-    ):
-        """History cannot outlive permission. The Turn stays — the question
-        was still asked — but the pointer into a now-unreadable Record does
-        not come back."""
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
-
-        Record.objects.filter(pk=flood.pk).update(
-            pipeline_status=PipelineStatus.DRAFT
-        )
-
-        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        assert turn["citations"] == []
-        assert turn["question"] == FLOOD_QUESTION
-
-    def test_omitting_the_conversation_id_still_answers_and_stores_nothing(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-
-        with use_composition_root(root_with(embedder=embedder)):
-            body = ask(client_for(reader), FLOOD_QUESTION).json()
-
-        assert body["answer"]
-        assert body["conversation_id"] is None
-        assert Conversation.objects.count() == 0
-        assert Turn.objects.count() == 0
-
-    def test_asking_into_someone_elses_conversation_is_a_404(
-        self, embedder, space, client_for
-    ):
-        owner = make_user("owner@cit.edu")
-        stranger = make_user("stranger@cit.edu")
-        conversation_id = start(client_for(owner)).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            refused = ask(client_for(stranger), FLOOD_QUESTION,
-                          conversation_id=conversation_id)
-
-        assert refused.status_code == 404
-        assert Turn.objects.count() == 0
-
-    def test_asking_into_a_conversation_that_never_existed_is_the_same_404(
-        self, embedder, space, client_for
-    ):
-        owner = make_user("owner@cit.edu")
-        stranger = make_user("stranger@cit.edu")
-        conversation_id = start(client_for(owner)).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            client = client_for(stranger)
-            refused = ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
-            missing = ask(client, FLOOD_QUESTION, conversation_id=conversation_id + 999)
-
-        assert refused.status_code == missing.status_code == 404
-        assert refused.json() == missing.json()
-
-    def test_a_conversation_id_that_is_not_a_number_is_refused_not_a_500(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        with use_composition_root(root_with(embedder=embedder)):
-            response = ask(client_for(reader), FLOOD_QUESTION,
-                           conversation_id="not-an-id")
-        assert response.status_code in (400, 404)
-
-    def test_the_first_question_names_an_untitled_conversation(
-        self, embedder, space, client_for
-    ):
-        """So a sidebar of conversations is findable without anyone naming
-        each one by hand."""
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
-
-        assert client.get(
-            conversation_url(conversation_id)
-        ).json()["title"] == FLOOD_QUESTION
-
-
 # -- re-resolving a stored citation's quote (IR-299) ---------------------------
 
 
@@ -324,30 +147,6 @@ class CitationReResolutionTests:
     transcript re-resolves it against the reader's *current* visibility and
     the chunk's *current* liveness, rather than replaying whatever was true
     when the Turn was written."""
-
-    def test_a_visible_citation_replays_with_its_quote_and_page(
-        self, embedder, space, client_for
-    ):
-        """The whole point of IR-299: a reopened transcript shows the same
-        quote a fresh answer would, not a bare pointer."""
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            live = ask(client, FLOOD_QUESTION,
-                       conversation_id=conversation_id).json()
-
-        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        stored, = turn["citations"]
-        live_citation, = live["citations"]
-
-        assert stored["text"] == live_citation["text"]
-        assert stored["record_title"] == live_citation["record_title"]
-        assert stored["page"] == live_citation["page"]
-        assert stored["context_path"] == live_citation["context_path"]
 
     def test_a_citation_whose_chunk_was_tombstoned_by_rechunking_degrades_to_a_record_level_link(
         self, embedder, space, client_for
@@ -417,297 +216,44 @@ class CitationReResolutionTests:
         assert len(eight_turns.captured_queries) == len(one_turn.captured_queries)
 
 
-class ScopedRetrievalTests:
-    """A Conversation scoped to a Record retrieves only that Record's
-    passages by default, and only widens when explicitly asked (IR-298,
-    ADR-026 §9)."""
-
-    def test_a_scoped_conversation_only_retrieves_its_record(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-        make_record(title="Tilapia Ponds", text=POND_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client, record=flood.pk).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            body = ask(client, FLOOD_QUESTION,
-                      conversation_id=conversation_id).json()
-
-        assert [c["record_id"] for c in body["citations"]] == [flood.pk]
-        assert body["widened"] is False
-
-    def test_a_scoped_conversation_never_answers_from_another_paper_unasked(
-        self, embedder, space, client_for
-    ):
-        """The reader must never get an answer drawn from a different paper
-        without having asked for it -- a pond question inside a Conversation
-        scoped to the flood paper still only ever cites the flood paper."""
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-        make_record(title="Tilapia Ponds", text=POND_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client, record=flood.pk).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            body = ask(client, POND_QUESTION,
-                      conversation_id=conversation_id).json()
-
-        assert [s["id"] for s in body["sources"]] == [flood.pk]
-        assert body["widened"] is False
-
-    def test_widen_reaches_every_readable_paper(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-        pond = make_record(title="Tilapia Ponds", text=POND_TEXT,
-                           embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client, record=flood.pk).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            body = ask(client, POND_QUESTION, conversation_id=conversation_id,
-                      widen=True).json()
-
-        # Widened, so both papers are reachable -- the pond paper is the
-        # better match and ranks first, but the flood paper is no longer
-        # excluded the way it is in the unwidened test above.
-        assert body["sources"][0]["id"] == pond.pk
-        assert {s["id"] for s in body["sources"]} == {flood.pk, pond.pk}
-        assert body["widened"] is True
-
-    def test_widening_is_a_per_question_choice_not_a_standing_one(
-        self, embedder, space, client_for
-    ):
-        """Widening once must not leak into the next question -- scope
-        changes only when the reader asks, every time."""
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-        make_record(title="Tilapia Ponds", text=POND_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client, record=flood.pk).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            ask(client, POND_QUESTION, conversation_id=conversation_id, widen=True)
-            second = ask(client, POND_QUESTION,
-                        conversation_id=conversation_id).json()
-
-        # Back to scoped, as if the first widened question never happened.
-        assert second["widened"] is False
-        assert [s["id"] for s in second["sources"]] == [flood.pk]
-
-    def test_widen_does_nothing_to_an_unscoped_conversation(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            body = ask(client, FLOOD_QUESTION, conversation_id=conversation_id,
-                      widen=True).json()
-
-        assert body["widened"] is False
-
-    def test_widen_does_nothing_without_a_conversation_at_all(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-
-        with use_composition_root(root_with(embedder=embedder)):
-            body = ask(client_for(reader), FLOOD_QUESTION, widen=True).json()
-
-        assert body["widened"] is False
-        assert body["answer"]
-
-    def test_the_widened_flag_is_stored_and_replayed(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client, record=flood.pk).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            ask(client, FLOOD_QUESTION, conversation_id=conversation_id,
-               widen=True)
-
-        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        assert turn["widened"] is True
-
-    def test_a_scoped_record_that_is_no_longer_readable_yields_no_results(
-        self, embedder, space, client_for
-    ):
-        """The scope is applied through `visible_to`, never instead of it: a
-        Record can stop being readable after a Conversation was scoped to it,
-        and retrieval must still refuse it."""
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client, record=flood.pk).json()["id"]
-
-        Record.objects.filter(pk=flood.pk).update(
-            pipeline_status=PipelineStatus.DRAFT
-        )
-
-        with use_composition_root(root_with(embedder=embedder)):
-            body = ask(client, FLOOD_QUESTION,
-                      conversation_id=conversation_id).json()
-
-        assert body["sources"] == []
-        assert body["mode"] == "no_results"
-
-
 class ReplayingATurnTests:
-    def test_a_turn_written_when_no_model_was_reachable_replays_as_unavailable(
-        self, embedder, space, client_for
-    ):
-        """The stored state is the domain's, mapped to the wire on the way
-        out — so a reopened transcript can never present "no model was
-        reachable" as an answer somebody wrote."""
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
+    """A Turn Django stored before IR-957 replays under its own state, never as an answer it was not.
+
+    Django no longer writes Turns, so each is stored the way its answer path left it.
+    """
+
+    def _replayed(self, client_for, state, answer):
+        client = client_for(make_user("reader@cit.edu"))
         conversation_id = start(client).json()["id"]
-
-        with use_composition_root(
-            root_with(embedder=embedder, llm=_BrokenLLM())
-        ):
-            live = ask(client, FLOOD_QUESTION,
-                       conversation_id=conversation_id).json()
-
+        stored = Turn.objects.create(conversation_id=conversation_id, question=FLOOD_QUESTION,
+                                     answer=answer, state=state)
         turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        assert live["mode"] == turn["state"] == "unavailable"
+        return turn, stored
+
+    def test_a_turn_written_when_no_model_was_reachable_replays_as_unavailable(self, client_for):
+        turn, stored = self._replayed(client_for, UNAVAILABLE, "No answering model was reachable.")
+        assert turn["state"] == "unavailable"
         assert turn["answer"] is None
-        assert turn["message"] == live["message"]
+        assert turn["message"] == stored.answer
 
-    def test_a_turn_that_found_nothing_replays_as_no_results(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            live = ask(client, FLOOD_QUESTION,
-                       conversation_id=conversation_id).json()
-
-        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        assert live["mode"] == turn["state"] == "no_results"
+    def test_a_turn_that_found_nothing_replays_as_no_results(self, client_for):
+        turn, _ = self._replayed(client_for, NO_SOURCES, "")
+        assert turn["state"] == "no_results"
         assert turn["answer"] is None
-        assert turn["message"] == live["message"]
+        assert turn["message"]
 
-    def test_a_partial_turn_replays_with_its_partial_flag_set(
-        self, embedder, space, client_for
-    ):
-        """A stream cut off mid-answer (IR-328) stores `state="partial"`.
-        Since IR-458 `answer_mode` maps that to `"partial"` -- the fragment
-        rides in `message`, `answer` is null, so it is never presented as a
-        finished answer -- and the `partial` flag stays for clients that
-        render the fragment with a notice (IR-329)."""
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder, llm=_CutOffLLM())):
-            response = ask_stream(client, FLOOD_QUESTION, conversation_id=conversation_id)
-            with pytest.raises(RuntimeError):
-                b"".join(response.streaming_content)
-
-        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
-        stored = Turn.objects.get(conversation_id=conversation_id)
+    def test_a_partial_turn_replays_with_its_partial_flag_set(self, client_for):
+        """The fragment rides in `message`, never `answer` (IR-328, IR-458)."""
+        turn, stored = self._replayed(client_for, PARTIAL, "Rainfall gauges were")
         assert turn["state"] == "partial"
         assert turn["partial"] is True
         assert turn["answer"] is None
         assert turn["message"] == stored.answer
 
-    def test_a_complete_turn_replays_with_no_partial_flag(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        with use_composition_root(root_with(embedder=embedder)):
-            ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
-
-        turn, = client.get(conversation_url(conversation_id)).json()["turns"]
+    def test_a_complete_turn_replays_with_no_partial_flag(self, client_for):
+        turn, stored = self._replayed(client_for, GENERATED, "Rainfall gauges.")
         assert turn["partial"] is False
-
-
-@pytest.mark.slow
-class LongConversationTests:
-    def test_a_conversation_well_past_five_turns_succeeds(
-        self, embedder, space, client_for
-    ):
-        """The live bug this ticket fixes as a side effect. The frontend sent
-        the whole transcript as the question and the endpoint caps a question
-        at 2,000 characters, so conversations died at roughly six turns. With
-        history behind a conversation id, a question is just a question."""
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        # Each question is the length a real one is, so the *transcript* —
-        # what the old client sent as the question — passes 2,000 characters
-        # around turn six. That is the condition that used to fail, and
-        # asserting on twelve short questions would not reproduce it.
-        questions = [
-            f"{FLOOD_QUESTION} {'detail ' * 40} follow-up {turn}"
-            for turn in range(12)
-        ]
-        assert len(questions[0]) > 300
-
-        with use_composition_root(root_with(embedder=embedder)):
-            for turn, question in enumerate(questions):
-                response = ask(client, question, conversation_id=conversation_id)
-                assert response.status_code == 200, f"turn {turn} failed"
-
-        body = client.get(conversation_url(conversation_id)).json()
-        assert len(body["turns"]) == 12
-        transcript = "".join(t["question"] + (t["answer"] or "")
-                             for t in body["turns"])
-        assert len(transcript) > 2 * 2000, (
-            "the transcript must exceed the cap that used to be applied to it"
-        )
-        # In the order they were asked, so a reopened transcript reads as the
-        # conversation that happened.
-        assert [t["question"] for t in body["turns"]] == questions
-
-    def test_the_question_length_guard_still_applies(self, client_for):
-        """Kept as a plain abuse guard, which is all it was ever supposed to
-        be — it stopped being load-bearing when history left the question."""
-        reader = make_user("reader@cit.edu")
-        client = client_for(reader)
-        conversation_id = start(client).json()["id"]
-
-        response = ask(client, "x" * 2001, conversation_id=conversation_id)
-        assert response.status_code == 400
-
-
-# -- the privacy property ------------------------------------------------------
+        assert turn["answer"] == stored.answer
 
 
 class PrivacyTests:

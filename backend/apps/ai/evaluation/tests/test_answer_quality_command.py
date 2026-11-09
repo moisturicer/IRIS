@@ -60,12 +60,15 @@ def test_a_paid_run_refuses_before_sending_without_a_runtime_and_enforced_admiss
     _call("--write-lock", str(lock), "--grader-model", GRADER)
     with pytest.raises(CommandError, match="--runtime-url"):
         _call("--run", "--lock", str(lock), "--grader-model", GRADER)
-    settings.AI_DURABLE_ASK = False
-    settings.AI_EVIDENCE_DECISION = "off"
+    # Django no longer answers (IR-957), so its arm must come from an earlier run.
+    with pytest.raises(CommandError, match="--reuse-django"):
+        _call("--run", "--lock", str(lock), "--grader-model", GRADER,
+              "--runtime-url", "http://runtime.invalid", "--runtime-model", "m")
     settings.AI_PROVIDER_ADMISSION = "off"
     with pytest.raises(CommandError, match="enforce"):
         _call("--run", "--lock", str(lock), "--grader-model", GRADER,
-              "--runtime-url", "http://runtime.invalid", "--runtime-model", "m")
+              "--runtime-url", "http://runtime.invalid", "--runtime-model", "m",
+              "--reuse-django", str(tmp_path / "earlier.json"))
 
 
 def test_a_lowered_family_minimum_validates_a_draft_but_never_freezes_it(tmp_path):
@@ -189,17 +192,6 @@ def test_a_paper_the_disclosure_gate_withholds_is_a_condition_problem():
     assert _withheld_problems(papers[:1], explain.get) == []
     problems = _withheld_problems(papers, explain.get)
     assert len(problems) == 1 and "1 of 2" in problems[0] and "consented" in problems[0]
-
-
-def test_preflight_prices_every_model_django_may_call_including_the_router(settings):
-    from apps.ai.management.commands.eval_answer_quality import _django_models
-    from apps.ai.providers.openrouter_decisions import PINNED_MODEL
-
-    settings.LLM_ROUTE_MODEL = "vendor/router-backup"
-    settings.AI_JEV_ROUTING_ENABLED = True
-    assert {PINNED_MODEL, "vendor/router-backup"} <= _django_models()
-    settings.AI_JEV_ROUTING_ENABLED = False
-    assert PINNED_MODEL not in _django_models()
 
 
 def test_a_throttled_edge_grant_is_not_mistaken_for_a_refusal():

@@ -22,7 +22,7 @@ from apps.ai.evidence.model_decision import (
     ModelDecision,
 )
 from apps.ai.models import Conversation, Turn
-from apps.ai.tests.test_eval_evidence_model_command import direct, grounded, write_set
+from apps.ai.tests.evidence_sets import direct, grounded, write_set
 
 pytestmark = pytest.mark.django_required
 

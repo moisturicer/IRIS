@@ -32,6 +32,8 @@ class AgentProfile:
     limits: Limits
     #: None never compacts (IR-734).
     compaction: Optional[Compaction] = None
+    #: "enforce" repairs or trims a failing draft; "flag" delivers it and notes what it could not match; "advisory" only logs.
+    checks: str = "enforce"
     #: Read-only calls in one tool group fetched at once; 1 runs them one by one (IR-1003).
     tool_concurrency: int = 1
 
@@ -101,6 +103,9 @@ def read(values) -> AgentProfile:
         if not compaction.fits(provider.capacities[model], reserves):
             raise NotConfigured("RUNS_AGENT_COMPACTION leaves no room to summarize or finish"
                                 " under RUNS_AGENT_MODEL's capacity")
+    checks = str(getattr(values, "RUNS_AGENT_CHECKS", "") or "enforce").strip().lower()
+    if checks not in ("enforce", "flag", "advisory"):
+        raise NotConfigured("RUNS_AGENT_CHECKS must be enforce, flag or advisory")
     pin = Pin(
         model=model, endpoint=provider.endpoint, adapter=OpenAICompatibleAgentProvider.adapter,
         dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=CHAT_PROMPT_VERSION,
@@ -108,7 +113,7 @@ def read(values) -> AgentProfile:
         state_version=runs_config.SCHEMA, data_policy=provider.data_policy,
     )
     return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits,
-                        compaction=compaction, tool_concurrency=_tool_concurrency(values))
+                        compaction=compaction, checks=checks, tool_concurrency=_tool_concurrency(values))
 
 
 def executor(profile: AgentProfile, dsn: str, *, provider=None):
@@ -125,7 +130,7 @@ def executor(profile: AgentProfile, dsn: str, *, provider=None):
     admitted = AdmittedAgentProvider(inner, Ledger(dsn, profile.limits), purpose=PURPOSE)
     return AgentExecutor(admitted, profile.pin, profile.reserves, profiles=profile.bounds,
                          price=profile.limits.prices[profile.pin.model], compaction=profile.compaction,
-                         tool_concurrency=profile.tool_concurrency)
+                         checks=profile.checks, tool_concurrency=profile.tool_concurrency)
 
 
 def selected(values) -> Optional[AgentProfile]:

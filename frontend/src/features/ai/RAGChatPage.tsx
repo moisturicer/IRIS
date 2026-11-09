@@ -1,627 +1,128 @@
-import { errorDetail } from "@/lib/errorDetail";
-import { readFailureKind } from "@/lib/readFailure";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { Skeleton } from "@/components/ui";
-import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { cn } from "@/lib/utils";
-import { InterruptedState } from "@/components/shared/InterruptedState";
-import { TONES } from "@/components/ui/statusTones";
 /**
- * FR-M3-01 — Conversational RAG chatbot UI (SDD Module 3).
+ * Ask IRIS (FR-M3-01). Every question is answered by the AI runtime (IR-957):
+ * `/ai` starts a conversation and `/ai/conversations/<uuid>` reopens one.
  *
- * Conversations are persisted server-side (IR-295) and read/written through
- * the same API Paper Chat uses (IR-298) -- there is one Conversation model
- * for both surfaces, not a local transcript glued into the question on every
- * turn. History travels as a `conversation_id`; a question is just a
- * question, and IRIS resolves what "its" refers to on the server.
- *
- * **Every conversation has its own address (IR-548)**,
- * `/ai/conversations/<id>`. `/ai` itself only decides which one to open --
- * the latest, a new one, a Record's (`?record=`) or one for a handed-off
- * draft -- and replaces itself with that address. Opening an address,
- * refreshing it, or moving back and forward loads the conversation through
- * the owner-scoped API, so the address grants nothing: someone else's reads
- * exactly like a missing one. A queued question still answering when the
- * page opens is followed again from its first event; one that ended without
- * its answer says so and offers Retry.
+ * A numeric address is a Conversation Django answered before the switch. It
+ * opens read-only (`EarlierConversation`), so nothing a reader asked is lost,
+ * and continuing it means asking again here.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { conversationPath, useConsumeHandoff } from "@/lib/askHandoff";
-import { CitationConversationContext, CitationTurnContext, addressNumber } from "@/lib/citedPage";
-import { aiApi } from "@/api/ai";
+import { useConsumeHandoff } from "@/lib/askHandoff";
+import { runtimeReader, type ReaderConversationSummary } from "@/api/runtimeReader";
 import { useUIStore } from "@/store/ui.store";
-import type { ChatMessage } from "@/types/chat";
-import type { AIStatus, ConversationDetail, ConversationSummary } from "@/types/ai";
-import { recordsApi } from "@/api/records";
-import { AskIrisMark } from "./components/AskIrisIcons";
-import { ChatMessageList } from "./components/ChatMessageList";
-import { ChatInput } from "./components/ChatInput";
-import { CHAT_OPENING } from "./components/answerLayout";
-import { ComparisonPicker } from "./components/ComparisonPicker";
-import { ModelPill } from "./components/ModelPill";
+import { useElementWidth } from "@/hooks/useElementWidth";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { RuntimeReader } from "./components/RuntimeReader";
+import { EarlierConversation } from "./components/EarlierConversations";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
-import { ConversationHistoryList, ConversationSidebar } from "./components/ConversationSidebar";
-import { SourceContextPanel, SourcePassages } from "./components/SourceContextPanel";
+import { ConversationHistoryList, ConversationSidebar, NewChatButton } from "./components/ConversationSidebar";
 import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
-import { useElementWidth } from "@/hooks/useElementWidth";
-import { useConversationClient } from "./conversation/useConversationClient";
-import { useReaderPath } from "@/api/runtimeReader";
-import { RuntimeReader } from "./components/RuntimeReader";
 
-/** History or sources: the two panels that sit beside the answer, or open over it (IR-570). */
-type AskPanel = "history" | "sources";
+const RUNTIME_ID = /^[0-9a-f-]{36}$/i;
+const EARLIER_ID = /^[1-9]\d*$/;
 
-/** The composer's accessible name, and its placeholder where there is room. */
-const FOLLOW_UP_LABEL = "Ask a follow-up about the research corpus…";
-
-/** The address's conversation id: `undefined` at `/ai`, `null` if malformed. */
-function parseConversationParam(raw: string | undefined): number | null | undefined {
-  if (raw === undefined) return undefined;
-  return /^[1-9]\d*$/.test(raw) ? Number(raw) : null;
-}
-
-/**
- * The key chat history lived under before Conversations were persisted
- * server-side. Read only to decide whether to explain the sidebar emptying
- * (IR-298) -- what it held is demo and testing chats against a corpus of
- * stub files, not migrated (IR-294 §Further Notes).
- */
-const LEGACY_STORAGE_KEY = "iris_rag_conversations";
-
-function useLegacyConversationsNotice() {
-  const [visible, setVisible] = useState(() => {
-    try {
-      return localStorage.getItem(LEGACY_STORAGE_KEY) !== null;
-    } catch {
-      return false;
-    }
-  });
-
-  const dismiss = () => {
-    try {
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
-    } catch {
-      /* per-browser convenience only */
-    }
-    setVisible(false);
-  };
-
-  return { visible, dismiss };
-}
+type AskPanel = "history";
 
 export default function RAGChatPage() {
   const rawId = useParams().conversationId;
-  // The server's switch decides the path (IR-863). Neither page mounts before
-  // it is known, so the Django page's requests are exactly what they were.
-  const path = useReaderPath();
-  if (!path) return <p role="status" className="p-6 text-sm text-stone-600">Opening Ask IRIS…</p>;
-  if (path === "runtime" && (!rawId || /^[0-9a-f-]{36}$/i.test(rawId))) return <RuntimeAskPage />;
-  return <LegacyRAGChatPage />;
+  if (rawId && EARLIER_ID.test(rawId) && Number.isSafeInteger(Number(rawId))) {
+    return <EarlierConversation id={Number(rawId)} />;
+  }
+  if (rawId && !RUNTIME_ID.test(rawId)) {
+    return <p role="alert" className="p-6">This conversation could not be opened.</p>;
+  }
+  return <RuntimeAskPage />;
 }
 
 function RuntimeAskPage() {
   const { conversationId } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const draft = useConsumeHandoff();
+  const addToast = useUIStore(s => s.addToast);
   const rawRecord = params.get("record");
   const recordId = rawRecord && /^[1-9]\d*$/.test(rawRecord) ? Number(rawRecord) : undefined;
-  if (rawRecord !== null && (!recordId || !Number.isSafeInteger(recordId))) {
-    return <p role="alert" className="p-6">This paper could not be opened.</p>;
-  }
-  return <div className="flex h-full min-h-0 flex-col">
-    <header className="flex items-center justify-between gap-4 border-b border-stone-200 px-6 py-4">
-      <h1 className="font-display text-2xl text-stone-900">Ask IRIS</h1>
-      <button type="button" className="min-h-11 text-sm text-brand underline" onClick={() => navigate("/ai")}>New conversation</button>
-    </header>
-    <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
-      onConversation={id => { if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true }); }} />
-  </div>;
-}
+  const api = useMemo(() => runtimeReader(), []);
 
-// The server picks the model; a reader has no choice to make (ADR-036).
-const ANSWER_MODEL = [
-  { value: "auto", short: "Auto", label: "Auto", description: "IRIS chooses the model for each answer", icon: "far fa-lightbulb" },
-] as const;
-
-function LegacyRAGChatPage() {
-  const [searchParams] = useSearchParams();
-  const recordParam = searchParams.get("record");
-  const routeId = parseConversationParam(useParams().conversationId);
-  const atIndex = routeId === undefined;
-  const navigate = useNavigate();
-  const addToast       = useUIStore((s) => s.addToast);
-  const legacyNotice    = useLegacyConversationsNotice();
-  const handoff         = useConsumeHandoff();
-
-  const [conversations, setConversations]   = useState<ConversationSummary[]>([]);
-  const [historyOpen, setHistoryOpen]       = useState(true);
-  const [sourcesOpen, setSourcesOpen]       = useState(false);
-  const [status, setStatus]                 = useState<AIStatus | null>(null);
-  const [suggestions, setSuggestions]       = useState<string[]>([]);
-  const [deleteTarget, setDeleteTarget] = useState<ConversationSummary | null>(null);
+  const [conversations, setConversations] = useState<ReaderConversationSummary[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<ReaderConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  /**
-   * A conversation (or the list) that did not load (IR-906). `interrupted` is a
-   * timeout (Retry); anything else is a failure (Try again). A missing or
-   * refused conversation is not this: it is `client.unavailable`.
-   */
-  const [loadFailure, setLoadFailure] = useState<{ interrupted: boolean; noun: string; subject: string } | null>(null);
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  // Too narrow to hold history and sources beside the answer, they open one at
-  // a time as drawers over it, closed until asked for (IR-570). Unmeasured
-  // (jsdom, the first paint) counts as wide: the layout this page always had.
-  const [observePage, pageWidth]            = useElementWidth<HTMLDivElement>();
-  const panelsAsDrawers = pageWidth > 0 && pageWidth < ASK_PANELS_INLINE_PX;
-  const [drawer, setDrawer]                 = useState<AskPanel | null>(null);
-  // The toggle that opened the drawer, read as it is activated: once the page
-  // behind goes inert the browser has already taken focus off it.
-  const drawerOpener                        = useRef<HTMLElement | null>(null);
-  /** Whether `panel` is showing: in its drawer, or as its column. */
-  const panelShown = (panel: AskPanel) =>
-    panelsAsDrawers ? drawer === panel : panel === "history" ? historyOpen : sourcesOpen;
-  /** The toolbar's toggle: opens `panel`'s drawer, or shows or hides its column. */
-  const togglePanel = (panel: AskPanel) => {
-    if (!panelsAsDrawers) {
-      (panel === "history" ? setHistoryOpen : setSourcesOpen)((v) => !v);
-      return;
-    }
+  const [observePage, pageWidth] = useElementWidth<HTMLDivElement>();
+  const asDrawers = pageWidth > 0 && pageWidth < ASK_PANELS_INLINE_PX;
+  const [drawer, setDrawer] = useState<AskPanel | null>(null);
+  const drawerOpener = useRef<HTMLElement | null>(null);
+
+  const refreshList = useCallback(async () => {
+    try { setConversations(await api.list()); } catch { /* the list is a convenience; the reader still works */ }
+  }, [api]);
+  useEffect(() => { void refreshList(); }, [refreshList, conversationId]);
+  useEffect(() => { setDrawer(null); }, [conversationId]);
+  useEffect(() => { setDrawer(null); }, [asDrawers]);
+
+  const shown = (panel: AskPanel) => asDrawers ? drawer === panel : historyOpen;
+  const toggle = (panel: AskPanel) => {
+    if (!asDrawers) { setHistoryOpen(v => !v); return; }
     drawerOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setDrawer(panel);
   };
-  const refreshList = useCallback(async () => {
-    const { data } = await aiApi.conversations.list();
-    setConversations(data);
-    return data;
-  }, []);
 
-  // Transcripts, drafts, selected answers and answers in flight, one set per
-  // conversation, each answer bound to the conversation that asked (IR-562).
-  const configuredLimit = status?.comparison_max_records;
-  const comparisonLimit = configuredLimit !== undefined && Number.isInteger(configuredLimit) && configuredLimit >= 2
-    ? configuredLimit : undefined;
-  const client = useConversationClient({
-    onAnswered: (_conversationId, message, onScreen) => {
-      if (onScreen && message.citations?.length) setSourcesOpen(true);
-      refreshList();
-    },
-    onFailed: (_conversationId, error) => {
-      addToast({
-        type:    "error",
-        message: errorDetail(error, "IRIS could not answer right now. Check that the AI service is available."),
-      });
-    },
-  }, comparisonLimit);
-  const { activeId, unavailable, messages, selected } = client;
-  const loading = client.isAnswering;
-  const comparisonInvalid = client.comparisonRecords.length > 0 &&
-    (comparisonLimit === undefined || client.comparisonRecords.length < 2 || client.comparisonRecords.length > comparisonLimit);
+  if (rawRecord !== null && (!recordId || !Number.isSafeInteger(recordId))) {
+    return <p role="alert" className="p-6">This paper could not be opened.</p>;
+  }
 
-  // Read off the selected reply itself, so the panel cannot show one answer's
-  // passages beside another, or one conversation's beside another's (IR-284,
-  // IR-562). A newer answer that cited nothing shows that, not older sources.
-  const citations = selected?.citations ?? [];
-  const sources = selected?.sources ?? [];
-  const sourcesAvailable = selected !== null;
+  const title = conversations.find(c => c.id === conversationId)?.title || "New chat";
+  const newChat = () => navigate("/ai");
 
-  const activeTitle = unavailable
-    ? "Conversation unavailable"
-    : conversations.find((c) => c.id === activeId)?.title || "New chat";
-
-  const { open, show, showUnavailable, isOnScreen, setDraftFor } = client;
-
-  // Back from a citation (IR-578): `?turn=` names the answer to come back
-  // to. Once it is on screen it is selected, its sources shown, and the
-  // transcript opens at it.
-  const returnTurn = addressNumber(searchParams.get("turn"));
-  const returnedTo = returnTurn == null
-    ? undefined
-    : messages.find((m) => m.role === "assistant" && m.turnId === returnTurn);
-
-  /** Shows `conversation` and makes its address the current one. */
-  const goTo = useCallback(
-    (conversation: ConversationDetail, replace = false, nextDraft: string | null = null) => {
-      show(conversation);
-      if (nextDraft) setDraftFor(conversation.id, nextDraft);
-      navigate(conversationPath(conversation.id), {
-        replace,
-        // The draft also rides in router state, never the address (IR-559),
-        // so reloading the conversation's address still finds it.
-        state: nextDraft ? { draft: nextDraft } : null,
-      });
-    },
-    [navigate, setDraftFor, show],
-  );
-
-  // `/ai` decides which conversation to open and replaces itself with its
-  // address. An address that names one opens it in the effect below.
-  useEffect(() => {
-    let cancelled = false;
-    const recordId = recordParam;
-    setLoadFailure(null);
-
-    (async () => {
-      try {
-        const list = await refreshList();
-        if (cancelled || !atIndex) return;
-
-        if (recordId) {
-          // A draft scoped to the Record, never an ask: the reader sends it.
-          const nextDraft = `Tell me about research record #${recordId} and summarize its key contributions.`;
-          const { data: scoped } = await aiApi.conversations.list({ record: Number(recordId) });
-          if (cancelled) return;
-          const { data } = scoped.length > 0
-            ? await aiApi.conversations.get(scoped[0].id)
-            : await aiApi.conversations.create({ record: Number(recordId) });
-          if (cancelled) return;
-          goTo(data, true, nextDraft);
-          return;
-        }
-
-        if (handoff) {
-          // A handed-off question opens a new Conversation as an editable draft.
-          const { data } = await aiApi.conversations.create();
-          if (cancelled) return;
-          goTo(data, true, handoff);
-          return;
-        }
-
-        const { data } = list.length > 0
-          ? await aiApi.conversations.get(list[0].id)
-          : await aiApi.conversations.create();
-        if (cancelled) return;
-        goTo(data, true);
-      } catch (error) {
-        if (!cancelled) {
-          setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", noun: "conversations", subject: "your conversations" });
-        }
-      }
-    })();
-
-    return () => { cancelled = true; };
-    // refreshList, goTo and the client's callbacks are stable across renders,
-    // and `handoff` is read once on arrival — only the `record` query param, or arriving at `/ai`
-    // itself, should re-run this.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordParam, atIndex, loadAttempt]);
-
-  // A draft that arrived with a conversation's own address -- a reload after
-  // a handoff -- belongs to the first conversation that address opens.
-  const routedDraft = useRef(atIndex ? null : handoff);
-
-  // Opening an address: directly, on refresh, or by back and forward.
-  useEffect(() => {
-    // At `/ai` the first effect owns the failure; clearing it here would erase it.
-    if (routeId === undefined) return;
-    setLoadFailure(null);
-    if (routeId !== null && isOnScreen(routeId)) return;
-    if (routeId === null) {
-      showUnavailable();
-      return;
-    }
-    open(routeId)
-      .then(() => {
-        const draft = routedDraft.current;
-        routedDraft.current = null;
-        if (draft && isOnScreen(routeId)) setDraftFor(routeId, draft);
-      })
-      .catch((error: unknown) => {
-        setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", noun: "conversation", subject: "this conversation" });
-      });
-  }, [routeId, isOnScreen, open, setDraftFor, showUnavailable, loadAttempt]);
-
-  // A drawer belongs to the layout that opened it, and to the conversation it
-  // was opened over: widening the page or moving to another conversation (a
-  // link in history, New chat) puts the answer back in front.
-  useEffect(() => {
-    setDrawer(null);
-  }, [panelsAsDrawers, activeId]);
-
-  // The sources column describes an answer in the conversation on screen, so
-  // another conversation opens with it closed, until its own answer cites.
-  useEffect(() => {
-    setSourcesOpen(false);
-  }, [activeId]);
-
-  // After the reset above, so the answer returned to keeps its sources open.
-  const { select } = client;
-  useEffect(() => {
-    if (!returnedTo) return;
-    select(returnedTo.id);
-    if (returnedTo.citations?.length && !panelsAsDrawers) setSourcesOpen(true);
-    // Once per answer returned to: selecting another afterwards is the reader's.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [returnedTo?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    aiApi
-      .status()
-      .then(({ data }) => !cancelled && setStatus(data))
-      .catch(() => {});
-
-    // Suggested prompts are built from classifications that actually exist,
-    // so a suggestion never leads to an empty answer.
-    recordsApi
-      .classifications()
-      .then(({ data }) => {
-        if (cancelled) return;
-        const names = (data.results ?? []).map((c) => c.name).slice(0, 4);
-        const fromCatalogue = names.map((n) => `What research exists on ${n.toLowerCase()}?`);
-        // Generic, catalogue-agnostic prompts fill out to 4 when there are
-        // fewer than 4 classifications -- still safe to suggest since they
-        // never assume a specific classification exists.
-        const fallback = [
-          "What research has been published at CIT-U?",
-          "What are the most recent submissions?",
-          "Summarize a thesis from the repository",
-          "What departments have published research?",
-        ];
-        const combined = [...fromCatalogue, ...fallback.filter((p) => !fromCatalogue.includes(p))];
-        setSuggestions(combined.slice(0, 4));
-      })
-      .catch(() => {});
-
-    return () => { cancelled = true; };
-  }, []);
-
-  const handleNewChat = async () => {
-    const { data } = await aiApi.conversations.create();
-    goTo(data);
-    refreshList();
-  };
-
-  const requestDelete = (id: number) => {
-    if (deleting) return;
-    const target = conversations.find((c) => c.id === id);
-    if (!target) return;
-    // Only one focus trap is active: the phone history drawer closes first.
-    setDrawer(null);
-    setDeleteError(null);
-    setDeleteTarget(target);
-  };
-
-  const handleDelete = async () => {
+  const remove = async () => {
     if (!deleteTarget || deleting) return;
-    const id = deleteTarget.id;
-    let removed = false;
-    setDeleting(true);
-    setDeleteError(null);
+    setDeleting(true); setDeleteError(null);
     try {
-      await aiApi.conversations.remove(id);
-      removed = true;
-      client.forget(id);
+      await api.remove(deleteTarget.id);
+      setConversations(all => all.filter(c => c.id !== deleteTarget.id));
+      if (deleteTarget.id === conversationId) navigate("/ai", { replace: true });
       setDeleteTarget(null);
-      setConversations((all) => all.filter((c) => c.id !== id));
-      const list = await refreshList();
-      if (isOnScreen(id) || unavailable) {
-        const { data } = list.length > 0
-          ? await aiApi.conversations.get(list[0].id)
-          : await aiApi.conversations.create();
-        // The deleted address must not come back with Back.
-        goTo(data, true);
-      }
       addToast({ type: "info", message: "Chat removed." });
-    } catch (error) {
-      if (removed) {
-        if (isOnScreen(id)) showUnavailable();
-        addToast({ type: "error", message: "Chat removed, but history could not be refreshed. Reload to continue." });
-      } else {
-        setDeleteError(errorDetail(error, "Could not delete this conversation. Please try again."));
-      }
-    } finally {
-      setDeleting(false);
-    }
+    } catch {
+      setDeleteError("Could not delete this conversation. Please try again.");
+    } finally { setDeleting(false); }
   };
 
-  const handleRetry = async (message: ChatMessage) => {
-    try {
-      await client.retry(message);
-    } catch (error) {
-      addToast({ type: "error", message: errorDetail(error, "IRIS could not retry that question right now.") });
-    }
-  };
 
-  const centered = !unavailable && !loading && !client.streaming && messages.length === 0;
-
-  return (
-    // `dvh`, not `vh`: the page is the height of what a phone shows, so the
-    // composer stays above the software keyboard rather than under it (IR-570).
-    // Every citation here names its conversation, the way back (IR-578).
-    <CitationConversationContext.Provider value={activeId}>
-    <div ref={observePage} className="relative flex flex-col h-dvh bg-canvas overflow-hidden">
-      <div
-        className="flex flex-1 min-h-0 min-w-0 relative"
-        // Behind an open drawer the page waits, so focus cannot wander to it.
-        {...(drawer ? { inert: "" } : {})}
-      >
-        {!panelsAsDrawers && (
-          <ConversationSidebar
-            conversations={conversations}
-            activeId={activeId}
-            open={historyOpen}
-            onDelete={requestDelete}
-          />
-        )}
-
-        {/* Center: chat. The only `surface` white on the page (IR-570). */}
-        <div className="flex flex-col flex-1 min-w-0 relative bg-surface">
-          <ChatToolbar
-            sessionTitle={activeTitle}
-            historyOpen={panelShown("history")}
-            sourcesOpen={panelShown("sources")}
-            sourcesAvailable={sourcesAvailable}
-            onToggleHistory={() => togglePanel("history")}
-            onToggleSources={() => togglePanel("sources")}
-            onNewChat={handleNewChat}
-            asDrawers={panelsAsDrawers}
-          />
-
-          {legacyNotice.visible && (
-            <div
-              role="status"
-              className="shrink-0 flex items-start gap-2 px-4 py-2 bg-stone-50 border-b border-stone-200 text-[13px] text-stone-600"
-            >
-              <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
-              <p className="flex-1">
-                <strong>Your previous chats are gone.</strong> They were stored only in this
-                browser and are not carried over now that conversations are saved to your
-                account.
-              </p>
-              <button
-                type="button"
-                onClick={legacyNotice.dismiss}
-                aria-label="Dismiss"
-                className="text-stone-400 hover:text-stone-700 shrink-0"
-              >
-                <i className="fas fa-xmark text-[12px]" aria-hidden />
-              </button>
-            </div>
-          )}
-
-          {status && !status.generative && (
-            <div className={`shrink-0 flex items-start gap-2 px-4 py-2 text-[13px] ring-inset ${TONES.active}`}>
-              <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
-              <p>
-                <strong>Retrieval-only mode.</strong> IRIS finds and ranks real passages, but no
-                answering model is configured, so it will return sources rather than a written
-                answer. Set <code className="font-mono">LLM_API_KEY</code> to enable synthesis.
-              </p>
-            </div>
-          )}
-
-          <div className={`flex min-h-0 flex-1 flex-col ${centered ? CHAT_OPENING : ""}`}>
-          {unavailable ? (
-            <div role="status" className="flex-1 flex items-center justify-center p-8 text-center">
-              <div className={`max-w-md rounded-xl px-6 py-5 ${TONES.attention}`}>
-                <h2 className="text-[20px] font-bold mb-2">This conversation is not available.</h2>
-                <p className="text-[15px] leading-relaxed mb-5">
-                  It may have been deleted, or the link may be wrong.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleNewChat}
-                  className="rounded-lg bg-white px-4 py-2 text-[14px] font-semibold text-brand hover:bg-stone-100"
-                >
-                  Start a new chat
-                </button>
-              </div>
-            </div>
-          ) : loadFailure ? (
-            <div className="flex-1 flex items-center justify-center">
-              {loadFailure.interrupted ? (
-                <InterruptedState what={loadFailure.noun} onRetry={() => setLoadAttempt((n) => n + 1)} />
-              ) : (
-                <EmptyState
-                  icon="fa-plug-circle-xmark"
-                  tone="error"
-                  title={`Could not load ${loadFailure.subject}`}
-                  message="Check that the AI service is available, then try again."
-                  action={<button type="button" onClick={() => setLoadAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>}
-                />
-              )}
-            </div>
-          ) : client.isOpening && messages.length === 0 ? (
-            <div className="flex-1">
-              <Skeleton rows={3} label="Loading this conversation…" />
-            </div>
-          ) : (
-            <ChatMessageList
-              messages={messages}
-              isLoading={loading}
-              streaming={client.streaming}
-              suggestions={suggestions}
-              onSuggestion={client.send}
-              indexedRecords={status?.indexed_records ?? null}
-              onRetry={handleRetry}
-              onStop={() => void client.stop()}
-              selectedId={selected?.id ?? null}
-              anchorTurn={returnTurn}
-              onSelectSources={(message) => {
-                client.select(message.id);
-                if (panelsAsDrawers) togglePanel("sources");
-                else setSourcesOpen(true);
-              }}
-            />
-          )}
-          <ChatInput
-            centered={centered}
-            onSend={client.send}
-            draft={client.draft}
-            onDraftChange={client.setDraft}
-            disabled={loading || !activeId}
-            sendDisabled={comparisonInvalid}
-            label={FOLLOW_UP_LABEL}
-            // One line in a phone's composer; the name above stays whole.
-            placeholder={panelsAsDrawers ? "Ask a follow-up…" : FOLLOW_UP_LABEL}
-          >
-            <ComparisonPicker key={activeId} selected={client.comparisonRecords} onChange={client.setComparisonRecords}
-              limit={comparisonLimit} scoped={client.record !== null} disabled={loading || !activeId} />
-            <ModelPill name="Model" value="auto" options={ANSWER_MODEL} />
-          </ChatInput>
-          </div>
+  return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
+    <div className="relative flex min-h-0 min-w-0 flex-1" {...(drawer ? { inert: "" } : {})}>
+      {!asDrawers && <ConversationSidebar conversations={conversations} activeId={conversationId ?? null}
+        open={historyOpen} onNewChat={newChat} onCollapse={() => toggle("history")}
+        onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
+        <ChatToolbar sessionTitle={title} historyOpen={shown("history")}
+          onToggleHistory={() => toggle("history")} asDrawers={asDrawers} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
+            initialDraft={conversationId ? undefined : draft ?? undefined}
+            onAnswered={() => void refreshList()}
+            onConversation={id => {
+              void refreshList();
+              if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true });
+            }} />
         </div>
-
-        {!panelsAsDrawers && (
-          <CitationTurnContext.Provider value={selected?.turnId ?? null}>
-          <SourceContextPanel
-            open={sourcesOpen}
-            citations={citations}
-            sources={sources}
-            question={selected?.question ?? null}
-            onClose={() => setSourcesOpen(false)}
-          />
-          </CitationTurnContext.Provider>
-        )}
       </div>
-
-      {drawer === "history" && (
-        <ChatDrawer
-          title="Chat history"
-          side="start"
-          closeLabel="Close chat history"
-          onClose={() => setDrawer(null)}
-          returnTo={drawerOpener.current}
-        >
-          {/* The toolbar has no room for New chat on a phone; this is its place. */}
-          <div className="shrink-0 px-3 pt-3">
-            <button
-              type="button"
-              onClick={handleNewChat}
-              className="w-full inline-flex items-center justify-center gap-2 min-h-11 px-3 rounded-lg border border-stone-200
-                text-[14px] font-semibold text-stone-700 hover:bg-stone-50 hover:text-stone-900 transition-colors"
-            >
-              <i className="fas fa-plus text-[11px]" aria-hidden />
-              New chat
-            </button>
-          </div>
-          <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={requestDelete} />
-        </ChatDrawer>
-      )}
-      {drawer === "sources" && (
-        <ChatDrawer
-          title="Referenced passages"
-          description={selected?.question ? `For “${selected.question}”` : "The exact text behind the answer"}
-          side="end"
-          closeLabel="Hide sources panel"
-          onClose={() => setDrawer(null)}
-          returnTo={drawerOpener.current}
-        >
-          <CitationTurnContext.Provider value={selected?.turnId ?? null}>
-            <SourcePassages citations={citations} sources={sources} answered={selected !== null} />
-          </CitationTurnContext.Provider>
-        </ChatDrawer>
-      )}
-      <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"
-        message={`Delete “${deleteTarget?.title || "New conversation"}” and its messages? This cannot be undone.`}
-        confirmLabel="Delete conversation" danger focusCancel confirming={deleting} error={deleteError}
-        onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
-    </CitationConversationContext.Provider>
-  );
+
+    {drawer === "history" && <ChatDrawer title="Chat history" side="start" closeLabel="Close chat history"
+      onClose={() => setDrawer(null)} returnTo={drawerOpener.current}>
+      <div className="flex shrink-0 px-3 pt-3">
+        <NewChatButton onClick={() => { setDrawer(null); newChat(); }} />
+      </div>
+      <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null}
+        onDelete={id => { setDrawer(null); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
+    </ChatDrawer>}
+    <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"
+      message={`Delete “${deleteTarget?.title || "New conversation"}” and its messages? This cannot be undone.`}
+      confirmLabel="Delete conversation" danger focusCancel confirming={deleting} error={deleteError}
+      onCancel={() => setDeleteTarget(null)} onConfirm={() => void remove()} />
+  </div>;
 }

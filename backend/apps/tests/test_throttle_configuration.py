@@ -12,6 +12,7 @@ import pytest
 RATE_KEYS = (
     "API_THROTTLE_ANON", "API_THROTTLE_USER", "API_THROTTLE_AI_QUERY",
     "API_THROTTLE_LOGIN", "API_THROTTLE_REGISTER", "API_THROTTLE_DATA_EXPORT",
+    "API_THROTTLE_AI_RUNTIME_EDGE",
     "API_THROTTLE_ANON_BURST", "API_THROTTLE_USER_BURST", "API_THROTTLE_AI_QUERY_BURST",
     "API_THROTTLE_LOGIN_BURST", "API_THROTTLE_REGISTER_BURST",
 )
@@ -23,7 +24,7 @@ DEFAULT_RATES = {
     "ai_overview": "600/hour",
     "auth_login_burst": "120/minute", "auth_login": "3000/day",
     "auth_register_burst": "60/minute", "auth_register": "750/day",
-    "personal_data_export": "5/hour",
+    "personal_data_export": "5/hour", "ai_runtime_edge": "10000/hour",
 }
 
 
@@ -56,6 +57,7 @@ def test_unset_rates_keep_existing_defaults_even_in_debug(debug, module):
     ("API_THROTTLE_LOGIN", "auth_login", "9000/hour"),
     ("API_THROTTLE_REGISTER", "auth_register", "900/hour"),
     ("API_THROTTLE_DATA_EXPORT", "personal_data_export", "90/hour"),
+    ("API_THROTTLE_AI_RUNTIME_EDGE", "ai_runtime_edge", "20000/hour"),
     ("API_THROTTLE_ANON_BURST", "anon_burst", "900/minute"),
     ("API_THROTTLE_USER_BURST", "user_burst", "900/minute"),
     ("API_THROTTLE_AI_QUERY_BURST", "ai_query_burst", "90/minute"),

@@ -1,5 +1,8 @@
 import hashlib
+import json
+
 import openai
+
 import httpx
 from typing import List, Optional
 from ai.admission import scope
@@ -10,6 +13,7 @@ from ai.domain.ports import (
 )
 from ai.infrastructure import agent_config
 from ai.infrastructure.settings import settings
+from ai.runs import stream
 
 #: Statuses another attempt may not meet; any other non-2xx is a refusal.
 TRANSIENT_STATUSES = frozenset({408, 409, 429})
@@ -100,12 +104,86 @@ class OpenAICompatibleAgentProvider(LLMProvider):
         if not self.accepts(request.pin):
             raise UnsupportedCapability("pin")
         payload = self.encode(request)
+        sink = stream.active()
+        if sink is not None:
+            body = await self._stream(payload, sink)
+            return self.dialect.decode(body, request.pin)
         response = await self._post(payload)
         try:
             body = response.json()
         except ValueError:
             body = None
         return self.dialect.decode(body, request.pin)
+
+    async def _stream(self, payload: dict, sink) -> Optional[dict]:
+        """The same response body as a plain send, assembled from the stream; text pieces go to `sink` as they arrive."""
+        url = f"{self.config.endpoint}/chat/completions"
+        headers = {"Authorization": f"Bearer {self.config.api_key}"}
+        body = {**payload, "stream": True, "stream_options": {"include_usage": True}}
+        message: dict = {"role": "assistant", "content": ""}
+        calls: dict[int, dict] = {}
+        finish, usage, extra = None, None, {}
+
+        async def read(client):
+            nonlocal finish, usage
+            async with client.stream("POST", url, json=body, headers=headers) as response:
+                status = response.status_code
+                if status in TRANSIENT_STATUSES or status >= 500:
+                    raise TransientProviderError(f"status {status}")
+                if not 200 <= status < 300:
+                    raise ProviderRejected(f"status {status}")
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except ValueError:
+                        continue
+                    if chunk.get("error"):
+                        raise TransientProviderError("stream error")
+                    usage = chunk.get("usage") or usage
+                    for choice in chunk.get("choices") or []:
+                        delta = choice.get("delta") or {}
+                        if delta.get("content"):
+                            message["content"] += delta["content"]
+                            await sink.text(delta["content"])
+                        if delta.get("reasoning"):
+                            message["reasoning"] = (message.get("reasoning") or "") + delta["reasoning"]
+                        for name in self.dialect.opaque_fields:
+                            if isinstance(delta.get(name), list):
+                                extra.setdefault(name, []).extend(delta[name])
+                        for call in delta.get("tool_calls") or []:
+                            slot = calls.setdefault(call.get("index", len(calls)),
+                                                    {"type": "function", "function": {"name": "", "arguments": ""}})
+                            if call.get("id"):
+                                slot["id"] = call["id"]
+                            function = call.get("function") or {}
+                            if function.get("name"):
+                                slot["function"]["name"] += function["name"]
+                            if function.get("arguments"):
+                                slot["function"]["arguments"] += function["arguments"]
+                        if choice.get("finish_reason"):
+                            finish = choice["finish_reason"]
+
+        try:
+            if self._http_client is not None:
+                await read(self._http_client)
+            else:
+                async with httpx.AsyncClient(timeout=None) as client:
+                    await read(client)
+        except httpx.HTTPError as failed:
+            raise TransientProviderError(type(failed).__name__) from None
+        if finish is None:
+            return None
+        if calls:
+            message["tool_calls"] = [calls[i] for i in sorted(calls)]
+        if not message["content"]:
+            message["content"] = None
+        message.update(extra)
+        return {"choices": [{"message": message, "finish_reason": finish}], "usage": usage or {}}
 
     async def _post(self, payload: dict) -> httpx.Response:
         url = f"{self.config.endpoint}/chat/completions"

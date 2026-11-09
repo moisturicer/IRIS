@@ -1,43 +1,7 @@
-import { useEffect, useState } from "react";
 import { apiClient } from "./client";
 
 export const READER_PROTOCOL = "runs-reader-1";
 
-/** Which path answers Ask IRIS: the deployment's choice, never the browser's (IR-863). */
-export type ReaderPath = "runtime" | "django";
-let knownPath: ReaderPath | undefined;
-let readingPath: Promise<ReaderPath> | undefined;
-
-/**
- * Reads `AI_RUNTIME_READER` once per page load. Unreadable means Django, the
- * path that answered before the switch existed; that is not remembered, so the
- * next surface to open asks again.
- */
-export function loadReaderPath(): Promise<ReaderPath> {
-  readingPath ??= apiClient.get<{ path: string }>("/ai/reader/").then(
-    ({ data }) => (knownPath = data.path === "runtime" ? "runtime" : "django"),
-    () => { readingPath = undefined; return "django" as const; },
-  );
-  return readingPath;
-}
-
-/** `undefined` until the switch has been read. */
-export function useReaderPath(): ReaderPath | undefined {
-  const [path, setPath] = useState(knownPath);
-  useEffect(() => {
-    if (path) return;
-    let current = true;
-    void loadReaderPath().then((next) => { if (current) setPath(next); });
-    return () => { current = false; };
-  }, [path]);
-  return path;
-}
-
-/** Forget the switch, so the next surface reads it again. */
-export function resetReaderPath() {
-  knownPath = undefined;
-  readingPath = undefined;
-}
 export type Depth = "ordinary" | "deep";
 export interface ReaderRun {
   protocol: typeof READER_PROTOCOL;
@@ -49,6 +13,8 @@ export interface ReaderRun {
   question: string;
   base_revision: number;
   version: number;
+  created_at?: string;
+  finished_at?: string | null;
   depth: Depth;
   awaiting_reader: boolean;
   sources_available: boolean;
@@ -59,17 +25,45 @@ export interface ReaderRun {
   cursor?: number;
   plan: null | { revision: number; steps: { id: string; title: string; status: "pending" | "in_progress" | "done" | "blocked" }[] };
   context: null | { estimated: true; used_tokens: number; capacity_tokens: number };
+  /** What the run is doing now: a coarse phase and its latest step. Null once it ends. */
+  activity?: null | ReaderActivity;
+  /** The answer as the model is writing it, before it is checked; absent once the Turn commits. */
+  draft?: string;
+  /** Tokens the provider reported for this run's model calls. */
+  usage?: null | ReaderUsage;
   /** Older context condensed into a summary; the original Turns stay (IR-735). Absent from older servers. */
   compaction?: null | { compactions: number; turns_compacted: number; last: "compacted" | "kept" };
   capabilities: { manual_compaction: boolean };
 }
+export interface ReaderActivity {
+  phase: "waiting" | "working";
+  label: string;
+  /** When this phase began (ISO). */
+  since: string;
+  step: null | { kind: "read" | "search" | "catalogue" | "recall"; label: string; detail: string[] };
+}
+export interface ReaderUsage {
+  calls: number;
+  /** Prompt plus completion tokens the provider reported for this run. */
+  total_tokens: number;
+  /** The latest call's prompt: how full the model's context window is. */
+  context_tokens: number;
+  capacity_tokens: number | null;
+  /** Held back for the answer. */
+  reserved_tokens: number | null;
+  /** The prompt size at which older context is compacted; null when compaction is off. */
+  compacts_at_tokens: number | null;
+}
+export interface ReaderConversationSummary { id: string; title: string; record_id: number | null; updated_at: string }
 export interface ReaderConversation {
   protocol: typeof READER_PROTOCOL;
   id: string;
   revision: number;
   runs: ReaderRun[];
   turns: { id: string; run_id: string; ordinal: number; question: string; answer: string; kind: string;
-    citations: { record_id: number; page: number; quote: string; revision: string }[] }[];
+    citations: { record_id: number; page: number; quote: string; revision: string;
+      regions?: { page: number; left: number; top: number; right: number; bottom: number }[] }[];
+    papers?: { title: string; record_id: number }[] }[];
 }
 
 export const activeRun = (run: ReaderRun) => run.state === "queued" || run.state === "running";
@@ -90,41 +84,45 @@ function checked<T extends { protocol: string }>(data: T): T {
 }
 
 /** Same-origin edge injects server credentials; none are held by the browser. */
-export function runtimeReader(recordId?: number) {
-  const config = { baseURL: "/api/v1", headers: { "X-IRIS-Protocol": READER_PROTOCOL,
-    ...(recordId ? { "X-IRIS-Record": String(recordId) } : {}) } };
+export function runtimeReader(scope?: number | (() => number | undefined)) {
+  // A function is read on every request, so one reader can widen from a paper to all papers.
+  const config = () => {
+    const recordId = typeof scope === "function" ? scope() : scope;
+    return { baseURL: "/api/v1", headers: { "X-IRIS-Protocol": READER_PROTOCOL,
+      ...(recordId ? { "X-IRIS-Record": String(recordId) } : {}) } };
+  };
   const base = "/ai/runtime";
   return {
     async submit(question: string, depth: Depth, key: string, conversation?: ReaderConversation) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs`, {
         question, depth, ...(conversation ? { conversation_id: conversation.id, base_revision: conversation.revision } : {}),
-      }, { ...config, headers: { ...config.headers, "Idempotency-Key": key } });
+      }, { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },
     async status(id: string) {
-      const { data } = await apiClient.get<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}`, config);
+      const { data } = await apiClient.get<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}`, config());
       return checked(data);
     },
     async stop(id: string) {
-      const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/cancel`, {}, config);
+      const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/cancel`, {}, config());
       return checked(data);
     },
     /** Ask again after a run ended without an answer: a new run linked to the first; the key makes a repeated click one request. */
     async retry(id: string, key: string) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/retry`, {},
-        { ...config, headers: { ...config.headers, "Idempotency-Key": key } });
+        { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },
-    /** Condense an owned conversation as a run of its own; the key makes a repeated click one request. */
-    async compact(conversation: ReaderConversation, key: string) {
-      const { data } = await apiClient.post<ReaderRun>(
-        `${base}/conversations/${encodeURIComponent(conversation.id)}/compact`,
-        { base_revision: conversation.revision },
-        { ...config, headers: { ...config.headers, "Idempotency-Key": key } });
-      return checked(data);
+    async list() {
+      const { data } = await apiClient.get<{ protocol: string; conversations: ReaderConversationSummary[] }>(
+        `${base}/conversations`, config());
+      return checked(data).conversations;
+    },
+    async remove(id: string) {
+      await apiClient.delete(`${base}/conversations/${encodeURIComponent(id)}`, config());
     },
     async reopen(id: string) {
-      const { data } = await apiClient.get<ReaderConversation>(`${base}/conversations/${encodeURIComponent(id)}`, config);
+      const { data } = await apiClient.get<ReaderConversation>(`${base}/conversations/${encodeURIComponent(id)}`, config());
       return checked(data);
     },
   };

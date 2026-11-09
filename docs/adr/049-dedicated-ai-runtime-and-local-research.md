@@ -167,6 +167,31 @@ Both vector reads order the rows of the policy-filtered `research_vectors` / `re
 4. **`research-7` (prompt `agent-research-7`).** Same tools as `research-6`. A Paper Chat opens with a message naming its paper (handle and title), sent only if the send may carry that paper. The prompt asks the model to search before asking back on a vague question, to search more than once for "which papers" questions, to use a clearly intended close match, to say an answer may be incomplete when results were withheld, and to group a count to learn valid filter names. New AGENT runs are pinned to `research-7`; earlier pins keep their behaviour, including one repair.
    - **Gain:** Paper Chat follow-ups resolve "this approach", and fewer needless clarifications. **Cost:** a longer prompt on every request.
 
+## Amendment — 2026-11-09 (IR-957): the switch
+
+**Status: Directed by Jive Tyler I. Revalde, the owner, to an AI assistant in chat on 2026-11-09 ("do it anyway"), and recorded here at his direction.** This amends §27. The decisions above stand except where this says otherwise.
+
+1. **§27: the owner flips it once IR-956 passes.** IR-955's bar (the 2026-11-07 amendment, item 2) is the gate, and the owner switches when the report passes it; there is no separate release-approval step.
+   - **What happened instead:** the owner switched before the bar was met. IR-995's agent-only rerun (run `20261109-041415-…-858559d8`, stacked on IR-994) still **failed** on F12 alone, two readers with different access: 43.8% correct against Django's 62.5%. Every other family and both overall figures passed, with no leaks. This record exists so nobody reads the switch as a pass.
+2. **What switched.**
+   - New runs pin the AGENT executor: `RUNS_EXECUTOR=agent` in `ai/.env.example`.
+   - The runs worker is a default Compose service in both stacks; `docker-compose.prod.yml` had none.
+   - `AI_RUNTIME_READER` is gone. The edge grant no longer refuses for it, and `GET /ai/reader/` always answers `runtime`, so a page loaded before the switch opens the runtime reader.
+   - Ask IRIS and Paper Chat mount only the runtime reader.
+3. **Django stopped answering.**
+   - `/ai/ask/`, `/ai/ask/stream/`, a queued run's retry and `/ai/search/` answer **410 Gone** and write nothing.
+   - Removed with their settings and tests: the `lanes-v1` and `controller-v1` engines, lane routing, the research lane (`apps/ai/research/`), comparison building, question resolution, conversation memory and the evidence shadow (its task, queue, worker and rate-limit lane).
+   - The evidence detector stays as an offline instrument (`eval_evidence`).
+4. **Nothing is cut off mid-answer.**
+   - Migration `ai/0044` ends every Django run still queued or running as `failed`, reason `retired`, with one `run_failed` journal event, so a follower reaches its end.
+   - `answer_queued_question` stays registered and does the same for a message dispatched before the switch.
+   - A Django Conversation stays readable through the owner-scoped API. It cannot be continued, and no new one can be started.
+5. **What Django keeps:** reader grants and the runtime edge grant, access rules (`visible_to`, `research_records`), the disclosure gate, provider admission, indexing, the AI Overview and paper briefs.
+6. **§24 after the switch.** `eval_answer_quality --run` collects the agent alone and needs `--reuse-django`, since Django can no longer be collected.
+7. **Rollback is a revert** of IR-957's commit. Unapply `ai/0044` first (`manage.py migrate ai 0043`). Its reverse does nothing, so retired runs stay ended, as they would have once their deadline passed.
+   - **Gain:** one answer path, and the measured gains reach readers: 85.2% correct against 36.1%, citation support 73.5% against 26.8%.
+   - **Cost:** two readers with different access are answered worse than Django did (F12). Readers lose Django's conversation history sidebar, comparison picker and "All papers" widen. Earlier conversations open read-only.
+
 ## Amendment — 2026-11-09 (IR-996): no runtime guards
 
 **Status: Decided by Jive Tyler I. Revalde, owner, in chat on 2026-11-09, and recorded here at his direction.** This supersedes the IR-889 amendment (2026-11-05), IR-725's withholding of Record evidence, and the send-time parts of the IR-994 and IR-995 amendments.

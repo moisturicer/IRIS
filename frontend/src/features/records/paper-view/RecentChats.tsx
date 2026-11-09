@@ -1,12 +1,10 @@
-import type { ConversationSummary } from "@/types/ai";
+import type { ReaderConversationSummary as ConversationSummary } from "@/api/runtimeReader";
 import { cn } from "@/lib/utils";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 
 /** What a recent chat is called: its title, else how much of it there is (IR-584). */
 export function recentChatLabel(c: ConversationSummary): string {
-  if (c.title.trim()) return c.title.trim();
-  const n = c.turn_count;
-  return n === 0 ? "New chat, no questions yet" : `Chat with ${n} ${n === 1 ? "question" : "questions"}`;
+  return c.title.trim() || "New chat, no questions yet";
 }
 
 function when(iso: string): string {
@@ -25,7 +23,7 @@ export function RecentChats({
   className,
 }: {
   chats: readonly ConversationSummary[];
-  activeId: number | null;
+  activeId: string | null;
   onChoose: (chat: ConversationSummary) => void;
   className?: string;
 }) {

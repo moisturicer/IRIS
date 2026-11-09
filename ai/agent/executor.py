@@ -3,9 +3,9 @@
 The same model turns search, read, plan and draft, keeping every exchange
 in order. Bounds close research while the final answer and one repair still
 fit; the final turn keeps the tools declared with `tool_choice: none`. Only
-a checked, completed answer is delivered: a failing draft is repaired once in
-the same Conversation, and a failing repair keeps only what each sentence's
-own citations support, or nothing. A changed source is never repaired
+a checked, completed answer is delivered: a failing draft is repaired up to
+twice in the same Conversation, and if it still fails the latest draft goes out
+whole, minus citations that name no source. A changed source is never repaired
 around; it fences delivery. The pin is checked against what
 this code and the provider support before anything is sent; a mismatch is
 `unavailable`, never a substitute model or dialect.
@@ -21,6 +21,7 @@ import time
 from dataclasses import replace
 from typing import Mapping, Optional
 
+from ai.runs import stream
 from ai.admission.errors import AdmissionDenied
 from ai.admission.limits import Price
 from ai.agent import assurance, checkpoint, compaction as compacting
@@ -111,8 +112,9 @@ HYBRID_INSTRUCTIONS = RECOVERY_INSTRUCTIONS + (
 )
 LISTING_INSTRUCTIONS = HYBRID_INSTRUCTIONS + (
     " For which papers match an Area, PSCED area, record type, years or IP flag, use list_records: it "
-    "names every matching paper this reader can see, up to 50, with the exact total. Say when it stopped "
-    "short, and never present a search sample as a complete list."
+    "names the matching papers this reader can see, up to 50 at a time, with the exact total. When more "
+    "remain, say how many and offer the next page (the same filters with offset); a reader who asks for "
+    "more, or for all of them, gets the following pages. Never present a search sample as a complete list."
 )
 CHAT_INSTRUCTIONS = LISTING_INSTRUCTIONS + (
     " When a paper chat message names the paper this conversation is about, words such as 'this "
@@ -172,12 +174,17 @@ class AgentExecutor:
 
     def __init__(self, provider: LLMProvider, pin: Pin, reserves: Reserves, *,
                  profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None,
-                 compaction: Optional[Compaction] = None, tool_concurrency: int = 1):
+                 compaction: Optional[Compaction] = None, checks: str = "enforce", tool_concurrency: int = 1):
         if type(tool_concurrency) is not int or tool_concurrency < 1:
             raise ValueError("tool_concurrency must be a positive integer")
         #: Read-only calls in one tool group fetched at once; 1 runs them one by one (IR-1003).
         self.tool_concurrency = tool_concurrency
         self.provider = provider
+        #: "enforce" refuses, repairs or trims a draft that fails the checks. "flag" delivers it,
+        #: dropping a citation that cannot be bound to a source and noting any number or title it
+        #: could not match. "advisory" delivers it and only logs the findings.
+        self.checks = checks
+        self.enforce_checks = checks == "enforce"
         self.pin = pin
         self.reserves = reserves
         #: None never compacts: a full window then closes research, as before (IR-734).
@@ -417,7 +424,7 @@ class _Run:
             listing=version in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION))
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
         self.chat = version == CHAT_TOOL_VERSION
-        self.repairs = 2 if self.chat else 1
+        self.repairs = 2
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         #: Sources the history carried when the answer was written (IR-994).
@@ -750,12 +757,17 @@ class _Run:
         # Recorded before sending; a stopped run admits no further attempt.
         if not await self.tools.journal("model", {"purpose": PURPOSE, "phase": phase, "step": self.steps + 1}):
             raise Unavailable("run_ended")
+        sink = stream.active()
+        if sink is not None:
+            await sink.attempt(phase, live=not self.agent.enforce_checks)
         send = self.agent.summarize if phase == "compact" else self.agent.send
         try:
             # The run's deadline bounds every send, admitted or not.
             turn = await asyncio.wait_for(send(request), max(0.0, self.deadline - time.monotonic()))
         except asyncio.TimeoutError:
             raise Unavailable("deadline") from None
+        if sink is not None:
+            await sink.settle(turn.stop is not StopReason.TOOLS)
         self.steps += phase == "gather"
         self.budget.spend(turn, status.occupancy_tokens, request.max_output_tokens)
         return turn
@@ -766,6 +778,12 @@ class _Run:
         found = self._findings(text)
         if not found:
             return await self._commit(text)
+        if not self.agent.enforce_checks:
+            # Advisory: the answer stands as written, minus citations that cannot be bound to a source.
+            log.info("agent draft findings (delivered): %s", ",".join(sorted(found)))
+            text = assurance.bindable(text, self.investigation, excluded=self._focus("excluded"))
+            note = self._note(found) if self.agent.checks == "flag" else ""
+            return await self._commit(f"{text}\n\n{note}" if note else text)
         log.info("agent draft refused: %s", ",".join(sorted(found)))
         # A source that changed since it was read fences delivery; it is never repaired around.
         await self._recheck(text)
@@ -780,15 +798,19 @@ class _Run:
             if not found:
                 return await self._commit(text_now)
             log.info("agent repair refused: %s", ",".join(sorted(found)))
-        # Out of repairs: what each sentence supports on its own is kept, and the gap is said.
-        for draft in drafts:
-            kept = draft and assurance.supported_units(
-                draft, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
-            if kept:
-                partial = f"{kept}\n\n{assurance.LIMITATION}"
-                self._checked(partial)
-                return await self._commit(partial)
-        raise Unavailable("invalid_draft")
+        # Out of repairs: the latest draft is delivered whole, never trimmed or refused. Citations that bind
+        # to no source are removed; a sentence still stating an unsupported number or title is marked as such.
+        text = assurance.qualified(drafts[0], self.investigation, prior=self.prior,
+                                   excluded=self._focus("excluded"))
+        return await self._commit(text or assurance.UNESTABLISHED)
+
+    def _note(self, found: dict) -> str:
+        """The numbers and titles a delivered answer states that no passage supports, as one line."""
+        # A whole number no larger than the papers read is a position in a list, not a claim.
+        listed = len(self.investigation.papers)
+        shown = {**found, "unsupported_number": [n for n in found.get("unsupported_number", [])
+                                                 if not (n.isdigit() and 0 < int(n) <= listed)]}
+        return assurance.unmatched_note(shown)
 
     async def _repair(self, history: list, found) -> Optional[tuple[str, list]]:
         """One more turn in the same Conversation and the history ending with it; None if it cannot."""
@@ -811,6 +833,10 @@ class _Run:
         if self.investigation.outages:
             # Said by the application, not left to the model; it is part of the stored Turn (IR-731).
             answer = f"{answer}\n\n{assurance.outage_limitation(self.investigation.outages)}"
+        sink = stream.active()
+        if sink is not None and self.agent.enforce_checks:
+            # The answer is only known once the checks are done, so it is shown now, whole, and typed out by the page.
+            await sink.final(answer)
         return self._result(answer, citations)
 
     async def _recheck(self, text: str) -> None:
@@ -849,11 +875,10 @@ class _Run:
                                   clarification=clarification)
 
     def _checked(self, text: str, *, clarification: bool = False) -> None:
-        """A clarification or a salvaged answer that fails a check is never delivered."""
+        """Logs what a clarification fails; a check never refuses an answer, only a changed source does."""
         failures = sorted(self._findings(text, clarification=clarification))
         if failures:
-            log.info("agent draft refused: %s", ",".join(failures))
-            raise Unavailable("invalid_draft")
+            log.info("agent draft findings (delivered): %s", ",".join(failures))
 
     def _result(self, answer: str, citations, *, kind: str = "answer") -> Result:
         previous = self.context.state or {}

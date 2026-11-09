@@ -59,7 +59,6 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, AbstractSet, Callable, Optional
 
 from apps.ai.answers.selection import SourceSelection
-from apps.ai.answers.service import GroundedAnswerService
 from apps.ai.providers.ports import EmbeddingProvider, LLMProvider, Reranker
 from apps.ai.retrieval.degraded import (
     DegradableRetriever,
@@ -72,12 +71,8 @@ from apps.ai.retrieval.two_stage import TwoStageRetriever
 from apps.records.models import Record
 
 if TYPE_CHECKING:
-    from apps.ai.evidence.model_decision import ModelEvidenceDecision
     from apps.ai.providers.vision import ImageDescribingLLM
     from apps.ai.inference import InferenceTask
-    from apps.ai.memory import ConversationMemory
-    from apps.ai.providers.tool_calling import ToolCallingLLM
-    from apps.ai.resolution import QuestionResolver
 
 
 def _vendor_failures() -> Callable[[BaseException], bool]:
@@ -128,31 +123,15 @@ class CompositionRoot:
         embedder: Optional[EmbeddingProvider] = None,
         reranker: Optional[Reranker] = None,
         llm: Optional[LLMProvider] = None,
-        resolver: Optional["QuestionResolver"] = None,
-        memory: Optional["ConversationMemory"] = None,
         permits: Callable[[Record], bool] = disclosure_permits,
         policy_enabled: bool = True,
-        shadow_llm: Optional["ToolCallingLLM"] = None,
-        engine: Optional[str] = None,
     ) -> None:
         self._embedder = embedder
         self._reranker = reranker
         self._llm = llm
         self._task_llms: dict["InferenceTask", LLMProvider] = {}
-        self._resolver = resolver
-        self._memory = memory
         self._permits = permits
         self._policy_enabled = policy_enabled
-        self._shadow_llm = shadow_llm
-        self._engine = engine
-
-    @property
-    def engine(self) -> str:
-        """The answer engine a new run pins (IR-593, ADR-042). Code, not a
-        setting: no reader or deployment toggle chooses it."""
-        from apps.ai.controller.versions import NEW_RUN_ENGINE
-
-        return self._engine or NEW_RUN_ENGINE
 
     # -- the vendor seams ---------------------------------------------------
 
@@ -222,72 +201,6 @@ class CompositionRoot:
             self._task_llms[key] = provider
         return provider
 
-    def resolver(self) -> Optional["QuestionResolver"]:
-        """The follow-up rewriter, or ``None`` when resolution is switched off.
-
-        Independently switchable (ADR-026 Decision 8, IR-296) behind
-        ``AI_QUESTION_RESOLUTION_ENABLED`` -- a caller treats ``None`` as
-        "skip resolution entirely", which is what makes retrieval quality
-        with and without it measurable under ADR-023. An injected resolver
-        (a test's ``QuestionResolver`` over a ``ScriptedLLM``) is used
-        verbatim and bypasses the setting, the same shape every other vendor
-        seam on this root uses.
-
-        Built with the default Django cache rather than deferred like the
-        query-vector cache: resolution caching needs no ``EmbeddingSpace``
-        id, so there is no equivalent reason to leave it unwired.
-
-        The model comes from the ``resolve`` Inference task as of IR-383,
-        not from a second ``LLM_RESOLUTION_MODEL`` namespace -- so a
-        withdrawn model is caught by the startup check (IR-379) rather than
-        by a reader's follow-up. An unconfigured task means no rewriter,
-        which the caller already treats as "search with what was typed".
-        """
-        if self._resolver is None:
-            from django.conf import settings
-
-            if not getattr(settings, "AI_QUESTION_RESOLUTION_ENABLED", True):
-                return None
-
-            from django.core.cache import cache
-
-            from apps.ai.inference import InferenceTask
-            from apps.ai.providers.openai_compatible import LLMUnavailable
-            from apps.ai.resolution import QuestionResolver
-
-            try:
-                llm = self.llm_for(InferenceTask.RESOLVE)
-            except LLMUnavailable:
-                return None
-
-            self._resolver = QuestionResolver(llm=llm, cache=cache)
-        return self._resolver
-
-    def shadow_decider(self) -> Optional["ModelEvidenceDecision"]:
-        """The shadow pilot's decision (IR-466): the `answer` Profile under
-        its own breaker key. ``None`` with no model, or an injected answer
-        ``llm`` and no ``shadow_llm``."""
-        from apps.ai.evidence.model_decision import ModelEvidenceDecision
-
-        if self._shadow_llm is None:
-            if self._llm is not None:
-                return None
-
-            from apps.ai.evidence.shadow import SHADOW_BREAKER_KEY
-            from apps.ai.inference import InferenceTask, build_profile_llm, profile_for
-            from apps.ai.providers.openai_compatible import LLMUnavailable
-
-            profile = profile_for(InferenceTask.ANSWER)
-            if not profile.is_configured:
-                return None
-            try:
-                self._shadow_llm = build_profile_llm(
-                    profile, breaker_key=SHADOW_BREAKER_KEY, lane="shadow"
-                )
-            except LLMUnavailable:
-                return None
-        return ModelEvidenceDecision(self._shadow_llm)
-
     def figure_describer(self) -> Optional["ImageDescribingLLM"]:
         """The ``describe_figure`` model, or ``None`` while its Profile is unset (IR-852)."""
         from apps.ai.inference import InferenceTask, profile_for
@@ -296,24 +209,6 @@ class CompositionRoot:
         if self._llm is None and not profile_for(InferenceTask.DESCRIBE_FIGURE).is_configured:
             return None
         return require_image_describing(self.llm_for(InferenceTask.DESCRIBE_FIGURE))
-
-    def memory(self) -> Optional["ConversationMemory"]:
-        """The conversation-memory recaller, or ``None`` when off.
-
-        Same switch shape as ``resolver()`` (``AI_CONVERSATION_MEMORY_ENABLED``,
-        IR-297), but this collaborator calls no vendor, so there is no key to
-        be missing.
-        """
-        if self._memory is None:
-            from django.conf import settings
-
-            if not getattr(settings, "AI_CONVERSATION_MEMORY_ENABLED", True):
-                return None
-
-            from apps.ai.memory import ConversationMemory
-
-            self._memory = ConversationMemory()
-        return self._memory
 
     def generation_configured(self) -> bool:
         """Whether a model would actually answer, without calling one.
@@ -456,21 +351,6 @@ class CompositionRoot:
             permits=self._permits,
             policy_enabled=self._policy_enabled,
             max_sources=max_sources,
-        )
-
-    def answer_service(
-        self, max_sources: int, record: Optional[Record] = None
-    ) -> GroundedAnswerService:
-        """A grounded-answer service on the ``answer`` task."""
-        from apps.ai.inference import InferenceTask
-
-        return GroundedAnswerService(
-            retriever=self.retriever(record=record),
-            llm=self.llm_for(InferenceTask.ANSWER),
-            permits=self._permits,
-            policy_enabled=self._policy_enabled,
-            max_sources=max_sources,
-            memory=self.memory(),
         )
 
 

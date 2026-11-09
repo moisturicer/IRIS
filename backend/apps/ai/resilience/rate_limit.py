@@ -30,8 +30,6 @@ class Lane(enum.Enum):
 
     QUERY = "query"
     INGESTION = "ingestion"
-    #: IR-466: its own strict budget, not a share of the account.
-    SHADOW = "shadow"
 
 
 #: How the account's budget is divided. The query lane is prioritised because a
@@ -57,7 +55,7 @@ class _Store(Protocol):
 
 
 def lane_budget(lane: Lane, total: int) -> int:
-    """This lane's share of the account budget. The shadow lane has none."""
+    """This lane's share of the account budget."""
     return int(math.floor(total * _LANE_SHARE[lane]))
 
 
@@ -135,9 +133,6 @@ def bucket_for(lane: Lane, store: Optional[_Store] = None) -> TokenBucket:
             decode_responses=True,
         )
 
-    if lane is Lane.SHADOW:
-        budget = settings.AI_EVIDENCE_SHADOW_TOKENS_PER_MINUTE
-    else:
-        total = getattr(settings, "AI_RATE_LIMIT_TOKENS_PER_MINUTE", 1_000_000)
-        budget = lane_budget(lane, total)
+    total = getattr(settings, "AI_RATE_LIMIT_TOKENS_PER_MINUTE", 1_000_000)
+    budget = lane_budget(lane, total)
     return TokenBucket(store, lane, budget=budget, window_seconds=60)

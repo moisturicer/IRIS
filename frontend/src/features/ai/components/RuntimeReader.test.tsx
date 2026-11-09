@@ -9,7 +9,7 @@ import type { ReaderRun } from "@/api/runtimeReader";
 
 afterEach(() => vi.restoreAllMocks());
 
-test("reader sees persisted work, stops by keyboard and asks deeply unless they turn it off", async () => {
+test("reader sees persisted work, stops by keyboard and can ask more deeply", async () => {
   const queued = { protocol: "runs-reader-1", id: "run-1", conversation_id: "conversation-1", question: "Compare",
     state: "running", version: 1, depth: "ordinary", awaiting_reader: false,
     plan: { revision: 2, steps: [{ id: "compare", title: "Compare methods", status: "in_progress" }] },
@@ -22,15 +22,16 @@ test("reader sees persisted work, stops by keyboard and asks deeply unless they 
     String(path).endsWith("cancel") ? stopped : queued }));
   const user = userEvent.setup();
   render(<MemoryRouter><RuntimeReader conversationId="conversation-1" /></MemoryRouter>);
-  expect(await screen.findByText("Compare methods")).toBeInTheDocument();
-  expect(screen.getByText("In progress")).toBeInTheDocument();
-  expect(screen.getByText("Context estimate unavailable")).toBeInTheDocument();
+  // The plan stays internal; the reader sees what the run is doing now.
+  expect(await screen.findByText("Thinking")).toBeInTheDocument();
+  expect(screen.queryByText("Compare methods")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /compact/i })).not.toBeInTheDocument();
   expect(screen.getByText(/can make mistakes/)).toBeInTheDocument();
   screen.getByRole("button", { name: "Stop research" }).focus();
   await user.keyboard("{Enter}");
-  expect(await screen.findByText("Stopped")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Research depth: Thorough" })).toBeInTheDocument();
+  expect(await screen.findByText("Stopped before an answer was ready.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Research depth: Standard" }));
+  await user.click(screen.getByRole("menuitemradio", { name: /Thorough/ }));
   await user.type(screen.getByRole("textbox"), "Compare further");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(post).toHaveBeenCalledWith("/ai/runtime/runs", expect.objectContaining({
@@ -48,8 +49,8 @@ test("a reader can ask one question at ordinary depth", async () => {
     protocol: "runs-reader-1", id: "c", revision: 0, runs: [], turns: [],
   } });
   render(<MemoryRouter><RuntimeReader /></MemoryRouter>);
-  await user.click(screen.getByRole("button", { name: "Research depth: Thorough" }));
-  await user.click(screen.getByRole("menuitemradio", { name: /Standard/ }));
+  // Standard is the default: nothing to turn off first.
+  expect(screen.getByRole("button", { name: "Research depth: Standard" })).toBeInTheDocument();
   await user.type(screen.getByRole("textbox"), "Quick question");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(post).toHaveBeenCalledWith("/ai/runtime/runs",
@@ -105,7 +106,6 @@ test("reader is told, without internals, when earlier conversation was condensed
   expect(screen.queryByText(/condensed/)).not.toBeInTheDocument();
   rerender(<ResearchProgress run={{ ...running, compaction: { compactions: 1, turns_compacted: 3, last: "compacted" } }} />);
   expect(screen.getByText(/condensed into a summary/)).toBeInTheDocument();
-  expect(screen.getByText(/Estimated context: 900 of 1,000 tokens/)).toBeInTheDocument();
   // A summary that was tried and kept nothing says nothing.
   rerender(<ResearchProgress run={{ ...running, compaction: { compactions: 0, turns_compacted: 0, last: "kept" } }} />);
   expect(screen.queryByText(/condensed/)).not.toBeInTheDocument();
