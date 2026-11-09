@@ -226,6 +226,26 @@ def _use_local_memory_cache() -> None:
     clear_cache_handlers(setting="CACHES")
 
 
+@pytest.fixture(autouse=True)
+def _each_test_starts_with_no_request_counts():
+    """Empty the cache DRF's throttles count in before every test (IR-999).
+
+    The counts used to leak from one test to the next unnoticed, because every
+    window was an hour or a day. A per-minute burst fills within one fast run of
+    tests that all sign in from 127.0.0.1, so a later test was refused for what
+    earlier tests had done. A test about throttling makes its own requests.
+    """
+    try:
+        from django.conf import settings
+        from django.core.cache import cache
+    except ImportError:
+        yield
+        return
+    if settings.configured:
+        cache.clear()
+    yield
+
+
 def pytest_report_header(config):
     """Name the Hypothesis profile in the run header.
 
