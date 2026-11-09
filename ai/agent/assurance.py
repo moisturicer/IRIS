@@ -260,6 +260,16 @@ def reading_coverage(citations, investigation: Investigation) -> list[dict]:
     } for revision, read in investigation.readings.items() if revision in cited_revisions]
 
 
+def unmatched_note(found: dict[str, list[str]]) -> str:
+    """One line naming the numbers and paper titles a delivered answer states that no passage supports."""
+    items = list(found.get("unsupported_number", [])) + [f"\u201c{item}\u201d" for item in found.get("unknown_title", [])]
+    if not items:
+        return ""
+    shown = ", ".join(item[:_ITEM_CHARS] for item in items[:5])
+    more = f" and {len(items) - 5} more" if len(items) > 5 else ""
+    return f"*Not matched to the passages IRIS read: {shown}{more}.*"
+
+
 def bindable(text: str, investigation: Investigation, *, excluded=()) -> str:
     """`text` without citations that name no passage of this run or a paper the reader ruled out."""
     def keep(match: re.Match) -> str:

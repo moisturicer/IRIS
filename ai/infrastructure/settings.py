@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     RUNS_AGENT_RESERVES: str = ""
     #: Optional (IR-734); blank never compacts.
     RUNS_AGENT_COMPACTION: str = ""
-    RUNS_AGENT_CHECKS: str = "advisory"
+    RUNS_AGENT_CHECKS: str = "flag"
     # No defaults: unset limits refuse every submission.
     RUNS_DEADLINE_SECONDS: int | None = None
     RUNS_LEASE_SECONDS: int | None = None

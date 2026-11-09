@@ -110,8 +110,9 @@ HYBRID_INSTRUCTIONS = RECOVERY_INSTRUCTIONS + (
 )
 LISTING_INSTRUCTIONS = HYBRID_INSTRUCTIONS + (
     " For which papers match an Area, PSCED area, record type, years or IP flag, use list_records: it "
-    "names every matching paper this reader can see, up to 50, with the exact total. Say when it stopped "
-    "short, and never present a search sample as a complete list."
+    "names the matching papers this reader can see, up to 50 at a time, with the exact total. When more "
+    "remain, say how many and offer the next page (the same filters with offset); a reader who asks for "
+    "more, or for all of them, gets the following pages. Never present a search sample as a complete list."
 )
 CHAT_INSTRUCTIONS = LISTING_INSTRUCTIONS + (
     " When a paper chat message names the paper this conversation is about, words such as 'this "
@@ -175,11 +176,13 @@ class AgentExecutor:
 
     def __init__(self, provider: LLMProvider, pin: Pin, reserves: Reserves, *,
                  profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None,
-                 compaction: Optional[Compaction] = None, enforce_checks: bool = True):
+                 compaction: Optional[Compaction] = None, checks: str = "enforce"):
         self.provider = provider
-        #: True refuses, repairs or trims a draft that fails the checks. False delivers it: the
-        #: findings are logged, and only a citation to a passage that cannot be bound is dropped.
-        self.enforce_checks = enforce_checks
+        #: "enforce" refuses, repairs or trims a draft that fails the checks. "flag" delivers it,
+        #: dropping a citation that cannot be bound to a source and noting any number or title it
+        #: could not match. "advisory" delivers it and only logs the findings.
+        self.checks = checks
+        self.enforce_checks = checks == "enforce"
         self.pin = pin
         self.reserves = reserves
         #: None never compacts: a full window then closes research, as before (IR-734).
@@ -746,7 +749,13 @@ class _Run:
         if not self.agent.enforce_checks:
             # Advisory: the answer stands as written, minus citations that cannot be bound to a source.
             log.info("agent draft findings (delivered): %s", ",".join(sorted(found)))
-            return await self._commit(assurance.bindable(text, self.investigation, excluded=self._focus("excluded")))
+            text = assurance.bindable(text, self.investigation, excluded=self._focus("excluded"))
+            # A whole number no larger than the papers read is a position in a list, not a claim.
+            listed = len(self.investigation.papers)
+            shown = {**found, "unsupported_number": [n for n in found.get("unsupported_number", [])
+                                                     if not (n.isdigit() and 0 < int(n) <= listed)]}
+            note = assurance.unmatched_note(shown) if self.agent.checks == "flag" else ""
+            return await self._commit(f"{text}\n\n{note}" if note else text)
         log.info("agent draft refused: %s", ",".join(sorted(found)))
         # A source that changed since it was read fences delivery; it is never repaired around.
         await self._recheck(text)

@@ -242,6 +242,7 @@ class RunService:
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
         except Exception:
+            log.exception("run %s failed in the executor", run_id)
             if sink is not None:
                 await sink.end()
             await self.store.fail(run_id, claim.fence, "executor_failed")

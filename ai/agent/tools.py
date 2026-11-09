@@ -91,11 +91,12 @@ COUNT_RECORDS = ToolSpec(
 LIST_RECORDS = ToolSpec(
     "list_records",
     "Every paper this reader can see that matches metadata: Area (classification), PSCED area, record "
-    "type, completion years or IP flag, by title, with the exact total. Names at most 50 and says when "
-    "it stopped short. Cannot list by topic.",
+    "type, completion years or IP flag, by title, with the exact total. Names at most 50 at a time and says "
+    "when more remain; pass offset to continue from where the last page stopped. Cannot list by topic.",
     _object({
         "classification": _NAME, "psced": _NAME, "record_type": _NAME,
         "year_from": _YEAR, "year_to": _YEAR, "is_ip": {"type": "boolean"},
+        "offset": {"type": "integer", "minimum": 0},
     }))
 
 #: research-5's search: keyword and meaning together, narrowed by metadata (IR-886).
@@ -348,7 +349,11 @@ class Investigation:
                 filters = {k: v for k, v in args.items() if k != "group_by"}
                 return self._counted(await self.research.count(filters, args.get("group_by")))
             if spec is LIST_RECORDS:
-                return self._listed(await self.research.list_records(args))
+                offset = args.get("offset", 0)
+                if "offset" in args and (not _int(offset) or offset < 0):
+                    raise InvalidArguments
+                filters = {k: v for k, v in args.items() if k != "offset"}
+                return self._listed(await self.research.list_records(filters, offset=offset))
             if spec is READ_MANUSCRIPT:
                 return self._evidence(await self._screened(await self._read(args, room)), call.id)
             if spec is RECOVER_TURN:

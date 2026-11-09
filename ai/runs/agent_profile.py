@@ -33,8 +33,8 @@ class AgentProfile:
     limits: Limits
     #: None never compacts (IR-734).
     compaction: Optional[Compaction] = None
-    #: "advisory" delivers the answer as written; "enforce" repairs or trims one that fails the checks.
-    checks: str = "advisory"
+    #: "flag" delivers the answer and notes what it could not match; "advisory" only logs; "enforce" repairs or trims.
+    checks: str = "flag"
 
 
 def _json(values, name, shape: str):
@@ -94,9 +94,9 @@ def read(values) -> AgentProfile:
         if not compaction.fits(provider.capacities[model], reserves):
             raise NotConfigured("RUNS_AGENT_COMPACTION leaves no room to summarize or finish"
                                 " under RUNS_AGENT_MODEL's capacity")
-    checks = str(getattr(values, "RUNS_AGENT_CHECKS", "") or "advisory").strip().lower()
-    if checks not in ("advisory", "enforce"):
-        raise NotConfigured("RUNS_AGENT_CHECKS must be advisory or enforce")
+    checks = str(getattr(values, "RUNS_AGENT_CHECKS", "") or "flag").strip().lower()
+    if checks not in ("flag", "advisory", "enforce"):
+        raise NotConfigured("RUNS_AGENT_CHECKS must be flag, advisory or enforce")
     pin = Pin(
         model=model, endpoint=provider.endpoint, adapter=OpenAICompatibleAgentProvider.adapter,
         dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=CHAT_PROMPT_VERSION,
@@ -121,7 +121,7 @@ def executor(profile: AgentProfile, dsn: str, *, provider=None):
     admitted = AdmittedAgentProvider(inner, Ledger(dsn, profile.limits), purpose=PURPOSE)
     return AgentExecutor(admitted, profile.pin, profile.reserves, profiles=profile.bounds,
                          price=profile.limits.prices[profile.pin.model], compaction=profile.compaction,
-                         enforce_checks=profile.checks == "enforce")
+                         checks=profile.checks)
 
 
 def selected(values) -> Optional[AgentProfile]:
