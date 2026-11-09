@@ -216,9 +216,9 @@ REST_FRAMEWORK = {
         "personal_data_export": throttle_rate("API_THROTTLE_DATA_EXPORT", "5/hour"),
         # Per client address (IR-661). A campus shares one, so these allow a
         # class signing in together; the lockout still answers per account and address.
-        "auth_login_burst": throttle_rate("API_THROTTLE_LOGIN_BURST", "30/minute"),
+        "auth_login_burst": throttle_rate("API_THROTTLE_LOGIN_BURST", "120/minute"),
         "auth_login": throttle_rate("API_THROTTLE_LOGIN", "3000/day"),
-        "auth_register_burst": throttle_rate("API_THROTTLE_REGISTER_BURST", "15/minute"),
+        "auth_register_burst": throttle_rate("API_THROTTLE_REGISTER_BURST", "60/minute"),
         "auth_register": throttle_rate("API_THROTTLE_REGISTER", "750/day"),
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).

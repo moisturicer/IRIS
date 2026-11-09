@@ -21,8 +21,8 @@ DEFAULT_RATES = {
     "user_burst": "180/minute", "user": "75000/day",
     "ai_query_burst": "15/minute", "ai_query": "750/day",
     "ai_overview": "600/hour",
-    "auth_login_burst": "30/minute", "auth_login": "3000/day",
-    "auth_register_burst": "15/minute", "auth_register": "750/day",
+    "auth_login_burst": "120/minute", "auth_login": "3000/day",
+    "auth_register_burst": "60/minute", "auth_register": "750/day",
     "personal_data_export": "5/hour",
 }
 
@@ -59,8 +59,8 @@ def test_unset_rates_keep_existing_defaults_even_in_debug(debug, module):
     ("API_THROTTLE_ANON_BURST", "anon_burst", "900/minute"),
     ("API_THROTTLE_USER_BURST", "user_burst", "900/minute"),
     ("API_THROTTLE_AI_QUERY_BURST", "ai_query_burst", "90/minute"),
-    ("API_THROTTLE_LOGIN_BURST", "auth_login_burst", "90/minute"),
-    ("API_THROTTLE_REGISTER_BURST", "auth_register_burst", "90/minute"),
+    ("API_THROTTLE_LOGIN_BURST", "auth_login_burst", "900/minute"),
+    ("API_THROTTLE_REGISTER_BURST", "auth_register_burst", "900/minute"),
 ])
 @pytest.mark.parametrize("module", ["base", "development"])
 def test_each_rate_can_be_overridden_independently(key, scope, value, module):

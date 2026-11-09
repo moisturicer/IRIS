@@ -51,8 +51,8 @@ also work). Invalid values stop startup and name the offending key.
 The separate AI overview budget is unchanged.
 
 Login and registration have budgets of their own (IR-661): `API_THROTTLE_LOGIN_BURST`
-and `API_THROTTLE_LOGIN` (`30/minute`, `3000/day`), and `API_THROTTLE_REGISTER_BURST`
-and `API_THROTTLE_REGISTER` (`15/minute`, `750/day`), same format. They count per
+and `API_THROTTLE_LOGIN` (`120/minute`, `3000/day`), and `API_THROTTLE_REGISTER_BURST`
+and `API_THROTTLE_REGISTER` (`60/minute`, `750/day`), same format. They count per
 client address, read as `TRUSTED_PROXY_COUNT` says, and do not spend the anonymous
 budget. A refusal is a 429 with `Retry-After`. The axes lockout is separate and
 still answers per account and address.
