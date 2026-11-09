@@ -159,9 +159,14 @@ REPAIR_NOTE = (
 )
 
 
-def feedback(found: dict[str, list[str]]) -> str:
+#: research-8's repair adds this, so the answer never refers to a draft the reader did not see (IR-1004).
+UNSEEN_DRAFT = ("The reader never saw that draft: write the answer as if for the first time, without "
+                "mentioning, correcting or apologising for it.")
+
+
+def feedback(found: dict[str, list[str]], *, unseen: bool = False) -> str:
     """Actionable instructions for the one repair, naming the draft's own failing items."""
-    lines = [REPAIR_NOTE]
+    lines = [f"{REPAIR_NOTE} {UNSEEN_DRAFT}" if unseen else REPAIR_NOTE]
     for code in sorted(found):
         items = ", ".join(repr(item[:_ITEM_CHARS]) for item in found[code][:_ITEMS])
         lines.append("- " + _FEEDBACK[code].format(items=items))

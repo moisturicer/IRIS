@@ -73,7 +73,7 @@ def _bounds(values) -> dict[str, Bounds]:
 
 def read(values) -> AgentProfile:
     """The whole profile, or `NotConfigured` naming the first problem."""
-    from ai.agent.executor import CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION
+    from ai.agent.executor import EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION
     from ai.admission.transport import RESEARCH_LANE
     from ai.infrastructure.openai_adapter import OpenAICompatibleAgentProvider
 
@@ -103,8 +103,8 @@ def read(values) -> AgentProfile:
                                 " under RUNS_AGENT_MODEL's capacity")
     pin = Pin(
         model=model, endpoint=provider.endpoint, adapter=OpenAICompatibleAgentProvider.adapter,
-        dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=CHAT_PROMPT_VERSION,
-        tool_version=CHAT_TOOL_VERSION, public_version=runs_config.PROTOCOL,
+        dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=EVIDENCE_PROMPT_VERSION,
+        tool_version=EVIDENCE_TOOL_VERSION, public_version=runs_config.PROTOCOL,
         state_version=runs_config.SCHEMA, data_policy=provider.data_policy,
     )
     return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits,

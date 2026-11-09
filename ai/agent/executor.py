@@ -64,6 +64,9 @@ LISTING_TOOL_VERSION = "research-6"
 #: research-6's tools, plus Paper Chat naming its paper and a second answer repair (IR-995).
 CHAT_PROMPT_VERSION = "agent-research-7"
 CHAT_TOOL_VERSION = "research-7"
+#: research-7's tools; repository questions answered from the repository or declined (IR-1004).
+EVIDENCE_PROMPT_VERSION = "agent-research-8"
+EVIDENCE_TOOL_VERSION = "research-8"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -124,6 +127,21 @@ CHAT_INSTRUCTIONS = LISTING_INSTRUCTIONS + (
     "fits. When a filter value is unknown, call "
     "count_records grouped by that field to see the valid names, then try again."
 )
+EVIDENCE_INSTRUCTIONS = CHAT_INSTRUCTIONS + (
+    " When the question asks what a paper in the repository reports, such as a value, method, result, "
+    "dataset or where a tool can be accessed, answer only from what the tools returned and cite passages "
+    "by handle. Counts and lists from count_records or list_records are repository findings too: give "
+    "them without passage handles. Before saying the papers do not answer it, search again with "
+    "different wording. If the papers this reader can see still do not answer it, say so in a sentence "
+    "or two and stop: do not answer from general knowledge, and do not name papers, tools or values "
+    "you did not read. The reader sees only your final answer, so never mention or correct an earlier "
+    "draft."
+)
+#: Delivered under research-8 when every repair failed and no sentence stands on its own (IR-1004).
+NO_SUPPORTED_ANSWER = (
+    "I could not write an answer that the papers you can read support, so I am not giving one. "
+    "Try asking about a specific paper or rewording the question."
+)
 #: Opens a Paper Chat under research-7: the one paper every question is about (IR-995).
 PAPER_CHAT_PREFIX = "[IRIS paper chat] This conversation is about one paper: "
 #: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
@@ -149,10 +167,11 @@ PROMPTS = {
     (HYBRID_PROMPT_VERSION, HYBRID_TOOL_VERSION): HYBRID_INSTRUCTIONS,
     (LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION): LISTING_INSTRUCTIONS,
     (CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION): CHAT_INSTRUCTIONS,
+    (EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION): EVIDENCE_INSTRUCTIONS,
 }
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
                           RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
-                          CHAT_TOOL_VERSION)
+                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -405,18 +424,22 @@ class _Run:
         # One clarification at a time: not twice in a row, however much history is carried.
         asked = bool(context.prior) and context.prior[-1].kind == "clarification"
         version = agent.pin.tool_version
+        #: research-8 offers research-7's tools (IR-1004).
+        tooled = CHAT_TOOL_VERSION if version == EVIDENCE_TOOL_VERSION else version
         self.investigation = Investigation(
             tools, clarify=not asked,
-            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
-                                 HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION,
-                                    LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
-                                 CHAT_TOOL_VERSION),
-            hybrid=version in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            listing=version in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION))
+            metadata=tooled in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
+                                HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            manuscripts=tooled in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION,
+                                   LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            recovery=tooled in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
+                                CHAT_TOOL_VERSION),
+            hybrid=tooled in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            listing=tooled in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION))
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
-        self.chat = version == CHAT_TOOL_VERSION
+        self.chat = tooled == CHAT_TOOL_VERSION
+        #: research-8 repairs without mentioning the draft and declines when nothing stands (IR-1004).
+        self.evidence = version == EVIDENCE_TOOL_VERSION
         self.repairs = 2 if self.chat else 1
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
@@ -788,6 +811,8 @@ class _Run:
                 partial = f"{kept}\n\n{assurance.LIMITATION}"
                 self._checked(partial)
                 return await self._commit(partial)
+        if self.evidence:
+            return self._result(NO_SUPPORTED_ANSWER, ())
         raise Unavailable("invalid_draft")
 
     async def _repair(self, history: list, found) -> Optional[tuple[str, list]]:
@@ -795,7 +820,7 @@ class _Run:
         if not self.agent.reserves.repair_tokens:
             return None
         # `history` already ends with the draft; the feedback follows it.
-        history = [*history, User(assurance.feedback(found))]
+        history = [*history, User(assurance.feedback(found, unseen=self.evidence))]
         request, status = self.agent.estimate(self.request(history, closed=True))
         if not self.budget.fits([(status.occupancy_tokens, request.max_output_tokens)]):
             return None
