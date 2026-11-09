@@ -195,21 +195,31 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardResultsPagination",
     "PAGE_SIZE": 20,
+    # Soft limits (IR-999): every budget below but the export and the
+    # overview has a per-minute `_burst` a person can reach, whose refusal
+    # clears in under a minute, and a daily backstop only a script reaches.
     "DEFAULT_THROTTLE_CLASSES": [
+        "core.throttling.AnonBurstThrottle",
         "rest_framework.throttling.AnonRateThrottle",
+        "core.throttling.UserBurstThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
-        "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
-        "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
+        "anon_burst": throttle_rate("API_THROTTLE_ANON_BURST", "180/minute"),
+        "anon": throttle_rate("API_THROTTLE_ANON", "30000/day"),
+        "user_burst": throttle_rate("API_THROTTLE_USER_BURST", "180/minute"),
+        "user": throttle_rate("API_THROTTLE_USER", "75000/day"),
+        "ai_query_burst": throttle_rate("API_THROTTLE_AI_QUERY_BURST", "15/minute"),
+        "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "750/day"),
         # A person's own data download (IR-786): per signed-in person, because each
         # one reads a whole account and is audited.
         "personal_data_export": throttle_rate("API_THROTTLE_DATA_EXPORT", "5/hour"),
         # Per client address (IR-661). A campus shares one, so these allow a
         # class signing in together; the lockout still answers per account and address.
-        "auth_login": throttle_rate("API_THROTTLE_LOGIN", "300/hour"),
-        "auth_register": throttle_rate("API_THROTTLE_REGISTER", "60/hour"),
+        "auth_login_burst": throttle_rate("API_THROTTLE_LOGIN_BURST", "30/minute"),
+        "auth_login": throttle_rate("API_THROTTLE_LOGIN", "3000/day"),
+        "auth_register_burst": throttle_rate("API_THROTTLE_REGISTER_BURST", "15/minute"),
+        "auth_register": throttle_rate("API_THROTTLE_REGISTER", "750/day"),
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
         "ai_overview": "600/hour",

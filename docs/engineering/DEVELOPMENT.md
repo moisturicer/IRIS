@@ -36,18 +36,23 @@ Read this first — several obvious commands fail for reasons that are already u
 
 ### API rate limits during development (IR-371)
 
-Every API call counts, including Paper View reloads and polling. Unset
-`API_THROTTLE_ANON`, `API_THROTTLE_USER` and `API_THROTTLE_AI_QUERY` retain
-`100/day`, `1000/day` and `60/hour`. `backend/.env.example` explicitly opts
-into local values of `10000/day`, `100000/day` and `6000/hour`; copy those
+Every API call counts, including Paper View reloads and polling. Each budget
+counts over two windows (IR-999): a per-minute burst a person can reach, whose
+refusal clears in under a minute, and a daily backstop only a script reaches.
+Unset, `API_THROTTLE_ANON_BURST`/`API_THROTTLE_ANON` are `180/minute` and
+`30000/day` per address, `API_THROTTLE_USER_BURST`/`API_THROTTLE_USER` are
+`180/minute` and `75000/day` per person, and
+`API_THROTTLE_AI_QUERY_BURST`/`API_THROTTLE_AI_QUERY` are `15/minute` and
+`750/day`. `backend/.env.example` opts into higher local values; copy those
 keys into your local `backend/.env` and restart backend processes to use them.
 `DEBUG` never raises a limit. Each rate must be a positive integer followed by
 `/second`, `/minute`, `/hour` or `/day` (short forms s/sec, m/min, h and d
 also work). Invalid values stop startup and name the offending key.
 The separate AI overview budget is unchanged.
 
-Login and registration have budgets of their own (IR-661): `API_THROTTLE_LOGIN`
-(`300/hour`) and `API_THROTTLE_REGISTER` (`60/hour`), same format. They count per
+Login and registration have budgets of their own (IR-661): `API_THROTTLE_LOGIN_BURST`
+and `API_THROTTLE_LOGIN` (`30/minute`, `3000/day`), and `API_THROTTLE_REGISTER_BURST`
+and `API_THROTTLE_REGISTER` (`15/minute`, `750/day`), same format. They count per
 client address, read as `TRUSTED_PROXY_COUNT` says, and do not spend the anonymous
 budget. A refusal is a 429 with `Retry-After`. The axes lockout is separate and
 still answers per account and address.
