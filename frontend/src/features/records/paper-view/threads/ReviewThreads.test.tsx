@@ -198,6 +198,9 @@ describe("the composer", () => {
     expect(screen.getByRole("radio", { name: "Suggestion" })).toHaveFocus();
     await user.keyboard("{ArrowUp}");
     expect(screen.getByRole("radio", { name: "Must fix" })).toBeChecked();
+    // Suggested wording (IR-876) is optional and comes after the severity.
+    await user.tab();
+    expect(screen.getByRole("textbox", { name: "Suggested wording (optional)" })).toHaveFocus();
     await user.tab();
     await user.tab();
     expect(screen.getByRole("button", { name: "Add to review" })).toHaveFocus();

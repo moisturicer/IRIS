@@ -682,7 +682,13 @@ describe("the new-version control follows revision requests", () => {
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    const submit = await screen.findByRole("button", { name: "Submit new version" });
+    const open = await screen.findByRole("button", { name: "Submit new version" });
+    expect(open).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
+    // The dialog opens anyway, so the owner can read the response to
+    // reviewers it would carry, and holds Submit there (IR-876).
+    await userEvent.click(open);
+    const dialog = await screen.findByRole("dialog", { name: "Submit new version" });
+    const submit = within(dialog).getByRole("button", { name: /^Submit v\d+$/ });
     expect(submit).toBeDisabled();
     expect(submit).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
   });

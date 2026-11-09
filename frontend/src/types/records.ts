@@ -622,6 +622,41 @@ export interface RevisionFlags {
 }
 
 /** What submitting a new version would do, for its confirmation (IR-273). */
+/** Where a thread's passage is in one later Version (ADR-032 §7, IR-876). */
+export interface ThreadPlace {
+  version:         number;
+  outcome:         "found" | "changed" | "removed";
+  /** Null when the passage was removed. */
+  page:            number | null;
+  /** The quote when found, the edited passage when changed. */
+  text:            string;
+  regions:         PageRegion[];
+  /** The page the suggested wording appears on in this Version, or null. */
+  suggestion_page: number | null;
+}
+
+/** One thread in the response to reviewers (ADR-032 §7, IR-876). */
+export interface ResponseLetterEntry {
+  thread:      number;
+  party:       string;
+  party_label: string;
+  severity:    ThreadSeverity | null;
+  comment:     string;
+  version:     number | null;
+  page:        number | null;
+  quote:       string;
+  /** Null: no answer given. */
+  answer:      ThreadAnswerPayload["kind"] | null;
+  note:        string;
+}
+
+/** The response a Version was submitted with, frozen then. */
+export interface ResponseLetter {
+  version:    number;
+  created_at: string;
+  entries:    ResponseLetterEntry[];
+}
+
 export interface NewVersionHint {
   /** The version it would be. */
   number:   number;
@@ -629,8 +664,10 @@ export interface NewVersionHint {
   rereview: string[];
   /** The offices whose clearance it keeps; empty under the restart-all policy. */
   kept:     string[];
-  /** Why it cannot be submitted yet: nothing has changed since the newest request. */
+  /** Why it cannot be submitted yet: nothing changed, or a Must fix has no answer. */
   blocked:  string | null;
+  /** The response to reviewers it would carry, as it stands (IR-876). */
+  letter?:  ResponseLetterEntry[];
 }
 
 export interface OpenRevisionRequest {
@@ -844,6 +881,18 @@ export interface ReviewComment {
   /** The Decision's comment, the reason it closed. */
   closed_reason?:        string | null;
   answer?:               ThreadAnswerPayload | null;
+  /** A reviewer's replacement text for the passage; empty for none (IR-876). */
+  suggestion?:           string;
+  /** Where the passage is in the newest Version it was looked for in, or null. */
+  place?:                ThreadPlace | null;
+  /** The Version from which the thread is Outdated, or null (IR-876). */
+  outdated_since?:       number | null;
+  /**
+   * Accepted wording looked for in the first Version placed after it was
+   * accepted: its page there, or a null page when it isn't. Null until
+   * such a Version exists (IR-876).
+   */
+  wording_check?:        { version: number; page: number | null } | null;
   /** Severity changes, resolving and reopening, oldest first. Empty on a draft. */
   events?:               ThreadEvent[];
   /*
