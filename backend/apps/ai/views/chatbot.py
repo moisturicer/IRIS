@@ -21,6 +21,12 @@ from apps.ai.streaming import EventStreamResponse
 from apps.ai.grants.reads import research_records
 
 
+class AIQueryBurstThrottle(UserRateThrottle):
+    """Ask IRIS's per-minute burst (IR-999); `AIQueryThrottle` is its daily backstop."""
+
+    scope = "ai_query_burst"
+
+
 class AIQueryThrottle(UserRateThrottle):
     """Retrieval hits the DB and may hit a paid provider — cap it per user."""
 
@@ -29,6 +35,7 @@ class RetiredAnswerView(APIView):
     """Django no longer answers questions or searches passages (IR-957)."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AIQueryBurstThrottle, AIQueryThrottle]
 
     def _gone(self, request, *args, **kwargs):
         return Response(

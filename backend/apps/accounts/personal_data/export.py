@@ -518,8 +518,8 @@ def workflow_acts(user) -> dict:
             for r in reviews
         ],
         "review_comments": [
-            {"paper": _paper(c.record_id, titles), "body": c.body, "is_reply": c.reply_to_id is not None,
-             "at": c.created_at}
+            {"paper": _paper(c.record_id, titles), "body": c.body, "suggestion": c.suggestion,
+             "is_reply": c.reply_to_id is not None, "at": c.created_at}
             for c in comments
         ],
         "review_rounds": [

@@ -668,7 +668,13 @@ describe("the new-version control follows revision requests", () => {
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    const submit = await screen.findByRole("button", { name: "Submit new version" });
+    const open = await screen.findByRole("button", { name: "Submit new version" });
+    expect(open).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
+    // The dialog opens anyway, so the owner can read the response to
+    // reviewers it would carry, and holds Submit there (IR-876).
+    await userEvent.click(open);
+    const dialog = await screen.findByRole("dialog", { name: "Submit new version" });
+    const submit = within(dialog).getByRole("button", { name: /^Submit v\d+$/ });
     expect(submit).toBeDisabled();
     expect(submit).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
   });
@@ -698,7 +704,9 @@ describe("the byline credits the adviser (IR-472)", () => {
     renderPaperView();
 
     await waitForRecord(record.title);
-    expect(screen.getByText("Adviser: Maria Santos")).toBeInTheDocument();
+    const adviser = screen.getByRole("list", { name: "Adviser" });
+    expect(within(adviser).getByText("Maria Santos")).toBeInTheDocument();
+    expect(within(adviser).getByText("Adviser")).toBeInTheDocument();
   });
 
   it("shows no adviser line on a record without one", async () => {
@@ -706,7 +714,7 @@ describe("the byline credits the adviser (IR-472)", () => {
     renderPaperView();
 
     await waitForRecord(record.title);
-    expect(screen.queryByText(/^Adviser:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Adviser" })).not.toBeInTheDocument();
   });
 });
 
@@ -720,7 +728,7 @@ describe("names that open a Profile (IR-700)", () => {
     renderPaperView();
 
     await waitForRecord(record.title);
-    expect(screen.getByRole("link", { name: "Maria Santos" })).toHaveAttribute("href", `/people/${ASSIGNED_ADVISER_ID}`);
+    expect(screen.getByRole("link", { name: "Maria Santos, Adviser" })).toHaveAttribute("href", `/people/${ASSIGNED_ADVISER_ID}`);
   });
 
   it("leaves the adviser as plain text when the flag is false or absent", async () => {
@@ -728,13 +736,16 @@ describe("names that open a Profile (IR-700)", () => {
     renderPaperView();
 
     await waitForRecord(record.title);
-    expect(screen.getByText("Adviser: Maria Santos")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Maria Santos" })).not.toBeInTheDocument();
+    const adviser = screen.getByRole("list", { name: "Adviser" });
+    expect(within(adviser).getByText("Maria Santos")).toBeInTheDocument();
+    expect(within(adviser).getByText("Adviser")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Maria Santos, Adviser" })).not.toBeInTheDocument();
   });
 
-  it("lists the owners, linking those with a Profile, and shows nothing when none has one", async () => {
+  it("links an author chip to the matching owner's Profile when available", async () => {
     shownRecord = {
       ...record,
+      authors: [{ id: 1, name: "Ana Reyes", role: null }],
       owners: [
         { id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true, has_profile: true },
         { id: 2, user: 42, email: "j@x.edu", full_name: "Jomar Ybanez", is_primary: false, has_profile: false },
@@ -743,12 +754,12 @@ describe("names that open a Profile (IR-700)", () => {
     renderPaperView();
 
     await waitForRecord(record.title);
-    expect(screen.getByRole("link", { name: "Ana Reyes" })).toHaveAttribute("href", "/people/41");
-    expect(screen.queryByRole("link", { name: "Jomar Ybanez" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Owners:/)).toHaveTextContent("Jomar Ybanez");
+    expect(screen.getByRole("link", { name: "Ana Reyes, Author" })).toHaveAttribute("href", "/people/41");
+    expect(screen.queryByText("Jomar Ybanez")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Owners:/)).not.toBeInTheDocument();
   });
 
-  it("shows no owners line, and no email, when no owner has a Profile", async () => {
+  it("does not expose owner metadata when an author has no Profile", async () => {
     shownRecord = {
       ...record,
       owners: [{ id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true }],

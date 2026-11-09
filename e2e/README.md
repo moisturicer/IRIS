@@ -78,11 +78,13 @@ Both run inside the backend container (`support/stack.ts`).
 - **Inactivity expiry** is enforced by the server at 30 minutes. Its check
   runs only in a separate pass with `SESSION_IDLE_TIMEOUT_MINUTES=2`
   (`E2E_IDLE_PASS=1`).
-- **Request throttles.** DRF's general throttles are raised to 20000/day
-  (`API_THROTTLE_ANON`, `API_THROTTLE_USER`). Behind nginx every signed-out
-  request comes from one address, and the 100/day default runs out partway
-  through one full run. No acceptance criterion measures them. The lockout
-  under test is axes', left at its default of three failures.
+- **Request throttles.** DRF's per-minute bursts are raised to 6000/minute
+  (`API_THROTTLE_ANON_BURST`, `API_THROTTLE_USER_BURST`,
+  `API_THROTTLE_LOGIN_BURST`, `API_THROTTLE_REGISTER_BURST`; IR-999). Behind
+  nginx every signed-out request comes from one address, and a run is faster
+  than a person. The daily backstops keep their defaults. No acceptance
+  criterion measures them. The lockout under test is axes', left at its
+  default of three failures.
 - **Ask IRIS** is not driven here. IR-631 reuses IR-630 and IR-605/IR-608
   evidence from the same SHA. IR-250 (the embargo field) is Done, but a paper
   still reaches the AI only once someone has answered for it (ADR-052), and a

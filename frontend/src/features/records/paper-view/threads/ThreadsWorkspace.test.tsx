@@ -25,6 +25,7 @@ const api = vi.hoisted(() => ({
   documentRequestSlots: vi.fn(() => new Promise(() => {})),
   reviewComments: vi.fn(),
   finishReview: vi.fn(),
+  responseLetters: vi.fn(),
 }));
 vi.mock("@/api/records", () => ({ recordsApi: api }));
 
@@ -46,6 +47,13 @@ beforeEach(() => {
   api.tracker.mockReset().mockResolvedValue({ data: TRACKER });
   api.reviewComments.mockReset().mockResolvedValue({ data: THREADS });
   api.finishReview.mockReset().mockResolvedValue({ data: {} });
+  api.responseLetters.mockReset().mockResolvedValue({ data: [] });
+});
+
+const LETTER = (version: number) => ({
+  version, created_at: "2026-11-09T00:00:00Z",
+  entries: [{ thread: 1, party: "itso", party_label: "ITSO", severity: "must_fix", comment: "Name the sample.",
+    version: 1, page: 4, quote: "a sample of 40", answer: "addressed", note: "Section 3.2 names it." }],
 });
 
 const record = {
@@ -193,4 +201,21 @@ describe("threads in the review workspace", () => {
     await screen.findByRole("article", { name: "Thread 1, ITSO" });
     await expectNoBlockingA11yViolations(container);
   });
+
+describe("the response to reviewers when a reviewer looks again (IR-876)", () => {
+  it("opens Threads on the letter the newest Version was submitted with", async () => {
+    api.responseLetters.mockResolvedValue({ data: [LETTER(2)] });
+    openWorkspace();
+    const letter = await screen.findByRole("region", { name: "Response to reviewers, v2" });
+    expect(screen.getByRole("tab", { name: /Threads/ })).toHaveAttribute("aria-selected", "true");
+    expect(letter).toHaveTextContent("Addressed: Section 3.2 names it.");
+  });
+
+  it("stays on the conversation when the letter is an older Version's", async () => {
+    api.responseLetters.mockResolvedValue({ data: [LETTER(1)] });
+    openWorkspace();
+    await waitFor(() => expect(api.responseLetters).toHaveBeenCalled());
+    expect(screen.getByRole("tab", { name: /Conversation/ })).toHaveAttribute("aria-selected", "true");
+  });
+});
 });

@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
 import { joinLabels } from "@/lib/utils";
-import type { NewVersionHint } from "@/types/records";
+import type { NewVersionHint, ResponseLetterEntry } from "@/types/records";
+
+import { LetterEntries } from "./threads/ResponseLetter";
 
 interface NewVersionDialogProps {
   recordId: number;
@@ -39,10 +41,16 @@ export function newVersionSummary(hint: NewVersionHint): string {
  * clearance survives, since that is what ADR-003's clearance-aware
  * resubmission promises the owner. The server re-checks that something
  * changed; its refusal is shown as it words it.
+ *
+ * **The response to reviewers** (ADR-032 §7, IR-876): the dialog shows the
+ * letter the Version will carry, assembled from the owner's answers as they
+ * stand, and holds *Submit* while the server says a *Must fix* has none.
  */
 export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDone }: NewVersionDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const blockedId = useId();
+  const letter = hint.letter ?? [];
 
   const submit = async () => {
     if (sending) return;
@@ -69,7 +77,13 @@ export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDon
           <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>
             Cancel
           </Button>
-          <Button type="button" onClick={() => void submit()} loading={sending}>
+          <Button
+            type="button"
+            onClick={() => void submit()}
+            loading={sending}
+            disabled={hint.blocked != null}
+            aria-describedby={hint.blocked ? blockedId : undefined}
+          >
             Submit v{hint.number}
           </Button>
         </div>
@@ -83,6 +97,10 @@ export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDon
             : "Your manuscript is unchanged; the details you edited and the documents you uploaded go with it."}{" "}
           Every earlier version stays in the record&rsquo;s history.
         </p>
+        {letter.length > 0 && <LetterPreview entries={letter} />}
+        {hint.blocked && (
+          <p id={blockedId} className="text-[14px] text-brand leading-relaxed">{hint.blocked}</p>
+        )}
         {error && (
           <p role="alert" className={LOAD_ERROR}>
             <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
@@ -91,5 +109,18 @@ export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDon
         )}
       </div>
     </Modal>
+  );
+}
+
+function LetterPreview({ entries }: { entries: ResponseLetterEntry[] }) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="space-y-2">
+      <h3 id={headingId} className="text-[14px] font-semibold text-stone-900">Response to reviewers</h3>
+      <p className="text-small text-stone-600">
+        Sent with this version, from your answers in Threads. Reviewers read it first.
+      </p>
+      <LetterEntries entries={entries} />
+    </section>
   );
 }

@@ -10,6 +10,8 @@ from rest_framework.throttling import SimpleRateThrottle, UserRateThrottle
 
 from .client_address import client_address
 
+# Soft limits (IR-999): each budget has a per-minute burst and a daily backstop.
+
 
 class ClientAddressThrottle(SimpleRateThrottle):
     def get_cache_key(self, request, view):
@@ -22,8 +24,16 @@ class PersonalDataExportThrottle(UserRateThrottle):
     scope = "personal_data_export"
 
 
+class LoginBurstThrottle(ClientAddressThrottle):
+    scope = "auth_login_burst"
+
+
 class LoginThrottle(ClientAddressThrottle):
     scope = "auth_login"
+
+
+class RegisterBurstThrottle(ClientAddressThrottle):
+    scope = "auth_register_burst"
 
 
 class RegisterThrottle(ClientAddressThrottle):

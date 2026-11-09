@@ -1,41 +1,54 @@
-import { Fragment } from "react";
 import { Link } from "react-router-dom";
 
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { personPath } from "@/lib/access";
 import { cn } from "@/lib/utils";
-import type { RecordOwner } from "@/types/records";
 
-/** A person's name, opening their Profile (IR-700). Used only where the server says it can open. */
-export function PersonLink({ id, name }: { id: number; name: string }) {
-  return (
-    <Link
-      to={personPath(id)}
-      className={cn("rounded-sm font-semibold text-stone-800 underline underline-offset-2 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
-    >
-      {name}
-    </Link>
+type PersonRole = "Author" | "Adviser";
+const ROLE_AVATAR_STYLES: Record<PersonRole, string> = {
+  Author: "bg-brand",
+  Adviser: "bg-stone-700",
+};
+
+/** A compact author/adviser chip. A profile link is rendered only when the API allows it. */
+export function PersonChip({ id, name, role, hasProfile = false }: {
+  id?: number;
+  name: string;
+  role: PersonRole;
+  hasProfile?: boolean;
+}) {
+  const classes = cn(
+    "inline-flex min-h-11 items-center gap-2 rounded-full bg-white pl-1 pr-3.5 py-1 ring-1 ring-stone-200 text-small font-semibold text-stone-800",
+    hasProfile && id != null && "hover:ring-brand-300 hover:text-brand",
+    COLOUR_TRANSITION,
+    hasProfile && id != null && FOCUS_RING,
   );
+  const chip = (
+    <>
+      <span
+        className={cn(
+          "w-6 h-6 shrink-0 rounded-full text-white text-3xs font-bold flex items-center justify-center",
+          ROLE_AVATAR_STYLES[role],
+        )}
+        aria-hidden
+      >
+        {initials(name)}
+      </span>
+      <span className="whitespace-nowrap">{name}</span>
+      <span className="whitespace-nowrap border-l border-stone-200 pl-2 text-2xs font-medium text-stone-500">{role}</span>
+    </>
+  );
+
+  if (hasProfile && id != null) {
+    return (
+      <Link to={personPath(id)} aria-label={`${name}, ${role}`} className={classes}>
+        {chip}
+      </Link>
+    );
+  }
+  return <span className={classes}>{chip}</span>;
 }
 
-/**
- * A published paper's owners, in the byline's meta row (IR-700). It shows only
- * when at least one owner has a Profile to open: owners are accounts, and the
- * authors above are byline names. An owner without a visible Profile (suspended
- * or former) is plain text in the list, never a link to a not-found page.
- */
-export function OwnerNames({ owners }: { owners: RecordOwner[] | undefined }) {
-  const list = owners ?? [];
-  if (!list.some((owner) => owner.has_profile)) return null;
-  return (
-    <span>
-      Owners:{" "}
-      {list.map((owner, index) => (
-        <Fragment key={owner.id}>
-          {index > 0 && ", "}
-          {owner.has_profile ? <PersonLink id={owner.user} name={owner.full_name} /> : owner.full_name}
-        </Fragment>
-      ))}
-    </span>
-  );
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
