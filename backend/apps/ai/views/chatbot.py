@@ -30,6 +30,8 @@ class AIQueryBurstThrottle(UserRateThrottle):
 class AIQueryThrottle(UserRateThrottle):
     """Retrieval hits the DB and may hit a paid provider — cap it per user."""
 
+    scope = "ai_query"
+
 
 class RetiredAnswerView(APIView):
     """Django no longer answers questions or searches passages (IR-957)."""

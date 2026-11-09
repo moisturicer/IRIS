@@ -194,9 +194,11 @@ def test_the_overview_performs_no_retrieval():
 def test_the_answer_service_offers_no_second_way_to_an_overview():
     """`answer_service(task=...)` existed only for the overview (IR-380)."""
     tree = ast.parse((APPS_AI / "composition.py").read_text(encoding="utf-8"))
-    method = next(
+    # Django no longer answers (IR-957), so the service may be gone; if it returns, it takes no task.
+    methods = [
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef) and node.name == "answer_service"
-    )
-    assert "task" not in [arg.arg for arg in method.args.args]
+    ]
+    for method in methods:
+        assert "task" not in [arg.arg for arg in method.args.args]

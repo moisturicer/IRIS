@@ -23,6 +23,7 @@ _ATTEMPT = (
     "id", "operation", "purpose", "purpose_version", "model", "lane", "state", "sent",
     "usage_reported", "reserved_input_tokens", "reserved_output_tokens", "reserved_cost_micros",
     "charge_attempts", "charge_input_tokens", "charge_output_tokens", "charge_cost_micros",
+    "cached_input_tokens",
 )
 
 
@@ -42,7 +43,9 @@ async def run_report(dsn: str, run_id) -> dict:
     attempts = [dict(row) for row in rows]
     charged = {name: sum(a[f"charge_{name}"] for a in attempts)
                for name in ("attempts", "input_tokens", "output_tokens", "cost_micros")}
-    report = {"run_id": str(run_id), "attempts": attempts, "charged": charged,
+    # Prompt-cache hits as the vendor reported them; part of the input, never discounted (IR-953).
+    cached = sum(a["cached_input_tokens"] or 0 for a in attempts)
+    report = {"run_id": str(run_id), "attempts": attempts, "charged": charged, "cached_input_tokens": cached,
               "unreported": sum(1 for a in attempts if a["sent"] and not a["usage_reported"])}
     if allowance is not None:
         ceiling = Ceiling.of_allowance(allowance)

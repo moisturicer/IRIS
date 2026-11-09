@@ -84,6 +84,10 @@ class OpenAICompatibleAgentProvider(LLMProvider):
         payload = self.dialect.encode(request)
         if self.config.routing is not None:
             payload["provider"] = self.config.routing
+        binding = scope.current()
+        if self.config.prompt_cache == agent_config.PROMPT_CACHE_RUN and binding is not None:
+            # One run's turns share a growing prefix; the key never spans runs or readers.
+            payload["prompt_cache_key"] = f"iris-run-{binding.run_id}"
         return payload
 
     @property

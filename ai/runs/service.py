@@ -198,7 +198,8 @@ class RunService:
         try:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id,
                                   embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger,
-                                  reranker=self.reranker, follow_stored_grant=True)
+                                  reranker=self.reranker, follow_stored_grant=True,
+                                  cache_query_vectors=getattr(self.cfg, "query_vector_cache", False))
             # Every provider attempt inside is admitted against this run (IR-725).
             with admission.bound(admission.RunBinding(run_id, claim.fence)), stream.bound(sink):
                 if compacting:

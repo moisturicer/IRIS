@@ -126,6 +126,11 @@ RECOVER_TURN = ToolSpec(
     "earlier Turn, such as one a compacted summary mentions.", _object({"turn": {"type": "integer", "minimum": 1}},
                                                                        ["turn"]))
 
+#: Read-only calls a tool group may fetch together (IR-1003). Not `read_manuscript`,
+#: whose room depends on the results before it, nor plan, focus or clarification.
+PREFETCHABLE = (SEARCH, HYBRID_SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE, RESOLVE_PAPERS,
+                COUNT_RECORDS, LIST_RECORDS, RECOVER_TURN)
+
 RESEARCH = (SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE)
 #: Named papers and exact counts, offered only under the research-2 tool version (IR-750).
 METADATA = (RESOLVE_PAPERS, COUNT_RECORDS)
@@ -324,14 +329,52 @@ class Investigation:
                  for n, i in enumerate((i for i in state.get("shown", ()) if i in self.papers), start=1)]
         return {"shown": shown, "selected": listed("selected"), "excluded": listed("excluded")}
 
-    async def execute(self, call: ToolCall, *, room: int = 0) -> Outcome:
-        """Run one call; `room` is the bytes a manuscript read may return (IR-733)."""
+    def fetcher(self, call: ToolCall):
+        """The read-only fetch `call` would make, to start early; None when it must wait its turn (IR-1003).
+
+        Only reads whose outcome does not depend on the calls before them. The
+        fetch changes nothing the model sees; `execute` folds it in call order.
+        """
+        spec = next((s for s in self.specs() if s.name == call.name), None)
+        if spec is None or spec not in PREFETCHABLE:
+            return None
+        try:
+            args = _arguments(call, spec)
+        except InvalidArguments:
+            return None
+        return self._fetch(spec, args)
+
+    async def _fetch(self, spec: ToolSpec, args: dict):
+        if spec is COUNT_RECORDS:
+            filters = {k: v for k, v in args.items() if k != "group_by"}
+            return await self.research.count(filters, args.get("group_by"))
+        if spec is LIST_RECORDS:
+            return await self.research.list_records(args)
+        if spec is RECOVER_TURN:
+            if not _int(args["turn"]):
+                raise InvalidArguments
+            return await self.research.recover_turn(args["turn"])
+        return await self._research(spec, args)
+
+    async def execute(self, call: ToolCall, *, room: int = 0, fetched=None) -> Outcome:
+        """Run one call; `room` is the bytes a manuscript read may return (IR-733).
+
+        `fetched` is a fetch `fetcher` started early; its result is folded here,
+        exactly as if the call had run now (IR-1003).
+        """
         self.tool_calls += 1
         spec = next((s for s in self.specs() if s.name == call.name), None)
         if spec is None:
             return Outcome(json.dumps({"error": "unknown_tool"}), control_only=True)
         try:
             args = _arguments(call, spec)
+            if fetched is not None:
+                raw = await fetched
+                if spec is COUNT_RECORDS:
+                    return self._counted(raw)
+                if spec is LIST_RECORDS:
+                    return self._listed(raw)
+                return self._evidence(raw)
             if spec is UPDATE_PLAN:
                 return await self._plan(args["steps"])
             if spec is UPDATE_FOCUS:

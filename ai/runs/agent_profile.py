@@ -34,6 +34,8 @@ class AgentProfile:
     compaction: Optional[Compaction] = None
     #: "enforce" repairs or trims a failing draft; "flag" delivers it and notes what it could not match; "advisory" only logs.
     checks: str = "enforce"
+    #: Read-only calls in one tool group fetched at once; 1 runs them one by one (IR-1003).
+    tool_concurrency: int = 1
 
 
 def _json(values, name, shape: str):
@@ -51,6 +53,16 @@ def _record(cls, name, raw):
         return cls(**raw)
     except (TypeError, ValueError):
         raise NotConfigured(f"{name} is malformed") from None
+
+
+def _tool_concurrency(values) -> int:
+    """Optional: blank runs a tool group one call at a time (IR-1003)."""
+    raw = str(getattr(values, "RUNS_AGENT_TOOL_CONCURRENCY", "") or "").strip()
+    if not raw:
+        return 1
+    if not raw.isdigit() or not 1 <= int(raw) <= 16:
+        raise NotConfigured("RUNS_AGENT_TOOL_CONCURRENCY must be a whole number from 1 to 16")
+    return int(raw)
 
 
 def _bounds(values) -> dict[str, Bounds]:
@@ -101,7 +113,7 @@ def read(values) -> AgentProfile:
         state_version=runs_config.SCHEMA, data_policy=provider.data_policy,
     )
     return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits,
-                        compaction=compaction, checks=checks)
+                        compaction=compaction, checks=checks, tool_concurrency=_tool_concurrency(values))
 
 
 def executor(profile: AgentProfile, dsn: str, *, provider=None):
@@ -118,7 +130,7 @@ def executor(profile: AgentProfile, dsn: str, *, provider=None):
     admitted = AdmittedAgentProvider(inner, Ledger(dsn, profile.limits), purpose=PURPOSE)
     return AgentExecutor(admitted, profile.pin, profile.reserves, profiles=profile.bounds,
                          price=profile.limits.prices[profile.pin.model], compaction=profile.compaction,
-                         checks=profile.checks)
+                         checks=profile.checks, tool_concurrency=profile.tool_concurrency)
 
 
 def selected(values) -> Optional[AgentProfile]:
