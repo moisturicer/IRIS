@@ -8,10 +8,8 @@ from apps.ai.composition import use_composition_root
 from apps.ai.overview.pages import build_page_prompt, parse_page_citations
 from apps.ai.providers.fakes import ScriptedLLM
 from apps.ai.regions import Region
-from apps.ai.models import DocumentChunk
 from apps.ai.retrieval.ports import RetrievedChunk
 
-from .corpus import FLOOD_QUESTION, FLOOD_TEXT, ask, make_record, make_user, root_with
 from . import test_overview_whole_paper as whole_paper
 from .test_overview_whole_paper import _root as _overview_root
 
@@ -158,23 +156,3 @@ class OverviewPageCitationTests:
         [(system, user)] = llm.calls
         assert "[p. 3]" in system
         assert "[p. 9]" in user
-
-
-@pytest.mark.db_required
-@pytest.mark.django_db
-class ChatStaysChunkLevelTests:
-    def test_a_chat_citation_names_a_chunk_and_its_quoted_passage(
-        self, embedder, space, client_for
-    ):
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-
-        with use_composition_root(root_with(embedder=embedder)):
-            body = ask(client_for(reader), FLOOD_QUESTION).json()
-
-        citation, = body["citations"]
-        assert citation["marker"] == 1
-        assert citation["chunk_id"] == DocumentChunk.objects.get(record=flood).pk
-        assert citation["page"] == 4
-        assert citation["text"] == FLOOD_TEXT

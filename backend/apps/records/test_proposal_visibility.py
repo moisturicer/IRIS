@@ -41,7 +41,7 @@ from django.db import connection
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.ai.composition import CompositionRoot, use_composition_root
+from apps.ai.composition import CompositionRoot
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
 from apps.ai.models.embedding import RecordEmbedding, RecordSpaceEmbedding
@@ -229,64 +229,9 @@ class ProposalVisibilityTests(APITestCase):
             status.HTTP_200_OK,
         )
 
-    # --- Ask IRIS --------------------------------------------------------------
-
-    def test_ask_iris_search_never_returns_a_proposal(self):
-        self.as_user(self.stranger)
-        with use_composition_root(root_with(self.embedder)):
-            response = self.client.post(
-                AI_SEARCH, {"query": MARKER, "top_k": 20}, format="json"
-            )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-
-        # `results` is passages, not records (IR-284): several can come from
-        # one paper, so this reads the record each passage belongs to.
-        returned = {row["record_id"] for row in response.data["results"]}
-        self.assertIn(self.published_thesis.pk, returned)
-        self.assertNotIn(self.approved_proposal.pk, returned)
-        self.assertNotIn(self.completed_proposal.pk, returned)
-
-    def test_ask_iris_ask_never_cites_a_proposal_to_a_stranger(self):
-        # A stranger owns neither Proposal and neither is published, so under
-        # `visible_to(user)` -- the one predicate retrieval now applies
-        # (IR-283/285) -- both are simply not candidates.
-        cache.clear()
-        self.as_user(self.stranger)
-        with use_composition_root(root_with(self.embedder)):
-            response = self.client.post(
-                AI_ASK, {"question": f"What is known about {MARKER}?", "top_k": 20},
-                format="json",
-            )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-
-        # A citation is an object carrying the record it belongs to, the
-        # page, and the quote (IR-284) -- not a bare id.
-        cited = {c["record_id"] for c in response.data["citations"]}
-        sourced = {s["id"] for s in response.data["sources"]}
-        self.assertIn(self.published_thesis.pk, cited)
-        for proposal in self.proposals:
-            self.assertNotIn(proposal.pk, cited)
-            self.assertNotIn(proposal.pk, sourced)
-
-    def test_ask_iris_still_answers_the_owner_from_their_own_proposal(self):
-        # Not the mirror of the stranger case above. `test_an_owner_receives_
-        # their_own_draft` (apps/ai/retrieval/tests/test_visibility.py) is an
-        # established security property: retrieval is `visible_to(user)`
-        # everywhere (CLAUDE.md's "one predicate used everywhere, including
-        # RAG retrieval"), and an owner's own Proposal is visible to them by
-        # that same rule. IR-264 narrowed who else can find a Proposal, not
-        # what its owner can. This only pins that the owner's own question
-        # still gets an answer at all -- which record it draws on is theirs
-        # to have retrievable, not this test's concern.
-        cache.clear()
-        self.as_user(self.owner)
-        with use_composition_root(root_with(self.embedder)):
-            response = self.client.post(
-                AI_ASK, {"question": f"What is known about {MARKER}?", "top_k": 20},
-                format="json",
-            )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertTrue(response.data["citations"], "the owner's own question found nothing")
+    # --- Ask IRIS ---------------------------------------------------------------
+    # Django's /ai/ask/ and /ai/search/ were retired in IR-957; a Proposal's
+    # exclusion from the AI runtime is `research_records`, tested in apps/ai/grants.
 
     def test_similar_records_never_suggest_a_proposal(self):
         # The paper view's "similar" list reuses Ask IRIS retrieval. Every

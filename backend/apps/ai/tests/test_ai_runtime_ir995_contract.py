@@ -12,7 +12,7 @@ REPO = Path(__file__).resolve().parents[4]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from ai.agent.assurance import LIMITATION  # noqa: E402
+from ai.agent.assurance import QUALIFIER  # noqa: E402
 from ai.agent.executor import PAPER_CHAT_PREFIX, AgentExecutor  # noqa: E402
 from ai.research.tools import NO_MATCH, Coverage, Match, ToolResult  # noqa: E402
 from .test_ai_runtime_agent_loop_contract import (  # noqa: E402
@@ -89,9 +89,9 @@ def test_research_7_repairs_a_failing_draft_twice():
     assert not [name for name, _ in corpus.events if name == "check"]
 
 
-def test_research_6_still_repairs_once_then_keeps_supported_sentences():
-    provider = screened(tools(call("s", "search", query="flood")),
-                        reply(f"{GOOD} Some 40 more papers agree."), reply(f"{GOOD} Some 40 more papers agree."))
+def test_research_6_also_repairs_twice_then_marks_what_stays_unsupported():
+    still = reply(f"{GOOD} Some 40 more papers agree.")
+    provider = screened(tools(call("s", "search", query="flood")), still, still, still)
     result, corpus = answer(provider, PIN_6, Searchable())
-    assert result.answer == f"It predicted 87 floods [1].\n\n{LIMITATION}"
-    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair"]
+    assert result.answer == f"It predicted 87 floods [1]. Some 40 more papers agree. {QUALIFIER}"
+    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair", "repair"]

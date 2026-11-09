@@ -333,34 +333,6 @@ def chunk_extraction(self, extraction_id: int, source_revision=None, *, force: b
 
 
 #: For unexpected errors only; a vendor failure is a recorded fallback route.
-SHADOW_MAX_RETRIES = 3
-
-
-@shared_task(
-    bind=True,
-    max_retries=SHADOW_MAX_RETRIES,
-    acks_late=True,
-    reject_on_worker_lost=True,
-    ignore_result=True,
-    soft_time_limit=120,
-    time_limit=150,
-)
-def decide_evidence_shadow(self, shadow_id: int):
-    """One shadow evidence decision (IR-466). A lost worker requeues the
-    message, so its stale row can be reclaimed once."""
-    from apps.ai.evidence.shadow import run_shadow_decision
-
-    final = self.request.retries >= self.max_retries
-    try:
-        return run_shadow_decision(shadow_id, final_attempt=final)
-    except Exception as exc:
-        # Only the type travels into Celery's retry log, never a message.
-        raise self.retry(
-            exc=RuntimeError(type(exc).__name__),
-            countdown=30 * (self.request.retries + 1),
-        )
-
-
 @shared_task
 def metadata_extraction_task(document_id):
     pass
@@ -370,17 +342,13 @@ def embedding_generation_task(document_id):
     pass
 
 
-@shared_task(acks_late=True, reject_on_worker_lost=True, ignore_result=True)
+@shared_task(ignore_result=True)
 def answer_queued_question(run_id: str):
-    """One delivery of a queued Ask IRIS question (IR-544).
+    """Ends a Django question still queued at the switch (IR-957).
 
-    Acknowledged late, so a worker that dies mid-answer leaves the message to
-    be delivered again. Each delivery claims a new attempt and fences out the
-    one before it; a run that already ended is left alone, which is what keeps
-    a redelivery from writing a second Turn. No retry beyond that: a failure
-    ends the run, and spending more on it is IR-545's decision. Time limits
-    are set per dispatch from the run's deadline (`durable._dispatch`).
+    Django stopped answering, so a message dispatched before the switch ends
+    its run `failed` with reason `retired` instead of answering it.
     """
-    from apps.ai.durable import execute
+    from apps.ai.durable import retire
 
-    execute(run_id)
+    retire(run_id)

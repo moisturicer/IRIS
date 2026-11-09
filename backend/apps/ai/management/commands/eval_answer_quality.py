@@ -1,20 +1,19 @@
-"""Answer quality of Django `lanes-v1` and the runtime agent on one frozen set (IR-956).
+"""Answer quality of the runtime agent against stored Django answers, one frozen set (IR-956).
 
     python manage.py eval_answer_quality --set S.json --validate
     python manage.py eval_answer_quality --set S.json --write-lock L.json --grader-model M
     python manage.py eval_answer_quality --set S.json --lock L.json --grader-model M \\
-        --run --runtime-url URL --runtime-model M2
     python manage.py eval_answer_quality --set S.json --lock L.json --grader-model M \\
-        --rescore RUN.json [--reuse-django RUN.json --run ...]
+        --rescore RUN.json [--reuse-django RUN.json --run --runtime-url URL --runtime-model M2]
 
-``--run`` sends every case to both engines on paid model calls, one case at a
-time, through provider admission: a case whose worst case would not fit in what
+``--run`` sends every case to the runtime agent on paid model calls, one case
+at a time, through provider admission, and needs ``--reuse-django``: Django's
+answer path is retired (IR-957), so its arm comes from an earlier run file. a case whose worst case would not fit in what
 is left of the campaign is not started, and it and every later case are
 reported as not run and scored as failures. It then grades every answer with
 the pinned grader and writes a run file and a Markdown report. ``--rescore``
 grades whatever a run file left ungraded and rewrites the report;
-``--reuse-django`` collects only the agent and keeps the earlier Django answers,
-for rerunning the agent arm after a runtime change.
+``--reuse-django`` names that run file; its Django answers are kept as they were.
 
 ``--reader-a`` and ``--reader-b`` name the two readers by email. Every request
 carries a token minted for it, so a run outlives the token lifetime; tokens go
@@ -33,11 +32,11 @@ from rest_framework.test import APIClient
 
 from apps.ai.evaluation import answer_quality as aq
 from apps.ai.evaluation.engines import RUNTIME_ENGINE, normalize_model
-from apps.ai.evaluation.replay import CampaignAttempts, RuntimeAttempts, collect_case
+from apps.ai.evaluation.legacy_engines import LEGACY_ENGINE
+from apps.ai.evaluation.replay import CampaignAttempts, RuntimeAttempts
 from apps.ai.evaluation.runfile import file_digest, load_json, write_json
 from apps.ai.evaluation.runtime_replay import (DEFAULT_DEADLINE_SECONDS, RuntimeSeam,
                                                collect_case_runtime)
-from apps.ai.controller.versions import LEGACY_ENGINE, NEW_RUN_ENGINE
 
 DEFAULT_OUT = "../docs/evaluation/runs"
 
@@ -115,21 +114,6 @@ def _stray_attempts(since, rows) -> list[str]:
         return []
     return [f"the campaign charged attempts no case made ({', '.join(map(str, stray))}); "
             "other work shared the campaign during the run"]
-
-
-def _django_models() -> set[str]:
-    """Every model the Django arm may call: each task's profile, plus the Jev router."""
-    from apps.ai.inference.profiles import profile_for
-    from apps.ai.inference.tasks import InferenceTask
-    from apps.ai.providers.openrouter_decisions import PINNED_MODEL
-
-    models = set()
-    for task in InferenceTask:
-        profile = profile_for(task)
-        models.update(m for m in (profile.model, *profile.fallback_models) if m)
-    if settings.AI_JEV_ROUTING_ENABLED:
-        models.add(PINNED_MODEL)
-    return models
 
 
 def _throttle_problems(*, turns: int) -> list[str]:
@@ -243,13 +227,6 @@ class _Reader:
         return self._fresh().get(path)
 
 
-class DjangoAttempts(CampaignAttempts):
-    """Django's own attempts in the shared campaign: the runtime's are its own (owner ai)."""
-
-    def _query(self):
-        return super()._query().exclude(owner="ai")
-
-
 class AdmittedGrader(aq.ModelGrader):
     """The grader, each call its own admitted run charged to ``lane``."""
 
@@ -279,7 +256,7 @@ def _scope(case, access):
 
 
 class Command(BaseCommand):
-    help = "Measure Ask IRIS answer quality on both engines with one frozen set (IR-956)."
+    help = "Measure the runtime agent's answer quality against stored Django answers (IR-956)."
 
     def add_arguments(self, parser):
         parser.add_argument("--set", required=True)
@@ -290,7 +267,7 @@ class Command(BaseCommand):
         parser.add_argument("--run", action="store_true")
         parser.add_argument("--rescore", metavar="RUN")
         parser.add_argument("--reuse-django", metavar="RUN",
-                            help="Keep this run file's Django answers; collect only the agent.")
+                            help="The earlier run whose Django answers this run keeps; required by --run.")
         parser.add_argument("--reader-a", metavar="EMAIL")
         parser.add_argument("--reader-b", metavar="EMAIL")
         parser.add_argument("--preflight", action="store_true",
@@ -378,18 +355,10 @@ class Command(BaseCommand):
         if not (options["runtime_url"] or options["runtime_gateway"]) or not options["runtime_model"]:
             raise CommandError("--run needs --runtime-url (or --runtime-gateway) and "
                                "--runtime-model")
-        if options["runtime_gateway"] and not settings.AI_RUNTIME_READER:
-            raise CommandError("--runtime-gateway needs AI_RUNTIME_READER on, as the edge does")
         if options["runtime_gateway"] and not _service_secret():
             raise CommandError("--runtime-gateway needs AI_GATEWAY_SERVICE_SECRET")
-        if NEW_RUN_ENGINE != LEGACY_ENGINE:
-            raise CommandError(f"the Django arm must be {LEGACY_ENGINE}, this code runs "
-                               f"{NEW_RUN_ENGINE}")
-        if settings.AI_DURABLE_ASK:
-            raise CommandError("the Django arm needs synchronous Ask IRIS (AI_DURABLE_ASK off) "
-                               "for attributable costs")
-        if getattr(settings, "AI_EVIDENCE_DECISION", "off") != "off":
-            raise CommandError("the evidence shadow must be off during a counted run")
+        if not options["reuse_django"]:
+            raise CommandError("--run needs --reuse-django: Django no longer answers (IR-957)")
         limits = self._admission()
         answer_model = profile_for(InferenceTask.ANSWER).model
         if normalize_model(answer_model) != normalize_model(options["runtime_model"]):
@@ -439,15 +408,13 @@ class Command(BaseCommand):
         if problems:
             raise CommandError("access state is not what the set needs:\n  "
                                + "\n  ".join(problems))
-        previous = load_json(options["reuse_django"]) if options["reuse_django"] else None
-        if previous is not None:
-            if previous.get("set_sha256") != aq.set_digest(data):
-                raise CommandError("--reuse-django comes from a different set")
-            if previous["access"] != access.as_dict():
-                raise CommandError("access state changed since the reused Django run")
-            if normalize_model(previous["models"]["answer"]) != normalize_model(answer_model):
-                raise CommandError("the reused Django run answered with another model")
-        django_attempts = DjangoAttempts(limits.campaign_key)
+        previous = load_json(options["reuse_django"])
+        if previous.get("set_sha256") != aq.set_digest(data):
+            raise CommandError("--reuse-django comes from a different set")
+        if previous["access"] != access.as_dict():
+            raise CommandError("access state changed since the reused Django run")
+        if normalize_model(previous["models"]["answer"]) != normalize_model(answer_model):
+            raise CommandError("the reused Django run answered with another model")
         runtime_attempts = RuntimeAttempts(limits.campaign_key)
         watermark = CampaignAttempts(limits.campaign_key).snapshot()
         caps = {"case_attempts": 10 ** 6}
@@ -457,10 +424,6 @@ class Command(BaseCommand):
             self._preflight(data, options, limits, answer_model, seam_for, access)
             return
 
-        def django(case):
-            return collect_case(readers[case["reader"]], _scope(case, access),
-                                attempts=django_attempts, limits=caps)
-
         def agent(case):
             seam = seam_for(case["reader"], access.title_to_id.get(case.get("scope")))
             return collect_case_runtime(seam, _scope(case, access),
@@ -468,24 +431,22 @@ class Command(BaseCommand):
                                         depth=options["depth"],
                                         deadline_seconds=options["run_deadline_seconds"])
 
-        collectors = {"agent": agent} if previous else {"django": django, "agent": agent}
+        collectors = {"agent": agent}
         budget = aq.Budget(run_ceiling_micros=limits.run.cost_micros,
                            remaining=self._remaining(limits), arms=len(collectors))
         started = time.monotonic()
         collected = aq.collect_both(data["cases"], collectors, fits=budget.fits)
         rows = collected["rows"]
         not_run = collected["not_run"]
-        if previous:
-            rows["django"] = previous["rows"]["django"]
-            not_run = sorted(set(not_run) | set(previous.get("not_run") or []))
+        rows["django"] = previous["rows"]["django"]
+        not_run = sorted(set(not_run) | set(previous.get("not_run") or []))
         after, _ = measure_access(data, users)
         conditions = [] if after.as_dict() == access.as_dict() else [
             "access state changed during the run"]
         conditions += _served_model_problems(rows.get("agent", {}), options["runtime_model"])
         conditions += aq.throttled_problems(rows)
-        if previous is None:
-            conditions += _stray_attempts(
-                CampaignAttempts(limits.campaign_key).since(watermark), rows)
+        conditions += _stray_attempts(
+            CampaignAttempts(limits.campaign_key).since(watermark), rows)
         run_id = str(uuid.uuid4())
         record = {
             "schema": "answer-quality-run-1", "run_id": run_id, "ticket": "IR-956",
@@ -499,10 +460,10 @@ class Command(BaseCommand):
             "data_policy": options["data_policy"], "campaign_key": limits.campaign_key,
             "access": access.as_dict(),
             "conditions": conditions,
-            "reused_django_from": (previous or {}).get("run_id"),
+            "reused_django_from": previous.get("run_id"),
             "collection_seconds": round(time.monotonic() - started),
             "rows": rows, "not_run": not_run,
-            "grades": {"django": (previous or {}).get("grades", {}).get("django", {})},
+            "grades": {"django": previous.get("grades", {}).get("django", {})},
         }
         path = Path(options["out"]) / f"{time.strftime('%Y%m%d-%H%M%S')}-IR-956-answer-quality-{run_id[:8]}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -513,8 +474,7 @@ class Command(BaseCommand):
     def _preflight(self, data, options, limits, answer_model, seam_for, access):
         """Every check a paid run makes before sending, and nothing sent."""
         problems = [f"no admission price for {m}" for m in
-                    sorted({answer_model, options["runtime_model"], options["grader_model"],
-                            *_django_models()})
+                    sorted({answer_model, options["runtime_model"], options["grader_model"]})
                     if normalize_model(m) not in {normalize_model(k) for k in limits.prices}]
         problems += _throttle_problems(turns=sum(len(c["turns"]) for c in data["cases"]))
         if options["runtime_gateway"]:

@@ -1,5 +1,4 @@
 from django.urls import path
-from .views.research import ResearchRunDetailView
 from .views.brief import PaperBriefView
 from .views.grants import (
     ReaderPathView, ReaderSessionGrantView, RunGrantRenewView, RunGrantView, RuntimeEdgeGrantView,
@@ -7,13 +6,10 @@ from .views.grants import (
 
 from .views import (
     AIStatusView,
-    ChatQueryView,
-    ChatStreamView,
+    RetiredAnswerView,
     RunStreamView,
     RunCancelView,
-    RunRetryView,
-    SemanticSearchView,
-    ConversationListCreateView,
+    ConversationListView,
     ConversationDetailView,
     EmbedRecordView,
     EmbedAllView,
@@ -21,27 +17,27 @@ from .views import (
     RecordOverviewView,
 )
 
-# Only routes backed by an implemented view are registered here. Summarisation
-# stays out until its service exists — a 404 is more honest than a 500 from a
-# `pass` body.
+# Django stopped answering questions in IR-957: the AI runtime answers every
+# one, through the same-origin edge `runtime/edge-grant/` authenticates. The
+# old answer routes stay registered so a page loaded before the switch gets
+# 410 Gone, not a 404 that reads like a missing conversation.
 urlpatterns = [
     path("records/<int:pk>/brief/", PaperBriefView.as_view(), name="ai-paper-brief"),
-    path("research/runs/<uuid:pk>/", ResearchRunDetailView.as_view(), name="ai-research-run"),
-    path("ask/",        ChatQueryView.as_view(),  name="ai-ask"),
-    path("ask/stream/", ChatStreamView.as_view(), name="ai-ask-stream"),
+    path("ask/",        RetiredAnswerView.as_view(), name="ai-ask"),
+    path("ask/stream/", RetiredAnswerView.as_view(), name="ai-ask-stream"),
     path("ask/runs/<uuid:pk>/stream/", RunStreamView.as_view(), name="ai-ask-run-stream"),
     path("ask/runs/<uuid:pk>/cancel/", RunCancelView.as_view(), name="ai-ask-run-cancel"),
-    path("ask/runs/<uuid:pk>/retry/", RunRetryView.as_view(), name="ai-ask-run-retry"),
+    path("ask/runs/<uuid:pk>/retry/", RetiredAnswerView.as_view(), name="ai-ask-run-retry"),
     path("ask/runs/<uuid:pk>/grant/", RunGrantView.as_view(), name="ai-ask-run-grant"),
     path("ask/runs/<uuid:pk>/grant/renew/", RunGrantRenewView.as_view(), name="ai-ask-run-grant-renew"),
     path("runtime/grant/", ReaderSessionGrantView.as_view(), name="ai-runtime-grant"),
     path("runtime/edge-grant/", RuntimeEdgeGrantView.as_view(), name="ai-runtime-edge-grant"),
     path("reader/", ReaderPathView.as_view(), name="ai-reader-path"),
-    path("search/", SemanticSearchView.as_view(), name="ai-search"),
+    path("search/", RetiredAnswerView.as_view(), name="ai-search"),
     path("status/", AIStatusView.as_view(),       name="ai-status"),
     path("records/<int:pk>/overview/", RecordOverviewView.as_view(),
          name="ai-record-overview"),
-    path("conversations/",           ConversationListCreateView.as_view(),
+    path("conversations/",           ConversationListView.as_view(),
          name="ai-conversations"),
     path("conversations/<int:pk>/",  ConversationDetailView.as_view(),
          name="ai-conversation-detail"),

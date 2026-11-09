@@ -618,26 +618,20 @@ REVIEWS = {
 }
 
 AI = {
-    "ai-ask": Entry({"POST": [
-        _case(SIGNED_IN, data={"question": ""}),
-        _case(PRIVATE, data={"question": "What is this research?", "conversation_id": Ref("conversation")}, objects=("conversation",)),
-    ]}),
-    "ai-ask-stream": Entry({"POST": [
-        _case(SIGNED_IN, data={"question": ""}),
-        _case(PRIVATE, data={"question": "What is this research?", "conversation_id": Ref("conversation")}, objects=("conversation",)),
-    ]}),
-    "ai-search": Entry({"POST": _case(SIGNED_IN, data={"query": ""})}),
+    # Django stopped answering in IR-957: these answer 410 to every signed-in reader.
+    "ai-ask": Entry({"POST": _case(SIGNED_IN, data={"question": "What is this research?"})}),
+    "ai-ask-stream": Entry({"POST": _case(SIGNED_IN, data={"question": "What is this research?"})}),
+    "ai-search": Entry({"POST": _case(SIGNED_IN, data={"query": "research"})}),
     "ai-status": Entry({"GET": _case(SIGNED_IN)}),
     "ai-paper-brief": Entry({"POST": _case(READS_RECORD, kwargs=RECORD, data={})}),
     "ai-record-overview": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
-    "ai-conversations": Entry({"GET": _case(SIGNED_IN), "POST": _case(SIGNED_IN, data={"title": "Matrix"})}),
+    "ai-conversations": Entry({"GET": _case(SIGNED_IN)}),
     "ai-conversation-detail": Entry({m: _case(PRIVATE, kwargs={"pk": Ref("conversation")},
                                             **({} if m in ("GET", "DELETE") else {"data": {"title": "Renamed"}}))
                                     for m in ("GET", "PUT", "PATCH", "DELETE")}),
-    "ai-research-run": Entry({"GET": _case(PRIVATE, kwargs={"pk": Ref("research_run")})}),
     "ai-ask-run-stream": Entry({"GET": _case(PRIVATE, kwargs={"pk": Ref("ask_run")})}),
     "ai-ask-run-cancel": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
-    "ai-ask-run-retry": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
+    "ai-ask-run-retry": Entry({"POST": _case(SIGNED_IN, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant-renew": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-runtime-grant": Entry({"POST": _case(SIGNED_IN, data={})}),

@@ -1,15 +1,12 @@
 """research-8: repository questions are answered from the repository or declined (IR-1004).
 
 IR-995's F12 run: reader b was answered from general knowledge where the papers it
-can see say nothing, repairs mentioned the draft the reader never saw, and one run
-ended `invalid_draft` instead of saying it had no supported answer.
+can see say nothing, and repairs mentioned the draft the reader never saw.
 """
 
 import dataclasses
 import sys
 from pathlib import Path
-
-import pytest
 
 REPO = Path(__file__).resolve().parents[4]
 if str(REPO) not in sys.path:
@@ -17,10 +14,9 @@ if str(REPO) not in sys.path:
 
 from ai.agent import assurance  # noqa: E402
 from ai.agent.executor import (  # noqa: E402
-    EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION, NO_SUPPORTED_ANSWER, PAPER_CHAT_PREFIX, PROMPTS,
+    EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION, PAPER_CHAT_PREFIX, PROMPTS,
 )
-from ai.runs.executor import Unavailable  # noqa: E402
-from .test_ai_runtime_agent_loop_contract import PIN, call, handle, models, reply, tools  # noqa: E402
+from .test_ai_runtime_agent_loop_contract import PIN, call, handle, reply, tools  # noqa: E402
 from .test_ai_runtime_followups_contract import screened, sent_text  # noqa: E402
 from .test_ai_runtime_ir995_contract import BAD, GOOD, PIN_7, Chat, Searchable, answer  # noqa: E402
 
@@ -54,19 +50,11 @@ def test_research_8_repair_says_the_reader_never_saw_the_draft():
     assert assurance.UNSEEN_DRAFT not in sent_text(provider.requests[-1])
 
 
-def test_research_8_says_it_has_no_supported_answer_when_no_sentence_stands():
-    provider = screened(tools(call("s", "search", query="flood")), reply(BAD), reply(BAD), reply(BAD))
-    result, corpus = answer(provider, PIN_8, Searchable())
-    assert result.answer == NO_SUPPORTED_ANSWER
-    assert result.citations == () or not result.citations
-    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair", "repair"]
-
-
-def test_research_7_still_ends_invalid_draft_when_no_sentence_stands():
-    provider = screened(tools(call("s", "search", query="flood")), reply(BAD), reply(BAD), reply(BAD))
-    with pytest.raises(Unavailable) as refused:
-        answer(provider, PIN_7, Searchable())
-    assert refused.value.code == "invalid_draft"
+def test_research_8_out_of_repairs_delivers_the_last_draft_as_research_7_does():
+    replies = [tools(call("s", "search", query="flood")), reply(BAD), reply(BAD), reply(BAD)]
+    seven, _ = answer(screened(*replies), PIN_7, Searchable())
+    eight, _ = answer(screened(*replies), PIN_8, Searchable())
+    assert eight.answer == seven.answer
 
 
 def test_research_8_keeps_what_research_7_added():

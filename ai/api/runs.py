@@ -15,13 +15,13 @@ import uuid
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from ai.runs import config as runs_config
 from ai.runs.service import RunService
 from ai.runs.store import Busy, Conflict, NotFound, Unauthorized
-from ai.runs import public
+from ai.runs import public, stream
 
 router = APIRouter()
 
@@ -35,11 +35,6 @@ class SubmitRequest(BaseModel):
     base_revision: int | None = Field(default=None, ge=0)
     #: The larger configured profile unless the reader chooses "ordinary" (ADR-049 §16 as amended).
     depth: Literal["ordinary", "deep"] = runs_config.DEFAULT_DEPTH
-
-
-class CompactRequest(BaseModel):
-    #: The Conversation revision the reader saw; a Turn since then makes this a conflict.
-    base_revision: int = Field(ge=0)
 
 
 @functools.cache
@@ -83,6 +78,31 @@ async def _call(service, action, protocol=None):
         return JSONResponse({"status": "busy", **({} if protocol else {"reason": busy.reason})}, status_code=503)
 
 
+def _meter(s) -> dict:
+    """What the context meter draws beside the reported tokens: the answer's reserve and the compaction threshold."""
+    reserves = getattr(s.executor, "reserves", None)
+    rule = getattr(s.executor, "compaction", None)
+    return {"reserved_tokens": (reserves.output_tokens + reserves.reasoning_tokens) if reserves else None,
+            "compacts_at_tokens": rule.threshold_tokens if rule else None}
+
+
+@router.get("/conversations")
+async def list_conversations(
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
+):
+    """The reader's recent Conversations, for the history list. Reader protocol only."""
+    if protocol is None:
+        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
+
+    async def act(s: RunService):
+        items = await s.store.list_conversations(grant)
+        return JSONResponse({"protocol": public.PROTOCOL, "conversations": items})
+
+    return await _call(service, act, protocol)
+
+
 @router.post("/runs")
 async def submit_run(
     body: SubmitRequest,
@@ -99,7 +119,7 @@ async def submit_run(
         )
         if protocol:
             run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=s.can_compact) if protocol else run,
+        return JSONResponse(public.run(run, **_meter(s)) if protocol else run,
                             status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
@@ -119,8 +139,62 @@ async def run_status(
 
     async def act(s: RunService):
         snapshot = await s.store.status(grant, run_id, reader_projection=bool(protocol))
-        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact, after=after)
+        return JSONResponse(public.run(snapshot, **_meter(s), after=after)
                             if protocol else snapshot)
+
+    return await _call(service, act, protocol)
+
+
+@router.get("/runs/{run_id}/draft")
+async def stream_draft(
+    run_id: uuid.UUID,
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
+):
+    """The answer as it is being written, as server-sent events, from its first piece.
+
+    Each event is `{"t": "reset"}` (a new attempt replaces the text so far),
+    `{"t": "text", "d": "..."}` or `{"t": "end"}`. Unchecked: the committed
+    Turn is the answer. Reader protocol only; 204 when drafts are not published.
+    """
+    if protocol is None:
+        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
+
+    async def act(s: RunService):
+        await s.store.status(grant, run_id)  # owned by this reader, or NotFound / Unauthorized
+        if s.drafts is None:
+            return Response(status_code=204)
+
+        async def events():
+            last = "0"
+            idle = 0.0
+            while True:
+                try:
+                    found = await s.drafts.xread({stream.key(run_id): last}, block=2000, count=200)
+                except (TimeoutError, OSError):
+                    found = []
+                if not found:
+                    idle += 2
+                    # Nothing for a while: end once the run has, and keep the connection alive meanwhile.
+                    run = await s.store.status(grant, run_id)
+                    if run["state"] not in ("queued", "running") or idle > 900:
+                        yield "data: {\"t\": \"end\"}\n\n"
+                        return
+                    yield ": keep-alive\n\n"
+                    continue
+                idle = 0.0
+                for _key, entries in found:
+                    for entry_id, fields in entries:
+                        last = entry_id.decode() if isinstance(entry_id, bytes) else entry_id
+                        raw = fields.get(b"e") or fields.get("e")
+                        text = raw.decode() if isinstance(raw, bytes) else raw
+                        yield f"data: {text}\n\n"
+                        if '"t": "end"' in text:
+                            return
+
+        return StreamingResponse(events(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
     return await _call(service, act, protocol)
 
@@ -143,7 +217,7 @@ async def retry_run(
         run, created = await s.retry(grant, run_id, key=idempotency_key)
         if protocol:
             run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=s.can_compact) if protocol else run,
+        return JSONResponse(public.run(run, **_meter(s)) if protocol else run,
                             status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
@@ -158,7 +232,7 @@ async def cancel_run(
 ):
     async def act(s: RunService):
         snapshot = await s.store.cancel(grant, run_id, reader_projection=bool(protocol))
-        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact) if protocol else snapshot)
+        return JSONResponse(public.run(snapshot, **_meter(s)) if protocol else snapshot)
 
     return await _call(service, act, protocol)
 
@@ -172,38 +246,7 @@ async def reopen_conversation(
 ):
     async def act(s: RunService):
         snapshot = await s.store.reopen(grant, conversation_id, include_runs=bool(protocol))
-        return JSONResponse(public.conversation(snapshot, manual_compaction=s.can_compact) if protocol else snapshot)
-
-    return await _call(service, act, protocol)
-
-
-@router.post("/conversations/{conversation_id}/compact")
-async def compact_conversation(
-    conversation_id: uuid.UUID,
-    body: CompactRequest,
-    idempotency_key: str = Header(min_length=8, max_length=128),
-    grant: str | None = Header(default=None, alias=GRANT_HEADER),
-    service: RunService | None = Depends(_service),
-    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
-):
-    """Condense an owned Conversation on the reader's request (IR-754).
-
-    The same mechanism as automatic compaction, as a run of its own: 201 with
-    the run when admitted, 200 for the same request again (a double click),
-    409 while another run is active in the Conversation or when it has moved
-    past `base_revision`. Reader protocol only.
-    """
-    if protocol is None:
-        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
-
-    async def act(s: RunService):
-        if not s.can_compact:
-            return _unavailable()
-        run, created = await s.submit_compaction(
-            grant, key=idempotency_key, conversation_id=conversation_id, base_revision=body.base_revision,
-        )
-        run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=True), status_code=201 if created else 200)
+        return JSONResponse(public.conversation(snapshot, **_meter(s)) if protocol else snapshot)
 
     return await _call(service, act, protocol)
 

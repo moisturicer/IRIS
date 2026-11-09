@@ -352,8 +352,8 @@ def test_turn_citations_revision_and_journal_commit_together(runtime):
     reopened = run(RunStore(runtime).reopen(grant, run_["conversation_id"]))
     assert reopened["revision"] == 1
     assert reopened["turns"][0]["citations"] == [
-        {"record_id": 11, "page": 3, "quote": "a", "revision": None},
-        {"record_id": 12, "page": None, "quote": "b", "revision": None},
+        {"record_id": 11, "page": 3, "quote": "a", "revision": None, "regions": []},
+        {"record_id": 12, "page": None, "quote": "b", "revision": None, "regions": []},
     ]
 
     # The second citation violates a constraint after the Turn row is written.

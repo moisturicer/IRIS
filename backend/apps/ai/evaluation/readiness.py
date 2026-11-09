@@ -36,7 +36,7 @@ from .campaign_report import CAPABILITY_NOTE, DISABLED, MIN_REPETITIONS, approva
 from .conversation_scoring import (DEFAULT_MIN_EXAMPLES, TARGET_LABEL, TARGETS,
                                    ZERO_BREACH_NOTE, _frac)
 from .engines import mismatches
-from .pilot_report import percentile
+from .stats import percentile
 from .scenarios import BROWSER_CHECKS, SUITES
 
 SCHEMA_VERSION = "release-readiness-1"

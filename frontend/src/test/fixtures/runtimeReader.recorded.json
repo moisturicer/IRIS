@@ -29,6 +29,15 @@
       "capacity_tokens": 1000000
     },
     "compaction": null,
+    "activity": null,
+    "usage": {
+      "calls": 0,
+      "total_tokens": 0,
+      "context_tokens": 0,
+      "capacity_tokens": 1000000,
+      "reserved_tokens": 300,
+      "compacts_at_tokens": null
+    },
     "cursor": 6,
     "retry_of": null,
     "retried_by": null,
@@ -72,6 +81,15 @@
           "capacity_tokens": 1000000
         },
         "compaction": null,
+        "activity": null,
+        "usage": {
+          "calls": 0,
+          "total_tokens": 0,
+          "context_tokens": 0,
+          "capacity_tokens": 1000000,
+          "reserved_tokens": 300,
+          "compacts_at_tokens": null
+        },
         "cursor": 6,
         "retry_of": null,
         "retried_by": null,
@@ -95,13 +113,15 @@
             "record_id": 1,
             "page": 3,
             "quote": "river gauges measure water level hourly",
-            "revision": "1:e-1-1"
+            "revision": "1:e-1-1",
+            "regions": []
           },
           {
             "record_id": 2,
             "page": 5,
             "quote": "pond water sampled weekly for turbidity",
-            "revision": "2:e-2-1"
+            "revision": "2:e-2-1",
+            "regions": []
           }
         ],
         "facts": [
@@ -110,7 +130,8 @@
             "papers": 2,
             "exhaustive": false
           }
-        ]
+        ],
+        "papers": []
       }
     ]
   }

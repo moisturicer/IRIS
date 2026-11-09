@@ -15,6 +15,7 @@ from .test_ai_runtime_agent_loop_contract import (
 )
 from .test_ai_runtime_context_contract import RESERVES
 from ai.agent import checkpoint
+from ai.agent.assurance import QUALIFIER  # noqa: E402
 from ai.agent.executor import AgentExecutor
 from ai.agent.tools import Investigation
 from ai.research.tools import RecoveredTurn
@@ -85,20 +86,19 @@ def test_an_exact_detail_is_read_from_the_original_turn_and_cited_from_its_sourc
 def test_recovery_does_not_make_an_excluded_paper_citable_again():
     corpus = corpus_with_turn()
     answer = f"Earlier it predicted 87 floods [{ORIGINAL}]."
-    provider = recording(tools(call("c1", "recover_turn", turn=2)), reply(answer), reply(answer))
-    with pytest.raises(Unavailable) as refused:
-        ask(provider, corpus, state=EXCLUDED)
-    assert refused.value.code == "invalid_draft"
+    provider = recording(tools(call("c1", "recover_turn", turn=2)), reply(answer), reply(answer), reply(answer))
+    result = ask(provider, corpus, state=EXCLUDED)
+    assert result.citations == ()
+    # The recovered Turn still states the number, so only the excluded citation goes.
+    assert result.answer == "Earlier it predicted 87 floods."
 
 
-def test_a_number_nobody_recovered_or_read_is_refused():
+def test_a_number_nobody_recovered_or_read_is_marked_as_not_established():
     corpus = corpus_with_turn()
-    provider = recording(tools(call("c1", "recover_turn", turn=2)),
-                         reply(f"It predicted 99 floods [{ORIGINAL}]."),
-                         reply(f"It predicted 99 floods [{ORIGINAL}]."))
-    with pytest.raises(Unavailable) as refused:
-        ask(provider, corpus)
-    assert refused.value.code == "invalid_draft"
+    invented = reply(f"It predicted 99 floods [{ORIGINAL}].")
+    provider = recording(tools(call("c1", "recover_turn", turn=2)), invented, invented, invented)
+    result = ask(provider, corpus)
+    assert result.answer == f"It predicted 99 floods [1]. {QUALIFIER}"
 
 
 def test_a_turn_the_reader_may_not_recover_is_the_same_refusal_as_a_missing_one():

@@ -44,8 +44,7 @@ class Command(BaseCommand):
                     try:
                         result = subprocess.run([sys.executable, "-m", "pytest", *nodes,
                                                  "--junitxml", str(report)], cwd=backend,
-                                                env={**os.environ, "DB_NAME": options["test_database_name"],
-                                                     "AI_RESEARCH_LANE": "off", "AI_EVIDENCE_DECISION": "off"},
+                                                env={**os.environ, "DB_NAME": options["test_database_name"]},
                                                 stdout=log, stderr=log,
                                                 timeout=600, check=False)
                         row = junit_result(report, result.returncode) if report.exists() else {

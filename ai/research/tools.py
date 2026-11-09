@@ -830,10 +830,14 @@ class ResearchTools:
 
         return await self._call("count", body)
 
-    async def list_records(self, filters: dict, limit: int | None = None) -> ToolResult:
-        """Readable Records matching metadata filters, by title, with the exact total (IR-994)."""
+    async def list_records(self, filters: dict, limit: int | None = None, offset: int = 0) -> ToolResult:
+        """Readable Records matching metadata filters, by title, with the exact total (IR-994).
+
+        `offset` pages through a long list: the next titles, in the same order.
+        """
         cap = metadata.MAX_LISTED if limit is None else limit
-        if not valid_filters(filters) or not _is_int(cap) or not 0 < cap <= metadata.MAX_LISTED:
+        if (not valid_filters(filters) or not _is_int(cap) or not 0 < cap <= metadata.MAX_LISTED
+                or not _is_int(offset) or offset < 0):
             return ToolResult.unavailable("invalid_argument")
 
         async def body(conn):
@@ -849,7 +853,7 @@ class ResearchTools:
                     WHERE ($1::bigint IS NULL OR r.id = $1)""" + _filter_sql(2) + " ORDER BY r.title, r.id",
                 self.scope, *params,
             )
-            named = rows[:cap]
+            named = rows[offset:offset + cap]
             handles = await self._handles(conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in named])
             records = tuple(
                 RecordRef(h, r["record_id"], r["title"],
@@ -859,7 +863,7 @@ class ResearchTools:
             fact = Count(total=len(rows), filters=tuple(sorted(applied)), scope_record_id=self.scope,
                          population=frozenset(r["record_id"] for r in rows))
             return ToolResult(OK if rows else NO_MATCH, records=records, count=fact,
-                              coverage=Coverage(len(records), len(rows), len(rows) > len(records)))
+                              coverage=Coverage(len(records), len(rows), offset + len(records) < len(rows)))
 
         return await self._call("list_records", body)
 

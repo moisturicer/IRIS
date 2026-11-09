@@ -19,7 +19,7 @@ from apps.ai.evidence.jev_noul import STATE_FIELDS, jev_digest
 from apps.ai.models import Conversation, Turn
 from apps.ai.providers.decisions import NoulAnswer, ScriptedDecisionModel
 from apps.ai.providers.openrouter_decisions import PINNED_MODEL
-from apps.ai.tests.test_eval_evidence_model_command import direct, grounded, write_set
+from apps.ai.tests.evidence_sets import direct, grounded, write_set
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Mapping, Optional, Sequence
 
-from apps.ai.controller.versions import CONTROLLER_ENGINE, LEGACY_ENGINE
+from apps.ai.evaluation.legacy_engines import CONTROLLER_ENGINE, LEGACY_ENGINE
 from apps.ai.public import PUBLIC_PROTOCOL
 
 from .conversation_scoring import (ARMS, CONDITION_KEYS, DEFAULT_MIN_EXAMPLES, MODES,
@@ -17,7 +17,7 @@ from .conversation_scoring import (ARMS, CONDITION_KEYS, DEFAULT_MIN_EXAMPLES, M
 from .conversations import check_lock, postdates_lock, split_digests
 from .engines import (RUNTIME_ARM, RUNTIME_ENGINE, RUNTIME_TRANSPORT, effective_limits,
                       effective_models, mismatches, runtime_identity)
-from .pilot_report import percentile
+from .stats import percentile
 
 MIN_REPETITIONS = 3
 REQUIRED_MANIFEST = ("run_id", "timestamp_utc", "git_commit", "engine_version",
