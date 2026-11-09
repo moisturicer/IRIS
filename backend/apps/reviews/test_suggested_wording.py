@@ -103,3 +103,20 @@ class WhereItIsNowTests(WordingTestBase):
         made = self.thread(record, self.adviser, "Count again.", anchor=ANCHOR)
         listed = {c["id"]: c for c in self.listed(record, self.adviser).data}[made["id"]]
         self.assertEqual((listed["place"], listed["outdated_since"]), (None, None))
+
+    def test_the_wording_is_checked_in_the_first_version_after_it_was_accepted(self):
+        record = self.at_adviser_open()
+        made = self.thread(record, self.adviser, "Count again.", anchor=ANCHOR, suggestion=WORDING)
+        self.sent(record, self.adviser)
+        v2 = record.versions.create(number=2, created_by=self.owner, cause=VersionCause.REVISION)
+        v3 = record.versions.create(number=3, created_by=self.owner, cause=VersionCause.REVISION)
+        # v2 was placed before the owner accepted: it can't say whether they used the wording.
+        ThreadPlace.objects.create(thread_id=made["id"], version=v2, outcome=ThreadPlaceOutcome.FOUND,
+                                   page=3, text="forty respondents")
+        self.assertEqual(self.answer(record, made["id"], "addressed", note="").status_code, status.HTTP_200_OK)
+        check = lambda: {c["id"]: c for c in self.listed(record, self.owner).data}[made["id"]]["wording_check"]  # noqa: E731
+        self.assertIsNone(check())
+
+        ThreadPlace.objects.create(thread_id=made["id"], version=v3, outcome=ThreadPlaceOutcome.CHANGED,
+                                   page=4, text="forty-two respondents in all", suggestion_page=4)
+        self.assertEqual(check(), {"version": 3, "page": 4})

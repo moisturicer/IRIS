@@ -42,7 +42,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.records.versions import latest_version
-from core.enums import PipelineStatus, ThreadPlaceOutcome, ThreadSeverity, ThreadState
+from core.enums import PipelineStatus, ThreadAnswer, ThreadPlaceOutcome, ThreadSeverity, ThreadState
 from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
 
 from . import threads
@@ -104,6 +104,17 @@ def _place_payload(comment) -> Optional[dict]:
         "version": place.version.number, "outcome": place.outcome, "page": place.page,
         "text": place.text, "regions": place.regions, "suggestion_page": place.suggestion_page,
     }
+
+
+def _wording_check(comment) -> Optional[dict]:
+    """Whether accepted wording is in the first Version placed after it was
+    accepted: its page there, or None for the page when it isn't (IR-876).
+    None until such a Version exists, so an earlier Version is never read
+    as the answer to it."""
+    if not comment.suggestion or comment.answer != ThreadAnswer.ADDRESSED or not comment.answered_at:
+        return None
+    after = next((p for p in _places(comment) if p.placed_at > comment.answered_at), None)
+    return {"version": after.version.number, "page": after.suggestion_page} if after else None
 
 
 def _outdated_since(comment) -> Optional[int]:
@@ -168,6 +179,7 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "suggestion": comment.suggestion if top else "",
         "place": _place_payload(comment) if top else None,
         "outdated_since": _outdated_since(comment) if top else None,
+        "wording_check": _wording_check(comment) if top else None,
         "state": comment.state if top else None,
         "resolved_by": _name(comment.resolved_by) if top and comment.state == ThreadState.RESOLVED else None,
         "resolved_at": comment.resolved_at.isoformat() if top and comment.resolved_at else None,
