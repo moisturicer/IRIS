@@ -9,16 +9,14 @@
 //   interrupted the read got no answer in time (ADR-061); see `timeOut`
 //   revoked     the server answered 403 or 404, which read alike (IR-153)
 // A cell the matrix marks N/A has no entry here, and neither has a state a
-// surface does not have. Cells that exist but are NOT scanned, each because it
-// needs a fixture this tier lacks (docs/testing/traceability/IR-908.md lists them):
-// Discover's filtered-empty and timed-out "Load more", the Saved view's empty and
-// "no longer available" cells, My Reviews' per-tab empties, Ask IRIS's list-failure
-// and no-sources cells, and the review panels' empty copy.
+// surface does not have. The extra cells whose scans need a second interaction
+// or a different response shape live in AXE_STATES below; forced-cells.spec.ts
+// still proves their behavior and recovery.
 //
 // `shows` finds the thing that proves the screen is in the state and not in
 // the one before it; without it a scan could run on the wrong screen.
-import type { Locator, Page } from "@playwright/test";
-import { hang } from "./open-screen";
+import type { Locator, Page, Request, Route } from "@playwright/test";
+import { hang, makeLaterReadsTimeOut } from "./open-screen";
 import type { MockApi } from "./mock-api";
 import { PAPER, PAPER_DETAIL, paginated } from "./fixtures";
 
@@ -219,6 +217,93 @@ export const STATES: UiState[] = [
     loading: (page) => page.locator('[aria-busy="true"]').first(),
     ok: EMPTY_CONSOLE, recovered: text(/Nothing open at/),
   }),
+];
+
+/** Matrix cells whose axe scan needs a second interaction or a specialized fixture. */
+export interface AxeState {
+  id: string;
+  screen: string;
+  path?: string;
+  override?: (api: MockApi) => void;
+  prepare?: (page: Page) => Promise<void>;
+  shows: (page: Page) => Locator;
+}
+
+const pageNumber = (request: Request) => new URL(request.url()).searchParams.get("page");
+
+export const AXE_STATES: AxeState[] = [
+  {
+    id: "discover · filtered empty", screen: "discover", path: "/?q=flood",
+    override: (api) => api.on("GET", "/records/", paginated([])),
+    shows: (page) => page.getByRole("heading", { name: "No research matches these filters" }),
+  },
+  {
+    id: "discover · load more timed out", screen: "discover",
+    override: (api) => api.on("GET", "/records/", async (route: Route, request: Request) => {
+      if (pageNumber(request) === "2") {
+        // Let the browser's capped XHR timeout produce the interrupted state,
+        // then settle the route so Chromium can close cleanly after the scan.
+        await new Promise<void>((resolve) => setTimeout(resolve, 1_000));
+        return route.fulfill({ status: 503, json: failed });
+      }
+      return route.fulfill({ json: { count: 2, next: "/records/?page=2", previous: null, results: [PAPER] } });
+    }),
+    prepare: async (page) => {
+      const loadMore = page.getByRole("button", { name: "Load more (1 left)" });
+      await loadMore.waitFor();
+      await makeLaterReadsTimeOut(page, "/records/");
+      await loadMore.click();
+    },
+    shows: (page) => page.getByText("More results didn't load."),
+  },
+  {
+    id: "saved · empty", screen: "my-library", path: "/records/mine?section=saved",
+    shows: (page) => page.getByText("No saved papers yet"),
+  },
+  {
+    id: "saved · no longer available", screen: "my-library", path: "/records/mine?section=saved",
+    override: (api) => api.on("GET", "/library/saves/", { results: [{ record_id: 999, available: false }] }),
+    shows: (page) => page.getByText(/1 saved paper is no longer available to you/),
+  },
+  ...([
+    ["to_review", "Nothing to review"],
+    ["in_review", "Nothing in review"],
+    ["done", "No decisions yet"],
+  ] as const).map(([tab, title]) => ({
+    id: `my reviews · ${tab.replace("_", " ")} empty`, screen: "my-reviews", path: `/review?tab=${tab}`,
+    override: (api: MockApi) => api.on("GET", "/reviews/mine/", EMPTY_REVIEWS),
+    shows: (page: Page) => page.getByText(title),
+  })),
+  {
+    id: "ask iris · conversation list failure", screen: "ask-iris",
+    override: (api) => api.on("GET", "/ai/conversations/", failed, 500),
+    shows: (page) => page.getByText("Could not load your conversations"),
+  },
+  {
+    id: "ask iris · no sources", screen: "ask-iris-conversation",
+    override: (api) => api.on("POST", "/ai/ask/stream/", (route: Route) => route.fulfill({
+      status: 200, headers: { "content-type": "text/event-stream" },
+      body: `event: done\ndata: ${JSON.stringify({ citations: [], sources: [], conversation_id: 1, turn_id: 31 })}\nid: 1\n\n`,
+    })),
+    prepare: async (page) => {
+      await page.getByRole("textbox", { name: /Ask a follow-up about the research corpus/ }).fill("What about the moon?");
+      await page.getByRole("button", { name: "Send message" }).click();
+    },
+    shows: (page) => page.getByText("No readable sources matched that question."),
+  },
+  {
+    id: "review tracker · empty", screen: "paper-view",
+    override: (api) => {
+      asParticipant(api);
+      api.on("GET", "/records/101/tracker/", { ...TRACKER, current_holders: [] });
+    },
+    shows: (page) => page.getByText("No routing recorded yet."),
+  },
+  {
+    id: "review timeline · empty", screen: "paper-view", path: "/records/101?section=review",
+    override: (api) => { asParticipant(api); api.on("GET", "/records/101/tracker/", TRACKER); },
+    shows: (page) => page.getByText("Nothing has happened in this review yet."),
+  },
 ];
 
 /** A stable name for the results and the test title. */

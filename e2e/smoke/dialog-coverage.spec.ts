@@ -52,3 +52,8 @@ test("every case opens from a screen that exists", () => {
   const ids = new Set(SCREENS.map((s) => s.id));
   expect(DIALOGS.filter((d) => !ids.has(d.screen)).map((d) => d.id)).toEqual([]);
 });
+
+test("every dialog scan case has a unique name", () => {
+  const ids = DIALOGS.map((d) => d.id);
+  expect(ids.filter((id, i) => ids.indexOf(id) !== i), "duplicate dialog case ids").toEqual([]);
+});
