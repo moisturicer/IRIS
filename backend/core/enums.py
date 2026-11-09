@@ -342,6 +342,18 @@ class ThreadState(models.TextChoices):
     CLOSED = "closed", "Closed by Decision"
 
 
+class ThreadPlaceOutcome(models.TextChoices):
+    """
+    Where a thread's passage is in a later Version (ADR-032 §7, *Outdated
+    threads*; IR-876). `ThreadPlace.outcome`. *Changed* and *Removed* make the
+    thread Outdated, which nothing but resolving it ends.
+    """
+
+    FOUND = "found", "Found"
+    CHANGED = "changed", "Changed"
+    REMOVED = "removed", "Passage removed"
+
+
 class ThreadAnswer(models.TextChoices):
     """
     An owner's answer to a reviewer's thread (ADR-032 §7). Neither resolves

@@ -194,6 +194,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-version-compare": Entry({
         "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
     }),
+    # The response to reviewers is review material (ADR-032 §7, IR-876).
+    "record-response-letters": Entry({
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
+    }),
     "record-similar": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     # ADR-029: novelty results belong only to the Proposal's owner.
     "record-related-research": Entry({
