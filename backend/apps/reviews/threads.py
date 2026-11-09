@@ -62,6 +62,9 @@ OWNER = ""
 #: Longest note an answer carries: a sentence or two, not a letter.
 MAX_NOTE_LENGTH = 2_000
 
+#: The note an *Addressed* answer carries when it accepts suggested wording.
+ACCEPTED_WORDING = "Accepted the suggested wording."
+
 
 class ThreadNotFound(Exception):
     """404: the record's review, or the thread, is not this viewer's to see."""
@@ -334,6 +337,10 @@ def answer(record, user, thread_id, *, kind, note) -> ReviewComment:
     if kind not in ThreadAnswer.values:
         raise ThreadError("Mark the thread Addressed or Declined.")
     note = note.strip() if isinstance(note, str) else ""
+    if not note and kind == ThreadAnswer.ADDRESSED and thread.suggestion:
+        # Accepting the suggested wording is the Addressed answer (IR-876):
+        # a promise, since IRIS can't edit the PDF.
+        note = ACCEPTED_WORDING
     if not note:
         raise ThreadError(
             "Say where you addressed it." if kind == ThreadAnswer.ADDRESSED
