@@ -143,3 +143,8 @@ export const PAPER_DETAIL = {
   manuscript_unsubmitted: false,
   submitter_status: null,
 };
+
+/** Ask IRIS on the AI runtime (IR-957): one owned conversation with nothing asked yet. */
+export const RUNTIME_CONVERSATION_ID = "00000000-0000-4000-8000-000000000002";
+export const RUNTIME_CONVERSATION = { protocol: "runs-reader-1", id: RUNTIME_CONVERSATION_ID, revision: 0, runs: [], turns: [] };
+export const RUNTIME_CONVERSATION_PATH = `/ai/runtime/conversations/${RUNTIME_CONVERSATION_ID}`;

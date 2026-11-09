@@ -200,18 +200,21 @@ def test_paper_chat_stays_on_its_record_whatever_the_model_asks(api, runtime):
     assert [c["record_id"] for c in reopened["turns"][0]["citations"]] == [flood.pk]
 
 
-def test_an_invalid_draft_and_an_invalid_repair_commit_no_turn(api, runtime):
+def test_a_draft_that_fails_both_repairs_is_delivered_whole_and_marked(api, runtime):
+    """Never refused over a check: the citation that names nothing is removed, the claim is qualified."""
     client, holder = api
     paper("Flood forecasting", {4: [("Methods", FLOOD)]})
     grant = issue.reader_session_grant(make_user("agent-invalid@cit.edu")).token
     invalid = reply("It forecast 912 floods [P00000000000000000009].")
-    provider = recording(tools(call("s", "search", query="water")), invalid, invalid)
+    provider = recording(tools(call("s", "search", query="water")), invalid, invalid, invalid)
     holder["service"] = agent_service(runtime, provider)
     run_ = submit(client, grant, "agent-invalid", "How many floods?").json()
-    assert (run_["state"], run_["end_reason"]) == ("failed", "unavailable")
-    assert [m["phase"] for m in models(run_)] == ["gather", "gather", "repair"]
+    assert run_["state"] == "completed"
+    assert [m["phase"] for m in models(run_)] == ["gather", "gather", "repair", "repair"]
     reopened = client.get(f"/api/v1/ai/conversations/{run_['conversation_id']}", headers=as_reader(grant)).json()
-    assert reopened["revision"] == 0 and reopened["turns"] == []
+    [turn] = reopened["turns"]
+    assert turn["answer"] == "It forecast 912 floods. (the sources read do not establish this)"
+    assert turn["citations"] == []
 
 
 # --- One repair (IR-729) -------------------------------------------------------

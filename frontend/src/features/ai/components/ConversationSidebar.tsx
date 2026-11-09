@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { cn, formatDate } from "@/lib/utils";
 import type { ReaderConversationSummary } from "@/api/runtimeReader";
+import { EarlierConversationList } from "./EarlierConversations";
 
 interface ConversationSidebarProps {
   conversations:    ReaderConversationSummary[];
@@ -62,7 +63,7 @@ export function ConversationHistoryList({
   activeId,
   onDelete,
 }: Omit<ConversationSidebarProps, "open" | "onNewChat" | "onCollapse">) {
-  return (
+  return (<>
     <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-2 py-2 space-y-1">
       {conversations.length === 0 ? (
         <p className="px-3 py-6 text-[13px] text-stone-500 text-center">
@@ -109,7 +110,9 @@ export function ConversationHistoryList({
         })
       )}
     </nav>
-  );
+    {/* Conversations Django answered before IR-957, read-only. */}
+    <EarlierConversationList />
+  </>);
 }
 
 /** Starts a new conversation; heads the history list wherever it is shown. */

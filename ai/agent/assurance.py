@@ -309,12 +309,18 @@ def unmatched_note(found: dict[str, list[str]]) -> str:
     return f"*The sources IRIS read do not establish: {shown}{more}.*"
 
 
+_MARKER_LIKE = re.compile(r"\[(?!P[0-9a-f]{20}\])(?:\d+|P[0-9A-Za-z]*)(?:\s*[,–-]\s*\d+)*\]")
+
+
 def bindable(text: str, investigation: Investigation, *, excluded=()) -> str:
     """`text` without citations that name no passage of this run or a paper the reader ruled out."""
     def keep(match: re.Match) -> str:
         passage = investigation.passages.get(match.group(1))
         return match.group(0) if passage is not None and passage.record_id not in excluded else ""
-    return re.sub(r"[ 	]{2,}", " ", CITE.sub(keep, text)).strip()
+    # A number or handle the model typed in brackets reads as a citation but points at nothing.
+    text = _MARKER_LIKE.sub("", CITE.sub(keep, text))
+    # A removed citation leaves no gap before the punctuation that followed it.
+    return re.sub(r"[ \t]+([.,;:!?])", r"\1", re.sub(r"[ \t]{2,}", " ", text)).strip()
 
 
 def deliver(text: str, investigation: Investigation) -> tuple[str, tuple[Citation, ...]]:

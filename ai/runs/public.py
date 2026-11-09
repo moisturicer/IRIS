@@ -150,8 +150,11 @@ def activity(snapshot):
     return {"phase": "working", "label": label, "since": since, "step": step}
 
 
-def usage(snapshot, reserved_tokens=None):
-    """Tokens the provider reported for this run's model calls; the context is the latest call's prompt."""
+def usage(snapshot, reserved_tokens=None, compacts_at_tokens=None):
+    """Tokens the provider reported for this run's model calls; the context is the latest call's prompt.
+
+    Only provider-reported counts are summed; a call with no reported usage adds nothing.
+    """
     used = snapshot.get("usage")
     if not used:
         return None
@@ -159,9 +162,9 @@ def usage(snapshot, reserved_tokens=None):
     for event in snapshot.get("events", []):
         if event["name"] == "context" and type((event.get("data") or {}).get("capacity_tokens")) is int:
             capacity = event["data"]["capacity_tokens"]
-    return {**{key: used[key] for key in ("calls", "input_tokens", "output_tokens", "cost_usd")},
+    return {"calls": used["calls"], "total_tokens": used["input_tokens"] + used["output_tokens"],
             "context_tokens": used["last_input_tokens"], "capacity_tokens": capacity,
-            "reserved_tokens": reserved_tokens}
+            "reserved_tokens": reserved_tokens, "compacts_at_tokens": compacts_at_tokens}
 
 
 def kind(snapshot):
@@ -169,7 +172,7 @@ def kind(snapshot):
     return "compact" if (snapshot.get("pinned") or {}).get("kind") == KIND_COMPACT else "ask"
 
 
-def run(snapshot, *, manual_compaction=False, after=None, reserved_tokens=None):
+def run(snapshot, *, manual_compaction=False, after=None, reserved_tokens=None, compacts_at_tokens=None):
     """The reader's view of a run. A cursor (`after`) adds the journal replay past it (IR-726)."""
     # A compaction asks nothing; it shows an empty question rather than none.
     snapshot = {**snapshot, "question": snapshot["question"] or ""}
@@ -184,7 +187,7 @@ def run(snapshot, *, manual_compaction=False, after=None, reserved_tokens=None):
         "kind": kind(snapshot),
         **progress(visible),
         "activity": activity(snapshot),
-        "usage": usage(snapshot, reserved_tokens),
+        "usage": usage(snapshot, reserved_tokens, compacts_at_tokens),
         # The end of what the reader may see: where a reconnecting reader asks to continue from.
         "cursor": cursor,
         **({"journal": replay} if after is not None else {}),
@@ -195,11 +198,12 @@ def run(snapshot, *, manual_compaction=False, after=None, reserved_tokens=None):
     }
 
 
-def conversation(snapshot, *, manual_compaction=False, reserved_tokens=None):
+def conversation(snapshot, *, manual_compaction=False, reserved_tokens=None, compacts_at_tokens=None):
     available = {item["id"]: item.get("sources_available", True) for item in snapshot["runs"]}
     return {
         "protocol": PROTOCOL, "id": snapshot["id"], "revision": snapshot["revision"],
-        "runs": [run(item, manual_compaction=manual_compaction, reserved_tokens=reserved_tokens)
+        "runs": [run(item, manual_compaction=manual_compaction, reserved_tokens=reserved_tokens,
+                     compacts_at_tokens=compacts_at_tokens)
                  for item in snapshot["runs"]],
         "turns": [{**{key: turn[key] for key in (
             "id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations",

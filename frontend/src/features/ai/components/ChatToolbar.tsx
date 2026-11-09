@@ -48,7 +48,7 @@ export function ChatToolbar({
         <p className="text-[12px] font-semibold uppercase tracking-wider text-stone-600 truncate">
           Ask IRIS
         </p>
-        <p className="text-[15px] font-semibold text-stone-900 truncate">{sessionTitle}</p>
+        <h1 className="text-[15px] font-semibold text-stone-900 truncate">{sessionTitle}</h1>
       </div>
 
 

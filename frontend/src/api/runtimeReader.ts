@@ -44,14 +44,15 @@ export interface ReaderActivity {
 }
 export interface ReaderUsage {
   calls: number;
-  input_tokens: number;
-  output_tokens: number;
-  cost_usd: number;
+  /** Prompt plus completion tokens the provider reported for this run. */
+  total_tokens: number;
   /** The latest call's prompt: how full the model's context window is. */
   context_tokens: number;
   capacity_tokens: number | null;
   /** Held back for the answer. */
   reserved_tokens: number | null;
+  /** The prompt size at which older context is compacted; null when compaction is off. */
+  compacts_at_tokens: number | null;
 }
 export interface ReaderConversationSummary { id: string; title: string; record_id: number | null; updated_at: string }
 export interface ReaderConversation {
@@ -109,14 +110,6 @@ export function runtimeReader(scope?: number | (() => number | undefined)) {
     /** Ask again after a run ended without an answer: a new run linked to the first; the key makes a repeated click one request. */
     async retry(id: string, key: string) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/retry`, {},
-        { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
-      return checked(data);
-    },
-    /** Condense an owned conversation as a run of its own; the key makes a repeated click one request. */
-    async compact(conversation: ReaderConversation, key: string) {
-      const { data } = await apiClient.post<ReaderRun>(
-        `${base}/conversations/${encodeURIComponent(conversation.id)}/compact`,
-        { base_revision: conversation.revision },
         { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },

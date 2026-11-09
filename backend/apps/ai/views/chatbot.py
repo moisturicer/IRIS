@@ -37,7 +37,7 @@ class RetiredAnswerView(APIView):
             status=status.HTTP_410_GONE,
         )
 
-    get = post = _gone
+    post = _gone
 
 
 class RunStreamView(APIView):

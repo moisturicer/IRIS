@@ -213,11 +213,11 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
           aria-label={recent.length > 0 ? `Recent chats (${recent.length})` : "Recent chats"}
           title={recent.length > 0 ? `Recent chats (${recent.length})` : "No recent chats yet"}
           className={cn(ICON_BUTTON, recentOpen && "bg-stone-200 text-stone-900")}>
-          <i className="fas fa-clock-rotate-left text-[13px]" aria-hidden />
-          {recent.length > 0 && <span aria-hidden className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[9px] font-semibold leading-4 text-white">{recent.length}</span>}
+          <i className="fas fa-clock-rotate-left text-xs" aria-hidden />
+          {recent.length > 0 && <span aria-hidden className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-3xs font-semibold leading-4 text-white">{recent.length}</span>}
         </button>
         <button type="button" onClick={newChat} aria-label="New chat" title="New chat" className={ICON_BUTTON}>
-          <i className="fas fa-plus text-[13px]" aria-hidden />
+          <i className="fas fa-plus text-xs" aria-hidden />
         </button>
         <Button variant="ghost" size="icon" onClick={props.onClose} aria-label="Close Ask IRIS" className="-mr-2">
           <i className="fas fa-xmark" aria-hidden />

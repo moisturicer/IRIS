@@ -37,11 +37,6 @@ class SubmitRequest(BaseModel):
     depth: Literal["ordinary", "deep"] = runs_config.DEFAULT_DEPTH
 
 
-class CompactRequest(BaseModel):
-    #: The Conversation revision the reader saw; a Turn since then makes this a conflict.
-    base_revision: int = Field(ge=0)
-
-
 @functools.cache
 def get_run_service() -> RunService:
     from ai.infrastructure.settings import settings
@@ -83,10 +78,12 @@ async def _call(service, action, protocol=None):
         return JSONResponse({"status": "busy", **({} if protocol else {"reason": busy.reason})}, status_code=503)
 
 
-def _reserved(s) -> int | None:
-    """Tokens the agent holds back for its answer, shown beside the context it used."""
+def _meter(s) -> dict:
+    """What the context meter draws beside the reported tokens: the answer's reserve and the compaction threshold."""
     reserves = getattr(s.executor, "reserves", None)
-    return (reserves.output_tokens + reserves.reasoning_tokens) if reserves else None
+    rule = getattr(s.executor, "compaction", None)
+    return {"reserved_tokens": (reserves.output_tokens + reserves.reasoning_tokens) if reserves else None,
+            "compacts_at_tokens": rule.threshold_tokens if rule else None}
 
 
 @router.get("/conversations")
@@ -122,7 +119,7 @@ async def submit_run(
         )
         if protocol:
             run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=s.can_compact, reserved_tokens=_reserved(s)) if protocol else run,
+        return JSONResponse(public.run(run, **_meter(s)) if protocol else run,
                             status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
@@ -142,7 +139,7 @@ async def run_status(
 
     async def act(s: RunService):
         snapshot = await s.store.status(grant, run_id, reader_projection=bool(protocol))
-        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact, reserved_tokens=_reserved(s), after=after)
+        return JSONResponse(public.run(snapshot, **_meter(s), after=after)
                             if protocol else snapshot)
 
     return await _call(service, act, protocol)
@@ -220,7 +217,7 @@ async def retry_run(
         run, created = await s.retry(grant, run_id, key=idempotency_key)
         if protocol:
             run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=s.can_compact, reserved_tokens=_reserved(s)) if protocol else run,
+        return JSONResponse(public.run(run, **_meter(s)) if protocol else run,
                             status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
@@ -235,7 +232,7 @@ async def cancel_run(
 ):
     async def act(s: RunService):
         snapshot = await s.store.cancel(grant, run_id, reader_projection=bool(protocol))
-        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact, reserved_tokens=_reserved(s)) if protocol else snapshot)
+        return JSONResponse(public.run(snapshot, **_meter(s)) if protocol else snapshot)
 
     return await _call(service, act, protocol)
 
@@ -249,38 +246,7 @@ async def reopen_conversation(
 ):
     async def act(s: RunService):
         snapshot = await s.store.reopen(grant, conversation_id, include_runs=bool(protocol))
-        return JSONResponse(public.conversation(snapshot, manual_compaction=s.can_compact, reserved_tokens=_reserved(s)) if protocol else snapshot)
-
-    return await _call(service, act, protocol)
-
-
-@router.post("/conversations/{conversation_id}/compact")
-async def compact_conversation(
-    conversation_id: uuid.UUID,
-    body: CompactRequest,
-    idempotency_key: str = Header(min_length=8, max_length=128),
-    grant: str | None = Header(default=None, alias=GRANT_HEADER),
-    service: RunService | None = Depends(_service),
-    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
-):
-    """Condense an owned Conversation on the reader's request (IR-754).
-
-    The same mechanism as automatic compaction, as a run of its own: 201 with
-    the run when admitted, 200 for the same request again (a double click),
-    409 while another run is active in the Conversation or when it has moved
-    past `base_revision`. Reader protocol only.
-    """
-    if protocol is None:
-        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
-
-    async def act(s: RunService):
-        if not s.can_compact:
-            return _unavailable()
-        run, created = await s.submit_compaction(
-            grant, key=idempotency_key, conversation_id=conversation_id, base_revision=body.base_revision,
-        )
-        run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run, manual_compaction=True, reserved_tokens=_reserved(s)), status_code=201 if created else 200)
+        return JSONResponse(public.conversation(snapshot, **_meter(s)) if protocol else snapshot)
 
     return await _call(service, act, protocol)
 

@@ -25,7 +25,7 @@ describe("Paper Chat", () => {
     const user = userEvent.setup();
     const { container } = render(<MemoryRouter><PaperChatPanel record={record} onClose={() => {}} /></MemoryRouter>);
 
-    expect(screen.getByText("Research stays within this paper.")).toBeInTheDocument();
+    expect(screen.getByText("Ask about this paper.")).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Ask about this paper" }), "What was measured?");
     await user.click(screen.getByRole("button", { name: "Send message" }));
 

@@ -165,7 +165,7 @@ def test_every_location_nginx_answers_itself_includes_the_snippet():
     sets the same headers, and nginx would send them twice. The private AI
     runtime does not set them, so its reader proxy includes the snippet.
     """
-    conf = _without_comments(_frontend("nginx.conf"))
+    conf = "\n".join(_without_comments(_frontend(name)) for name in ("nginx.conf", "runtime-edge.conf"))
     blocks = location_blocks(conf)
     assert blocks, "no location blocks found -- has nginx.conf changed shape?"
     served = [(line, body) for line, body in blocks if "proxy_pass" not in body]

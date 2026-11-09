@@ -426,6 +426,7 @@ jobs:
             echo "DB_USER=iris"
             echo "DB_PASSWORD=ci-only-not-a-real-secret"
             echo "REDIS_PASSWORD=ci-only-not-a-real-secret"
+            echo "AI_GATEWAY_SERVICE_SECRET=ci-only-not-a-real-secret"
             echo "IRIS_DOMAIN=localhost"
           } > .env
 

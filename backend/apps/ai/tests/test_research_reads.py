@@ -158,17 +158,3 @@ def test_database_mode_reads_under_a_bound_run_s_own_scope(settings, grant_db, p
             assert ids(reads.research_records(owner)) == set()
         with reads.bound_run(owned_run(stranger)):
             assert ids(reads.research_records(owner)) == set()
-
-
-def test_a_queued_answer_reads_under_its_own_run(people, monkeypatch):
-    from apps.ai import durable
-    from apps.ai.models import AskRunAttempt
-    from .grant_support import owned_run
-
-    run = owned_run(people["owner"])
-    attempt = AskRunAttempt.objects.create(run=run, number=1)
-    seen = []
-    monkeypatch.setattr(durable, "_answer_run",
-                        lambda attempt_, run_: seen.append(reads.current_run()))
-    durable._answer(attempt)
-    assert [r.pk for r in seen] == [run.pk]

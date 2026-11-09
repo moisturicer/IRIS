@@ -14,13 +14,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from apps.ai.composition import CompositionRoot, use_composition_root
+from apps.ai.composition import CompositionRoot
 from apps.ai.inference import InferenceTask
 from apps.ai.inference.completions import LOGGER_NAME as COMPLETION_LOGGER
 from apps.ai.providers.fakes import ScriptedReranker
 from apps.ai.resilience.llm import reset_llm_breakers
 
-from .corpus import FLOOD_QUESTION, FLOOD_TEXT, ask, make_record, make_user
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -109,49 +108,6 @@ def _root(embedder):
 
 
 class AnswerTaskTests:
-    def test_the_answer_task_reaches_the_model_its_profile_names(
-        self, settings, vendor, embedder, space, client_for
-    ):
-        settings.LLM_ANSWER_MODEL = "the-answer-model"
-        settings.LLM_ANSWER_API_KEY = "answer-key"
-        settings.LLM_ANSWER_VENDOR = "openrouter"
-        # What the flat settings say must not win once the task is configured.
-        settings.LLM_MODEL = "the-old-flat-model"
-
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-
-        with use_composition_root(_root(embedder)):
-            response = ask(client_for(reader), FLOOD_QUESTION)
-
-        assert response.status_code == 200
-        assert response.json()["mode"] == "generative"
-        assert [call["model"] for call in vendor.calls] == ["the-answer-model"]
-        assert vendor.credentials == [("answer-key", "https://openrouter.ai/api/v1")]
-
-    def test_with_no_new_variables_the_flat_settings_still_answer(
-        self, settings, vendor, embedder, space, client_for
-    ):
-        """The compatibility promise: an existing deployment changes no
-        `.env` and reaches the same model it does today."""
-        settings.LLM_ANSWER_MODEL = ""
-        settings.LLM_ANSWER_API_KEY = ""
-        settings.LLM_ANSWER_VENDOR = ""
-        settings.LLM_MODEL = "the-old-flat-model"
-        settings.LLM_API_KEY = "flat-key"
-        settings.LLM_BASE_URL = "https://flat.test/v1"
-
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-
-        with use_composition_root(_root(embedder)):
-            ask(client_for(reader), FLOOD_QUESTION)
-
-        assert [call["model"] for call in vendor.calls] == ["the-old-flat-model"]
-        assert vendor.credentials == [("flat-key", "https://flat.test/v1")]
-
     def test_an_injected_fake_bypasses_profile_resolution_entirely(self):
         from apps.ai.providers.fakes import ScriptedLLM
 
@@ -184,174 +140,3 @@ class AnswerTaskTests:
         with pytest.raises(UnknownInferenceTask):
             CompositionRoot().llm_for("answers")
 
-
-class ExhaustingTheFallbackListTests:
-    """IR-385: what a reader sees when every model on the account fails."""
-
-    def test_the_answer_is_unavailable_and_the_sources_are_still_returned(
-        self, settings, monkeypatch, embedder, space, client_for
-    ):
-        """ADR-008's rule survives the fallback list: no model, no answer,
-        and retrieval's passages are still handed over so a reader can read
-        them themselves. Nothing is tried at a second vendor -- there is no
-        longer one to try."""
-        import openai
-
-        rate_limited = RuntimeError("rate limit exceeded")
-        vendor = _RecordingVendor(
-            failing={"first-model": rate_limited, "second-model": rate_limited}
-        )
-        monkeypatch.setattr(openai, "OpenAI", vendor)
-
-        settings.LLM_ANSWER_MODEL = "first-model"
-        settings.LLM_ANSWER_FALLBACK_MODELS = "second-model"
-        settings.LLM_ANSWER_API_KEY = "one-account-key"
-
-        reader = make_user("reader@cit.edu")
-        flood = make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                            embedder=embedder, space=space)
-
-        with use_composition_root(_root(embedder)):
-            body = ask(client_for(reader), FLOOD_QUESTION).json()
-
-        assert body["answer"] is None
-        assert body["mode"] == "unavailable"
-        assert [source["id"] for source in body["sources"]] == [flood.pk]
-        assert [call["model"] for call in vendor.calls] == [
-            "first-model",
-            "second-model",
-        ]
-        assert set(vendor.credentials) == {
-            ("one-account-key", "https://api.groq.com/openai/v1")
-        }
-
-
-class CompletionLoggingWiredThroughLlmForTests:
-    """IR-387: `llm_for` is the one seam every production caller reaches a
-    task's model through, so wiring the completion logger there (rather than
-    into `build_profile_llm` itself, which existing tests assert returns a
-    bare `FallbackLLMProvider`) means the whole HTTP path gets one record per
-    call for free."""
-
-    def test_a_real_answer_call_emits_a_completion_record(
-        self, completion_logs, settings, vendor, embedder, space, client_for
-    ):
-        settings.LLM_ANSWER_MODEL = "the-answer-model"
-        settings.LLM_ANSWER_API_KEY = "answer-key"
-        settings.LLM_ANSWER_VENDOR = "groq"
-
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-
-        with use_composition_root(_root(embedder)):
-            ask(client_for(reader), FLOOD_QUESTION)
-
-        records = [
-            r for r in completion_logs.records if r.name == COMPLETION_LOGGER
-        ]
-        assert len(records) == 1
-        assert records[0].inference_task == "answer"
-        assert records[0].vendor == "groq"
-        assert records[0].model == "the-answer-model"
-        assert records[0].fallback_fired is False
-        assert records[0].error_kind is None
-
-    def test_a_fallback_that_fires_is_named_in_the_record(
-        self, completion_logs, settings, monkeypatch, embedder, space, client_for
-    ):
-        """The record's `model` is the one that actually answered, not the
-        one configured first -- the same guarantee `last_model_used` gives
-        `answers/service.py` (IR-385)."""
-        import openai
-
-        rate_limited = RuntimeError("rate limit exceeded")
-        vendor = _RecordingVendor(failing={"first-model": rate_limited})
-        monkeypatch.setattr(openai, "OpenAI", vendor)
-
-        settings.LLM_ANSWER_MODEL = "first-model"
-        settings.LLM_ANSWER_FALLBACK_MODELS = "second-model"
-        settings.LLM_ANSWER_API_KEY = "one-account-key"
-
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-
-        with use_composition_root(_root(embedder)):
-            ask(client_for(reader), FLOOD_QUESTION)
-
-        records = [
-            r for r in completion_logs.records if r.name == COMPLETION_LOGGER
-        ]
-        assert len(records) == 1
-        assert records[0].model == "second-model"
-        assert records[0].fallback_fired is True
-
-    def test_exhausting_the_fallback_list_names_the_last_model_tried(
-        self, completion_logs, settings, monkeypatch, embedder, space, client_for
-    ):
-        """When every model on the account fails, the record must not blame
-        the one configured first -- `FallbackLLMProvider.last_model_used`
-        is set only on success, so the record has to be built from
-        `last_attempted_model` instead for this to be right."""
-        import openai
-
-        rate_limited = RuntimeError("rate limit exceeded")
-        vendor = _RecordingVendor(
-            failing={"first-model": rate_limited, "second-model": rate_limited}
-        )
-        monkeypatch.setattr(openai, "OpenAI", vendor)
-
-        settings.LLM_ANSWER_MODEL = "first-model"
-        settings.LLM_ANSWER_FALLBACK_MODELS = "second-model"
-        settings.LLM_ANSWER_API_KEY = "one-account-key"
-
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-
-        with use_composition_root(_root(embedder)):
-            body = ask(client_for(reader), FLOOD_QUESTION).json()
-
-        assert body["mode"] == "unavailable"
-        records = [
-            r for r in completion_logs.records if r.name == COMPLETION_LOGGER
-        ]
-        assert len(records) == 1
-        assert records[0].model == "second-model"
-        assert records[0].fallback_fired is True
-        assert records[0].error_kind == "rate_limit"
-
-
-class AnOpenTaskBreakerStillDegradesTests:
-    """IR-386's acceptance criterion in its own terms: an open breaker must
-    still produce the unavailable state with sources, at the same HTTP
-    boundary, once it is the *task's* breaker (not a model's) that trips."""
-
-    def test_the_answer_tasks_own_breaker_opening_degrades_the_next_request(
-        self, settings, vendor, embedder, space, client_for
-    ):
-        from apps.ai.resilience.llm import breaker_for
-
-        settings.LLM_ANSWER_MODEL = "the-answer-model"
-        settings.LLM_ANSWER_API_KEY = "answer-key"
-        vendor._failing["the-answer-model"] = RuntimeError("rate limit exceeded")
-
-        breaker = breaker_for(InferenceTask.ANSWER.breaker_key)
-        breaker._failure_threshold = 1  # noqa: SLF001 -- test-only
-
-        reader = make_user("reader@cit.edu")
-        make_record(title="Flood Prediction", text=FLOOD_TEXT,
-                    embedder=embedder, space=space)
-
-        with use_composition_root(_root(embedder)):
-            first = ask(client_for(reader), FLOOD_QUESTION).json()
-            # The breaker is open now -- a second request must not reach the
-            # vendor again, only the task's own model list already did.
-            second = ask(client_for(reader), FLOOD_QUESTION).json()
-
-        for body in (first, second):
-            assert body["answer"] is None
-            assert body["mode"] == "unavailable"
-            assert body["sources"], "sources must still be returned (ADR-008)"
-        assert len(vendor.calls) == 1

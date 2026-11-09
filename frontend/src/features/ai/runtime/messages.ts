@@ -79,8 +79,6 @@ export function conversationTotals(conversation: ReaderConversation | undefined,
   const usages = runs.map(r => r.usage).filter((u): u is ReaderUsage => !!u);
   return {
     latest: [...usages].reverse().find(u => u.calls > 0) ?? null,
-    totals: usages.reduce((sum, u) => ({ input_tokens: sum.input_tokens + u.input_tokens,
-      output_tokens: sum.output_tokens + u.output_tokens, cost_usd: sum.cost_usd + u.cost_usd, calls: sum.calls + u.calls }),
-    { input_tokens: 0, output_tokens: 0, cost_usd: 0, calls: 0 }),
+    totalTokens: usages.reduce((sum, u) => sum + u.total_tokens, 0),
   };
 }

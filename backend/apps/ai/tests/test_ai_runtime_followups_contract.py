@@ -64,7 +64,7 @@ PIN_6 = dataclasses.replace(PIN, prompt_version="agent-research-6", tool_version
 
 
 class Listing(Catalogue):
-    async def list_records(self, filters, limit=None):
+    async def list_records(self, filters, limit=None, offset=0):
         self.calls.append(("list", dict(filters)))
         records = (dataclasses.replace(self.record(1), year=2024), dataclasses.replace(self.record(2), year=None))
         fact = Count(total=2, filters=(("classification", "Hydrology"),), population=frozenset({1, 2}))

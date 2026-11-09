@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AxiosAdapter, InternalAxiosRequestConfig } from "axios";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { apiClient } from "@/api/client";
 import recorded from "@/test/fixtures/runtimeReader.recorded.json";
@@ -54,17 +54,21 @@ function renderAsk(at: string) {
   );
 }
 
-/** What a reader sees of the answer: its text, then each citation in order. */
-function answerAsRead() {
-  const article = screen.getByRole("article", { name: "Research question" });
-  const citations = within(article).getByRole("list", { name: "Cited passages" });
+/** The answer's paragraph: its markers render as chips, so match on the whole element's text. */
+const answerText = () => screen.findByText((_, element) =>
+  element?.tagName === "P" && /^Both studies sample water/.test(element.textContent ?? ""));
+
+/** What a reader sees of the answer: its text, then each cited passage in order, with the sources opened. */
+async function answerAsRead(user: ReturnType<typeof userEvent.setup>) {
+  const answer = (await answerText()).textContent;
+  const toggle = screen.getByRole("button", { name: /sources? for this answer/ });
+  if (toggle.getAttribute("aria-expanded") !== "true") await user.click(toggle);
+  // The passage rows, not the numbered chips in the text that link to the same pages.
+  const passages = screen.getAllByRole("link").filter(link =>
+    link.getAttribute("href")?.includes("page=") && (link.textContent ?? "").length > 3);
   return {
-    question: within(article).getByText(live.question).textContent,
-    answer: within(article).getByText(conversation.turns[0].answer).textContent,
-    citations: within(citations).getAllByRole("listitem").map((item) => ({
-      link: within(item).getByRole("link").getAttribute("href"),
-      text: item.textContent,
-    })),
+    answer,
+    citations: passages.map(link => ({ link: link.getAttribute("href"), text: link.textContent })),
   };
 }
 
@@ -98,12 +102,10 @@ it("delivers a question through the runtime and reopens the same answer after a 
   await user.type(box, live.question);
   await user.click(screen.getByRole("button", { name: "Send message" }));
 
-  expect(await screen.findByText(conversation.turns[0].answer)).toBeInTheDocument();
-  expect(screen.getByText("Compare how each study samples water")).toBeInTheDocument();
-  expect(screen.getByText("Answer ready")).toBeInTheDocument();
+  expect(await answerText()).toBeInTheDocument();
   expect(screen.getByText(/can make mistakes/)).toBeInTheDocument();
   await waitFor(() => expect(address).toBe(`/ai/conversations/${conversation.id}`));
-  const delivered = answerAsRead();
+  const delivered = await answerAsRead(user);
   expect(delivered.citations).toEqual([
     { link: "/records/1?page=3", text: expect.stringContaining("river gauges measure water level hourly") },
     { link: "/records/2?page=5", text: expect.stringContaining("pond water sampled weekly for turbidity") },
@@ -123,8 +125,8 @@ it("delivers a question through the runtime and reopens the same answer after a 
   first.unmount();
 
   const reopened = renderAsk(`/ai/conversations/${conversation.id}`);
-  expect(await screen.findByText(conversation.turns[0].answer)).toBeInTheDocument();
-  expect(answerAsRead()).toEqual(delivered);
+  expect(await answerText()).toBeInTheDocument();
+  expect(await answerAsRead(user)).toEqual(delivered);
   await expectNoBlockingA11yViolations(reopened.container);
 });
 
@@ -147,8 +149,8 @@ it.each([
 it("a conversation that cannot be opened says so and offers a new one", async () => {
   route = (config) => (config.url === CONVERSATION ? { status: 404, data: { status: "not_found" } } : runtime(config));
   renderAsk(`/ai/conversations/${conversation.id}`);
-  expect(await screen.findByRole("alert")).toHaveTextContent(/conversation is not available/);
-  expect(screen.getByRole("link", { name: "Start a new conversation" })).toHaveAttribute("href", "/ai");
+  expect(await screen.findByRole("heading", { name: "This conversation is not available." })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Start a new chat" })).toHaveAttribute("href", "/ai");
 });
 
 it("a stopped run reads as stopped, from a keyboard-operated Stop", async () => {
@@ -166,7 +168,7 @@ it("a stopped run reads as stopped, from a keyboard-operated Stop", async () => 
   const stop = await screen.findByRole("button", { name: "Stop research" });
   stop.focus();
   await user.keyboard("{Enter}");
-  expect(await screen.findByText("Stopped")).toBeInTheDocument();
+  expect(await screen.findByText("Stopped before an answer was ready.")).toBeInTheDocument();
   expect(screen.getByText(/can make mistakes/)).toBeInTheDocument();
 });
 

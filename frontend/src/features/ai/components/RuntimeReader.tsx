@@ -4,6 +4,12 @@ import { isAxiosError } from "axios";
 import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
+import { readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { InterruptedState } from "@/components/shared/InterruptedState";
+import { Skeleton } from "@/components/ui";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ChatInput } from "./ChatInput";
 import { ANSWER_MARKDOWN, CHAT_COLUMN, CHAT_OPENING, CHAT_STREAM_CARET } from "./answerLayout";
 import { CitationText } from "./CitationText";
@@ -48,7 +54,8 @@ export function ResearchProgress({ run }: { run: ReaderRun }) {
   </section>;
 }
 
-const COMPACTION_HELP = "Condenses older answers into a summary to make room. Original answers are kept.";
+
+const ICON_ACTION = "inline-flex size-9 items-center justify-center rounded-full text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800 focus-visible:outline-brand";
 
 /** A compaction's status: the same words live, reconnected and reopened, and never an internal (IR-754). */
 export function CompactionStatus({ run }: { run: ReaderRun }) {
@@ -137,11 +144,13 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const [error, setError] = useState<Trouble>();
   const generation = useRef(0);
   const pending = useRef<{ question: string; depth: Depth; key: string; conversation?: ReaderConversation }>();
-  const pendingCompact = useRef<{ key: string; conversation: ReaderConversation }>();
   const pendingRetry = useRef<{ key: string; run: ReaderRun }>();
   const sending = useRef(false);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
+  // Opening a conversation by its address: loading, then its content or one of the shared read states (IR-906).
+  const [opening, setOpening] = useState<ReadFailureKind | "loading">();
+  const [openAttempt, setOpenAttempt] = useState(0);
   const reopen = useCallback(async (id: string, version = generation.current) => {
     const next = await api.reopen(id);
     if (version !== generation.current) return;
@@ -154,17 +163,24 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   useEffect(() => {
     const version = ++generation.current;
     setConversation(undefined); setRun(undefined); setError(undefined);
-    pending.current = undefined; pendingCompact.current = undefined; pendingRetry.current = undefined;
+    pending.current = undefined; pendingRetry.current = undefined;
+    setOpening(conversationId ? "loading" : undefined);
     if (conversationId) {
       setBusy(true);
-      void reopen(conversationId, version).catch((failure) => {
-        if (version === generation.current) fail(failure);
+      void reopen(conversationId, version).then(() => {
+        if (version === generation.current) setOpening(undefined);
+      }, (failure) => {
+        if (version !== generation.current) return;
+        const status = isAxiosError(failure) ? failure.response?.status : undefined;
+        // A lapsed session or an old page says so in the reader's own words; any other failure is a read state.
+        if (failure instanceof ProtocolMismatch || status === 401 || status === 406) { setOpening(undefined); fail(failure); }
+        else setOpening(readFailureKind(failure));
       }).finally(() => { if (version === generation.current) setBusy(false); });
     }
     const epoch = generation;
     return () => { ++epoch.current; };
     // A scope/address change detaches; it never asks the worker to cancel.
-  }, [api, conversationId, fail, reopen]);
+  }, [api, conversationId, fail, reopen, openAttempt]);
 
   useEffect(() => {
     if (!run || !activeRun(run) || error) return;
@@ -214,45 +230,6 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       }
     }
     finally {
-      sending.current = false;
-      if (version === generation.current) setBusy(false);
-    }
-  };
-
-  /** The reader asks to condense the conversation: one run, however many times it is clicked. */
-  const compact = async (retry = false) => {
-    if (sending.current) return;
-    const request = retry ? pendingCompact.current
-      : conversation && { key: crypto.randomUUID(), conversation };
-    if (!request) return;
-    pendingCompact.current = request;
-    sending.current = true;
-    setBusy(true); setError(undefined);
-    const version = generation.current;
-    try {
-      const next = await api.compact(request.conversation, request.key);
-      if (version !== generation.current) return;
-      pendingCompact.current = undefined;
-      setRun(next);
-      await reopen(next.conversation_id, version);
-    } catch (failure) {
-      if (version !== generation.current) return;
-      if (isAxiosError(failure) && failure.response?.status === 409) {
-        // Another run is active, or the conversation moved on: show what is true now, not a guess.
-        pendingCompact.current = undefined;
-        try {
-          const latest = await reopen(request.conversation.id, version);
-          const last = latest?.runs[latest.runs.length - 1];
-          if (version === generation.current && !(last && activeRun(last))) {
-            setError({ message: "This conversation changed. Reconnect, then compact it again.", retry: true });
-          }
-        } catch (reopenFailure) { fail(reopenFailure); }
-      } else {
-        const next = trouble(failure);
-        if (!next.retry) pendingCompact.current = undefined;
-        setError(next);
-      }
-    } finally {
       sending.current = false;
       if (version === generation.current) setBusy(false);
     }
@@ -309,7 +286,6 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
 
   const reconnect = async () => {
     if (pending.current) return send(pending.current.question, true);
-    if (pendingCompact.current) return compact(true);
     if (pendingRetry.current) return retryRun(true);
     const id = run?.conversation_id ?? conversationId;
     if (!id) return;
@@ -323,11 +299,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     && conversation.revision === run.base_revision
     && conversation.runs[conversation.runs.length - 1]?.id === run.id;
 
-  // Only where the deployment can condense, once there is something to condense, and never beside an active run.
-  const canCompact = !!conversation && conversation.turns.length > 0 && !error && !!run
-    && !activeRun(run) && run.capabilities?.manual_compaction === true;
-
-  const centered = !conversation?.runs.length && !run && !busy && !error;
+  const centered = !conversation?.runs.length && !run && !busy && !error && !opening;
   const records = useCitedRecords(conversation);
   const live = useDraft(run, scope);
   // What each run streamed, kept on screen until the saved answer takes over.
@@ -380,6 +352,16 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       <div ref={column} className={cn(dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
         {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
           {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
+        {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" />}
+        {opening === "unavailable" && <div className="py-10 text-center">
+          <h2 className="font-display text-xl text-stone-900">This conversation is not available.</h2>
+          <p className="mt-2 text-sm text-stone-600">It may have been deleted, or the link may be wrong.</p>
+          <Link to="/ai" className={cn(PILL_SECONDARY, FOCUS_RING, "mt-5 inline-flex")}>Start a new chat</Link>
+        </div>}
+        {opening === "failed" && <EmptyState icon="fa-plug-circle-xmark" tone="error" title="Could not load this conversation"
+          message="Check that the AI service is available, then try again."
+          action={<button type="button" onClick={() => setOpenAttempt(n => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>} />}
+        {opening === "interrupted" && <InterruptedState what="conversation" onRetry={() => setOpenAttempt(n => n + 1)} />}
         {runs.map(item => {
           const current = item.id === run?.id ? run : item;
           if (compactionRun(item)) return <CompactionStatus key={item.id} run={current} />;
@@ -413,31 +395,29 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
             })()}
           </div>;
         })}
-        {busy && !run && <p role="status" className="text-sm text-stone-600">Connecting to Ask IRIS…</p>}
+        {busy && !run && !opening && <p role="status" className="text-sm text-stone-600">Connecting to Ask IRIS…</p>}
         {error && <div role="alert" className="space-y-2 text-sm text-stone-700">
           <p>{error.message}</p>
           {error.retry && <button type="button" disabled={busy} onClick={() => void reconnect()} className="min-h-11 underline text-brand">Reconnect</button>}
           {error.missing && <Link to="/ai" className="inline-flex min-h-11 items-center underline text-brand">Start a new conversation</Link>}
         </div>}
-        {canRetry && <button type="button" onClick={() => void retryRun()}
-          className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
-          Try this question again</button>}
+        {canRetry && run && <div className="flex justify-end gap-1">
+          <button type="button" onClick={() => setDraft(run.question)} aria-label="Edit this question" title="Edit"
+            className={ICON_ACTION}><i aria-hidden className="fas fa-pen text-[13px]" /></button>
+          <button type="button" onClick={() => void retryRun()} aria-label="Try this question again" title="Retry"
+            className={ICON_ACTION}><i aria-hidden className="fas fa-rotate-right text-[13px]" /></button>
+        </div>}
         {run && activeRun(run) && compactionRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
           className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
           Stop compaction</button>}
       </div>
     </div>
-    {canCompact && <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-2 text-sm text-stone-700">
-      <button type="button" disabled={busy} onClick={() => void compact()} aria-describedby="compact-help"
-        className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand disabled:opacity-60">
-        Compact conversation</button>
-      <p id="compact-help" className="min-w-0 flex-1 basis-56 text-xs text-stone-600">{COMPACTION_HELP}</p>
-    </div>}
     <ChatInput centered={centered} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
+      beside={usage.latest && <TokenUsageMeter usage={usage.latest} />}
       onStop={run && activeRun(run) && !compactionRun(run) && !busy ? () => void stop() : undefined}
       maxLength={4000}
       placeholder={scope ? "Ask about this paper…" : "Ask about the research corpus…"}
-      disabled={busy || !!error || !!(run && activeRun(run))} label={scope ? "Ask about this paper" : "Ask about the research corpus"}>
+      disabled={busy || !!error || !!opening || !!(run && activeRun(run))} label={scope ? "Ask about this paper" : "Ask about the research corpus"}>
       <ModelPill name="Research depth" value={depth} options={DEPTHS} onChange={setDepth}
         note="IRIS chooses the model for each answer." />
       {scopeToggle && <button type="button" onClick={() => scopeToggle.onChange(!scopeToggle.allPapers)}
@@ -450,7 +430,6 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         <i aria-hidden className={cn("text-[11px]", scopeToggle.allPapers ? "fas fa-layer-group" : "far fa-file-lines")} />
         {scopeToggle.allPapers ? "All papers" : "This paper"}
       </button>}
-      {usage.latest && <TokenUsageMeter usage={usage.latest} />}
     </ChatInput>
   </div>;
 }

@@ -65,15 +65,6 @@ def test_an_unknown_mode_stops_startup(settings):
         verify_admission_configuration()
 
 
-def test_queued_questions_need_enforcement(settings):
-    settings.AI_DURABLE_ASK = True
-    settings.AI_PROVIDER_ADMISSION = "off"
-    with pytest.raises(ImproperlyConfigured, match="AI_PROVIDER_ADMISSION=enforce"):
-        verify_admission_configuration()
-    enforce(settings)
-    verify_admission_configuration()
-
-
 def test_the_output_cap_is_sent_only_under_enforcement(settings):
     settings.AI_PROVIDER_ADMISSION = "off"
     settings.AI_ADMISSION_MAX_OUTPUT_TOKENS = CAMPAIGN["AI_ADMISSION_MAX_OUTPUT_TOKENS"]

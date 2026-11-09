@@ -321,14 +321,12 @@ export const DIALOGS: DialogCase[] = [
  * not an omission: the reason is what would have to be built to scan it.
  */
 export const UNSCANNED: Record<string, string> = {
-  "features/ai/components/ComparisonPicker.tsx":
-    "Opens from the Ask IRIS composer and searches Records as you type; it needs the search mock and a draft question first.",
   "features/records/paper-view/EmbargoCard.tsx":
     "Its dialogs set and release an embargo, which only the Adviser or RDCO may do on a submitted Record: a fixture with the embargo capabilities and an embargo state.",
   "features/records/paper-view/FilesSection.tsx":
     "Its dialogs replace a manuscript and remove a file: a Record the reader owns with files attached and the upload slots mocked.",
   "features/records/paper-view/PaperChatDock.tsx":
-    "Paper Chat's modal form needs the dock opened on a Record with an indexed paper and a mocked conversation stream (SSE), which the smoke tier's JSON mock cannot answer yet.",
+    "Paper Chat's modal form needs the dock opened on a Record with the AI runtime's conversation and draft stream (SSE) mocked, which the smoke tier's JSON mock cannot answer yet.",
   "features/records/paper-view/ReviewDetails.tsx":
     "A name card that opens over a reviewer or party in the review sidebar; it needs a tracker with parties and reviews, a fixture of its own.",
   "features/records/paper-view/ReviewWorkspaceLayout.tsx":

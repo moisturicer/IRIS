@@ -43,6 +43,16 @@ test("a stopped question can be asked again as a new linked run, once", async ()
   expect(post).toHaveBeenCalledTimes(1);
 });
 
+test("a stopped question can be edited: the edit icon puts it back in the composer and sends nothing", async () => {
+  reopened(run());
+  const post = vi.spyOn(apiClient, "post");
+  const user = userEvent.setup();
+  render(<MemoryRouter><RuntimeReader conversationId="conversation-1" /></MemoryRouter>);
+  await user.click(await screen.findByRole("button", { name: "Edit this question" }));
+  expect(screen.getByRole("textbox")).toHaveValue("Compare");
+  expect(post).not.toHaveBeenCalled();
+});
+
 test.each([
   ["answered", run({ state: "completed" }), 1],
   ["already retried", run({ retried_by: "run-2" }), 0],

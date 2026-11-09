@@ -9,6 +9,8 @@ interface ChatInputProps {
   disabled?: boolean;
   sendDisabled?: boolean;
   children?: ReactNode;
+  /** Sits immediately left of Send (or Stop). */
+  beside?: ReactNode;
   placeholder?: string;
   /** The box's accessible name, when the placeholder is shortened for a narrow page. */
   label?: string;
@@ -26,7 +28,7 @@ interface ChatInputProps {
 
 const ATTACH_CLOSED = "Attaching files is not available yet";
 
-export function ChatInput({ onSend, disabled, sendDisabled, children, placeholder, label, draft, onDraftChange, maxLength, onStop, centered = false }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, sendDisabled, children, beside, placeholder, label, draft, onDraftChange, maxLength, onStop, centered = false }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
   const text = draft ?? ownText;
   const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
@@ -81,10 +83,12 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
           </button>
           {children}
         </div>
+        <div className="col-start-2 row-start-2 self-start flex items-center gap-1">
+        {beside}
         {onStop ? <button
           type="button"
           onClick={onStop}
-          className={`${CHAT_COMPOSER_ICON} col-start-2 row-start-2 self-start bg-brand text-white
+          className={`${CHAT_COMPOSER_ICON} bg-brand text-white
             hover:bg-brand-light active:scale-95 motion-reduce:active:scale-100
             transition-[background-color,transform] duration-150 motion-reduce:transition-none ${FOCUS_RING}`}
           aria-label="Stop research"
@@ -94,7 +98,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
         </button> : <button
           type="submit"
           disabled={disabled || sendDisabled || !text.trim()}
-          className={`${CHAT_COMPOSER_ICON} col-start-2 row-start-2 self-start bg-brand text-white
+          className={`${CHAT_COMPOSER_ICON} bg-brand text-white
             hover:bg-brand-light disabled:bg-stone-100 disabled:text-stone-500 disabled:cursor-not-allowed
             active:scale-95 disabled:active:scale-100 motion-reduce:active:scale-100
             transition-[background-color,color,transform] duration-150 motion-reduce:transition-none ${FOCUS_RING}`}
@@ -102,6 +106,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
         >
           <i className="fas fa-arrow-up text-sm" aria-hidden />
         </button>}
+        </div>
       </div>
       <AskIrisNotice className={`text-center mt-1.5 ${CHAT_COLUMN}`} />
     </form>

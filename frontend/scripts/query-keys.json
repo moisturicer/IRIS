@@ -10,7 +10,6 @@
     "turn": "turn id",
     "cite": "citation marker number",
     "id": "record ids for a list lookup",
-    "after": "stream event cursor",
     "version": "manuscript version number",
     "type": "record-type id",
     "college": "college ids",

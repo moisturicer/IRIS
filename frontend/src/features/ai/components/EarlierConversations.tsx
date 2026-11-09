@@ -73,7 +73,7 @@ export function EarlierConversationList() {
   }, []);
 
   if (conversations.length === 0) return null;
-  return <details className="border-t border-stone-200 px-6 py-3 text-sm">
+  return <details className="shrink-0 border-t border-stone-200 px-3 py-2 text-sm">
     <summary className="min-h-11 cursor-pointer py-2 text-stone-700">Earlier conversations ({conversations.length})</summary>
     <ul className="mt-2 space-y-1">
       {conversations.map(c => <li key={c.id} className="min-w-0">

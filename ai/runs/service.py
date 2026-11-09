@@ -96,45 +96,19 @@ class RunService:
         except TypeError:
             raise ValueError("bounds") from None
 
-    @property
-    def can_compact(self) -> bool:
-        """Whether a reader may ask to condense a Conversation (IR-754).
-
-        Only an AGENT that new runs are pinned to and that has a compaction
-        rule: the same mechanism and the same admission as automatic
-        compaction, never a second summarizer.
-        """
-        return (getattr(self.executor, "compaction", None) is not None
-                and callable(getattr(self.executor, "compact", None)))
-
     async def submit(self, grant, *, key, question, conversation_id, base_revision,
                      depth=runs_config.DEFAULT_DEPTH):
         """The run's projection, and whether this submission admitted it."""
         return await self._enqueue(grant, key=key, question=question, conversation_id=conversation_id,
                                    base_revision=base_revision, depth=depth, pinned=self.pinned(depth))
 
-    async def submit_compaction(self, grant, *, key, conversation_id, base_revision):
-        """The run that condenses the Conversation, and whether this request admitted it (IR-754).
-
-        A run of its own: it has its own identity, deadline and allowance,
-        asks nothing and writes no Turn. It is admitted only where an Ask
-        would be -- no active run in the Conversation, the revision the reader
-        saw -- so it never shares or extends an investigation's budget.
-        """
-        depth = "ordinary"
-        return await self._enqueue(grant, key=key, question=None, conversation_id=conversation_id,
-                                   base_revision=base_revision, depth=depth, compaction=True,
-                                   pinned={**self.pinned(depth), "kind": runs_config.KIND_COMPACT})
-
-    async def _enqueue(self, grant, *, key, question, conversation_id, base_revision, depth, pinned,
-                       compaction=False):
+    async def _enqueue(self, grant, *, key, question, conversation_id, base_revision, depth, pinned):
         dispatch = self.cfg.dispatch
         row, created = await self.store.admit(
             grant, key=key, question=question, conversation_id=conversation_id,
             base_revision=base_revision, deadline_seconds=self.cfg.limits.deadline_for(depth),
             allowance=self.cfg.limits.allowance(), pinned=pinned, depth=depth,
             max_queued=dispatch.max_queued, max_active_per_reader=dispatch.max_active_per_reader,
-            compaction=compaction,
         )
         return await self._queued(grant, row, created)
 

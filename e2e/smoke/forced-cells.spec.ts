@@ -7,11 +7,11 @@ import type { Page, Request, Route } from "@playwright/test";
 import { expect, test, type MockApi } from "./support/mock-api";
 import { makeLaterReadsTimeOut, openScreen } from "./support/open-screen";
 import { SCREENS } from "./support/screens";
-import { PAPER, PAPER_DETAIL, paginated } from "./support/fixtures";
+import { PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated } from "./support/fixtures";
 import { EMPTY_REVIEWS, TRACKER } from "./support/states";
 
 const screen = (id: string) => SCREENS.find((s) => s.id === id)!;
-const COMPOSER = "Ask a follow-up about the research corpus…";
+const COMPOSER = "Ask about the research corpus";
 const SECOND = { ...PAPER, id: 102, title: "Rainwater harvesting for terraced farms" };
 const searchOf = (request: Request) => new URL(request.url()).searchParams;
 const retryControl = (page: Page) => page.getByRole("button", { name: /^(Try again|Retry)$/ });
@@ -115,56 +115,50 @@ test.describe("My Library · Saved", () => {
 
 // --- Ask IRIS ---------------------------------------------------------------
 
+/** A finished run and the conversation it wrote, as the runtime serves them (IR-957). */
+const answered = (answer: string) => {
+  const run = {
+    protocol: "runs-reader-1", id: "00000000-0000-4000-8000-000000000001", conversation_id: RUNTIME_CONVERSATION_ID,
+    state: "completed", question: "What about the moon?", base_revision: 0, version: 3,
+    turn_id: "00000000-0000-4000-8000-000000000003", depth: "ordinary", awaiting_reader: false,
+    created_at: "2026-11-05T00:00:00+00:00", finished_at: "2026-11-05T00:00:00+00:00", kind: "ask",
+    plan: null, context: null, compaction: null, cursor: 2, retry_of: null, retried_by: null,
+    sources_available: true, capabilities: { manual_compaction: false },
+  };
+  return { run, conversation: { ...RUNTIME_CONVERSATION, revision: 1, runs: [run], turns: [{
+    id: run.turn_id, run_id: run.id, ordinal: 1, question: run.question, answer, kind: "answer",
+    created_at: run.finished_at, citations: [],
+  }] } };
+};
+
 test.describe("Ask IRIS", () => {
   test("a new chat opens on its opening question with the composer ready", async ({ page, api }) => {
-    await openScreen(page, api, screen("ask-iris-conversation"));
-    await expect(page.getByRole("heading", { name: /What do you want to ask/ })).toBeVisible();
+    await openScreen(page, api, screen("ask-iris"));
+    await expect(page.getByText("What would you like to investigate?")).toBeVisible();
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeEnabled();
     await expect(retryControl(page)).toHaveCount(0);
   });
 
-  test("a conversation list that fails to load says so in place, and Try again opens a chat", async ({ page, api }) => {
+  test("a chat history that fails to load leaves the chat usable", async ({ page, api }) => {
     await openScreen(page, api, screen("ask-iris"), {
-      override: (a) => a.on("GET", "/ai/conversations/", { detail: "smoke: down" }, 500),
+      override: (a) => a.on("GET", "/ai/runtime/conversations", { detail: "smoke: down" }, 500),
     });
-    await expect(page.getByText("Could not load your conversations")).toBeVisible();
-    await expect(page.getByText("Check that the AI service is available, then try again.")).toBeVisible();
-    // In the page, not a toast over an empty screen: the reader can act on it.
-    await expect(page.getByRole("heading", { name: /What do you want to ask/ })).toHaveCount(0);
-
-    const listed = api.seen.filter((k) => k === "GET /ai/conversations/").length;
-    api.on("GET", "/ai/conversations/", []);
-    await page.getByRole("button", { name: "Try again" }).click();
-    await expect(page.getByRole("heading", { name: /What do you want to ask/ })).toBeVisible();
-    expect(api.seen.filter((k) => k === "GET /ai/conversations/").length).toBeGreaterThan(listed);
-    await expect(page).toHaveURL(/\/ai\/conversations\/1$/);
+    // The history is a convenience: the reader can still ask, and nothing claims the chat failed.
+    await expect(page.getByText("What would you like to investigate?")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: COMPOSER })).toBeEnabled();
+    await expect(retryControl(page)).toHaveCount(0);
   });
 
-  test("a conversation list that times out says it took too long, and Retry opens a chat", async ({ page, api }) => {
-    await openScreen(page, api, screen("ask-iris"), {
-      timeOut: { only: "/ai/conversations/" },
-      override: (a) => a.on("GET", "/ai/conversations/", () => new Promise<void>(() => undefined)),
-    });
-    await expect(page.getByText("This took too long")).toBeVisible();
-    await expect(page.getByText("The conversations did not finish loading.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(0);
-
-    api.on("GET", "/ai/conversations/", []);
-    await page.getByRole("button", { name: "Retry", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /What do you want to ask/ })).toBeVisible();
-  });
-
-  test("an answer with nothing to cite says no sources matched, offers no Sources button, and the reader can ask again", async ({ page, api }) => {
+  test("an answer with nothing to cite offers no Sources button, and the reader can ask again", async ({ page, api }) => {
     await openScreen(page, api, screen("ask-iris-conversation"));
-    api.on("POST", "/ai/ask/stream/", (route: Route) => route.fulfill({
-      status: 200, headers: { "content-type": "text/event-stream" },
-      // A `done` with no answer text: the server found nothing readable.
-      body: `event: done\ndata: ${JSON.stringify({ citations: [], sources: [], conversation_id: 1, turn_id: 31 })}\nid: 1\n\n`,
-    }));
-    await page.getByRole("textbox", { name: COMPOSER }).fill("What about the moon?");
+    const { run, conversation } = answered("The sources IRIS read do not establish an answer to this question.");
+    api.on("POST", "/ai/runtime/runs", run, 201);
+    api.on("GET", `/ai/runtime/runs/${run.id}`, run);
+    await page.getByRole("textbox", { name: COMPOSER }).fill(run.question);
+    api.on("GET", RUNTIME_CONVERSATION_PATH, conversation);
     await page.getByRole("button", { name: "Send message" }).click();
 
-    await expect(page.getByText("No readable sources matched that question.")).toBeVisible();
+    await expect(page.getByText("The sources IRIS read do not establish an answer to this question.")).toBeVisible();
     await expect(page.getByRole("button", { name: /sources? for this answer/ })).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeEnabled();
     // Not a failure: nothing to retry.
