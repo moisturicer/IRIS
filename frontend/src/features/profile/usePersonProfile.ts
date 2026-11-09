@@ -12,6 +12,7 @@ export interface ListState<T> {
   /** The last page loaded; `0` while the first has not. */
   page:        number;
   hasMore:     boolean;
+  loading:     boolean;
   loadingMore: boolean;
   /** Why the last attempt failed. With no items it is the first page that failed. */
   error:       string | null;
@@ -36,12 +37,33 @@ export type PersonProfileState =
 function firstPage<T>(result: PromiseSettledResult<AxiosResponse<ProfilePage<T>>>): ListState<T> {
   if (result.status === "fulfilled") {
     const { results, next } = result.value.data;
-    return { items: results, page: 1, hasMore: next !== null, loadingMore: false, error: null };
+    return { items: results, page: 1, hasMore: next !== null, loading: false, loadingMore: false, error: null };
   }
   return {
-    items: [], page: 0, hasMore: false, loadingMore: false,
+    items: [], page: 0, hasMore: false, loading: false, loadingMore: false,
     error: errorDetail(result.reason, "This couldn't load. Try again."),
   };
+}
+
+type IdList = ListState<{ id: number }>;
+type ListPatch = (change: (list: IdList) => IdList) => void;
+
+/** Shared paging and retry behavior for a Profile list. */
+function loadMoreProfileList(id: number, key: ListKey, list: IdList, patch: ListPatch) {
+  const page = list.page + 1;
+  patch((value) => ({ ...value, loadingMore: true, error: null }));
+  const fetch: Promise<AxiosResponse<ProfilePage<{ id: number }>>> = peopleApi[key](id, page);
+  fetch.then(({ data }) => {
+    patch((value) => {
+      const seen = new Set(value.items.map((item) => item.id));
+      return {
+        items: [...value.items, ...data.results.filter((item) => !seen.has(item.id))],
+        page, hasMore: data.next !== null, loading: false, loadingMore: false, error: null,
+      };
+    });
+  }).catch((error: unknown) => {
+    patch((value) => ({ ...value, loadingMore: false, error: errorDetail(error, "More didn't load. Try again.") }));
+  });
 }
 
 const isNotFound = (error: unknown) =>
@@ -100,29 +122,73 @@ export function usePersonProfile(id: number) {
     const now = latest.current;
     if (now.kind !== "ready") return;
     const current = generation.current;
-    const list = now.model[key] as ListState<{ id: number }>;
+    const list = now.model[key] as IdList;
     if (list.loadingMore) return;
-    const page = list.page + 1;
 
-    const patch = (change: (l: ListState<{ id: number }>) => ListState<{ id: number }>) =>
+    const patch: ListPatch = (change) =>
       setState((s) => (s.kind === "ready" && current === generation.current
-        ? { kind: "ready", model: { ...s.model, [key]: change(s.model[key] as ListState<{ id: number }>) } as PersonProfileModel }
+        ? { kind: "ready", model: { ...s.model, [key]: change(s.model[key] as IdList) } as PersonProfileModel }
         : s));
-
-    patch((l) => ({ ...l, loadingMore: true, error: null }));
-    const fetch: Promise<AxiosResponse<ProfilePage<{ id: number }>>> = peopleApi[key](id, page);
-    fetch.then(({ data }) => {
-      patch((l) => {
-        const seen = new Set(l.items.map((item) => item.id));
-        return {
-          items: [...l.items, ...data.results.filter((item) => !seen.has(item.id))],
-          page, hasMore: data.next !== null, loadingMore: false, error: null,
-        };
-      });
-    }).catch((error: unknown) => {
-      patch((l) => ({ ...l, loadingMore: false, error: errorDetail(error, "More didn't load. Try again.") }));
-    });
+    loadMoreProfileList(id, key, list, patch);
   }, [id]);
 
   return { state, retry, more };
+}
+
+/** The signed-in person's three lists, without requesting their public-profile header again. */
+export function useOwnProfileLists(id: number | null) {
+  const [lists, setLists] = useState(() => pendingLists());
+  const generation = useRef(0);
+  const latest = useRef(lists);
+  latest.current = lists;
+
+  useEffect(() => {
+    const current = ++generation.current;
+    if (id === null) {
+      setLists(pendingLists(false));
+      return () => { generation.current += 1; };
+    }
+
+    setLists(pendingLists());
+    Promise.allSettled([
+      peopleApi.research(id, 1),
+      peopleApi.advised(id, 1),
+      peopleApi.collaborators(id, 1),
+    ]).then(([research, advised, collaborators]) => {
+      if (current !== generation.current) return;
+      setLists({
+        research: firstPage(research),
+        advised: firstPage(advised),
+        collaborators: firstPage(collaborators),
+      });
+    });
+    return () => { generation.current += 1; };
+  }, [id]);
+
+  const more = useCallback((key: ListKey) => {
+    if (id === null) return;
+    const now = latest.current;
+    const list = now[key] as IdList;
+    if (list.loadingMore) return;
+    const current = generation.current;
+
+    const patch: ListPatch = (change) =>
+      setLists((state) => (current === generation.current
+        ? { ...state, [key]: change(state[key] as IdList) }
+        : state));
+    loadMoreProfileList(id, key, list, patch);
+  }, [id]);
+
+  return { ...lists, onMore: more };
+}
+
+function pendingList<T>(): ListState<T> {
+  return { items: [], page: 0, hasMore: false, loading: true, loadingMore: false, error: null };
+}
+
+function pendingLists(loading = true) {
+  const list = <T,>() => loading ? pendingList<T>() : {
+    items: [], page: 0, hasMore: false, loading: false, loadingMore: false, error: null,
+  };
+  return { research: list<ProfilePaper>(), advised: list<ProfilePaper>(), collaborators: list<Collaborator>() };
 }
