@@ -8,9 +8,9 @@
 //
 // A dialog source file that is neither here nor in UNSCANNED fails
 // dialog-coverage.spec.ts, so a new dialog cannot ship without a decision.
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
-import { PAPER, PAPER_DETAIL, paginated } from "./fixtures";
+import { PAPER, PAPER_DETAIL, paginated, type SmokeRole } from "./fixtures";
 
 export interface DialogCase {
   id: string;
@@ -20,6 +20,8 @@ export interface DialogCase {
   path?: string;
   /** Source files (relative to frontend/src) this case puts on screen. */
   sources: string[];
+  /** Override the screen's usual reader when a capability is role-gated. */
+  role?: SmokeRole;
   override?: (api: MockApi) => void;
   /** Narrower than the desktop default, for a dialog that exists only there. */
   viewport?: { width: number; height: number };
@@ -314,24 +316,114 @@ export const DIALOGS: DialogCase[] = [
     }, true),
   reviewAction("request documents", "request_document", "Request documents", "features/document-requests/RequestDocumentDialog.tsx",
     (api) => api.on("GET", `/records/${PAPER.id}/document-requests/slots/`, [{ id: 1, name: "Ethics clearance" }])),
+  {
+    id: "paper chat in its modal form", screen: "paper-view", path: `/records/${PAPER.id}`,
+    viewport: { width: 820, height: 900 }, sources: ["features/records/paper-view/PaperChatDock.tsx"],
+    override: (api) => {
+      api.on("GET", "/ai/reader/", { path: "django" });
+      api.on("GET", "/ai/conversations/", []);
+      api.on("POST", "/ai/conversations/", {
+        id: 1, title: "", record: PAPER.id, record_title: PAPER.title, turn_count: 0,
+        created_at: "2026-11-05T08:00:00+08:00", updated_at: "2026-11-05T08:00:00+08:00", turns: [],
+      }, 201);
+      api.on("POST", "/ai/ask/stream/", (route: Route) => route.fulfill({
+        status: 200, headers: { "content-type": "text/event-stream" },
+        body: `event: done\ndata: ${JSON.stringify({ citations: [], sources: [], conversation_id: 1, turn_id: 31 })}\nid: 1\n\n`,
+      }));
+    },
+    open: async (page) => {
+      await page.getByRole("button", { name: "Ask IRIS" }).click();
+      await page.getByRole("textbox", { name: "Ask about this paper" }).fill("What does this paper say?");
+      await page.getByRole("button", { name: "Send", exact: true }).click();
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Ask IRIS" }),
+  },
+  {
+    id: "reviewer name card", screen: "paper-view", path: `/records/${PAPER.id}?section=review`,
+    sources: ["features/records/paper-view/ReviewDetails.tsx"],
+    override: (api) => {
+      reviewing()(api);
+      api.on("GET", `/records/${PAPER.id}/tracker/`, {
+        ...TRACKER,
+        parties: [{
+          party: "itso", label: "ITSO", state: "active", state_label: "Reviewing", started: true,
+          outcome: null, outcome_label: null, at: null, preserved: false, carryover: null, carryover_version: null,
+          carryover_label: null, awaiting_document: null, outcome_earlier: false, in_pool: false,
+          changes_requested: false, seats: [{ reviewer: 5, reviewer_name: "Ines Tan", state: "in_review", state_label: "In review", verdict: null, verdict_label: null }],
+          due_at: null, original_due_at: null, is_overdue: false, clock_paused: false, can_extend: false, extensions: [],
+        }],
+      });
+    },
+    open: async (page) => {
+      await page.getByRole("tab", { name: "Details" }).click();
+      await page.getByRole("button", { name: "Ines Tan" }).click();
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Ines Tan" }),
+  },
+  {
+    id: "review workspace details drawer", screen: "paper-view", path: `/records/${PAPER.id}?section=review`,
+    viewport: { width: 820, height: 900 }, sources: ["features/records/paper-view/ReviewWorkspaceLayout.tsx"],
+    override: (api) => {
+      reviewing()(api);
+      api.on("GET", `/records/${PAPER.id}/`, { ...PAPER_DETAIL, is_participant: true, abstract_file: "/media/manuscript.pdf" });
+      api.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER);
+      api.on("GET", `/records/${PAPER.id}/manuscript/`, (route: Route) => route.fulfill({
+        status: 200, headers: { "content-type": "application/pdf" }, body: Buffer.from("%PDF-1.4\n%%EOF"),
+      }));
+    },
+    open: async (page) => { await page.getByRole("button", { name: "Open review pane" }).click(); },
+    dialog: (page) => page.getByRole("dialog", { name: "Review pane" }),
+  },
+  {
+    id: "comparison picker", screen: "ask-iris", sources: ["features/ai/components/ComparisonPicker.tsx"],
+    override: (api) => {
+      api.on("GET", "/ai/status/", { embedding_space: null, generative: false, indexed_records: 0, comparison_max_records: 4 });
+      api.on("GET", "/records/", paginated([PAPER]));
+    },
+    open: async (page) => { await page.getByRole("button", { name: "Compare papers" }).click(); },
+    dialog: (page) => page.getByRole("dialog", { name: "Compare papers" }),
+  },
+  ...(["set", "release", "release_ip"] as const).map((action): DialogCase => ({
+    id: action === "set" ? "change embargo review date" : action === "release" ? "release embargo" : "release IP mark",
+    screen: "paper-view", role: "RDCO", sources: ["features/records/paper-view/EmbargoCard.tsx"],
+    override: (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, is_ip: action === "release_ip", embargo: { state: "held", until: "2026-12-01" },
+        capabilities: ["cite", "set_embargo", "release_embargo", ...(action === "release_ip" ? ["release_ip"] : [])],
+      });
+      api.on("GET", "/users/role-requests/", paginated([]));
+    },
+    open: async (page) => {
+      const label = action === "set" ? "Change date" : action === "release" ? "Release embargo" : "Release IP mark";
+      await page.getByRole("button", { name: label }).click();
+    },
+    dialog: anyDialog,
+  })),
+  {
+    id: "remove an attached file", screen: "paper-view", role: "Student",
+    path: `/records/${PAPER.id}?section=review&documents=open`,
+    sources: ["features/records/paper-view/FilesSection.tsx"],
+    override: (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+        capabilities: ["cite", "edit_details"],
+      });
+      api.on("GET", `/documents/records/${PAPER.id}/slots/`, [{ id: 2, name: "Ethics clearance", uploads: [] }]);
+      api.on("GET", "/documents/files/", [{
+        id: 7, record: PAPER.id, file: "ethics.pdf", filename: "Ethics clearance.pdf", uploaded_by: 1,
+        uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
+      }]);
+      api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
+      api.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER);
+    },
+    open: async (page) => { await page.getByRole("button", { name: "Remove Ethics clearance.pdf" }).click(); },
+    dialog: (page) => page.getByRole("dialog", { name: "Remove Ethics clearance.pdf?" }),
+  },
 ];
 
 /**
  * Dialog source files this tier does not open, and why. Each is a decision,
  * not an omission: the reason is what would have to be built to scan it.
  */
-export const UNSCANNED: Record<string, string> = {
-  "features/ai/components/ComparisonPicker.tsx":
-    "Opens from the Ask IRIS composer and searches Records as you type; it needs the search mock and a draft question first.",
-  "features/records/paper-view/EmbargoCard.tsx":
-    "Its dialogs set and release an embargo, which only the Adviser or RDCO may do on a submitted Record: a fixture with the embargo capabilities and an embargo state.",
-  "features/records/paper-view/FilesSection.tsx":
-    "Its dialogs replace a manuscript and remove a file: a Record the reader owns with files attached and the upload slots mocked.",
-  "features/records/paper-view/PaperChatDock.tsx":
-    "Paper Chat's modal form needs the dock opened on a Record with an indexed paper and a mocked conversation stream (SSE), which the smoke tier's JSON mock cannot answer yet.",
-  "features/records/paper-view/ReviewDetails.tsx":
-    "A name card that opens over a reviewer or party in the review sidebar; it needs a tracker with parties and reviews, a fixture of its own.",
-  "features/records/paper-view/ReviewWorkspaceLayout.tsx":
-    "The review workspace's details drawer, which opens only when the workspace is too narrow for its three columns and a tracker is drawn; the Details tab is covered by the add-a-colleague and request-a-review cases, the drawer itself is not.",
-};
+export const UNSCANNED: Record<string, string> = {};
 

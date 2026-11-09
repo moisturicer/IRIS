@@ -8,7 +8,7 @@ import { axeScan } from "../support/a11y";
 import { expect, test } from "./support/mock-api";
 import { expectNotCrashed, openScreen, settle } from "./support/open-screen";
 import { SCREENS } from "./support/screens";
-import { STATES, stateId } from "./support/states";
+import { AXE_STATES, STATES, stateId } from "./support/states";
 
 for (const state of STATES) {
   const id = stateId(state);
@@ -27,5 +27,21 @@ for (const state of STATES) {
 
     const { findings } = await axeScan(page, id, testInfo);
     expect(findings, `${id} (${state.path ?? screen.path})`).toEqual([]);
+  });
+}
+
+for (const state of AXE_STATES) {
+  test(`${state.id} has no serious or critical accessibility findings`, async ({ page, api }, testInfo) => {
+    const screen = SCREENS.find((s) => s.id === state.screen);
+    if (!screen) throw new Error(`states.ts names a screen that screens.ts does not have: ${state.screen}`);
+
+    await openScreen(page, api, { ...screen, path: state.path ?? screen.path }, { override: state.override });
+    await state.prepare?.(page);
+    await expect(state.shows(page), `${state.id}: the screen is not in this state`).toBeVisible();
+    await expectNotCrashed(page);
+    await settle(page);
+
+    const { findings } = await axeScan(page, state.id, testInfo);
+    expect(findings, `${state.id} (${state.path ?? screen.path})`).toEqual([]);
   });
 }

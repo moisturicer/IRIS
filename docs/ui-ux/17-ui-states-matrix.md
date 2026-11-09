@@ -39,6 +39,8 @@ Legend: **✓** already implemented · **●** added by IR-906 · **N/A** with t
 
 ## How it is proved
 
+The smoke tier runs axe over the cells in `e2e/smoke/support/states.ts` and its supplemental `AXE_STATES` catalogue. Those supplemental cases scan filtered-empty Discover, timed-out Load more, Saved's empty and unavailable rows, each My Reviews tab's empty copy, Ask IRIS's conversation-list failure and no-sources answer, and the review tracker's and timeline's empty copy. `forced-cells.spec.ts` continues to assert their behavior and recovery; axe checks each rendered state. See [`../testing/traceability/IR-908.md`](../testing/traceability/IR-908.md).
+
 Each ● cell has a test that queries by role and accessible name. They are listed in [`docs/testing/traceability/IR-906.md`](../testing/traceability/IR-906.md).
 
 Every cell that is not N/A has a test that forces it in a real browser (IR-907): the one request that decides the state is intercepted, and the test asserts what the reader sees and can do next. What it does not cover is named in the traceability record, for example a Paper View re-read after an act that finds access gone. `e2e/smoke/forced-coverage.spec.ts` reads this table, so a cell added, resolved or marked N/A here without a matching change to `e2e/smoke/support/matrix-proofs.ts` fails CI. (It checks that each named test exists as a `test(` line; that the test passes is what the rest of the smoke tier shows.) See [`docs/testing/traceability/IR-907.md`](../testing/traceability/IR-907.md).
