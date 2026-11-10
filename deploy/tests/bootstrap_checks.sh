@@ -40,6 +40,14 @@ iris_not_running() { [ -z "$(docker ps -q --filter label=com.docker.compose.proj
 said()           { grep -q "$2" "$LOGS/$1"; }
 nothing_changed() { ! grep -E ': (installed|created|added|cloned)( |$)' "$LOGS/run2.log"; }
 
+# GitHub's runner image already has a /swapfile in /etc/fstab. Remove both so
+# the first run has to create them, as on a fresh server.
+if [ -e /swapfile ]; then
+    swapoff /swapfile 2> /dev/null || true
+    rm -f /swapfile
+fi
+sed -i '\|^/swapfile[[:space:]]|d' /etc/fstab
+
 # Refuses before changing anything.
 # The log is root's to write; only the script runs as the user.
 # shellcheck disable=SC2024
@@ -80,6 +88,7 @@ check "swap is kept across reboots, listed once" fstab_once
 check "the user is in the docker group" in_docker_group
 check "main is cloned into the user's home, owned by them" cloned
 check "the clone is on main" on_main
+check "first run says swap was created" said run1.log "swap: created"
 check "DuckDNS is skipped without its file" said run1.log "duckdns: skipped"
 check "no .env file is written" no_env_files
 check "IRIS is not started" iris_not_running
