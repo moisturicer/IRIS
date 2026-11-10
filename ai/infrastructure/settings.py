@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     RUNS_DEEP_CONCURRENCY: int | None = None
     RUNS_WORKER_CONCURRENCY: int | None = None
     RUNS_POLL_SECONDS: float | None = None
+    #: Pooled runtime connections per process, and how long a caller waits for one (IR-1012).
+    RUNS_DB_POOL_SIZE: int | None = None
+    RUNS_DB_ACQUIRE_SECONDS: float | None = None
     # Worker wakeups only; empty means workers poll PostgreSQL.
     RUNS_REDIS_URL: str = ""
     # Optional (IR-953): reuses a query's embedding within one run; blank is on, "off" disables.

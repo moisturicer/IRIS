@@ -1,0 +1,295 @@
+{
+  "commit": "v0.1.0-2389-g4ea01cec-dirty",
+  "ticket": "IR-1007",
+  "summary": {
+    "provider": "real",
+    "cache": "cold",
+    "simultaneous": true,
+    "submissions": 20,
+    "distinct": 20,
+    "outcomes": {
+      "answered": 19,
+      "failure": 1
+    },
+    "answered_share": 0.95,
+    "wall_ms": 73268,
+    "answered_per_minute": 15.56,
+    "latency_ms": {
+      "ordinary": {
+        "submissions": 15,
+        "answered": {
+          "n": 14,
+          "p50": 27528,
+          "p95": 52728,
+          "max": 52728
+        },
+        "ended": {
+          "n": 15,
+          "p50": 27719,
+          "p95": 52728,
+          "max": 52728
+        }
+      },
+      "deep": {
+        "submissions": 5,
+        "answered": {
+          "n": 5,
+          "p50": 52562,
+          "p95": 69075,
+          "max": 69075
+        },
+        "ended": {
+          "n": 5,
+          "p50": 52562,
+          "p95": 69075,
+          "max": 69075
+        }
+      }
+    },
+    "goal": null,
+    "claim": "unverified"
+  },
+  "spend": {
+    "campaign": "ir861-dev-pilot-2026-11",
+    "attempts": 70,
+    "cost_usd": 0.089919
+  },
+  "readers": 20,
+  "deep_share": 0.25,
+  "conditions": {
+    "ticket": "IR-1012",
+    "database": "iris_ir956_eval (proxy corpus), max_connections 100",
+    "workers": 1,
+    "worker_slots": 24,
+    "deep_slots": 20,
+    "db_pool": "worker 20, gateway 8 (one process)",
+    "research_lane": 48,
+    "embedding_lane": 16,
+    "account": 64,
+    "pin": "agent-research-8",
+    "model": "openai/gpt-6-luna:floor",
+    "readers": 20
+  },
+  "rows": [
+    {
+      "question": "how many qubits are needed to index the signal samples?",
+      "depth": "ordinary",
+      "reader": "burst-reader-01@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 23502,
+      "run_id": "32ac4d6f-c2d6-4e37-a902-6da79d2a6b02",
+      "kind": "answer",
+      "attempts": 2,
+      "cost_usd": 0.00064
+    },
+    {
+      "question": "how many commercially released reference tracks were used?",
+      "depth": "ordinary",
+      "reader": "burst-reader-02@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 23452,
+      "run_id": "2f0c80d3-4eaa-45b6-ae19-65da32d7b0da",
+      "kind": "answer",
+      "attempts": 2,
+      "cost_usd": 0.000955
+    },
+    {
+      "question": "how many target entities went into the entity pool?",
+      "depth": "ordinary",
+      "reader": "burst-reader-03@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 25580,
+      "run_id": "182e0566-184e-41da-931f-fc5196a0990a",
+      "kind": "answer",
+      "attempts": 3,
+      "cost_usd": 0.001745
+    },
+    {
+      "question": "which model and numeric precision were instrumented to observe cache access patterns?",
+      "depth": "deep",
+      "reader": "burst-reader-04@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 69075,
+      "run_id": "a5d367c3-5ca1-4b2a-939d-1976bb0e90b3",
+      "kind": "answer",
+      "attempts": 10,
+      "cost_usd": 0.021901
+    },
+    {
+      "question": "how many candidate protoclusters did the network flag?",
+      "depth": "ordinary",
+      "reader": "burst-reader-05@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 25457,
+      "run_id": "141561ba-b70e-4f01-bf4b-3d915f855b8c",
+      "kind": "answer",
+      "attempts": 2,
+      "cost_usd": 0.00097
+    },
+    {
+      "question": "how many recently-quenched objects hosting a bright active nucleus did they pick out?",
+      "depth": "ordinary",
+      "reader": "burst-reader-06@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 25531,
+      "run_id": "adee3809-95ed-4f2a-a072-ca22d6a31014",
+      "kind": "answer",
+      "attempts": 2,
+      "cost_usd": 0.000959
+    },
+    {
+      "question": "by how much did the total light reaching the instrument grow in the L band on the test star?",
+      "depth": "ordinary",
+      "reader": "burst-reader-07@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 25615,
+      "run_id": "6ee139ab-364c-423a-88f4-168c35eb8449",
+      "kind": "answer",
+      "attempts": 3,
+      "cost_usd": 0.001879
+    },
+    {
+      "question": "how many galaxies were used to build the map of where galaxies cluster on the sky?",
+      "depth": "deep",
+      "reader": "burst-reader-08@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 38166,
+      "run_id": "b1d017ba-7ed9-4f0b-a317-d531137c218c",
+      "kind": "answer",
+      "attempts": 4,
+      "cost_usd": 0.005072
+    },
+    {
+      "question": "which two solvers did they implement, one for easy equations and one for hard ones?",
+      "depth": "ordinary",
+      "reader": "burst-reader-09@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 27719,
+      "run_id": "653e8aed-a5e4-4fb5-a4da-d65a8853c4a7",
+      "kind": "answer",
+      "attempts": 2,
+      "cost_usd": 0.001098
+    },
+    {
+      "question": "how many regressions were reanalysed?",
+      "depth": "ordinary",
+      "reader": "burst-reader-10@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 27528,
+      "run_id": "f25250da-c2ef-4a6f-8ba2-be322de7717e",
+      "kind": "answer",
+      "attempts": 2,
+      "cost_usd": 0.001074
+    },
+    {
+      "question": "how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
+      "depth": "ordinary",
+      "reader": "burst-reader-11@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 50352,
+      "run_id": "c8abc4ba-79d6-478a-8e1d-09f044c3381d",
+      "kind": "answer",
+      "attempts": 4,
+      "cost_usd": 0.004284
+    },
+    {
+      "question": "how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
+      "depth": "deep",
+      "reader": "burst-reader-12@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 56876,
+      "run_id": "8266e4cd-d887-4ee8-9586-62c91c295669",
+      "kind": "answer",
+      "attempts": 5,
+      "cost_usd": 0.012964
+    },
+    {
+      "question": "how do they make the generator produce the rare in-between arrangements instead of the common ones?",
+      "depth": "ordinary",
+      "reader": "burst-reader-13@cit.edu",
+      "outcome": "failure",
+      "latency_ms": 39995,
+      "run_id": "5663762f-6255-4900-850c-834a142931fb",
+      "kind": null,
+      "attempts": 3,
+      "cost_usd": 0.012503
+    },
+    {
+      "question": "how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
+      "depth": "ordinary",
+      "reader": "burst-reader-14@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 52418,
+      "run_id": "80bdcce0-4940-4587-9760-4c3eef3d568d",
+      "kind": "answer",
+      "attempts": 5,
+      "cost_usd": 0.005087
+    },
+    {
+      "question": "where is the waveform actually held in their scheme?",
+      "depth": "ordinary",
+      "reader": "burst-reader-15@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 50520,
+      "run_id": "46a9ccd1-e85f-4873-81c6-813f2ab04a02",
+      "kind": "answer",
+      "attempts": 5,
+      "cost_usd": 0.006637
+    },
+    {
+      "question": "what do the two fields each actually care about when they judge a model?",
+      "depth": "deep",
+      "reader": "burst-reader-16@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 52562,
+      "run_id": "378cd871-2d72-4867-9e2e-3d5adcd379b1",
+      "kind": "answer",
+      "attempts": 4,
+      "cost_usd": 0.003437
+    },
+    {
+      "question": "when the treatment has more than two levels, what do the existing fixes actually recover?",
+      "depth": "ordinary",
+      "reader": "burst-reader-17@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 52608,
+      "run_id": "9358220d-adf1-442e-afb6-0f365b9365f7",
+      "kind": "answer",
+      "attempts": 3,
+      "cost_usd": 0.002708
+    },
+    {
+      "question": "what happens to the correction when the assumed rate of spurious links is slightly wrong?",
+      "depth": "ordinary",
+      "reader": "burst-reader-18@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 42171,
+      "run_id": "ae366f49-e0d8-4e24-87da-867d483dc63b",
+      "kind": "answer",
+      "attempts": 2,
+      "cost_usd": 0.001226
+    },
+    {
+      "question": "why was reaching memory on another machine historically so slow?",
+      "depth": "ordinary",
+      "reader": "burst-reader-19@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 52728,
+      "run_id": "b4f521e1-81d3-438c-a823-7d36e0ddca8b",
+      "kind": "answer",
+      "attempts": 4,
+      "cost_usd": 0.002917
+    },
+    {
+      "question": "what two different kinds of unevenness do they separate when analysing flash-held caches?",
+      "depth": "deep",
+      "reader": "burst-reader-20@cit.edu",
+      "outcome": "answered",
+      "latency_ms": 23405,
+      "run_id": "5e72d07d-9d42-4280-bdf4-c417e066026b",
+      "kind": "answer",
+      "attempts": 3,
+      "cost_usd": 0.001863
+    }
+  ]
+}

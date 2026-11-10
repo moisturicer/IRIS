@@ -29,6 +29,7 @@ from .test_ai_runtime_context_contract import MILLION
 from .test_ai_runtime_runs_db import DISPATCH, REPO, admin_dsn, run, session
 from ai.domain.ports import ProviderRejected  # noqa: E402
 from ai.infrastructure.recording_adapter import HANG, RecordingAgentProvider  # noqa: E402
+from ai.infrastructure import db  # noqa: E402
 from ai.runs import config as runs_config  # noqa: E402
 from ai.runs.store import RunStore  # noqa: E402
 from ai.runs.worker import build  # noqa: E402
@@ -77,6 +78,8 @@ def values(dsn, executor="agent", *, limits=LIMITS, dispatch=DISPATCH, bounds=No
         **{f"RUNS_{k.upper()}": v for k, v in asdict(limits).items()},
         **{f"RUNS_{k.upper()}": v for k, v in asdict(dispatch).items()},
         **AGENT, "RUNS_AGENT_BOUNDS": json.dumps(bounds),
+        # Required since IR-1012; a worker process pools with them.
+        "RUNS_DB_POOL_SIZE": 8, "RUNS_DB_ACQUIRE_SECONDS": 30,
     }
 
 
@@ -103,7 +106,10 @@ class Vendor(RecordingAgentProvider):
 
 
 def worker(dsn, provider=None, executor="agent", **kw):
-    return build(SimpleNamespace(**values(dsn, executor, **kw)), agent_provider=provider)
+    built = build(SimpleNamespace(**values(dsn, executor, **kw)), agent_provider=provider)
+    # In-process tests run many event loops; a pool belongs to one, so these connect per use.
+    db.unconfigure(dsn)
+    return built
 
 
 def reply(content):
