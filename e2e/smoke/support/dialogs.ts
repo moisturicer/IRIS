@@ -106,6 +106,32 @@ const feedAction = (id: string, verb: string, title: string): DialogCase => ({
 
 export const DIALOGS: DialogCase[] = [
   {
+    id: "report a paper comment", screen: "paper-view",
+    sources: ["features/records/paper-view/CommentsSection.tsx"],
+    override: (api) => api.on("GET", `/records/${PAPER.id}/comments/`, {
+      comments: [{
+        id: 7, author_name: "Sam Student", body: "A public comment.", created_at: "2026-11-04T08:00:00Z",
+        edited_at: null, is_author: false, can_edit: false, can_report: true, reply_to: null, deletion_kind: null,
+      }],
+      count: 1,
+    }),
+    open: async (page) => { await page.getByRole("button", { name: "Report", exact: true }).click(); },
+    dialog: (page) => page.getByRole("dialog", { name: "Report comment" }),
+  },
+  {
+    id: "delete a paper comment", screen: "paper-view",
+    sources: ["features/records/paper-view/CommentsSection.tsx"],
+    override: (api) => api.on("GET", `/records/${PAPER.id}/comments/`, {
+      comments: [{
+        id: 7, author_name: "Sam Student", body: "A public comment.", created_at: "2026-11-04T08:00:00Z",
+        edited_at: null, is_author: true, can_edit: true, can_report: false, reply_to: null, deletion_kind: null,
+      }],
+      count: 1,
+    }),
+    open: async (page) => { await page.getByRole("button", { name: "Delete", exact: true }).click(); },
+    dialog: (page) => page.getByRole("dialog", { name: "Delete this comment?" }),
+  },
+  {
     id: "cite a paper", screen: "paper-view", sources: ["features/discover/PaperCiteModal.tsx", "features/discover/DiscoverPage.tsx", "components/ui/Modal.tsx"],
     open: press(/Cite/), dialog: anyDialog,
   },

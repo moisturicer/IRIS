@@ -205,6 +205,29 @@ export interface RecordFileItem {
   can_remove: boolean;
 }
 
+/** A public comment on a published paper (ADR-032 §7, IR-690). */
+export interface PublicComment {
+  id: number;
+  author_name: string | null;
+  body: string | null;
+  created_at: string;
+  edited_at: string | null;
+  is_author: boolean;
+  can_edit: boolean;
+  can_report: boolean;
+  reply_to: number | null;
+  /** `writer` renders as [deleted], `moderator` as [removed]. */
+  deletion_kind: "writer" | "moderator" | null;
+}
+
+/** The public thread and its count of comments that have not been deleted. */
+export interface PublicCommentsResponse {
+  comments: PublicComment[];
+  count: number;
+}
+
+export type PublicCommentReportReason = "spam" | "harassment" | "off_topic" | "other";
+
 /**
  * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
  * 2026-10-06 amendment adds (IR-411): `continue_draft`, reopening one's own
