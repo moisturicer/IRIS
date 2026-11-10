@@ -9,7 +9,7 @@ What belongs to the server, not to a laptop.
 | `tests/bootstrap_checks.sh` | CI's check of `bootstrap_server.sh`, run on a throwaway VM |
 | `aws/iris-demo.yaml` | CloudFormation template: the whole AWS server from one file, running `bootstrap_server.sh` at first boot (IR-1013) |
 | `aws/iris-guards.yaml` | CloudFormation template: budget alert, auto-recover and a daily stop and start for one server (IR-1015) |
-| `tests/check_restart_policies.py` | CI's check that every long-running service comes back after a start |
+| `tests/check_compose_prod.py` | CI's check of `docker-compose.prod.yml`: every long-running service comes back after a start, and every service's logs are rotated (10 MB × 3) |
 
 ## bootstrap_server.sh
 

@@ -616,11 +616,11 @@ jobs:
           cfn-lint deploy/aws/iris-demo.yaml deploy/aws/iris-guards.yaml --regions ap-southeast-1 us-east-1
 
       # A scheduled start or a recovery brings IRIS back only through Docker's
-      # restart policies (IR-1015).
-      - name: Check every service restarts by itself
+      # restart policies (IR-1015), and unrotated logs can fill the disk (IR-1017).
+      - name: Check every service restarts by itself and rotates its logs
         run: |
           pip install "PyYAML==6.0.2"
-          python deploy/tests/check_restart_policies.py docker-compose.prod.yml
+          python deploy/tests/check_compose_prod.py docker-compose.prod.yml
 
   security:
     name: Security
