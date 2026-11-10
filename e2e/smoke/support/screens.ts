@@ -254,7 +254,11 @@ export const SCREENS: Screen[] = [
   },
   {
     id: "profile", path: "/profile", route: "/profile", role: "Student",
-    mocks: wrap("Student"),
+    mocks: wrap("Student", (api) => {
+      api.on("GET", "/users/1/profile/research/", { next: null, results: [] });
+      api.on("GET", "/users/1/profile/advised/", { next: null, results: [] });
+      api.on("GET", "/users/1/profile/collaborators/", { next: null, results: [] });
+    }),
     heading: /Sam Student/,
     primary: (p) => p.getByRole("link", { name: "Edit profile" }).first(), primaryLabel: "Edit profile",
   },
