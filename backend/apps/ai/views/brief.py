@@ -6,13 +6,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.ai.briefs import brief_for
-from .chatbot import AIQueryThrottle
+from .chatbot import AIQueryBurstThrottle, AIQueryThrottle
 from apps.ai.grants.reads import research_records
 
 
 class PaperBriefView(APIView):
     permission_classes = [IsAuthenticated]
-    throttle_classes = [AIQueryThrottle]
+    throttle_classes = [AIQueryBurstThrottle, AIQueryThrottle]
 
     def post(self, request, pk):
         record = get_object_or_404(research_records(request.user), pk=pk)

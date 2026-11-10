@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from core.enums import (
@@ -15,6 +17,7 @@ from core.enums import (
     SeatState,
     ThreadAnswer,
     ThreadEventKind,
+    ThreadPlaceOutcome,
     ThreadSeverity,
     ThreadState,
 )
@@ -529,6 +532,12 @@ class ReviewComment(models.Model):
     )
     answered_at = models.DateTimeField(null=True, blank=True)
 
+    #: A reviewer's replacement text for an anchored passage (IR-876). Set
+    #: while the thread is a draft and fixed once it is sent, so the owner
+    #: accepts or declines the wording they read. Accepting is the *Addressed*
+    #: answer: IRIS can't edit the PDF, so it is a promise.
+    suggestion  = models.TextField(blank=True, default="")
+
     class Meta:
         ordering = ["record", "created_at", "pk"]
         indexes  = [
@@ -602,3 +611,90 @@ class ReviewThreadEvent(models.Model):
 
     def __str__(self):
         return f"Thread {self.thread_id} | {self.kind}"
+
+
+class ThreadPlace(models.Model):
+    """
+    Where an anchored thread's passage is in one later Version (ADR-032 §7,
+    *Outdated threads*; IR-876). The thread's own anchor never changes: each
+    later Version adds a row, found from the previous Version's place, so a
+    thread follows its passage and an Outdated one still shows its original.
+    """
+
+    thread  = models.ForeignKey(ReviewComment, on_delete=models.CASCADE, related_name="places")
+    version = models.ForeignKey(
+        "records.RecordVersion", on_delete=models.RESTRICT, related_name="thread_places",
+    )
+    outcome = models.CharField(max_length=20, choices=ThreadPlaceOutcome.choices)
+    #: Null when the passage was removed.
+    page    = models.PositiveIntegerField(null=True, blank=True)
+    #: The text here: the quote when found, the edited passage when changed.
+    text    = models.TextField(blank=True, default="")
+    regions = models.JSONField(default=list, blank=True)
+    #: The suggested-wording hint (ADR-058 §3): the page it appears on in this
+    #: Version, or null where it doesn't, or the thread carries none.
+    suggestion_page = models.PositiveIntegerField(null=True, blank=True)
+    placed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["thread", "version"], name="one_place_per_thread_version"),
+        ]
+
+    def __str__(self):
+        return f"Thread {self.thread_id} in version {self.version_id}: {self.outcome}"
+
+
+class ResponseLetter(models.Model):
+    """
+    The response to reviewers (ADR-032 §7; IR-876): the owner's answers to
+    the open threads of the parties that asked for a revision, frozen when
+    the Version answering them was submitted. Never edited afterwards.
+    """
+
+    version    = models.OneToOneField(
+        "records.RecordVersion", on_delete=models.CASCADE, related_name="response_letter",
+    )
+    #: One entry per thread, in the letter's order (`response_letter.entries`).
+    entries    = models.JSONField(default=list)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Response letter for version {self.version_id}"
+
+
+#: How many saved replies one person keeps (IR-877). Enough for a reviewer's
+#: stock phrases; a ceiling because each is stored and listed in full.
+MAX_SAVED_REPLIES = 50
+#: The longest title a saved reply takes: a label in a menu, not a sentence.
+MAX_SAVED_REPLY_TITLE = 60
+
+
+class SavedReply(models.Model):
+    """
+    A person's own reusable text, inserted into a review comment (ADR-032 §7,
+    2026-11-04 Conveniences; IR-877). Private: every queryset starts from
+    `owner=request.user`, so another person's reply cannot be addressed and is
+    the same 404 as a missing one. It belongs to no record, so no review
+    predicate applies, and inserting one only adds text to a comment box.
+
+    The title is unique per person ignoring case, which the database enforces.
+    Kept until its owner deletes it or the account goes (the key cascades).
+    Not in Django admin and writes no `AuditEvent`, like a saved feed.
+    """
+
+    owner      = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_replies",
+    )
+    title      = models.CharField(max_length=MAX_SAVED_REPLY_TITLE)
+    body       = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("title"), "owner", name="unique_saved_reply_title"),
+        ]
+
+    def __str__(self):
+        return f"SavedReply(owner={self.owner_id}, title={self.title!r})"

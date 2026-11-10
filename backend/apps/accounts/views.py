@@ -18,6 +18,7 @@ from core.permissions import (
     role_change_refusal,
 )
 from core.pagination import LargeResultsPagination
+from core.throttling import UserBurstThrottle
 from apps.audit.services import create_audit_event
 from apps.audit import retention
 from apps.audit.models import AuditEvent
@@ -56,14 +57,16 @@ from .sessions import (
     revoke_token,
 )
 from .lockout import LOCKED_BY_ADMIN
-from .throttles import LoginThrottle, PersonalDataExportThrottle, RegisterThrottle
+from .throttles import (
+    LoginBurstThrottle, LoginThrottle, PersonalDataExportThrottle, RegisterBurstThrottle, RegisterThrottle,
+)
 from .personal_data import EXPORT_FORMAT, SECTIONS, build_export
 
 
 class RegisterView(generics.CreateAPIView):
     serializer_class   = RegisterSerializer
     permission_classes = [AllowAny]
-    throttle_classes   = [RegisterThrottle]
+    throttle_classes   = [RegisterBurstThrottle, RegisterThrottle]
 
     def perform_create(self, serializer):
         from django.db import transaction
@@ -89,7 +92,7 @@ class RegisterView(generics.CreateAPIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [LoginThrottle]
+    throttle_classes = [LoginBurstThrottle, LoginThrottle]
 
     @transaction.atomic
     def post(self, request):
@@ -368,7 +371,7 @@ class PersonalDataExportView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    throttle_classes = [UserRateThrottle, PersonalDataExportThrottle]
+    throttle_classes = [UserBurstThrottle, UserRateThrottle, PersonalDataExportThrottle]
 
     def get(self, request):
         payload = build_export(request.user)

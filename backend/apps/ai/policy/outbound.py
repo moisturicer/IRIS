@@ -51,11 +51,11 @@ class Dependency:
 
 
 def configured_provider_permits(model: Optional[str]) -> bool:
-    """Only a model IRIS's configuration names, under a no-training policy."""
+    """Only a model IRIS's configuration names; its data terms are the developer's choice (IR-996)."""
     from django.conf import settings
     from django.core.exceptions import ImproperlyConfigured
 
-    from apps.ai.inference import DataPolicy, InferenceTask, profile_for
+    from apps.ai.inference import InferenceTask, profile_for
 
     if not model:
         return False
@@ -65,8 +65,7 @@ def configured_provider_permits(model: Optional[str]) -> bool:
             profile = profile_for(task)
         except (ImproperlyConfigured, ValueError):
             continue
-        if profile.data_policy is DataPolicy.NO_TRAINING:
-            known.update(profile.models)
+        known.update(profile.models)
     return model in known - {""}
 
 

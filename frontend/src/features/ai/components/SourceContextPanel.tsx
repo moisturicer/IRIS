@@ -1,6 +1,8 @@
 import type { ChatCitation, SemanticSearchResult } from "@/types/ai";
-import { hasCitationQuote } from "@/lib/citedPage";
-import { OpenPassageLink, PassageQuote } from "./PassageQuote";
+import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
+import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { withMathRendered } from "./PassageQuote";
 import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
 
 interface SourceContextPanelProps {
@@ -74,66 +76,71 @@ export function SourceContextPanel({ open, question = null, citations, sources, 
   );
 }
 
+/** One cited passage: its marker, a two-line quote, and its page; the whole row opens the paper there. */
+function PassageRow({ citation, title }: { citation: ChatCitation; title: string }) {
+  const { to, state } = useCitationLink(citation);
+  const quote = hasCitationQuote(citation) ? citation.text.replace(/\s+/g, " ").trim() : "";
+  return (
+    <Link to={to} state={state} title={quote || undefined}
+      aria-label={openCitationLabel(citation, title)}
+      className="group/row grid grid-cols-[1.375rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-stone-100">
+      <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-md bg-brand-50 text-2xs font-semibold tabular-nums leading-none text-brand">
+        {citation.marker}
+      </span>
+      <span className="line-clamp-2 min-w-0 text-[13px] leading-[1.45] text-stone-700">
+        {quote ? withMathRendered(quote) : <span className="italic text-stone-500">Open the passage</span>}
+      </span>
+      <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-stone-500">
+        {citation.page != null && <>p. {citation.page}</>}
+        <i aria-hidden className="fas fa-arrow-right text-[9px] opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-visible/row:opacity-100" />
+      </span>
+    </Link>
+  );
+}
+
 /**
- * The passages one answer cited, quote first and then whose work it is.
- * Beside the answer on a wide page, and in the sources drawer on a phone
- * (IR-570), so the two cannot show them differently.
+ * The passages one answer cited, grouped by paper: the paper once, then a row
+ * per passage. A row opens the paper at that page, highlighted.
  */
 export function SourcePassages({
   citations,
   sources,
   answered = false,
+  className = "p-2",
 }: Pick<SourceContextPanelProps, "citations" | "sources"> & {
+  className?: string;
   /** Whether there is an answer at all: one that cited nothing says so. */
   answered?: boolean;
 }) {
-  const cardFor = (recordId: number) => sources.find((s) => s.id === recordId);
+  if (citations.length === 0) {
+    return (
+      <p className={cn("px-2 py-4 text-center text-[13px] text-stone-500", className)}>
+        {answered ? "This answer cited no passages." : "Ask a question to see the passages IRIS used in its answer."}
+      </p>
+    );
+  }
+  const groups = new Map<number, ChatCitation[]>();
+  for (const citation of citations) groups.set(citation.record_id, [...(groups.get(citation.record_id) ?? []), citation]);
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5">
-      {citations.length === 0 && (
-        <p className="text-[14px] text-stone-500 text-center py-8 px-2">
-          {answered
-            ? "This answer cited no passages."
-            : "Ask a question to see the passages IRIS used in its answer."}
-        </p>
-      )}
-
-      {citations.map((citation) => {
-        const card = cardFor(citation.record_id);
-        const hasQuote = hasCitationQuote(citation);
-
+    <div className={cn("divide-y divide-stone-200/70", className)}>
+      {[...groups].map(([recordId, passages]) => {
+        const card = sources.find((s) => s.id === recordId);
+        const title = card?.title ?? "Source";
+        const byline = [card?.authors?.trim(), card?.year].filter(Boolean).join(" · ");
         return (
-          <article
-            key={`${citation.chunk_id}-${citation.marker}`}
-            className="pb-2.5 border-b border-stone-100 last:border-b-0 last:pb-0"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-[14px] font-semibold text-stone-900 leading-snug line-clamp-2">
-                <span aria-hidden className="text-[#6B0F12] mr-1">[{citation.marker}]</span>
-                {card?.title ?? (hasQuote ? citation.record_title : "Source")}
-              </h3>
-              {citation.page != null && (
-                <span className="shrink-0 text-[11px] font-semibold text-stone-400">
-                  Page {citation.page}
-                </span>
-              )}
+          <section key={recordId} aria-label={title} className="py-2 first:pt-0 last:pb-0">
+            <div className="flex items-baseline gap-2 px-2">
+              <Link to={`/records/${recordId}`} className="min-w-0 truncate text-[13px] font-semibold text-stone-900 hover:text-brand hover:underline">
+                {title}
+              </Link>
+              <ResearchOriginBadge origin={card?.origin} />
             </div>
-            {card && <>
-              <p className={`text-[12px] text-stone-500 mt-0.5 line-clamp-1 ${card.authors?.trim() ? "" : "italic"}`}>
-                {card.authors?.trim() || "Authors not recorded"}
-              </p>
-              <ResearchOriginBadge origin={card.origin} />
-            </>}
-
-            {hasQuote && <PassageQuote text={citation.text} className="mt-1" />}
-
-            <OpenPassageLink
-              citation={citation}
-              title={card?.title ?? (hasQuote ? undefined : "the source")}
-              className="mt-1.5"
-            />
-          </article>
+            {byline && <p className="truncate px-2 text-[12px] text-stone-500">{byline}</p>}
+            <div className="mt-1">
+              {passages.map((citation) => <PassageRow key={`${citation.chunk_id}-${citation.marker}`} citation={citation} title={title} />)}
+            </div>
+          </section>
         );
       })}
     </div>

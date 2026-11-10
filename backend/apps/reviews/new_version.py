@@ -69,6 +69,7 @@ from core.enums import (
 from core.permissions import is_record_owner
 
 from . import revisions, routing
+from . import response_letter
 from .threads import new_version_blocked_reason
 from .models import RecordAssignment, RecordClearance, ResubmissionRequest, ReviewerSeat
 
@@ -166,7 +167,8 @@ def new_version_hint(record, user) -> Optional[dict]:
     - `rereview`: the parties that review it: those that asked, and under
       `RESTART_ALL` the completed offices it reopens;
     - `kept`: the offices whose `cleared` clearance it keeps;
-    - `blocked`: why it cannot be submitted yet.
+    - `blocked`: why it cannot be submitted yet;
+    - `letter`: the response to reviewers it would carry (IR-876).
     """
     if not routing.is_in_review(record) or not is_record_owner(user, record):
         return None
@@ -183,6 +185,7 @@ def new_version_hint(record, user) -> Optional[dict]:
         "rereview": [_label(p) for p in rereview],
         "kept": [_label(o) for o in kept],
         "blocked": unchanged_reason(record, requests) or new_version_blocked_reason(record, requests),
+        "letter": response_letter.assemble(record, requests),
     }
 
 
@@ -231,6 +234,14 @@ def submit_new_version(record, actor):
 
     previous = latest_version(record)
     version = write_version(record, actor, VersionCause.REVISION)
+    # Frozen before the requests resolve, from the same open threads the
+    # owner was shown (ADR-032 §7, IR-876).
+    response_letter.freeze(version, requests)
+    from .tasks import place_review_threads
+
+    # A metadata-only Version shares its reading, so nothing will be read:
+    # place the threads now too (ADR-032 §7, IR-876).
+    transaction.on_commit(lambda: place_review_threads.delay(record.pk))
     if (version.manuscript.name or None) != (previous.manuscript.name or None):
         # The revised manuscript waited for this version to be extracted
         # (`versions.manuscript_awaits_submission`); now it is the one

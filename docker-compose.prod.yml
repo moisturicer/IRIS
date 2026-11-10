@@ -102,9 +102,6 @@ services:
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - AI_GATEWAY_URL=http://ai-gateway:8001
-      # The Ask IRIS reader path (IR-863), from the repo-root .env so nginx and
-      # Django read one value. Off: Django answers as before.
-      - AI_RUNTIME_READER=${AI_RUNTIME_READER:-false}
     depends_on:
       db:
         condition: service_healthy
@@ -141,8 +138,11 @@ services:
       # that login and no other.
       - UVICORN_WORKERS=4
       - MAX_CONCURRENT_LLM=80
+      - RUNS_REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/2
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1" ]
@@ -153,6 +153,31 @@ services:
       resources:
         limits:
           memory: 1g
+
+  # Research workers for AI-owned runs (IR-723). Every Ask IRIS and Paper Chat
+  # question is a run since IR-957, so without this nothing is answered.
+  ai-runs-worker:
+    networks:
+      - private
+      - egress
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: python -m ai.runs.worker
+    env_file:
+      - ./ai/.env
+    environment:
+      - RUNS_REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/2
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   celery-default:
     networks:
@@ -281,50 +306,6 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # IR-466: the evidence-decision shadow pilot. Concurrency 1 bounds how
-  # much shadow traffic competes with readers at the vendor, which has no
-  # priority mechanism. Idle unless AI_EVIDENCE_DECISION=shadow.
-  celery-shadow:
-    networks:
-      - private
-      - egress
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      args:
-        REQUIREMENT_FILE: production.txt
-    restart: unless-stopped
-    command: celery -A config worker -l info -Q shadow -n shadow@%h --concurrency=1
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A config inspect ping -d shadow@$$HOSTNAME || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    volumes:
-      - media_files:/app/media
-    env_file:
-      - ./backend/.env
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
-      - DB_HOST=db
-      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
-      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
-      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-      # Django's cache (IR-132). Database 1, so flushing the Celery
-      # broker on 0 cannot take the query-embedding cache with it.
-      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-
   celery-beat:
     networks:
       - private
@@ -369,10 +350,7 @@ services:
       - DJANGO_ADMIN_ALLOWED_NETWORKS=${DJANGO_ADMIN_ALLOWED_NETWORKS:-}
       - TRUSTED_PROXY_COUNT=${TRUSTED_PROXY_COUNT:-}
       # Server-only nginx credential. Never use a VITE_ prefix for this secret.
-      - AI_GATEWAY_SERVICE_SECRET=${AI_GATEWAY_SERVICE_SECRET:-}
-      # The Ask IRIS reader path (IR-863): the same value backend reads, so nginx
-      # requires the gateway secret exactly when Django opens the path.
-      - AI_RUNTIME_READER=${AI_RUNTIME_READER:-false}
+      - AI_GATEWAY_SERVICE_SECRET=${AI_GATEWAY_SERVICE_SECRET:?run python scripts/setup_env.py to set AI_GATEWAY_SERVICE_SECRET in the repo-root .env}
     # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
     # longer serves /media/, so the web container has no reason to be able to
     # read uploaded documents at all.

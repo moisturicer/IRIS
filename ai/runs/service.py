@@ -17,6 +17,7 @@ from ai.admission import scope as admission
 from ai.agent.budget import Bounds
 from ai.research.tools import ResearchTools
 from ai.runs import config as runs_config
+from ai.runs import stream
 from ai.runs.dispatch import Notifier, PollingNotifier
 from ai.runs.executor import Compacted, Executor, RunContext, Unavailable
 from ai.runs.store import Claim, Fenced, RunStore
@@ -27,12 +28,11 @@ log = logging.getLogger(__name__)
 class RunService:
     def __init__(self, store: RunStore, cfg: runs_config.RunsConfig, executor: Executor,
                  notifier: Notifier | None = None, *, serves=(), embedding_provider=None,
-                 embedding_ledger=None, reranker=None, send_guard=None):
+                 embedding_ledger=None, reranker=None):
         self.embedding_provider = embedding_provider
         self.embedding_ledger = embedding_ledger
-        #: Optional search reranking and the guard its sends pass (IR-886).
+        #: Optional search reranking (IR-886).
         self.reranker = reranker
-        self.send_guard = send_guard
         self.store = store
         self.cfg = cfg
         #: What new runs are pinned to.
@@ -41,6 +41,8 @@ class RunService:
         self.executors = {e.name: e for e in (*serves, executor)}
         self.notifier = notifier or PollingNotifier()
         self.worker = f"worker-{uuid.uuid4().hex[:12]}"
+        #: Where live drafts go (Redis); None publishes nothing.
+        self.drafts = stream.client_for(getattr(cfg, "redis_url", "") or "")
 
     def pinned(self, depth: str = "ordinary", executor: Executor | None = None) -> dict:
         """What fixes a run's interpretation, persisted at admission."""
@@ -93,45 +95,19 @@ class RunService:
         except TypeError:
             raise ValueError("bounds") from None
 
-    @property
-    def can_compact(self) -> bool:
-        """Whether a reader may ask to condense a Conversation (IR-754).
-
-        Only an AGENT that new runs are pinned to and that has a compaction
-        rule: the same mechanism and the same admission as automatic
-        compaction, never a second summarizer.
-        """
-        return (getattr(self.executor, "compaction", None) is not None
-                and callable(getattr(self.executor, "compact", None)))
-
     async def submit(self, grant, *, key, question, conversation_id, base_revision,
                      depth=runs_config.DEFAULT_DEPTH):
         """The run's projection, and whether this submission admitted it."""
         return await self._enqueue(grant, key=key, question=question, conversation_id=conversation_id,
                                    base_revision=base_revision, depth=depth, pinned=self.pinned(depth))
 
-    async def submit_compaction(self, grant, *, key, conversation_id, base_revision):
-        """The run that condenses the Conversation, and whether this request admitted it (IR-754).
-
-        A run of its own: it has its own identity, deadline and allowance,
-        asks nothing and writes no Turn. It is admitted only where an Ask
-        would be -- no active run in the Conversation, the revision the reader
-        saw -- so it never shares or extends an investigation's budget.
-        """
-        depth = "ordinary"
-        return await self._enqueue(grant, key=key, question=None, conversation_id=conversation_id,
-                                   base_revision=base_revision, depth=depth, compaction=True,
-                                   pinned={**self.pinned(depth), "kind": runs_config.KIND_COMPACT})
-
-    async def _enqueue(self, grant, *, key, question, conversation_id, base_revision, depth, pinned,
-                       compaction=False):
+    async def _enqueue(self, grant, *, key, question, conversation_id, base_revision, depth, pinned):
         dispatch = self.cfg.dispatch
         row, created = await self.store.admit(
             grant, key=key, question=question, conversation_id=conversation_id,
             base_revision=base_revision, deadline_seconds=self.cfg.limits.deadline_for(depth),
             allowance=self.cfg.limits.allowance(), pinned=pinned, depth=depth,
             max_queued=dispatch.max_queued, max_active_per_reader=dispatch.max_active_per_reader,
-            compaction=compaction,
         )
         return await self._queued(grant, row, created)
 
@@ -217,12 +193,15 @@ class RunService:
             log.info("run %s unavailable: cannot_compact", run_id)
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
+        # The answer as it is written, for the reader to watch; replaced by the checked Turn.
+        sink = stream.DraftSink(self.drafts, run_id) if self.drafts is not None else None
         try:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id,
                                   embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger,
-                                  reranker=self.reranker, guard=self.send_guard, follow_stored_grant=True)
+                                  reranker=self.reranker, follow_stored_grant=True,
+                                  cache_query_vectors=getattr(self.cfg, "query_vector_cache", False))
             # Every provider attempt inside is admitted against this run (IR-725).
-            with admission.bound(admission.RunBinding(run_id, claim.fence)):
+            with admission.bound(admission.RunBinding(run_id, claim.fence)), stream.bound(sink):
                 if compacting:
                     result = await executor.compact(tools, self._context(claim, bounds))
                 elif getattr(executor, "takes_context", False):
@@ -230,13 +209,20 @@ class RunService:
                 else:
                     result = await executor.answer(claim.question, tools)
         except Unavailable as refused:
+            if sink is not None:
+                await sink.end()
             # Operators get the code; readers only see `unavailable`.
             log.info("run %s unavailable: %s", run_id, refused.code)
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
         except Exception:
+            log.exception("run %s failed in the executor", run_id)
+            if sink is not None:
+                await sink.end()
             await self.store.fail(run_id, claim.fence, "executor_failed")
             return
+        if sink is not None:
+            await sink.end()
         try:
             if isinstance(result, Compacted):
                 await self.store.commit_compaction(run_id, claim.fence, result)

@@ -21,7 +21,9 @@ fenced. Attempt accounting carries no content and is kept.
 from __future__ import annotations
 
 import hashlib
+import base64
 import json
+import re
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -137,6 +139,37 @@ DISPATCH_LOCK = "iris_ai.dispatch"
 
 #: A Paper Chat grant ($2) reaches only its own Record's Conversations (IR-719).
 IN_SCOPE = "($2::bigint IS NULL OR scope_record_id = $2)"
+#: A grant with no Record scope reads every readable paper.
+NO_SCOPE = 0
+#: A paper title as the agent marks it in an answer.
+TITLE = re.compile(r"«([^«»\n]{3,300})»")
+
+
+def regions(bboxes, page_sizes) -> list[dict]:
+    """A passage's rectangles as fractions of its page, for the reader's highlight; [] when unknown."""
+    try:
+        boxes = json.loads(bboxes) if isinstance(bboxes, str) else (bboxes or [])
+        sizes = json.loads(page_sizes) if isinstance(page_sizes, str) else (page_sizes or {})
+    except ValueError:
+        return []
+    out = []
+    for box in boxes:
+        try:
+            page = int(box["page"])
+            left, top, right, bottom = (float(box[k]) for k in ("left", "top", "right", "bottom"))
+            width, height = (float(v) for v in sizes[str(page)])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if box.get("degenerate") or right <= left or bottom <= top or width <= 0 or height <= 0:
+            continue
+        clamp = lambda v: min(1.0, max(0.0, v))  # noqa: E731
+        out.append({"page": page, "left": clamp(left / width), "top": clamp(top / height),
+                    "right": clamp(right / width), "bottom": clamp(bottom / height)})
+    return out
+
+
+#: Tools that read a paper's text, as opposed to searching or counting.
+READING_TOOLS = ("read_manuscript", "read_page", "open_passage", "outline", "recover_turn")
 
 
 class NotFound(Exception):
@@ -244,6 +277,16 @@ class RunStore:
             return await conn.fetchval("SELECT iris_authz.begin_research($1, 'reader_session')", grant)
         except asyncpg.InsufficientPrivilegeError:
             raise Unauthorized from None
+
+    @staticmethod
+    def _stored_scope(token: str | None) -> int:
+        """The Record scope a stored grant was issued for, or NO_SCOPE. Read from our own signed value."""
+        try:
+            part = (token or "").split(".")[2]
+            rec = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))).get("rec")
+            return int(rec) if rec is not None else NO_SCOPE
+        except (IndexError, ValueError, TypeError, AttributeError):
+            return NO_SCOPE - 1
 
     @staticmethod
     def _reader(claims: dict) -> tuple[int, int | None]:
@@ -361,8 +404,9 @@ class RunStore:
             )
             if found is None:
                 raise NotFound
-            # Paper Chat stays on its Record; widening is a new Conversation.
-            if found["scope_record_id"] != scope:
+            # Paper Chat may widen to every readable paper and back, in the same Conversation; it
+            # never moves to another Record, and a general Conversation never narrows to one.
+            if scope is not None and found["scope_record_id"] != scope:
                 raise Conflict("scope_mismatch")
             revision = found["revision"]
             if base_revision != revision:
@@ -426,8 +470,8 @@ class RunStore:
             "SELECT revision, scope_record_id FROM iris_ai.conversation WHERE id = $1",
             original["conversation_id"],
         )
-        # Paper Chat stays on its Record; the retry reads under this grant, so it must match.
-        if conversation["scope_record_id"] != scope:
+        # The retry reads under this grant: its Record, or wider, never another Record.
+        if scope is not None and conversation["scope_record_id"] != scope:
             raise Conflict("scope_mismatch")
         existing = await conn.fetchrow(
             f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE reader_id = $1 AND request_key = $2",
@@ -522,7 +566,7 @@ class RunStore:
         try:
             async with conn.transaction():
                 reader, scope = await self._principal(conn, row["reader_grant"])
-                if reader != row["reader_id"] or scope != row["scope_record_id"]:
+                if reader != row["reader_id"] or (scope is not None and scope != row["scope_record_id"]):
                     raise Unauthorized
         except Unauthorized:
             await self._end(conn, run_id, "failed", "authorization_expired", move_fence=True)
@@ -582,7 +626,7 @@ class RunStore:
             run_key(run_id),
         )
         return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"],
-                     scope_record_id=row["scope_record_id"], run_id=run_id,
+                     scope_record_id=scope, run_id=run_id,
                      grant=row["reader_grant"], depth=row["depth"], allowance=row["allowance"],
                      remaining_seconds=float(row["remaining"]),
                      prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"], t["ordinal"],
@@ -743,7 +787,7 @@ class RunStore:
                         reader, scope = await self._principal(conn, run["reader_grant"])
                 except Unauthorized:
                     return "stale", None
-                if reader != run["reader_id"] or scope != run["scope_record_id"]:
+                if reader != run["reader_id"] or (scope is not None and scope != run["scope_record_id"]):
                     return "stale", None
                 revision = await conn.fetchval(
                     "SELECT coalesce(max(revision), 0) + 1 FROM iris_ai.conversation_handoff"
@@ -893,16 +937,16 @@ class RunStore:
                 claims = await self._verify(conn, grant)
                 reader, scope = self._reader(claims)
                 await self._owned_run(conn, reader, scope, run_id)
-                # Only a grant of exactly the Conversation's scope renews,
-                # so a reconnect never widens what the run reads.
-                await conn.execute(
-                    """UPDATE iris_ai.ask_run r SET reader_grant = $2, grant_expires_at = to_timestamp($3)
-                         FROM iris_ai.conversation c
-                        WHERE r.id = $1 AND c.id = r.conversation_id AND r.state = ANY($4)
-                          AND c.scope_record_id IS NOT DISTINCT FROM $5::bigint
-                          AND r.grant_expires_at < to_timestamp($3)""",
-                    run_id, grant, claims["exp"], list(ACTIVE), scope,
-                )
+                # Only a grant of exactly the scope the run started with renews,
+                # so a reconnect never widens (or narrows) what the run reads.
+                started = await conn.fetchval("SELECT reader_grant FROM iris_ai.ask_run WHERE id = $1", run_id)
+                if self._stored_scope(started) == (scope if scope is not None else NO_SCOPE):
+                    await conn.execute(
+                        """UPDATE iris_ai.ask_run r SET reader_grant = $2, grant_expires_at = to_timestamp($3)
+                            WHERE r.id = $1 AND r.state = ANY($4)
+                              AND r.grant_expires_at < to_timestamp($3)""",
+                        run_id, grant, claims["exp"], list(ACTIVE),
+                    )
                 return await self._projection(conn, run_id, reader=reader_projection)
 
     @staticmethod
@@ -917,10 +961,24 @@ class RunStore:
             run_id,
         )
         events = await conn.fetch(
-            "SELECT sequence, name, data FROM iris_ai.run_event WHERE run_id = $1 ORDER BY sequence",
+            "SELECT sequence, name, data, created_at FROM iris_ai.run_event WHERE run_id = $1 ORDER BY sequence",
             run_id,
         )
         retried_by = await conn.fetchval("SELECT id FROM iris_ai.ask_run WHERE retry_of = $1", run_id)
+        # What the model calls actually used, as the provider reported it.
+        attempts = await conn.fetch(
+            """SELECT charge_input_tokens, charge_output_tokens, charge_cost_micros
+                 FROM public.ai_providerreservation
+                WHERE run_key = $1 AND operation = 'llm' AND sent AND usage_reported ORDER BY id""",
+            run_key(run_id),
+        )
+        usage = {
+            "calls": len(attempts),
+            "input_tokens": sum(a["charge_input_tokens"] for a in attempts),
+            "output_tokens": sum(a["charge_output_tokens"] for a in attempts),
+            "cost_usd": sum(a["charge_cost_micros"] for a in attempts) / 1_000_000,
+            "last_input_tokens": attempts[-1]["charge_input_tokens"] if attempts else 0,
+        }
         evidence = {}
         if reader:
             # Recheck every evidence dependency under begin_research's live RLS,
@@ -952,6 +1010,18 @@ class RunStore:
                 f" AND NOT ({CURRENT_SOURCE_TURN}))",
                 run_id,
             )
+            # Titles of the papers this run has read, for the reader's live phase.
+            read = [source for event in events
+                    if event["name"] == "tool" and event["data"].get("tool") in READING_TOOLS
+                    for source in event["data"].get("sources", [])]
+            chunksets = list(dict.fromkeys(int(s.split(":", 1)[0]) for s in read if s.split(":", 1)[0].isdigit()))
+            titles = await conn.fetch(
+                "SELECT cs.id, r.title FROM iris_ai.research_chunksets() cs"
+                " JOIN public.records_record r ON r.id = cs.record_id WHERE cs.id = ANY($1::bigint[])",
+                chunksets,
+            ) if chunksets else []
+            by_id = {row["id"]: row["title"] for row in titles}
+            evidence["read_titles"] = list(dict.fromkeys(by_id[c] for c in chunksets if c in by_id))
             evidence["sources_available"] = (
                 {row["revision"] for row in current} == dependencies and not counted_unreadable
                 and carried_current)
@@ -980,7 +1050,8 @@ class RunStore:
             "queued_seconds": float(run["queued_seconds"]),
             "latency_seconds": (float(run["latency_seconds"])
                                 if run["latency_seconds"] is not None else None),
-            "events": [dict(e) for e in events],
+            "usage": usage,
+            "events": [{**dict(e), "created_at": e["created_at"].isoformat()} for e in events],
         }
 
     async def reopen(self, grant, conversation_id, *, include_runs=False) -> dict:
@@ -1003,11 +1074,28 @@ class RunStore:
                     conversation_id,
                 )
                 citations = await conn.fetch(
-                    """SELECT c.turn_id, c.position, c.record_id, c.page, c.quote, c.revision
+                    """SELECT c.turn_id, c.position, c.record_id, c.page, c.quote, c.revision,
+                              d.bboxes, cs.page_sizes
                          FROM iris_ai.citation c JOIN iris_ai.turn t ON t.id = c.turn_id
+                         LEFT JOIN public.ai_chunkset cs
+                           ON split_part(c.revision, ':', 1) ~ '^[0-9]+$'
+                          AND cs.id = split_part(c.revision, ':', 1)::bigint
+                         LEFT JOIN LATERAL (SELECT d.bboxes FROM public.ai_documentchunk d
+                                             WHERE d.chunk_set_id = cs.id AND d.content = c.quote
+                                             LIMIT 1) d ON true
                         WHERE t.conversation_id = $1 ORDER BY c.turn_id, c.position""",
                     conversation_id,
                 )
+                # Papers an answer names in «guillemets», linked only when the reader can read them.
+                named = sorted({title.strip() for t in turns for title in TITLE.findall(t["answer"] or "")})
+                papers = await conn.fetch(
+                    """SELECT DISTINCT ON (lower(r.title)) r.id, r.title FROM public.records_record r
+                        WHERE lower(r.title) = ANY($1::text[])
+                          AND EXISTS (SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.record_id = r.id)
+                        ORDER BY lower(r.title), r.id""",
+                    [n.lower() for n in named],
+                ) if named else []
+                by_title = {row["title"].lower(): row["id"] for row in papers}
                 run_ids = await conn.fetch(
                     "SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1 ORDER BY created_at, id",
                     conversation_id,
@@ -1017,7 +1105,7 @@ class RunStore:
         for c in citations:
             by_turn.setdefault(c["turn_id"], []).append(
                 {"record_id": c["record_id"], "page": c["page"], "quote": c["quote"],
-                 "revision": c["revision"]}
+                 "revision": c["revision"], "regions": regions(c["bboxes"], c["page_sizes"])}
             )
         return {
             "id": str(conversation_id),
@@ -1033,8 +1121,32 @@ class RunStore:
                 "pinned": t["pinned"],
                 "citations": by_turn.get(t["id"], []) if t["sources_available"] else [],
                 "facts": shown_facts(t["facts"]) if t["sources_available"] else [],
+                "papers": [{"title": title, "record_id": by_title[title.lower()]}
+                           for title in dict.fromkeys(m.strip() for m in TITLE.findall(t["answer"] or ""))
+                           if title.lower() in by_title] if t["sources_available"] else [],
             } for t in turns],
         }
+
+    async def list_conversations(self, grant, *, limit=50) -> list[dict]:
+        """The reader's recent Conversations, newest activity first, titled by their first question."""
+        async with self._connect() as conn:
+            async with conn.transaction(isolation="repeatable_read"):
+                reader, scope = await self._principal(conn, grant)
+                rows = await conn.fetch(
+                    f"""SELECT c.id, c.scope_record_id, c.created_at,
+                               (SELECT r.question FROM iris_ai.ask_run r
+                                 WHERE r.conversation_id = c.id AND r.question <> ''
+                                 ORDER BY r.created_at LIMIT 1) AS title,
+                               coalesce((SELECT max(r.created_at) FROM iris_ai.ask_run r
+                                          WHERE r.conversation_id = c.id), c.created_at) AS updated_at
+                          FROM iris_ai.conversation c
+                         WHERE c.reader_id = $1 AND c.deleted_at IS NULL
+                           AND ($2::bigint IS NULL OR c.scope_record_id = $2)
+                         ORDER BY updated_at DESC LIMIT $3""",
+                    reader, scope, limit,
+                )
+        return [{"id": str(r["id"]), "title": r["title"] or "", "record_id": r["scope_record_id"],
+                 "updated_at": r["updated_at"].isoformat()} for r in rows]
 
     async def delete_conversation(self, grant, conversation_id) -> None:
         async with self._connect() as conn:

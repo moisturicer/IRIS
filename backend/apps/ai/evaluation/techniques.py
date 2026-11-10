@@ -128,15 +128,6 @@ TECHNIQUES: tuple[Technique, ...] = (
         ticket="IR-397",
         note="token ceiling on the assembled passage set; 0 is unbudgeted",
     ),
-    Technique(
-        name="evidence_decision",
-        setting="AI_EVIDENCE_DECISION",
-        kind="choice",
-        adr="ADR-035 §1",
-        ticket="IR-466",
-        note="record a shadow evidence decision per Turn; `on` is rejected, not unbuilt",
-        choices=("off", "shadow"),
-    ),
 )
 
 

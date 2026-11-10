@@ -16,11 +16,11 @@
 //   revoked      403 or 404: one screen, the same words for both (IR-153), no retry
 //
 // Mid-session withdrawal (a permission taken away between a list and the page it
-// links to) is exercised at the end of the file. The Ask IRIS stream is in
-// ask-iris-stream.spec.ts.
+// links to) is exercised at the end of the file.
 import { expect, test } from "./support/mock-api";
 import { openScreen, expectNotCrashed } from "./support/open-screen";
 import { SCREENS } from "./support/screens";
+import { RUNTIME_CONVERSATION_PATH } from "./support/fixtures";
 import { STATES, stateId, type UiState } from "./support/states";
 import type { Locator, Page, Route } from "@playwright/test";
 
@@ -210,12 +210,12 @@ test("Discover → Paper View: a Record withdrawn after it was listed lands on t
 test("Ask IRIS: a Conversation whose access is withdrawn after it was opened reads as not available", async ({ page, api }) => {
   const screen = SCREENS.find((s) => s.id === "ask-iris-conversation")!;
   await openScreen(page, api, screen);
-  await expect(page.getByRole("heading", { name: /What do you want to ask/ })).toBeVisible();
+  await expect(page.getByText("What would you like to investigate?")).toBeVisible();
 
   // Access to it is withdrawn; the reader reloads the address they were on.
-  api.on("GET", "/ai/conversations/1/", { detail: "smoke: refused" }, 403);
+  api.on("GET", RUNTIME_CONVERSATION_PATH, { detail: "smoke: refused" }, 403);
   await page.reload();
   await expect(page.getByRole("heading", { name: "This conversation is not available." })).toBeVisible();
   await expect(anyRetry(page)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Start a new chat" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start a new chat" })).toBeVisible();
 });

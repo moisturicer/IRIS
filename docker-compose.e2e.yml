@@ -40,12 +40,12 @@ services:
     <<: *e2e-env
   celery-embedding:
     <<: *e2e-env
-  celery-shadow:
-    <<: *e2e-env
   celery-beat:
     <<: *e2e-env
 
   ai-gateway:
+    profiles: ["ai-gateway"]
+  ai-runs-worker:
     profiles: ["ai-gateway"]
 
   caddy:

@@ -49,9 +49,7 @@ from apps.ai.evaluation import QuestionSetError, load_question_set
 from apps.ai.evaluation import chain as chained
 from apps.ai.evaluation.evidence import MIN_EXAMPLES, annotated, judge, run_curated
 from apps.ai.evidence import (
-    SETTING_MODE,
     active_rule_set,
-    configured_mode,
     institution_terms,
 )
 from apps.ai.evidence.detector import EvidenceDetector
@@ -346,7 +344,6 @@ class Command(BaseCommand):
                 "question_set_path": question_set.source,
                 "question_set_sha256": _digest(question_set.source),
                 "rule_set_digest": rule_set.digest,
-                SETTING_MODE: configured_mode(),
                 "institution_terms": len(institution_terms()),
                 # Recorded as absent rather than omitted, so a results file
                 # without a model run can still be compared with one that has.

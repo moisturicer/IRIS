@@ -18,7 +18,7 @@
 import type { Locator, Page, Request, Route } from "@playwright/test";
 import { hang, makeLaterReadsTimeOut } from "./open-screen";
 import type { MockApi } from "./mock-api";
-import { PAPER, PAPER_DETAIL, paginated } from "./fixtures";
+import { PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_PATH, paginated } from "./fixtures";
 
 export type MatrixState = "loading" | "empty" | "error" | "interrupted" | "revoked";
 
@@ -114,11 +114,6 @@ export const TRACKER = {
   reviews: [], versions: [], review_comments: [], resubmissions: [],
 };
 
-export const CONVERSATION = {
-  id: 1, title: "", record: null, record_title: null, turn_count: 0,
-  created_at: "2026-11-05T08:00:00+08:00", updated_at: "2026-11-05T08:00:00+08:00", turns: [],
-};
-
 export const EMPTY_REVIEWS = { rows: [], counts: { to_review: 0, in_review: 0, done: 0 }, next: null };
 export const EMPTY_CONSOLE = { office: "rdco", office_label: "RDCO", rows: [], load: [] };
 
@@ -190,14 +185,14 @@ export const STATES: UiState[] = [
     ok: [], recovered: text("No download requests yet"),
   }),
 
-  // Ask IRIS, Django path: an address that cannot be read says the conversation is not available.
-  ...reads("ask-iris-conversation", "GET", "/ai/conversations/1/", {
+  // Ask IRIS on the runtime: an address that cannot be read says the conversation is not available.
+  ...reads("ask-iris-conversation", "GET", RUNTIME_CONVERSATION_PATH, {
     error: "Could not load this conversation",
     revoked: "This conversation is not available.",
   }, {
     loading: announced("Loading this conversation"),
-    ok: CONVERSATION, recovered: (page) => page.getByRole("heading", { name: /What do you want to ask/ }),
-    revokedNext: (page) => page.getByRole("button", { name: "Start a new chat" }),
+    ok: RUNTIME_CONVERSATION, recovered: text("What would you like to investigate?"),
+    revokedNext: (page) => page.getByRole("link", { name: "Start a new chat" }),
   }),
 
   // Review.
@@ -274,22 +269,29 @@ export const AXE_STATES: AxeState[] = [
     override: (api: MockApi) => api.on("GET", "/reviews/mine/", EMPTY_REVIEWS),
     shows: (page: Page) => page.getByText(title),
   })),
+  // Ask IRIS on the AI runtime (IR-957): the history failing leaves the chat usable.
   {
-    id: "ask iris · conversation list failure", screen: "ask-iris",
-    override: (api) => api.on("GET", "/ai/conversations/", failed, 500),
-    shows: (page) => page.getByText("Could not load your conversations"),
+    id: "ask iris · history failure", screen: "ask-iris",
+    override: (api) => api.on("GET", "/ai/runtime/conversations", failed, 500),
+    shows: (page) => page.getByText("What would you like to investigate?"),
   },
   {
     id: "ask iris · no sources", screen: "ask-iris-conversation",
-    override: (api) => api.on("POST", "/ai/ask/stream/", (route: Route) => route.fulfill({
-      status: 200, headers: { "content-type": "text/event-stream" },
-      body: `event: done\ndata: ${JSON.stringify({ citations: [], sources: [], conversation_id: 1, turn_id: 31 })}\nid: 1\n\n`,
-    })),
-    prepare: async (page) => {
-      await page.getByRole("textbox", { name: /Ask a follow-up about the research corpus/ }).fill("What about the moon?");
-      await page.getByRole("button", { name: "Send message" }).click();
-    },
-    shows: (page) => page.getByText("No readable sources matched that question."),
+    override: (api) => api.on("GET", RUNTIME_CONVERSATION_PATH, {
+      ...RUNTIME_CONVERSATION, revision: 1, runs: [{
+        protocol: "runs-reader-1", id: "00000000-0000-4000-8000-000000000001", conversation_id: RUNTIME_CONVERSATION.id,
+        state: "completed", question: "What about the moon?", base_revision: 0, version: 3,
+        turn_id: "00000000-0000-4000-8000-000000000003", depth: "ordinary", awaiting_reader: false,
+        created_at: "2026-11-05T00:00:00+00:00", finished_at: "2026-11-05T00:00:00+00:00", kind: "ask",
+        plan: null, context: null, compaction: null, cursor: 2, retry_of: null, retried_by: null,
+        sources_available: true, capabilities: { manual_compaction: false },
+      }], turns: [{
+        id: "00000000-0000-4000-8000-000000000003", run_id: "00000000-0000-4000-8000-000000000001", ordinal: 1,
+        question: "What about the moon?", answer: "The sources IRIS read do not establish an answer to this question.",
+        kind: "answer", created_at: "2026-11-05T00:00:00+00:00", citations: [],
+      }],
+    }),
+    shows: (page) => page.getByText("The sources IRIS read do not establish an answer to this question."),
   },
   {
     id: "review tracker · empty", screen: "paper-view",

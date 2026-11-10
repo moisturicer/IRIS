@@ -10,7 +10,7 @@ import type { MatrixState } from "./states";
 
 export type Proof =
   | { catalogue: { screen: string; variant?: string; read?: string } }
-  | { test: { file: "forced-states.spec.ts" | "forced-cells.spec.ts" | "ask-iris-stream.spec.ts"; title: string } };
+  | { test: { file: "forced-states.spec.ts" | "forced-cells.spec.ts"; title: string } };
 
 export type Surface =
   | "discover" | "paper-view" | "my-library" | "ask-iris" | "my-reviews" | "office-console" | "review-panels";
@@ -57,26 +57,18 @@ export const PROOFS: Record<Surface, Partial<Record<MatrixState, Proof[]>>> = {
     interrupted: library(...ALL_VIEWS),
     revoked: [hand("forced-cells.spec.ts", "a saved paper the reader can no longer read is reported, not hidden")],
   },
+  // On the AI runtime since IR-957; Django's answer stream and its spec are retired.
   "ask-iris": {
-    loading: [
-      cat("ask-iris-conversation"),
-      hand("ask-iris-stream.spec.ts", "shows that IRIS is working while the stream is held"),
-    ],
+    loading: [cat("ask-iris-conversation")],
     empty: [
       hand("forced-cells.spec.ts", "a new chat opens on its opening question"),
-      hand("forced-cells.spec.ts", "an answer with nothing to cite says no sources matched"),
+      hand("forced-cells.spec.ts", "an answer with nothing to cite offers no Sources button"),
     ],
     error: [
       cat("ask-iris-conversation"),
-      hand("forced-cells.spec.ts", "a conversation list that fails to load says so in place"),
-      hand("ask-iris-stream.spec.ts", "the request fails with a server error"),
+      hand("forced-cells.spec.ts", "a chat history that fails to load leaves the chat usable"),
     ],
-    interrupted: [
-      cat("ask-iris-conversation"),
-      hand("forced-cells.spec.ts", "a conversation list that times out says it took too long"),
-      hand("ask-iris-stream.spec.ts", "cut off after some text"),
-      hand("ask-iris-stream.spec.ts", "a run that ${state} says so, and Retry starts a new run that answers"),
-    ],
+    interrupted: [cat("ask-iris-conversation")],
     revoked: [
       cat("ask-iris-conversation"),
       hand("forced-states.spec.ts", "a Conversation whose access is withdrawn after it was opened reads as not available"),

@@ -1,5 +1,8 @@
-"""Code-owned, version-fenced paper comparisons (IR-549)."""
+"""Code-owned, version-fenced paper comparisons (IR-549), as stored Turns show them.
 
-from .service import comparison_events, reader_view
+The comparison lane that built them is retired (IR-957).
+"""
 
-__all__ = ["comparison_events", "reader_view"]
+from .storage import reader_view
+
+__all__ = ["reader_view"]

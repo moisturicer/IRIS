@@ -269,6 +269,14 @@ class ExportContentTests(APITestCase):
         feeds = self.export()["saved_feeds"]
         self.assertEqual([(f["name"], f["query"]) for f in feeds], [("Water", {"q": "water"})])
 
+    def test_saved_replies_are_the_persons_own(self):
+        from apps.reviews.models import SavedReply
+
+        SavedReply.objects.create(owner=self.me, title="Typo", body="There's a typo here.")
+        SavedReply.objects.create(owner=self.stranger, title="Not mine", body="x")
+        replies = self.export()["saved_replies"]
+        self.assertEqual([(r["title"], r["body"]) for r in replies], [("Typo", "There's a typo here.")])
+
     def test_a_finished_review_round_is_in_the_acts_of_its_actor_only(self):
         from apps.reviews.models import ReviewRound
 
@@ -328,10 +336,13 @@ class ExportContentTests(APITestCase):
         published = _paper("Reviewed work", self.stranger, status=PipelineStatus.PUBLISHED)
         Review.objects.create(record=published, reviewed_by=self.me, stage="adviser",
                               status="approved", comment="Looks sound.")
-        ReviewComment.objects.create(record=published, author=self.me, body="One question on chapter 2.")
+        ReviewComment.objects.create(record=published, author=self.me, body="One question on chapter 2.",
+                                     suggestion="forty-two respondents")
         acts = self.export()["workflow_acts"]
         self.assertEqual(acts["reviews"][0]["comment"], "Looks sound.")
         self.assertEqual(acts["review_comments"][0]["body"], "One question on chapter 2.")
+        # Suggested wording is the reviewer's own writing too (IR-876).
+        self.assertEqual(acts["review_comments"][0]["suggestion"], "forty-two respondents")
 
     def test_consent_history_is_every_notice_answer_the_person_gave(self):
         from apps.accounts.models import DataNotice

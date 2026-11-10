@@ -123,11 +123,30 @@ services:
       - /app/node_modules
     command: sh -c "npm install && npm run dev -- --host"
     environment:
-      - VITE_API_BASE_URL=http://localhost:8000/api/v1
-      - VITE_AI_API_BASE_URL=http://localhost:8001/api/v1
       # Bind-mounted source on Windows/macOS emits no inotify events — poll instead
       # so edits on the host hot-reload. See frontend/vite.config.ts.
       - VITE_USE_POLLING=1
+
+  # Development edge, the production nginx routing in front of Vite (IR-957).
+  # Browse http://localhost:8080. It adds the gateway secret and the reader
+  # grant check, which Vite cannot, so Ask IRIS works here as it does in prod.
+  edge:
+    image: nginxinc/nginx-unprivileged:1.25-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./frontend/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/runtime-edge.conf:/etc/nginx/iris/runtime-edge.conf:ro
+      - ./frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
+      - ./frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/iris/41-iris-runtime-reader.sh:ro
+    environment:
+      - AI_GATEWAY_SERVICE_SECRET=${AI_GATEWAY_SERVICE_SECRET:?run python scripts/setup_env.py to set AI_GATEWAY_SERVICE_SECRET in the repo-root .env}
+    # The script is stripped of CRs first: a Windows checkout may have them.
+    command: sh -c "tr -d '\\r' < /iris/41-iris-runtime-reader.sh | sh && exec nginx -g 'daemon off;'"
+    depends_on:
+      - frontend
+      - backend
 
   ai-gateway:
     build:
@@ -148,8 +167,11 @@ services:
       # that login and no other.
       - UVICORN_WORKERS=4
       - MAX_CONCURRENT_LLM=80
+      - RUNS_REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/2
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1" ]
@@ -161,13 +183,12 @@ services:
         limits:
           memory: 1g
 
-  # Research workers for AI-owned runs (IR-723). Opt-in: `--profile runs`.
-  # Interactive and deep runs only; ingestion stays on the celery workers.
+  # Research workers for AI-owned runs (IR-723). Every Ask IRIS and Paper
+  # Chat question is a run since IR-957; ingestion stays on the celery workers.
   ai-runs-worker:
     build:
       context: ./ai
       dockerfile: Dockerfile
-    profiles: [ "runs" ]
     restart: unless-stopped
     command: python -m ai.runs.worker
     env_file:
@@ -277,48 +298,6 @@ services:
     command: celery -A config worker -l info -Q embedding -n embedding@%h --concurrency=4
     healthcheck:
       test: ["CMD-SHELL", "celery -A config inspect ping -d embedding@$$HOSTNAME || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    volumes:
-      - ./backend:/app
-      - media_files:/app/media
-    env_file:
-      - ./backend/.env
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.development
-      - DB_HOST=db
-      - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
-      - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
-      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-      # Django's cache (IR-132). Database 1, so flushing the Celery
-      # broker on 0 cannot take the query-embedding cache with it.
-      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-
-  # IR-466: the evidence-decision shadow pilot. Concurrency 1 bounds how
-  # much shadow traffic competes with readers at the vendor, which has no
-  # priority mechanism. Idle unless AI_EVIDENCE_DECISION=shadow.
-  celery-shadow:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      args:
-        REQUIREMENT_FILE: development.txt
-    restart: unless-stopped
-    command: celery -A config worker -l info -Q shadow -n shadow@%h --concurrency=1
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A config inspect ping -d shadow@$$HOSTNAME || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

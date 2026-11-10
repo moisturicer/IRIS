@@ -14,7 +14,7 @@ from collections import Counter
 from typing import Any, Mapping, Optional, Sequence
 
 from .engines import mismatches
-from .pilot_report import percentile
+from .stats import percentile
 
 ARMS = ("current", "fixed_synthesis", "controller", "runtime")
 #: `capability` compares a larger allowance on purpose and is never an architecture result (IR-740).

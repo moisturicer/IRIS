@@ -21,7 +21,7 @@ from apps.documents.models import DocumentKind, ExtractionFigure, PdfExtraction
 from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
 
-from .corpus import ask, ask_stream, make_user, root_with, search
+from .corpus import make_user, root_with
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -72,41 +72,6 @@ def figure_paper(embedder, space, owner):
 
 def prompts(llm):
     return " ".join(system + user for system, user in llm.calls)
-
-
-def test_retrieval_finds_the_figure_and_no_answer_citation_or_prompt_carries_its_description(
-    embedder, space, client_for,
-):
-    reader = make_user("reader@cit.edu")
-    record, _ = figure_paper(embedder, space, reader)
-    llm = ScriptedLLM()
-
-    with use_composition_root(root_with(embedder=embedder, llm=llm)):
-        answered = ask(client_for(reader), QUESTION)
-        streamed = ask_stream(client_for(reader), QUESTION)
-        found = search(client_for(reader), QUESTION)
-
-    citation, = answered.json()["citations"]
-    assert (citation["record_id"], citation["text"]) == (record.pk, CAPTION)
-    assert [p["text"] for p in found.json()["results"]] == [CAPTION]
-    for payload in (answered.content, b"".join(streamed.streaming_content), found.content):
-        assert SENTINEL.encode() not in payload
-    assert SENTINEL not in prompts(llm)
-
-
-def test_a_transcript_never_carries_the_description(embedder, space, client_for):
-    reader = make_user("reader@cit.edu")
-    figure_paper(embedder, space, reader)
-    client = client_for(reader)
-
-    with use_composition_root(root_with(embedder=embedder)):
-        conversation = client.post(reverse("ai-conversations"), {}, format="json").json()["id"]
-        ask(client, QUESTION, conversation_id=conversation)
-        transcript = client.get(reverse("ai-conversation-detail", args=[conversation]))
-
-    assert transcript.status_code == 200
-    assert transcript.json()["turns"]
-    assert SENTINEL.encode() not in transcript.content
 
 
 def test_an_ai_overview_never_carries_the_description(embedder, space, client_for):

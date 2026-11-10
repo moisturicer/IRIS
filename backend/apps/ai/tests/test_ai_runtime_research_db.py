@@ -156,7 +156,7 @@ def test_a_reader_finds_a_paper_and_opens_its_passage_at_the_exact_revision(rese
     turn = client.get(f"/api/v1/ai/conversations/{response.json()['conversation_id']}",
                       headers=as_reader(grant)).json()["turns"][0]
     assert turn["citations"] == [{"record_id": flood.pk, "page": 4, "quote": FLOOD,
-                                  "revision": hit.source.revision}]
+                                  "revision": hit.source.revision, "regions": []}]
 
 
 def test_tool_calls_are_journalled_as_names_and_codes(research):
@@ -279,12 +279,19 @@ def test_paper_chat_stays_on_its_record(research):
     assert search.coverage.inspected_records == 1
     assert (widened.status, widened.reason) == ("unavailable", "unknown_handle")
 
-    # A follow-up cannot widen the Conversation by dropping the scope.
+    # A follow-up never moves the Conversation to another paper...
     client, _ = research
+    other = next(r.record_id for r in outside[0][1].records if r.record_id != chosen.pk)
+    elsewhere = issue.reader_session_grant(reader, other).token
+    moved = submit(client, elsewhere, "tools-chat-2",
+                   conversation_id=response.json()["conversation_id"], base_revision=1)
+    assert moved.status_code == 409 and moved.json() == {"status": "scope_mismatch"}
+    # ...but may widen it to every readable paper, in the same Conversation.
     unscoped = issue.reader_session_grant(reader).token
-    follow = submit(client, unscoped, "tools-chat-2",
+    follow = submit(client, unscoped, "tools-chat-3",
                     conversation_id=response.json()["conversation_id"], base_revision=1)
-    assert follow.status_code == 409 and follow.json() == {"status": "scope_mismatch"}
+    assert follow.status_code == 201
+    assert follow.json()["conversation_id"] == response.json()["conversation_id"]
 
     # A Paper Chat grant reaches no other Conversation of the reader's.
     general = outside_run["conversation_id"]

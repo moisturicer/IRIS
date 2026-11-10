@@ -38,6 +38,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ROOT_ENV = REPO_ROOT / ".env"
 BACKEND_ENV = REPO_ROOT / "backend" / ".env"
 BACKEND_EXAMPLE = REPO_ROOT / "backend" / ".env.example"
+AI_ENV = REPO_ROOT / "ai" / ".env"
+AI_EXAMPLE = REPO_ROOT / "ai" / ".env.example"
 
 # The three Compose interpolates. Django reads them from backend/.env; the db
 # service needs them as POSTGRES_* at container-creation time.
@@ -96,6 +98,49 @@ def set_redis_password() -> str | None:
         text = text.rstrip("\n") + f"\n\n# The password both Compose stacks give Redis (IR-669).\n{line}\n"
     ROOT_ENV.write_text(text, encoding="utf-8")
     return f"updated  {ROOT_ENV.relative_to(REPO_ROOT)}  (generated REDIS_PASSWORD)"
+
+
+def _usable_secret(value: str | None) -> bool:
+    return not blank(value) and not value.startswith("replace-me")
+
+
+def _put(path: Path, key: str, value: str) -> bool:
+    """Set `key` in an env file unless it already holds a real value."""
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    if re.search(rf"^{key}=(?!replace-me)\S", text, re.MULTILINE):
+        return False
+    line = f"{key}={value}"
+    if re.search(rf"^{key}=.*$", text, re.MULTILINE):
+        text = re.sub(rf"^{key}=.*$", lambda _: line, text, count=1, flags=re.MULTILINE)
+    else:
+        text = text.rstrip("\n") + f"\n{line}\n"
+    path.write_text(text, encoding="utf-8")
+    return True
+
+
+def set_gateway_secret() -> list[str]:
+    """One gateway secret in the three places that must agree.
+
+    nginx (repo-root .env), Django (backend/.env) and the gateway
+    (ai/.env, as SERVICE_SECRET). An existing real value is reused, so a
+    running deployment keeps its secret; a fresh one is generated.
+    """
+    found = [
+        read_env(ROOT_ENV).get("AI_GATEWAY_SERVICE_SECRET"),
+        read_env(BACKEND_ENV).get("AI_GATEWAY_SERVICE_SECRET"),
+        read_env(AI_ENV).get("SERVICE_SECRET"),
+    ]
+    secret = next((v for v in found if _usable_secret(v)), None) or secrets.token_urlsafe(48)
+    messages = []
+    if not AI_ENV.exists() and AI_EXAMPLE.exists():
+        AI_ENV.write_text(AI_EXAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+        messages.append(f"created  {AI_ENV.relative_to(REPO_ROOT)}  (from ai/.env.example)")
+    for path, key in ((ROOT_ENV, "AI_GATEWAY_SERVICE_SECRET"),
+                      (BACKEND_ENV, "AI_GATEWAY_SERVICE_SECRET"),
+                      (AI_ENV, "SERVICE_SECRET")):
+        if path.exists() and _put(path, key, secret):
+            messages.append(f"updated  {path.relative_to(REPO_ROOT)}  (set {key})")
+    return messages
 
 
 def recovery_secrets() -> dict[str, str]:
@@ -193,6 +238,13 @@ def main() -> int:
     if message:
         did_something = True
         print(message)
+
+    # --- gateway secret ---------------------------------------------------
+    for message in set_gateway_secret():
+        did_something = True
+        print(message)
+    if AI_ENV.exists() and "sk-or-replace-me" in AI_ENV.read_text(encoding="utf-8"):
+        print("note:    set AGENT_LLM_API_KEY in ai/.env to your OpenRouter key.")
 
     # --- warn about anything burned ---------------------------------------
     root = read_env(ROOT_ENV)

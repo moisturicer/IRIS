@@ -12,27 +12,30 @@ LEFT, LINE = 72, 16
 
 
 def pdf(pages, *, running_head="Community Waste-to-Energy Feasibility", numbered=True,
-        size=letter, number_at=36, first_number=1) -> bytes:
+        size=letter, number_at=36, first_number=1, embedded=False) -> bytes:
     """A PDF from ``pages``: each a list of ``(kind, text)`` with kind
     ``heading`` (bold), ``plain`` (body font, e.g. a numbered or capitals
     heading), ``para`` (an indented paragraph, one item per line), ``table``
     (rows of cells, ruled) or ``blank`` (a vertical gap). Each page's number
-    is drawn ``number_at`` pt above the bottom, counting from ``first_number``."""
+    is drawn ``number_at`` pt above the bottom, counting from ``first_number``.
+    ``embedded`` draws in an embedded TrueType font, as a word processor does,
+    so the file carries a ToUnicode CMap (IR-1005)."""
+    body, bold = _embedded_fonts() if embedded else (BODY, BOLD)
     out = BytesIO()
     c = canvas.Canvas(out, pagesize=size)
     width, height = size
     for number, items in enumerate(pages, start=1):
         if running_head:
-            c.setFont(BODY, 10)
+            c.setFont(body, 10)
             c.drawString(LEFT, height - 40, running_head)
         y = height - 90
         for kind, value in items:
             if kind in ("heading", "plain"):
-                c.setFont(BOLD if kind == "heading" else BODY, 12)
+                c.setFont(bold if kind == "heading" else body, 12)
                 c.drawString(LEFT, y, value)
                 y -= LINE * 1.8
             elif kind == "para":
-                c.setFont(BODY, 12)
+                c.setFont(body, 12)
                 for i, line in enumerate(value):
                     c.drawString(LEFT + (36 if i == 0 else 0), y, line)
                     y -= LINE
@@ -42,11 +45,22 @@ def pdf(pages, *, running_head="Community Waste-to-Energy Feasibility", numbered
             elif kind == "blank":
                 y -= LINE * 2
         if numbered:
-            c.setFont(BODY, 10)
+            c.setFont(body, 10)
             c.drawCentredString(width / 2, number_at, str(number + first_number - 1))
         c.showPage()
     c.save()
     return out.getvalue()
+
+
+def _embedded_fonts() -> tuple[str, str]:
+    """reportlab's own Bitstream Vera, embedded as a subset with a ToUnicode CMap."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    for name, file in (("Vera", "Vera.ttf"), ("VeraBd", "VeraBd.ttf")):
+        if name not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(name, file))
+    return "Vera", "VeraBd"
 
 
 def _table(c, rows, y):

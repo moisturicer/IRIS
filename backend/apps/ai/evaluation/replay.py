@@ -14,8 +14,8 @@ from typing import Mapping
 
 import httpx
 
-from apps.ai.controller.versions import (ANSWER_PROMPT_VERSION, CONTROLLER_ENGINE,
-                                         PLAN_PROMPT_VERSION, PROTOCOL_VERSION)
+from apps.ai.evaluation.legacy_engines import (ANSWER_PROMPT_VERSION, CONTROLLER_ENGINE,
+                                              PLAN_PROMPT_VERSION, PROTOCOL_VERSION)
 from apps.ai.public import PUBLIC_PROTOCOL
 
 from .http_driver import parse_sse

@@ -1,6 +1,6 @@
 """One Voyage rerank request, with no retries (IR-886).
 
-Called only by `ResearchTools.hybrid_search`, after admission and the send guard.
+Called only by `ResearchTools.hybrid_search`, after admission.
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ class Ranked:
 class VoyageReranker:
     endpoint = ENDPOINT
     adapter = "voyage"
-    data_policy = "no-training"
 
     def __init__(self, api_key: str, *, model: str):
         if not api_key.strip() or not model.strip():

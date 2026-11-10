@@ -343,25 +343,32 @@ export const DIALOGS: DialogCase[] = [
   reviewAction("request documents", "request_document", "Request documents", "features/document-requests/RequestDocumentDialog.tsx",
     (api) => api.on("GET", `/records/${PAPER.id}/document-requests/slots/`, [{ id: 1, name: "Ethics clearance" }])),
   {
+    // Saved replies (IR-877): managed from the menu under the Conversation tab's comment box.
+    id: "manage saved replies", screen: "paper-view", path: `/records/${PAPER.id}?section=review`,
+    sources: ["features/records/paper-view/SavedReplies.tsx"],
+    override: (api) => {
+      reviewing("comment_review")(api);
+      api.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER);
+      api.on("GET", "/reviews/saved-replies/", {
+        results: [{ id: 1, title: "Cite the source", body: "Please cite where this comes from.",
+          created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" }],
+        limit: 50,
+      });
+    },
+    open: async (page) => {
+      await page.getByRole("button", { name: "Saved replies" }).first().click();
+      await page.getByRole("button", { name: "Manage saved replies" }).click();
+    },
+    dialog: anyDialog,
+  },
+  {
+    // Paper Chat on the AI runtime (IR-957): the modal form opens on the paper with no chat yet.
     id: "paper chat in its modal form", screen: "paper-view", path: `/records/${PAPER.id}`,
     viewport: { width: 820, height: 900 }, sources: ["features/records/paper-view/PaperChatDock.tsx"],
     override: (api) => {
-      api.on("GET", "/ai/reader/", { path: "django" });
-      api.on("GET", "/ai/conversations/", []);
-      api.on("POST", "/ai/conversations/", {
-        id: 1, title: "", record: PAPER.id, record_title: PAPER.title, turn_count: 0,
-        created_at: "2026-11-05T08:00:00+08:00", updated_at: "2026-11-05T08:00:00+08:00", turns: [],
-      }, 201);
-      api.on("POST", "/ai/ask/stream/", (route: Route) => route.fulfill({
-        status: 200, headers: { "content-type": "text/event-stream" },
-        body: `event: done\ndata: ${JSON.stringify({ citations: [], sources: [], conversation_id: 1, turn_id: 31 })}\nid: 1\n\n`,
-      }));
+      api.on("GET", "/ai/runtime/conversations", { protocol: "runs-reader-1", conversations: [] });
     },
-    open: async (page) => {
-      await page.getByRole("button", { name: "Ask IRIS" }).click();
-      await page.getByRole("textbox", { name: "Ask about this paper" }).fill("What does this paper say?");
-      await page.getByRole("button", { name: "Send", exact: true }).click();
-    },
+    open: async (page) => { await page.getByRole("button", { name: "Ask IRIS" }).click(); },
     dialog: (page) => page.getByRole("dialog", { name: "Ask IRIS" }),
   },
   {
@@ -399,15 +406,6 @@ export const DIALOGS: DialogCase[] = [
     },
     open: async (page) => { await page.getByRole("button", { name: "Open review pane" }).click(); },
     dialog: (page) => page.getByRole("dialog", { name: "Review pane" }),
-  },
-  {
-    id: "comparison picker", screen: "ask-iris", sources: ["features/ai/components/ComparisonPicker.tsx"],
-    override: (api) => {
-      api.on("GET", "/ai/status/", { embedding_space: null, generative: false, indexed_records: 0, comparison_max_records: 4 });
-      api.on("GET", "/records/", paginated([PAPER]));
-    },
-    open: async (page) => { await page.getByRole("button", { name: "Compare papers" }).click(); },
-    dialog: (page) => page.getByRole("dialog", { name: "Compare papers" }),
   },
   ...(["set", "release", "release_ip"] as const).map((action): DialogCase => ({
     id: action === "set" ? "change embargo review date" : action === "release" ? "release embargo" : "release IP mark",
