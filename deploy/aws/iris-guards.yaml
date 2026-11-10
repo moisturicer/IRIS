@@ -1,0 +1,205 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Cost and uptime guards for one IRIS server (IR-1015): a monthly budget alert
+  for the account, an alarm that recovers the instance after a hardware fault,
+  and an optional daily stop and start. Each part is optional. It works on any
+  instance, whether made by deploy/aws/iris-demo.yaml or by hand. Deleting the
+  stack removes all three and leaves the instance as it is.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Server }
+        Parameters: [InstanceId]
+      - Label: { default: Budget alert (off without an email) }
+        Parameters: [BudgetEmail, MonthlyBudgetUsd]
+      - Label: { default: Auto-recover }
+        Parameters: [AutoRecover]
+      - Label: { default: Daily stop and start (off unless both times are set) }
+        Parameters: [StopTime, StartTime, ScheduleTimeZone]
+
+Parameters:
+  InstanceId:
+    Type: AWS::EC2::Instance::Id
+    Description: >-
+      The IRIS server, for example the InstanceId output of the iris-demo stack.
+  BudgetEmail:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    ConstraintDescription: an email address, or empty
+    Description: >-
+      Who gets the budget emails. Leave it empty for no budget. AWS emails this
+      address once to confirm nothing; the alerts just arrive.
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 100
+    MinValue: 1
+    Description: >-
+      The month's limit for the whole account, in US$. An email goes at 80% of
+      the forecast and at 100% of actual spend. It warns; it stops nothing.
+  AutoRecover:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Recover the instance onto healthy hardware when AWS's system status check
+      fails. Same instance ID, disk and Elastic IP.
+  StopTime:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^([01]\d|2[0-3]):[0-5]\d$'
+    ConstraintDescription: a 24-hour time such as 23:00, or empty
+    Description: When to stop the server every day, for example 23:00. Empty for no schedule.
+  StartTime:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^([01]\d|2[0-3]):[0-5]\d$'
+    ConstraintDescription: a 24-hour time such as 07:00, or empty
+    Description: When to start it again every day, for example 07:00. Empty for no schedule.
+  ScheduleTimeZone:
+    Type: String
+    Default: Asia/Manila
+    AllowedPattern: '^[A-Za-z]+(/[A-Za-z0-9_+-]+)*$'
+    ConstraintDescription: an IANA time zone such as Asia/Manila
+    Description: The time zone of StopTime and StartTime.
+
+Rules:
+  # A stop without a start would leave the server off for good.
+  BothTimesOrNeither:
+    Assertions:
+      - Assert: !Or
+          - !And
+            - !Equals [!Ref StopTime, ""]
+            - !Equals [!Ref StartTime, ""]
+          - !And
+            - !Not [!Equals [!Ref StopTime, ""]]
+            - !Not [!Equals [!Ref StartTime, ""]]
+        AssertDescription: Set both StopTime and StartTime, or neither.
+
+Conditions:
+  HasBudget: !Not [!Equals [!Ref BudgetEmail, ""]]
+  HasAutoRecover: !Equals [!Ref AutoRecover, "true"]
+  HasSchedule: !Not [!Equals [!Ref StopTime, ""]]
+
+Resources:
+  # For the whole account, not only this server.
+  Budget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudget
+    Properties:
+      Budget:
+        BudgetName: !Sub "${AWS::StackName}-monthly"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - { SubscriptionType: EMAIL, Address: !Ref BudgetEmail }
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - { SubscriptionType: EMAIL, Address: !Ref BudgetEmail }
+
+  # Two failed minutes in a row of the host's own check (not IRIS's) recover
+  # the instance. A recovery keeps the instance ID, disk and Elastic IP.
+  RecoverAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasAutoRecover
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-recover"
+      AlarmDescription: Recovers the IRIS server when AWS's system status check fails (IR-1015).
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions:
+        - { Name: InstanceId, Value: !Ref InstanceId }
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Sub arn:${AWS::Partition}:automate:${AWS::Region}:ec2:recover
+
+  # The scheduler may stop and start this one instance, and nothing else.
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Condition: HasSchedule
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: { "aws:SourceAccount": !Ref AWS::AccountId }
+      Policies:
+        - PolicyName: stop-and-start-one-instance
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ec2:StopInstances, ec2:StartInstances]
+                Resource: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${InstanceId}
+
+  StopSchedule:
+    Type: AWS::Scheduler::Schedule
+    Condition: HasSchedule
+    Properties:
+      Name: !Sub "${AWS::StackName}-stop"
+      Description: Stops the IRIS server every day (IR-1015).
+      ScheduleExpression: !Sub
+        - "cron(${Minute} ${Hour} * * ? *)"
+        - Hour: !Select [0, !Split [":", !Ref StopTime]]
+          Minute: !Select [1, !Split [":", !Ref StopTime]]
+      ScheduleExpressionTimezone: !Ref ScheduleTimeZone
+      FlexibleTimeWindow: { Mode: "OFF" }
+      Target:
+        Arn: arn:aws:scheduler:::aws-sdk:ec2:stopInstances
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: !Sub '{"InstanceIds": ["${InstanceId}"]}'
+
+  # After a start, Docker and every IRIS container come back by themselves
+  # (restart: unless-stopped), and the Elastic IP keeps the address.
+  StartSchedule:
+    Type: AWS::Scheduler::Schedule
+    Condition: HasSchedule
+    Properties:
+      Name: !Sub "${AWS::StackName}-start"
+      Description: Starts the IRIS server every day (IR-1015).
+      ScheduleExpression: !Sub
+        - "cron(${Minute} ${Hour} * * ? *)"
+        - Hour: !Select [0, !Split [":", !Ref StartTime]]
+          Minute: !Select [1, !Split [":", !Ref StartTime]]
+      ScheduleExpressionTimezone: !Ref ScheduleTimeZone
+      FlexibleTimeWindow: { Mode: "OFF" }
+      Target:
+        Arn: arn:aws:scheduler:::aws-sdk:ec2:startInstances
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: !Sub '{"InstanceIds": ["${InstanceId}"]}'
+
+Outputs:
+  BudgetName:
+    Condition: HasBudget
+    Description: Billing and Cost Management → Budgets.
+    Value: !Sub "${AWS::StackName}-monthly"
+  RecoverAlarmName:
+    Condition: HasAutoRecover
+    Description: CloudWatch → Alarms. "OK" means the host is healthy.
+    Value: !Ref RecoverAlarm
+  Schedule:
+    Condition: HasSchedule
+    Description: EventBridge → Schedules.
+    Value: !Sub "stops at ${StopTime}, starts at ${StartTime} (${ScheduleTimeZone})"

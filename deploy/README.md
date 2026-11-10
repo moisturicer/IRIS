@@ -8,6 +8,8 @@ What belongs to the server, not to a laptop.
 | `bootstrap_server.sh` | Gets a fresh Ubuntu 24.04 server ready for IRIS (IR-1014) |
 | `tests/bootstrap_checks.sh` | CI's check of `bootstrap_server.sh`, run on a throwaway VM |
 | `aws/iris-demo.yaml` | CloudFormation template: the whole AWS server from one file, running `bootstrap_server.sh` at first boot (IR-1013) |
+| `aws/iris-guards.yaml` | CloudFormation template: budget alert, auto-recover and a daily stop and start for one server (IR-1015) |
+| `tests/check_restart_policies.py` | CI's check that every long-running service comes back after a start |
 
 ## bootstrap_server.sh
 
@@ -142,3 +144,34 @@ Then carry on from **Next** above. A new instance can take a minute or two after
 **CloudFormation →** the stack **→ Delete.** That deletes the instance, its disk, the Elastic IP, the security group and the role, so nothing keeps billing. Everything on the server's disk goes with it, the database included. Back up anything you need first.
 
 **Cost while it runs:** the instance, its disk and the public IPv4 address. AWS charges for every public IPv4 address, attached or not: US$0.005 an hour, about US$3.65 a month.
+
+## aws/iris-guards.yaml
+
+**Why:** the server costs about US$3 a day while it runs. Nothing warns before a bill grows, nothing restarts the server after a hardware fault, and it runs all night when nobody uses it. This template adds all three to any instance, including one built by hand like `iris-demo`.
+
+| Part | Parameters | Off when |
+|---|---|---|
+| Budget for the **whole account**: an email at 80% of the month's forecast and at 100% of actual spend. It warns; it stops nothing | `BudgetEmail`, `MonthlyBudgetUsd` (default 100) | `BudgetEmail` is empty |
+| Auto-recover: when AWS's own hardware check fails two minutes running, the instance moves to healthy hardware with the same ID, disk and IP | `AutoRecover` (default `true`) | `false` |
+| Daily stop and start, by EventBridge Scheduler, with a role that can stop and start this one instance only | `StopTime`, `StartTime` (for example `23:00`, `07:00`), `ScheduleTimeZone` (default `Asia/Manila`) | both times are empty (the default). One without the other is refused |
+
+Vendor spending (OpenRouter, Voyage, LlamaParse) is not in this budget: each vendor account has its own cap, and `AI_ADMISSION_*` limits it.
+
+**Costs:** nothing for the guards themselves (budgets, up to ten alarms and this many schedules are free). While stopped, the disk and the Elastic IP still bill, about US$0.30 a day.
+
+### Create it
+
+1. Find the server's instance ID: **EC2 → Instances**, or the `InstanceId` output of the `iris-demo` stack.
+2. **CloudFormation → Create stack → With new resources**, in the server's region. Upload `deploy/aws/iris-guards.yaml`, and name it, for example `iris-guards`.
+3. Fill in the parameters, tick the IAM acknowledgement (the scheduler's role), and **Submit**.
+
+To change the times later: the stack → **Update → Use existing template**, then edit the parameters. **Delete** removes the budget, the alarm and the schedules, and leaves the server alone.
+
+### After a scheduled start
+
+Docker starts at boot, and every IRIS service comes back by itself because each one says `restart: unless-stopped` (CI checks this). The Elastic IP keeps the address, so DuckDNS needs no change. The site is back a minute or two after the start time. If it isn't:
+
+```bash
+cd ~/IRIS
+docker compose -f docker-compose.prod.yml ps
+```

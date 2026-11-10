@@ -610,10 +610,17 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Lint the CloudFormation template
+      - name: Lint the CloudFormation templates
         run: |
           pip install "cfn-lint==1.59.0"
-          cfn-lint deploy/aws/iris-demo.yaml --regions ap-southeast-1 us-east-1
+          cfn-lint deploy/aws/iris-demo.yaml deploy/aws/iris-guards.yaml --regions ap-southeast-1 us-east-1
+
+      # A scheduled start or a recovery brings IRIS back only through Docker's
+      # restart policies (IR-1015).
+      - name: Check every service restarts by itself
+        run: |
+          pip install "PyYAML==6.0.2"
+          python deploy/tests/check_restart_policies.py docker-compose.prod.yml
 
   security:
     name: Security
