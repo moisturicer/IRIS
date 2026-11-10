@@ -37,13 +37,14 @@ class PeopleSearchTests(APITestCase):
         self.client.force_authenticate(self.viewer)
 
     def test_search_matches_names_and_interests_and_returns_only_public_fields(self):
-        by_name = self.client.get(self.url, {"search": "Lovelace"})
-        by_full_name = self.client.get(self.url, {"search": "Ada Lovelace"})
-        by_interest = self.client.get(self.url, {"search": "analytical"})
+        by_name = self.client.get(self.url, {"q": "Lovelace"})
+        by_full_name = self.client.get(self.url, {"q": "Ada Lovelace"})
+        by_interest = self.client.get(self.url, {"q": "analytical"})
 
         self.assertEqual([person["id"] for person in by_name.data["results"]], [self.ada.pk])
         self.assertEqual([person["id"] for person in by_full_name.data["results"]], [self.ada.pk])
         self.assertEqual([person["id"] for person in by_interest.data["results"]], [self.ada.pk])
+        self.assertEqual(by_name.data["count"], 1)
         person = by_name.data["results"][0]
         self.assertEqual(set(person), self.PERSON_KEYS)
         self.assertEqual(person["role_label"], "Student")
@@ -72,7 +73,7 @@ class PeopleSearchTests(APITestCase):
             person.first_name = "Hidden"
             person.save(update_fields=["first_name"])
 
-        response = self.client.get(self.url, {"search": "Hidden"})
+        response = self.client.get(self.url, {"q": "Hidden"})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["results"], [])
@@ -99,7 +100,7 @@ class PeopleSearchTests(APITestCase):
         for record in (published, draft, proposal_record):
             RecordOwner.objects.create(record=record, user=self.ada, is_primary=True)
 
-        first = self.client.get(self.url, {"search": "Ada", "page_size": 1})
+        first = self.client.get(self.url, {"q": "Ada", "page_size": 1})
         second_page = self.client.get(first.data["next"])
 
         self.assertEqual(first.status_code, 200)
@@ -116,6 +117,6 @@ class PeopleSearchTests(APITestCase):
     def test_people_search_requires_sign_in(self):
         self.client.force_authenticate(None)
 
-        response = self.client.get(self.url, {"search": "Ada"})
+        response = self.client.get(self.url, {"q": "Ada"})
 
         self.assertEqual(response.status_code, 401)

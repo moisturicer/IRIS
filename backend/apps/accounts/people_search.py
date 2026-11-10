@@ -41,20 +41,20 @@ def _role_filter(queryset, raw):
     return queryset.filter(role__name=role)
 
 
-def _base_queryset(request, search):
+def _people_queryset(request, query):
     # Reuse the profile eligibility rule so a hidden profile can never leak into
     # Discover. Search fields are deliberately limited to names and interests.
     people = public_profile.open_profiles()
-    if search:
+    if query:
         name_match = Q()
-        for word in search.split():
+        for word in query.split():
             name_match &= (
                 Q(first_name__icontains=word)
                 | Q(middle_initial__icontains=word)
                 | Q(last_name__icontains=word)
             )
         people = people.filter(
-            name_match | Q(research_interests__name__icontains=search)
+            name_match | Q(research_interests__name__icontains=query)
         )
 
     college_id = _filter_id(request.query_params, "college")
@@ -71,22 +71,26 @@ def _base_queryset(request, search):
         )
     people = _role_filter(people, request.query_params.get("role"))
 
+    return (
+        people.distinct()
+        .order_by(Lower("last_name"), Lower("first_name"), "pk")
+    )
+
+
+def _with_paper_counts(people, viewer):
     papers = (
-        public_profile.published_papers(request.user)
+        public_profile.published_papers(viewer)
         .filter(owners__user_id=OuterRef("pk"))
         .order_by()
         .values("owners__user_id")
         .annotate(total=Count("pk", distinct=True))
         .values("total")[:1]
     )
-    return (
-        people.annotate(published_paper_count=Coalesce(Subquery(papers), Value(0)))
-        .select_related(
-            "role", "student_profile__course__department__college",
-            "adviser_profile__college", "adviser_profile__department",
-        )
-        .distinct()
-        .order_by(Lower("last_name"), Lower("first_name"), "pk")
+    return people.annotate(
+        published_paper_count=Coalesce(Subquery(papers), Value(0)),
+    ).select_related(
+        "role", "student_profile__course__department__college",
+        "adviser_profile__college", "adviser_profile__department",
     )
 
 
@@ -109,5 +113,9 @@ def _person_payload(person):
 
 def search(request):
     """Return one page of public people matching Discover's search and filters."""
-    queryset = _base_queryset(request, request.query_params.get("search", "").strip())
-    return public_profile.paginate(request, queryset, PAGE_SIZE, _person_payload)
+    people = _people_queryset(request, request.query_params.get("q", "").strip())
+    count = people.count()
+    page = public_profile.paginate(
+        request, _with_paper_counts(people, request.user), PAGE_SIZE, _person_payload,
+    )
+    return {"count": count, **page}
