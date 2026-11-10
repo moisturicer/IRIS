@@ -66,7 +66,7 @@ export function DiscoverSearchComposer({ value, onChange }: DiscoverSearchCompos
           className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100 hover:text-brand [@media(pointer:fine)]:h-9 [@media(pointer:fine)]:w-9", COLOUR_TRANSITION, FOCUS_RING)}>
           <i className="fas fa-times-circle" aria-hidden />
         </button>}
-        <p id="discover-search-help" className="sr-only">Search research, authors and topics as you type.</p>
+        <p id="discover-search-help" className="sr-only">Search research, people and topics as you type.</p>
     </div>
   );
 }

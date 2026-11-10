@@ -17,6 +17,7 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { importedReference } from "@/test/fixtures/importedReference";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { recordsApi } from "@/api/records";
+import { peopleApi } from "@/api/people";
 import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
 import { libraryApi, type SavedFeed } from "@/api/library";
@@ -70,6 +71,24 @@ let recommended: { mode: "for_you" | "latest"; results: (RecordListItem & { reas
 const page = <T,>(results: T[], count = results.length) =>
   Promise.resolve({ data: { results, count } });
 
+const peoplePage = (data: Awaited<ReturnType<typeof peopleApi.search>>["data"]) =>
+  Promise.resolve({ data } as Awaited<ReturnType<typeof peopleApi.search>>);
+
+const discoverPerson = (id: number) => ({
+  id,
+  first_name: "Lena",
+  middle_initial: "M",
+  last_name: `Cruz ${id}`,
+  role_label: "Student" as const,
+  college_name: "College of Engineering",
+  department_name: "Computer Studies",
+  course_name: "BS Computer Science",
+  photo_url: null,
+  published_paper_count: 3,
+});
+
+let people: ReturnType<typeof discoverPerson>[] = [];
+
 const feedPage = (data: Awaited<ReturnType<typeof recordsApi.forYou>>["data"]) =>
   Promise.resolve({ data } as Awaited<ReturnType<typeof recordsApi.forYou>>);
 
@@ -115,7 +134,14 @@ vi.mock("@/api/library", () => ({
 }));
 
 vi.mock("@/api/accounts", () => ({
-  accountsApi: { colleges: vi.fn(() => page([{ id: 4, name: "College of Engineering" }])) },
+  accountsApi: {
+    colleges: vi.fn(() => page([{ id: 4, name: "College of Engineering" }])),
+    departments: vi.fn(() => page([{ id: 8, name: "Computer Studies", college: 4, college_name: "College of Engineering" }])),
+  },
+}));
+
+vi.mock("@/api/people", () => ({
+  peopleApi: { search: vi.fn(() => peoplePage({ results: people, count: people.length, next: null })) },
 }));
 
 vi.mock("@/api/notifications", () => ({
@@ -177,6 +203,8 @@ beforeEach(() => {
   localStorage.clear();
   useLibraryStore.setState({ load: "idle", items: {}, failure: null });
   listed = [publishedThesis];
+  people = [];
+  vi.mocked(peopleApi.search).mockImplementation(() => peoplePage({ results: people, count: people.length, next: null }));
   total = null;
   recommended = { mode: "latest", results: [{ ...publishedThesis, reason: { kind: "latest" } }], next_cursor: null, count: 1 };
   signInAs("Student");
@@ -234,6 +262,42 @@ describe("the page head", () => {
 });
 
 describe("browsing", () => {
+  it("previews up to five matching people and opens filtered People results", async () => {
+    people = Array.from({ length: 6 }, (_, index) => discoverPerson(index + 1));
+    const { container } = renderDiscover();
+
+    await userEvent.type(screen.getByRole("textbox", { name: "Search records" }), "climate");
+    expect(await screen.findByRole("heading", { name: "People" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Lena M\. Cruz 1/ })).toHaveAttribute("href", "/people/1");
+    expect(screen.getAllByRole("link", { name: /Lena M\. Cruz/ })).toHaveLength(5);
+    expect(screen.getAllByText("LC")[0]).toHaveClass("rounded-full");
+    expect(screen.getAllByText("College of Engineering · Computer Studies · BS Computer Science")).toHaveLength(5);
+    expect(screen.getAllByText(/3 published papers/)).toHaveLength(5);
+
+    await userEvent.click(screen.getByRole("button", { name: "See all people" }));
+    expect(screen.getByRole("button", { name: "People", pressed: true })).toBeInTheDocument();
+    const college = screen.getByRole("combobox", { name: "College" });
+    await userEvent.selectOptions(college, "4");
+    const department = await screen.findByRole("combobox", { name: "Department" });
+    await userEvent.selectOptions(department, "8");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Role" }), "Student");
+
+    await waitFor(() => expect(peopleApi.search).toHaveBeenLastCalledWith({
+      q: "climate", page: 1, page_size: 20, college: 4, department: 8, role: "Student",
+    }));
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("keeps Discover usable when the people-search response has a malformed person", async () => {
+    vi.mocked(peopleApi.search).mockImplementation(() => Promise.resolve({ data: { count: 1, results: [{}] } } as never));
+    renderDiscover();
+    await userEvent.type(screen.getByRole("textbox", { name: "Search records" }), "climate");
+
+    expect(await screen.findByText("People could not be loaded.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Discover" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /undefined/ })).not.toBeInTheDocument();
+  });
+
   it("offers For you, Latest, and Trending, opening on the latest catalogue", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);

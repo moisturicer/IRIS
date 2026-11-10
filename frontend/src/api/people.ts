@@ -6,12 +6,25 @@
  * who does not exist.
  */
 import { apiClient } from "./client";
-import type { Collaborator, ProfilePage, ProfilePaper, PublicProfile } from "@/types/people";
+import type { Collaborator, PeopleSearchPage, ProfilePage, ProfilePaper, PublicProfile } from "@/types/people";
 
 /** How many a page holds: the numbers settled for the Profile's lists. */
 export const PROFILE_PAGE_SIZE = { papers: 10, collaborators: 12 } as const;
 
+export interface PeopleSearchParams {
+  q?: string;
+  page?: number;
+  page_size?: number;
+  college?: number;
+  department?: number;
+  role?: string;
+}
+
 export const peopleApi = {
+  /** `GET /users/search/` (IR-697): public, paged people matching Discover's query. */
+  search: (params: PeopleSearchParams) =>
+    apiClient.get<PeopleSearchPage>("/users/search/", { params }),
+
   /** `GET /users/<id>/profile/` */
   get: (id: number) => apiClient.get<PublicProfile>(`/users/${id}/profile/`),
 
