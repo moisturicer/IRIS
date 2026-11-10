@@ -441,26 +441,42 @@ def compare_documents(old: list, new: list) -> list:
 # --- where a text appears (IR-876) ----------------------------------------------
 
 def appears_in(reading: dict, text: str) -> list:
-    """Where ``text`` appears in ``reading``, after normalisation and ignoring
-    case, even across passages: for each place it is found, a list with one
-    ``{"section", "page", "regions"}`` per passage it touches. Empty when it
-    doesn't appear."""
-    wanted = norm(text).lower()
+    """Where ``text`` appears in ``reading`` (`locate`): for each place it is
+    found, a list with one ``{"section", "page", "regions"}`` per passage it
+    touches. Empty when it doesn't appear."""
+    return [
+        [{"section": key, "page": passage["page"], "regions": passage.get("regions", [])}
+         for key, passage in spot]
+        for spot in locate(reading, text)
+    ]
+
+
+def locate(reading: dict, text: str) -> list:
+    """Where ``text`` appears in ``reading``, after normalisation, ignoring case
+    and **ignoring whitespace**, even across passages: for each place it is
+    found, the ``(section key, passage)`` pairs it touches.
+
+    Whitespace is ignored because a quote taken in the browser loses the space
+    where a PDF line wraps (`range.toString()` joins the two words), while the
+    reader keeps it: matched with spaces, a quote over a line break was not
+    found even in the Version it was taken from (IR-1008)."""
+    wanted = _compact(text)
     if not wanted:
         return []
     spans, parts, at = [], [], 0
     for key, passage in _flat(reading):
-        piece = norm(passage["text"]).lower()
+        piece = _compact(passage["text"])
         spans.append((at, at + len(piece), key, passage))
         parts.append(piece)
-        at += len(piece) + 1
-    whole = " ".join(parts)
+        at += len(piece)
+    whole = "".join(parts)
     found, start = [], whole.find(wanted)
     while start != -1:
         end = start + len(wanted)
-        found.append([
-            {"section": key, "page": passage["page"], "regions": passage.get("regions", [])}
-            for (s, e, key, passage) in spans if s < end and e > start
-        ])
+        found.append([(key, passage) for (s, e, key, passage) in spans if s < end and e > start])
         start = whole.find(wanted, start + 1)
     return found
+
+
+def _compact(text: str) -> str:
+    return norm(text).lower().replace(" ", "")
