@@ -587,6 +587,23 @@ jobs:
           grep -q 'deadline-notifications apps.reviews.tasks.send_deadline_notifications' beat.log
           grep -q 'recovery-dispatch apps.accounts.recovery.tasks.dispatch_recovery_intents' beat.log
 
+  # IR-1014: the first-boot script runs for real on a fresh Ubuntu 24.04 VM,
+  # twice -- it creates /swapfile, edits /etc/fstab and clones, which is why
+  # it runs here and not on a laptop. The runner already has Docker, so the
+  # fresh-install path is proven on a new EC2 instance instead (IR-1014.md).
+  server-bootstrap:
+    name: Server bootstrap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Lint the bootstrap scripts
+        run: shellcheck deploy/bootstrap_server.sh deploy/tests/bootstrap_checks.sh
+
+      - name: Run the bootstrap twice and check what it left
+        run: sudo deploy/tests/bootstrap_checks.sh
+
   security:
     name: Security
     runs-on: ubuntu-latest
