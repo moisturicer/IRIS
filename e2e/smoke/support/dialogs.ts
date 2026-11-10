@@ -317,6 +317,25 @@ export const DIALOGS: DialogCase[] = [
   reviewAction("request documents", "request_document", "Request documents", "features/document-requests/RequestDocumentDialog.tsx",
     (api) => api.on("GET", `/records/${PAPER.id}/document-requests/slots/`, [{ id: 1, name: "Ethics clearance" }])),
   {
+    // Saved replies (IR-877): managed from the menu under the Conversation tab's comment box.
+    id: "manage saved replies", screen: "paper-view", path: `/records/${PAPER.id}?section=review`,
+    sources: ["features/records/paper-view/SavedReplies.tsx"],
+    override: (api) => {
+      reviewing("comment_review")(api);
+      api.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER);
+      api.on("GET", "/reviews/saved-replies/", {
+        results: [{ id: 1, title: "Cite the source", body: "Please cite where this comes from.",
+          created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" }],
+        limit: 50,
+      });
+    },
+    open: async (page) => {
+      await page.getByRole("button", { name: "Saved replies" }).first().click();
+      await page.getByRole("button", { name: "Manage saved replies" }).click();
+    },
+    dialog: anyDialog,
+  },
+  {
     // Paper Chat on the AI runtime (IR-957): the modal form opens on the paper with no chat yet.
     id: "paper chat in its modal form", screen: "paper-view", path: `/records/${PAPER.id}`,
     viewport: { width: 820, height: 900 }, sources: ["features/records/paper-view/PaperChatDock.tsx"],
