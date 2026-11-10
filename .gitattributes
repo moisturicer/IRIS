@@ -3,6 +3,8 @@
 backend/entrypoint.sh text eol=lf
 frontend/docker-entrypoint.d/*.sh text eol=lf
 scripts/*.sh text eol=lf
+# Run on the server, or pasted into EC2 user data, which a CRLF copy breaks (IR-1014).
+deploy/**/*.sh text eol=lf
 
 # Contract fixtures are compared byte for byte with what their layout draws (IR-838).
 *.pdf binary
