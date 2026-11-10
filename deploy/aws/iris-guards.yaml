@@ -29,8 +29,8 @@ Parameters:
     AllowedPattern: '^$|^[^@\s]+@[^@\s]+\.[^@\s]+$'
     ConstraintDescription: an email address, or empty
     Description: >-
-      Who gets the budget emails. Leave it empty for no budget. AWS emails this
-      address once to confirm nothing; the alerts just arrive.
+      Who gets the budget emails. Leave it empty for no budget. AWS sends no
+      confirmation email first; the alerts just arrive.
   MonthlyBudgetUsd:
     Type: Number
     Default: 100
@@ -112,7 +112,9 @@ Resources:
             - { SubscriptionType: EMAIL, Address: !Ref BudgetEmail }
 
   # Two failed minutes in a row of the host's own check (not IRIS's) recover
-  # the instance. A recovery keeps the instance ID, disk and Elastic IP.
+  # the instance. A recovery keeps the instance ID, disk and Elastic IP. t3 and
+  # m7i-flex already recover by themselves by default; this alarm makes it
+  # explicit and visible in CloudWatch, and doesn't depend on that default.
   RecoverAlarm:
     Type: AWS::CloudWatch::Alarm
     Condition: HasAutoRecover
@@ -145,6 +147,8 @@ Resources:
             Action: sts:AssumeRole
             Condition:
               StringEquals: { "aws:SourceAccount": !Ref AWS::AccountId }
+              ArnLike:
+                "aws:SourceArn": !Sub "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/${AWS::StackName}-*"
       Policies:
         - PolicyName: stop-and-start-one-instance
           PolicyDocument:
@@ -167,12 +171,14 @@ Resources:
       ScheduleExpressionTimezone: !Ref ScheduleTimeZone
       FlexibleTimeWindow: { Mode: "OFF" }
       Target:
-        Arn: arn:aws:scheduler:::aws-sdk:ec2:stopInstances
+        Arn: !Sub arn:${AWS::Partition}:scheduler:::aws-sdk:ec2:stopInstances
         RoleArn: !GetAtt SchedulerRole.Arn
         Input: !Sub '{"InstanceIds": ["${InstanceId}"]}'
 
-  # After a start, Docker and every IRIS container come back by themselves
-  # (restart: unless-stopped), and the Elastic IP keeps the address.
+  # After a start, Docker brings every IRIS container back by its restart
+  # policy (restart: unless-stopped), and the Elastic IP keeps the address.
+  # Docker doesn't wait for compose's depends_on then, so services that need
+  # the database restart a few times until it is up (deploy/README.md).
   StartSchedule:
     Type: AWS::Scheduler::Schedule
     Condition: HasSchedule
@@ -186,7 +192,7 @@ Resources:
       ScheduleExpressionTimezone: !Ref ScheduleTimeZone
       FlexibleTimeWindow: { Mode: "OFF" }
       Target:
-        Arn: arn:aws:scheduler:::aws-sdk:ec2:startInstances
+        Arn: !Sub arn:${AWS::Partition}:scheduler:::aws-sdk:ec2:startInstances
         RoleArn: !GetAtt SchedulerRole.Arn
         Input: !Sub '{"InstanceIds": ["${InstanceId}"]}'
 
@@ -194,7 +200,7 @@ Outputs:
   BudgetName:
     Condition: HasBudget
     Description: Billing and Cost Management → Budgets.
-    Value: !Sub "${AWS::StackName}-monthly"
+    Value: !Ref Budget
   RecoverAlarmName:
     Condition: HasAutoRecover
     Description: CloudWatch → Alarms. "OK" means the host is healthy.

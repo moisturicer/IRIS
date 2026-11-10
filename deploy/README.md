@@ -147,12 +147,12 @@ Then carry on from **Next** above. A new instance can take a minute or two after
 
 ## aws/iris-guards.yaml
 
-**Why:** the server costs about US$3 a day while it runs. Nothing warns before a bill grows, nothing restarts the server after a hardware fault, and it runs all night when nobody uses it. This template adds all three to any instance, including one built by hand like `iris-demo`.
+**Why:** the server costs about US$3 a day while it runs. Nothing warns before a bill grows, nothing shows when the host hardware fails, and the server runs all night when nobody uses it. This template adds all three to any instance, including one built by hand like `iris-demo`.
 
 | Part | Parameters | Off when |
 |---|---|---|
 | Budget for the **whole account**: an email at 80% of the month's forecast and at 100% of actual spend. It warns; it stops nothing | `BudgetEmail`, `MonthlyBudgetUsd` (default 100) | `BudgetEmail` is empty |
-| Auto-recover: when AWS's own hardware check fails two minutes running, the instance moves to healthy hardware with the same ID, disk and IP | `AutoRecover` (default `true`) | `false` |
+| Auto-recover: when AWS's own hardware check fails two minutes running, the instance moves to healthy hardware with the same ID, disk and IP. t3 and m7i-flex already do this by default; the alarm makes it explicit and shows it in CloudWatch | `AutoRecover` (default `true`) | `false` |
 | Daily stop and start, by EventBridge Scheduler, with a role that can stop and start this one instance only | `StopTime`, `StartTime` (for example `23:00`, `07:00`), `ScheduleTimeZone` (default `Asia/Manila`) | both times are empty (the default). One without the other is refused |
 
 Vendor spending (OpenRouter, Voyage, LlamaParse) is not in this budget: each vendor account has its own cap, and `AI_ADMISSION_*` limits it.
@@ -169,9 +169,16 @@ To change the times later: the stack → **Update → Use existing template**, t
 
 ### After a scheduled start
 
-Docker starts at boot, and every IRIS service comes back by itself because each one says `restart: unless-stopped` (CI checks this). The Elastic IP keeps the address, so DuckDNS needs no change. The site is back a minute or two after the start time. If it isn't:
+Docker starts at boot, and every IRIS service comes back by itself because each one says `restart: unless-stopped` (CI checks this). Only `migrate` stays exited, which is right: it already ran. The Elastic IP keeps the address, so DuckDNS needs no change.
+
+At boot Docker doesn't wait for the database the way `docker compose up` does, so the backend and the workers may restart a few times until it is ready. The site is back a few minutes after the start time.
+
+**Check that you can sign in, not only that the page loads.** The frontend looks up the backend's internal address once, when it starts (IR-200). If the backend came up later at a new address, the page loads but sign-in fails. The fix is one command:
 
 ```bash
 cd ~/IRIS
-docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps                 # all "Up", migrate "Exited (0)"
+docker compose -f docker-compose.prod.yml restart frontend   # if sign-in fails
 ```
+
+**Encrypted disks:** the scheduled start works with the default EBS encryption key (`aws/ebs`), which both templates use. A disk encrypted with a key of your own would need that key to allow the scheduler's role, or the start fails and the instance goes back to stopped.
