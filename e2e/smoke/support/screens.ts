@@ -195,6 +195,7 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/records/facets/", { years: [2025] });
       api.on("GET", "/records/interests/", { classifications: [], psced: [] });
       api.on("GET", "/records/", paginated([PAPER]));
+      api.on("GET", "/users/search/", { count: 0, next: null, results: [] });
       api.on("GET", "/library/saves/", { results: [] });
       api.on("GET", "/library/feeds/", { results: [], limit: 10 });
     },
