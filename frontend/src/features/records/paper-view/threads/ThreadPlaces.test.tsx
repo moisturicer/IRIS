@@ -87,6 +87,20 @@ describe("where a thread's passage is now", () => {
     expect(within(card()).getByText("Outdated since v2")).toBeInTheDocument();
     expect(within(card()).getByRole("region", { name: "Now in v3, p. 6" })).toHaveTextContent("forty-two respondents in all");
   });
+
+  it("says why a passage hasn't been followed into a later Version", () => {
+    setup([comment({
+      anchor: ANCHOR, place: null,
+      not_followed: { version: 2, message: "Can't follow this passage into v2: no text for v1." },
+    })]);
+    expect(within(card()).getByText("Can't follow this passage into v2: no text for v1.")).toBeInTheDocument();
+  });
+
+  it("ignores a reason of the wrong shape", () => {
+    setup([comment({ anchor: ANCHOR, not_followed: { version: 2 } as unknown as ReviewComment["not_followed"] })]);
+    expect(within(card()).queryByText(/follow this passage/)).not.toBeInTheDocument();
+    expect(card()).toBeInTheDocument();
+  });
 });
 
 describe("suggested wording", () => {

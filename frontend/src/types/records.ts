@@ -893,6 +893,12 @@ export interface ReviewComment {
    * such a Version exists (IR-876).
    */
   wording_check?:        { version: number; page: number | null } | null;
+  /**
+   * Why an open thread's passage hasn't been followed into the next Version,
+   * such as a Version with no text, or null when there is nothing to explain
+   * (IR-1009).
+   */
+  not_followed?:         { version: number; message: string } | null;
   /** Severity changes, resolving and reopening, oldest first. Empty on a draft. */
   events?:               ThreadEvent[];
   /*

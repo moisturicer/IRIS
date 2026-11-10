@@ -218,6 +218,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-873** | Two Versions compared section by section, both read by one reader, never naming it, in the reviewer's Changes tab — ADR-058 §3 as amended 2026-11-08; FR-M5-01 (label only) | [details](traceability/IR-873.md) | **IMPLEMENTED** |
 | **IR-876** | A thread follows its passage into later Versions and goes Outdated where it changed; suggested wording; the response to reviewers frozen onto each Version — ADR-032 §7 and its IR-876 build notes; no FR- id | [details](traceability/IR-876.md) | **IN PROGRESS** |
 | **IR-1008** | A thread's quote is found in a Version's text whatever its spaces at line breaks, so it is placed found or changed, not removed — fix to IR-876; no FR- id | [details](traceability/IR-1008.md) | **VERIFIED** |
+| **IR-1009** | A thread says why it isn't followed into a later Version (no text for a Version, or still looking) instead of saying nothing — follow-up to IR-876; no FR- id | [details](traceability/IR-1009.md) | **IMPLEMENTED** |
 | **IR-1005** | The review-text reader loads its text encodings before its sandbox closes, so a PDF in an embedded font is read, not stored as no text — fix to IR-871; no FR- id | [details](traceability/IR-1005.md) | **VERIFIED** |
 
 ### Non-functional

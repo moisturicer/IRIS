@@ -42,7 +42,9 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.records.versions import latest_version
-from core.enums import PipelineStatus, ThreadAnswer, ThreadPlaceOutcome, ThreadSeverity, ThreadState
+from core.enums import (
+    PipelineStatus, ReviewTextState, ThreadAnswer, ThreadPlaceOutcome, ThreadSeverity, ThreadState,
+)
 from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
 
 from . import threads
@@ -124,6 +126,35 @@ def _outdated_since(comment) -> Optional[int]:
     return first.version.number if first else None
 
 
+def _not_followed(comment, viewer) -> Optional[dict]:
+    """Why an open thread's passage hasn't been followed into the next Version,
+    or None (IR-1009). Following needs both Versions' review text (IR-876), so
+    a missing one is named; otherwise placing is still to come. A removed
+    passage is followed no further, so it needs no note."""
+    if comment.is_draft or comment.state != ThreadState.OPEN or not comment.anchor_version_id:
+        return None
+    if not comment.anchor_quote.strip():
+        return None
+    places = _places(comment)
+    if places and places[-1].outcome == ThreadPlaceOutcome.REMOVED:
+        return None
+    start = places[-1].version.number if places else comment.anchor_version.number
+    later = [v for v in viewer.versions if v.number > start]
+    if not later:
+        return None
+    nxt = later[0]
+    for version in [v for v in viewer.versions if v.number == start] + [nxt]:
+        state = version.review_text.state if version.review_text else None
+        if state == ReviewTextState.NO_TEXT:
+            why = f"no text for v{version.number}"
+        elif state == ReviewTextState.NOT_KEPT:
+            why = f"v{version.number}'s text was not kept"
+        else:
+            continue
+        return {"version": nxt.number, "message": f"Can't follow this passage into v{nxt.number}: {why}."}
+    return {"version": nxt.number, "message": f"Looking for this passage in v{nxt.number}."}
+
+
 class _Viewer:
     """What `user` may do here, read once per payload rather than per comment."""
 
@@ -137,6 +168,17 @@ class _Viewer:
         self.participant = is_record_participant(user, record)
         self.in_review = is_in_review(record)
         self._seats: dict[str, bool] = {}
+        self._versions: Optional[list] = None
+
+    @property
+    def versions(self) -> list:
+        """The record's Versions with their review texts, oldest first, read once."""
+        if self._versions is None:
+            from apps.records.models import RecordVersion
+
+            self._versions = list(RecordVersion.objects.filter(record=self.record)
+                                  .select_related("review_text").order_by("number"))
+        return self._versions
 
     def holds(self, party) -> bool:
         if party not in self._seats:
@@ -180,6 +222,7 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "place": _place_payload(comment) if top else None,
         "outdated_since": _outdated_since(comment) if top else None,
         "wording_check": _wording_check(comment) if top else None,
+        "not_followed": _not_followed(comment, viewer) if top else None,
         "state": comment.state if top else None,
         "resolved_by": _name(comment.resolved_by) if top and comment.state == ThreadState.RESOLVED else None,
         "resolved_at": comment.resolved_at.isoformat() if top and comment.resolved_at else None,
