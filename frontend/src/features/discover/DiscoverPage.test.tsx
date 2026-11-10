@@ -141,7 +141,7 @@ vi.mock("@/api/accounts", () => ({
 }));
 
 vi.mock("@/api/people", () => ({
-  peopleApi: { search: vi.fn(() => peoplePage({ results: people, count: people.length })) },
+  peopleApi: { search: vi.fn(() => peoplePage({ results: people, count: people.length, next: null })) },
 }));
 
 vi.mock("@/api/notifications", () => ({
@@ -204,7 +204,7 @@ beforeEach(() => {
   useLibraryStore.setState({ load: "idle", items: {}, failure: null });
   listed = [publishedThesis];
   people = [];
-  vi.mocked(peopleApi.search).mockImplementation(() => peoplePage({ results: people, count: people.length }));
+  vi.mocked(peopleApi.search).mockImplementation(() => peoplePage({ results: people, count: people.length, next: null }));
   total = null;
   recommended = { mode: "latest", results: [{ ...publishedThesis, reason: { kind: "latest" } }], next_cursor: null, count: 1 };
   signInAs("Student");
