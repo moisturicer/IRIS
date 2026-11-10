@@ -393,6 +393,18 @@ The review discussion remains one record-level timeline, with the same readers, 
 - **Notifications,** in-app only: the paper's owners on each new comment, a writer when someone replies, a writer when their comment is removed, RDCO on a first report.
 - Removals and dismissals are audited. Ask IRIS never reads comments.
 
+**Build notes, 2026-11-10 (Hermoine Zozobrado, IR-690 design session; Accepted).** Transcribed by an agent.
+
+1. **A deleted comment that is part of a conversation keeps its marker.** It has a reply, deleted or not, or it is itself a reply. Only a standalone comment with no replies disappears. This replaces "without replies, it disappears" above for a reply: Ana comments, Ben replies, both delete, and both show "[deleted]".
+2. **The paper's owners hear of each new top-level comment, not of replies.** A reply tells only the writer of the comment it answers. Nobody is told about their own comment.
+3. **Nothing offers reporting until reports exist** (IR-691). Until then, `can_report` is false on every comment.
+4. **Posting has its own request budget**, 10 a minute and 200 a day per person, set by `API_THROTTLE_COMMENT_BURST` and `API_THROTTLE_COMMENT`. Reading, editing and deleting spend nothing.
+
+**Choices made while building IR-690, confirmed 2026-11-10 by Hermoine Zozobrado (Accepted).** An agent proposed them while building, outside the design session, and she confirmed each one as written. Transcribed by an agent.
+
+- *Who sees what.* A paper that is not published answers the same 404 as a missing paper, to its owners too. A reply may answer a reply; the thread stays flat.
+- *A deleted account.* Its comments stay, shown as "Former user", like a Call's poster. Its personal-data export lists the comments it wrote: a deleted or removed one without its text, since no response carries that text.
+
 **Amendment, 2026-11-04 (Hermoine Zozobrado, design session; Accepted): review threads.** This replaces the IR-679 note's "Changes and Threads are later phases" and the review-workspace roadmap's Phases 3–5 (`../review_workspace_roadmap.md`). The review discussion keeps its readers and writers (`may_read_review` reads, participants write, IR-419). What follows is how a discussion becomes a review.
 
 **IRIS never edits the manuscript.** "Like Google Docs" means comments on a passage, suggested wording, replies and resolving. A revision is always a new PDF the author makes elsewhere, submitted as a Version. *Rejected: editing in the browser.* It would turn the manuscript from a PDF into stored text, against extraction (ADR-056), chunking (ADR-013) and citation anchors (ADR-031), and it would need a document model nobody has budgeted.

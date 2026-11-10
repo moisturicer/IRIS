@@ -15,6 +15,7 @@ RATE_KEYS = (
     "API_THROTTLE_AI_RUNTIME_EDGE",
     "API_THROTTLE_ANON_BURST", "API_THROTTLE_USER_BURST", "API_THROTTLE_AI_QUERY_BURST",
     "API_THROTTLE_LOGIN_BURST", "API_THROTTLE_REGISTER_BURST",
+    "API_THROTTLE_COMMENT", "API_THROTTLE_COMMENT_BURST",
 )
 # Soft limits (IR-999): a per-minute burst and a daily backstop per budget.
 DEFAULT_RATES = {
@@ -25,6 +26,7 @@ DEFAULT_RATES = {
     "auth_login_burst": "120/minute", "auth_login": "3000/day",
     "auth_register_burst": "60/minute", "auth_register": "750/day",
     "personal_data_export": "5/hour", "ai_runtime_edge": "10000/hour",
+    "public_comment_burst": "10/minute", "public_comment": "200/day",
 }
 
 
@@ -63,6 +65,8 @@ def test_unset_rates_keep_existing_defaults_even_in_debug(debug, module):
     ("API_THROTTLE_AI_QUERY_BURST", "ai_query_burst", "90/minute"),
     ("API_THROTTLE_LOGIN_BURST", "auth_login_burst", "900/minute"),
     ("API_THROTTLE_REGISTER_BURST", "auth_register_burst", "900/minute"),
+    ("API_THROTTLE_COMMENT", "public_comment", "500/day"),
+    ("API_THROTTLE_COMMENT_BURST", "public_comment_burst", "30/minute"),
 ])
 @pytest.mark.parametrize("module", ["base", "development"])
 def test_each_rate_can_be_overridden_independently(key, scope, value, module):

@@ -330,6 +330,21 @@ def review_mentions(user) -> list[dict]:
     return [{"paper": _paper(row.comment.record_id, titles), "at": row.notified_at} for row in rows]
 
 
+def comments(user) -> list[dict]:
+    """The Comments the person wrote on published papers (IR-690). A deleted or
+    removed one is listed without its text, which no response ever carries."""
+    from apps.records.models import PublicComment
+
+    rows = list(PublicComment.objects.filter(author=user).order_by("id"))
+    titles = _readable_titles(user, [row.record_id for row in rows])
+    return [
+        {"paper": _paper(row.record_id, titles), "body": None if row.deletion_kind else row.body,
+         "is_reply": row.reply_to_id is not None, "deletion": row.deletion_kind,
+         "at": row.created_at, "edited_at": row.edited_at}
+        for row in rows
+    ]
+
+
 def discovery(user) -> dict:
     from apps.records.models import DiscoveryDismissal, DiscoveryInterests
 
@@ -641,6 +656,7 @@ SECTIONS: dict[str, Callable] = {
     "saved_replies": saved_replies,
     "viewed_marks": viewed_marks,
     "review_mentions": review_mentions,
+    "comments": comments,
     "discovery": discovery,
     "conversations": conversations,
     "download_requests": download_requests,

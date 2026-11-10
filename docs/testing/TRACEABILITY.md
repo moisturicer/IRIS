@@ -227,6 +227,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1009** | A thread says why it isn't followed into a later Version (no text for a Version, or still looking) instead of saying nothing — follow-up to IR-876; no FR- id | [details](traceability/IR-1009.md) | **VERIFIED** |
 | **IR-877** | Viewed marks, saved replies and @mentions in the review — ADR-032 §7 Conveniences and its IR-877 build notes, ADR-058 §3 point 7; no FR- id. Built in three stacked PRs: [#663](https://github.com/moisturicer/IRIS/pull/663), [#664](https://github.com/moisturicer/IRIS/pull/664), [#665](https://github.com/moisturicer/IRIS/pull/665) | [details](traceability/IR-877.md) | **VERIFIED** |
 | **IR-1005** | The review-text reader loads its text encodings before its sandbox closes, so a PDF in an embedded font is read, not stored as no text — fix to IR-871; no FR- id | [details](traceability/IR-1005.md) | **VERIFIED** |
+| **IR-690** | Comments on published papers: write, reply, edit and delete — ADR-032 §7, amendment 2026-10-31, and its IR-690 build notes; no FR- id. PR [#672](https://github.com/moisturicer/IRIS/pull/672) | [details](traceability/IR-690.md) | **VERIFIED** |
 
 ### Non-functional
 

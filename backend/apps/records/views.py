@@ -5,6 +5,7 @@ from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.settings import api_settings
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponse
 from django.db import transaction
@@ -46,6 +47,7 @@ from .download_service import (
 # core.enums, and taking it from both was a redefinition. The models module
 # still re-exports it, so either import resolves -- the canonical one wins.
 from .models import Record, DownloadRequest, DeleteRequest
+from .public_comments import CommentPostBurstThrottle, CommentPostThrottle
 from .serializers import (
     RecordListSerializer,
     RecordDetailSerializer,
@@ -915,6 +917,61 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews.tracker import tracker_payload
 
         return Response(tracker_payload(self.get_object(), request.user))
+
+    def _public_comment_response(self, act, success=status.HTTP_200_OK):
+        """
+        Run a Comments act (ADR-032 §7, IR-690). 404 for a paper the caller may
+        not read, one that is not published, or a comment not on it -- the
+        same body `get_object()` gives a missing record -- 403 for someone
+        else's comment, 400 for what cannot be done.
+        """
+        from apps.records import public_comments
+
+        try:
+            result = act(public_comments)
+        except public_comments.CommentNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except public_comments.CommentRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except public_comments.CommentError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=success) if result is None else Response(result, status=success)
+
+    @action(
+        detail=True, methods=["get", "post"], url_path="comments", url_name="comments",
+        throttle_classes=[*api_settings.DEFAULT_THROTTLE_CLASSES, CommentPostBurstThrottle, CommentPostThrottle],
+    )
+    def comments(self, request, pk=None):
+        """
+        GET  /records/<id>/comments/ -- a published paper's Comments, oldest first, and their count.
+        POST /records/<id>/comments/ `{"body": str, "reply_to"?: id}` -- 201 with the comment.
+
+        Any signed-in account, on a published paper only (`apps.records.public_comments`).
+        Posting has its own request budget.
+        """
+        record = self.get_object()
+        if request.method == "GET":
+            return self._public_comment_response(lambda c: c.thread(record, request.user))
+        return self._public_comment_response(
+            lambda c: c.post(record, request.user, body=request.data.get("body"),
+                             reply_to=request.data.get("reply_to")),
+            success=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["patch", "delete"], url_path=r"comments/(?P<comment_id>[0-9]+)", url_name="comment")
+    def comment(self, request, pk=None, comment_id=None):
+        """
+        PATCH  /records/<id>/comments/<comment_id>/ `{"body": str}` -- its writer edits it.
+        DELETE /records/<id>/comments/<comment_id>/ -- its writer deletes it (204).
+        """
+        record = self.get_object()
+        if request.method == "DELETE":
+            return self._public_comment_response(
+                lambda c: c.delete(record, request.user, comment_id), success=status.HTTP_204_NO_CONTENT,
+            )
+        return self._public_comment_response(
+            lambda c: c.edit(record, request.user, comment_id, body=request.data.get("body")),
+        )
 
     def _comment_response(self, act, success=status.HTTP_200_OK):
         """

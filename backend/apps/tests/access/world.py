@@ -282,6 +282,9 @@ def build_world() -> World:
     o["published"] = published = _record(
         "Matrix: a published Thesis", owner, users["adviser"], status=PipelineStatus.PUBLISHED,
     )
+    # The owner's Comment on the published paper (IR-690): only its writer edits or deletes it.
+    from apps.records.models import PublicComment
+    o["public_comment"] = PublicComment.objects.create(record=published, author=owner, body="Thanks for reading.")
     o["download_request"] = DownloadRequest.objects.create(
         record=published, requested_by=other, note="For my thesis.",
     )

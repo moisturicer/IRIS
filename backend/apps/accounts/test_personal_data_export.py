@@ -309,6 +309,24 @@ class ExportContentTests(APITestCase):
         self.assertEqual(set(mentions[0]), {"paper", "at"})
         self.assertNotIn("See p. 4.", str(mentions))
 
+    def test_their_comments_are_theirs_and_a_deleted_one_has_no_text(self):
+        from django.utils import timezone
+
+        from apps.records.models import PublicComment
+        from core.enums import CommentDeletion
+
+        paper = _paper("Discussed in public", self.stranger, status=PipelineStatus.PUBLISHED)
+        PublicComment.objects.create(record=paper, author=self.me, body="Mine, standing.")
+        PublicComment.objects.create(record=paper, author=self.me, body="Mine, deleted.",
+                                     deletion_kind=CommentDeletion.WRITER, deleted_at=timezone.now())
+        PublicComment.objects.create(record=paper, author=self.stranger, body="Someone else's.")
+
+        mine = self.export()["comments"]
+
+        self.assertEqual([c["body"] for c in mine], ["Mine, standing.", None])
+        self.assertNotIn("Mine, deleted.", str(mine))
+        self.assertNotIn("Someone else's.", str(mine))
+
     def test_a_finished_review_round_is_in_the_acts_of_its_actor_only(self):
         from apps.reviews.models import ReviewRound
 
