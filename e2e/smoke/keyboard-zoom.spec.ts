@@ -2,7 +2,7 @@
 // equivalent at 400% zoom (1280 CSS px / 4 = 320 CSS px).
 import type { Locator, Page, Route } from "@playwright/test";
 import { expect, test } from "./support/mock-api";
-import { account, mockShell, PAPER, PAPER_DETAIL, paginated, signedIn, type SmokeRole } from "./support/fixtures";
+import { account, mockShell, PAPER, PAPER_DETAIL, paginated, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, signedIn, type SmokeRole } from "./support/fixtures";
 import { openScreen } from "./support/open-screen";
 import { DIALOGS, type DialogCase } from "./support/dialogs";
 import { SCREENS } from "./support/screens";
@@ -11,7 +11,7 @@ import { checkReachable, measureOverflow } from "../support/viewport";
 import { manuscriptPdf } from "../support/pdf";
 
 const QUESTION = "What soil sensors were tested?";
-const COMPOSER = "Ask a follow-up about the research corpus…";
+const COMPOSER = "Ask about the research corpus";
 const TAB_STOPS = "a[href], button:not(:disabled), input:not([type=hidden]):not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])";
 
 const screen = (id: string) => {
@@ -76,11 +76,6 @@ async function expectDialogKeyboardContract(page: Page, dialog: Locator, opener:
   await expect(dialog).toHaveCount(0);
   await expectVisibleFocus(opener);
 }
-
-const frame = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-const answer = (text: string) => frame("done", {
-  answer: text, citations: [], sources: [], conversation_id: 1, turn_id: 40,
-});
 
 function draftDetail(overrides: Record<string, unknown> = {}) {
   return {
@@ -151,6 +146,7 @@ function mockReadyDraft(api: MockApi, initialDraft = draftDetail()) {
   } }));
   api.on("GET", "/records/42/document-requests/", []);
   api.on("GET", "/records/42/review-comments/", []);
+  api.on("GET", "/records/42/response-letters/", []);
   api.on("POST", "/records/42/submit/", (route: Route) => {
     state = "submitted";
     return route.fulfill({ json: { detail: "Submitted." } });
@@ -227,11 +223,41 @@ test("Ask IRIS accepts and sends a question from the keyboard", async ({ page, a
   await tabTo(page, composer);
   await expectVisibleFocus(composer);
   await page.keyboard.type(QUESTION);
-  api.on("POST", "/ai/ask/stream/", (route: Route) => route.fulfill({
-    status: 200,
-    headers: { "content-type": "text/event-stream" },
-    body: answer("Capacitive probes were tested in upland rice fields."),
-  }));
+  const run = {
+    protocol: "runs-reader-1",
+    id: "00000000-0000-4000-8000-000000000001",
+    conversation_id: RUNTIME_CONVERSATION_ID,
+    state: "completed",
+    question: QUESTION,
+    base_revision: 0,
+    version: 3,
+    turn_id: "00000000-0000-4000-8000-000000000003",
+    depth: "ordinary",
+    awaiting_reader: false,
+    plan: null,
+    context: null,
+    compaction: null,
+    cursor: 2,
+    retry_of: null,
+    retried_by: null,
+    sources_available: true,
+    capabilities: { manual_compaction: false },
+  };
+  api.on("POST", "/ai/runtime/runs", run, 201);
+  api.on("GET", RUNTIME_CONVERSATION_PATH, {
+    ...RUNTIME_CONVERSATION,
+    revision: 1,
+    runs: [run],
+    turns: [{
+      id: run.turn_id,
+      run_id: run.id,
+      ordinal: 1,
+      question: QUESTION,
+      answer: "Capacitive probes were tested in upland rice fields.",
+      kind: "answer",
+      citations: [],
+    }],
+  });
   await page.keyboard.press("Enter");
   await expect(page.getByText(QUESTION, { exact: true })).toBeVisible();
   await expect(page.getByText("Capacitive probes were tested in upland rice fields.")).toBeVisible();
