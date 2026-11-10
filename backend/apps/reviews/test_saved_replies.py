@@ -16,7 +16,7 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import User
 
 from .comments import MAX_BODY_LENGTH
-from .models import MAX_SAVED_REPLIES, SavedReply
+from .models import MAX_SAVED_REPLIES, MAX_SAVED_REPLY_TITLE, SavedReply
 
 REPLIES = "/api/v1/reviews/saved-replies/"
 
@@ -139,7 +139,7 @@ class SavedReplyTests(APITestCase):
         self.assertEqual(self.make("Long", body="x" * (MAX_BODY_LENGTH + 1)).status_code, 400)
 
     def test_the_title_is_bounded(self):
-        self.assertEqual(self.make(title="t" * 61).status_code, 400)
+        self.assertEqual(self.make(title="t" * (MAX_SAVED_REPLY_TITLE + 1)).status_code, 400)
 
     def test_an_edit_names_something_to_change(self):
         pk = self.make().data["id"]

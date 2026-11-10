@@ -666,6 +666,8 @@ class ResponseLetter(models.Model):
 #: How many saved replies one person keeps (IR-877). Enough for a reviewer's
 #: stock phrases; a ceiling because each is stored and listed in full.
 MAX_SAVED_REPLIES = 50
+#: The longest title a saved reply takes: a label in a menu, not a sentence.
+MAX_SAVED_REPLY_TITLE = 60
 
 
 class SavedReply(models.Model):
@@ -684,7 +686,7 @@ class SavedReply(models.Model):
     owner      = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_replies",
     )
-    title      = models.CharField(max_length=60)
+    title      = models.CharField(max_length=MAX_SAVED_REPLY_TITLE)
     body       = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -17,20 +17,23 @@ import type { SavedReply } from "@/types/reviews";
 
 type Loaded = { state: "idle" | "loading" | "failed" } | { state: "ready"; replies: SavedReply[] };
 
+/** Is `r` a saved reply as we read one (F1)? */
+function isReply(r: unknown): r is SavedReply {
+  return !!r && typeof r === "object" && typeof (r as SavedReply).id === "number"
+    && typeof (r as SavedReply).title === "string" && typeof (r as SavedReply).body === "string";
+}
+
 /** The replies in a response, or null when it isn't the shape we read (F1). */
 function repliesIn(data: unknown): SavedReply[] | null {
   const results = (data as { results?: unknown } | null)?.results;
-  if (!Array.isArray(results)) return null;
-  return results.filter((r): r is SavedReply =>
-    !!r && typeof r === "object" && typeof (r as SavedReply).id === "number"
-    && typeof (r as SavedReply).title === "string" && typeof (r as SavedReply).body === "string");
+  return Array.isArray(results) ? results.filter(isReply) : null;
 }
 
 const byTitle = (a: SavedReply, b: SavedReply) =>
   a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
 
 /** `value` with `text` added at `at`: nothing is removed. */
-export function insertAt(value: string, text: string, at: number): { value: string; caret: number } {
+function insertAt(value: string, text: string, at: number): { value: string; caret: number } {
   const i = Math.max(0, Math.min(at, value.length));
   return { value: value.slice(0, i) + text + value.slice(i), caret: i + text.length };
 }
@@ -110,7 +113,8 @@ export function SavedReplies({ textareaRef, value, onChange }: {
               ))}
             </ul>
           )}
-          {loaded.state !== "loading" && (
+          {/* Only over a loaded list: managing an unloaded one would lose the rest. */}
+          {loaded.state === "ready" && (
             <Button type="button" size="sm" variant="ghost" onClick={() => setManaging(true)}>
               Manage saved replies
             </Button>
@@ -121,16 +125,19 @@ export function SavedReplies({ textareaRef, value, onChange }: {
         open={managing}
         replies={replies}
         onChange={(next) => setLoaded({ state: "ready", replies: [...next].sort(byTitle) })}
+        onStale={() => void load()}
         onClose={() => setManaging(false)}
       />
     </div>
   );
 }
 
-function ManageSavedReplies({ open, replies, onChange, onClose }: {
+function ManageSavedReplies({ open, replies, onChange, onStale, onClose }: {
   open: boolean;
   replies: SavedReply[];
   onChange: (replies: SavedReply[]) => void;
+  /** A write answered with a body we can't read (F1): the list is read again. */
+  onStale: () => void;
   onClose: () => void;
 }) {
   return (
@@ -142,7 +149,8 @@ function ManageSavedReplies({ open, replies, onChange, onClose }: {
           <ul className="space-y-2">
             {replies.map((r) => (
               <ReplyItem key={r.id} reply={r}
-                onSaved={(saved) => onChange(replies.map((x) => (x.id === saved.id ? saved : x)))}
+                onSaved={(saved) => (isReply(saved)
+                  ? onChange(replies.map((x) => (x.id === saved.id ? saved : x))) : onStale())}
                 onDeleted={() => onChange(replies.filter((x) => x.id !== r.id))} />
             ))}
           </ul>
@@ -152,7 +160,8 @@ function ManageSavedReplies({ open, replies, onChange, onClose }: {
           <ReplyForm submitLabel="Save reply" clearOnSuccess
             onSubmit={async (body) => {
               const { data } = await reviewsApi.createSavedReply(body);
-              onChange([...replies, data]);
+              if (isReply(data)) onChange([...replies, data]);
+              else onStale();
             }} />
         </section>
       </div>
@@ -162,7 +171,7 @@ function ManageSavedReplies({ open, replies, onChange, onClose }: {
 
 function ReplyItem({ reply, onSaved, onDeleted }: {
   reply: SavedReply;
-  onSaved: (reply: SavedReply) => void;
+  onSaved: (reply: unknown) => void;
   onDeleted: () => void;
 }) {
   const titleId = useId();

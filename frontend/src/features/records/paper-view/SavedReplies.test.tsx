@@ -103,6 +103,8 @@ describe("inserting a saved reply", () => {
 
     expect(await screen.findByText("Your saved replies couldn’t be loaded.")).toBeInTheDocument();
     expect(box().value).toBe("Kept");
+    // Managing a list that never loaded would lose the replies not shown.
+    expect(screen.queryByRole("button", { name: "Manage saved replies" })).not.toBeInTheDocument();
   });
 
   it("leaves out an entry of the wrong shape and keeps the rest", async () => {
@@ -149,6 +151,18 @@ describe("managing saved replies", () => {
     expect(await within(dialog).findByRole("listitem", { name: "Methods" })).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Done" }));
     expect(await screen.findByRole("button", { name: "Insert “Methods”" })).toBeInTheDocument();
+  });
+
+  it("reads the list again when a save answers with the wrong shape", async () => {
+    api.createSavedReply.mockResolvedValue({ data: { saved: true } });
+    const { user, dialog } = await openManager();
+
+    await user.type(within(dialog).getByRole("textbox", { name: "Title" }), "Methods");
+    await user.type(within(dialog).getByRole("textbox", { name: "Text" }), "Say more.");
+    await user.click(within(dialog).getByRole("button", { name: "Save reply" }));
+
+    await vi.waitFor(() => expect(api.savedReplies).toHaveBeenCalledTimes(2));
+    expect(within(dialog).getByRole("listitem", { name: "Typo" })).toBeInTheDocument();
   });
 
   it("shows the server's refusal and keeps what was typed", async () => {

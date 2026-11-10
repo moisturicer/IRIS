@@ -27,9 +27,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .comments import MAX_BODY_LENGTH
-from .models import MAX_SAVED_REPLIES, SavedReply
-
-MAX_TITLE_LENGTH = 60
+from .models import MAX_SAVED_REPLIES, MAX_SAVED_REPLY_TITLE, SavedReply
 
 DUPLICATE_TITLE = "You already have a saved reply with that title."
 
@@ -38,8 +36,8 @@ def clean_title(raw) -> str:
     title = raw.strip() if isinstance(raw, str) else ""
     if not title:
         raise ValidationError({"title": ["Give the reply a title."]})
-    if len(title) > MAX_TITLE_LENGTH:
-        raise ValidationError({"title": [f"Use {MAX_TITLE_LENGTH} characters or fewer."]})
+    if len(title) > MAX_SAVED_REPLY_TITLE:
+        raise ValidationError({"title": [f"Use {MAX_SAVED_REPLY_TITLE} characters or fewer."]})
     return title
 
 
@@ -73,7 +71,7 @@ def _entry(reply) -> dict:
     }
 
 
-def _body(request) -> dict:
+def _payload(request) -> dict:
     return request.data if isinstance(request.data, dict) else {}
 
 
@@ -100,7 +98,7 @@ class SavedReplyListView(APIView):
         return Response({"results": [_entry(r) for r in rows], "limit": MAX_SAVED_REPLIES})
 
     def post(self, request):
-        data = _body(request)
+        data = _payload(request)
         title, body = clean_title(data.get("title")), clean_body(data.get("body"))
         with transaction.atomic():
             _locked(request.user)
@@ -120,7 +118,7 @@ class SavedReplyDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, reply_id):
-        data = _body(request)
+        data = _payload(request)
         if "title" not in data and "body" not in data:
             raise ValidationError({"detail": ["Give a title or a text to change."]})
         title = clean_title(data["title"]) if "title" in data else None
