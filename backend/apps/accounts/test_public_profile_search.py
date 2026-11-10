@@ -32,6 +32,7 @@ class PeopleSearchTests(APITestCase):
         StudentProfile.objects.create(user=self.ada, course=self.course)
         self.faculty = make_user("faculty@cit.edu", RoleName.ADVISER)
         AdviserProfile.objects.create(user=self.faculty, college=self.college, department=self.department)
+        self.office = make_user("office@cit.edu", RoleName.ITSO)
         self.url = reverse("user-search")
         self.client.force_authenticate(self.viewer)
 
@@ -52,6 +53,7 @@ class PeopleSearchTests(APITestCase):
             ({"college": self.college.pk}, {self.ada.pk, self.faculty.pk}),
             ({"department": self.department.pk}, {self.ada.pk, self.faculty.pk}),
             ({"role": "Faculty"}, {self.faculty.pk}),
+            ({"role": "office"}, {self.office.pk}),
         ):
             with self.subTest(params=params):
                 response = self.client.get(self.url, params)

@@ -11,6 +11,7 @@ from . import profile, public_profile
 OFFICE_ROLES = (RoleName.ITSO, RoleName.IERC, RoleName.KTTO, RoleName.RDCO)
 SEARCH_ROLES = (RoleName.STUDENT, RoleName.ADVISER, *OFFICE_ROLES)
 BAD_FILTER = "Provide a valid college or department ID."
+PAGE_SIZE = 20
 
 
 def _filter_id(params, key):
@@ -108,29 +109,5 @@ def _person_payload(person):
 
 def search(request):
     """Return one page of public people matching Discover's search and filters."""
-    try:
-        page = int(request.query_params.get("page", 1))
-    except (TypeError, ValueError):
-        raise ValidationError({"page": public_profile.BAD_PAGE})
-    try:
-        page_size = int(request.query_params.get("page_size", 20))
-    except (TypeError, ValueError):
-        raise ValidationError({"page_size": public_profile.BAD_PAGE_SIZE})
-    if page < 1:
-        raise ValidationError({"page": public_profile.BAD_PAGE})
-    if page_size < 1:
-        raise ValidationError({"page_size": public_profile.BAD_PAGE_SIZE})
-    page_size = min(page_size, public_profile.MAX_PAGE_SIZE)
-
     queryset = _base_queryset(request, request.query_params.get("search", "").strip())
-    start = (page - 1) * page_size
-    window = list(queryset[start:start + page_size + 1])
-    next_url = None
-    if len(window) > page_size:
-        from rest_framework.utils.urls import replace_query_param
-
-        next_url = replace_query_param(request.build_absolute_uri(), "page", page + 1)
-    return {
-        "next": next_url,
-        "results": [_person_payload(person) for person in window[:page_size]],
-    }
+    return public_profile.paginate(request, queryset, PAGE_SIZE, _person_payload)
