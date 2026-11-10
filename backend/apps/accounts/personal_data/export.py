@@ -317,6 +317,19 @@ def viewed_marks(user) -> list[dict]:
     ]
 
 
+def review_mentions(user) -> list[dict]:
+    """Where the person was mentioned in a review discussion (IR-877): the paper
+    and when they were told. A draft's mention is its writer's until it is sent,
+    so only mentions the person was told of are theirs; the comment and its
+    writer are not named."""
+    from apps.reviews.models import ReviewMention
+
+    rows = list(ReviewMention.objects.filter(user=user, notified_at__isnull=False)
+                .select_related("comment").order_by("id"))
+    titles = _readable_titles(user, [row.comment.record_id for row in rows])
+    return [{"paper": _paper(row.comment.record_id, titles), "at": row.notified_at} for row in rows]
+
+
 def discovery(user) -> dict:
     from apps.records.models import DiscoveryDismissal, DiscoveryInterests
 
@@ -627,6 +640,7 @@ SECTIONS: dict[str, Callable] = {
     "saved_feeds": saved_feeds,
     "saved_replies": saved_replies,
     "viewed_marks": viewed_marks,
+    "review_mentions": review_mentions,
     "discovery": discovery,
     "conversations": conversations,
     "download_requests": download_requests,

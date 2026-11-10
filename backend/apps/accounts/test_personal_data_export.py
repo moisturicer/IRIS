@@ -291,6 +291,24 @@ class ExportContentTests(APITestCase):
         self.assertEqual([(m["record_id"], m["version"], m["section"]) for m in marks],
                          [(paper.pk, 1, "methods")])
 
+    def test_mentions_they_were_told_of_are_theirs_and_a_draft_s_are_not(self):
+        from django.utils import timezone
+
+        from apps.reviews.models import ReviewComment, ReviewMention
+
+        paper = _paper("Discussed", self.stranger, status=PipelineStatus.PUBLISHED)
+        sent = ReviewComment.objects.create(record=paper, author=self.stranger, body="See p. 4.")
+        draft = ReviewComment.objects.create(record=paper, author=self.stranger, body="Hm.", is_draft=True)
+        ReviewMention.objects.create(comment=sent, user=self.me, notified_at=timezone.now())
+        ReviewMention.objects.create(comment=draft, user=self.me)
+        ReviewMention.objects.create(comment=sent, user=self.stranger, notified_at=timezone.now())
+
+        mentions = self.export()["review_mentions"]
+
+        self.assertEqual(len(mentions), 1)
+        self.assertEqual(set(mentions[0]), {"paper", "at"})
+        self.assertNotIn("See p. 4.", str(mentions))
+
     def test_a_finished_review_round_is_in_the_acts_of_its_actor_only(self):
         from apps.reviews.models import ReviewRound
 

@@ -8,10 +8,11 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { errorDetail } from "@/lib/errorDetail";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { cn, formatDate } from "@/lib/utils";
-import type { RecordTracker, ReviewComment } from "@/types/records";
+import type { MentionedPerson, RecordTracker, ReviewComment } from "@/types/records";
 
 import { RailHeading } from "./headings";
 import { ReviewStatus } from "./ReviewStatus";
+import { MentionPicker, MentionedPeople, peopleIn } from "./Mentions";
 import { SavedReplies } from "./SavedReplies";
 import { timelineEntries, type TimelineEntry, type TimelineKind } from "./timelineEntries";
 
@@ -33,8 +34,14 @@ const KIND_ICON: Record<TimelineKind, string> = {
 interface Discussion {
   /** The server offers `comment_review`: comment and reply. */
   canComment: boolean;
-  post: (body: string, replyTo?: number) => Promise<void>;
-  edit: (commentId: number, body: string) => Promise<void>;
+  /** Whose review discussion this is: the mention picker asks who takes part (IR-877). */
+  recordId: number;
+  post: (body: string, replyTo: number | undefined, mentions: number[]) => Promise<void>;
+  /**
+   * `mentions`, when given, replaces whom the comment mentions; someone new is
+   * notified once. Left out, they stay as they are.
+   */
+  edit: (commentId: number, body: string, mentions?: number[]) => Promise<void>;
 }
 
 /**
@@ -94,8 +101,13 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
   const [draftNote, setDraftNote] = useState("");
   const discussion: Discussion = {
     canComment,
-    post: async (body, replyTo) => {
-      const { data } = await recordsApi.postReviewComment(recordId, replyTo === undefined ? { body } : { body, reply_to: replyTo });
+    recordId,
+    post: async (body, replyTo, mentions) => {
+      const { data } = await recordsApi.postReviewComment(recordId, {
+        body,
+        ...(replyTo === undefined ? {} : { reply_to: replyTo }),
+        ...(mentions.length ? { mentions } : {}),
+      });
       // A seated reviewer's new thread is a draft: it waits in Threads, unseen.
       setDraftNote(data?.is_draft
         ? "Added to your drafts in Threads. Only you see it until you finish your review."
@@ -103,8 +115,8 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
       onCommented?.();
       reread();
     },
-    edit: async (commentId, body) => {
-      await recordsApi.editReviewComment(recordId, commentId, { body });
+    edit: async (commentId, body, mentions) => {
+      await recordsApi.editReviewComment(recordId, commentId, mentions === undefined ? { body } : { body, mentions });
       reread();
     },
   };
@@ -159,7 +171,8 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
               <CommentForm
                 label="Comment"
                 submitLabel="Comment"
-                onSubmit={(body) => discussion.post(body)}
+                recordId={recordId}
+                onSubmit={(body, mentions) => discussion.post(body, undefined, mentions)}
                 clearOnSuccess
               />
             )}
@@ -239,8 +252,9 @@ function TimelineItem({ entry, discussion }: { entry: TimelineEntry; discussion:
         <CommentForm
           label={replyLabel}
           submitLabel="Send reply"
-          onSubmit={async (body) => {
-            await discussion.post(body, thread.root.id);
+          recordId={discussion.recordId}
+          onSubmit={async (body, mentions) => {
+            await discussion.post(body, thread.root.id, mentions);
             setReplying(false);
           }}
           onCancel={() => setReplying(false)}
@@ -282,6 +296,7 @@ function EditableComment({
 }) {
   const [editing, setEditing] = useState(false);
   const canEdit = discussion.canComment && comment.can_edit;
+  const before = peopleIn(comment.mentions);
 
   if (editing) {
     return (
@@ -289,8 +304,12 @@ function EditableComment({
         label="Edit your comment"
         submitLabel="Save"
         initial={comment.body}
-        onSubmit={async (body) => {
-          await discussion.edit(comment.id, body);
+        initialMentions={before}
+        recordId={discussion.recordId}
+        onSubmit={async (body, mentions) => {
+          // Sent only when changed, so a payload without them never clears them.
+          const same = mentions.length === before.length && mentions.every((m, i) => m === before[i].id);
+          await discussion.edit(comment.id, body, same ? undefined : mentions);
           setEditing(false);
         }}
         onCancel={() => setEditing(false)}
@@ -300,6 +319,7 @@ function EditableComment({
   return (
     <>
       <CommentBody body={comment.body} />
+      <MentionedPeople people={comment.mentions} />
       {discussion.canComment && (action || canEdit) && (
         <div className="flex gap-3 mt-1">
           {action}
@@ -341,7 +361,11 @@ interface CommentFormProps {
   label: string;
   submitLabel: string;
   initial?: string;
-  onSubmit: (body: string) => Promise<void>;
+  /** Whose review discussion: whom the box may mention (IR-877). */
+  recordId: number;
+  /** An edit starts from whom the comment already mentions. */
+  initialMentions?: MentionedPerson[];
+  onSubmit: (body: string, mentions: number[]) => Promise<void>;
   onCancel?: () => void;
   /** Empty the box once the server has it (the composer, not an edit). */
   clearOnSuccess?: boolean;
@@ -351,9 +375,12 @@ interface CommentFormProps {
  * A comment being written: the composer, a reply, or an edit. A refusal is
  * the server's own words, and what was written stays in the box.
  */
-function CommentForm({ label, submitLabel, initial = "", onSubmit, onCancel, clearOnSuccess }: CommentFormProps) {
+function CommentForm({
+  label, submitLabel, initial = "", recordId, initialMentions = [], onSubmit, onCancel, clearOnSuccess,
+}: CommentFormProps) {
   const id = useId();
   const [body, setBody] = useState(initial);
+  const [mentioned, setMentioned] = useState<MentionedPerson[]>(initialMentions);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const ready = body.trim() !== "";
@@ -365,8 +392,11 @@ function CommentForm({ label, submitLabel, initial = "", onSubmit, onCancel, cle
     setError(null);
     setSending(true);
     try {
-      await onSubmit(body.trim());
-      if (clearOnSuccess) setBody("");
+      await onSubmit(body.trim(), mentioned.map((p) => p.id));
+      if (clearOnSuccess) {
+        setBody("");
+        setMentioned([]);
+      }
     } catch (err) {
       setError(`${errorDetail(err, "Your comment could not be sent. Please try again.")} What you wrote is kept.`);
     } finally {
@@ -388,6 +418,7 @@ function CommentForm({ label, submitLabel, initial = "", onSubmit, onCancel, cle
         className={fieldClasses(false)}
       />
       <SavedReplies textareaRef={ref} value={body} onChange={setBody} />
+      <MentionPicker recordId={recordId} value={mentioned} onChange={setMentioned} />
       {error && (
         <p role="alert" className={LOAD_ERROR}>
           <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />

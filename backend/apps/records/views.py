@@ -940,7 +940,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         GET  /records/<id>/review-comments/ -- the review discussion, oldest first.
         POST /records/<id>/review-comments/
-        `{"body": str, "reply_to"?: id, "severity"?: str, "anchor"?: {...}, "suggestion"?: str}`
+        `{"body": str, "reply_to"?: id, "severity"?: str, "anchor"?: {...}, "suggestion"?: str,
+          "mentions"?: [user id]}`
 
         Read under `may_read_review`; written by the record's participants, on
         a submitted record (`apps.reviews.comments`). A new comment answers 201.
@@ -953,10 +954,23 @@ class RecordViewSet(viewsets.ModelViewSet):
                 record, request.user,
                 body=request.data.get("body"), reply_to=request.data.get("reply_to"),
                 severity=request.data.get("severity"), anchor=request.data.get("anchor"),
-                suggestion=request.data.get("suggestion"),
+                suggestion=request.data.get("suggestion"), mentioned=request.data.get("mentions"),
             ), request.user),
             success=status.HTTP_201_CREATED,
         )
+
+    @action(detail=True, methods=["get"], url_path="review-mentionable", url_name="review-mentionable")
+    def review_mentionable(self, request, pk=None):
+        """
+        GET /records/<id>/review-mentionable/ -> `{"results": [{"id", "name"}]}`
+
+        Whom the caller may mention in this record's review discussion
+        (ADR-032 §7, IR-877): everyone `may_read_review` admits but the caller.
+        Only a writer is offered it: 404 to one who may not read the review,
+        403 to one who reads it but may not write in it.
+        """
+        record = self.get_object()
+        return self._comment_response(lambda c: {"results": c.mentionable(record, request.user)})
 
     @action(
         detail=True, methods=["patch", "delete"],
@@ -964,7 +978,8 @@ class RecordViewSet(viewsets.ModelViewSet):
     )
     def review_comment(self, request, pk=None, comment_id=None):
         """
-        PATCH  /records/<id>/review-comments/<comment_id>/ `{"body"?: str, "suggestion"?: str}`
+        PATCH  /records/<id>/review-comments/<comment_id>/
+               `{"body"?: str, "suggestion"?: str, "mentions"?: [user id]}`
         DELETE /records/<id>/review-comments/<comment_id>/
 
         Its author edits a comment; a changed body stamps `edited_at`. A
@@ -978,7 +993,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             )
         return self._comment_response(lambda c: c.comment_payload(c.edit_comment(
             record, request.user, int(comment_id), body=request.data.get("body"),
-            suggestion=request.data.get("suggestion"),
+            suggestion=request.data.get("suggestion"), mentioned=request.data.get("mentions"),
         ), request.user))
 
     @action(
