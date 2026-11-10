@@ -734,3 +734,33 @@ class ViewedMark(models.Model):
 
     def __str__(self):
         return f"Viewed by {self.user_id}: {self.section_key[:40]} in reading {self.reading_id}"
+
+
+class ReviewMention(models.Model):
+    """
+    A person a review comment mentions (ADR-032 §7 Conveniences; IR-877 build
+    notes 3 and 4), picked beside the text rather than parsed out of it.
+
+    Only someone `may_read_review` admits may be mentioned, checked when the
+    comment is written (`apps.reviews.mentions`). **A row is never deleted
+    while its comment stands**: a name removed in an edit is `active=False`,
+    so adding it back finds `notified_at` already set and nobody is told twice
+    about one comment. `notified_at` is set when the notice is sent: at once
+    for a comment that posts at once, at *Finish review* for a draft's.
+    """
+
+    comment     = models.ForeignKey(ReviewComment, on_delete=models.CASCADE, related_name="mentions")
+    user        = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="review_mentions",
+    )
+    active      = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(default=timezone.now)
+    notified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["comment", "user"], name="one_mention_per_comment_person"),
+        ]
+
+    def __str__(self):
+        return f"Mention of {self.user_id} in comment {self.comment_id}"

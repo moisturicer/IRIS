@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -47,7 +48,7 @@ from core.enums import (
 )
 from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
 
-from . import threads
+from . import mentions, threads
 from .models import ReviewComment
 
 #: Longer than any comment a reviewer writes, short enough that the timeline
@@ -209,6 +210,8 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "created_at": comment.created_at.isoformat(),
         "edited_at": comment.edited_at.isoformat() if comment.edited_at else None,
         "can_edit": mine,
+        # The people it mentions (IR-877).
+        "mentions": mentions.payload(comment),
         # The thread (ADR-032 §7, IR-874).
         "party": (comment.party or None) if top else None,
         "party_label": threads.party_label(comment.party) if top else None,
@@ -264,7 +267,7 @@ def comments_payload(record, user) -> list[dict[str, Any]]:
     rows = (
         _visible(record, user)
         .select_related("author", "version", "anchor_version", "resolved_by", "answered_by", "record")
-        .prefetch_related("events__actor", "places__version")
+        .prefetch_related("events__actor", "places__version", "mentions__user")
     )
     viewer = _Viewer(record, user)
     return [comment_payload(c, user, viewer) for c in rows.order_by("created_at", "pk")]
@@ -386,13 +389,39 @@ def _suggestion(value) -> str:
     return value.strip()
 
 
+def _mentioned(record, value, comment=None) -> Optional[list]:
+    """The people `value` mentions, or None when the request leaves them out."""
+    if value is None:
+        return None
+    try:
+        return mentions.people(record, value, comment)
+    except mentions.MentionError as exc:
+        raise CommentError(str(exc)) from None
+
+
+def _with_mentions(comment, user, people) -> ReviewComment:
+    if people is not None:
+        mentions.replace(comment, people)
+        mentions.tell_now(comment, user)
+    return comment
+
+
+def mentionable(record, user) -> list[dict[str, Any]]:
+    """`GET /records/<id>/review-mentionable/`: whom a writer may mention, but themselves."""
+    _writer(record, user)
+    return [{"id": u.pk, "name": u.get_full_name()}
+            for u in mentions.candidates(record) if u.pk != user.pk]
+
+
+@transaction.atomic
 def post_comment(record, user, *, body, reply_to: Optional[int] = None,
-                 severity=None, anchor=None, suggestion=None) -> ReviewComment:
+                 severity=None, anchor=None, suggestion=None, mentioned=None) -> ReviewComment:
     """`POST /records/<id>/review-comments/`: a participant comments."""
     _writer(record, user)
     if record.pipeline_status == PipelineStatus.DRAFT:
         raise CommentError("A draft is not under review. Comments open once it is submitted.")
     text = _body(body)
+    people = _mentioned(record, mentioned)
 
     if reply_to not in (None, ""):
         try:
@@ -412,10 +441,10 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None,
                 "A reply belongs to its thread: it has no severity, anchor or suggested wording."
             )
         # Replies post immediately and are never held (ADR-032 §7).
-        return ReviewComment.objects.create(
+        return _with_mentions(ReviewComment.objects.create(
             record=record, author=user, body=text,
             version=latest_version(record), reply_to=parent,
-        )
+        ), user, people)
 
     party, seated = writer_party(record, user)
     wording = _suggestion(suggestion)
@@ -431,11 +460,11 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None,
         severity = severity or ThreadSeverity.SUGGESTION
         if severity not in ThreadSeverity.values:
             raise CommentError("Choose Must fix or Suggestion.")
-    return ReviewComment.objects.create(
+    return _with_mentions(ReviewComment.objects.create(
         record=record, author=user, body=text, version=latest_version(record),
         party=party, severity=severity, is_draft=seated, suggestion=wording,
         **(_anchor(record, anchor) if anchor is not None else {}),
-    )
+    ), user, people)
 
 
 def _own(record, user, comment_id) -> ReviewComment:
@@ -449,11 +478,15 @@ def _own(record, user, comment_id) -> ReviewComment:
     return comment
 
 
-def edit_comment(record, user, comment_id, *, body=None, suggestion=None) -> ReviewComment:
+@transaction.atomic
+def edit_comment(record, user, comment_id, *, body=None, suggestion=None,
+                 mentioned=None) -> ReviewComment:
     """`PATCH /records/<id>/review-comments/<comment_id>/`: the author edits
-    the body, or a draft's suggested wording. Sent wording is fixed (IR-876),
-    so the owner always answers the wording they read."""
+    the body, a draft's suggested wording, or whom it mentions (IR-877; a
+    change of mentions alone stamps no `edited_at`). Sent wording is fixed
+    (IR-876), so the owner always answers the wording they read."""
     comment = _own(record, user, comment_id)
+    people = _mentioned(record, mentioned, comment)
     fields = []
     if suggestion is not None:
         if not comment.is_draft:
@@ -472,7 +505,7 @@ def edit_comment(record, user, comment_id, *, body=None, suggestion=None) -> Rev
             fields += ["body", "edited_at"]
     if fields:
         comment.save(update_fields=fields)
-    return comment
+    return _with_mentions(comment, user, people)
 
 
 def delete_draft(record, user, comment_id) -> None:

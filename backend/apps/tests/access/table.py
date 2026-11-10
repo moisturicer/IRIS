@@ -295,6 +295,11 @@ RECORDS: dict[str, Entry | Shadowed] = {
             kwargs=RECORD, data={"body": "Which version is this?"},
         ),
     }),
+    # Whom a writer may mention (IR-877): the writers of the discussion only,
+    # so a pool member who reads it is refused, as POST above refuses them.
+    "record-review-mentionable": Entry({
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE), kwargs=RECORD),
+    }),
     "record-review-comment": Entry({
         "PATCH": _case(
             row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE),
