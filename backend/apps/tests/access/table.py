@@ -557,6 +557,8 @@ ACCOUNTS = {
     }),
     "user-photo": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
     "user-interest-suggestions": Entry({"GET": _case(SIGNED_IN, query={"q": "mach"})}),
+    # IR-697: Discover people search has the same signed-in audience as profiles.
+    "user-search": Entry({"GET": _case(SIGNED_IN, query={"search": "research"})}),
     # IR-696: a person's public profile and its three lists, for any signed-in
     # user. The subject is the one who is read, not an actor: an account the
     # server hides answers the same 404 as a missing id, which is not an access
