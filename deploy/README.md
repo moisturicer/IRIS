@@ -66,7 +66,7 @@ DUCKDNS_DOMAIN=iris-citu
 DUCKDNS_TOKEN=<the token from duckdns.org>
 ```
 
-`DUCKDNS_DOMAIN` is the subdomain alone, without `.duckdns.org`. Then run the script again. It refuses the file unless it is owned by root with mode 600, and fails at once on a token DuckDNS rejects, rather than after the next reboot. Each later run sends the address again, as every boot does.
+`DUCKDNS_DOMAIN` is the subdomain alone, without `.duckdns.org`. Then run the script again: `sudo bash ~/IRIS/deploy/bootstrap_server.sh` (the clone's copy, on any server this script set up). It refuses the file unless it is owned by root with mode 600, and fails at once on a token DuckDNS rejects, rather than after the next reboot. Each later run sends the address again, as every boot does.
 
 **Not at launch.** User data runs before anyone can create this file, and putting the token in user data would expose it. So a server started from user data has no DuckDNS until someone logs in once, creates the file and runs the script again. With an Elastic IP, skip DuckDNS's updater altogether: set the address once on duckdns.org.
 
@@ -96,12 +96,16 @@ and fill in `backend/.env` and `ai/.env` (domain, vendor keys, Gmail) before `do
 
 | Resource | What for |
 |---|---|
-| EC2 instance | Ubuntu 24.04 (the newest image AWS lists for the region), encrypted gp3 disk; runs `bootstrap_server.sh` at first boot |
+| EC2 instance | Ubuntu 24.04 (Canonical's current image for the region), encrypted gp3 disk; runs `bootstrap_server.sh` at first boot |
 | Security group | ports 80 and 443 open to anywhere (Caddy needs 80 for its certificate); 22 only if you give an SSH address |
 | Elastic IP | the fixed address DuckDNS points at |
 | IAM role | `AmazonSSMManagedInstanceCore` only, so Session Manager can open a shell without SSH or a key |
 
 It holds no secret and starts nothing: the `.env` files are still written by a person, as in **Next** above.
+
+**Before you start:**
+- **A default VPC.** The region needs its default VPC, which every AWS account has unless someone deleted it (**VPC → Your VPCs**, "Default VPC: Yes"). The template names no network of its own, so without one the stack fails at the security group and rolls back.
+- **A public repository.** The server downloads the script from GitHub without signing in, so the repository must be public.
 
 ### Create the stack
 
@@ -114,13 +118,13 @@ It holds no secret and starts nothing: the `.env` files are still written by a p
    | `InstanceType` | `m7i-flex.large` | `t3.large` where that isn't offered. The smaller ones are only for trying the template: the build needs about 8 GB |
    | `DiskSizeGiB` | `64` | |
    | `SshSourceIp` | empty | your public IPv4 to allow SSH from it alone; empty keeps port 22 closed |
-   | `KeyPairName` | empty | an existing key pair, for SSH; not needed for Session Manager |
-   | `IrisRef` | `main` | which version of `bootstrap_server.sh` runs; it downloads it from GitHub at first boot |
+   | `KeyPairName` | empty | an existing key pair, for SSH. Only useful with `SshSourceIp`; not needed for Session Manager |
+   | `IrisRef` | `main` | which version of `bootstrap_server.sh` is downloaded and run at first boot. Only the script follows it: the code it clones is always `main`. Leave it as `main` unless you are testing a change to the script itself |
 
 4. Tick **"I acknowledge that AWS CloudFormation might create IAM resources"** (the Session Manager role), then **Submit**.
 5. About three minutes later the stack says `CREATE_COMPLETE`. **Outputs** shows `PublicIp` and `InstanceId`. Point the DuckDNS name at `PublicIp` once, on duckdns.org.
 
-The bootstrap keeps running for a few minutes after that. Check it as below.
+`CREATE_COMPLETE` means AWS made the resources, not that the bootstrap worked: it keeps running for a few minutes after that, and a failure there doesn't show in CloudFormation. Check it as below.
 
 ### Connect without SSH
 
@@ -137,4 +141,4 @@ Then carry on from **Next** above. A new instance can take a minute or two after
 
 **CloudFormation →** the stack **→ Delete.** That deletes the instance, its disk, the Elastic IP, the security group and the role, so nothing keeps billing. Everything on the server's disk goes with it, the database included. Back up anything you need first.
 
-**Cost while it runs:** the instance, its disk and the public IPv4 address. AWS charges for every public IPv4 address, attached or not, about US$3.60 a month.
+**Cost while it runs:** the instance, its disk and the public IPv4 address. AWS charges for every public IPv4 address, attached or not: US$0.005 an hour, about US$3.65 a month.

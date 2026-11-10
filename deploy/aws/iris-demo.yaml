@@ -36,7 +36,7 @@ Parameters:
   SshSourceIp:
     Type: String
     Default: ""
-    AllowedPattern: '^$|^(\d{1,3}\.){3}\d{1,3}$'
+    AllowedPattern: '^$|^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$'
     ConstraintDescription: an IPv4 address such as 203.0.113.7, or empty
     Description: >-
       Your public IPv4 address, to allow SSH (port 22) from it alone. Leave it
@@ -45,16 +45,18 @@ Parameters:
     Type: String
     Default: ""
     Description: >-
-      An existing EC2 key pair, for SSH. Leave it empty if you'll use Session
-      Manager only.
+      An existing EC2 key pair, for SSH. It is only useful with SshSourceIp,
+      which opens port 22. Leave both empty to use Session Manager only.
   IrisRef:
     Type: String
     Default: main
-    AllowedPattern: '^[A-Za-z0-9._/-]+$'
-    ConstraintDescription: a branch, tag or commit of the IRIS repository
+    # Path segments only: no "..", and no leading or doubled "/", so the URL
+    # can't be steered to another repository.
+    AllowedPattern: '^[A-Za-z0-9_-]+([./][A-Za-z0-9_-]+)*$'
+    ConstraintDescription: a branch, tag or commit of the IRIS repository, such as main
     Description: >-
-      Which version of deploy/bootstrap_server.sh to run at first boot. The
-      script itself always clones main.
+      Which version of deploy/bootstrap_server.sh to download and run at first
+      boot. Only the script follows it: the script always clones main.
   ImageId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
@@ -87,7 +89,8 @@ Resources:
     Properties:
       Roles: [!Ref Role]
 
-  # In the region's default VPC. Caddy needs port 80 to get its certificate.
+  # In the region's default VPC, which the stack needs (it names no VPC or
+  # subnet). Caddy needs port 80 to get its certificate.
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
