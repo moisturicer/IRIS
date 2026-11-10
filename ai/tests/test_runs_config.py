@@ -12,7 +12,7 @@ COMPLETE = dict(
     RUNS_MAX_OUTPUT_TOKENS=500, RUNS_MAX_COST_USD=0.5,
     RUNS_DEEP_DEADLINE_SECONDS=600, RUNS_MAX_QUEUED=20, RUNS_MAX_ACTIVE_PER_READER=3,
     RUNS_MAX_RUNNING_PER_READER=1, RUNS_DEEP_CONCURRENCY=1, RUNS_WORKER_CONCURRENCY=2,
-    RUNS_POLL_SECONDS=2,
+    RUNS_POLL_SECONDS=2, RUNS_DB_POOL_SIZE=4, RUNS_DB_ACQUIRE_SECONDS=2,
 )
 
 
@@ -81,3 +81,8 @@ def test_deep_work_cannot_take_every_worker_slot():
     assert "RUNS_DEEP_CONCURRENCY must be below RUNS_WORKER_CONCURRENCY" in config.problems(
         settings(RUNS_DEEP_CONCURRENCY=2, RUNS_WORKER_CONCURRENCY=2)
     )
+
+
+def test_the_runtime_pool_is_sized_from_settings():
+    pool = config.read(settings()).db_pool
+    assert (pool.size, pool.acquire_seconds) == (4, 2)

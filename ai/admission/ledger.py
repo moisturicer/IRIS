@@ -9,7 +9,6 @@ admits nothing. Writes and settles only ``owner = 'ai'`` rows.
 
 from __future__ import annotations
 
-import json
 import logging
 import math
 from dataclasses import dataclass
@@ -17,6 +16,8 @@ from datetime import timedelta
 from typing import Optional, Sequence
 
 import asyncpg
+
+from ai.infrastructure import db
 
 from . import errors
 from .errors import AdmissionDenied
@@ -29,7 +30,7 @@ log = logging.getLogger(__name__)
 APP_NAME = "iris-ai-admission"
 OWNER = "ai"
 _PER_TEXT_OVERHEAD = 8
-_STORE_ERRORS = (asyncpg.PostgresError, asyncpg.InterfaceError, OSError)
+_STORE_ERRORS = (asyncpg.PostgresError, asyncpg.InterfaceError, OSError, db.Exhausted)
 _CHARGE = ("attempts", "input_tokens", "output_tokens", "cost_micros")
 
 
@@ -106,10 +107,8 @@ class Ledger:
             log.warning("provider admission not configured: %s", missing)
             return cls(dsn, None)
 
-    async def _connect(self):
-        conn = await asyncpg.connect(self.dsn, server_settings={"application_name": APP_NAME})
-        await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
-        return conn
+    def _connect(self):
+        return db.connection(self.dsn, APP_NAME)
 
     async def admit(self, request: Request, binding: Optional[RunBinding]) -> "Ticket":
         """Reserve ``request``'s worst case, or raise `AdmissionDenied`."""
@@ -124,12 +123,8 @@ class Ledger:
         wanted = {"attempts": 1, "input_tokens": request.input_tokens,
                   "output_tokens": request.output_tokens, "cost_micros": cost}
         try:
-            conn = await self._connect()
-            try:
-                async with conn.transaction():
-                    pk, campaign_id, timeout = await self._reserve(conn, limits, request, binding, wanted)
-            finally:
-                await conn.close()
+            async with self._connect() as conn, conn.transaction():
+                pk, campaign_id, timeout = await self._reserve(conn, limits, request, binding, wanted)
         except _Refused as refused:
             log.info("provider admission refused: %s (run %s)", refused.reason, binding.run_id)
             raise AdmissionDenied(refused.reason) from None
@@ -260,12 +255,8 @@ class Ticket:
             return
         self._settled = True
         try:
-            conn = await self._ledger._connect()
-            try:
-                async with conn.transaction():
-                    await self._settle(conn, usage)
-            finally:
-                await conn.close()
+            async with self._ledger._connect() as conn, conn.transaction():
+                await self._settle(conn, usage)
         except _STORE_ERRORS:
             log.exception("could not settle reservation %s; it stays charged at its reservation", self.pk)
 

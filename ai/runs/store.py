@@ -32,6 +32,7 @@ from typing import Mapping
 import asyncpg
 
 from ai.admission.scope import run_key
+from ai.infrastructure import db
 from ai.runs.config import KIND_COMPACT
 from ai.runs.executor import Compacted, PriorTurn, Result
 
@@ -261,12 +262,12 @@ class RunStore:
 
     @asynccontextmanager
     async def _connect(self):
-        conn = await asyncpg.connect(self.dsn, server_settings={"application_name": APP_NAME})
-        await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
         try:
-            yield conn
-        finally:
-            await conn.close()
+            async with db.connection(self.dsn, APP_NAME) as conn:
+                yield conn
+        except db.Exhausted:
+            # Out of connections is a busy runtime, never a 500 (IR-1012).
+            raise Busy("database") from None
 
     @staticmethod
     async def _verify(conn, grant: str | None) -> dict:

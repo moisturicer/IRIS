@@ -47,6 +47,7 @@ def build(settings, *, agent_provider=None) -> RunService:
 
     `agent_provider` replaces the configured vendor adapter, for tests only.
     """
+    from ai.infrastructure import db
     from ai.runs import agent_profile
     from ai.runs import config as runs_config
     from ai.runs.dispatch import notifier_for
@@ -54,6 +55,8 @@ def build(settings, *, agent_provider=None) -> RunService:
     from ai.runs.store import RunStore
 
     cfg = runs_config.read(settings)
+    if cfg.db_pool is not None:
+        db.configure(cfg.database_url, cfg.db_pool.size, cfg.db_pool.acquire_seconds)
     profile = agent_profile.selected(settings)
     deterministic = DeterministicExecutor()
     if profile is None:
@@ -98,7 +101,12 @@ async def _main() -> None:
             loop.add_signal_handler(sig, stop.set)
         except NotImplementedError:
             pass
-    await Worker(build(settings)).serve(stop)
+    from ai.infrastructure import db
+
+    try:
+        await Worker(build(settings)).serve(stop)
+    finally:
+        await db.close()
 
 
 def main() -> None:

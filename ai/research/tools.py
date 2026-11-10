@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 import asyncpg
 
+from ai.infrastructure import db
 from ai.research import metadata
 from ai.runs.store import CURRENT_HANDOFF, CURRENT_SOURCE_TURN, RunStore
 
@@ -419,9 +420,7 @@ class ResearchTools:
 
     @asynccontextmanager
     async def _session(self):
-        conn = await asyncpg.connect(self.dsn, server_settings={"application_name": APP_NAME})
-        await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
-        try:
+        async with db.connection(self.dsn, APP_NAME) as conn:
             async with conn.transaction():
                 grant = await self._grant(conn)
                 if not grant:
@@ -444,8 +443,6 @@ class ResearchTools:
                         or run["reader_id"] != int(claims["sub"])):
                     raise _Refused("run_ended")
                 yield conn
-        finally:
-            await conn.close()
 
     async def _call(self, name: str, body) -> ToolResult:
         try:

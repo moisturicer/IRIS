@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ai.infrastructure.db import PoolSize
+
 EXECUTORS = ("deterministic", "agent")
 DEPTHS = ("ordinary", "deep")
 #: Owner decision, ADR-049's 2026-11-04 amendment (IR-885).
@@ -22,6 +24,7 @@ LIMIT_NAMES = (
     "RUNS_MAX_ATTEMPTS", "RUNS_MAX_INPUT_TOKENS", "RUNS_MAX_OUTPUT_TOKENS", "RUNS_MAX_COST_USD",
     "RUNS_MAX_QUEUED", "RUNS_MAX_ACTIVE_PER_READER", "RUNS_MAX_RUNNING_PER_READER",
     "RUNS_DEEP_CONCURRENCY", "RUNS_WORKER_CONCURRENCY", "RUNS_POLL_SECONDS",
+    "RUNS_DB_POOL_SIZE", "RUNS_DB_ACQUIRE_SECONDS",
 )
 
 
@@ -82,6 +85,8 @@ class RunsConfig:
     redis_url: str = ""
     #: Reuse a query's embedding within one run (IR-953); on unless RUNS_QUERY_VECTOR_CACHE=off.
     query_vector_cache: bool = False
+    #: Pooled connections per process; None opens one per use, as tests and scripts do (IR-1012).
+    db_pool: "PoolSize | None" = None
 
 
 def problems(values) -> list[str]:
@@ -137,4 +142,5 @@ def read(values) -> RunsConfig:
         ),
         redis_url=getattr(values, "RUNS_REDIS_URL", ""),
         query_vector_cache=query_vector_cache(values),
+        db_pool=PoolSize(values.RUNS_DB_POOL_SIZE, values.RUNS_DB_ACQUIRE_SECONDS),
     )

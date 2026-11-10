@@ -6,6 +6,13 @@ services:
       - private
     image: pgvector/pgvector:pg16
     restart: unless-stopped
+    # Room for the runtime's pools (gateway 4 x 8, two workers x 20), Django,
+    # Celery and maintenance (IR-1012). Memory settings follow the host.
+    command: >-
+      postgres -c max_connections=200
+      -c shared_buffers=${PG_SHARED_BUFFERS:-1GB}
+      -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-3GB}
+    shm_size: 256mb
     environment:
       # Sourced from the repo-root .env (see .env.example). ":?" makes an
       # unset value stop `docker compose up` with a named error instead of
@@ -117,8 +124,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1G
+          # Four ASGI workers with room for 100 users at once (IR-1012).
+          cpus: '2.0'
+          memory: 2G
 
   ai-gateway:
     networks:
@@ -137,7 +145,8 @@ services:
       # ./ai/.env, hence depends_on db; ADR-014's IR-826 amendment allows
       # that login and no other.
       - UVICORN_WORKERS=4
-      - MAX_CONCURRENT_LLM=80
+      # Per gateway process: 4 x 8 connections (IR-1012).
+      - RUNS_DB_POOL_SIZE=8
       - RUNS_REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/2
     depends_on:
       db:
@@ -175,9 +184,11 @@ services:
       redis:
         condition: service_healthy
     deploy:
+      # Two workers x 24 slots: 48 questions at once (IR-1012).
+      replicas: 2
       resources:
         limits:
-          memory: 512m
+          memory: 1g
 
   celery-default:
     networks:
