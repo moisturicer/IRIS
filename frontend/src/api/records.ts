@@ -3,7 +3,7 @@ import type {
   RecordListItem, RecordDetail, RecordFormData, MyResearchItem, RecordEmbargo,
   IpReleaseResult,
   Classification, PSCEDClassification, RecordType,
-  DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
+  DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment, MentionedPerson,
   ThreadSeverity, ThreadAnchor, FinishReviewRequest,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
@@ -63,11 +63,21 @@ export const recordsApi = {
    */
   postReviewComment: (
     id: number,
-    body: { body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor; suggestion?: string },
+    body: {
+      body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor; suggestion?: string;
+      /** Account ids of the people it mentions (IR-877). */
+      mentions?: number[];
+    },
   ) => apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
-  /** Its author edits a comment; a changed body is marked edited. */
-  editReviewComment: (id: number, commentId: number, body: { body: string }) =>
+  /**
+   * Its author edits a comment; a changed body is marked edited. `mentions`,
+   * when sent, replaces whom it mentions; someone new is notified once (IR-877).
+   */
+  editReviewComment: (id: number, commentId: number, body: { body: string; mentions?: number[] }) =>
     apiClient.patch<ReviewComment>(`/records/${id}/review-comments/${commentId}/`, body),
+  /** Whom the caller may mention in this record's review discussion (IR-877). */
+  reviewMentionable: (id: number) =>
+    apiClient.get<{ results: MentionedPerson[] }>(`/records/${id}/review-mentionable/`),
   /**
    * Every comment the viewer may see, oldest first: every sent one and their
    * own drafts (ADR-032 §7, IR-874). A 404 to anyone who may not read the review.
@@ -242,6 +252,13 @@ export const recordsApi = {
    */
   compareVersions: (id: number, pair?: { from: number; to: number }, options: { signal?: AbortSignal } = {}) =>
     apiClient.get<VersionComparisonPayload>(`/records/${id}/versions/compare/`, { params: pair, signal: options.signal }),
+  /**
+   * Tick or untick one compared section as viewed, for the caller alone
+   * (IR-877). `side` is the later Version's, or the earlier one's for a
+   * section the later Version removed. The mark follows the section's text.
+   */
+  markSectionViewed: (id: number, body: { from: number; to: number; side: "from" | "to"; key: string; viewed: boolean }) =>
+    apiClient.post<{ viewed: boolean }>(`/records/${id}/versions/compare/viewed/`, body),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   // Submitting asks no consent (ADR-054, IR-791): the paper carries its Contact
   // person's AI answer from the moment its draft was created.

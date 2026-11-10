@@ -838,6 +838,12 @@ export interface TrackerReview {
   version:          number | null;
 }
 
+/** Someone a review comment mentions, or may mention (IR-877). */
+export interface MentionedPerson {
+  id:   number;
+  name: string;
+}
+
 /**
  * One message in a record's review discussion (ADR-032 §7, IR-419). Private
  * to the review; public discussion is a separate model.
@@ -857,6 +863,8 @@ export interface ReviewComment {
   edited_at:   string | null;
   /** The server's answer: Edit is offered only where this is true. */
   can_edit:    boolean;
+  /** The people it mentions (IR-877). Optional so an older payload still reads. */
+  mentions?:   MentionedPerson[];
   /*
    * The thread (ADR-032 §7, 2026-11-04; IR-874). A top-level comment is a
    * thread; a reply carries these empty. Optional so an older payload or a
@@ -977,6 +985,8 @@ export interface SectionComparison {
   to:      SectionHeading | null;
   changes: VersionChange[];
   counts:  ChangeCounts;
+  /** The viewer ticked this section's text as viewed (IR-877); theirs alone. */
+  viewed?: boolean;
 }
 
 export interface ComparisonNotice {
