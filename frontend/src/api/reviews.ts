@@ -2,6 +2,8 @@ import { apiClient } from "./client";
 import type { AddReviewerOptions, ReviewerSeat } from "@/types/records";
 import type {
   OfficeConsole,
+  SavedRepliesPage,
+  SavedReply,
   MyReviewsPage,
   MyReviewsQuery,
   WorkflowAnalytics,
@@ -79,4 +81,15 @@ export const reviewsApi = {
   /** A coordinator's console of their office's open work (IR-623). Refused (403) to anyone else. */
   office: (office: string | null) =>
     apiClient.get<OfficeConsole>("/reviews/office/", { params: office ? { office } : {} }),
+  /**
+   * The caller's saved replies (IR-877), by title. Private: another
+   * person's reply is a 404, and inserting one is the comment box's own
+   * doing, so the server never hears that a reply was used.
+   */
+  savedReplies: () => apiClient.get<SavedRepliesPage>("/reviews/saved-replies/"),
+  createSavedReply: (body: { title: string; body: string }) =>
+    apiClient.post<SavedReply>("/reviews/saved-replies/", body),
+  updateSavedReply: (id: number, body: { title?: string; body?: string }) =>
+    apiClient.patch<SavedReply>(`/reviews/saved-replies/${id}/`, body),
+  deleteSavedReply: (id: number) => apiClient.delete<void>(`/reviews/saved-replies/${id}/`),
 };

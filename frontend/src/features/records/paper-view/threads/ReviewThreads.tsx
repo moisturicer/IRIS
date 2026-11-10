@@ -9,6 +9,7 @@ import { errorDetail } from "@/lib/errorDetail";
 import { cn, formatDate } from "@/lib/utils";
 import type { ResponseLetter, ReviewComment, ThreadSeverity } from "@/types/records";
 
+import { SavedReplies } from "../SavedReplies";
 import type { Passage } from "./passage";
 import { ResponseLetterPanel } from "./ResponseLetter";
 import { SEVERITY_WORDS, filterThreads, isOpen, threadStatus, type Thread, type ThreadFilter, type ThreadViewer } from "./threadModel";
@@ -270,7 +271,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
 
       {form === "reply" && (
         <TextForm
-          label="Reply" submitLabel="Reply" required busy={busy}
+          label="Reply" submitLabel="Reply" required busy={busy} savedReplies
           hint="Posted now, not held with your review."
           onCancel={() => setForm(null)}
           onSubmit={(body) => act(() => recordsApi.postReviewComment(id, { body, reply_to: root.id }), "Your reply could not be sent.")}
@@ -417,8 +418,10 @@ function Reply({ reply }: { reply: ReviewComment }) {
   );
 }
 
-function TextForm({ label, submitLabel, hint, required, busy, onSubmit, onCancel }: {
+function TextForm({ label, submitLabel, hint, required, busy, savedReplies, onSubmit, onCancel }: {
   label: string; submitLabel: string; hint?: string; required?: boolean; busy: boolean;
+  /** Offer saved replies (IR-877): a reply is a comment; an answer's note is not. */
+  savedReplies?: boolean;
   onSubmit: (text: string) => void; onCancel: () => void;
 }) {
   const id = useId();
@@ -435,6 +438,7 @@ function TextForm({ label, submitLabel, hint, required, busy, onSubmit, onCancel
       <textarea ref={ref} id={id} rows={3} value={text} onChange={(e) => setText(e.target.value)}
         aria-describedby={hint ? `${id}-hint` : undefined} className={fieldClasses(false)} />
       {hint && <p id={`${id}-hint`} className="text-2xs text-stone-600">{hint}</p>}
+      {savedReplies && <SavedReplies textareaRef={ref} value={text} onChange={setText} />}
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button type="submit" size="sm" disabled={busy || (required && !text.trim())}>{submitLabel}</Button>
@@ -502,6 +506,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
       <label htmlFor={`${ids}-body`} className="sr-only">Comment</label>
       <textarea ref={ref} id={`${ids}-body`} rows={3} value={body} onChange={(e) => setBody(e.target.value)}
         placeholder="What should the authors look at here?" className={fieldClasses(false)} />
+      <SavedReplies textareaRef={ref} value={body} onChange={setBody} />
       {drafting && (
         <fieldset className="flex flex-wrap items-center gap-3">
           <legend className="sr-only">Severity</legend>

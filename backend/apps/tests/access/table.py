@@ -66,6 +66,8 @@ SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE)
 #: `feed`, a reader's private saved feed (IR-577): its owner alone; everyone
 #: else cannot know it exists.
 OWNS_FEED = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
+#: `saved_reply`, a person's private saved reply (IR-877): the same shape.
+OWNS_SAVED_REPLY = OWNS_FEED
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY, DENY)
 
@@ -602,6 +604,17 @@ SEAT = {"pk": Ref("seat")}
 REVIEWS = {
     **REVIEW_DEADLINES,
     "reviews-mine": Entry({"GET": _case(SIGNED_IN)}),
+    # IR-877, ADR-032 §7 Conveniences: a saved reply is the caller's own, so
+    # listing and saving are anyone's, and another person's reply is the same
+    # 404 as a missing one.
+    "saved-replies": Entry({
+        "GET": _case(SIGNED_IN),
+        "POST": _case(SIGNED_IN, data={"title": "Matrix reply", "body": "Please clarify."}),
+    }),
+    "saved-reply": Entry({
+        "PATCH": _case(OWNS_SAVED_REPLY, kwargs={"reply_id": Ref("saved_reply")}, data={"body": "Edited."}),
+        "DELETE": _case(OWNS_SAVED_REPLY, kwargs={"reply_id": Ref("saved_reply")}),
+    }),
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
     "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
