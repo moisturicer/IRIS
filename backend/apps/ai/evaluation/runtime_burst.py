@@ -98,7 +98,7 @@ def summarize(rows: Sequence[Mapping], *, provider: str, cache: str, wall_ms: in
     for depth in DEPTHS:
         mine = [row for row in rows if row["depth"] == depth]
         latency[depth] = {
-            "submitted": len(mine),
+            "submissions": len(mine),
             "answered": _latency([r["latency_ms"] for r in mine
                                   if r["outcome"] == ANSWERED and r["latency_ms"] is not None]),
             "ended": _latency([r["latency_ms"] for r in mine
