@@ -85,3 +85,40 @@ def test_matching_ignores_line_break_hyphens_and_case():
     new = reading(("Method", [(3, "EACH HOUSE-HOLD WAS VISITED TWICE.")]))
 
     assert placement.place(old, new, "household was visited").outcome == FOUND
+
+
+# A browser quote loses the space where a PDF line wraps: `range.toString()`
+# joins the last word of one line to the first of the next (IR-1008).
+
+def test_a_quote_missing_a_line_break_space_is_found_where_its_text_is_unchanged():
+    old = reading(("Method", METHOD))
+    new = reading(("Method", [(5, text) for _, text in METHOD]))
+
+    place = placement.place(old, new, "household wasvisited twice")
+
+    assert (place.outcome, place.page, place.regions) == (FOUND, 5, [region(5, 1)])
+
+
+def test_a_quote_missing_a_line_break_space_on_an_edited_passage_is_changed_not_removed():
+    old = reading(("Method", METHOD))
+    new = reading(("Method", [METHOD[0], (3, "Each household was visited three times."), METHOD[2]]))
+
+    place = placement.place(old, new, "household wasvisited twice")
+
+    assert (place.outcome, place.text) == (CHANGED, "Each household was visited three times.")
+
+
+def test_a_quote_across_two_passages_without_the_space_between_them_is_found():
+    old = reading(("Method", METHOD))
+
+    place = placement.place(old, old, "in Cebu City.Each household")
+
+    assert (place.outcome, place.page, place.regions) == (FOUND, 3, [region(3, 0), region(3, 1)])
+
+
+def test_suggested_wording_across_a_line_break_is_found():
+    from apps.reviews import comparison
+
+    found = comparison.appears_in(reading(("Method", METHOD)), "coded bytwo researchers")
+
+    assert [[p["page"] for p in spot] for spot in found] == [[4]]
