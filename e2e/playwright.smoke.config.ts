@@ -42,7 +42,7 @@ export default defineConfig({
     command: `npm run preview -- --host 127.0.0.1 --port ${port} --strictPort`,
     cwd: "../frontend",
     url: `http://127.0.0.1:${port}/login`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: process.env.IRIS_SMOKE_MANAGED_SERVER === "1" || !process.env.CI,
     timeout: 60_000,
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
