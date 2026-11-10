@@ -977,6 +977,8 @@ export interface SectionComparison {
   to:      SectionHeading | null;
   changes: VersionChange[];
   counts:  ChangeCounts;
+  /** The viewer ticked this section's text as viewed (IR-877); theirs alone. */
+  viewed?: boolean;
 }
 
 export interface ComparisonNotice {

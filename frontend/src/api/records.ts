@@ -242,6 +242,13 @@ export const recordsApi = {
    */
   compareVersions: (id: number, pair?: { from: number; to: number }, options: { signal?: AbortSignal } = {}) =>
     apiClient.get<VersionComparisonPayload>(`/records/${id}/versions/compare/`, { params: pair, signal: options.signal }),
+  /**
+   * Tick or untick one compared section as viewed, for the caller alone
+   * (IR-877). `side` is the later Version's, or the earlier one's for a
+   * section the later Version removed. The mark follows the section's text.
+   */
+  markSectionViewed: (id: number, body: { from: number; to: number; side: "from" | "to"; key: string; viewed: boolean }) =>
+    apiClient.post<{ viewed: boolean }>(`/records/${id}/versions/compare/viewed/`, body),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   // Submitting asks no consent (ADR-054, IR-791): the paper carries its Contact
   // person's AI answer from the moment its draft was created.

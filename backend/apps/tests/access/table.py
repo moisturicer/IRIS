@@ -196,6 +196,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-version-compare": Entry({
         "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
     }),
+    # A Viewed mark (IR-877, ADR-032 §7 Conveniences) is the caller's own, on
+    # a comparison only the review's readers see: the same readers, and the
+    # one-Version world record is the same non-refusing 400.
+    "record-version-compare-viewed": Entry({
+        "POST": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD,
+                      data={"from": 1, "to": 2, "side": "to", "key": "introduction", "viewed": True}),
+    }),
     # The response to reviewers is review material (ADR-032 §7, IR-876).
     "record-response-letters": Entry({
         "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),

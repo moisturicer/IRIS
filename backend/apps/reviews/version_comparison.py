@@ -67,7 +67,8 @@ def choose(record, user, old_number=None, new_number=None) -> tuple:
     return (old, new) if old.number < new.number else (new, old)
 
 
-def _reading(text) -> dict:
+def as_reading(text) -> dict:
+    """A stored reading in the shape `comparison.compare` takes."""
     return {"page_count": text.page_count, "warnings": text.warnings,
             "sections": store.sections(text)}
 
@@ -138,9 +139,12 @@ def payload(record, user, old_number=None, new_number=None) -> dict:
         said = (store.message(version, version.review_text) if version.manuscript
                 else f"v{version.number} has no manuscript, so it can't be compared.")
         return {**body, "message": said}
-    compared = _reading(pair.old), _reading(pair.new)
+    compared = as_reading(pair.old), as_reading(pair.new)
     result = comparison.compare(*compared)
     for notice in result["notices"]:
         notice["message"] = _notice_message(notice, old, new)
     result["threads"] = _threads(record, old, new, compared, result)
+    from .viewed import annotate
+
+    annotate(result, compared, record, user)
     return {**body, "message": None, **result}

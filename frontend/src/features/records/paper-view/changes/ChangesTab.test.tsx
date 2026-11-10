@@ -16,7 +16,7 @@ import { groupThreads } from "../threads/threadModel";
 import { ChangesTab } from "./ChangesTab";
 import { PREPARING_POLL_MS } from "./useVersionComparison";
 
-const api = vi.hoisted(() => ({ compareVersions: vi.fn() }));
+const api = vi.hoisted(() => ({ compareVersions: vi.fn(), markSectionViewed: vi.fn() }));
 vi.mock("@/api/records", () => ({ recordsApi: api }));
 
 const VERSIONS = [1, 2, 3].map((number) => ({
@@ -77,6 +77,7 @@ function open(over: Partial<Parameters<typeof ChangesTab>[0]> = {}) {
 const summary = async () => (await screen.findByText("v2 → v3:")).parentElement;
 
 beforeEach(() => {
+  api.markSectionViewed.mockReset().mockResolvedValue({ data: { viewed: true } });
   api.compareVersions.mockReset().mockResolvedValue({ data: ready() });
 });
 
@@ -235,6 +236,114 @@ describe("when there is nothing to show yet", () => {
     api.compareVersions.mockRejectedValue({ response: { status: 400, data: { detail: "Choose two different Versions." } } });
     open();
     expect(await screen.findByRole("alert")).toHaveTextContent("Choose two different Versions.");
+  });
+});
+
+describe("Viewed marks (IR-877)", () => {
+  const viewedBox = (name: string) => screen.findByRole("checkbox", { name: `Viewed: ${name}` });
+
+  it("ticks a section viewed, tells the server which, and folds its changes away", async () => {
+    const user = userEvent.setup();
+    open();
+    const box = await viewedBox("1.1 Background of the Study");
+    expect(box).not.toBeChecked();
+    expect(screen.getByRole("article", { name: "Changed, page 2" })).toBeInTheDocument();
+
+    await user.click(box);
+
+    expect(api.markSectionViewed).toHaveBeenCalledWith(7, { from: 2, to: 3, side: "to", key: "background", viewed: true });
+    expect(box).toBeChecked();
+    expect(screen.queryByRole("article", { name: "Changed, page 2" })).not.toBeInTheDocument();
+    // The list of changed sections says so too.
+    expect(within(screen.getByRole("navigation", { name: "Changed sections" })).getByText(/Viewed/)).toBeInTheDocument();
+  });
+
+  it("shows a section the server says is viewed as ticked, and unticking it sends that", async () => {
+    api.compareVersions.mockResolvedValue({ data: ready({ sections: [
+      section("background", "1.1 Background of the Study", {
+        status: "changed", changes: [NUMBER], counts: { changed: 1, added: 0, removed: 0, moved: 0 }, viewed: true,
+      }),
+    ] }) });
+    api.markSectionViewed.mockResolvedValue({ data: { viewed: false } });
+    const user = userEvent.setup();
+    open();
+    const box = await viewedBox("1.1 Background of the Study");
+    expect(box).toBeChecked();
+
+    await user.click(box);
+
+    expect(api.markSectionViewed).toHaveBeenCalledWith(7, expect.objectContaining({ key: "background", viewed: false }));
+    expect(box).not.toBeChecked();
+    expect(screen.getByRole("article", { name: "Changed, page 2" })).toBeInTheDocument();
+  });
+
+  it("marks a removed section on its earlier side", async () => {
+    api.compareVersions.mockResolvedValue({ data: ready({ sections: [
+      section("methods", "Methods", { status: "removed", to: null }),
+    ] }) });
+    const user = userEvent.setup();
+    open();
+
+    await user.click(await viewedBox("Methods"));
+
+    expect(api.markSectionViewed).toHaveBeenCalledWith(7, expect.objectContaining({ side: "from", key: "methods" }));
+  });
+
+  it("waits for one answer before the box can be clicked again", async () => {
+    let answer: (value: unknown) => void = () => {};
+    api.markSectionViewed.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    const user = userEvent.setup();
+    open();
+    const box = await viewedBox("1.1 Background of the Study");
+
+    await user.click(box);
+    expect(box).toBeDisabled();
+    await act(async () => answer({ data: { viewed: true } }));
+
+    expect(box).toBeEnabled();
+    expect(box).toBeChecked();
+    expect(api.markSectionViewed).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts the box back and says so when the server refuses", async () => {
+    api.markSectionViewed.mockRejectedValue({ response: { status: 400, data: { detail: "That section isn't in this comparison." } } });
+    const user = userEvent.setup();
+    open();
+    const box = await viewedBox("1.1 Background of the Study");
+
+    await user.click(box);
+
+    expect(await screen.findByText("That section isn't in this comparison.")).toBeInTheDocument();
+    expect(box).not.toBeChecked();
+  });
+
+  it("reads an answer of the wrong shape as a failure", async () => {
+    api.markSectionViewed.mockResolvedValue({ data: { ok: 1 } });
+    const user = userEvent.setup();
+    open();
+    const box = await viewedBox("1.1 Background of the Study");
+
+    await user.click(box);
+
+    expect(await screen.findByText("Couldn't save that. Please try again.")).toBeInTheDocument();
+    expect(box).not.toBeChecked();
+  });
+
+  it("treats a `viewed` of the wrong shape as not viewed", async () => {
+    api.compareVersions.mockResolvedValue({ data: ready({ sections: [
+      { ...section("background", "1.1 Background of the Study", {
+        status: "changed", changes: [NUMBER], counts: { changed: 1, added: 0, removed: 0, moved: 0 },
+      }), viewed: "yes" as unknown as boolean },
+    ] }) });
+    open();
+    expect(await viewedBox("1.1 Background of the Study")).not.toBeChecked();
+  });
+
+  it("offers no Viewed box when the comparison is listed by page", async () => {
+    api.compareVersions.mockResolvedValue({ data: ready({ mode: "pages", sections: [], changes: [NUMBER] }) });
+    open();
+    await screen.findByText("v2 → v3:");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 });
 
