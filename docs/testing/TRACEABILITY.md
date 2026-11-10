@@ -229,6 +229,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1005** | The review-text reader loads its text encodings before its sandbox closes, so a PDF in an embedded font is read, not stored as no text — fix to IR-871; no FR- id | [details](traceability/IR-1005.md) | **VERIFIED** |
 | **IR-690** | Comments on published papers: write, reply, edit and delete — ADR-032 §7, amendment 2026-10-31, and its IR-690 build notes; no FR- id. PR [#672](https://github.com/moisturicer/IRIS/pull/672) | [details](traceability/IR-690.md) | **VERIFIED** |
 | **IR-1014** | A script gets a fresh Ubuntu server ready for IRIS: Docker, swap, the clone and DuckDNS, safe to run twice; never starts IRIS or writes a `.env` — epic IR-805; no FR- id. Awaits the run on a fresh EC2 instance with a reboot | [details](traceability/IR-1014.md) | **IMPLEMENTED** |
+| **IR-1013** | A CloudFormation template makes the AWS demo server from one file: instance, firewall, fixed IP and Session Manager access, running the IR-1014 script at first boot — epic IR-805; no FR- id. Awaits a real-account run at the next migration | [details](traceability/IR-1013.md) | **IMPLEMENTED** |
 
 ### Non-functional
 

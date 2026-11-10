@@ -604,6 +604,17 @@ jobs:
       - name: Run the bootstrap twice and check what it left
         run: sudo deploy/tests/bootstrap_checks.sh
 
+      # The CloudFormation template (IR-1013). Creating the stack in a real
+      # account is a person's step (docs/testing/traceability/IR-1013.md).
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Lint the CloudFormation template
+        run: |
+          pip install "cfn-lint==1.59.0"
+          cfn-lint deploy/aws/iris-demo.yaml --regions ap-southeast-1 us-east-1
+
   security:
     name: Security
     runs-on: ubuntu-latest

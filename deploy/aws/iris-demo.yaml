@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  IRIS demo server (IR-1013): one Ubuntu 24.04 instance with a fixed public IP,
+  ports 80 and 443 open, Session Manager access, and deploy/bootstrap_server.sh
+  run at first boot. It never starts IRIS and holds no secret; the .env files
+  are written by a person afterwards (deploy/README.md). Deleting the stack
+  deletes everything it created, the Elastic IP included.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Server }
+        Parameters: [InstanceType, DiskSizeGiB]
+      - Label: { default: Access (both optional; Session Manager works without them) }
+        Parameters: [SshSourceIp, KeyPairName]
+      - Label: { default: Code }
+        Parameters: [IrisRef]
+      - Label: { default: Advanced }
+        Parameters: [ImageId]
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: m7i-flex.large
+    AllowedValues: [m7i-flex.large, t3.large, t3.medium, t3.small, t3.micro]
+    Description: >-
+      m7i-flex.large (8 GB) runs IRIS; t3.large is the fallback where it isn't
+      offered. The smaller ones are only for trying the stack out: IRIS's build
+      needs about 8 GB.
+  DiskSizeGiB:
+    Type: Number
+    Default: 64
+    MinValue: 20
+    MaxValue: 500
+    Description: Size of the server's disk, in GiB.
+  SshSourceIp:
+    Type: String
+    Default: ""
+    AllowedPattern: '^$|^(\d{1,3}\.){3}\d{1,3}$'
+    ConstraintDescription: an IPv4 address such as 203.0.113.7, or empty
+    Description: >-
+      Your public IPv4 address, to allow SSH (port 22) from it alone. Leave it
+      empty to keep port 22 closed and connect with Session Manager instead.
+  KeyPairName:
+    Type: String
+    Default: ""
+    Description: >-
+      An existing EC2 key pair, for SSH. Leave it empty if you'll use Session
+      Manager only.
+  IrisRef:
+    Type: String
+    Default: main
+    AllowedPattern: '^[A-Za-z0-9._/-]+$'
+    ConstraintDescription: a branch, tag or commit of the IRIS repository
+    Description: >-
+      Which version of deploy/bootstrap_server.sh to run at first boot. The
+      script itself always clones main.
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: >-
+      Canonical's current Ubuntu Server 24.04 image for this region, looked up
+      when the stack is created. Leave it as it is.
+
+Conditions:
+  AllowSsh: !Not [!Equals [!Ref SshSourceIp, ""]]
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
+
+Resources:
+  # Lets Session Manager reach the server, so it needs no SSH and no key pair.
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-role" }
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref Role]
+
+  # In the region's default VPC. Caddy needs port 80 to get its certificate.
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "IRIS (${AWS::StackName}): web from anywhere, SSH only if a source IP was given"
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP }
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIpv6: "::/0", Description: HTTP }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIpv6: "::/0", Description: HTTPS }
+        - !If
+          - AllowSsh
+          - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Sub "${SshSourceIp}/32", Description: SSH from one address }
+          - !Ref AWS::NoValue
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-sg" }
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref AWS::NoValue]
+      SecurityGroupIds: [!GetAtt SecurityGroup.GroupId]
+      MetadataOptions:
+        HttpTokens: required
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: !Ref DiskSizeGiB
+            Encrypted: true
+            DeleteOnTermination: true
+      # Runs once, as root, at first boot; its output is in
+      # /var/log/cloud-init-output.log. A failed download stops it there.
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-connrefused -o /root/bootstrap_server.sh \
+            "https://raw.githubusercontent.com/moisturicer/IRIS/${IrisRef}/deploy/bootstrap_server.sh"
+          IRIS_USER=ubuntu bash /root/bootstrap_server.sh
+      Tags:
+        - { Key: Name, Value: !Ref AWS::StackName }
+
+  # The fixed address DuckDNS points at. Deleted with the stack.
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Instance
+      Tags:
+        - { Key: Name, Value: !Sub "${AWS::StackName}-ip" }
+
+Outputs:
+  PublicIp:
+    Description: The server's fixed address. Point the DuckDNS name at it.
+    Value: !Ref ElasticIp
+  InstanceId:
+    Description: The server, for EC2 → Instances → Connect → Session Manager.
+    Value: !Ref Instance

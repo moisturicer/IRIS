@@ -7,6 +7,7 @@ What belongs to the server, not to a laptop.
 | `caddy/Caddyfile` | Caddy's settings: HTTPS in front of IRIS (`docker-compose.prod.yml`) |
 | `bootstrap_server.sh` | Gets a fresh Ubuntu 24.04 server ready for IRIS (IR-1014) |
 | `tests/bootstrap_checks.sh` | CI's check of `bootstrap_server.sh`, run on a throwaway VM |
+| `aws/iris-demo.yaml` | CloudFormation template: the whole AWS server from one file, running `bootstrap_server.sh` at first boot (IR-1013) |
 
 ## bootstrap_server.sh
 
@@ -32,7 +33,7 @@ less bootstrap_server.sh          # read it before running it as root
 sudo bash bootstrap_server.sh
 ```
 
-At launch, with no login at all: paste the whole file into **EC2 → Launch instance → Advanced details → User data**. It runs once, as root, at first boot. Its output goes to `/var/log/cloud-init-output.log`, one `IRIS bootstrap:` line per step:
+On AWS, the template below does this for you. Launching by hand instead, with no login at all: paste the whole file into **EC2 → Launch instance → Advanced details → User data**. It runs once, as root, at first boot. Its output goes to `/var/log/cloud-init-output.log`, one `IRIS bootstrap:` line per step:
 
 ```bash
 grep "IRIS bootstrap" /var/log/cloud-init-output.log
@@ -86,3 +87,54 @@ python3 scripts/setup_env.py
 ```
 
 and fill in `backend/.env` and `ai/.env` (domain, vendor keys, Gmail) before `docker compose -f docker-compose.prod.yml up -d --build`.
+
+## aws/iris-demo.yaml
+
+**Why:** the first server (2026-11-10) was clicked together in the EC2 console: instance, firewall, fixed IP. This template makes the same server in any AWS account from one file, and deleting it removes everything it made.
+
+**What it creates:**
+
+| Resource | What for |
+|---|---|
+| EC2 instance | Ubuntu 24.04 (the newest image AWS lists for the region), encrypted gp3 disk; runs `bootstrap_server.sh` at first boot |
+| Security group | ports 80 and 443 open to anywhere (Caddy needs 80 for its certificate); 22 only if you give an SSH address |
+| Elastic IP | the fixed address DuckDNS points at |
+| IAM role | `AmazonSSMManagedInstanceCore` only, so Session Manager can open a shell without SSH or a key |
+
+It holds no secret and starts nothing: the `.env` files are still written by a person, as in **Next** above.
+
+### Create the stack
+
+1. AWS console, in the region you want (for example Asia Pacific (Singapore)): **CloudFormation → Create stack → With new resources**.
+2. **Upload a template file:** `deploy/aws/iris-demo.yaml` from your clone.
+3. **Stack name:** for example `iris-demo`. Parameters:
+
+   | Parameter | Default | Notes |
+   |---|---|---|
+   | `InstanceType` | `m7i-flex.large` | `t3.large` where that isn't offered. The smaller ones are only for trying the template: the build needs about 8 GB |
+   | `DiskSizeGiB` | `64` | |
+   | `SshSourceIp` | empty | your public IPv4 to allow SSH from it alone; empty keeps port 22 closed |
+   | `KeyPairName` | empty | an existing key pair, for SSH; not needed for Session Manager |
+   | `IrisRef` | `main` | which version of `bootstrap_server.sh` runs; it downloads it from GitHub at first boot |
+
+4. Tick **"I acknowledge that AWS CloudFormation might create IAM resources"** (the Session Manager role), then **Submit**.
+5. About three minutes later the stack says `CREATE_COMPLETE`. **Outputs** shows `PublicIp` and `InstanceId`. Point the DuckDNS name at `PublicIp` once, on duckdns.org.
+
+The bootstrap keeps running for a few minutes after that. Check it as below.
+
+### Connect without SSH
+
+**EC2 → Instances →** the instance → **Connect → Session Manager → Connect.** It opens a browser shell as `ssm-user`. Switch to the user that owns the clone:
+
+```bash
+sudo -iu ubuntu
+grep "IRIS bootstrap" /var/log/cloud-init-output.log    # ends with "finished"
+```
+
+Then carry on from **Next** above. A new instance can take a minute or two after boot to appear in Session Manager.
+
+### Delete it
+
+**CloudFormation →** the stack **→ Delete.** That deletes the instance, its disk, the Elastic IP, the security group and the role, so nothing keeps billing. Everything on the server's disk goes with it, the database included. Back up anything you need first.
+
+**Cost while it runs:** the instance, its disk and the public IPv4 address. AWS charges for every public IPv4 address, attached or not, about US$3.60 a month.
