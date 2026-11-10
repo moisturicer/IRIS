@@ -237,6 +237,9 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
         </button>
       )}
       <WhereNow root={root} />
+      {typeof root.not_followed?.message === "string" && (
+        <p className="text-2xs text-stone-700">{root.not_followed.message}</p>
+      )}
       {root.suggestion && <SuggestedWording root={root} />}
 
       <div className="text-small text-stone-800">
