@@ -35,7 +35,7 @@ The smoke tier also runs **axe in a real browser** (IR-908): on every routed scr
 
 `keyboard-zoom.spec.ts` adds keyboard-only checks for the new Publish submission, the submit → reviewer revision request → author resubmission flow, Discover paper opening, and Ask IRIS question entry. It verifies visible keyboard focus; Publish and review dialogs also verify Tab/Shift+Tab trapping, Escape dismissal, and focus restoration. The same core actions, including Publish's manuscript and Details steps, are checked at 320 CSS pixels, the reflow equivalent of 400% zoom from a 1280 CSS-pixel viewport, for horizontal overflow and primary-control reachability. This viewport check does not emulate a browser's desktop zoom control or verify 200% text resizing.
 
-The smoke tier also **forces each state of the UI states matrix** (IR-907) by intercepting the one request that decides it, and asserts what the reader sees and can do next. `forced-states.spec.ts` runs every state in `smoke/support/states.ts` (loading is a held read that is then released, empty, a 500 with Try again, a real request timeout with Retry and no automatic retry, a 403 and a 404 that must read the same with no retry), and two withdrawals while the reader is already in the product. `forced-cells.spec.ts` holds the cells that need a second read or a different fixture (Discover's filtered-empty and failed or timed-out Load more, Saved, My Reviews' tabs, Ask IRIS's list failure and no-sources, the review tracker and timeline). `ask-iris-stream.spec.ts` cuts, fails and ends the Ask IRIS event stream. `forced-coverage.spec.ts` reads `docs/ui-ux/17-ui-states-matrix.md` and fails when a cell the document does not mark N/A has no forced-state test (`smoke/support/matrix-proofs.ts`), so editing the matrix without a test fails the build.
+The smoke tier also **forces each state of the UI states matrix** (IR-907) by intercepting the one request that decides it, and asserts what the reader sees and can do next. `forced-states.spec.ts` runs every state in `smoke/support/states.ts` (loading is a held read that is then released, empty, a 500 with Try again, a real request timeout with Retry and no automatic retry, a 403 and a 404 that must read the same with no retry), and two withdrawals while the reader is already in the product. `forced-cells.spec.ts` holds the cells that need a second read or a different fixture (Discover's filtered-empty and failed or timed-out Load more, Saved, My Reviews' tabs, Ask IRIS's history failure and no-sources, the review tracker and timeline). (`ask-iris-stream.spec.ts`, which cut and failed Django's Ask IRIS event stream, was retired with that stream in IR-957.) `forced-coverage.spec.ts` reads `docs/ui-ux/17-ui-states-matrix.md` and fails when a cell the document does not mark N/A has no forced-state test (`smoke/support/matrix-proofs.ts`), so editing the matrix without a test fails the build.
 
 Output goes to `playwright-report-smoke/` and `test-results-smoke/` (trace and
 video for a failure only). Mark the "Frontend smoke" check required in the
@@ -80,11 +80,13 @@ Both run inside the backend container (`support/stack.ts`).
 - **Inactivity expiry** is enforced by the server at 30 minutes. Its check
   runs only in a separate pass with `SESSION_IDLE_TIMEOUT_MINUTES=2`
   (`E2E_IDLE_PASS=1`).
-- **Request throttles.** DRF's general throttles are raised to 20000/day
-  (`API_THROTTLE_ANON`, `API_THROTTLE_USER`). Behind nginx every signed-out
-  request comes from one address, and the 100/day default runs out partway
-  through one full run. No acceptance criterion measures them. The lockout
-  under test is axes', left at its default of three failures.
+- **Request throttles.** DRF's per-minute bursts are raised to 6000/minute
+  (`API_THROTTLE_ANON_BURST`, `API_THROTTLE_USER_BURST`,
+  `API_THROTTLE_LOGIN_BURST`, `API_THROTTLE_REGISTER_BURST`; IR-999). Behind
+  nginx every signed-out request comes from one address, and a run is faster
+  than a person. The daily backstops keep their defaults. No acceptance
+  criterion measures them. The lockout under test is axes', left at its
+  default of three failures.
 - **Ask IRIS** is not driven here. IR-631 reuses IR-630 and IR-605/IR-608
   evidence from the same SHA. IR-250 (the embargo field) is Done, but a paper
   still reaches the AI only once someone has answered for it (ADR-052), and a

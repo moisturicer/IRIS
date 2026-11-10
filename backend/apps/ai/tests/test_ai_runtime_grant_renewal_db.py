@@ -11,7 +11,6 @@ import sys
 import time
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
 from urllib.parse import unquote, urlparse
 
 import asyncpg
@@ -22,10 +21,6 @@ REPO = Path(__file__).resolve().parents[4]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from ai.admission import errors  # noqa: E402
-from ai.admission.errors import AdmissionDenied  # noqa: E402
-from ai.admission.guard import SendGuard  # noqa: E402
-from ai.admission.scope import RunBinding  # noqa: E402
 from ai.research.tools import ResearchTools  # noqa: E402
 from ai.runs import config as runs_config  # noqa: E402
 from ai.runs.executor import Result, Unavailable  # noqa: E402
@@ -173,27 +168,7 @@ def test_without_a_reconnect_the_same_investigation_ends_unauthorized(runtime):
 
 # --- AC3: a reader who stops reconnecting, or loses access, still ends it ---------
 
-def test_a_lapsed_grant_is_refused_at_provider_admission_too(runtime):
-    user = make_user("renew-admission@cit.edu")
-    first = short_grant(user)
-    seen = {}
-
-    async def between(tools):
-        binding = RunBinding(tools.run_id, tools.fence)
-        pin = SimpleNamespace(data_policy="no-training")
-        await SendGuard(runtime).check(binding, pin)  # still granted
-        await past(first)
-        try:
-            await SendGuard(runtime).check(binding, pin)
-        except AdmissionDenied as denied:
-            seen["code"] = denied.reason
-
-    executor = Investigation(first, runtime, between=between)
-    ask(runtime, user, executor, first, "request-renew-admission")
-    assert seen["code"] == errors.ACCESS_REVOKED
-
-
-def test_a_renewed_run_ends_at_the_next_read_and_admission_once_the_reader_loses_access(runtime):
+def test_a_renewed_run_ends_at_the_next_read_once_the_reader_loses_access(runtime):
     user = make_user("renew-revoked@cit.edu")
     paper("Flood forecasting", {4: [("Methods", FLOOD)]})
     first = short_grant(user)
@@ -206,16 +181,10 @@ def test_a_renewed_run_ends_at_the_next_read_and_admission_once_the_reader_loses
         # The account is deactivated while the renewed grant is still unexpired.
         await asyncio.to_thread(_deactivate, user.pk)
         seen["after"] = await tools.search("flooding")
-        try:
-            await SendGuard(runtime).check(RunBinding(tools.run_id, tools.fence),
-                                           SimpleNamespace(data_policy="no-training"))
-        except AdmissionDenied as denied:
-            seen["admission"] = denied.reason
 
     ask(runtime, user, Investigation(first, runtime, between=between), first, "request-renew-revoked")
     assert seen["before"].status == "ok"
     assert (seen["after"].status, seen["after"].reason) == ("unavailable", "unauthorized")
-    assert seen["admission"] == errors.ACCESS_REVOKED
 
 
 def _deactivate(user_id):

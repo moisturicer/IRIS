@@ -41,7 +41,7 @@ function typeset(source: string): string | null {
 }
 
 /** A passage's `$$...$$` formulas rendered; not run through Markdown. */
-function withMathRendered(text: string) {
+export function withMathRendered(text: string) {
   const parts: React.ReactNode[] = [];
   let last = 0;
   for (const match of text.matchAll(DISPLAY_MATH)) {

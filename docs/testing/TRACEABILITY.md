@@ -185,9 +185,13 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-886** | The agent's search finds permitted Passages by meaning as well as by keyword, narrowed by Area, PSCED area, record type or years, with one read policy — under IR-712, ADR-049 (2026-11-07 amendment); no FR- id | [details](traceability/IR-886.md) | **PARTIAL** |
 | **IR-994** | The runtime agent answers follow-ups, exact counts and complete listings: earlier answers carry their sources, and counts and title lists pass the send guard as metadata — under IR-955, ADR-049 (2026-11-08 amendment); no FR- id | [details](traceability/IR-994.md) | **PARTIAL** |
 | **IR-995** | A withheld or unmatched result no longer ends an agent run; titles and category names match whatever their case or punctuation; Paper Chat names its paper; two answer repairs under `research-7` — under IR-955, ADR-049 (2026-11-09 amendment); no FR- id | [details](traceability/IR-995.md) | **PARTIAL** |
+| **IR-957** | Ask IRIS and Paper Chat are answered by the AI runtime; Django's answer path is retired, its routes answer 410, in-flight runs end `retired` and earlier Conversations stay readable — under IR-955, ADR-049 (2026-11-09 amendment, switched before IR-955's bar passed); no FR- id | [details](traceability/IR-957.md) | **PARTIAL** |
+| **IR-996** | No runtime guards: disclosure is decided once at indexing; the AI runtime's send guard, IR-889 approval and source screen are removed, tool results reach the model whole, and no code requires a vendor no-training policy — under IR-955, ADR-049 (2026-11-09 IR-996 amendment); no FR- id | [details](traceability/IR-996.md) | **PARTIAL** |
+| **IR-1004** | Repository questions answered from the repository or declined, a fixed decline when no sentence stands, repairs that never mention the draft, under `research-8`; F12 87.5% on the merged code, F09 blocked by the removed manual compaction — under IR-955, ADR-049 (2026-11-09 amendment); no FR- id | [details](traceability/IR-1004.md) | **PARTIAL** |
+| **IR-953, IR-1003** | Prompt-cache hits recorded per attempt; a per-run query-vector cache (on) and prompt-cache key (off); a tool group's read-only calls fetched concurrently and folded in call order — under IR-712, ADR-049 (IR-953 amendment); no FR- id | [details](traceability/IR-953.md) | **PARTIAL** |
 | **IR-885** | A runtime question runs at deep depth unless the reader chooses ordinary | [details](traceability/IR-885.md) | **PARTIAL** |
 | **IR-884** | ADR-049 and the AI runtime spec are on `main`; IR-714's resume, export and review questions have owners | [details](traceability/IR-884.md) | **PARTIAL** |
-| **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
+| **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id. The switch is removed by IR-957: the runtime always answers | [details](traceability/IR-863.md) | **PARTIAL** |
 | **IR-754** | A reader deliberately compacts an owned Conversation from Ask IRIS or Paper Chat as a run of its own, through IR-734's mechanism, and sees what happened — under IR-715, ADR-049 §19; no FR- id | [details](traceability/IR-754.md) | **PARTIAL** |
 | **IR-736** | A long-paper investigation continues across repeated compactions and safely rebuilds when native continuation state is incompatible — under IR-715, ADR-049 §19–20; no FR- id | [details](traceability/IR-736.md) | **PARTIAL** |
 | **IR-785** | A person asks to delete their account; the System Admin confirms it once nobody is waiting on them, erasing their details and private data and keeping the row — under IR-779, ADR-051 decisions 8–12, 28; no FR- id | [details](traceability/IR-785.md) | **PARTIAL** |
@@ -213,6 +217,12 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-874** | Review threads, backend: anchored threads, *Must fix* and *Suggestion*, drafts sent by Finish review, *Comment only*, resolving and answering, and what an open *Must fix* blocks — ADR-032 §7 (2026-11-04, corrected 2026-11-06); no FR- id | [details](traceability/IR-874.md) | **IMPLEMENTED** |
 | **IR-875** | Review threads, frontend: comment on a selection or find match, the Threads tab, and the Finish review dialog, driven by server capabilities — ADR-032 §7 (2026-11-04, corrected and noted 2026-11-06); no FR- id | [details](traceability/IR-875.md) | **IMPLEMENTED** |
 | **IR-878** | RDCO publishes an Unlisted paper later, only once its embargo is released, and the history keeps its Decision as *kept unlisted* — ADR-047 §10, ADR-052 decision 14 as amended; no FR- id | [details](traceability/IR-878.md) | **IMPLEMENTED** |
+| **IR-873** | Two Versions compared section by section, both read by one reader, never naming it, in the reviewer's Changes tab — ADR-058 §3 as amended 2026-11-08; FR-M5-01 (label only) | [details](traceability/IR-873.md) | **VERIFIED** |
+| **IR-876** | A thread follows its passage into later Versions and goes Outdated where it changed; suggested wording; the response to reviewers frozen onto each Version — ADR-032 §7 and its IR-876 build notes; no FR- id | [details](traceability/IR-876.md) | **VERIFIED** |
+| **IR-1008** | A thread's quote is found in a Version's text whatever its spaces at line breaks, so it is placed found or changed, not removed — fix to IR-876; no FR- id | [details](traceability/IR-1008.md) | **VERIFIED** |
+| **IR-1009** | A thread says why it isn't followed into a later Version (no text for a Version, or still looking) instead of saying nothing — follow-up to IR-876; no FR- id | [details](traceability/IR-1009.md) | **VERIFIED** |
+| **IR-877** | Viewed marks, saved replies and @mentions in the review — ADR-032 §7 Conveniences and its IR-877 build notes, ADR-058 §3 point 7; no FR- id. Built in three stacked PRs: [#663](https://github.com/moisturicer/IRIS/pull/663), [#664](https://github.com/moisturicer/IRIS/pull/664), [#665](https://github.com/moisturicer/IRIS/pull/665) | [details](traceability/IR-877.md) | **VERIFIED** |
+| **IR-1005** | The review-text reader loads its text encodings before its sandbox closes, so a PDF in an embedded font is read, not stored as no text — fix to IR-871; no FR- id | [details](traceability/IR-1005.md) | **VERIFIED** |
 
 ### Non-functional
 
@@ -224,6 +234,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-S4 | Server-side authorization | [details](traceability/NFR-S4.md) | **PARTIAL** |
 | NFR-S5 | Audit immutability | [details](traceability/NFR-S5.md) | **VERIFIED** |
 | NFR-S6 | Account protection | [details](traceability/NFR-S6.md) | **PARTIAL** |
+| **IR-999** | Soft rate limits: each budget has a per-minute burst whose refusal clears in under a minute, and a daily backstop; extends NFR-S6 (IR-661) | [details](traceability/IR-999.md) | **IMPLEMENTED** |
 | NFR-P1 | 100 concurrent sessions | [details](traceability/NFR-P1.md) | **NOT STARTED** |
 | NFR-P2…P5 | Performance and processing | [details](traceability/NFR-P2-P5.md) | **NOT STARTED** |
 | NFR-R1 | Uptime | [details](traceability/NFR-R1.md) | **NOT STARTED** |
@@ -232,7 +243,8 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-U1 | General usability | [details](traceability/NFR-U1.md) | **NOT STARTED** |
 | **NFR-U2** | Submission in under 10 min, 5 of 5 participants | [details](traceability/NFR-U2.md) | **NOT STARTED** |
 | **IR-700** | Another person's Profile at `/people/:id` over the draft IR-696 contract, with Adviser and owner names linking to it, and no middle-initial or ORCID iD field on Edit profile — IR-694; no FR- id; waits on IR-696 and IR-692 | [details](traceability/IR-700.md) | **PARTIAL** |
-| **IR-948** | Your own Profile mounts the same view as another person's; no papers or collaborators until IR-949 — IR-694; no FR- id | [details](traceability/IR-948.md) | **PARTIAL** |
+| **IR-948** | Your own Profile mounts the shared view; IR-949 adds its own papers and collaborators — IR-694; no FR- id | [details](traceability/IR-948.md) | **PARTIAL** |
+| **IR-949** | Your own Profile reads its Research, Advised and Collaborators lists from IR-696; own-ID backend check returns 200; browser review at 375 and 1280 px remains | [details](traceability/IR-949.md) | **PARTIAL** |
 | **IR-326** | Streaming Ask IRIS endpoint — no FR- id; part C of IR-323's "event-shaped answer path", under ADR-028 (one deterministic retrieval call … | [details](traceability/IR-326.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |

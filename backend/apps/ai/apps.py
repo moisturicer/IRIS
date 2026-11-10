@@ -6,41 +6,27 @@ class AiConfig(AppConfig):
     name = "apps.ai"
 
     def ready(self):
-        """Startup checks for the AI configuration (IR-379, IR-464, IR-312, IR-838).
+        """Startup checks for the AI configuration (IR-379, IR-312, IR-838).
 
         Here rather than in a settings module because they must hold whichever
         settings module is loaded. It also puts them on every entry point --
         `runserver`, gunicorn, a Celery worker and `manage.py check` alike -- so
         a deploy fails rather than a reader's question.
         """
-        from apps.ai.evidence import (
-            load_rule_set,
-            verify_evidence_configuration,
-        )
         from apps.ai.extraction import verify_extraction_configuration
         from apps.ai.inference import verify_inference_configuration
         from apps.ai.similarity import verify_novelty_configuration
 
         from apps.ai.admission.limits import verify_admission_configuration
-        from apps.ai.routing.chat import verify_research_configuration
-        from apps.ai.comparison_configuration import verify_comparison_configuration
-        from apps.ai.controller.budget import verify_controller_configuration
         from apps.ai.grants.config import verify_grant_configuration
         from apps.ai.grants.reads import verify_research_read_configuration
 
         verify_extraction_configuration()
-        verify_research_configuration()
-        verify_controller_configuration()
-        verify_comparison_configuration()
         verify_admission_configuration()
         verify_grant_configuration()
         verify_research_read_configuration()
         verify_inference_configuration()
-        verify_evidence_configuration()
         verify_novelty_configuration()
-        # The evidence rule set is read here and nowhere else, so a
-        # `.env` edit cannot remove a requirement between two questions.
-        load_rule_set()
 
         from django.db.models.signals import pre_migrate
 

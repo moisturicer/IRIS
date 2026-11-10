@@ -426,6 +426,7 @@ jobs:
             echo "DB_USER=iris"
             echo "DB_PASSWORD=ci-only-not-a-real-secret"
             echo "REDIS_PASSWORD=ci-only-not-a-real-secret"
+            echo "AI_GATEWAY_SERVICE_SECRET=ci-only-not-a-real-secret"
             echo "IRIS_DOMAIN=localhost"
           } > .env
 
@@ -511,6 +512,7 @@ jobs:
           image=nginxinc/nginx-unprivileged:1.25-alpine
           mounts="-v $PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
                   -v $PWD/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
+                  -v $PWD/frontend/runtime-edge.conf:/etc/nginx/iris/runtime-edge.conf:ro
                   -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
                   -v $PWD/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro
                   -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"

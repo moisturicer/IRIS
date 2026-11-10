@@ -16,12 +16,16 @@ import { recordsApi } from "@/api/records";
 import { ReviewTimeline } from "./ReviewTimeline";
 
 vi.mock("@/api/records", () => ({
-  recordsApi: { tracker: vi.fn(), postReviewComment: vi.fn(), editReviewComment: vi.fn() },
+  recordsApi: { tracker: vi.fn(), postReviewComment: vi.fn(), editReviewComment: vi.fn(), reviewMentionable: vi.fn() },
 }));
+
+const reviews = vi.hoisted(() => ({ savedReplies: vi.fn() }));
+vi.mock("@/api/reviews", () => ({ reviewsApi: reviews }));
 
 const tracker = vi.mocked(recordsApi.tracker);
 const postComment = vi.mocked(recordsApi.postReviewComment);
 const editComment = vi.mocked(recordsApi.editReviewComment);
+const mentionable = vi.mocked(recordsApi.reviewMentionable);
 
 const comment = (overrides: Partial<ReviewComment>): ReviewComment => ({
   id: 1,
@@ -225,6 +229,19 @@ describe("ReviewTimeline", () => {
       await expectNoBlockingA11yViolations(container);
     });
 
+    it("inserts a saved reply into the comment box (IR-877)", async () => {
+      respond(discussion([]));
+      reviews.savedReplies.mockResolvedValue({ data: { results: [
+        { id: 1, title: "Thanks", body: "Thank you, noted.", created_at: "", updated_at: "" },
+      ], limit: 50 } });
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Saved replies" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Insert “Thanks”" }));
+
+      expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Thank you, noted.");
+    });
+
     it("will not post an empty comment", async () => {
       respond(discussion([]));
       renderScreen(<ReviewTimeline recordId={7} canComment />);
@@ -278,6 +295,37 @@ describe("ReviewTimeline", () => {
       await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
       expect(editComment).toHaveBeenCalledWith(7, 1, { body: "Mine, fixed." });
+    });
+
+    it("mentions someone picked beside the text, and shows them under it (IR-877)", async () => {
+      respond(discussion([comment({ id: 1, body: "Mine.", mentions: [{ id: 4, name: "Ana Cruz" }] })]));
+      mentionable.mockResolvedValue({ data: { results: [{ id: 5, name: "Ben Lim" }] } } as never);
+      postComment.mockResolvedValue({ data: comment({ id: 2 }) } as never);
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      expect(await screen.findByText("Mentioned: Ana Cruz")).toBeInTheDocument();
+      await userEvent.type(screen.getByRole("textbox", { name: "Comment" }), "Can you check §3?");
+      await userEvent.click(screen.getByRole("button", { name: "Mention someone" }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Ben Lim" }));
+      await userEvent.click(screen.getByRole("button", { name: "Comment" }));
+
+      expect(postComment).toHaveBeenCalledWith(7, { body: "Can you check §3?", mentions: [5] });
+    });
+
+    it("an edit starts from whom the comment already mentions (IR-877)", async () => {
+      respond(discussion([comment({ id: 1, body: "Mine.", can_edit: true, mentions: [{ id: 4, name: "Ana Cruz" }] })]));
+      editComment.mockResolvedValue({ data: comment({ id: 1 }) } as never);
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Edit your comment" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      // Unchanged, so not sent: an older payload's comment keeps whom it mentions.
+      expect(editComment).toHaveBeenLastCalledWith(7, 1, { body: "Mine." });
+
+      await userEvent.click(await screen.findByRole("button", { name: "Edit your comment" }));
+      await userEvent.click(screen.getByRole("button", { name: "Stop mentioning Ana Cruz" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(editComment).toHaveBeenLastCalledWith(7, 1, { body: "Mine.", mentions: [] });
     });
   });
 });

@@ -21,7 +21,6 @@ from django.test import override_settings
 
 from apps.ai import history
 from apps.ai.chunking.tokens import count_tokens, truncate_to_tokens
-from apps.ai.resolution import build_resolution_prompt, resolution_cache_key
 
 pytestmark = [pytest.mark.django_required]
 
@@ -248,50 +247,6 @@ class TheNewestTurnIsAlwaysPresentTests:
         assert window[0].pk == 4
 
 
-class OneCounterForBothPromptsTests:
-    """The resolver prompt and the answering prompt are built from the same
-    windowed list, and neither narrows it again."""
-
-    def test_neither_prompt_slices_the_window_it_is_given(self):
-        from apps.ai.answers.citations import build_prompt
-
-        turns = _short_turns(40)
-        # Tight enough that the budget excludes some of them: 40 Turns this
-        # short all fit inside the default, which is the point of the
-        # ticket but makes this particular assertion vacuous.
-        with override_settings(AI_HISTORY_TOKEN_BUDGET=200):
-            window = history.history_window(turns)
-
-        resolver_prompt = build_resolution_prompt("and after that?", window)
-        answering_prompt = build_prompt("and after that?", chunks=(), history=window)
-
-        for turn in window:
-            assert turn.question in resolver_prompt
-            assert turn.question in answering_prompt
-        excluded = turns[: -len(window)]
-        assert excluded, "the budget must have excluded something for this to mean anything"
-        for turn in excluded:
-            assert turn.question not in resolver_prompt
-            assert turn.question not in answering_prompt
-
-    def test_both_prompts_hold_the_same_history_lines(self):
-        from apps.ai.answers.citations import build_prompt
-
-        window = history.history_window(_short_turns(40))
-        in_resolver = [
-            line
-            for line in build_resolution_prompt("q", window).splitlines()
-            if line.startswith(("Q: ", "A: "))
-        ]
-        in_answering = [
-            line
-            for line in build_prompt("q", chunks=(), history=window).splitlines()
-            if line.startswith(("Q: ", "A: "))
-        ]
-        # The answering prompt's own `Question:` line is not a `Q: ` line.
-        assert in_resolver == in_answering
-
-
 class NoVendorCallToCountTokensTests:
     """AC: no vendor token-counting call is made anywhere on this path --
     there is no such endpoint to call, and the counting is local."""
@@ -343,39 +298,3 @@ class TruncationPrimitiveTests:
         cut = truncate_to_tokens("héllo wörld naïve café", 3)
         assert "�" not in cut
         assert "héllo wörld naïve café".startswith(cut)
-
-
-class TheCacheKeyFollowsTheWindowTests:
-    """AC: one key per (question, history) pair, computed from the Turns
-    actually used -- a variable window changes which ids are folded in."""
-
-    def test_a_different_window_makes_a_different_key(self):
-        turns = _short_turns(40)
-        with override_settings(AI_HISTORY_TOKEN_BUDGET=300):
-            small = history.history_window(turns)
-        with override_settings(AI_HISTORY_TOKEN_BUDGET=3000):
-            large = history.history_window(turns)
-        assert len(small) < len(large)
-        assert resolution_cache_key("q", small) != resolution_cache_key("q", large)
-
-    def test_the_same_window_and_question_share_a_key(self):
-        window = history.history_window(_short_turns(10))
-        assert resolution_cache_key("its limitations?", window) == (
-            resolution_cache_key("  Its Limitations?  ", window)
-        )
-
-    def test_two_truncations_of_one_turn_do_not_share_a_key(self):
-        """The ids are identical and the prompts are not, which is why the
-        key folds in the text's length as well as the Turn's id."""
-        turns = _long_turns(1)
-        with override_settings(AI_HISTORY_TOKEN_BUDGET=100):
-            short_cut = history.history_window(turns)
-        with override_settings(AI_HISTORY_TOKEN_BUDGET=400):
-            long_cut = history.history_window(turns)
-        assert [t.pk for t in short_cut] == [t.pk for t in long_cut]
-        assert build_resolution_prompt("q", short_cut) != build_resolution_prompt(
-            "q", long_cut
-        )
-        assert resolution_cache_key("q", short_cut) != resolution_cache_key(
-            "q", long_cut
-        )

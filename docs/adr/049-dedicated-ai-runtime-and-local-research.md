@@ -166,3 +166,59 @@ Both vector reads order the rows of the policy-filtered `research_vectors` / `re
    - **Gain:** fewer fragment answers. **Cost:** up to one more model call per failing answer.
 4. **`research-7` (prompt `agent-research-7`).** Same tools as `research-6`. A Paper Chat opens with a message naming its paper (handle and title), sent only if the send may carry that paper. The prompt asks the model to search before asking back on a vague question, to search more than once for "which papers" questions, to use a clearly intended close match, to say an answer may be incomplete when results were withheld, and to group a count to learn valid filter names. New AGENT runs are pinned to `research-7`; earlier pins keep their behaviour, including one repair.
    - **Gain:** Paper Chat follow-ups resolve "this approach", and fewer needless clarifications. **Cost:** a longer prompt on every request.
+
+## Amendment — 2026-11-09 (IR-957): the switch
+
+**Status: Directed by Jive Tyler I. Revalde, the owner, to an AI assistant in chat on 2026-11-09 ("do it anyway"), and recorded here at his direction.** This amends §27. The decisions above stand except where this says otherwise.
+
+1. **§27: the owner flips it once IR-956 passes.** IR-955's bar (the 2026-11-07 amendment, item 2) is the gate, and the owner switches when the report passes it; there is no separate release-approval step.
+   - **What happened instead:** the owner switched before the bar was met. IR-995's agent-only rerun (run `20261109-041415-…-858559d8`, stacked on IR-994) still **failed** on F12 alone, two readers with different access: 43.8% correct against Django's 62.5%. Every other family and both overall figures passed, with no leaks. This record exists so nobody reads the switch as a pass.
+2. **What switched.**
+   - New runs pin the AGENT executor: `RUNS_EXECUTOR=agent` in `ai/.env.example`.
+   - The runs worker is a default Compose service in both stacks; `docker-compose.prod.yml` had none.
+   - `AI_RUNTIME_READER` is gone. The edge grant no longer refuses for it, and `GET /ai/reader/` always answers `runtime`, so a page loaded before the switch opens the runtime reader.
+   - Ask IRIS and Paper Chat mount only the runtime reader.
+3. **Django stopped answering.**
+   - `/ai/ask/`, `/ai/ask/stream/`, a queued run's retry and `/ai/search/` answer **410 Gone** and write nothing.
+   - Removed with their settings and tests: the `lanes-v1` and `controller-v1` engines, lane routing, the research lane (`apps/ai/research/`), comparison building, question resolution, conversation memory and the evidence shadow (its task, queue, worker and rate-limit lane).
+   - The evidence detector stays as an offline instrument (`eval_evidence`).
+4. **Nothing is cut off mid-answer.**
+   - Migration `ai/0044` ends every Django run still queued or running as `failed`, reason `retired`, with one `run_failed` journal event, so a follower reaches its end.
+   - `answer_queued_question` stays registered and does the same for a message dispatched before the switch.
+   - A Django Conversation stays readable through the owner-scoped API. It cannot be continued, and no new one can be started.
+5. **What Django keeps:** reader grants and the runtime edge grant, access rules (`visible_to`, `research_records`), the disclosure gate, provider admission, indexing, the AI Overview and paper briefs.
+6. **§24 after the switch.** `eval_answer_quality --run` collects the agent alone and needs `--reuse-django`, since Django can no longer be collected.
+7. **Rollback is a revert** of IR-957's commit. Unapply `ai/0044` first (`manage.py migrate ai 0043`). Its reverse does nothing, so retired runs stay ended, as they would have once their deadline passed.
+   - **Gain:** one answer path, and the measured gains reach readers: 85.2% correct against 36.1%, citation support 73.5% against 26.8%.
+   - **Cost:** two readers with different access are answered worse than Django did (F12). Readers lose Django's conversation history sidebar, comparison picker and "All papers" widen. Earlier conversations open read-only.
+
+## Amendment — 2026-11-09 (IR-996): no runtime guards
+
+**Status: Decided by Jive Tyler I. Revalde, owner, in chat on 2026-11-09, and recorded here at his direction.** This supersedes the IR-889 amendment (2026-11-05), IR-725's withholding of Record evidence, and the send-time parts of the IR-994 and IR-995 amendments.
+
+1. **Disclosure is decided once, at indexing.** A paper that is embargoed, unreleased IP or without the contact person's AI consent (`apps.ai.policy.disclosure.may_disclose`) is never indexed, so it never appears in AI search. Nothing rechecks it at send time, in development or production.
+2. **No send guard.** `ai/admission/guard.py`, the IR-889 proxy send approval (`RUNS_PROXY_SEND_APPROVAL`, `RUNS_DEPLOYMENT_STAGE`) and the per-result source screen are deleted. Tool results reach the model complete and unmodified; nothing is refused, trimmed or withheld for disclosure. Earlier answers and compacted summaries are always sent. Query embeddings and reranking send without a check.
+3. **The vendor's data terms are the developer's choice, not a coded rule.** No code requires a "no-training" policy: `AGENT_LLM_DATA_POLICY` is an optional label, Voyage clients take no policy, and Django's configured-model check and figure-description vendor check no longer look at data terms. This supersedes ADR-015's no-training precondition for the AI runtime and ADR-036's uniform no-training rule as a startup or send check.
+4. **Kept:** reader visibility inside the research tools (a reader still reads only what PostgreSQL row security lets them), the spending ledger, and the indexing disclosure gate.
+   - **Gain:** every indexed paper is usable; no approvals to maintain; no withheld or refused results. **Cost:** a paper whose status changes after indexing stays indexed until it is re-indexed, and its text can be sent; a run cancelled or revoked between admission and send may make one more paid call; nothing in code stops a vendor that trains on data from being configured.
+
+## Amendment — 2026-11-09 (IR-953): repeated cost and wait in the research loop
+
+**Status: Partly accepted. Approver: Jive Tyler I. Revalde.** Drafted by an AI agent. Items 3 and 4 were approved in chat on 2026-11-09. Item 2 ships **off**, and the recommendation is to leave it off.
+
+1. **Prompt-cache hits are recorded (built, always on).** The chat-completions dialect reads `usage.prompt_tokens_details.cached_tokens` into the model turn. Each settled attempt stores it in `ai_providerreservation.cached_input_tokens` (Django migration `ai/0044`, nullable; null means the vendor did not report it). `python -m ai.admission.report <run_id>` prints the run's total. The charge is **never** discounted for a cache hit, and the reservation never assumes one.
+   - **Gain:** the cache's effect can be measured on real runs. **Cost:** one nullable column.
+   - OpenAI-family models already cache a repeated prompt prefix of 1,024 tokens or more on their own. IRIS cannot turn that off. Recording the hits only makes it visible.
+2. **A per-run cache key (built, off). Decision needed.** `AGENT_LLM_PROMPT_CACHE=run` sends `prompt_cache_key = iris-run-<run id>`, so one run's gathering turns, which share a growing prefix, are routed to the same cache. The key never spans runs or readers. Blank or `off` sends nothing.
+   - **Gain:** more cache hits within a run. **Cost:** on the configured route, none was found.
+   - **Checked 2026-11-09 on the configured route** (OpenRouter, `only: ["azure"]`, `zdr: true`, `require_parameters: true`), with tiny probes costing about US$0.001 in total:
+     - The route accepts `prompt_cache_key`, although no endpoint lists it among its supported parameters.
+     - Caching happens **without** the key. The same 2,874-token prompt sent three times came back with 0, 2,871 and 2,871 cached tokens, and the cost of the repeats fell from US$0.000362 to US$0.0000315.
+     - OpenRouter lists cached input at US$0.01 per million tokens against US$0.10 uncached. Writing to the cache costs US$0.125 per million. Prompts over 272,000 tokens cost double, which is why the window stays at 272,000.
+     - OpenAI's prompt-caching guide says every caching feature is compatible with Zero Data Retention.
+   - **Recommendation:** leave the key off. Caching already happens on this single-provider route, so the key adds nothing measurable. Because the ledger charges every cached token at full price, real spend is lower than the ledger shows.
+3. **A per-run query-vector cache (built, on). Approved by Jive Tyler I. Revalde in chat on 2026-11-09.** It is on unless `RUNS_QUERY_VECTOR_CACHE=off`. It reuses a query's embedding when the same text is searched again in the same run and the same Embedding Space. It is held in memory by that run's research tools and dropped when the run ends, so it never crosses runs or readers.
+   - **Gain:** a repeated search costs no second paid embedding call and no wait for one. **Cost:** none found. The vector is the same input to the same model in the same space.
+4. **Concurrent tool calls (built, IR-1003). Approved by Jive Tyler I. Revalde in chat on 2026-11-09.** A tool group's read-only research calls (search, open_passage, read_page, outline, resolve_papers, count_records, list_records, recover_turn) start together, as long as they fall within the tool limit and before the first `ask_clarification`. `read_manuscript`, plan, focus and clarification still run in turn, because the room a read gets depends on the results before it. Results are folded in call order, so the model sees exactly what a sequential run gives it. Each call's journal entry waits until every earlier call has committed, so the journal keeps call order and the `max(sequence) + 1` numbering never collides. Handles are random tokens, so they do not depend on order. `RUNS_AGENT_TOOL_CONCURRENCY` caps how many run at once per group: optional, 1 to 16, and blank means 1 (sequential).
+   - **Gain:** a turn with two searches waits for one. **Cost:** up to the cap in extra database connections per run. At the edge of a run's allowance, two embeddings reserved at once can refuse one that a sequential run would have admitted. That only ever errs toward spending less.
+5. **Measurement has not been run.** No latency or cost figure exists before or after. The approver decided on 2026-11-09 that the paid before-and-after comparison waits until IR-1004 is implemented.

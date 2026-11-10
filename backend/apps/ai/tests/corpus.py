@@ -185,7 +185,7 @@ class _SilentCutOffLLM(LLMProvider):
         raise RuntimeError("connection reset")
 
 
-def root_with(embedder=None, llm=None, resolver=None):
+def root_with(embedder=None, llm=None):
     """A root whose vendors are fakes and whose disclosure gate allows.
 
     The gate is opened deliberately and explicitly. These records carry no
@@ -194,19 +194,11 @@ def root_with(embedder=None, llm=None, resolver=None):
     what comes back would be satisfied by an empty list. The gate's own refusing
     behaviour is asserted in `apps/ai/policy/tests/` and in
     `test_embargo_every_way_out.py`.
-
-    `resolver` defaults to `None`, which is *not* "no resolution" — it falls
-    through to `CompositionRoot`'s own settings-driven default, exactly as an
-    unconfigured deployment would. No test here relies on that path actually
-    calling a model. Resolution runs on every follow-up since IR-445, and with
-    no model reachable it falls back to the raw question, so a test that
-    asserts on resolution must pass a resolver explicitly, as those do.
     """
     return CompositionRoot(
         embedder=embedder,
         reranker=ScriptedReranker(),
         llm=llm or ScriptedLLM(),
-        resolver=resolver,
         permits=lambda record: True,
     )
 

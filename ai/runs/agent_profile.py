@@ -12,7 +12,6 @@ import json
 from dataclasses import dataclass, fields
 from typing import Mapping, Optional
 
-from ai.admission.guard import NO_TRAINING
 from ai.admission.limits import Limits, NotConfigured, read as read_limits
 from ai.agent.budget import Bounds, profiles as checked_profiles
 from ai.agent.compaction import Compaction
@@ -33,6 +32,10 @@ class AgentProfile:
     limits: Limits
     #: None never compacts (IR-734).
     compaction: Optional[Compaction] = None
+    #: "enforce" repairs or trims a failing draft; "flag" delivers it and notes what it could not match; "advisory" only logs.
+    checks: str = "enforce"
+    #: Read-only calls in one tool group fetched at once; 1 runs them one by one (IR-1003).
+    tool_concurrency: int = 1
 
 
 def _json(values, name, shape: str):
@@ -52,6 +55,16 @@ def _record(cls, name, raw):
         raise NotConfigured(f"{name} is malformed") from None
 
 
+def _tool_concurrency(values) -> int:
+    """Optional: blank runs a tool group one call at a time (IR-1003)."""
+    raw = str(getattr(values, "RUNS_AGENT_TOOL_CONCURRENCY", "") or "").strip()
+    if not raw:
+        return 1
+    if not raw.isdigit() or not 1 <= int(raw) <= 16:
+        raise NotConfigured("RUNS_AGENT_TOOL_CONCURRENCY must be a whole number from 1 to 16")
+    return int(raw)
+
+
 def _bounds(values) -> dict[str, Bounds]:
     raw = _json(values, "RUNS_AGENT_BOUNDS", "a JSON object of profiles per depth")
     if not isinstance(raw, dict) or set(raw) != set(runs_config.DEPTHS):
@@ -62,7 +75,7 @@ def _bounds(values) -> dict[str, Bounds]:
 
 def read(values) -> AgentProfile:
     """The whole profile, or `NotConfigured` naming the first problem."""
-    from ai.agent.executor import CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION
+    from ai.agent.executor import EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION
     from ai.admission.transport import RESEARCH_LANE
     from ai.infrastructure.openai_adapter import OpenAICompatibleAgentProvider
 
@@ -70,8 +83,6 @@ def read(values) -> AgentProfile:
     if missing:
         raise NotConfigured(", ".join(missing))
     provider = agent_config.read(values)
-    if provider.data_policy != NO_TRAINING:
-        raise NotConfigured(f"AGENT_LLM_DATA_POLICY must be {NO_TRAINING}")
     limits = read_limits(values)
     if RESEARCH_LANE not in limits.lanes:
         raise NotConfigured(f"AI_ADMISSION_LANE_CONCURRENCY must name the {RESEARCH_LANE} lane")
@@ -92,14 +103,17 @@ def read(values) -> AgentProfile:
         if not compaction.fits(provider.capacities[model], reserves):
             raise NotConfigured("RUNS_AGENT_COMPACTION leaves no room to summarize or finish"
                                 " under RUNS_AGENT_MODEL's capacity")
+    checks = str(getattr(values, "RUNS_AGENT_CHECKS", "") or "enforce").strip().lower()
+    if checks not in ("enforce", "flag", "advisory"):
+        raise NotConfigured("RUNS_AGENT_CHECKS must be enforce, flag or advisory")
     pin = Pin(
         model=model, endpoint=provider.endpoint, adapter=OpenAICompatibleAgentProvider.adapter,
-        dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=CHAT_PROMPT_VERSION,
-        tool_version=CHAT_TOOL_VERSION, public_version=runs_config.PROTOCOL,
+        dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=EVIDENCE_PROMPT_VERSION,
+        tool_version=EVIDENCE_TOOL_VERSION, public_version=runs_config.PROTOCOL,
         state_version=runs_config.SCHEMA, data_policy=provider.data_policy,
     )
     return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits,
-                        compaction=compaction)
+                        compaction=compaction, checks=checks, tool_concurrency=_tool_concurrency(values))
 
 
 def executor(profile: AgentProfile, dsn: str, *, provider=None):
@@ -115,7 +129,8 @@ def executor(profile: AgentProfile, dsn: str, *, provider=None):
     inner = provider if provider is not None else OpenAICompatibleAgentProvider(profile.provider)
     admitted = AdmittedAgentProvider(inner, Ledger(dsn, profile.limits), purpose=PURPOSE)
     return AgentExecutor(admitted, profile.pin, profile.reserves, profiles=profile.bounds,
-                         price=profile.limits.prices[profile.pin.model], compaction=profile.compaction)
+                         price=profile.limits.prices[profile.pin.model], compaction=profile.compaction,
+                         checks=profile.checks, tool_concurrency=profile.tool_concurrency)
 
 
 def selected(values) -> Optional[AgentProfile]:

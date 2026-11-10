@@ -276,7 +276,9 @@ def _is_orm_field_path(node, parents):
             for target in ancestor.targets:
                 if isinstance(target, ast.Name) and target.id in FIELD_LIST_TARGETS:
                     return True
-        if isinstance(ancestor, ast.keyword) and ancestor.arg == "update_fields":
+        # `fields=[...]` in a constraint or an index names fields, like the
+        # `fields = (...)` assignments above (IR-877: `ViewedMark.reading`).
+        if isinstance(ancestor, ast.keyword) and ancestor.arg in ("update_fields", "fields"):
             return True
         if isinstance(ancestor, ast.Call):
             func = ancestor.func

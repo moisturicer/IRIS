@@ -11,7 +11,7 @@
 //   - for table-heavy screens, the small-screen behaviour (see TABLE_BEHAVIOUR).
 import type { Locator, Page } from "@playwright/test";
 import type { MockApi } from "./mock-api";
-import { PAPER, PAPER_DETAIL, paginated, type SmokeRole } from "./fixtures";
+import { PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
 
 export interface Screen {
   /** Stable name in the results table. */
@@ -108,18 +108,12 @@ const AUDIT_EVENT = {
   record: 101, record_title: LONG_TITLE, metadata: {}, created_at: when("11-05"),
 };
 
+// Ask IRIS runs on the AI runtime (IR-957): its history, and the conversation an address opens.
 const askIrisMocks = wrap("Student", (api) => {
-  api.on("GET", "/ai/reader/", { path: "django" });
+  api.on("GET", "/ai/runtime/conversations", { protocol: "runs-reader-1", conversations: [] });
+  api.on("GET", RUNTIME_CONVERSATION_PATH, RUNTIME_CONVERSATION);
+  // Conversations Django answered before the switch, listed read-only under the history.
   api.on("GET", "/ai/conversations/", []);
-  api.on("GET", "/ai/status/", { embedding_space: null, generative: false, indexed_records: 0 });
-  api.on("GET", "/records/classifications/", paginated([]));
-  // Opening a blank chat makes its conversation, then reads it back.
-  const conversation = {
-    id: 1, title: "", record: null, record_title: null, turn_count: 0,
-    created_at: when("11-05"), updated_at: when("11-05"), turns: [],
-  };
-  api.on("POST", "/ai/conversations/", conversation, 201);
-  api.on("GET", "/ai/conversations/1/", conversation);
 });
 
 export const SCREENS: Screen[] = [
@@ -206,11 +200,14 @@ export const SCREENS: Screen[] = [
     mocks: wrap("Student", (api) => {
       api.on("GET", `/records/${PAPER.id}/`, PAPER_DETAIL);
       api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
+      api.on("GET", `/records/${PAPER.id}/comments/`, { comments: [], count: 0 });
       api.on("GET", "/library/saves/", { results: [] });
       api.on("GET", `/ai/records/${PAPER.id}/overview/`, { state: "not_indexed", overview: null });
       api.on("GET", `/records/${PAPER.id}/similar/`, { results: [] });
       // Review threads (IR-875): the review workspace reads them beside the tracker.
       api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
+      // The response to reviewers (IR-876), read beside the threads.
+      api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
     }),
     heading: PAPER.title,
     primary: (p) => p.getByRole("button", { name: /Cite/ }).first(), primaryLabel: "Cite",
@@ -239,15 +236,14 @@ export const SCREENS: Screen[] = [
   {
     id: "ask-iris", path: "/ai", route: "/ai", role: "Student",
     mocks: askIrisMocks,
-    heading: /What do you want to ask/,
+    heading: "New chat",
     primary: (p) => p.getByRole("button", { name: "Send message" }), primaryLabel: "Send message",
   },
   {
-    // `/ai` opens a conversation and replaces itself with this address; this is
-    // the address a bookmark or "recent chats" link lands on directly.
-    id: "ask-iris-conversation", path: "/ai/conversations/1", route: "/ai/conversations/:conversationId", role: "Student",
+    // The address a bookmark or a chat in the history lands on directly.
+    id: "ask-iris-conversation", path: `/ai/conversations/${RUNTIME_CONVERSATION_ID}`, route: "/ai/conversations/:conversationId", role: "Student",
     mocks: askIrisMocks,
-    heading: /What do you want to ask/,
+    heading: "New chat",
     primary: (p) => p.getByRole("button", { name: "Send message" }), primaryLabel: "Send message",
   },
   {
@@ -258,7 +254,11 @@ export const SCREENS: Screen[] = [
   },
   {
     id: "profile", path: "/profile", route: "/profile", role: "Student",
-    mocks: wrap("Student"),
+    mocks: wrap("Student", (api) => {
+      api.on("GET", "/users/1/profile/research/", { next: null, results: [] });
+      api.on("GET", "/users/1/profile/advised/", { next: null, results: [] });
+      api.on("GET", "/users/1/profile/collaborators/", { next: null, results: [] });
+    }),
     heading: /Sam Student/,
     primary: (p) => p.getByRole("link", { name: "Edit profile" }).first(), primaryLabel: "Edit profile",
   },

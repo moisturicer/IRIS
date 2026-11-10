@@ -325,18 +325,23 @@ def test_a_retry_of_a_retry_that_also_failed_is_a_further_link_in_the_chain(api,
     assert rows("SELECT count(*) FROM iris_ai.ask_run") == [(3,)]
 
 
-def test_a_paper_chat_run_is_retried_only_under_its_own_scope(api, runtime):
+def test_a_paper_chat_run_is_retried_on_its_paper_or_wider_never_on_another(api, runtime):
     client, holder = api
     queue(holder, agent_service(runtime, recording(reply("One."))))
     owner, general = reader("life-scope@cit.edu")
     record = Record.objects.create(title="Scope", pipeline_status=PipelineStatus.PUBLISHED)
+    other = Record.objects.create(title="Elsewhere", pipeline_status=PipelineStatus.PUBLISHED)
     scoped = {**as_reader(issue.reader_session_grant(owner, record.pk).token), **PUBLIC}
+    elsewhere = {**as_reader(issue.reader_session_grant(owner, other.pk).token), **PUBLIC}
     started = ask(client, scoped, "life-scope-001").json()
     stop(client, scoped, started["id"])
-    # A grant of the whole corpus never widens a Paper Chat run, and nothing is written.
-    assert retry(client, general, started["id"], "life-scope-002").status_code == 409
+    # A grant for another paper cannot even see the run (IR-153), so nothing moves and nothing is written.
+    assert retry(client, elsewhere, started["id"], "life-scope-002").status_code == 404
     assert rows("SELECT count(*) FROM iris_ai.ask_run") == [(1,)]
-    assert retry(client, scoped, started["id"], "life-scope-003").status_code == 201
+    # A grant of the whole corpus widens it, in the same Conversation.
+    widened = retry(client, general, started["id"], "life-scope-003")
+    assert widened.status_code == 201
+    assert widened.json()["conversation_id"] == started["conversation_id"]
 
 
 def test_two_processes_retrying_one_run_start_one_new_run(runtime):

@@ -205,6 +205,29 @@ export interface RecordFileItem {
   can_remove: boolean;
 }
 
+/** A public comment on a published paper (ADR-032 §7, IR-690). */
+export interface PublicComment {
+  id: number;
+  author_name: string | null;
+  body: string | null;
+  created_at: string;
+  edited_at: string | null;
+  is_author: boolean;
+  can_edit: boolean;
+  can_report: boolean;
+  reply_to: number | null;
+  /** `writer` renders as [deleted], `moderator` as [removed]. */
+  deletion_kind: "writer" | "moderator" | null;
+}
+
+/** The public thread and its count of comments that have not been deleted. */
+export interface PublicCommentsResponse {
+  comments: PublicComment[];
+  count: number;
+}
+
+export type PublicCommentReportReason = "spam" | "harassment" | "off_topic" | "other";
+
 /**
  * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its
  * 2026-10-06 amendment adds (IR-411): `continue_draft`, reopening one's own
@@ -622,6 +645,41 @@ export interface RevisionFlags {
 }
 
 /** What submitting a new version would do, for its confirmation (IR-273). */
+/** Where a thread's passage is in one later Version (ADR-032 §7, IR-876). */
+export interface ThreadPlace {
+  version:         number;
+  outcome:         "found" | "changed" | "removed";
+  /** Null when the passage was removed. */
+  page:            number | null;
+  /** The quote when found, the edited passage when changed. */
+  text:            string;
+  regions:         PageRegion[];
+  /** The page the suggested wording appears on in this Version, or null. */
+  suggestion_page: number | null;
+}
+
+/** One thread in the response to reviewers (ADR-032 §7, IR-876). */
+export interface ResponseLetterEntry {
+  thread:      number;
+  party:       string;
+  party_label: string;
+  severity:    ThreadSeverity | null;
+  comment:     string;
+  version:     number | null;
+  page:        number | null;
+  quote:       string;
+  /** Null: no answer given. */
+  answer:      ThreadAnswerPayload["kind"] | null;
+  note:        string;
+}
+
+/** The response a Version was submitted with, frozen then. */
+export interface ResponseLetter {
+  version:    number;
+  created_at: string;
+  entries:    ResponseLetterEntry[];
+}
+
 export interface NewVersionHint {
   /** The version it would be. */
   number:   number;
@@ -629,8 +687,10 @@ export interface NewVersionHint {
   rereview: string[];
   /** The offices whose clearance it keeps; empty under the restart-all policy. */
   kept:     string[];
-  /** Why it cannot be submitted yet: nothing has changed since the newest request. */
+  /** Why it cannot be submitted yet: nothing changed, or a Must fix has no answer. */
   blocked:  string | null;
+  /** The response to reviewers it would carry, as it stands (IR-876). */
+  letter?:  ResponseLetterEntry[];
 }
 
 export interface OpenRevisionRequest {
@@ -801,6 +861,12 @@ export interface TrackerReview {
   version:          number | null;
 }
 
+/** Someone a review comment mentions, or may mention (IR-877). */
+export interface MentionedPerson {
+  id:   number;
+  name: string;
+}
+
 /**
  * One message in a record's review discussion (ADR-032 §7, IR-419). Private
  * to the review; public discussion is a separate model.
@@ -820,6 +886,8 @@ export interface ReviewComment {
   edited_at:   string | null;
   /** The server's answer: Edit is offered only where this is true. */
   can_edit:    boolean;
+  /** The people it mentions (IR-877). Optional so an older payload still reads. */
+  mentions?:   MentionedPerson[];
   /*
    * The thread (ADR-032 §7, 2026-11-04; IR-874). A top-level comment is a
    * thread; a reply carries these empty. Optional so an older payload or a
@@ -844,6 +912,24 @@ export interface ReviewComment {
   /** The Decision's comment, the reason it closed. */
   closed_reason?:        string | null;
   answer?:               ThreadAnswerPayload | null;
+  /** A reviewer's replacement text for the passage; empty for none (IR-876). */
+  suggestion?:           string;
+  /** Where the passage is in the newest Version it was looked for in, or null. */
+  place?:                ThreadPlace | null;
+  /** The Version from which the thread is Outdated, or null (IR-876). */
+  outdated_since?:       number | null;
+  /**
+   * Accepted wording looked for in the first Version placed after it was
+   * accepted: its page there, or a null page when it isn't. Null until
+   * such a Version exists (IR-876).
+   */
+  wording_check?:        { version: number; page: number | null } | null;
+  /**
+   * Why an open thread's passage hasn't been followed into the next Version,
+   * such as a Version with no text, or null when there is nothing to explain
+   * (IR-1009).
+   */
+  not_followed?:         { version: number; message: string } | null;
   /** Severity changes, resolving and reopening, oldest first. Empty on a draft. */
   events?:               ThreadEvent[];
   /*
@@ -873,6 +959,94 @@ export interface PageRegion {
   top:    number;
   right:  number;
   bottom: number;
+}
+
+/**
+ * Two Versions compared (ADR-058 §3 as amended 2026-11-08, IR-873):
+ * `GET /records/<id>/versions/compare/`. Both sides are read by one reader,
+ * and no field names it. Only `ready` carries the comparison itself.
+ */
+export type ComparisonState = "ready" | "preparing" | "unavailable" | "no_text";
+export type ChangeKind = "changed" | "added" | "removed" | "moved";
+
+/** One side of a change: the passage, its section key and where it is. */
+export interface ChangeSide {
+  section: string;
+  text:    string;
+  page:    number;
+  regions: PageRegion[];
+}
+
+export interface VersionChange {
+  kind:      ChangeKind;
+  /** `tentative`: possibly text the reader missed, not an edit. */
+  certainty: "established" | "tentative";
+  from:      ChangeSide | null;
+  to:        ChangeSide | null;
+  /** A changed passage's words, in order, the differing ones marked. */
+  words?:    { op: "equal" | "delete" | "insert"; text: string }[];
+}
+
+export interface SectionHeading {
+  key:     string;
+  heading: string;
+  page:    number | null;
+}
+
+export interface ChangeCounts {
+  changed: number;
+  added:   number;
+  removed: number;
+  moved:   number;
+}
+
+export interface SectionComparison {
+  status:  "unchanged" | "changed" | "added" | "removed";
+  renamed: boolean;
+  moved:   boolean;
+  from:    SectionHeading | null;
+  to:      SectionHeading | null;
+  changes: VersionChange[];
+  counts:  ChangeCounts;
+  /** The viewer ticked this section's text as viewed (IR-877); theirs alone. */
+  viewed?: boolean;
+}
+
+export interface ComparisonNotice {
+  code:    "sections_unidentified" | "may_be_unreliable";
+  side:    "from" | "to";
+  message: string;
+}
+
+export interface DocumentComparison {
+  slot:   string;
+  status: "unchanged" | "replaced" | "added" | "removed";
+  from:   number | null;
+  to:     number | null;
+}
+
+/** A sent thread on either Version, placed under a section (or null, by page). */
+export interface PlacedThread {
+  thread:  number;
+  side:    "from" | "to";
+  page:    number | null;
+  section: number | null;
+}
+
+export interface VersionComparisonPayload {
+  state:     ComparisonState;
+  /** What to tell the reviewer; null when ready. */
+  message:   string | null;
+  from:      number;
+  to:        number;
+  documents: DocumentComparison[];
+  mode?:     "sections" | "pages";
+  sections?: SectionComparison[];
+  /** By page: every change, in order. */
+  changes?:  VersionChange[];
+  notices?:  ComparisonNotice[];
+  counts?:   ChangeCounts & { sections_renamed: number; sections_moved: number };
+  threads?:  PlacedThread[];
 }
 
 /** A passage of one Version: where an anchored thread points. */

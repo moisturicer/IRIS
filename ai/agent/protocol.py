@@ -61,6 +61,8 @@ class ModelTurn:
     reasoned: bool = False
     input_tokens: int | None = None
     output_tokens: int | None = None
+    #: Prompt tokens the provider served from its cache; part of `input_tokens` (IR-953).
+    cached_input_tokens: int | None = None
     #: Sources carried by text or opaque state derived from earlier evidence.
     dependencies: frozenset = frozenset()
     #: A persisted turn whose source manifest does not exist cannot be resent.
@@ -114,7 +116,8 @@ class Pin:
 
     def __post_init__(self):
         for name, value in asdict(self).items():
-            if name != "requires" and not value:
+            # The data policy is an optional label for the vendor's terms (IR-996).
+            if name not in ("requires", "data_policy") and not value:
                 raise ValueError(f"pin {name} is required")
 
     def as_dict(self) -> dict:

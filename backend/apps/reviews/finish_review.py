@@ -37,7 +37,9 @@ review came with 3 comments."); the threads add no notice of their own.
 *Comment only* tells the owners and the other open Seat holders, once. So
 does an office reviewer's Clear or finding that does not complete the
 office, which no notice announced before: it says only that comments were
-sent, never the verdict (`notify_office_completed`).
+sent, never the verdict (`notify_office_completed`). Beside it, each person
+the drafts mention gets one notice counting them (`mentions.tell_finished`,
+IR-877).
 """
 
 from __future__ import annotations
@@ -50,7 +52,7 @@ from apps.records.versions import latest_version
 from core.enums import OPEN_SEAT_STATES, ReviewVerdict, SeatState, ThreadSeverity
 from core.permissions import may_read_review
 
-from . import decisions, office_review, revisions, routing, seats
+from . import decisions, mentions, office_review, revisions, routing, seats
 from .models import ReviewComment, ReviewerSeat, ReviewRound
 
 #: Verdicts that approve, so a *Must fix* sent with one would refuse it.
@@ -158,6 +160,7 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
     )
     ReviewComment.objects.filter(pk__in=[d.pk for d in drafts]).update(round=round_)
     audit.review_finished(round_, actor, threads=[d.pk for d in drafts], must_fix=must_fix)
+    mentions.tell_finished(record, actor, drafts, version)
 
     if verdict == ReviewVerdict.COMMENT_ONLY:
         _notify_unannounced(record, actor, round_, len(drafts), comment_only=True)

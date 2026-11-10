@@ -116,6 +116,7 @@ class ChatCompletions:
         return ModelTurn(
             items=tuple(items), stop=stop, reasoned=bool(message.get("reasoning")),
             input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
+            cached_input_tokens=_cached(usage),
         )
 
     @staticmethod
@@ -129,3 +130,10 @@ class ChatCompletions:
                 and isinstance(arguments, str)):
             raise _Malformed
         return ToolCall(call_id, name, arguments)
+
+
+def _cached(usage: dict) -> int | None:
+    """`prompt_tokens_details.cached_tokens` when the provider reports it as a count, else None."""
+    details = usage.get("prompt_tokens_details")
+    cached = details.get("cached_tokens") if isinstance(details, dict) else None
+    return cached if type(cached) is int and cached >= 0 else None

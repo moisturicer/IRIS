@@ -566,6 +566,11 @@ class ReviewText(models.Model):
     #: Why there is no text: a `sandbox` reason code. Blank when read.
     reason = models.CharField(max_length=32, blank=True)
     reader = models.CharField(max_length=64, blank=True)
+    #: The reader this text was made for, known before it is read (IR-873,
+    #: ADR-058 §3 as amended 2026-11-08). A comparison asks for a reading of a
+    #: file by one reader, so a second request finds the first instead of
+    #: queueing another. Blank on a text attached before IR-873 and never read.
+    requested_reader = models.CharField(max_length=64, blank=True)
     page_count = models.PositiveIntegerField(null=True, blank=True)
     #: What may be wrong with the sections found (`reader._finish`), e.g. no headings.
     warnings = models.JSONField(default=list, blank=True)
@@ -582,6 +587,13 @@ class ReviewText(models.Model):
                     ~models.Q(reader="") & models.Q(read_at__isnull=False)
                 ),
                 name="review_text_read_names_its_reader",
+            ),
+            # One reading of a file per reader: the one a Version was given at
+            # submission, or the one a comparison added beside it (IR-873).
+            models.UniqueConstraint(
+                fields=["record", "source_file", "manuscript_sha256", "requested_reader"],
+                condition=~models.Q(requested_reader=""),
+                name="review_text_one_reading_per_reader",
             ),
         ]
 

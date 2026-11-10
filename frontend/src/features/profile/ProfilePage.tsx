@@ -7,6 +7,7 @@ import { pathFor } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
 import { PersonProfileView, type ProfileSubject } from "./PersonProfileView";
+import { useOwnProfileLists } from "./usePersonProfile";
 
 /**
  * Your own Profile (IR-933): the page other signed-in people see for you, with
@@ -17,12 +18,12 @@ import { PersonProfileView, type ProfileSubject } from "./PersonProfileView";
  * so there is one design for everyone. It reads the signed-in user, so it shows
  * nothing the person has not put on their Profile: empty optional fields are
  * left out rather than shown as placeholders, and the account's email address
- * is never printed. Research, Advised and Collaborators are left out until
- * IR-949 reads them; the view does not say "No published papers yet." for a
- * person whose papers have simply not been loaded.
+ * is never printed. Research, Advised and Collaborators use the same paged
+ * endpoints and presentation as another person's Profile (IR-949).
  */
 export default function ProfilePage() {
   const { user } = useAuth();
+  const lists = useOwnProfileLists(user?.id ?? null);
   // Edit profile sends the person back here after a save and says so.
   const saved = (useLocation().state as { saved?: boolean } | null)?.saved === true;
   if (!user) return null;
@@ -57,7 +58,7 @@ export default function ProfilePage() {
         <Link to={pathFor("profileEdit")} className={cn(PILL_PRIMARY, FOCUS_RING)}>Edit profile</Link>
       </p>
 
-      <PersonProfileView profile={profile} />
+      <PersonProfileView profile={profile} lists={lists} />
     </div>
   );
 }

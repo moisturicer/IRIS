@@ -80,7 +80,7 @@ import { useCitationReference, type CitationResolution } from "./useCitationRefe
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PaperDownloadControl } from "./PaperDownloadControl";
-import { OwnerNames, PersonLink } from "./PersonLink";
+import { PersonChip } from "./PersonLink";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
 // Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
@@ -209,17 +209,6 @@ function LoadingSkeleton() {
 /** An outlined fact about the record: its type, classification, programme flags. */
 const META_PILL = "inline-flex min-h-5 items-center rounded-full px-2.5 text-2xs font-semibold leading-4";
 const META_CHIP = cn(META_PILL, "ring-1 ring-inset ring-stone-300 text-stone-700");
-
-/** Initials for the byline's mark. */
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
@@ -940,30 +929,30 @@ export default function PaperViewPage() {
               <div className="space-y-2">
                 {authorNames.length > 0 ? (
                   <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
-                    {authorNames.map((name) => (
-                      <li
-                        key={name}
-                        className="inline-flex items-center gap-2 rounded-full bg-white pl-1 pr-3.5 py-1 ring-1 ring-stone-200 text-small font-semibold text-stone-800"
-                      >
-                        <span className="w-6 h-6 shrink-0 rounded-full bg-brand text-white text-3xs font-bold flex items-center justify-center" aria-hidden>
-                          {initials(name)}
-                        </span>
-                        {name}
-                      </li>
-                    ))}
+                    {authorNames.map((name) => {
+                      const owner = record.owners.find((candidate) => candidate.full_name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+                      return (
+                        <li key={name}>
+                          <PersonChip id={owner?.user} hasProfile={owner?.has_profile} name={name} role="Author" />
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : <p className="text-sm text-stone-500 italic">Authors not recorded</p>}
+                {record.adviser_name && (
+                  <ul className="flex items-center gap-2 flex-wrap" aria-label="Adviser">
+                    <li>
+                      <PersonChip
+                        id={record.adviser ?? undefined}
+                        hasProfile={record.adviser != null && record.adviser_has_profile === true}
+                        name={record.adviser_name}
+                        role="Adviser"
+                      />
+                    </li>
+                  </ul>
+                )}
                 <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
-                  {record.adviser_name && (
-                    <span>
-                      Adviser:{" "}
-                      {record.adviser != null && record.adviser_has_profile
-                        ? <PersonLink id={record.adviser} name={record.adviser_name} />
-                        : record.adviser_name}
-                    </span>
-                  )}
-                  <OwnerNames owners={record.owners} />
                   {record.origin === "institutional" && <span>{INSTITUTION.name}</span>}
                   {record.publication_year && <span>Published {record.publication_year}</span>}
                   {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
@@ -1085,7 +1074,6 @@ export default function PaperViewPage() {
                         <button
                           type="button"
                           onClick={() => setNewVersionOpen(true)}
-                          disabled={record.revision.new_version.blocked != null}
                           aria-describedby={record.revision.new_version.blocked ? "new-version-blocked" : undefined}
                           className={cn(PILL_PRIMARY, "mt-3")}
                         >
@@ -1183,10 +1171,10 @@ export default function PaperViewPage() {
 
                 <RelatedWorks recordId={record.id} />
 
-                {/* Public discussion (IR-420, spec §8): drawn, not yet open. */}
-                <CommentsSection
-                  viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null}
-                />
+                {/* Public comments belong to published papers' Overview only. */}
+                {record.pipeline_status === "published" && (
+                  <CommentsSection recordId={record.id} viewerId={user?.id ?? null} />
+                )}
                 </div>
               </>
             )}
@@ -1197,6 +1185,7 @@ export default function PaperViewPage() {
                 authorView={userIsOwner}
                 onOpenReview={openReview}
                 onBarInset={setReviewBarInset}
+                onShowVersion={chooseVersion}
                 can={can}
                 reader={recordHasPaper(record) ? reader() : null}
                 timelineVersion={trackerVersion}

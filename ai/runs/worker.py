@@ -75,7 +75,6 @@ def search_providers(settings, dsn: str, profile) -> dict:
     key = str(getattr(settings, "VOYAGE_API_KEY", "") or "").strip()
     if profile is None or not key:
         return {}
-    from ai.admission.guard import ProxyApproval, SendGuard
     from ai.admission.ledger import Ledger
     from ai.ingestion.embeddings import VoyageContextEmbeddings
     from ai.research.rerank import VoyageReranker
@@ -83,11 +82,9 @@ def search_providers(settings, dsn: str, profile) -> dict:
     rerank_model = str(getattr(settings, "RUNS_RERANK_MODEL", "") or "").strip()
     return {
         "embedding_provider": VoyageContextEmbeddings(
-            key, model="voyage-context-4", dimensions=1024, data_policy="no-training"),
+            key, model="voyage-context-4", dimensions=1024),
         "embedding_ledger": Ledger(dsn, profile.limits),
         "reranker": VoyageReranker(key, model=rerank_model) if rerank_model else None,
-        "send_guard": SendGuard(dsn, ProxyApproval.from_json(settings.RUNS_PROXY_SEND_APPROVAL),
-                                stage=settings.RUNS_DEPLOYMENT_STAGE),
     }
 
 
