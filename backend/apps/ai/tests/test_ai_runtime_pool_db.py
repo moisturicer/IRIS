@@ -41,11 +41,13 @@ def pooled(runtime):  # noqa: F811
     db.unconfigure(runtime)
 
 
-async def _pooled_backends():
+async def _pooled_backends(dsn):
+    """This test's own pooled backends: parallel workers have pools of their own."""
     conn = await asyncpg.connect(admin_dsn())
     try:
         return await conn.fetchval(
-            "SELECT count(*) FROM pg_stat_activity WHERE application_name = $1", db.APP_NAME)
+            "SELECT count(*) FROM pg_stat_activity WHERE application_name = $1 AND usename = $2",
+            db.APP_NAME, dsn.split("://", 1)[1].split(":", 1)[0])
     finally:
         await conn.close()
 
@@ -56,7 +58,7 @@ def test_many_readers_at_once_share_a_bounded_pool(pooled):
     async def go():
         store = RunStore(pooled)
         listed = await asyncio.gather(*(store.list_conversations(g) for g in grants))
-        return listed, await _pooled_backends()
+        return listed, await _pooled_backends(pooled)
 
     listed, backends = run(go())
     assert listed == [[]] * 10

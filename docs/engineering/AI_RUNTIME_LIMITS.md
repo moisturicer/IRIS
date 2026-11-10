@@ -54,9 +54,9 @@ Only one allowance exists. `RunLimits.allowance()` is the same for both depths, 
 | `RUNS_MAX_QUEUED` | 200 | 200, assumed | Queue bound before `503 busy` |
 | `RUNS_MAX_ACTIVE_PER_READER` | 5 | | Runs a reader may have queued or running |
 | `RUNS_MAX_RUNNING_PER_READER` | 5 | | Runs a reader may have running at once |
-| `RUNS_WORKER_CONCURRENCY` | 8 | **24** per worker, two workers (IR-1012) | Runs one worker executes at once |
+| `RUNS_WORKER_CONCURRENCY` | 8 | **24** per worker, five workers: 120 slots (IR-1012) | Runs one worker executes at once |
 | `RUNS_DEEP_CONCURRENCY` | 4 | **20** per worker (IR-1012) | Deep runs per worker; must stay below the slots. Deep is the default depth, so this caps most runs |
-| `RUNS_DB_POOL_SIZE` | 40 | 40 per worker (above its 24 slots), 8 per gateway process (IR-1012) | Database connections one process holds |
+| `RUNS_DB_POOL_SIZE` | 30 | 30 per worker (above its 24 slots), 8 per gateway process (IR-1012) | Database connections one process holds |
 | `RUNS_DB_ACQUIRE_SECONDS` | 10 | 10 (IR-1012) | How long a call waits for a connection before `503 busy` |
 | `RUNS_POLL_SECONDS` | 1 | | Worker polling interval when Redis wakeups are off |
 
@@ -82,8 +82,8 @@ Only one allowance exists. `RunLimits.allowance()` is the same for both depths, 
 | `AI_ADMISSION_CAMPAIGN_MAX_OUTPUT_TOKENS` | 16,000,000 | | At US$0.50/M this is US$8 of output |
 | `AI_ADMISSION_CAMPAIGN_MAX_ACTIVE_MINUTES` | 2,250 | | Total time calls may hold a slot |
 | `AI_ADMISSION_RESERVE_FRACTION` | 0.25 | | The share of the campaign kept back for core work |
-| `AI_ADMISSION_LANE_CONCURRENCY` | research 16, chat 4, ingestion 2, overview 2, shadow 1, embedding 4, reranking 4, extraction 2 | **research 48, embedding 16, reranking 8**, the rest unchanged (IR-1012) | Calls in flight per lane |
-| `AI_ADMISSION_ACCOUNT_CONCURRENCY` | 24 | **64** (IR-1012) | Calls in flight per vendor account |
+| `AI_ADMISSION_LANE_CONCURRENCY` | research 16, chat 4, ingestion 2, overview 2, shadow 1, embedding 4, reranking 4, extraction 2 | **research 120, embedding 32, reranking 8**, the rest unchanged (IR-1012) | Calls in flight per lane |
+| `AI_ADMISSION_ACCOUNT_CONCURRENCY` | 24 | **128** (IR-1012) | Calls in flight per vendor account |
 | `AI_ADMISSION_PRICES` | luna 0.10/0.50, voyage-context-4 0.12, rerank-3 0.05 (US$/M) | | Luna checked against OpenRouter's Azure endpoint on 2026-11-09: 0.10/0.50 below 272K prompt tokens, doubling above it. Cached input costs 0.01 and is still charged at 0.10 | The prices every reservation is costed at |
 
 ### Optional switches (IR-953, off)

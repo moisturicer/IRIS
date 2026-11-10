@@ -6,10 +6,10 @@ services:
       - private
     image: pgvector/pgvector:pg16
     restart: unless-stopped
-    # Room for the runtime's pools (gateway 4 x 8, two workers x 40), Django,
+    # Room for the runtime's pools (gateway 4 x 8, five workers x 30), Django,
     # Celery and maintenance (IR-1012). Memory settings follow the host.
     command: >-
-      postgres -c max_connections=200
+      postgres -c max_connections=300
       -c shared_buffers=${PG_SHARED_BUFFERS:-1GB}
       -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-3GB}
     shm_size: 256mb
@@ -184,8 +184,8 @@ services:
       redis:
         condition: service_healthy
     deploy:
-      # Two workers x 24 slots: 48 questions at once (IR-1012).
-      replicas: 2
+      # Five workers x 24 slots: 100 readers at once with headroom (IR-1012).
+      replicas: 5
       resources:
         limits:
           memory: 1g
