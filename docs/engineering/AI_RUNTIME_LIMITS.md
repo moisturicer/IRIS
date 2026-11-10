@@ -56,7 +56,7 @@ Only one allowance exists. `RunLimits.allowance()` is the same for both depths, 
 | `RUNS_MAX_RUNNING_PER_READER` | 5 | | Runs a reader may have running at once |
 | `RUNS_WORKER_CONCURRENCY` | 8 | **24** per worker, two workers (IR-1012) | Runs one worker executes at once |
 | `RUNS_DEEP_CONCURRENCY` | 4 | **20** per worker (IR-1012) | Deep runs per worker; must stay below the slots. Deep is the default depth, so this caps most runs |
-| `RUNS_DB_POOL_SIZE` | 20 | 20 per worker, 8 per gateway process (IR-1012) | Database connections one process holds |
+| `RUNS_DB_POOL_SIZE` | 40 | 40 per worker (above its 24 slots), 8 per gateway process (IR-1012) | Database connections one process holds |
 | `RUNS_DB_ACQUIRE_SECONDS` | 10 | 10 (IR-1012) | How long a call waits for a connection before `503 busy` |
 | `RUNS_POLL_SECONDS` | 1 | | Worker polling interval when Redis wakeups are off |
 

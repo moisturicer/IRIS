@@ -56,7 +56,7 @@ def build(settings, *, agent_provider=None) -> RunService:
 
     cfg = runs_config.read(settings)
     if cfg.db_pool is not None:
-        db.configure(cfg.database_url, cfg.db_pool.size, cfg.db_pool.acquire_seconds)
+        db.configure(cfg.database_url, cfg.db_pool)
     profile = agent_profile.selected(settings)
     deterministic = DeterministicExecutor()
     if profile is None:

@@ -6,7 +6,7 @@ services:
       - private
     image: pgvector/pgvector:pg16
     restart: unless-stopped
-    # Room for the runtime's pools (gateway 4 x 8, two workers x 20), Django,
+    # Room for the runtime's pools (gateway 4 x 8, two workers x 40), Django,
     # Celery and maintenance (IR-1012). Memory settings follow the host.
     command: >-
       postgres -c max_connections=200

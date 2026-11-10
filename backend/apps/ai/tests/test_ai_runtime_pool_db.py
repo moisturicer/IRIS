@@ -36,7 +36,7 @@ ACQUIRE = 15.0
 
 @pytest.fixture
 def pooled(runtime):  # noqa: F811
-    db.configure(runtime, size=2, acquire_seconds=ACQUIRE)
+    db.configure(runtime, db.PoolSize(2, ACQUIRE))
     yield runtime
     db.unconfigure(runtime)
 
@@ -68,7 +68,7 @@ def test_an_exhausted_pool_makes_the_store_busy(pooled):
 
     async def go():
         async with db.connection(pooled), db.connection(pooled):
-            db.configure(pooled, size=2, acquire_seconds=0.2)
+            db.configure(pooled, db.PoolSize(2, 0.2))
             with pytest.raises(Busy) as busy:
                 await RunStore(pooled).list_conversations(grant)
         return busy.value.reason
@@ -76,22 +76,24 @@ def test_an_exhausted_pool_makes_the_store_busy(pooled):
     assert run(go()) == "database"
 
 
-def test_a_busy_store_answers_the_reader_503_busy(api, monkeypatch):  # noqa: F811
+def test_a_refused_connection_answers_the_reader_503_busy(api, runtime):  # noqa: F811
     client, holder = api
     grant = session(make_user("pool-route@cit.edu"))
-
-    async def exhausted(*args, **kwargs):
-        raise Busy("database")
-
-    monkeypatch.setattr(holder["service"], "submit", exhausted)
-    response = client.post("/api/v1/ai/runs", json={"question": "q"},
-                           headers={"X-IRIS-Reader-Grant": grant, "Idempotency-Key": "request-busy"})
+    # Nothing listens on port 1: PostgreSQL down or restarting.
+    closed = runtime.rsplit("@", 1)[0] + "@127.0.0.1:1/" + runtime.rsplit("/", 1)[1]
+    holder["service"] = service(closed)
+    db.configure(closed, db.PoolSize(2, ACQUIRE))
+    try:
+        response = client.post("/api/v1/ai/runs", json={"question": "q"},
+                               headers={"X-IRIS-Reader-Grant": grant, "Idempotency-Key": "request-busy"})
+    finally:
+        db.unconfigure(closed)
     assert response.status_code == 503
     assert response.json() == {"status": "busy", "reason": "database"}
 
 
 def test_a_returned_connection_carries_no_readers_grant(runtime):  # noqa: F811
-    db.configure(runtime, size=1, acquire_seconds=ACQUIRE)
+    db.configure(runtime, db.PoolSize(1, ACQUIRE))
     grant = session(make_user("pool-grant@cit.edu"))
 
     async def go():

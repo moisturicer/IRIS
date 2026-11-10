@@ -25,6 +25,10 @@ class Exhausted(Exception):
     """No connection within the acquire timeout, or PostgreSQL refused one."""
 
 
+#: Opening or waiting for a connection failed; never an error inside a caller's work.
+_REFUSED = (asyncio.TimeoutError, OSError, asyncpg.TooManyConnectionsError, asyncpg.CannotConnectNowError)
+
+
 @dataclass(frozen=True)
 class PoolSize:
     size: int
@@ -36,13 +40,15 @@ _configured: dict[str, PoolSize] = {}
 _pools: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
-def configure(dsn: str, size: int, acquire_seconds: float) -> None:
-    if size <= 0 or acquire_seconds <= 0:
+def configure(dsn: str, pool: PoolSize) -> None:
+    """The timeout applies at once; the size to pools opened after this call."""
+    if pool.size <= 0 or pool.acquire_seconds <= 0:
         raise ValueError("pool size and acquire timeout must be positive")
-    _configured[dsn] = PoolSize(size, acquire_seconds)
+    _configured[dsn] = pool
 
 
 def unconfigure(dsn: str) -> None:
+    """Later calls connect per use; pools already open stay until `close`."""
     _configured.pop(dsn, None)
 
 
@@ -54,7 +60,7 @@ def _pool(dsn: str, limits: PoolSize):
     loop = asyncio.get_running_loop()
     mine = _pools.setdefault(loop, {})
     task = mine.get(dsn)
-    if task is None or (task.done() and task.exception() is not None):
+    if task is None or (task.done() and (task.cancelled() or task.exception() is not None)):
         task = mine[dsn] = loop.create_task(_create(dsn, limits))
     return task
 
@@ -66,11 +72,12 @@ async def _create(dsn: str, limits: PoolSize):
 
 @asynccontextmanager
 async def connection(dsn: str, application_name: str = APP_NAME):
+    """`application_name` names an unpooled connection; pooled ones are all APP_NAME."""
     limits = _configured.get(dsn)
     if limits is None:
         try:
             conn = await asyncpg.connect(dsn, server_settings={"application_name": application_name})
-        except asyncpg.TooManyConnectionsError:
+        except _REFUSED:
             raise Exhausted from None
         try:
             await _init(conn)
@@ -81,7 +88,7 @@ async def connection(dsn: str, application_name: str = APP_NAME):
     try:
         pool = await _pool(dsn, limits)
         conn = await pool.acquire(timeout=limits.acquire_seconds)
-    except (asyncio.TimeoutError, asyncpg.TooManyConnectionsError):
+    except _REFUSED:
         raise Exhausted from None
     try:
         yield conn
