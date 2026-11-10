@@ -230,6 +230,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-690** | Comments on published papers: write, reply, edit and delete — ADR-032 §7, amendment 2026-10-31, and its IR-690 build notes; no FR- id. PR [#672](https://github.com/moisturicer/IRIS/pull/672) | [details](traceability/IR-690.md) | **VERIFIED** |
 | **IR-1014** | A script gets a fresh Ubuntu server ready for IRIS: Docker, swap, the clone and DuckDNS, safe to run twice; never starts IRIS or writes a `.env` — epic IR-805; no FR- id. Awaits the run on a fresh EC2 instance with a reboot | [details](traceability/IR-1014.md) | **IMPLEMENTED** |
 | **IR-1013** | A CloudFormation template makes the AWS demo server from one file: instance, firewall, fixed IP and Session Manager access, running the IR-1014 script at first boot — epic IR-805; no FR- id. Awaits a real-account run at the next migration | [details](traceability/IR-1013.md) | **IMPLEMENTED** |
+| **IR-1015** | Cost and uptime guards for one server: an account budget alert, an alarm that recovers the instance, and an optional daily stop and start, each optional — epic IR-805; no FR- id. Awaits its run on iris-demo | [details](traceability/IR-1015.md) | **IMPLEMENTED** |
 
 ### Non-functional
 
