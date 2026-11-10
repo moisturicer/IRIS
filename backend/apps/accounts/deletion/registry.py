@@ -74,6 +74,8 @@ RELATIONS: dict[str, Rule] = {
     "records.DownloadRequest.revoked_by":   Rule(KEEP, "Who revoked someone else's grant"),
     "records.DeleteRequest.requested_by":   Rule(KEEP, "A paper's deletion request concerns the paper, not the person"),
     "records.DeleteRequest.reviewed_by":    Rule(KEEP, "Who decided someone else's request"),
+    "records.PublicComment.author":         Rule(KEEP, "A Comment on a published paper shows \"Former user\" (IR-690)"),
+    "records.PublicComment.deleted_by":     Rule(KEEP, "Who deleted or removed a Comment"),
     # --- reviews and documents: who reviewed what is history (ADR-051 §11)
     "reviews.Review.reviewed_by":           Rule(KEEP, "Review history"),
     "reviews.RecordClearance.reviewed_by":  Rule(KEEP, "Review history"),

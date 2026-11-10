@@ -507,6 +507,42 @@ def notify_mentioned(record, *, actor, recipient, comments: int, version):
         _log_failure("notify_mentioned", record=record)
 
 
+def notify_paper_commented(record, comment, *, actor):
+    """
+    Someone commented on a published paper (ADR-032 §7, amendment 2026-10-31;
+    IR-690): each of its owners but the writer hears once. A reply tells only
+    the comment it answers (`notify_comment_replied`). In-app only.
+    """
+    try:
+        who = actor.get_full_name() or "Someone"
+        notif_type = NotificationType.objects.get_or_create(name="Paper Comment")[0]
+        for owner in record.owners.select_related("user"):
+            if owner.user_id == actor.pk:
+                continue
+            Notification.objects.create(
+                sender=actor, recipient=owner.user, record=record, notif_type=notif_type,
+                message=f'{who} commented on "{record.title}".',
+            )
+    except Exception:
+        _log_failure("notify_paper_commented", record=record)
+
+
+def notify_comment_replied(record, comment, *, actor):
+    """A comment's writer hears that someone else replied to it (IR-690). In-app only."""
+    try:
+        recipient = comment.reply_to.author
+        if recipient is None or recipient.pk == actor.pk:
+            return
+        who = actor.get_full_name() or "Someone"
+        Notification.objects.create(
+            sender=actor, recipient=recipient, record=record,
+            notif_type=NotificationType.objects.get_or_create(name="Comment Reply")[0],
+            message=f'{who} replied to your comment on "{record.title}".',
+        )
+    except Exception:
+        _log_failure("notify_comment_replied", record=record)
+
+
 def notify_document_requested(document_request, *, party_label: str):
     """
     Tell every owner that a party has asked for documents (ADR-022 §3.1).

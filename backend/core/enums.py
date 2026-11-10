@@ -320,6 +320,18 @@ class DocumentRequestItemState(models.TextChoices):
     REJECTED = "rejected", "Rejected"
 
 
+class CommentDeletion(models.TextChoices):
+    """
+    How a Comment on a published paper was taken down (ADR-032 §7, amendment
+    2026-10-31; IR-690). `PublicComment.deletion_kind`; null while it stands.
+    Its writer deletes it ("[deleted]"); RDCO or a system administrator
+    removes it with a reason ("[removed]", IR-691). Neither can be undone.
+    """
+
+    WRITER = "writer", "Deleted by its writer"
+    MODERATOR = "moderator", "Removed"
+
+
 class ThreadSeverity(models.TextChoices):
     """
     How much a reviewer's review thread asks of the author (ADR-032 §7,

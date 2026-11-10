@@ -14,6 +14,7 @@ from django.contrib.postgres.indexes import GinIndex
 # and avoids a rename that has nothing to do with this ticket.
 from core.enums import (  # noqa: F401
     PUBLICLY_VISIBLE_STATUSES,
+    CommentDeletion,
     EmbargoState,
     IPType,
     PipelineStatus,
@@ -786,3 +787,47 @@ class DeleteRequest(models.Model):
     )
     created_at  = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
+
+
+#: A Comment's longest text (ADR-032 §7, amendment 2026-10-31).
+PUBLIC_COMMENT_MAX_LENGTH = 2_000
+
+
+class PublicComment(models.Model):
+    """
+    A Comment on a published paper (ADR-032 §7, amendment 2026-10-31; IR-690).
+
+    Never shares a model with the review discussion (`reviews.ReviewComment`).
+    Shown only while its paper is published (`apps.records.public_comments`);
+    a paper that stops being public keeps its comments, unseen. A deleted or
+    removed comment keeps its text, which no response ever carries, so a
+    report about it can still be checked (IR-691).
+    """
+
+    record      = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="public_comments")
+    #: `SET_NULL`: a deleted account's comment stays, shown as "Former user".
+    author      = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="public_comments",
+    )
+    body        = models.TextField()
+    #: The comment it answers, on the same paper. The thread stays flat.
+    reply_to    = models.ForeignKey(
+        "self", on_delete=models.RESTRICT, null=True, blank=True, related_name="replies",
+    )
+    created_at  = models.DateTimeField(default=timezone.now)
+    #: Set by an edit; the earlier wording is not kept.
+    edited_at   = models.DateTimeField(null=True, blank=True)
+    deletion_kind = models.CharField(max_length=20, choices=CommentDeletion.choices, null=True, blank=True)
+    deleted_at  = models.DateTimeField(null=True, blank=True)
+    deleted_by  = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    #: A moderator's reason (IR-691); blank for a writer's own delete.
+    removal_reason = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        indexes = [models.Index(fields=["record", "created_at"], name="public_comment_thread")]
+
+    def __str__(self):
+        return f"Comment {self.pk} on record {self.record_id}"

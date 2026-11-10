@@ -384,6 +384,26 @@ RECORDS: dict[str, Entry | Shadowed] = {
             kwargs={"pk": Ref("download_request")}, data={},
         ),
     }),
+    # Comments on a published paper (IR-690): anyone signed in reads and
+    # writes; a paper in review answers like a hidden record, even to those
+    # who may read it. Only a comment's writer edits or deletes it.
+    "record-comments": Entry({
+        "GET": [
+            Case(Call(kwargs={"pk": Ref("published")}), row(ANON, OK, OK, OK, OK, OK, OK, OK, OK, OK),
+                 label="a published record"),
+            Case(Call(kwargs=RECORD), row(ANON, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+                 label="a record in review"),
+        ],
+        "POST": _case(row(ANON, OK, OK, OK, OK, OK, OK, OK, OK, OK),
+                      kwargs={"pk": Ref("published")}, data={"body": "Did you test it in the rain?"}),
+    }),
+    "record-comment": Entry({
+        "PATCH": _case(row(ANON, DENY, OK, DENY, DENY, DENY, DENY, DENY, DENY, DENY),
+                       kwargs={"pk": Ref("published"), "comment_id": Ref("public_comment")},
+                       data={"body": "Thanks for reading!"}),
+        "DELETE": _case(row(ANON, DENY, OK, DENY, DENY, DENY, DENY, DENY, DENY, DENY),
+                        kwargs={"pk": Ref("published"), "comment_id": Ref("public_comment")}),
+    }),
     # Exempt readers and grant holders (ADR-048). `other` holds a grant on
     # `published`; the role-less superuser holds none and is exempt from nothing.
     "record-download": Entry({

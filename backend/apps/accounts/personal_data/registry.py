@@ -53,6 +53,7 @@ INCLUDED: dict[str, str] = {
     "reviews.SavedReply": "saved_replies",
     "reviews.ViewedMark": "viewed_marks",
     "reviews.ReviewMention": "review_mentions",
+    "records.PublicComment": "comments",
     "records.DiscoveryInterests": "discovery",
     "records.DiscoveryDismissal": "discovery",
     "ai.Conversation": "conversations",
