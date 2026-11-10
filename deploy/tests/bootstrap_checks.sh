@@ -29,9 +29,10 @@ check() {
     fi
 }
 
-swap_on()        { swapon --show=NAME --noheadings | grep -qx /swapfile; }
+swap_on()        { grep -qx /swapfile <<< "$(swapon --show=NAME --noheadings)"; }
 fstab_once()     { [ "$(grep -c '^/swapfile none swap sw 0 0$' /etc/fstab)" = 1 ]; }
-in_docker_group() { id -nG "$USER_NAME" | tr ' ' '\n' | grep -qx docker; }
+one_swap_entry() { [ "$(awk '$1 == "/swapfile"' /etc/fstab | wc -l)" = 1 ]; }
+in_docker_group() { grep -qx docker <<< "$(id -nG "$USER_NAME" | tr ' ' '\n')"; }
 cloned()         { [ -d "$CLONE/.git" ] && [ "$(stat -c %U "$CLONE")" = "$USER_NAME" ]; }
 on_main()        { [ "$(git -C "$CLONE" rev-parse --abbrev-ref HEAD)" = main ]; }
 no_env_files()   { [ ! -e "$CLONE/.env" ] && [ ! -e "$CLONE/backend/.env" ] && [ ! -e "$CLONE/ai/.env" ]; }
@@ -54,7 +55,22 @@ chmod 644 /etc/iris/duckdns
 check "refuses a DuckDNS file others can read" [ $? -ne 0 ]
 check "says why" said openfile.log "readable by root only"
 check "changed nothing before refusing" [ ! -e /swapfile ]
+
+# A domain with .duckdns.org on the end is refused.
+printf 'DUCKDNS_DOMAIN=example.duckdns.org\nDUCKDNS_TOKEN=not-a-real-token\n' > /etc/iris/duckdns
+chmod 600 /etc/iris/duckdns
+"$SCRIPT" > "$LOGS/baddomain.log" 2>&1
+check "refuses a DuckDNS domain that isn't the subdomain alone" [ $? -ne 0 ]
+check "says what it wants" said baddomain.log "subdomain only"
 rm -f /etc/iris/duckdns
+
+IRIS_USER=no-such-user "$SCRIPT" > "$LOGS/nouser.log" 2>&1
+check "refuses a user that doesn't exist" [ $? -ne 0 ]
+check "names the user" said nouser.log "no user named no-such-user"
+
+IRIS_SWAP_SIZE=4 "$SCRIPT" > "$LOGS/badsize.log" 2>&1
+check "refuses a swap size without M or G" [ $? -ne 0 ]
+check "changed nothing before refusing a size" [ ! -e /swapfile ]
 
 # First run: does everything.
 "$SCRIPT" > "$LOGS/run1.log" 2>&1
@@ -78,6 +94,19 @@ for step in docker docker-group swap clone; do
 done
 check "fstab is unchanged" [ "$fstab_before" = "$(sha256sum /etc/fstab)" ]
 check "still one swap line" fstab_once
+
+# Third run, after a run stopped halfway: /swapfile exists but was never made
+# swap, and the fstab entry is written with other options. The swap is made
+# again and the entry is not added a second time.
+swapoff /swapfile
+rm -f /swapfile
+fallocate -l 16M /swapfile
+sed -i 's|^/swapfile none swap sw 0 0$|/swapfile none swap defaults 0 0|' /etc/fstab
+"$SCRIPT" > "$LOGS/run3.log" 2>&1
+check "third run succeeds" [ $? -eq 0 ]
+check "a half-made swap file is made again and turned on" swap_on
+check "an entry with other options is not added twice" one_swap_entry
+check "says swap was created" said run3.log "swap: created"
 
 if [ "$failures" -ne 0 ]; then
     echo "$failures check(s) failed. Bootstrap output:"

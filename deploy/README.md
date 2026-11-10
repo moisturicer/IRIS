@@ -20,7 +20,7 @@ What belongs to the server, not to a laptop.
 
 **What it never does:** start IRIS, or write a `.env` file. Secrets and vendor keys stay a separate step, done by a person.
 
-**Safe to run again.** A finished step is left alone. It never updates an existing clone: use `git pull` for that.
+**Safe to run again.** A finished step is left alone, and a step a stopped run left halfway (a swap file never made swap, Docker installed but not running) is finished. It never updates an existing clone: use `git pull` for that.
 
 ### Run it
 
@@ -43,10 +43,10 @@ grep "IRIS bootstrap" /var/log/cloud-init-output.log
 | Setting | Default |
 |---|---|
 | `IRIS_USER` | whoever ran `sudo`, else `ubuntu` |
-| `IRIS_REPO` | `https://github.com/moisturicer/IRIS.git` |
-| `IRIS_BRANCH` | `main` |
 | `IRIS_DIR` | `<user's home>/IRIS` |
-| `IRIS_SWAP_SIZE` | `4G` |
+| `IRIS_SWAP_SIZE` | `4G` (a number then `M` or `G`) |
+
+It always clones `main` of `https://github.com/moisturicer/IRIS.git`, which works only while that repository is public.
 
 ### DuckDNS (optional)
 
@@ -65,7 +65,9 @@ DUCKDNS_DOMAIN=iris-citu
 DUCKDNS_TOKEN=<the token from duckdns.org>
 ```
 
-`DUCKDNS_DOMAIN` is the subdomain alone, without `.duckdns.org`. Then run the script again. It refuses a file other users can read, and fails at once on a token DuckDNS rejects, rather than after the next reboot.
+`DUCKDNS_DOMAIN` is the subdomain alone, without `.duckdns.org`. Then run the script again. It refuses the file unless it is owned by root with mode 600, and fails at once on a token DuckDNS rejects, rather than after the next reboot. Each later run sends the address again, as every boot does.
+
+**Not at launch.** User data runs before anyone can create this file, and putting the token in user data would expose it. So a server started from user data has no DuckDNS until someone logs in once, creates the file and runs the script again. With an Elastic IP, skip DuckDNS's updater altogether: set the address once on duckdns.org.
 
 **Check it after a reboot:**
 
