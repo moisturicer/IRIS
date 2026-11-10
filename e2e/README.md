@@ -33,7 +33,7 @@ The screens are listed in `smoke/support/screens.ts`; see
 
 The smoke tier also runs **axe in a real browser** (IR-908): on every routed screen (`axe-routes.spec.ts`), on every state of the UI states matrix (`axe-states.spec.ts`, cells in `smoke/support/states.ts`), and with every dialog open (`axe-dialogs.spec.ts`, cases in `smoke/support/dialogs.ts`). WCAG 2.0/2.1 A and AA, contrast included; serious and critical findings fail the test, with each screen's full axe result attached. A new route needs a row in `screens.ts`, and `dialog-coverage.spec.ts` fails when a dialog source file is neither opened by a case nor listed in `UNSCANNED` with a reason.
 
-The smoke tier also **forces each state of the UI states matrix** (IR-907) by intercepting the one request that decides it, and asserts what the reader sees and can do next. `forced-states.spec.ts` runs every state in `smoke/support/states.ts` (loading is a held read that is then released, empty, a 500 with Try again, a real request timeout with Retry and no automatic retry, a 403 and a 404 that must read the same with no retry), and two withdrawals while the reader is already in the product. `forced-cells.spec.ts` holds the cells that need a second read or a different fixture (Discover's filtered-empty and failed or timed-out Load more, Saved, My Reviews' tabs, Ask IRIS's list failure and no-sources, the review tracker and timeline). `ask-iris-stream.spec.ts` cuts, fails and ends the Ask IRIS event stream. `forced-coverage.spec.ts` reads `docs/ui-ux/17-ui-states-matrix.md` and fails when a cell the document does not mark N/A has no forced-state test (`smoke/support/matrix-proofs.ts`), so editing the matrix without a test fails the build.
+The smoke tier also **forces each state of the UI states matrix** (IR-907) by intercepting the one request that decides it, and asserts what the reader sees and can do next. `forced-states.spec.ts` runs every state in `smoke/support/states.ts` (loading is a held read that is then released, empty, a 500 with Try again, a real request timeout with Retry and no automatic retry, a 403 and a 404 that must read the same with no retry), and two withdrawals while the reader is already in the product. `forced-cells.spec.ts` holds the cells that need a second read or a different fixture (Discover's filtered-empty and failed or timed-out Load more, Saved, My Reviews' tabs, Ask IRIS's history failure and no-sources, the review tracker and timeline). (`ask-iris-stream.spec.ts`, which cut and failed Django's Ask IRIS event stream, was retired with that stream in IR-957.) `forced-coverage.spec.ts` reads `docs/ui-ux/17-ui-states-matrix.md` and fails when a cell the document does not mark N/A has no forced-state test (`smoke/support/matrix-proofs.ts`), so editing the matrix without a test fails the build.
 
 Output goes to `playwright-report-smoke/` and `test-results-smoke/` (trace and
 video for a failure only). Mark the "Frontend smoke" check required in the
@@ -78,11 +78,13 @@ Both run inside the backend container (`support/stack.ts`).
 - **Inactivity expiry** is enforced by the server at 30 minutes. Its check
   runs only in a separate pass with `SESSION_IDLE_TIMEOUT_MINUTES=2`
   (`E2E_IDLE_PASS=1`).
-- **Request throttles.** DRF's general throttles are raised to 20000/day
-  (`API_THROTTLE_ANON`, `API_THROTTLE_USER`). Behind nginx every signed-out
-  request comes from one address, and the 100/day default runs out partway
-  through one full run. No acceptance criterion measures them. The lockout
-  under test is axes', left at its default of three failures.
+- **Request throttles.** DRF's per-minute bursts are raised to 6000/minute
+  (`API_THROTTLE_ANON_BURST`, `API_THROTTLE_USER_BURST`,
+  `API_THROTTLE_LOGIN_BURST`, `API_THROTTLE_REGISTER_BURST`; IR-999). Behind
+  nginx every signed-out request comes from one address, and a run is faster
+  than a person. The daily backstops keep their defaults. No acceptance
+  criterion measures them. The lockout under test is axes', left at its
+  default of three failures.
 - **Ask IRIS** is not driven here. IR-631 reuses IR-630 and IR-605/IR-608
   evidence from the same SHA. IR-250 (the embargo field) is Done, but a paper
   still reaches the AI only once someone has answered for it (ADR-052), and a

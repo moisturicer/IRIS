@@ -15,6 +15,8 @@ import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
 import { REVIEW_ACTIONS, VERDICT_CAPABILITIES, type DialogReviewAction } from "./reviewActions";
+import type { ShowPlace } from "./changes/ChangeItem";
+import { ChangesTab } from "./changes/ChangesTab";
 import { ReviewThreads } from "./threads/ReviewThreads";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
 import type { ReviewWorkspaceProps } from "./ReviewWorkspace";
@@ -37,7 +39,11 @@ const FOOTER_ACTIONS = REVIEW_ACTIONS.filter((a) => a.capability !== "route" && 
  * not verdicts -- requesting documents, withdrawing a revision request.
  */
 const FINISH_FOOTER_ACTIONS = FOOTER_ACTIONS.filter((a) => !VERDICT_CAPABILITIES.includes(a.capability));
-type Tab = "conversation" | "threads" | "details";
+type Tab = "conversation" | "threads" | "changes" | "details";
+
+const TAB_NAMES: Record<Tab, string> = {
+  conversation: "Conversation", threads: "Threads", changes: "Changes", details: "Details",
+};
 type Widths = { mid: number | null; side: number | null };
 
 function readWidths(): Widths {
@@ -60,7 +66,7 @@ function fitWidths(width: number, wanted: Widths) {
   return { mid: Math.floor(mid), side: Math.floor(Math.min(side, mid - 40)) };
 }
 
-export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, onChanged, onDocuments, onOpenReview }: ReviewWorkspaceProps) {
+export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, onChanged, onDocuments, onOpenReview, onShowVersion }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
   const sizes = fitWidths(width, wanted);
@@ -106,7 +112,34 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   // opened one included, so only a seat not yet opened asks for it here: an
   // opened one finishes instead (IR-875).
   const unopened = can.has("open_review") && seatToOpen(record) !== null;
-  const tabs: Tab[] = folded ? ["conversation", "threads", "details"] : ["conversation", "threads"];
+  // Changes needs two Versions to compare (ADR-058 §3, IR-873).
+  const versions = record.versions ?? [];
+  const comparable = versions.length >= 2;
+  const tabs: Tab[] = [
+    "conversation", "threads", ...(comparable ? ["changes" as const] : []), ...(folded ? ["details" as const] : []),
+  ];
+  const latest = versions[versions.length - 1]?.number ?? null;
+  // A reviewer looking again at a new Version reads the response it was
+  // submitted with first (ADR-032 §7, IR-876): once per letter, so a later
+  // tab choice is the reviewer's own.
+  const letterVersion = tw.panel.letter?.version ?? null;
+  const reviewing = finishing || unopened;
+  const ledWithLetter = useRef<number | null>(null);
+  useEffect(() => {
+    if (!reviewing || letterVersion === null || letterVersion !== latest || ledWithLetter.current === letterVersion) return;
+    ledWithLetter.current = letterVersion;
+    setTab("threads");
+  }, [reviewing, letterVersion, latest]);
+  // Fetched only once opened, then kept, so its choices survive a tab switch.
+  const [changesOpened, setChangesOpened] = useState(false);
+  useEffect(() => {
+    if (tab === "changes") setChangesOpened(true);
+    if (tab === "changes" && !comparable) setTab("conversation");
+  }, [tab, comparable]);
+  const showChange = ({ version, page, regions }: ShowPlace) => {
+    onShowVersion?.(version === latest ? null : version);
+    tw.showPlace(page, regions);
+  };
 
   useEffect(() => {
     if (!drawer || !open) return;
@@ -254,7 +287,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
                 <button key={name} type="button" role="tab" id={`${ids}-tab-${name}`}
                   aria-selected={tab === name} aria-controls={`${ids}-${name}`} tabIndex={tab === name ? 0 : -1}
                   onClick={() => setTab(name)} className={cn("review-tab", FOCUS_RING)}>
-                  {name === "conversation" ? "Conversation" : name === "details" ? "Details" : "Threads"}
+                  {TAB_NAMES[name]}
                   {name === "threads" && tw.count && <>{" "}<span className="ml-1 text-2xs font-normal text-stone-600">{tw.count}</span></>}
                 </button>
               ))}
@@ -275,6 +308,14 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             <div role="tabpanel" id={`${ids}-threads`} aria-labelledby={`${ids}-tab-threads`} hidden={tab !== "threads"} className="p-4">
               <ReviewThreads {...tw.panel} />
             </div>
+            {comparable && (
+              <div role="tabpanel" id={`${ids}-changes`} aria-labelledby={`${ids}-tab-changes`} hidden={tab !== "changes"} className="p-4">
+                {changesOpened && (
+                  <ChangesTab recordId={record.id} versions={versions} threads={tw.threads.sent}
+                    onShowInPaper={showChange} onOpenThread={tw.openThread} />
+                )}
+              </div>
+            )}
             {folded && <div role="tabpanel" id={`${ids}-details`} aria-labelledby={`${ids}-tab-details`} hidden={tab !== "details"} className="p-4">{details}</div>}
           </div>
           <footer ref={footer} className="review-pane-foot" aria-label="Your review">

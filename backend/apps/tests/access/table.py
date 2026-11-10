@@ -66,6 +66,8 @@ SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE)
 #: `feed`, a reader's private saved feed (IR-577): its owner alone; everyone
 #: else cannot know it exists.
 OWNS_FEED = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
+#: `saved_reply`, a person's private saved reply (IR-877): the same shape.
+OWNS_SAVED_REPLY = OWNS_FEED
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY, DENY)
 
@@ -188,6 +190,23 @@ RECORDS: dict[str, Entry | Shadowed] = {
             kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
         ),
     }),
+    # Comparing two Versions is review material too (ADR-058 §3 and §4,
+    # IR-873). The world's record has one Version, so a reader it admits gets
+    # the 400 that says there is nothing to compare: still not a refusal.
+    "record-version-compare": Entry({
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
+    }),
+    # A Viewed mark (IR-877, ADR-032 §7 Conveniences) is the caller's own, on
+    # a comparison only the review's readers see: the same readers, and the
+    # one-Version world record is the same non-refusing 400.
+    "record-version-compare-viewed": Entry({
+        "POST": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD,
+                      data={"from": 1, "to": 2, "side": "to", "key": "introduction", "viewed": True}),
+    }),
+    # The response to reviewers is review material (ADR-032 §7, IR-876).
+    "record-response-letters": Entry({
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
+    }),
     "record-similar": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     # ADR-029: novelty results belong only to the Proposal's owner.
     "record-related-research": Entry({
@@ -275,6 +294,11 @@ RECORDS: dict[str, Entry | Shadowed] = {
             row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs=RECORD, data={"body": "Which version is this?"},
         ),
+    }),
+    # Whom a writer may mention (IR-877): the writers of the discussion only,
+    # so a pool member who reads it is refused, as POST above refuses them.
+    "record-review-mentionable": Entry({
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE), kwargs=RECORD),
     }),
     "record-review-comment": Entry({
         "PATCH": _case(
@@ -557,6 +581,8 @@ ACCOUNTS = {
     }),
     "user-photo": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
     "user-interest-suggestions": Entry({"GET": _case(SIGNED_IN, query={"q": "mach"})}),
+    # IR-697: Discover people search has the same signed-in audience as profiles.
+    "user-search": Entry({"GET": _case(SIGNED_IN, query={"q": "research"})}),
     # IR-696: a person's public profile and its three lists, for any signed-in
     # user. The subject is the one who is read, not an actor: an account the
     # server hides answers the same 404 as a missing id, which is not an access
@@ -592,6 +618,17 @@ SEAT = {"pk": Ref("seat")}
 REVIEWS = {
     **REVIEW_DEADLINES,
     "reviews-mine": Entry({"GET": _case(SIGNED_IN)}),
+    # IR-877, ADR-032 §7 Conveniences: a saved reply is the caller's own, so
+    # listing and saving are anyone's, and another person's reply is the same
+    # 404 as a missing one.
+    "saved-replies": Entry({
+        "GET": _case(SIGNED_IN),
+        "POST": _case(SIGNED_IN, data={"title": "Matrix reply", "body": "Please clarify."}),
+    }),
+    "saved-reply": Entry({
+        "PATCH": _case(OWNS_SAVED_REPLY, kwargs={"reply_id": Ref("saved_reply")}, data={"body": "Edited."}),
+        "DELETE": _case(OWNS_SAVED_REPLY, kwargs={"reply_id": Ref("saved_reply")}),
+    }),
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
     "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
@@ -608,26 +645,20 @@ REVIEWS = {
 }
 
 AI = {
-    "ai-ask": Entry({"POST": [
-        _case(SIGNED_IN, data={"question": ""}),
-        _case(PRIVATE, data={"question": "What is this research?", "conversation_id": Ref("conversation")}, objects=("conversation",)),
-    ]}),
-    "ai-ask-stream": Entry({"POST": [
-        _case(SIGNED_IN, data={"question": ""}),
-        _case(PRIVATE, data={"question": "What is this research?", "conversation_id": Ref("conversation")}, objects=("conversation",)),
-    ]}),
-    "ai-search": Entry({"POST": _case(SIGNED_IN, data={"query": ""})}),
+    # Django stopped answering in IR-957: these answer 410 to every signed-in reader.
+    "ai-ask": Entry({"POST": _case(SIGNED_IN, data={"question": "What is this research?"})}),
+    "ai-ask-stream": Entry({"POST": _case(SIGNED_IN, data={"question": "What is this research?"})}),
+    "ai-search": Entry({"POST": _case(SIGNED_IN, data={"query": "research"})}),
     "ai-status": Entry({"GET": _case(SIGNED_IN)}),
     "ai-paper-brief": Entry({"POST": _case(READS_RECORD, kwargs=RECORD, data={})}),
     "ai-record-overview": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
-    "ai-conversations": Entry({"GET": _case(SIGNED_IN), "POST": _case(SIGNED_IN, data={"title": "Matrix"})}),
+    "ai-conversations": Entry({"GET": _case(SIGNED_IN)}),
     "ai-conversation-detail": Entry({m: _case(PRIVATE, kwargs={"pk": Ref("conversation")},
                                             **({} if m in ("GET", "DELETE") else {"data": {"title": "Renamed"}}))
                                     for m in ("GET", "PUT", "PATCH", "DELETE")}),
-    "ai-research-run": Entry({"GET": _case(PRIVATE, kwargs={"pk": Ref("research_run")})}),
     "ai-ask-run-stream": Entry({"GET": _case(PRIVATE, kwargs={"pk": Ref("ask_run")})}),
     "ai-ask-run-cancel": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
-    "ai-ask-run-retry": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
+    "ai-ask-run-retry": Entry({"POST": _case(SIGNED_IN, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant-renew": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-runtime-grant": Entry({"POST": _case(SIGNED_IN, data={})}),

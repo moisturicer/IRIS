@@ -57,9 +57,11 @@ export function PersonProfileView({ profile, lists }: PersonProfileViewProps) {
   const interests = profile.research_interests;
   // A list that failed is not an empty one: it keeps its place and says so.
   const showsRail = lists !== undefined
-    && (lists.collaborators.items.length > 0 || lists.collaborators.error !== null);
+    && (lists.collaborators.items.length > 0 || lists.collaborators.error !== null || lists.collaborators.loading);
   const noPapers = lists !== undefined
     && lists.research.items.length === 0 && lists.advised.items.length === 0
+    && !lists.research.loading && !lists.advised.loading
+    && !lists.research.loadingMore && !lists.advised.loadingMore
     && lists.research.error === null && lists.advised.error === null;
 
   return (
@@ -149,7 +151,7 @@ function useFocusFirstNewRow(count: number) {
 
 /** What sits under a list: its failure, with a retry, or Show more while there is more. */
 function ListFooter({ list, label, onMore }: { list: ListState<unknown>; label: string; onMore: () => void }) {
-  if (list.loadingMore) {
+  if (list.loading || list.loadingMore) {
     return (
       <p role="status" className="mt-4 inline-flex items-center gap-2 text-small text-stone-700">
         <Spinner size="sm" /> Loading…
@@ -180,7 +182,7 @@ function ListFooter({ list, label, onMore }: { list: ListState<unknown>; label: 
 function PaperSection({ title, list, onMore }: { title: string; list: ListState<ProfilePaper>; onMore: () => void }) {
   const { list: rows, mark } = useFocusFirstNewRow(list.items.length);
   // A first page that is being retried keeps its place: the section does not vanish and come back.
-  if (list.items.length === 0 && !list.error && !list.loadingMore) return null;
+  if (list.items.length === 0 && !list.error && !list.loading && !list.loadingMore) return null;
   return (
     <Section title={title}>
       {list.items.length > 0 && (

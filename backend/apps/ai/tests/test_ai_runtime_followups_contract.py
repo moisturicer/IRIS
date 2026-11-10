@@ -1,7 +1,7 @@
-"""Follow-ups, exact counts and listings get past the send guard (IR-994, ADR-049).
+"""Follow-ups, exact counts and listings reach the model (IR-994, ADR-049).
 
-The executor with a recording provider that applies the guard's own provenance
-check to every request, as the admitted transport does before a paid send.
+Since IR-996 nothing is checked at send time: the recording provider sees the
+request exactly as built.
 """
 
 import dataclasses
@@ -13,9 +13,7 @@ REPO = Path(__file__).resolve().parents[4]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from ai.admission.guard import _sources  # noqa: E402
-from ai.agent.executor import WITHHELD_ANSWER, WITHHELD_SUMMARY, AgentExecutor  # noqa: E402
-from ai.agent.protocol import ToolResult as Entry  # noqa: E402
+from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
 from ai.research.tools import OK, Count, Coverage, Source, ToolResult  # noqa: E402
 from ai.runs.executor import PriorTurn  # noqa: E402
@@ -28,19 +26,9 @@ PIN_2 = dataclasses.replace(PIN, prompt_version="agent-research-2", tool_version
 HYDROLOGY = Count(total=3, filters=(("classification", "Hydrology"),), population=frozenset({1, 2, 5}))
 
 
-class Guarded(RecordingAgentProvider):
-    """Refuses a request the guard's provenance check would refuse."""
-
-    async def converse(self, request):
-        _sources([e for e in request.history if isinstance(e, Entry)
-                  or getattr(e, "dependencies", frozenset())
-                  or getattr(e, "unverified_provenance", False)])
-        return await super().converse(request)
-
-
 def guarded(*responses):
-    return Guarded(responses=list(responses), capabilities=("continuation",),
-                   capacities={"scripted-model": MILLION})
+    return RecordingAgentProvider(responses=list(responses), capabilities=("continuation",),
+                                  capacities={"scripted-model": MILLION})
 
 
 class Catalogue(Corpus):
@@ -64,7 +52,7 @@ PIN_6 = dataclasses.replace(PIN, prompt_version="agent-research-6", tool_version
 
 
 class Listing(Catalogue):
-    async def list_records(self, filters, limit=None):
+    async def list_records(self, filters, limit=None, offset=0):
         self.calls.append(("list", dict(filters)))
         records = (dataclasses.replace(self.record(1), year=2024), dataclasses.replace(self.record(2), year=None))
         fact = Count(total=2, filters=(("classification", "Hydrology"),), population=frozenset({1, 2}))
@@ -109,20 +97,8 @@ FLOOD_SOURCE, POND_SOURCE = Source(1, 11, "e1"), Source(2, 22, "e2")
 EARLIER = "Rainfall gauges fed a neural network in «Flood forecasting»."
 
 
-class Screened(Guarded):
-    """A transport that can carry every source except `withdrawn`."""
-
-    withdrawn = frozenset()
-
-    async def eligible(self, pin, sources):
-        return frozenset(sources) - self.withdrawn
-
-
-def screened(*responses, withdrawn=()):
-    provider = Screened(responses=list(responses), capabilities=("continuation",),
-                        capacities={"scripted-model": MILLION})
-    provider.withdrawn = frozenset(withdrawn)
-    return provider
+def screened(*responses):
+    return guarded(*responses)
 
 
 def follow_up(provider, sources):
@@ -141,15 +117,6 @@ def test_a_follow_up_sends_the_earlier_answer_with_its_sources():
     assert EARLIER in sent_text(provider.requests[0])
 
 
-def test_an_earlier_answer_whose_paper_can_no_longer_be_sent_is_withheld_not_refused():
-    provider = screened(reply("General background."), withdrawn=[FLOOD_SOURCE])
-    result = follow_up(provider, frozenset({FLOOD_SOURCE}))
-    sent = sent_text(provider.requests[0])
-    assert EARLIER not in sent and WITHHELD_ANSWER in sent
-    assert "Which paper predicts floods?" in sent
-    assert result.answer == "General background."
-
-
 def test_an_answer_records_every_source_it_read_and_those_its_history_carried():
     provider = screened(
         tools(call("s", "search", query="ponds")),
@@ -159,26 +126,16 @@ def test_an_answer_records_every_source_it_read_and_those_its_history_carried():
     assert result.sources == {FLOOD_SOURCE, POND_SOURCE}
 
 
-class Failing(Screened):
-    async def eligible(self, pin, sources):
-        raise ConnectionError("database unreachable")
-
-
-def test_a_failed_source_check_withholds_the_earlier_answer_and_the_run_continues():
-    provider = Failing(responses=[reply("General background.")], capabilities=("continuation",),
-                       capacities={"scripted-model": MILLION})
-    result = follow_up(provider, frozenset({FLOOD_SOURCE}))
-    assert WITHHELD_ANSWER in sent_text(provider.requests[0])
-    assert result.answer == "General background."
-
-
-def test_an_unverifiable_summary_of_earlier_turns_is_withheld_not_refused():
+def test_an_earlier_answer_and_a_summary_are_always_sent_whole():
+    # IR-996: nothing withholds earlier answers or a derived summary at send time.
     saved = {"goal": "Water papers.", "preferences": [], "findings": [], "limitations": [], "plan": [],
              "shown": [], "selected": [], "excluded": [], "turns": [1], "sources": [],
              "format": "agent-handoff-1", "derived": True}
     provider = screened(reply("General background."))
+    prior = (PriorTurn("Which paper predicts floods?", EARLIER, "answer", 2, frozenset({FLOOD_SOURCE})),)
     agent = AgentExecutor(provider, PIN_2, RESERVES, profiles=PROFILES)
-    ctx = context(handoff={"revision": 1, "through_ordinal": 1, "body": saved})
+    ctx = context(prior=prior, handoff={"revision": 1, "through_ordinal": 1, "body": saved})
     result = run(agent.answer("Which was it?", Corpus(), ctx))
-    assert WITHHELD_SUMMARY in sent_text(provider.requests[0])
+    sent = sent_text(provider.requests[0])
+    assert EARLIER in sent and "Water papers." in sent
     assert result.answer == "General background."

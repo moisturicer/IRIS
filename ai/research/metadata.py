@@ -1,6 +1,7 @@
 """Title matching and the metadata count vocabulary (IR-750).
 
-Ports Django's `apps.ai.research.titles` and `aggregate_records` filters, so
+Ports the filters of Django's retired research lane (`apps.ai.research.titles`,
+`aggregate_records`, removed in IR-957), so
 both runtimes name papers and count them alike; the runtime cannot import Django.
 """
 

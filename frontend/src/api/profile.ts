@@ -30,7 +30,11 @@ export const profileApi = {
     body.append("crop_x", String(crop.x));
     body.append("crop_y", String(crop.y));
     body.append("crop_size", String(crop.size));
-    return apiClient.put<{ photo_url: string }>("/users/me/photo/", body);
+    return apiClient.put<{ photo_url: string }>("/users/me/photo/", body, {
+      // The shared client defaults to JSON, which would serialize this
+      // FormData instead of sending it as a multipart upload.
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
 
   removePhoto: () => apiClient.delete("/users/me/photo/"),

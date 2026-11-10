@@ -156,10 +156,12 @@ def test_a_handoff_cannot_make_a_passage_the_run_never_read_citable():
         tools(call("b", "search", query="pond")),
         reply(json.dumps(invented)),
         reply(f"Ponds flood [{handle('P', 9)}]."), reply(f"Ponds flood [{handle('P', 9)}]."),
+        reply(f"Ponds flood [{handle('P', 9)}]."),
     )
-    with pytest.raises(Unavailable) as refused:
-        research(provider, Handoffs())
-    assert refused.value.code == "invalid_draft"
+    result, _ = research(provider, Handoffs())
+    # Delivered, but the handle no read produced never becomes a citation.
+    assert result.answer == "Ponds flood."
+    assert result.citations == ()
 
 
 # --- A failed or stale compaction keeps the preceding context ------------------

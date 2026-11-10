@@ -29,6 +29,7 @@ run_nginx() {
         -v "$root/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro" \
         -v "$root/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
         -v "$root/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro" \
+        -v "$root/frontend/runtime-edge.conf:/etc/nginx/iris/runtime-edge.conf:ro" \
         -v "$html_mount:/usr/share/nginx/html:ro" \
         "$image" $command
 }

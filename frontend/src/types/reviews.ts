@@ -197,3 +197,17 @@ export interface WorkflowAnalyticsQuery {
   from: string;
   to: string;
 }
+
+/** A person's own reusable review text (ADR-032 §7 Conveniences, IR-877). */
+export interface SavedReply {
+  id: number;
+  title: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedRepliesPage {
+  results: SavedReply[];
+  limit: number;
+}

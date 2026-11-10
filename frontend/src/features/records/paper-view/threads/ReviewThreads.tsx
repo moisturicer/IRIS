@@ -7,9 +7,12 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import type { Capability } from "@/features/records/capabilities";
 import { errorDetail } from "@/lib/errorDetail";
 import { cn, formatDate } from "@/lib/utils";
-import type { ReviewComment, ThreadSeverity } from "@/types/records";
+import type { MentionedPerson, ResponseLetter, ReviewComment, ThreadSeverity } from "@/types/records";
 
+import { MentionPicker, MentionedPeople } from "../Mentions";
+import { SavedReplies } from "../SavedReplies";
 import type { Passage } from "./passage";
+import { ResponseLetterPanel } from "./ResponseLetter";
 import { SEVERITY_WORDS, filterThreads, isOpen, threadStatus, type Thread, type ThreadFilter, type ThreadViewer } from "./threadModel";
 import type { ReviewThreadsState } from "./useReviewThreads";
 
@@ -33,6 +36,8 @@ export interface ReviewThreadsProps {
   onClearParty: () => void;
   /** A thread to scroll to and focus, from a pin; bumped key so a second press works. */
   focus: { id: number; key: number } | null;
+  /** The newest response to reviewers, shown first (IR-876); null for none. */
+  letter?: ResponseLetter | null;
 }
 
 const FILTER_NAMES: Record<ThreadFilter, string> = { open: "Open", yours: "Yours", resolved: "Resolved", all: "All" };
@@ -80,6 +85,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
   return (
     <section aria-labelledby={headingId} className="space-y-4">
       <h3 id={headingId} className="sr-only">Threads</h3>
+      {props.letter && <ResponseLetterPanel letter={props.letter} />}
       {props.composing
         ? <Composer {...props} target={props.composing} />
         : canComment && (
@@ -215,6 +221,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           <span className="text-2xs text-stone-600">p.{root.anchor.page} · v{root.anchor.version}</span>
         )}
         <span className="flex-1" />
+        {root.outdated_since != null && <Chip>Outdated since v{root.outdated_since}</Chip>}
         {root.severity && <Chip tone={root.severity === "must_fix" ? "brand" : "quiet"}>{SEVERITY_WORDS[root.severity]}</Chip>}
         {root.is_draft
           ? <Chip><i className="fas fa-pen text-[9px]" aria-hidden />Draft</Chip>
@@ -231,12 +238,18 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           “{root.anchor.quote}”
         </button>
       )}
+      <WhereNow root={root} />
+      {typeof root.not_followed?.message === "string" && (
+        <p className="text-2xs text-stone-700">{root.not_followed.message}</p>
+      )}
+      {root.suggestion && <SuggestedWording root={root} />}
 
       <div className="text-small text-stone-800">
         <p className="text-2xs text-stone-600">
           {root.author_name ?? "Someone"} · {formatDate(root.created_at)}{root.edited_at ? " · edited" : ""}
         </p>
         <p className="whitespace-pre-wrap break-words">{root.body}</p>
+        <MentionedPeople people={root.mentions} />
       </div>
 
       {root.answer && (
@@ -260,10 +273,12 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
 
       {form === "reply" && (
         <TextForm
-          label="Reply" submitLabel="Reply" required busy={busy}
+          label="Reply" submitLabel="Reply" required busy={busy} savedReplies mentionsRecordId={id}
           hint="Posted now, not held with your review."
           onCancel={() => setForm(null)}
-          onSubmit={(body) => act(() => recordsApi.postReviewComment(id, { body, reply_to: root.id }), "Your reply could not be sent.")}
+          onSubmit={(body, mentions) => act(() => recordsApi.postReviewComment(id, {
+            body, reply_to: root.id, ...(mentions.length ? { mentions } : {}),
+          }), "Your reply could not be sent.")}
         />
       )}
       {(form === "addressed" || form === "declined") && (
@@ -280,6 +295,12 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       {form === null && (
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={`${pinWords(thread)} actions`}>
           {root.can_answer && <>
+            {root.suggestion && (
+              <Button size="sm" variant="outline" disabled={busy}
+                onClick={() => act(() => recordsApi.answerThread(id, root.id, { answer: "addressed", note: "" }), "Your answer could not be saved.")}>
+                Accept wording
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => setForm("addressed")}>Mark addressed</Button>
             <Button size="sm" variant="outline" onClick={() => setForm("declined")}>Decline</Button>
           </>}
@@ -312,6 +333,53 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       )}
       {error && <p role="alert" className="text-small text-brand">{error}</p>}
     </article>
+  );
+}
+
+/**
+ * Where the passage is in the newest Version it was looked for in (IR-876):
+ * found there (moved), changed (shown beside the original), or removed. A
+ * thread found in its own Version says nothing.
+ */
+function WhereNow({ root }: { root: ReviewComment }) {
+  const ids = useId();
+  const place = root.place;
+  if (!place || !root.anchor) return null;
+  if (place.outcome === "removed") {
+    return <p className="text-small text-stone-700">Passage removed in v{place.version}.</p>;
+  }
+  if (place.outcome === "found" && root.outdated_since == null) {
+    return <p className="text-small text-stone-700">Found on p. {place.page} of v{place.version}.</p>;
+  }
+  const label = `Now in v${place.version}, p. ${place.page}`;
+  return (
+    <section aria-labelledby={`${ids}-now`} className="space-y-0.5">
+      <p id={`${ids}-now`} className="text-2xs font-semibold text-stone-600">{label}</p>
+      <blockquote className="border-l-2 border-stone-300 pl-2 text-small text-stone-800">“{place.text}”</blockquote>
+    </section>
+  );
+}
+
+/**
+ * A reviewer's replacement text (IR-876). Accepting it is a promise, since
+ * IRIS can't edit the PDF; once accepted, the next Version says whether the
+ * wording appears. That is a hint: the reviewer still resolves the thread.
+ */
+function SuggestedWording({ root }: { root: ReviewComment }) {
+  const ids = useId();
+  const check = root.wording_check;
+  return (
+    <section aria-labelledby={`${ids}-wording`} className="rounded bg-stone-50 px-2 py-1.5 space-y-0.5">
+      <p id={`${ids}-wording`} className="text-2xs font-semibold text-stone-600">Suggested wording</p>
+      <p className="text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
+      {check && (
+        <p className="text-2xs text-stone-700">
+          {check.page != null
+            ? `Suggested wording found on p. ${check.page} of v${check.version}.`
+            : `Suggested wording not found in v${check.version}.`}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -350,21 +418,27 @@ function Reply({ reply }: { reply: ReviewComment }) {
         {reply.author_name ?? "Someone"} · {formatDate(reply.created_at)}{reply.edited_at ? " · edited" : ""}
       </p>
       <p className="whitespace-pre-wrap break-words">{reply.body}</p>
+      <MentionedPeople people={reply.mentions} />
     </li>
   );
 }
 
-function TextForm({ label, submitLabel, hint, required, busy, onSubmit, onCancel }: {
+function TextForm({ label, submitLabel, hint, required, busy, savedReplies, mentionsRecordId, onSubmit, onCancel }: {
   label: string; submitLabel: string; hint?: string; required?: boolean; busy: boolean;
-  onSubmit: (text: string) => void; onCancel: () => void;
+  /** Offer saved replies (IR-877): a reply is a comment; an answer's note is not. */
+  savedReplies?: boolean;
+  /** Offer mentions on this record (IR-877): a reply's, never an answer note's. */
+  mentionsRecordId?: number;
+  onSubmit: (text: string, mentions: number[]) => void; onCancel: () => void;
 }) {
   const id = useId();
   const [text, setText] = useState("");
+  const [mentioned, setMentioned] = useState<MentionedPerson[]>([]);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => ref.current?.focus(), []);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (text.trim() || !required) onSubmit(text.trim());
+    if (text.trim() || !required) onSubmit(text.trim(), mentioned.map((p) => p.id));
   };
   return (
     <form onSubmit={submit} className="space-y-1.5">
@@ -372,6 +446,8 @@ function TextForm({ label, submitLabel, hint, required, busy, onSubmit, onCancel
       <textarea ref={ref} id={id} rows={3} value={text} onChange={(e) => setText(e.target.value)}
         aria-describedby={hint ? `${id}-hint` : undefined} className={fieldClasses(false)} />
       {hint && <p id={`${id}-hint`} className="text-2xs text-stone-600">{hint}</p>}
+      {savedReplies && <SavedReplies textareaRef={ref} value={text} onChange={setText} />}
+      {mentionsRecordId !== undefined && <MentionPicker recordId={mentionsRecordId} value={mentioned} onChange={setMentioned} />}
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button type="submit" size="sm" disabled={busy || (required && !text.trim())}>{submitLabel}</Button>
@@ -391,6 +467,10 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   const drafting = can.has("finish_review");
   const [body, setBody] = useState("");
   const [severity, setSeverity] = useState<ThreadSeverity>("suggestion");
+  const [wording, setWording] = useState("");
+  const [mentioned, setMentioned] = useState<MentionedPerson[]>([]);
+  // Only a reviewer's thread on a passage carries wording (IR-876).
+  const canSuggest = drafting && target.kind === "passage";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -405,6 +485,8 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
       await recordsApi.postReviewComment(recordId, {
         body: body.trim(),
         ...(drafting ? { severity } : {}),
+        ...(canSuggest && wording.trim() ? { suggestion: wording.trim() } : {}),
+        ...(mentioned.length ? { mentions: mentioned.map((p) => p.id) } : {}),
         ...(target.kind === "passage" ? {
           anchor: {
             version: target.version, page: target.passage.page, quote: target.passage.quote,
@@ -435,6 +517,8 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
       <label htmlFor={`${ids}-body`} className="sr-only">Comment</label>
       <textarea ref={ref} id={`${ids}-body`} rows={3} value={body} onChange={(e) => setBody(e.target.value)}
         placeholder="What should the authors look at here?" className={fieldClasses(false)} />
+      <SavedReplies textareaRef={ref} value={body} onChange={setBody} />
+      <MentionPicker recordId={recordId} value={mentioned} onChange={setMentioned} />
       {drafting && (
         <fieldset className="flex flex-wrap items-center gap-3">
           <legend className="sr-only">Severity</legend>
@@ -446,6 +530,16 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
             </label>
           ))}
         </fieldset>
+      )}
+      {canSuggest && (
+        <div className="space-y-1">
+          <label htmlFor={`${ids}-wording`} className={LABEL}>Suggested wording (optional)</label>
+          <textarea id={`${ids}-wording`} rows={2} value={wording} onChange={(e) => setWording(e.target.value)}
+            aria-describedby={`${ids}-wording-hint`} className={fieldClasses(false)} />
+          <p id={`${ids}-wording-hint`} className="text-2xs text-stone-600">
+            The text you&rsquo;d put in its place. You can change it until you finish your review.
+          </p>
+        </div>
       )}
       {error && <p role="alert" className="text-small text-brand">{error}</p>}
       <div className="flex justify-end gap-2">

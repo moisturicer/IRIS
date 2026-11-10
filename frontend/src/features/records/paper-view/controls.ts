@@ -25,10 +25,10 @@ export const CONTROL_TEXT = "text-small font-semibold";
 export const CONTROL_BASE = `inline-flex items-center gap-1.5 ${CONTROL_SIZE} ${CONTROL_SHAPE} ${CONTROL_TEXT} transition-colors duration-200`;
 
 /** At rest: outlined, so the page has one filled thing at a time. */
-export const CONTROL_OUTLINE = "border border-stone-300 text-stone-700 hover:border-brand/40 hover:text-brand";
+export const CONTROL_OUTLINE = "border border-stone-300 text-stone-700 hover:bg-stone-100 hover:text-stone-900";
 
 /** Switched on: a quiet maroon tint. */
-export const CONTROL_ON = "bg-brand-50 border border-brand-200 text-brand hover:border-brand/50";
+export const CONTROL_ON = "bg-brand-50 border border-brand-200 text-brand hover:bg-brand-100";
 
 /** The one filled control (Send). */
 export const CONTROL_FILLED = "bg-brand border border-brand text-white hover:bg-brand-light disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-500 disabled:cursor-not-allowed";

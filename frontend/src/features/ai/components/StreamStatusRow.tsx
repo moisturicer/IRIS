@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { StreamingState } from "../conversation/answerStream";
+import type { StreamingState } from "../conversation/streamingState";
 import { cn } from "@/lib/utils";
 
 /** "12s" or "1m 05s". */

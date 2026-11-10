@@ -251,6 +251,16 @@ export default {
       },
 
       keyframes: {
+        // The reasoning thread's pulse, travelling down the margin.
+        "iris-thread": {
+          "0%":   { transform: "translateY(-100%)" },
+          "100%": { transform: "translateY(200%)" },
+        },
+        // An answer's source list opening.
+        "sources-open": {
+          "0%":   { opacity: "0", transform: "translateY(-4px)", clipPath: "inset(0 0 100% 0)" },
+          "100%": { opacity: "1", transform: "translateY(0)", clipPath: "inset(0 0 0 0)" },
+        },
         "fade-in-up": {
           "0%":   { opacity: "0", transform: "translateY(6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },

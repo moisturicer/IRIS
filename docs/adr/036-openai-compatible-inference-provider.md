@@ -290,3 +290,7 @@ pointed at OpenAI's own base URL is one configuration of the same adapter.
 `docs/rag_third_party_services_architecture.md` §2 · IR-131 (E · Grounded
 answers with citations) · ADR-008 (degradation, unchanged) · ADR-015 (the
 disclosure gate that governs transmission)
+
+## Amendment — 2026-11-09 (IR-996)
+
+No code requires a vendor no-training policy any more: the vendor's data terms are the developer's configuration choice. See [ADR-049](049-dedicated-ai-runtime-and-local-research.md) §Amendment — 2026-11-09 (IR-996).

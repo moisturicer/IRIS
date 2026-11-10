@@ -68,12 +68,9 @@ def test_a_runtime_smoke_writes_a_runtime_run_labelled_contract_evidence(tmp_pat
     assert "jwt-secret-value" not in json.dumps(run)
 
 
-def test_the_runtime_arm_and_url_go_together_and_the_old_arms_never_become_the_runtime(
-        tmp_path, served):
+def test_the_runtime_arm_needs_its_url(tmp_path, served):
     with pytest.raises(CommandError, match="--runtime-url"):
         call(tmp_path, case=["d1"], smoke=True, arm="runtime")
-    with pytest.raises(CommandError, match="--arm runtime"):
-        call(tmp_path, case=["d1"], smoke=True, arm="controller", runtime_url="https://x")
 
 
 def test_held_out_cases_and_real_providers_are_still_gated_before_any_request(tmp_path, served):

@@ -24,6 +24,42 @@ def test_a_thesis_is_read_in_the_sandbox():
 
 
 @linux
+def test_a_pdf_in_an_embedded_font_is_read_in_the_sandbox():
+    """A word processor's PDF maps its font to Unicode through a ToUnicode CMap,
+    which pdfminer decodes as UTF-16BE once the sandbox is closed (IR-1005)."""
+    outcome = sandbox.read_in_sandbox(BytesIO(pdf(THESIS, embedded=True)))
+    assert outcome.state == sandbox.READ, outcome
+    keys = [s["key"] for s in outcome.reading["sections"]]
+    assert "statement of the problem" in keys
+
+
+@linux
+def test_once_confined_the_child_can_still_decode_every_encoding_a_read_uses():
+    """Every codec is loaded before `confine()`, when its module can still be
+    opened: decoding empty bytes takes CPython's fast path and loads nothing
+    (IR-1005). Run as the sandbox runs the reader, isolated."""
+    import subprocess
+    from pathlib import Path
+
+    reader_path = Path(sandbox.__file__).with_name("reader.py")
+    probe = (
+        "import importlib.util\n"
+        f"spec = importlib.util.spec_from_file_location('reader', {str(reader_path)!r})\n"
+        "reader = importlib.util.module_from_spec(spec); spec.loader.exec_module(reader)\n"
+        "reader._preload()\n"
+        "reader.confine()\n"
+        "for codec in ('UTF-16BE', 'utf-16be', 'utf-16le', 'utf-16', 'latin-1', 'ascii', 'cp1252', 'utf-8'):\n"
+        "    try:\n"
+        "        'Recharge'.encode(codec).decode(codec)\n"
+        "    except Exception as exc:\n"
+        "        print('FAILED', codec, type(exc).__name__)\n"
+        "print('done')\n"
+    )
+    result = subprocess.run([sys.executable, "-I", "-c", probe], capture_output=True, text=True, timeout=30)
+    assert result.stdout.strip() == "done", result.stdout + result.stderr
+
+
+@linux
 def test_a_scan_reads_as_no_text():
     outcome = sandbox.read_in_sandbox(BytesIO(blank()))
     assert (outcome.state, outcome.reason) == (sandbox.NO_TEXT, "no_text_layer")

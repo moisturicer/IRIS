@@ -114,14 +114,14 @@ def test_replay_refuses_held_out_before_the_freeze(tmp_path):
     set_path, lock_path = _held_out_inputs(tmp_path, {"thresholds": None})
     with pytest.raises(CommandError, match="locked_at"):
         call_command("eval_replay_conversations", set=set_path, lock=lock_path, case=["h1"],
-                     held_out=True)
+                     held_out=True, runtime_url="https://runtime.invalid")
 
 
 def test_replay_refuses_paid_held_out_without_approvals(tmp_path):
     set_path, lock_path = _held_out_inputs(tmp_path, {"locked_at": "2026-10-01T00:00:00+00:00"})
     with pytest.raises(CommandError, match="approvals"):
         call_command("eval_replay_conversations", set=set_path, lock=lock_path, case=["h1"],
-                     held_out=True, providers="real",
+                     held_out=True, providers="real", runtime_url="https://runtime.invalid",
                      approvals=_write(tmp_path / "a.json", {"funding": APPROVED["funding"]}))
 
 
@@ -132,4 +132,4 @@ def test_replay_held_out_flag_takes_held_out_cases_only(tmp_path):
                        {**lock_record(data), "locked_at": "2026-10-01T00:00:00+00:00"})
     with pytest.raises(CommandError, match="held-out case"):
         call_command("eval_replay_conversations", set=set_path, lock=lock_path, case=["d1"],
-                     held_out=True)
+                     held_out=True, runtime_url="https://runtime.invalid")

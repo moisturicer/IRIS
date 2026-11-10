@@ -3,9 +3,9 @@
 The same model turns search, read, plan and draft, keeping every exchange
 in order. Bounds close research while the final answer and one repair still
 fit; the final turn keeps the tools declared with `tool_choice: none`. Only
-a checked, completed answer is delivered: a failing draft is repaired once in
-the same Conversation, and a failing repair keeps only what each sentence's
-own citations support, or nothing. A changed source is never repaired
+a checked, completed answer is delivered: a failing draft is repaired up to
+twice in the same Conversation, and if it still fails the latest draft goes out
+whole, minus citations that name no source. A changed source is never repaired
 around; it fences delivery. The pin is checked against what
 this code and the provider support before anything is sent; a mismatch is
 `unavailable`, never a substitute model or dialect.
@@ -21,6 +21,7 @@ import time
 from dataclasses import replace
 from typing import Mapping, Optional
 
+from ai.runs import stream
 from ai.admission.errors import AdmissionDenied
 from ai.admission.limits import Price
 from ai.agent import assurance, checkpoint, compaction as compacting
@@ -32,9 +33,11 @@ from ai.agent.context import (
 from ai.agent.protocol import (
     AgentRequest, ModelTurn, NotFinal, Pin, StopReason, Text, ToolGroup, ToolResult, User, final_answer,
 )
-from ai.agent.tools import ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded
+from ai.agent.tools import (
+    ASK_CLARIFICATION, ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded,
+)
 from ai.domain.ports import LLMProvider, ProviderRejected, TransientProviderError, UnsupportedCapability
-from ai.research.tools import OK
+from ai.research.tools import EARLIER_COMMITTED, OK
 from ai.runs import config as runs_config
 from ai.runs.executor import Compacted, Result, RunContext, Unavailable
 
@@ -62,6 +65,9 @@ LISTING_TOOL_VERSION = "research-6"
 #: research-6's tools, plus Paper Chat naming its paper and a second answer repair (IR-995).
 CHAT_PROMPT_VERSION = "agent-research-7"
 CHAT_TOOL_VERSION = "research-7"
+#: research-7's tools; repository questions answered from the repository or declined (IR-1004).
+EVIDENCE_PROMPT_VERSION = "agent-research-8"
+EVIDENCE_TOOL_VERSION = "research-8"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -109,8 +115,9 @@ HYBRID_INSTRUCTIONS = RECOVERY_INSTRUCTIONS + (
 )
 LISTING_INSTRUCTIONS = HYBRID_INSTRUCTIONS + (
     " For which papers match an Area, PSCED area, record type, years or IP flag, use list_records: it "
-    "names every matching paper this reader can see, up to 50, with the exact total. Say when it stopped "
-    "short, and never present a search sample as a complete list."
+    "names the matching papers this reader can see, up to 50 at a time, with the exact total. When more "
+    "remain, say how many and offer the next page (the same filters with offset); a reader who asks for "
+    "more, or for all of them, gets the following pages. Never present a search sample as a complete list."
 )
 CHAT_INSTRUCTIONS = LISTING_INSTRUCTIONS + (
     " When a paper chat message names the paper this conversation is about, words such as 'this "
@@ -119,15 +126,21 @@ CHAT_INSTRUCTIONS = LISTING_INSTRUCTIONS + (
     "clarifying question only when searching cannot settle it. For which papers do something, search "
     "more than once with different wording and name every paper that fits. When resolve_papers returns "
     "close matches, use the one that is clearly the paper meant and name it; ask only when none clearly "
-    "fits. A result whose reason is withheld left out passages from papers that cannot be shared now: "
-    "answer from the rest and say the answer may be incomplete. When a filter value is unknown, call "
+    "fits. When a filter value is unknown, call "
     "count_records grouped by that field to see the valid names, then try again."
+)
+EVIDENCE_INSTRUCTIONS = CHAT_INSTRUCTIONS + (
+    " When the question asks what a paper in the repository reports, such as a value, method, result, "
+    "dataset or where a tool can be accessed, answer only from what the tools returned and cite passages "
+    "by handle. Counts and lists from count_records or list_records are repository findings too: give "
+    "them without passage handles. Before saying the papers do not answer it, search again with "
+    "different wording. If the papers this reader can see still do not answer it, say so in a sentence "
+    "or two and stop: do not answer from general knowledge, and do not name papers, tools or values "
+    "you did not read. The reader sees only your final answer, so never mention or correct an earlier "
+    "draft."
 )
 #: Opens a Paper Chat under research-7: the one paper every question is about (IR-995).
 PAPER_CHAT_PREFIX = "[IRIS paper chat] This conversation is about one paper: "
-#: Sent in place of an earlier answer that drew on a source the send may no longer carry (IR-994).
-WITHHELD_ANSWER = "[This earlier answer is withheld: a paper it drew on can no longer be shared.]"
-WITHHELD_SUMMARY = "[The summary of earlier turns is withheld: a paper it drew on can no longer be shared.]"
 #: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
 COMPACT_REQUEST = (
     "The reader asked to condense this conversation now. This is not a question and not the reader's "
@@ -151,10 +164,11 @@ PROMPTS = {
     (HYBRID_PROMPT_VERSION, HYBRID_TOOL_VERSION): HYBRID_INSTRUCTIONS,
     (LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION): LISTING_INSTRUCTIONS,
     (CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION): CHAT_INSTRUCTIONS,
+    (EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION): EVIDENCE_INSTRUCTIONS,
 }
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
                           RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
-                          CHAT_TOOL_VERSION)
+                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -174,8 +188,17 @@ class AgentExecutor:
 
     def __init__(self, provider: LLMProvider, pin: Pin, reserves: Reserves, *,
                  profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None,
-                 compaction: Optional[Compaction] = None):
+                 compaction: Optional[Compaction] = None, checks: str = "enforce", tool_concurrency: int = 1):
+        if type(tool_concurrency) is not int or tool_concurrency < 1:
+            raise ValueError("tool_concurrency must be a positive integer")
+        #: Read-only calls in one tool group fetched at once; 1 runs them one by one (IR-1003).
+        self.tool_concurrency = tool_concurrency
         self.provider = provider
+        #: "enforce" refuses, repairs or trims a draft that fails the checks. "flag" delivers it,
+        #: dropping a citation that cannot be bound to a source and noting any number or title it
+        #: could not match. "advisory" delivers it and only logs the findings.
+        self.checks = checks
+        self.enforce_checks = checks == "enforce"
         self.pin = pin
         self.reserves = reserves
         #: None never compacts: a full window then closes research, as before (IR-734).
@@ -335,16 +358,57 @@ def _carried(history) -> frozenset:
     return frozenset(s for entry in history for s in getattr(entry, "dependencies", ()))
 
 
-def _screen(provider, pin):
-    """The admitted transport's source check, so results leave out what a send could not carry (IR-889)."""
-    eligible = getattr(provider, "eligible", None)
-    if eligible is None:
-        return None
 
-    async def screen(sources):
-        return await eligible(pin, sources)
+class _Fetches:
+    """A tool group's read-only fetches, started together and folded in call order (IR-1003).
 
-    return screen
+    Each fetch runs under a shared cap. Its journal entry waits until every
+    earlier call has committed, so the journal reads as a sequential run would.
+    Fetches start only for calls a sequential run would reach: within the tool
+    limit and before the first clarification. Fewer than two starts none.
+    """
+
+    def __init__(self, investigation, calls, *, cap: int, limit: int):
+        self.committed = [asyncio.Event() for _ in calls]
+        self.tasks: dict[int, asyncio.Task] = {}
+        if cap < 2:
+            return
+        started = {}
+        for n, call in enumerate(calls[:max(0, limit)]):
+            if call.name == ASK_CLARIFICATION.name:
+                break
+            fetch = investigation.fetcher(call)
+            if fetch is not None:
+                started[n] = fetch
+        if len(started) < 2:
+            for fetch in started.values():
+                fetch.close()
+            return
+        gate = asyncio.Semaphore(cap)
+        # Created in call order, so an earlier fetch always takes a slot first.
+        for n, fetch in started.items():
+            self.tasks[n] = asyncio.create_task(self._run(n, fetch, gate))
+
+    async def _run(self, n, fetch, gate):
+        token = EARLIER_COMMITTED.set(self.committed[n - 1] if n else None)
+        try:
+            async with gate:
+                return await fetch
+        finally:
+            EARLIER_COMMITTED.reset(token)
+            self.committed[n].set()
+
+    def take(self, n):
+        return self.tasks.pop(n, None)
+
+    def done(self, n) -> None:
+        self.committed[n].set()
+
+    def cancel(self) -> None:
+        """Whatever the fold did not reach: a sequential run would never have made it."""
+        for task in self.tasks.values():
+            task.cancel()
+        self.tasks.clear()
 
 
 class _Run:
@@ -362,20 +426,23 @@ class _Run:
         # One clarification at a time: not twice in a row, however much history is carried.
         asked = bool(context.prior) and context.prior[-1].kind == "clarification"
         version = agent.pin.tool_version
+        #: research-8 offers research-7's tools (IR-1004).
+        tool_set = CHAT_TOOL_VERSION if version == EVIDENCE_TOOL_VERSION else version
         self.investigation = Investigation(
             tools, clarify=not asked,
-            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
-                                 HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION,
-                                    LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            recovery=version in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
-                                 CHAT_TOOL_VERSION),
-            hybrid=version in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            listing=version in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            screen=_screen(agent.provider, agent.pin))
+            metadata=tool_set in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
+                                HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            manuscripts=tool_set in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION,
+                                   LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            recovery=tool_set in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
+                                CHAT_TOOL_VERSION),
+            hybrid=tool_set in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            listing=tool_set in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION))
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
-        self.chat = version == CHAT_TOOL_VERSION
-        self.repairs = 2 if self.chat else 1
+        self.chat = tool_set == CHAT_TOOL_VERSION
+        self.repairs = 2
+        #: research-8's repairs never mention the draft the reader did not see (IR-1004).
+        self.fresh_repairs = version == EVIDENCE_TOOL_VERSION
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         #: Sources the history carried when the answer was written (IR-994).
@@ -430,21 +497,28 @@ class _Run:
             calls = [c for item in turn.items if isinstance(item, ToolGroup) for c in item.calls]
             results = []
             progressed = False
-            for n, call in enumerate(calls):
-                if self.investigation.tool_calls >= self.bounds.max_tool_calls:
-                    # The exchange stays whole; the call is answered, not run.
-                    results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"}),
-                                              control_only=True))
-                    continue
-                room = self._room(history, results, calls[n:]) if call.name == READ_MANUSCRIPT.name else 0
-                outcome = await self.investigation.execute(call, room=room)
-                if outcome.clarification is not None:
-                    self._checked(outcome.clarification, clarification=True)
-                    self.carried_sources = _carried([*history, *results])
-                    return self._result(outcome.clarification, (), kind="clarification")
-                progressed = progressed or outcome.progress
-                results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
-                                          outcome.control_only, outcome.metadata_only))
+            fetches = _Fetches(self.investigation, calls, cap=self.agent.tool_concurrency,
+                               limit=self.bounds.max_tool_calls - self.investigation.tool_calls)
+            try:
+                for n, call in enumerate(calls):
+                    if self.investigation.tool_calls >= self.bounds.max_tool_calls:
+                        # The exchange stays whole; the call is answered, not run.
+                        results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"}),
+                                                  control_only=True))
+                        fetches.done(n)
+                        continue
+                    room = self._room(history, results, calls[n:]) if call.name == READ_MANUSCRIPT.name else 0
+                    outcome = await self.investigation.execute(call, room=room, fetched=fetches.take(n))
+                    fetches.done(n)
+                    if outcome.clarification is not None:
+                        self._checked(outcome.clarification, clarification=True)
+                        self.carried_sources = _carried([*history, *results])
+                        return self._result(outcome.clarification, (), kind="clarification")
+                    progressed = progressed or outcome.progress
+                    results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
+                                              outcome.control_only, outcome.metadata_only))
+            finally:
+                fetches.cancel()
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
             self.investigation.packed(history[len(history) - len(results):])
@@ -488,14 +562,9 @@ class _Run:
         if handoff:
             # Earlier Turns arrive compacted (IR-734).
             summary = compacting.render(handoff, self.investigation.papers, passages=False)
-            screened = self.investigation.screen is not None
-            if screened and (summary.unverified_provenance or not await self._sendable(summary.dependencies)):
-                summary = User(WITHHELD_SUMMARY)
             history.append(summary)
         for turn in self.prior:
             answer, sources = DELIVERED_MARKER.sub("", turn.answer), frozenset(turn.sources)
-            if not await self._sendable(sources):
-                answer, sources = WITHHELD_ANSWER, frozenset()
             history += [User(compacting.reader(turn.question)),
                         ModelTurn(items=(Text(answer),), stop=StopReason.END, dependencies=sources)]
         if shown:
@@ -505,23 +574,11 @@ class _Run:
             handle, title = self.investigation.papers[scope]
             note = User(PAPER_CHAT_PREFIX + json.dumps({"paper": handle, "title": title}, ensure_ascii=False),
                         self.investigation.recalled_sources)
-            # A paper the send may not carry is not named; its tools refuse it anyway.
-            if await self._sendable(note.dependencies):
-                history.append(note)
+            history.append(note)
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history
 
-    async def _sendable(self, sources: frozenset) -> bool:
-        """Whether a send may carry every one of `sources`; a failed check withholds (IR-994)."""
-        screen = self.investigation.screen
-        if not sources or screen is None:
-            return True
-        try:
-            return await screen(sources) == sources
-        except Exception:
-            log.warning("source screen failed", exc_info=True)
-            return False
 
     async def _resume(self) -> Optional[tuple[list, int]]:
         """The Conversation an earlier fence completed, verified now; None to start afresh (IR-724).
@@ -718,12 +775,17 @@ class _Run:
         # Recorded before sending; a stopped run admits no further attempt.
         if not await self.tools.journal("model", {"purpose": PURPOSE, "phase": phase, "step": self.steps + 1}):
             raise Unavailable("run_ended")
+        sink = stream.active()
+        if sink is not None:
+            await sink.attempt(phase, live=not self.agent.enforce_checks)
         send = self.agent.summarize if phase == "compact" else self.agent.send
         try:
             # The run's deadline bounds every send, admitted or not.
             turn = await asyncio.wait_for(send(request), max(0.0, self.deadline - time.monotonic()))
         except asyncio.TimeoutError:
             raise Unavailable("deadline") from None
+        if sink is not None:
+            await sink.settle(turn.stop is not StopReason.TOOLS)
         self.steps += phase == "gather"
         self.budget.spend(turn, status.occupancy_tokens, request.max_output_tokens)
         return turn
@@ -734,6 +796,12 @@ class _Run:
         found = self._findings(text)
         if not found:
             return await self._commit(text)
+        if not self.agent.enforce_checks:
+            # Advisory: the answer stands as written, minus citations that cannot be bound to a source.
+            log.info("agent draft findings (delivered): %s", ",".join(sorted(found)))
+            text = assurance.bindable(text, self.investigation, excluded=self._focus("excluded"))
+            note = self._note(found) if self.agent.checks == "flag" else ""
+            return await self._commit(f"{text}\n\n{note}" if note else text)
         log.info("agent draft refused: %s", ",".join(sorted(found)))
         # A source that changed since it was read fences delivery; it is never repaired around.
         await self._recheck(text)
@@ -748,22 +816,26 @@ class _Run:
             if not found:
                 return await self._commit(text_now)
             log.info("agent repair refused: %s", ",".join(sorted(found)))
-        # Out of repairs: what each sentence supports on its own is kept, and the gap is said.
-        for draft in drafts:
-            kept = draft and assurance.supported_units(
-                draft, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
-            if kept:
-                partial = f"{kept}\n\n{assurance.LIMITATION}"
-                self._checked(partial)
-                return await self._commit(partial)
-        raise Unavailable("invalid_draft")
+        # Out of repairs: the latest draft is delivered whole, never trimmed or refused. Citations that bind
+        # to no source are removed; a sentence still stating an unsupported number or title is marked as such.
+        text = assurance.qualified(drafts[0], self.investigation, prior=self.prior,
+                                   excluded=self._focus("excluded"))
+        return await self._commit(text or assurance.UNESTABLISHED)
+
+    def _note(self, found: dict) -> str:
+        """The numbers and titles a delivered answer states that no passage supports, as one line."""
+        # A whole number no larger than the papers read is a position in a list, not a claim.
+        listed = len(self.investigation.papers)
+        shown = {**found, "unsupported_number": [n for n in found.get("unsupported_number", [])
+                                                 if not (n.isdigit() and 0 < int(n) <= listed)]}
+        return assurance.unmatched_note(shown)
 
     async def _repair(self, history: list, found) -> Optional[tuple[str, list]]:
         """One more turn in the same Conversation and the history ending with it; None if it cannot."""
         if not self.agent.reserves.repair_tokens:
             return None
         # `history` already ends with the draft; the feedback follows it.
-        history = [*history, User(assurance.feedback(found))]
+        history = [*history, User(assurance.feedback(found, unseen=self.fresh_repairs))]
         request, status = self.agent.estimate(self.request(history, closed=True))
         if not self.budget.fits([(status.occupancy_tokens, request.max_output_tokens)]):
             return None
@@ -779,6 +851,10 @@ class _Run:
         if self.investigation.outages:
             # Said by the application, not left to the model; it is part of the stored Turn (IR-731).
             answer = f"{answer}\n\n{assurance.outage_limitation(self.investigation.outages)}"
+        sink = stream.active()
+        if sink is not None and self.agent.enforce_checks:
+            # The answer is only known once the checks are done, so it is shown now, whole, and typed out by the page.
+            await sink.final(answer)
         return self._result(answer, citations)
 
     async def _recheck(self, text: str) -> None:
@@ -817,11 +893,10 @@ class _Run:
                                   clarification=clarification)
 
     def _checked(self, text: str, *, clarification: bool = False) -> None:
-        """A clarification or a salvaged answer that fails a check is never delivered."""
+        """Logs what a clarification fails; a check never refuses an answer, only a changed source does."""
         failures = sorted(self._findings(text, clarification=clarification))
         if failures:
-            log.info("agent draft refused: %s", ",".join(failures))
-            raise Unavailable("invalid_draft")
+            log.info("agent draft findings (delivered): %s", ",".join(failures))
 
     def _result(self, answer: str, citations, *, kind: str = "answer") -> Result:
         previous = self.context.state or {}

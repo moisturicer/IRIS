@@ -1074,7 +1074,6 @@ export default function PaperViewPage() {
                         <button
                           type="button"
                           onClick={() => setNewVersionOpen(true)}
-                          disabled={record.revision.new_version.blocked != null}
                           aria-describedby={record.revision.new_version.blocked ? "new-version-blocked" : undefined}
                           className={cn(PILL_PRIMARY, "mt-3")}
                         >
@@ -1172,10 +1171,10 @@ export default function PaperViewPage() {
 
                 <RelatedWorks recordId={record.id} />
 
-                {/* Public discussion (IR-420, spec §8): drawn, not yet open. */}
-                <CommentsSection
-                  viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null}
-                />
+                {/* Public comments belong to published papers' Overview only. */}
+                {record.pipeline_status === "published" && (
+                  <CommentsSection recordId={record.id} viewerId={user?.id ?? null} />
+                )}
                 </div>
               </>
             )}
@@ -1186,6 +1185,7 @@ export default function PaperViewPage() {
                 authorView={userIsOwner}
                 onOpenReview={openReview}
                 onBarInset={setReviewBarInset}
+                onShowVersion={chooseVersion}
                 can={can}
                 reader={recordHasPaper(record) ? reader() : null}
                 timelineVersion={trackerVersion}

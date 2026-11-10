@@ -61,6 +61,8 @@ class Usage:
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     model: Optional[str] = None
+    #: Of `input_tokens`, served from the provider's prompt cache. Recorded, never discounted (IR-953).
+    cached_input_tokens: Optional[int] = None
 
     @property
     def reported(self) -> bool:
@@ -300,11 +302,11 @@ class Ticket:
             """UPDATE public.ai_providerreservation
                   SET state = $2, settled_at = $3, sent = $4, usage_reported = $5,
                       charge_attempts = $6, charge_input_tokens = $7, charge_output_tokens = $8,
-                      charge_cost_micros = $9, charge_active_ms = $10
+                      charge_cost_micros = $9, charge_active_ms = $10, cached_input_tokens = $11
                 WHERE id = $1""",
             self.pk, state, now, usage.sent, usage.sent and usage.reported,
             charge["attempts"], charge["input_tokens"], charge["output_tokens"],
-            charge["cost_micros"], charge["active_ms"],
+            charge["cost_micros"], charge["active_ms"], usage.cached_input_tokens if usage.sent else None,
         )
         await conn.execute(
             """UPDATE public.ai_providercampaign

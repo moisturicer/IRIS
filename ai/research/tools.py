@@ -13,9 +13,9 @@ import json
 import logging
 import re
 import secrets
+from contextvars import ContextVar
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from types import SimpleNamespace
 
 import asyncpg
 
@@ -374,10 +374,16 @@ class _Refused(Exception):
         self.reason = reason
 
 
+#: Inside a concurrent tool group, set when every earlier call has committed (IR-1003).
+#: A call waits on it before writing its journal entry, so entries keep call order.
+EARLIER_COMMITTED: ContextVar = ContextVar("research_earlier_committed", default=None)
+
+
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
                  scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None,
-                 reranker=None, guard=None, follow_stored_grant: bool = False):
+                 reranker=None, follow_stored_grant: bool = False,
+                 cache_query_vectors: bool = False):
         self.dsn = dsn
         self.grant = grant
         self.run_id = run_id
@@ -385,14 +391,16 @@ class ResearchTools:
         self.scope = scope_record_id
         self.embedding_provider = embedding_provider
         self.embedding_ledger = embedding_ledger
-        #: Off when None (IR-886); admitted through `embedding_ledger` and sent only past `guard`.
+        #: Off when None (IR-886); admitted through `embedding_ledger`.
         self.reranker = reranker
-        self.guard = guard
         #: The Embedding Space this run's first semantic search read; a later one must match (IR-886).
         self.space_id: int | None = None
         # A worker's tools read under the grant the run holds *now*, so a reader's
         # reconnect reaches a run already in progress (IR-880). Off, `grant` is the authority.
         self.follow_stored_grant = follow_stored_grant
+        #: (space id, query) -> vector, for this run alone; never shared (IR-953).
+        self.cache_query_vectors = cache_query_vectors
+        self._vectors: dict = {}
 
     async def _grant(self, conn) -> str | None:
         """The grant this call reads under: the run's stored one when following it (IR-880).
@@ -444,6 +452,9 @@ class ResearchTools:
             async with self._session() as conn:
                 result = await body(conn)
                 coverage = result.coverage
+                earlier = EARLIER_COMMITTED.get()
+                if earlier is not None:
+                    await earlier.wait()
                 await RunStore._journal(conn, self.run_id, "tool", {
                     "tool": name, "status": result.status, "returned": coverage.returned,
                     "total": coverage.total, "truncated": coverage.truncated,
@@ -819,10 +830,14 @@ class ResearchTools:
 
         return await self._call("count", body)
 
-    async def list_records(self, filters: dict, limit: int | None = None) -> ToolResult:
-        """Readable Records matching metadata filters, by title, with the exact total (IR-994)."""
+    async def list_records(self, filters: dict, limit: int | None = None, offset: int = 0) -> ToolResult:
+        """Readable Records matching metadata filters, by title, with the exact total (IR-994).
+
+        `offset` pages through a long list: the next titles, in the same order.
+        """
         cap = metadata.MAX_LISTED if limit is None else limit
-        if not valid_filters(filters) or not _is_int(cap) or not 0 < cap <= metadata.MAX_LISTED:
+        if (not valid_filters(filters) or not _is_int(cap) or not 0 < cap <= metadata.MAX_LISTED
+                or not _is_int(offset) or offset < 0):
             return ToolResult.unavailable("invalid_argument")
 
         async def body(conn):
@@ -838,7 +853,7 @@ class ResearchTools:
                     WHERE ($1::bigint IS NULL OR r.id = $1)""" + _filter_sql(2) + " ORDER BY r.title, r.id",
                 self.scope, *params,
             )
-            named = rows[:cap]
+            named = rows[offset:offset + cap]
             handles = await self._handles(conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in named])
             records = tuple(
                 RecordRef(h, r["record_id"], r["title"],
@@ -848,7 +863,7 @@ class ResearchTools:
             fact = Count(total=len(rows), filters=tuple(sorted(applied)), scope_record_id=self.scope,
                          population=frozenset(r["record_id"] for r in rows))
             return ToolResult(OK if rows else NO_MATCH, records=records, count=fact,
-                              coverage=Coverage(len(records), len(rows), len(rows) > len(records)))
+                              coverage=Coverage(len(records), len(rows), offset + len(records) < len(rows)))
 
         return await self._call("list_records", body)
 
@@ -1067,9 +1082,7 @@ class ResearchTools:
         if not isinstance(query, str) or not query.strip():
             return ToolResult.unavailable("invalid_argument")
         import asyncio
-        from types import SimpleNamespace
         from ai.admission.errors import AdmissionDenied
-        from ai.admission.guard import SendGuard
         from ai.admission.ledger import Request, Usage, estimate_tokens
         from ai.admission.scope import RunBinding
         from ai.ingestion.indexing import checked_vectors, space
@@ -1084,7 +1097,6 @@ class ResearchTools:
                 output_tokens=0), binding)
             usage = Usage()
             try:
-                await SendGuard(self.dsn).check(binding, SimpleNamespace(data_policy=provider.data_policy))
                 usage.sent = True
                 response = await asyncio.wait_for(provider.embed([query], input_type="query"), ticket.timeout_seconds)
                 vector = checked_vectors(response.vectors, 1, provider.dimensions)[0]
@@ -1195,13 +1207,16 @@ class ResearchTools:
                 pinned = await space(conn, provider)
             if self.space_id is not None and pinned["id"] != self.space_id:
                 return None, SPACE_CHANGED
+            cached = self._vectors.get((pinned["id"], query)) if self.cache_query_vectors else None
+            if cached is not None:
+                # The same text in the same space: no second admitted, paid embedding.
+                return cached, None
             ticket = await ledger.admit(Request(
                 operation="embed", purpose="query", purpose_version="query-1", lane="research",
                 account=provider.account, models=(provider.model,), input_tokens=estimate_tokens(query),
                 output_tokens=0), binding)
             usage = Usage()
             try:
-                await self._guard().check(binding, SimpleNamespace(data_policy=provider.data_policy))
                 usage.sent = True
                 try:
                     response = await asyncio.wait_for(provider.embed([query], input_type="query"),
@@ -1216,6 +1231,8 @@ class ResearchTools:
         except AdmissionDenied as refused:
             return None, refused.reason
         self.space_id = pinned["id"]
+        if self.cache_query_vectors:
+            self._vectors[(pinned["id"], query)] = vector
         return vector, None
 
     async def _candidates(self, conn, query: str, params: list, vector) -> dict:
@@ -1247,11 +1264,7 @@ class ResearchTools:
         return found
 
     async def _reranked(self, query: str, rows: list) -> tuple[list, str]:
-        """`rows` in the reranker's order, or unchanged with why not (IR-886).
-
-        Passage text goes to the vendor only when the send guard admits every
-        candidate's source; otherwise none is sent.
-        """
+        """`rows` in the reranker's order, or unchanged with why not (IR-886)."""
         reranker, ledger = self.reranker, self.embedding_ledger
         if reranker is None or ledger is None:
             return rows, OFF
@@ -1263,13 +1276,7 @@ class ResearchTools:
 
         binding = RunBinding(self.run_id, self.fence)
         texts = [r["content"] for r in rows]
-        sources = frozenset(Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]) for r in rows)
         try:
-            limits = getattr(ledger, "limits", None)
-            policy = {"account": reranker.account, "campaign": limits.campaign_key if limits else None,
-                      "price": limits.prices.get(reranker.model) if limits else None}
-            if await self._guard().eligible(binding, reranker, sources, **policy) != sources:
-                return rows, "withheld"
             ticket = await ledger.admit(Request(
                 operation="rerank", purpose="query", purpose_version="query-1", lane="research",
                 account=reranker.account, models=(reranker.model,),
@@ -1291,10 +1298,6 @@ class ResearchTools:
         except AdmissionDenied as refused:
             return rows, refused.reason
         return [rows[n] for n in order], OK
-
-    def _guard(self):
-        from ai.admission.guard import SendGuard
-        return self.guard or SendGuard(self.dsn)
 
     async def _call_on_handle(self, name: str, body) -> ToolResult:
         """`_call` in a savepoint; a refused handle is journalled like any outcome."""

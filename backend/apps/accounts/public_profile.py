@@ -5,9 +5,9 @@ A person's public profile: who has one, what it lists, and how a list pages
 Two rules live here and nowhere else, so every route and every `has_profile`
 flag agrees:
 
-* **Who has a profile** (`open_profiles`). An active, verified, unlocked
-  Student, Adviser or office member. A suspended, inactive, unverified or
-  unapproved (role-less) account and the System Admin have none; asking for
+* **Who has a profile** (`open_profiles`). An active, verified, unlocked,
+  undeleted Student, Adviser or office member. A suspended, inactive, deleted,
+  unverified or unapproved (role-less) account and the System Admin have none; asking for
   one is the same 404 as a missing id, so the API never confirms a hidden
   account exists.
 * **Which papers it lists** (`published_papers`). Discover's own predicate --
@@ -55,7 +55,8 @@ BAD_PAGE_SIZE = "page_size must be a whole number of 1 or more."
 def open_profiles():
     """The accounts whose profile may be read. The one predicate."""
     return User.objects.filter(
-        is_active=True, is_locked=False, is_verified=True, role__name__in=PROFILE_ROLES,
+        is_active=True, is_locked=False, is_verified=True, deleted_at__isnull=True,
+        role__name__in=PROFILE_ROLES,
     )
 
 

@@ -116,27 +116,6 @@ def _references_publicly_visible(path: pathlib.Path) -> bool:
     )
 
 
-def test_research_tools_reach_records_only_through_the_one_predicate():
-    """ADR-038 §2.2: tools add no second visibility path (IR-500).
-
-    `Record.objects` appears in one research module, whose function applies
-    the research-read policy (`research_records`, IR-718) before anything
-    else touches the queryset.
-    """
-    research = APPS_AI / "research"
-    reaching = {
-        path.relative_to(research).as_posix()
-        for path in research.rglob("*.py")
-        if "tests" not in path.parts and _reaches_record_manager(path)
-    }
-    assert reaching == {"tools/common.py"}, (
-        f"{sorted(reaching)} query Record directly; go through "
-        f"`tools.common.readable_records`."
-    )
-    common = (research / "tools" / "common.py").read_text(encoding="utf-8")
-    assert "research_records(ctx.user)" in common
-
-
 def test_ai_research_reads_have_one_entry_point():
     """IR-718: only `grants.reads` decides which Records a research read sees."""
     callers = {
@@ -215,9 +194,11 @@ def test_the_overview_performs_no_retrieval():
 def test_the_answer_service_offers_no_second_way_to_an_overview():
     """`answer_service(task=...)` existed only for the overview (IR-380)."""
     tree = ast.parse((APPS_AI / "composition.py").read_text(encoding="utf-8"))
-    method = next(
+    # Django no longer answers (IR-957), so the service may be gone; if it returns, it takes no task.
+    methods = [
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef) and node.name == "answer_service"
-    )
-    assert "task" not in [arg.arg for arg in method.args.args]
+    ]
+    for method in methods:
+        assert "task" not in [arg.arg for arg in method.args.args]

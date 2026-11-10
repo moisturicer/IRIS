@@ -1,55 +1,30 @@
-"""Replay development cases through the authenticated Ask IRIS reader.
+"""Replay development cases through the dedicated AI runtime's reader edge.
 
-The API runs in this process, so the manifest describes the settings that
-actually served it. Fake mode injects deterministic providers explicitly.
-
-With ``--runtime-url`` the cases go through the dedicated AI runtime's
-authenticated submit / progress / reopen routes at that deployment instead
-(IR-740). That service is not this process, so its provider mode and model are
-declared by the operator and recorded as declared. The run is ``arm: runtime``
-with its own engine, transport and schema identity, never ``controller-v1``.
+The cases go through the runtime's authenticated submit / progress / reopen
+routes at ``--runtime-url`` (IR-740). That service is not this process, so its
+provider mode and model are declared by the operator and recorded as declared.
+The run is ``arm: runtime`` with its own engine, transport and schema identity.
+Django's own arms (``current``, ``fixed_synthesis``, ``controller``) went with
+its answer path in IR-957.
 """
 
 from __future__ import annotations
 
-from contextlib import nullcontext
 from functools import partial
 
 import httpx
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.test import override_settings
-from rest_framework.test import APIClient
 
 from apps.ai.admission.limits import ENFORCE, mode, read_limits
-from apps.ai.composition import CompositionRoot, use_composition_root
-from apps.ai.controller import versions
 from apps.ai.evaluation.campaign_report import (CampaignRefused, require_frozen_for_held_out,
                                                 require_paid_held_out)
 from apps.ai.evaluation.conversations import check_lock, split_digests, validate_set
 from apps.ai.evaluation.engines import (RUNTIME_ARM, RUNTIME_ENGINE, RUNTIME_TRANSPORT,
                                         runtime_identity)
-from apps.ai.evaluation.faults import ToolOutage
-from apps.ai.evaluation.replay import (CampaignAttempts, ResearchDiagnostics, RuntimeAttempts,
-                                       collect_run)
+from apps.ai.evaluation.replay import RuntimeAttempts, collect_run
 from apps.ai.evaluation.runtime_replay import (DEFAULT_DEADLINE_SECONDS, RuntimeSeam,
                                                collect_case_runtime)
 from apps.ai.evaluation.runfile import eval_token, file_digest, load_json, write_run
-from apps.ai.inference.profiles import profile_for
-from apps.ai.inference.tasks import InferenceTask
-from apps.ai.providers.fakes import (DeterministicEmbeddingProvider, ScriptedReranker,
-                                     ScriptedToolCallingLLM)
-
-
-class LocalReader:
-    def __init__(self, client):
-        self.client = client
-
-    def post(self, path, payload):
-        return self.client.post(path, payload, format="json")
-
-    def get(self, path):
-        return self.client.get(path)
 
 
 def runtime_seam(url: str, token: str) -> RuntimeSeam:
@@ -67,11 +42,11 @@ class Command(BaseCommand):
         parser.add_argument("--lock", required=True)
         parser.add_argument("--case", action="append", required=True,
                             help="Development case ID; repeat to collect several.")
-        parser.add_argument("--arm", choices=("current", "fixed_synthesis", "controller", RUNTIME_ARM),
-                            help="Evaluation arm label; never changes the reader engine.")
-        parser.add_argument("--runtime-url",
+        parser.add_argument("--arm", choices=(RUNTIME_ARM,), default=RUNTIME_ARM,
+                            help="Evaluation arm label; the runtime is the only engine.")
+        parser.add_argument("--runtime-url", required=True,
                             help="Collect through the dedicated runtime's authenticated reader "
-                                 "edge at this origin (IR-740) instead of this process.")
+                                 "edge at this origin (IR-740).")
         parser.add_argument("--runtime-model", default="scripted",
                             help="The model the runtime deployment is configured to use; "
                                  "recorded as declared by the operator.")
@@ -125,120 +100,10 @@ class Command(BaseCommand):
         if options["smoke"] and (len(selected) != 1 or options["providers"] != "fake"
                                  or options["held_out"]):
             raise CommandError("--smoke requires one development case and fake providers")
-        if options["runtime_url"] or options["arm"] == RUNTIME_ARM:
-            return self._runtime(options, data, selected, split)
-        engine = versions.NEW_RUN_ENGINE
-        arm = options["arm"] or ("controller" if engine == versions.CONTROLLER_ENGINE
-                                 else "current")
-        if ((arm == "controller" and engine != versions.CONTROLLER_ENGINE) or
-            (arm in ("current", "fixed_synthesis") and engine != versions.LEGACY_ENGINE)):
-            raise CommandError(f"arm {arm} does not match this code's {engine} engine")
-
-        attempt_reader = None
-        pricing = {}
-        caps = {"case_attempts": options["case_attempts"]}
-        if options["providers"] == "real":
-            if settings.AI_DURABLE_ASK:
-                raise CommandError("real replay requires synchronous Ask IRIS for attributable costs")
-            if getattr(settings, "AI_EVIDENCE_DECISION", "off") != "off":
-                raise CommandError("real replay requires the asynchronous evidence shadow to be off")
-            if not options["approval_id"] or options["data_policy"] == "deterministic-fake-local":
-                raise CommandError("real providers need an approval ID and approved data policy")
-            if options["case_cost_usd"] is None or mode() != ENFORCE:
-                raise CommandError("real providers need a case cost cap and enforced admission")
-            try:
-                admission = read_limits()
-            except Exception as exc:
-                raise CommandError(f"admission limits unavailable: {exc}") from None
-            attempt_reader = CampaignAttempts(admission.campaign_key)
-            if attempt_reader.snapshot() != 0:
-                raise CommandError("the evaluation campaign already has attempts; use a fresh dedicated key")
-            caps.update({
-                "case_cost_usd": options["case_cost_usd"],
-                "turn_max_attempts": admission.run.attempts,
-                "turn_max_input_tokens": admission.run.input_tokens,
-                "turn_max_output_tokens": admission.run.output_tokens,
-                "turn_max_cost_usd": admission.run.cost_micros / 1_000_000,
-                "campaign_attempts": admission.spendable.attempts,
-                "campaign_input_tokens": admission.spendable.input_tokens,
-                "campaign_output_tokens": admission.spendable.output_tokens,
-                "campaign_cost_usd": admission.spendable.cost_micros / 1_000_000,
-                "campaign_active_ms": admission.spendable.active_ms,
-                "campaign_key": admission.campaign_key,
-            })
-            pricing = {model: {"input": price.input, "output": price.output}
-                       for model, price in admission.prices.items()}
-        elif options["case_cost_usd"] is not None:
-            caps["case_cost_usd"] = options["case_cost_usd"]
-
-        corpus = dict(data["corpus"])
-        corpus["set_sha256"] = file_digest(options["set"])
-        corpus["authorization_policy_version"] = "Record.visible_to+disclosure-gate"
-        if attempt_reader:
-            profiles = {task.value: profile_for(task) for task in
-                        (InferenceTask.PLAN, InferenceTask.ANSWER)}
-            models = {task: profile.model for task, profile in profiles.items()}
-            safe_profiles = {task: {"vendor": profile.vendor.value,
-                                    "model": profile.model,
-                                    "fallbacks": list(profile.fallback_models),
-                                    "reasoning_visible": profile.reasoning_visible}
-                             for task, profile in profiles.items()}
-        else:
-            models = {"plan": "scripted", "answer": "scripted"}
-            safe_profiles = {task: {"vendor": "deterministic_fake", "model": "scripted",
-                                    "fallbacks": [], "reasoning_visible": False}
-                             for task in models}
-        retrieval = {
-            "research_lane": (getattr(settings, "AI_RESEARCH_LANE", "off")
-                              if attempt_reader else "off"),
-            "keyword": bool(getattr(settings, "AI_KEYWORD_RETRIEVAL_ENABLED", False)),
-            "fusion": bool(getattr(settings, "AI_RETRIEVAL_FUSION_ENABLED", False)),
-            "screen_cache": bool(getattr(settings, "AI_SCREEN_CACHE", False)),
-            "evidence_shadow": "off",
-            "durable_ask": False,
-            "embedding_model": (getattr(settings, "VOYAGE_EMBED_MODEL", "")
-                                if attempt_reader else "deterministic_fake"),
-            "rerank_model": (getattr(settings, "VOYAGE_RERANK_MODEL", "")
-                             if attempt_reader else "deterministic_fake"),
-        }
-        client = APIClient()
-        client.credentials(HTTP_AUTHORIZATION=f"Bearer {eval_token()}",
-                           HTTP_X_IRIS_PROTOCOL="public-1")
-        if options["providers"] == "fake":
-            fake = ScriptedToolCallingLLM(
-                script=lambda request: ScriptedToolCallingLLM.answering(
-                    '{"next":"compose","basis":"general"}'),
-                reply="Deterministic evaluation answer.")
-            root = CompositionRoot(embedder=DeterministicEmbeddingProvider(),
-                                   reranker=ScriptedReranker(), llm=fake, engine=engine)
-            context = use_composition_root(root)
-            settings_context = override_settings(AI_DURABLE_ASK=False,
-                                                 AI_EVIDENCE_DECISION="off",
-                                                 AI_RESEARCH_LANE="off")
-        else:
-            context = nullcontext()
-            settings_context = nullcontext()
-        outage = ToolOutage()
-        with context, settings_context, outage.installed():
-            run = collect_run(LocalReader(client), selected, set_id=data["set_id"],
-                              set_digests=split_digests(data), corpus=corpus,
-                              model_ids=models, limits=caps,
-                              data_policy=options["data_policy"], cache=options["cache"],
-                              attempts=attempt_reader, approval_id=options["approval_id"],
-                              model_profiles=safe_profiles,
-                              partition_method=data.get("partition_method"),
-                              retrieval=retrieval, pricing=pricing,
-                              arm=arm, engine_version=engine, split=split,
-                              diagnostics=ResearchDiagnostics(), faults=outage)
-        run["manifest"]["set_sha256"] = corpus["set_sha256"]
-        path = write_run(options["out"], f"IR-606-replay-{run['run_id']}", run)
-        self.stdout.write(f"wrote {path} ({len(run['conversations'])} conversations)")
+        return self._runtime(options, data, selected, split)
 
     def _runtime(self, options, data, selected, split):
         """Collect through the dedicated runtime's reader edge; see the module docstring."""
-        if not options["runtime_url"] or options["arm"] not in (None, RUNTIME_ARM):
-            raise CommandError(f"the runtime arm needs --runtime-url, and --runtime-url means "
-                               f"--arm {RUNTIME_ARM}")
         if options["run_deadline_seconds"] <= 0:
             raise CommandError("--run-deadline-seconds must be positive")
         caps = {"case_attempts": options["case_attempts"]}

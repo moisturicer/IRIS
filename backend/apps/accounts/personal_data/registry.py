@@ -50,6 +50,9 @@ INCLUDED: dict[str, str] = {
     "documents.RecordUpload": "papers_owned",
     "library.SavedRecord": "saved_papers",
     "library.SavedFeed": "saved_feeds",
+    "reviews.SavedReply": "saved_replies",
+    "reviews.ViewedMark": "viewed_marks",
+    "reviews.ReviewMention": "review_mentions",
     "records.DiscoveryInterests": "discovery",
     "records.DiscoveryDismissal": "discovery",
     "ai.Conversation": "conversations",
@@ -157,6 +160,16 @@ EXCLUDED: dict[str, str] = {
         "The change history of a review thread (severity, resolved, reopened, answered). The "
         "person appears only as the actor; the thread text they wrote is exported with their "
         "review comments."
+    ),
+    "reviews.ThreadPlace": (
+        "Where the system found a review thread's passage in a later Version (IR-876): text "
+        "from the paper, computed, holding nothing the person wrote."
+    ),
+    "reviews.ResponseLetter": (
+        "The response to reviewers frozen onto a Version (IR-876): a copy of several people's "
+        "review threads and the authors' answers to them. It is the paper's review, read under "
+        "may_read_review, not one person's data; the threads a person wrote, and the wording "
+        "they suggested, are exported with their review comments."
     ),
     "records.ReviewText": _PAPER_DERIVED,
     "records.ReviewTextSection": _PAPER_DERIVED,

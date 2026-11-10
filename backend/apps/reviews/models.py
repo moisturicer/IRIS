@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from core.enums import (
@@ -15,6 +17,7 @@ from core.enums import (
     SeatState,
     ThreadAnswer,
     ThreadEventKind,
+    ThreadPlaceOutcome,
     ThreadSeverity,
     ThreadState,
 )
@@ -529,6 +532,12 @@ class ReviewComment(models.Model):
     )
     answered_at = models.DateTimeField(null=True, blank=True)
 
+    #: A reviewer's replacement text for an anchored passage (IR-876). Set
+    #: while the thread is a draft and fixed once it is sent, so the owner
+    #: accepts or declines the wording they read. Accepting is the *Addressed*
+    #: answer: IRIS can't edit the PDF, so it is a promise.
+    suggestion  = models.TextField(blank=True, default="")
+
     class Meta:
         ordering = ["record", "created_at", "pk"]
         indexes  = [
@@ -602,3 +611,156 @@ class ReviewThreadEvent(models.Model):
 
     def __str__(self):
         return f"Thread {self.thread_id} | {self.kind}"
+
+
+class ThreadPlace(models.Model):
+    """
+    Where an anchored thread's passage is in one later Version (ADR-032 §7,
+    *Outdated threads*; IR-876). The thread's own anchor never changes: each
+    later Version adds a row, found from the previous Version's place, so a
+    thread follows its passage and an Outdated one still shows its original.
+    """
+
+    thread  = models.ForeignKey(ReviewComment, on_delete=models.CASCADE, related_name="places")
+    version = models.ForeignKey(
+        "records.RecordVersion", on_delete=models.RESTRICT, related_name="thread_places",
+    )
+    outcome = models.CharField(max_length=20, choices=ThreadPlaceOutcome.choices)
+    #: Null when the passage was removed.
+    page    = models.PositiveIntegerField(null=True, blank=True)
+    #: The text here: the quote when found, the edited passage when changed.
+    text    = models.TextField(blank=True, default="")
+    regions = models.JSONField(default=list, blank=True)
+    #: The suggested-wording hint (ADR-058 §3): the page it appears on in this
+    #: Version, or null where it doesn't, or the thread carries none.
+    suggestion_page = models.PositiveIntegerField(null=True, blank=True)
+    placed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["thread", "version"], name="one_place_per_thread_version"),
+        ]
+
+    def __str__(self):
+        return f"Thread {self.thread_id} in version {self.version_id}: {self.outcome}"
+
+
+class ResponseLetter(models.Model):
+    """
+    The response to reviewers (ADR-032 §7; IR-876): the owner's answers to
+    the open threads of the parties that asked for a revision, frozen when
+    the Version answering them was submitted. Never edited afterwards.
+    """
+
+    version    = models.OneToOneField(
+        "records.RecordVersion", on_delete=models.CASCADE, related_name="response_letter",
+    )
+    #: One entry per thread, in the letter's order (`response_letter.entries`).
+    entries    = models.JSONField(default=list)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Response letter for version {self.version_id}"
+
+
+#: How many saved replies one person keeps (IR-877). Enough for a reviewer's
+#: stock phrases; a ceiling because each is stored and listed in full.
+MAX_SAVED_REPLIES = 50
+#: The longest title a saved reply takes: a label in a menu, not a sentence.
+MAX_SAVED_REPLY_TITLE = 60
+
+
+class SavedReply(models.Model):
+    """
+    A person's own reusable text, inserted into a review comment (ADR-032 §7,
+    2026-11-04 Conveniences; IR-877). Private: every queryset starts from
+    `owner=request.user`, so another person's reply cannot be addressed and is
+    the same 404 as a missing one. It belongs to no record, so no review
+    predicate applies, and inserting one only adds text to a comment box.
+
+    The title is unique per person ignoring case, which the database enforces.
+    Kept until its owner deletes it or the account goes (the key cascades).
+    Not in Django admin and writes no `AuditEvent`, like a saved feed.
+    """
+
+    owner      = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_replies",
+    )
+    title      = models.CharField(max_length=MAX_SAVED_REPLY_TITLE)
+    body       = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("title"), "owner", name="unique_saved_reply_title"),
+        ]
+
+    def __str__(self):
+        return f"SavedReply(owner={self.owner_id}, title={self.title!r})"
+
+
+class ViewedMark(models.Model):
+    """
+    A person ticked a compared section as viewed (ADR-032 §7 Conveniences and
+    its IR-877 build notes; ADR-058 §3 as amended, point 7). Private: read
+    only for its own `user`, and decides nothing.
+
+    **It belongs to the reading it was made on**, so it keeps that reading,
+    its Version, and the section's `key` and `text_hash` there. A section's
+    key can differ between two readings of one file, so a comparison shows a
+    section as Viewed when this person marked a section with **its
+    `text_hash`**, on this record, in any Version or reading. A later Version
+    that changes the section has another hash, which is how the mark clears;
+    nothing is deleted.
+    """
+
+    user       = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="viewed_marks",
+    )
+    record     = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="+")
+    version    = models.ForeignKey("records.RecordVersion", on_delete=models.CASCADE, related_name="+")
+    reading    = models.ForeignKey("records.ReviewText", on_delete=models.CASCADE, related_name="+")
+    section_key = models.CharField(max_length=255)
+    text_hash  = models.CharField(max_length=64)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "reading", "section_key"],
+                                    name="one_viewed_mark_per_reading_section"),
+        ]
+        indexes = [models.Index(fields=["user", "record", "text_hash"], name="viewed_mark_lookup")]
+
+    def __str__(self):
+        return f"Viewed by {self.user_id}: {self.section_key[:40]} in reading {self.reading_id}"
+
+
+class ReviewMention(models.Model):
+    """
+    A person a review comment mentions (ADR-032 §7 Conveniences; IR-877 build
+    notes 3 and 4), picked beside the text rather than parsed out of it.
+
+    Only someone `may_read_review` admits may be mentioned, checked when the
+    comment is written (`apps.reviews.mentions`). **A row is never deleted
+    while its comment stands**: a name removed in an edit is `active=False`,
+    so adding it back finds `notified_at` already set and nobody is told twice
+    about one comment. `notified_at` is set when the notice is sent: at once
+    for a comment that posts at once, at *Finish review* for a draft's.
+    """
+
+    comment     = models.ForeignKey(ReviewComment, on_delete=models.CASCADE, related_name="mentions")
+    user        = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="review_mentions",
+    )
+    active      = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(default=timezone.now)
+    notified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["comment", "user"], name="one_mention_per_comment_person"),
+        ]
+
+    def __str__(self):
+        return f"Mention of {self.user_id} in comment {self.comment_id}"

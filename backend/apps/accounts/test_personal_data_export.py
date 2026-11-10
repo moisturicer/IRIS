@@ -269,6 +269,46 @@ class ExportContentTests(APITestCase):
         feeds = self.export()["saved_feeds"]
         self.assertEqual([(f["name"], f["query"]) for f in feeds], [("Water", {"q": "water"})])
 
+    def test_saved_replies_are_the_persons_own(self):
+        from apps.reviews.models import SavedReply
+
+        SavedReply.objects.create(owner=self.me, title="Typo", body="There's a typo here.")
+        SavedReply.objects.create(owner=self.stranger, title="Not mine", body="x")
+        replies = self.export()["saved_replies"]
+        self.assertEqual([(r["title"], r["body"]) for r in replies], [("Typo", "There's a typo here.")])
+
+    def test_viewed_marks_are_the_persons_own(self):
+        from apps.records.models import RecordVersion, ReviewText
+        from apps.reviews.models import ViewedMark
+
+        paper = _paper("Compared", self.stranger, status=PipelineStatus.PUBLISHED)
+        version = RecordVersion.objects.create(record=paper, number=1)
+        reading = ReviewText.objects.create(record=paper, source_file="x.pdf")
+        for who in (self.me, self.stranger):
+            ViewedMark.objects.create(user=who, record=paper, version=version, reading=reading,
+                                      section_key="methods", text_hash="a" * 64)
+        marks = self.export()["viewed_marks"]
+        self.assertEqual([(m["record_id"], m["version"], m["section"]) for m in marks],
+                         [(paper.pk, 1, "methods")])
+
+    def test_mentions_they_were_told_of_are_theirs_and_a_draft_s_are_not(self):
+        from django.utils import timezone
+
+        from apps.reviews.models import ReviewComment, ReviewMention
+
+        paper = _paper("Discussed", self.stranger, status=PipelineStatus.PUBLISHED)
+        sent = ReviewComment.objects.create(record=paper, author=self.stranger, body="See p. 4.")
+        draft = ReviewComment.objects.create(record=paper, author=self.stranger, body="Hm.", is_draft=True)
+        ReviewMention.objects.create(comment=sent, user=self.me, notified_at=timezone.now())
+        ReviewMention.objects.create(comment=draft, user=self.me)
+        ReviewMention.objects.create(comment=sent, user=self.stranger, notified_at=timezone.now())
+
+        mentions = self.export()["review_mentions"]
+
+        self.assertEqual(len(mentions), 1)
+        self.assertEqual(set(mentions[0]), {"paper", "at"})
+        self.assertNotIn("See p. 4.", str(mentions))
+
     def test_a_finished_review_round_is_in_the_acts_of_its_actor_only(self):
         from apps.reviews.models import ReviewRound
 
@@ -328,10 +368,13 @@ class ExportContentTests(APITestCase):
         published = _paper("Reviewed work", self.stranger, status=PipelineStatus.PUBLISHED)
         Review.objects.create(record=published, reviewed_by=self.me, stage="adviser",
                               status="approved", comment="Looks sound.")
-        ReviewComment.objects.create(record=published, author=self.me, body="One question on chapter 2.")
+        ReviewComment.objects.create(record=published, author=self.me, body="One question on chapter 2.",
+                                     suggestion="forty-two respondents")
         acts = self.export()["workflow_acts"]
         self.assertEqual(acts["reviews"][0]["comment"], "Looks sound.")
         self.assertEqual(acts["review_comments"][0]["body"], "One question on chapter 2.")
+        # Suggested wording is the reviewer's own writing too (IR-876).
+        self.assertEqual(acts["review_comments"][0]["suggestion"], "forty-two respondents")
 
     def test_consent_history_is_every_notice_answer_the_person_gave(self):
         from apps.accounts.models import DataNotice

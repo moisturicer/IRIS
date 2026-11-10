@@ -216,17 +216,17 @@ def test_an_exact_count_that_succeeded_still_states_its_total_beside_an_outage()
     assert result.answer.endswith(assurance.outage_limitation(["search"]))
 
 
-def test_when_the_repair_fails_too_the_supported_sentence_survives_with_both_limitations():
+def test_when_both_repairs_fail_too_the_answer_is_kept_its_absence_claim_marked_and_the_outage_said():
     corpus = Failing(("read_page", R2))
     bad = reply(f"«Flood forecasting» predicted 87 floods [{P1}]. No pond papers report results.")
     provider = recording(
         tools(call("s", "search", query="flood")),
         tools(call("r", "read_page", paper=R2, page=2)),
-        bad, bad,
+        bad, bad, bad,
     )
     result = ask(provider, corpus)
     assert result.answer == "\n\n".join([
-        "«Flood forecasting» predicted 87 floods [1].", assurance.LIMITATION,
+        f"«Flood forecasting» predicted 87 floods [1]. No pond papers report results. {assurance.QUALIFIER}",
         assurance.outage_limitation(["read_page"]),
     ])
 

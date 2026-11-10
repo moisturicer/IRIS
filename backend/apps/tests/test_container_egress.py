@@ -25,7 +25,7 @@ EXPECTED = {
     "celery-default": ["private", "egress"],
     "celery-extraction": ["private", "egress"],
     "celery-embedding": ["private", "egress"],
-    "celery-shadow": ["private", "egress"],
+    "ai-runs-worker": ["private", "egress"],
     "caddy": ["private", "egress"],
 }
 

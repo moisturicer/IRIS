@@ -759,6 +759,87 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "private, no-store"
         return response
 
+    @action(detail=True, methods=["get"], url_path="response-letters", url_name="response-letters")
+    def response_letters(self, request, pk=None):
+        """
+        GET /records/<id>/response-letters/ -- the response to reviewers each
+        Version was submitted with, newest first (ADR-032 §7, IR-876). Review
+        material: a viewer `may_read_review` refuses gets the 404 a missing
+        record gets. Each reviewer reads their own party's answers first.
+        """
+        from apps.reviews import response_letter
+
+        record = self.get_object()
+        try:
+            return Response(response_letter.letters_payload(record, request.user))
+        except response_letter.LetterNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+
+    @action(
+        detail=True, methods=["get"],
+        url_path=r"versions/compare", url_name="version-compare",
+    )
+    def version_compare(self, request, pk=None):
+        """
+        GET /records/<id>/versions/compare/?from=N&to=M -- what changed between
+        two Versions (ADR-058 §3 as amended 2026-11-08, IR-873). Without
+        `from` and `to`: the Version this reviewer last finished a review on
+        -> latest, or previous -> latest.
+
+        Review material: a viewer `may_read_review` refuses gets the 404 a
+        missing paper gets, before any question about the pair. Its `state`
+        is `ready`, `preparing` (a reading is still being made), `unavailable`
+        or `no_text`, each with what to tell the reviewer, and never the
+        reader. Audited as reading the two Versions' text is.
+        """
+        from core.permissions import may_read_review
+
+        from apps.reviews import version_comparison
+
+        record = self.get_object()
+        if not may_read_review(request.user, record):
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            body = version_comparison.payload(
+                record, request.user,
+                request.query_params.get("from"), request.query_params.get("to"),
+            )
+        except version_comparison.BadPair as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        create_audit_event(
+            "DOWNLOAD", request.user, record=record,
+            metadata={"source": "version_comparison", "from": body["from"], "to": body["to"]},
+        )
+        response = Response(body)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    @action(
+        detail=True, methods=["post"],
+        url_path=r"versions/compare/viewed", url_name="version-compare-viewed",
+    )
+    def version_compare_viewed(self, request, pk=None):
+        """
+        POST /records/<id>/versions/compare/viewed/ -- tick or untick one
+        section of a comparison as viewed, for the caller alone (ADR-032 §7
+        Conveniences, IR-877; `apps.reviews.viewed`).
+
+        Review material: a viewer `may_read_review` refuses gets the 404 a
+        missing paper gets. A mark decides nothing and is never audited.
+        """
+        from core.permissions import may_read_review
+
+        from apps.reviews import viewed
+
+        record = self.get_object()
+        if not may_read_review(request.user, record):
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            state = viewed.set_viewed(record, request.user, request.data)
+        except viewed.ViewedError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"viewed": state})
+
     @action(detail=True, methods=["get"])
     def similar(self, request, pk=None):
         """
@@ -858,7 +939,9 @@ class RecordViewSet(viewsets.ModelViewSet):
     def review_comments(self, request, pk=None):
         """
         GET  /records/<id>/review-comments/ -- the review discussion, oldest first.
-        POST /records/<id>/review-comments/ `{"body": str, "reply_to"?: id}`
+        POST /records/<id>/review-comments/
+        `{"body": str, "reply_to"?: id, "severity"?: str, "anchor"?: {...}, "suggestion"?: str,
+          "mentions"?: [user id]}`
 
         Read under `may_read_review`; written by the record's participants, on
         a submitted record (`apps.reviews.comments`). A new comment answers 201.
@@ -871,9 +954,23 @@ class RecordViewSet(viewsets.ModelViewSet):
                 record, request.user,
                 body=request.data.get("body"), reply_to=request.data.get("reply_to"),
                 severity=request.data.get("severity"), anchor=request.data.get("anchor"),
+                suggestion=request.data.get("suggestion"), mentioned=request.data.get("mentions"),
             ), request.user),
             success=status.HTTP_201_CREATED,
         )
+
+    @action(detail=True, methods=["get"], url_path="review-mentionable", url_name="review-mentionable")
+    def review_mentionable(self, request, pk=None):
+        """
+        GET /records/<id>/review-mentionable/ -> `{"results": [{"id", "name"}]}`
+
+        Whom the caller may mention in this record's review discussion
+        (ADR-032 §7, IR-877): everyone `may_read_review` admits but the caller.
+        Only a writer is offered it: 404 to one who may not read the review,
+        403 to one who reads it but may not write in it.
+        """
+        record = self.get_object()
+        return self._comment_response(lambda c: {"results": c.mentionable(record, request.user)})
 
     @action(
         detail=True, methods=["patch", "delete"],
@@ -881,7 +978,8 @@ class RecordViewSet(viewsets.ModelViewSet):
     )
     def review_comment(self, request, pk=None, comment_id=None):
         """
-        PATCH  /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+        PATCH  /records/<id>/review-comments/<comment_id>/
+               `{"body"?: str, "suggestion"?: str, "mentions"?: [user id]}`
         DELETE /records/<id>/review-comments/<comment_id>/
 
         Its author edits a comment; a changed body stamps `edited_at`. A
@@ -895,6 +993,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             )
         return self._comment_response(lambda c: c.comment_payload(c.edit_comment(
             record, request.user, int(comment_id), body=request.data.get("body"),
+            suggestion=request.data.get("suggestion"), mentioned=request.data.get("mentions"),
         ), request.user))
 
     @action(

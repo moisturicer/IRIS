@@ -4,10 +4,10 @@ Outcomes: 404 missing or foreign, 409 `ended`, 403 `unauthorized`,
 200 `unavailable` (ADR-008) for anything else.
 """
 
-from django.conf import settings
 from django.http import Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.ai.grants import config, database, issue, reads
@@ -88,16 +88,19 @@ class ReaderSessionGrantView(APIView):
             lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
 
 
+class RuntimeEdgeThrottle(UserRateThrottle):
+    """Every runtime request passes this check, polling included: a budget of its own, per reader."""
+
+    scope = "ai_runtime_edge"
+
+
 class RuntimeEdgeGrantView(APIView):
     """Authenticate a same-origin nginx subrequest; no service credential leaves nginx."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [RuntimeEdgeThrottle]
 
     def get(self, request):
-        if not settings.AI_RUNTIME_READER:
-            # The switch is the deployment's, so the edge refuses rather than
-            # letting a browser reach the runtime on its own (IR-863).
-            return Response(status=403)
         raw = request.headers.get("X-IRIS-Record")
         record_id = None
         if raw:
@@ -117,14 +120,10 @@ class RuntimeEdgeGrantView(APIView):
 
 
 class ReaderPathView(APIView):
-    """Which path answers this deployment's Ask IRIS questions (IR-863).
-
-    `runtime` or `django`, from `AI_RUNTIME_READER` alone: nothing the request
-    carries changes it.
-    """
+    """Always `runtime` since IR-957, so a page loaded before the switch opens
+    the runtime reader rather than Django's retired answer routes."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        path = "runtime" if settings.AI_RUNTIME_READER else "django"
-        return Response({"path": path}, headers={"Cache-Control": "no-store"})
+        return Response({"path": "runtime"}, headers={"Cache-Control": "no-store"})

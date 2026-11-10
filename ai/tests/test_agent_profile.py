@@ -65,7 +65,7 @@ def test_a_complete_agent_profile_pins_new_runs_to_the_agent_and_still_serves_de
     agent = service.pinned("ordinary")["agent"]
     assert (agent["model"], agent["endpoint"], agent["adapter"]) == (
         "model-a", "https://llm.example.test/v1", "openai-compatible")
-    assert (agent["prompt_version"], agent["tool_version"]) == ("agent-research-7", "research-7")
+    assert (agent["prompt_version"], agent["tool_version"]) == ("agent-research-8", "research-8")
     assert service.pinned("deep")["bounds"]["max_steps"] == 8
     assert service.pinned("ordinary")["bounds"]["max_steps"] == 4
 
@@ -78,9 +78,16 @@ def test_the_deterministic_profile_needs_no_agent_setting():
     assert "agent" not in service.pinned("ordinary")
 
 
-@pytest.mark.parametrize("name", [n for n in AGENT if n != "RUNS_EXECUTOR"])
+@pytest.mark.parametrize("name", [n for n in AGENT if n not in ("RUNS_EXECUTOR", "AGENT_LLM_DATA_POLICY")])
 def test_an_absent_agent_setting_refuses_to_start_and_names_it(name):
     assert name in refusal(**{name: ""})
+
+
+@pytest.mark.parametrize("policy", ["", "vendor-default", "no-training"])
+def test_the_data_policy_is_an_optional_label_never_a_requirement(policy):
+    # IR-996: the vendor's data terms are the developer's choice, not a coded rule.
+    service = build(settings(AGENT_LLM_DATA_POLICY=policy))
+    assert service.pinned("ordinary")["agent"]["data_policy"] == policy
 
 
 def test_an_unknown_executor_refuses_to_start():
@@ -102,7 +109,6 @@ def test_an_unknown_executor_refuses_to_start():
      "RUNS_AGENT_RESERVES"),
     ({"RUNS_AGENT_RESERVES": json.dumps({"output_tokens": 10})}, "RUNS_AGENT_RESERVES"),
     ({"AGENT_LLM_ENDPOINT": "ftp://llm.example.test"}, "AGENT_LLM_ENDPOINT"),
-    ({"AGENT_LLM_DATA_POLICY": "vendor-default"}, "AGENT_LLM_DATA_POLICY"),
 ])
 def test_an_invalid_agent_profile_refuses_to_start_and_names_it(overrides, named):
     assert named in refusal(**overrides)

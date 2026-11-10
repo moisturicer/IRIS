@@ -13,15 +13,15 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass, field, replace
-from typing import Awaitable, Callable, Optional
+from dataclasses import dataclass, field
+from typing import Optional
 
 import asyncpg
 
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
 from ai.research.tools import (
-    NO_MATCH, OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence, valid_filters,
+    OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence, valid_filters,
 )
 
 log = logging.getLogger(__name__)
@@ -91,11 +91,12 @@ COUNT_RECORDS = ToolSpec(
 LIST_RECORDS = ToolSpec(
     "list_records",
     "Every paper this reader can see that matches metadata: Area (classification), PSCED area, record "
-    "type, completion years or IP flag, by title, with the exact total. Names at most 50 and says when "
-    "it stopped short. Cannot list by topic.",
+    "type, completion years or IP flag, by title, with the exact total. Names at most 50 at a time and says "
+    "when more remain; pass offset to continue from where the last page stopped. Cannot list by topic.",
     _object({
         "classification": _NAME, "psced": _NAME, "record_type": _NAME,
         "year_from": _YEAR, "year_to": _YEAR, "is_ip": {"type": "boolean"},
+        "offset": {"type": "integer", "minimum": 0},
     }))
 
 #: research-5's search: keyword and meaning together, narrowed by metadata (IR-886).
@@ -110,7 +111,7 @@ HYBRID_SEARCH = ToolSpec(
         "year_from": _YEAR, "year_to": _YEAR,
     }, ["query"]))
 #: Search signal outcomes the model is shown; any other reason is shown as unavailable.
-SIGNALS = ("ok", "off", "provider_gated", "provider_failed", "embedding_space_changed", "withheld")
+SIGNALS = ("ok", "off", "provider_gated", "provider_failed", "embedding_space_changed")
 
 READ_MANUSCRIPT = ToolSpec(
     "read_manuscript",
@@ -124,6 +125,11 @@ RECOVER_TURN = ToolSpec(
     "fresh handles for the passages it cited. Use it when the reader asks for an exact detail from an "
     "earlier Turn, such as one a compacted summary mentions.", _object({"turn": {"type": "integer", "minimum": 1}},
                                                                        ["turn"]))
+
+#: Read-only calls a tool group may fetch together (IR-1003). Not `read_manuscript`,
+#: whose room depends on the results before it, nor plan, focus or clarification.
+PREFETCHABLE = (SEARCH, HYBRID_SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE, RESOLVE_PAPERS,
+                COUNT_RECORDS, LIST_RECORDS, RECOVER_TURN)
 
 RESEARCH = (SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE)
 #: Named papers and exact counts, offered only under the research-2 tool version (IR-750).
@@ -283,10 +289,6 @@ class Investigation:
     #: Tools that failed during the run, in order of first failure (IR-731).
     outages: list[str] = field(default_factory=list)
     recalled_sources: frozenset = frozenset()
-    #: Which of a result's sources a send may carry (IR-889); the rest never reaches the model.
-    screen: Optional[Callable[[frozenset], Awaitable[frozenset]]] = None
-    #: Sources left out of results because a send could not carry them.
-    withheld: int = 0
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
@@ -327,14 +329,52 @@ class Investigation:
                  for n, i in enumerate((i for i in state.get("shown", ()) if i in self.papers), start=1)]
         return {"shown": shown, "selected": listed("selected"), "excluded": listed("excluded")}
 
-    async def execute(self, call: ToolCall, *, room: int = 0) -> Outcome:
-        """Run one call; `room` is the bytes a manuscript read may return (IR-733)."""
+    def fetcher(self, call: ToolCall):
+        """The read-only fetch `call` would make, to start early; None when it must wait its turn (IR-1003).
+
+        Only reads whose outcome does not depend on the calls before them. The
+        fetch changes nothing the model sees; `execute` folds it in call order.
+        """
+        spec = next((s for s in self.specs() if s.name == call.name), None)
+        if spec is None or spec not in PREFETCHABLE:
+            return None
+        try:
+            args = _arguments(call, spec)
+        except InvalidArguments:
+            return None
+        return self._fetch(spec, args)
+
+    async def _fetch(self, spec: ToolSpec, args: dict):
+        if spec is COUNT_RECORDS:
+            filters = {k: v for k, v in args.items() if k != "group_by"}
+            return await self.research.count(filters, args.get("group_by"))
+        if spec is LIST_RECORDS:
+            return await self.research.list_records(args)
+        if spec is RECOVER_TURN:
+            if not _int(args["turn"]):
+                raise InvalidArguments
+            return await self.research.recover_turn(args["turn"])
+        return await self._research(spec, args)
+
+    async def execute(self, call: ToolCall, *, room: int = 0, fetched=None) -> Outcome:
+        """Run one call; `room` is the bytes a manuscript read may return (IR-733).
+
+        `fetched` is a fetch `fetcher` started early; its result is folded here,
+        exactly as if the call had run now (IR-1003).
+        """
         self.tool_calls += 1
         spec = next((s for s in self.specs() if s.name == call.name), None)
         if spec is None:
             return Outcome(json.dumps({"error": "unknown_tool"}), control_only=True)
         try:
             args = _arguments(call, spec)
+            if fetched is not None:
+                raw = await fetched
+                if spec is COUNT_RECORDS:
+                    return self._counted(raw)
+                if spec is LIST_RECORDS:
+                    return self._listed(raw)
+                return self._evidence(raw)
             if spec is UPDATE_PLAN:
                 return await self._plan(args["steps"])
             if spec is UPDATE_FOCUS:
@@ -348,14 +388,18 @@ class Investigation:
                 filters = {k: v for k, v in args.items() if k != "group_by"}
                 return self._counted(await self.research.count(filters, args.get("group_by")))
             if spec is LIST_RECORDS:
-                return self._listed(await self.research.list_records(args))
+                offset = args.get("offset", 0)
+                if "offset" in args and (not _int(offset) or offset < 0):
+                    raise InvalidArguments
+                filters = {k: v for k, v in args.items() if k != "offset"}
+                return self._listed(await self.research.list_records(filters, offset=offset))
             if spec is READ_MANUSCRIPT:
-                return self._evidence(await self._screened(await self._read(args, room)), call.id)
+                return self._evidence(await self._read(args, room), call.id)
             if spec is RECOVER_TURN:
                 if not _int(args["turn"]):
                     raise InvalidArguments
-                return self._evidence(await self._screened(await self.research.recover_turn(args["turn"])))
-            return self._evidence(await self._screened(await self._research(spec, args)))
+                return self._evidence(await self.research.recover_turn(args["turn"]))
+            return self._evidence(await self._research(spec, args))
         except InvalidArguments:
             return Outcome(json.dumps({"error": "invalid_arguments"}), control_only=True)
         except asyncpg.InsufficientPrivilegeError:
@@ -368,45 +412,6 @@ class Investigation:
                 self.outages.append(spec.name)
             return Outcome(json.dumps({"status": UNAVAILABLE, "reason": TOOL_UNAVAILABLE}), control_only=True)
 
-    async def _screened(self, result: Evidence) -> Evidence:
-        """`result` without the sources a send could not carry, so one ineligible hit does not end the run."""
-        sources = result.dependencies
-        if self.screen is None or not sources:
-            return result
-        try:
-            allowed = await self.screen(sources)
-        except Exception:
-            # Fail closed: show nothing; the send's own guard check ends the run if it must.
-            log.warning("source screen failed", exc_info=True)
-            allowed = frozenset()
-        if allowed == sources:
-            return result
-        self.withheld += len(sources - allowed)
-
-        def kept(ref):
-            return ref.source is None or ref.source in allowed
-
-        passages = tuple(p for p in result.passages if p.source in allowed)
-        whole = result.reading is not None or bool(result.sections) or result.turn is not None
-        dropped_whole = whole and bool(sources - allowed)
-        trimmed = replace(
-            result,
-            records=tuple(r for r in result.records if kept(r)),
-            matches=tuple(replace(m, records=tuple(r for r in m.records if kept(r))) for m in result.matches),
-            passages=() if dropped_whole else passages,
-            sections=() if dropped_whole else result.sections,
-            reading=None if dropped_whole else result.reading,
-            turn=None if dropped_whole else result.turn,
-            coverage=replace(result.coverage, returned=max(
-                0, result.coverage.returned - (len(result.passages) - len(passages)))),
-            dependencies=frozenset() if dropped_whole else allowed,
-            # Tells the model some matches were left out, never which (IR-995).
-            reason=result.reason or "withheld",
-        )
-        if not (trimmed.passages or trimmed.records or trimmed.matches or trimmed.sections
-                or trimmed.reading or trimmed.turn):
-            return replace(trimmed, status=NO_MATCH, reason="withheld", dependencies=frozenset())
-        return trimmed
 
     async def _research(self, spec: ToolSpec, args: dict) -> Evidence:
         if spec is HYBRID_SEARCH:
@@ -485,8 +490,7 @@ class Investigation:
             self.papers.setdefault(record.record_id, (record.handle, record.title))
             new = new or ("paper", record.record_id) not in self.seen
             self.seen.add(("paper", record.record_id))
-        # A miss names no paper, so it is sent as a bare status the guard can pass (IR-995).
-        if result.matches and result.records:
+        if result.matches:
             body["matches"] = [{
                 "reference": m.reference, "kind": m.kind, "match": m.match,
                 **({"basis": m.basis} if m.basis else {}),

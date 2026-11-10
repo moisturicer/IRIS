@@ -25,7 +25,6 @@ from . import test_ai_runtime_runs_db as runs_db
 from .test_ai_runtime_runs_db import service, session
 from ai.admission import limits as ai_limits  # noqa: E402
 from ai.admission.errors import AdmissionDenied  # noqa: E402
-from ai.admission.guard import ProxyApproval, SendGuard, routing_digest  # noqa: E402
 from ai.admission.ledger import Ledger, Request  # noqa: E402
 from ai.admission.report import run_report  # noqa: E402
 from ai.admission.scope import RunBinding, bound  # noqa: E402
@@ -33,20 +32,19 @@ from ai.admission.transport import AdmittedAgentProvider  # noqa: E402
 from ai.agent.dialect import ChatCompletions  # noqa: E402
 from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.agent.protocol import (  # noqa: E402
-    AgentRequest, ModelTurn, Pin, StopReason, Text, ToolCall, ToolGroup, ToolResult, User,
+    AgentRequest, ModelTurn, Pin, StopReason, ToolCall, ToolGroup, ToolResult, User,
 )
 from ai.domain.ports import TransientProviderError  # noqa: E402
 from ai.infrastructure.recording_adapter import HANG, RecordingAgentProvider  # noqa: E402
 from ai.infrastructure.agent_config import AgentProviderConfig  # noqa: E402
 from ai.infrastructure.openai_adapter import OpenAICompatibleAgentProvider  # noqa: E402
 from ai.runs import config as runs_config  # noqa: E402
-from ai.runs.store import RunStore, Unauthorized  # noqa: E402
+from ai.runs.store import RunStore  # noqa: E402
 from ai.research.tools import Source  # noqa: E402
 from apps.ai.models.chunk import ChunkSet  # noqa: E402
 from apps.ai.models.admission import ProviderCampaign, ProviderReservation
-from apps.records.models import Record  # noqa: E402
 from .corpus import make_user  # noqa: E402
-from .test_ai_runtime_research_db import paper, write_source  # noqa: E402
+from .test_ai_runtime_research_db import paper  # noqa: E402
 from .test_ai_runtime_context_contract import MILLION  # noqa: E402
 from ai.agent.context import Capacity, FITS, Reserves  # noqa: E402
 
@@ -242,150 +240,35 @@ def test_a_django_attempt_in_flight_holds_the_shared_lane(runtime):
     refused(runtime, "admit-lane@cit.edu", "admit-lane-01", transport, provider)
 
 
-def interrupt_before_send(transport, interrupt):
-    """Run ``interrupt(run_id)`` after admission and before the guard's check."""
-    guard = transport.guard
-
-    class Late:
-        async def check(self, binding, pin, dependencies=(), **policy):
-            await interrupt(binding.run_id)
-            await guard.check(binding, pin, dependencies, **policy)
-
-    transport.guard = Late()
-
-
-async def as_admin(sql, run_id):
-    conn = await asyncpg.connect(runs_db.admin_dsn())
-    try:
-        await conn.execute(sql, run_id)
-    finally:
-        await conn.close()
-
-
-def test_stop_between_admission_and_send_releases_the_attempt(runtime):
-    provider, transport = admitted(runtime, reply())
-    interrupt_before_send(transport, lambda run_id: as_admin(
-        "UPDATE iris_ai.ask_run SET state = 'cancelled', fence = fence + 1 WHERE id = $1", run_id))
-    _, status = answer_one(runtime, "admit-stop@cit.edu", "admit-stop-01", transport)
-
-    assert status["state"] == "cancelled"
-    assert provider.requests == []
-    [attempt] = run(run_report(runtime, status["id"]))["attempts"]
-    assert (attempt["state"], attempt["sent"], attempt["charge_attempts"]) == ("released", False, 0)
-
-
-def test_revoked_access_between_admission_and_send_sends_nothing(runtime):
-    provider, transport = admitted(runtime, reply())
-    revoked = []
-
-    async def deactivate(run_id):
-        revoked.append(run_id)
-        await as_admin("""UPDATE accounts_user SET is_active = false
-                           WHERE id = (SELECT reader_id FROM iris_ai.ask_run WHERE id = $1)""", run_id)
-
-    interrupt_before_send(transport, deactivate)
-    built = service(runtime, AgentExecutor(transport, PIN, RESERVES))
-    # The drained submission's projection is refused: its reader is gone.
-    with pytest.raises(Unauthorized):
-        run(built.submit(session(make_user("admit-revoked@cit.edu")), key="admit-revoke1",
-                         question="Q?", conversation_id=None, base_revision=None))
-
-    # Look as an operator instead.
-    [run_id] = revoked
-    assert provider.requests == []
-    assert ProviderReservation.objects.get().state == "released"
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT state, end_reason FROM iris_ai.ask_run WHERE id = %s", [run_id])
-        assert cursor.fetchone() == ("failed", "unavailable")
-
-
-def test_a_provider_without_a_no_training_policy_is_refused(runtime):
-    pin = Pin(**{**PIN.as_dict(), "requires": (), "data_policy": "vendor-default"})
-    with pytest.raises(AdmissionDenied) as denied:
-        run(SendGuard(runtime).check(None, pin))
-    assert denied.value.reason == "provider_refused"
-
-
-def test_evidence_the_runtime_cannot_authorize_is_withheld(runtime):
-    with pytest.raises(AdmissionDenied) as denied:
-        run(SendGuard(runtime).check(None, PIN, dependencies=[("passage", 1)]))
-    assert denied.value.reason == "source_unavailable"
-
-
-def test_tool_results_in_the_request_are_withheld_by_the_transport(runtime):
-    provider, transport = admitted(runtime, reply())
-    binding = claimed(runtime, "admit-evidence@cit.edu", "admit-evidence")
-    request = AgentRequest(pin=PIN, instructions="I", history=(
-        User("Q?"), ModelTurn(items=(ToolGroup((ToolCall("c1", "search"),)),), stop=StopReason.TOOLS),
-        ToolResult("c1", "a passage"),
-    ))
-    with bound(binding), pytest.raises(AdmissionDenied) as denied:
-        run(transport.converse(request))
-    assert denied.value.reason == "source_unavailable"
-    assert provider.requests == []
-    assert ProviderReservation.objects.get().state == "released"
-
-
-def test_derived_text_is_withheld_after_its_tool_result_left_context(runtime):
-    provider, transport = admitted(runtime, reply())
-    binding = claimed(runtime, "admit-derived@cit.edu", "admit-derived")
-    source = Source(1, 8, "old-revision")
-    request = AgentRequest(pin=PIN, instructions="I", history=(
-        User("Q?"), ModelTurn(items=(Text("A passage summary"),), stop=StopReason.END,
-                              dependencies=frozenset({source})),
-    ))
-    with bound(binding), pytest.raises(AdmissionDenied) as denied:
-        run(transport.converse(request))
-    assert denied.value.reason == "source_unavailable"
-    assert provider.requests == []
-    assert ProviderReservation.objects.get().state == "released"
-
-
-def proxy_source():
-    record = paper("Public proxy", {4: [("Methods", "Public passage about water.")]})
-    Record.objects.filter(pk=record.pk).update(
-        origin=Record.Origin.IMPORTED_REFERENCE, is_embargoed=False,
-        embargo_released_at=timezone.now())
-    chunk_set = ChunkSet.objects.get(record=record, is_active=True)
-    return record, Source(record.pk, chunk_set.pk, chunk_set.extraction_hash)
-
-
-def proxy_approval(provider, source):
-    return ProxyApproval(
-        "IR-889", PIN.model, PIN.endpoint, provider.account, ADMISSION["AI_ADMISSION_CAMPAIGN"],
-        timezone.now() + timedelta(hours=1), frozenset({source}))
-
-
 def sourced_request(source):
     return AgentRequest(pin=PIN, instructions="I", history=(
         User("Q?"), ModelTurn(items=(ToolGroup((ToolCall("c1", "search"),)),),
                               stop=StopReason.TOOLS),
-        ToolResult("c1", '{"status":"ok","passages":[{"text":"Public passage"}]}',
+        ToolResult("c1", '{"status":"ok","passages":[{"text":"Institutional passage"}]}',
                    frozenset({source})),
     ))
 
 
-def test_approved_proxy_source_reaches_the_recording_provider(runtime):
-    _, source = proxy_source()
-    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
-    guard = SendGuard(runtime, proxy_approval(provider, source), stage="development")
-    transport = AdmittedAgentProvider(provider, Ledger(runtime, limits()), guard=guard)
-    binding = claimed(runtime, "admit-proxy@cit.edu", "admit-proxy")
+def test_any_paper_reaches_the_provider_with_no_send_time_check(runtime):
+    # IR-996: no approval, origin, embargo or reader recheck happens at send time.
+    record = paper("Institutional paper", {4: [("Methods", "Institutional passage.")]})
+    chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+    source = Source(record.pk, chunk_set.pk, chunk_set.extraction_hash)
+    provider, transport = admitted(runtime, reply())
+    binding = claimed(runtime, "admit-any@cit.edu", "admit-any")
     with bound(binding):
         turn = run(transport.converse(sourced_request(source)))
-    assert turn.text == "An answer."
-    assert turn.dependencies == {source}
-    assert len(provider.requests) == 1
+    assert turn.text == "An answer." and turn.dependencies == {source}
+    assert "Institutional passage" in json.dumps(provider.requests[0])
     assert ProviderReservation.objects.get().sent
 
 
-@pytest.mark.parametrize("change", ["allowed", "replaced", "embargoed"])
-def test_openrouter_adapter_payload_uses_only_approved_current_proxy(runtime, change):
-    record, source = proxy_source()
+def test_openrouter_payload_carries_its_routing_and_the_passage_whatever_its_data_policy(runtime):
+    record = paper("Institutional paper", {4: [("Methods", "Institutional passage.")]})
+    chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+    source = Source(record.pk, chunk_set.pk, chunk_set.extraction_hash)
     model, endpoint = "openai/gpt-6-luna:floor", "https://openrouter.ai/api/v1"
-    routing = {"only": ["azure/us"], "allow_fallbacks": False,
-               "data_collection": "deny", "zdr": True, "require_parameters": True,
-               "max_price": {"prompt": 0.22, "completion": 0.825}}
+    routing = {"only": ["azure/us"], "allow_fallbacks": True}
     captured = []
 
     def respond(request):
@@ -394,71 +277,18 @@ def test_openrouter_adapter_payload_uses_only_approved_current_proxy(runtime, ch
 
     provider = OpenAICompatibleAgentProvider(
         AgentProviderConfig(endpoint, "test-key", frozenset({model}), frozenset(),
-                            "no-training", {model: MILLION}, routing),
+                            "vendor-default", {model: MILLION}, routing),
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond)))
-    approval = ProxyApproval("IR-889", model, endpoint, provider.account,
-                             ADMISSION["AI_ADMISSION_CAMPAIGN"],
-                             timezone.now() + timedelta(hours=1), frozenset({source}),
-                             "https://citiris.atlassian.net/browse/IR-827", routing_digest(routing))
     priced = limits(AI_ADMISSION_PRICES=json.dumps({model: {"input": 0.22, "output": 0.825}}))
-    transport = AdmittedAgentProvider(provider, Ledger(runtime, priced),
-                                      guard=SendGuard(runtime, approval, stage="development"))
-    binding = claimed(runtime, f"admit-openrouter-{change}@cit.edu", f"admit-openrouter-{change}")
-    if change == "replaced":
-        write_source(record, {4: [("Methods", "Different public passage.")]}, "2")
-    elif change == "embargoed":
-        Record.objects.filter(pk=record.pk).update(is_embargoed=True, embargo_released_at=None)
+    transport = AdmittedAgentProvider(provider, Ledger(runtime, priced))
+    binding = claimed(runtime, "admit-openrouter@cit.edu", "admit-openrouter")
     request = replace(sourced_request(source), pin=replace(PIN, model=model, endpoint=endpoint,
-                                                           adapter="openai-compatible"))
+                                                           adapter="openai-compatible",
+                                                           data_policy="vendor-default"))
     with bound(binding):
-        if change == "allowed":
-            run(transport.converse(request))
-        else:
-            with pytest.raises(AdmissionDenied):
-                run(transport.converse(request))
-    if change == "allowed":
-        assert captured[0]["provider"] == routing
-        assert "Public passage" in captured[0]["messages"][-1]["content"]
-        assert not record.embargoed_until  # a released paper needs no review date
-    else:
-        assert captured == []
-
-
-@pytest.mark.parametrize("change", ["withdraw", "replace", "embargo", "ip"])
-def test_changed_or_withheld_proxy_never_reaches_the_provider(runtime, change):
-    record, source = proxy_source()
-    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
-    guard = SendGuard(runtime, proxy_approval(provider, source), stage="development")
-    transport = AdmittedAgentProvider(provider, Ledger(runtime, limits()), guard=guard)
-    binding = claimed(runtime, f"admit-{change}@cit.edu", f"admit-{change}")
-    if change == "withdraw":
-        Record.objects.filter(pk=record.pk).update(pipeline_status="draft")
-    elif change == "replace":
-        write_source(record, {4: [("Methods", "Replaced passage.")]}, "2")
-    elif change == "embargo":
-        Record.objects.filter(pk=record.pk).update(is_embargoed=True, embargo_released_at=None)
-    else:
-        Record.objects.filter(pk=record.pk).update(is_ip=True)
-    with bound(binding), pytest.raises(AdmissionDenied) as denied:
-        run(transport.converse(sourced_request(source)))
-    assert denied.value.reason == "source_unavailable"
-    assert provider.requests == []
-    assert not ProviderReservation.objects.get().sent
-
-
-def test_expired_proxy_approval_never_sends(runtime):
-    _, source = proxy_source()
-    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
-    approval = proxy_approval(provider, source)
-    expired = ProxyApproval(approval.approval_id, approval.model, approval.endpoint,
-                            approval.account, approval.campaign, timezone.now() - timedelta(seconds=1),
-                            approval.sources)
-    transport = AdmittedAgentProvider(provider, Ledger(runtime, limits()),
-                                      guard=SendGuard(runtime, expired, stage="development"))
-    binding = claimed(runtime, "admit-expired@cit.edu", "admit-expired")
-    with bound(binding), pytest.raises(AdmissionDenied):
-        run(transport.converse(sourced_request(source)))
-    assert provider.requests == []
+        run(transport.converse(request))
+    assert captured[0]["provider"] == routing
+    assert "Institutional passage" in captured[0]["messages"][-1]["content"]
 
 
 def test_redelivery_never_renews_the_run_allowance(runtime):

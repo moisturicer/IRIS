@@ -3,11 +3,12 @@ import type {
   RecordListItem, RecordDetail, RecordFormData, MyResearchItem, RecordEmbargo,
   IpReleaseResult,
   Classification, PSCEDClassification, RecordType,
-  DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
+  DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment, MentionedPerson,
   ThreadSeverity, ThreadAnchor, FinishReviewRequest,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
-  DiscoverInterests, ForYouPage, MetadataSuggestions,
+  DiscoverInterests, ForYouPage, MetadataSuggestions, VersionComparisonPayload, ResponseLetter,
+  PublicComment, PublicCommentReportReason, PublicCommentsResponse,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -63,11 +64,21 @@ export const recordsApi = {
    */
   postReviewComment: (
     id: number,
-    body: { body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor },
+    body: {
+      body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor; suggestion?: string;
+      /** Account ids of the people it mentions (IR-877). */
+      mentions?: number[];
+    },
   ) => apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
-  /** Its author edits a comment; a changed body is marked edited. */
-  editReviewComment: (id: number, commentId: number, body: { body: string }) =>
+  /**
+   * Its author edits a comment; a changed body is marked edited. `mentions`,
+   * when sent, replaces whom it mentions; someone new is notified once (IR-877).
+   */
+  editReviewComment: (id: number, commentId: number, body: { body: string; mentions?: number[] }) =>
     apiClient.patch<ReviewComment>(`/records/${id}/review-comments/${commentId}/`, body),
+  /** Whom the caller may mention in this record's review discussion (IR-877). */
+  reviewMentionable: (id: number) =>
+    apiClient.get<{ results: MentionedPerson[] }>(`/records/${id}/review-mentionable/`),
   /**
    * Every comment the viewer may see, oldest first: every sent one and their
    * own drafts (ADR-032 §7, IR-874). A 404 to anyone who may not read the review.
@@ -88,12 +99,33 @@ export const recordsApi = {
   answerThread: (id: number, threadId: number, body: { answer: "addressed" | "declined"; note: string }) =>
     apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/answer/`, body),
   /**
+   * The response to reviewers each Version was submitted with, newest first,
+   * frozen then (ADR-032 §7, IR-876). The viewer's own party comes first.
+   */
+  responseLetters: (id: number) =>
+    apiClient.get<ResponseLetter[]>(`/records/${id}/response-letters/`),
+  /**
    * A Seat holder sends their drafts with a summary and a verdict, in one act
    * (ADR-032 §7, IR-874). Each verdict keeps its own service's refusals; a
    * Decision's stale token is a 409. Answers with the tracker.
    */
   finishReview: (id: number, body: FinishReviewRequest) =>
     apiClient.post<RecordTracker>(`/records/${id}/finish-review/`, body),
+
+  /** Public comments on a published paper (ADR-032 §7, IR-690). */
+  publicComments: (id: number) =>
+    apiClient.get<PublicCommentsResponse>(`/records/${id}/comments/`),
+  postPublicComment: (id: number, body: { body: string; reply_to?: number }) =>
+    apiClient.post<PublicComment>(`/records/${id}/comments/`, body),
+  editPublicComment: (id: number, commentId: number, body: { body: string }) =>
+    apiClient.patch<PublicComment>(`/records/${id}/comments/${commentId}/`, body),
+  deletePublicComment: (id: number, commentId: number) =>
+    apiClient.delete<void>(`/records/${id}/comments/${commentId}/`),
+  reportPublicComment: (
+    id: number,
+    commentId: number,
+    body: { reason: PublicCommentReportReason; note?: string },
+  ) => apiClient.post<void>(`/records/${id}/comments/${commentId}/reports/`, body),
 
   /** Document requests on a record, oldest first (ADR-022 §5, IR-262). */
   documentRequests: (id: number) =>
@@ -229,6 +261,20 @@ export const recordsApi = {
    */
   downloadCopy:   (id: number) =>
     apiClient.get<Blob>(`/records/${id}/download/`, { responseType: "blob" }),
+  /**
+   * Two Versions compared (ADR-058 §3, IR-873). Without a pair, the server
+   * picks this reviewer's last finished Version → latest. A 400 says why a
+   * pair can't be compared.
+   */
+  compareVersions: (id: number, pair?: { from: number; to: number }, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<VersionComparisonPayload>(`/records/${id}/versions/compare/`, { params: pair, signal: options.signal }),
+  /**
+   * Tick or untick one compared section as viewed, for the caller alone
+   * (IR-877). `side` is the later Version's, or the earlier one's for a
+   * section the later Version removed. The mark follows the section's text.
+   */
+  markSectionViewed: (id: number, body: { from: number; to: number; side: "from" | "to"; key: string; viewed: boolean }) =>
+    apiClient.post<{ viewed: boolean }>(`/records/${id}/versions/compare/viewed/`, body),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   // Submitting asks no consent (ADR-054, IR-791): the paper carries its Contact
   // person's AI answer from the moment its draft was created.

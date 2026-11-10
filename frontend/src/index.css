@@ -74,6 +74,17 @@
     }
   }
 
+  /* While text is typing out, the caret stops blinking and the newest words
+     fade up from the page instead of popping in. */
+  .answer-caret.answer-typing > p:last-child::after,
+  .answer-caret.answer-typing > :is(ul, ol):last-child > li:last-child::after {
+    width: 2.75em;
+    margin-left: -2.75em;
+    background: linear-gradient(to right, transparent, theme("colors.canvas") calc(100% - 2px), currentColor calc(100% - 2px));
+    animation: none;
+    pointer-events: none;
+  }
+
   @keyframes answer-caret {
     0%, 49% { opacity: 1; }
     50%, 100% { opacity: 0; }

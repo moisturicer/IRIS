@@ -35,7 +35,6 @@ from typing import Iterable, Mapping, Optional
 from django.core.exceptions import ImproperlyConfigured
 
 from .profiles import (
-    DataPolicy,
     Profile,
     UnknownVendor,
     Vendor,
@@ -219,13 +218,6 @@ def provider_pin_problems(profiles: Iterable[Profile]) -> tuple[str, ...]:
                     "answers: choose providers with verified US/EU hosting "
                     "(IR-485 #6)."
                 )
-    problems.extend(
-        f"{profile.task.settings_prefix}_VENDOR must be openrouter: the "
-        f"{profile.task.value!r} task needs zero data retention (IR-852)."
-        for profile in profiles
-        if profile.is_configured and profile.data_policy is DataPolicy.ZERO_RETENTION
-        and profile.vendor is not Vendor.OPENROUTER
-    )
     return tuple(problems) + tuple(
         f"{profile.task.settings_prefix}_PROVIDER_ONLY is set, but the "
         f"{profile.task.value!r} task is at {profile.vendor.value}, which has "

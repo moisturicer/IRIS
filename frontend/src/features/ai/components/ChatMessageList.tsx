@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/types/chat";
 import { retryOffered } from "@/lib/chatMessages";
-import type { StreamingState } from "../conversation/answerStream";
+import type { StreamingState } from "../conversation/streamingState";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AssistantMessageSkeleton } from "./AssistantMessageSkeleton";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";

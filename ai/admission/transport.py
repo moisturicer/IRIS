@@ -1,8 +1,9 @@
 """An AGENT provider whose every physical attempt is admitted (IR-725).
 
 Each send -- the first, and each retry -- is reserved in the shared ledger,
-rechecked by the guard, sent with the completion cap it reserved, bounded
-by what remains of the run's deadline, and settled. A retry is another
+sent with the completion cap it reserved, bounded by what remains of the
+run's deadline, and settled. Nothing in the request is checked or withheld
+(IR-996). A retry is another
 attempt within the same allowance; nothing retries out of sight.
 """
 
@@ -13,13 +14,10 @@ from dataclasses import replace
 from typing import Optional
 
 from ai.agent.dialect import serialize
-from ai.agent.protocol import ToolResult
 from ai.domain.ports import LLMProvider, TransientProviderError, UnsupportedCapability
-from ai.infrastructure.settings import settings
 
 from . import errors, scope
 from .errors import AdmissionDenied
-from .guard import ProxyApproval, SendGuard
 from .ledger import Ledger, Request, Usage, estimate_tokens
 
 RESEARCH_LANE = "research"
@@ -29,32 +27,15 @@ class AdmittedAgentProvider(LLMProvider):
     #: What `AgentExecutor` requires of a paid provider.
     admitted = True
 
-    def __init__(self, provider: LLMProvider, ledger: Ledger, *, guard: Optional[SendGuard] = None,
+    def __init__(self, provider: LLMProvider, ledger: Ledger, *,
                  retries: int = 0, timeout_seconds: Optional[float] = None,
                  lane: str = RESEARCH_LANE, purpose: str = "answer"):
         self.provider = provider
         self.ledger = ledger
-        self.guard = guard or SendGuard(
-            ledger.dsn, ProxyApproval.from_json(settings.RUNS_PROXY_SEND_APPROVAL),
-            stage=settings.RUNS_DEPLOYMENT_STAGE)
         self.retries = retries
         self.timeout_seconds = timeout_seconds
         self.lane = lane
         self.purpose = purpose
-
-    def _policy(self, pin) -> dict:
-        limits = self.ledger.limits
-        return {"account": self.provider.account,
-                "campaign": limits.campaign_key if limits else None,
-                "routing": getattr(self.provider, "routing", None),
-                "price": getattr(limits, "prices", {}).get(pin.model) if limits else None}
-
-    async def eligible(self, pin, sources: frozenset) -> frozenset:
-        """Which of `sources` a send for this run may carry now; nothing outside a run."""
-        binding = scope.current()
-        if binding is None or not sources:
-            return frozenset()
-        return await self.guard.eligible(binding, pin, frozenset(sources), **self._policy(pin))
 
     def accepts(self, pin) -> bool:
         return self.provider.accepts(pin)
@@ -96,20 +77,15 @@ class AdmittedAgentProvider(LLMProvider):
         ), binding)
         usage = Usage()
         try:
-            # Tool results carry Record content: the guard must authorize them.
-            evidence = [e for e in request.history if isinstance(e, ToolResult)
-                        or getattr(e, "dependencies", frozenset())
-                        or getattr(e, "unverified_provenance", False)]
-            # A previous model turn may carry derived text or opaque state even
-            # when the original tool result has left the fitted context.
-            await self.guard.check(binding, request.pin, evidence, **self._policy(request.pin))
             # From here the vendor may bill it, whatever happens next.
             usage.sent = True
             with scope.admitted_send():
                 turn = await asyncio.wait_for(self.provider.converse(request), ticket.timeout_seconds)
             usage.input_tokens, usage.output_tokens = turn.input_tokens, turn.output_tokens
+            usage.cached_input_tokens = turn.cached_input_tokens
             usage.model = request.pin.model
-            sources = frozenset().union(*(e.dependencies for e in evidence)) if evidence else frozenset()
+            # The papers the turn drew on, kept as its label for later follow-ups (IR-994).
+            sources = frozenset(s for e in request.history for s in getattr(e, "dependencies", ()))
             return replace(turn, dependencies=sources) if sources else turn
         finally:
             await ticket.settle(usage)

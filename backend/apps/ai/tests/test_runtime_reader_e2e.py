@@ -32,11 +32,11 @@ RECORDING = runs_db.REPO / "frontend" / "src" / "test" / "fixtures" / "runtimeRe
 RUN_KEYS = {
     "protocol", "id", "conversation_id", "state", "question", "base_revision", "version", "turn_id",
     "depth", "awaiting_reader", "created_at", "finished_at", "plan", "context", "sources_available",
-    "capabilities", "compaction", "kind", "cursor", "retry_of", "retried_by",
+    "capabilities", "compaction", "kind", "cursor", "retry_of", "retried_by", "activity", "usage",
 }
 CONVERSATION_KEYS = {"protocol", "id", "revision", "runs", "turns"}
-TURN_KEYS = {"id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations", "facts"}
-CITATION_KEYS = {"record_id", "page", "quote", "revision"}
+TURN_KEYS = {"id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations", "facts", "papers"}
+CITATION_KEYS = {"record_id", "page", "quote", "revision", "regions"}
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 

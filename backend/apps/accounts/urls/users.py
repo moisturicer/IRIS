@@ -16,6 +16,7 @@ urlpatterns = [
     path("me/data/",      views.PersonalDataExportView.as_view(), name="user-me-data"),
     path("me/photo/",     views.MePhotoView.as_view(),         name="user-me-photo"),
     path("interests/",    views.InterestSuggestionsView.as_view(), name="user-interest-suggestions"),
+    path("search/",       views.PeopleSearchView.as_view(), name="user-search"),
     path("<int:pk>/photo/", views.UserPhotoView.as_view(),     name="user-photo"),
     # IR-696: a person's public profile, for any signed-in user.
     path("<int:pk>/profile/", views.PublicProfileView.as_view(), name="user-profile"),

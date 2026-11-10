@@ -20,7 +20,7 @@ if str(REPO) not in sys.path:
 from ai.admission.limits import Price  # noqa: E402
 from ai.agent.budget import Bounds  # noqa: E402
 from ai.agent.dialect import ChatCompletions  # noqa: E402
-from ai.agent.assurance import LIMITATION  # noqa: E402
+from ai.agent.assurance import QUALIFIER  # noqa: E402
 from ai.agent.executor import FINAL_NOTE, AgentExecutor  # noqa: E402
 from ai.agent.protocol import Pin  # noqa: E402
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
@@ -362,20 +362,19 @@ def test_stop_between_steps_admits_no_further_attempt():
 
 # --- Checks on the first draft -------------------------------------------------
 
-@pytest.mark.parametrize("draft", [
-    f"Floods [{handle('P', 9)}].",
-    "Floods [1].",
-    f"It predicted 912 floods [{handle('P', 1)}].",
-    f"«A paper nobody read» predicted floods [{handle('P', 1)}].",
-    f"All papers agree [{handle('P', 1)}].",
+@pytest.mark.parametrize("draft,delivered", [
+    (f"Floods [{handle('P', 9)}].", "Floods."),
+    ("Floods [1].", "Floods."),
+    (f"It predicted 912 floods [{handle('P', 1)}].", f"It predicted 912 floods [1]. {QUALIFIER}"),
+    (f"«A paper nobody read» predicted floods [{handle('P', 1)}].", f"«A paper nobody read» predicted floods [1]. {QUALIFIER}"),
+    (f"All papers agree [{handle('P', 1)}].", f"All papers agree [1]. {QUALIFIER}"),
 ])
-def test_a_draft_failing_a_deterministic_check_twice_is_not_delivered(draft):
-    # IR-729: the one repair repeats the mistake, and no sentence stands on its own.
-    provider = recording(tools(call("a", "search", query="flood")), reply(draft), reply(draft))
-    with pytest.raises(Unavailable) as refused:
-        ask(provider)
-    assert refused.value.code == "invalid_draft"
-    assert len(provider.requests) == 3
+def test_a_draft_failing_a_check_after_both_repairs_is_delivered_whole(draft, delivered):
+    # Never refused over a check: a citation naming nothing is removed, a claim still unsupported is qualified.
+    provider = recording(tools(call("a", "search", query="flood")), reply(draft), reply(draft), reply(draft))
+    result, corpus = ask(provider)
+    assert result.answer == delivered
+    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair", "repair"]
 
 
 def test_a_cited_source_replaced_before_commit_fails_safely():
@@ -418,34 +417,34 @@ def test_a_bad_page_and_a_wrong_count_are_corrected_once_in_the_same_conversatio
     assert "9" in note and "912" in note and "unsupported_number" not in note
 
 
-def test_a_second_invalid_draft_keeps_only_sentences_supported_on_their_own_and_says_so():
+def test_a_draft_still_invalid_after_two_repairs_keeps_every_sentence_and_marks_the_unsupported():
     good = f"It predicted 87 floods [{handle('P', 1)}]."
-    # An uncited sentence is not supported by anything, however harmless it reads.
     bad = (f"{good} «A paper nobody read» agrees [{handle('P', 1)}].\n"
            "Gauges are cheap to install. Some 40 more papers agree.")
-    provider = recording(tools(call("a", "search", query="flood")), reply(bad), reply(bad))
+    provider = recording(tools(call("a", "search", query="flood")), reply(bad), reply(bad), reply(bad))
     result, corpus = ask(provider)
-    assert result.answer == f"It predicted 87 floods [1].\n\n{LIMITATION}"
+    assert result.answer == (f"It predicted 87 floods [1]. «A paper nobody read» agrees [1]. {QUALIFIER}\n"
+                             f"Gauges are cheap to install. Some 40 more papers agree. {QUALIFIER}")
     [citation] = result.citations
     assert citation.page == 4
-    # One repair, never a second.
-    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair"]
+    # Two repairs, never a third.
+    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair", "repair"]
 
 
 def test_a_citation_after_the_full_stop_stays_with_its_sentence_and_never_stands_alone():
     p1 = handle("P", 1)
     bad = f"Rainfall gauges fed the network. [{p1}] It predicted 912 floods. [{p1}]"
-    provider = recording(tools(call("a", "search", query="flood")), reply(bad), reply(bad))
+    provider = recording(tools(call("a", "search", query="flood")), reply(bad), reply(bad), reply(bad))
     result, _ = ask(provider)
-    assert result.answer == f"Rainfall gauges fed the network. [1]\n\n{LIMITATION}"
+    assert result.answer == f"Rainfall gauges fed the network. [1] It predicted 912 floods. [1] {QUALIFIER}"
 
 
-def test_without_a_repair_reserve_the_first_draft_keeps_its_supported_sentences():
+def test_without_a_repair_reserve_the_first_draft_is_delivered_with_its_unsupported_claim_marked():
     no_repair = dataclasses.replace(RESERVES, repair_tokens=0)
     draft = f"It predicted 87 floods [{handle('P', 1)}]. It predicted 912 more [{handle('P', 1)}]."
     provider = recording(tools(call("a", "search", query="flood")), reply(draft), reply("Never sent."))
     result = run(AgentExecutor(provider, PIN, no_repair, profiles=PROFILES).answer("q", Corpus(), context()))
-    assert result.answer == f"It predicted 87 floods [1].\n\n{LIMITATION}"
+    assert result.answer == f"It predicted 87 floods [1]. It predicted 912 more [1]. {QUALIFIER}"
     assert len(provider.requests) == 2
 
 
@@ -465,11 +464,11 @@ def test_access_revoked_during_the_repair_ends_the_run_without_delivery():
     assert refused.value.code == "unauthorized"
 
 
-def test_a_truncated_repair_falls_back_to_what_the_first_draft_supports():
+def test_a_truncated_repair_falls_back_to_the_first_draft():
     first = f"It predicted 87 floods [{handle('P', 1)}]. It predicted 912 more."
     provider = recording(tools(call("a", "search", query="flood")), reply(first), reply("Half", finish="length"))
     result, _ = ask(provider)
-    assert result.answer == f"It predicted 87 floods [1].\n\n{LIMITATION}"
+    assert result.answer == f"It predicted 87 floods [1]. It predicted 912 more. {QUALIFIER}"
 
 
 def test_a_source_replaced_before_the_repair_fences_delivery_and_sends_no_repair():
@@ -509,9 +508,8 @@ def test_no_repair_is_sent_without_a_repair_reserve():
     no_repair = dataclasses.replace(RESERVES, repair_tokens=0)
     provider = recording(tools(call("a", "search", query="flood")),
                          reply(f"It predicted 912 floods [{handle('P', 1)}]."), reply("Never sent."))
-    with pytest.raises(Unavailable) as refused:
-        run(AgentExecutor(provider, PIN, no_repair, profiles=PROFILES).answer("q", Corpus(), context()))
-    assert refused.value.code == "invalid_draft"
+    result = run(AgentExecutor(provider, PIN, no_repair, profiles=PROFILES).answer("q", Corpus(), context()))
+    assert result.answer == f"It predicted 912 floods [1]. {QUALIFIER}"
     assert len(provider.requests) == 2
 
 
@@ -520,9 +518,8 @@ def test_the_repair_is_charged_to_the_original_allowance():
     greedy = reply(f"It predicted 912 floods [{handle('P', 1)}].")
     greedy["usage"]["prompt_tokens"] = ALLOWANCE["max_input_tokens"] - 100
     provider = recording(tools(call("a", "search", query="flood")), greedy, reply("Never sent."))
-    with pytest.raises(Unavailable) as refused:
-        ask(provider)
-    assert refused.value.code == "invalid_draft"
+    result, _ = ask(provider)
+    assert result.answer == f"It predicted 912 floods [1]. {QUALIFIER}"
     assert len(provider.requests) == 2
 
     # Within the allowance, the repair's usage is counted with the rest of the run.
@@ -666,9 +663,8 @@ def test_a_follow_up_answered_without_tools_is_still_checked():
     result, _ = ask(recording(reply("It predicted 87 floods.")), ctx=ctx, question="How many?")
     assert result.answer == "It predicted 87 floods."
     invented = reply("«An invented study» agrees.")
-    with pytest.raises(Unavailable) as refused:
-        ask(recording(invented, invented), ctx=ctx, question="Who agrees?")
-    assert refused.value.code == "invalid_draft"
+    result, _ = ask(recording(invented, invented, invented), ctx=ctx, question="Who agrees?")
+    assert result.answer == f"«An invented study» agrees. {QUALIFIER}"
 
 
 def test_earlier_turns_reach_the_model_without_their_delivered_markers():
@@ -678,13 +674,13 @@ def test_earlier_turns_reach_the_model_without_their_delivered_markers():
     assert provider.requests[0]["messages"][2] == {"role": "assistant", "content": "Two papers."}
 
 
-def test_citing_a_paper_the_reader_excluded_is_refused():
+def test_a_citation_of_a_paper_the_reader_excluded_never_reaches_the_answer():
     ctx = context(state={"shown": [1], "selected": [], "excluded": [1]})
     excluded = reply(f"Floods [{handle('P', 1)}].")
-    provider = recording(tools(call("a", "search", query="flood")), excluded, excluded)
-    with pytest.raises(Unavailable) as refused:
-        ask(provider, ctx=ctx)
-    assert refused.value.code == "invalid_draft"
+    provider = recording(tools(call("a", "search", query="flood")), excluded, excluded, excluded)
+    result, _ = ask(provider, ctx=ctx)
+    assert result.answer == "Floods."
+    assert result.citations == ()
 
 
 def test_a_run_ended_during_the_recheck_reports_that_not_a_changed_source():

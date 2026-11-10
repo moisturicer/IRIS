@@ -487,6 +487,26 @@ def notify_review_finished(record, *, actor, party_label: str, version, threads:
         _log_failure("notify_review_finished", record=record)
 
 
+def notify_mentioned(record, *, actor, recipient, comments: int, version):
+    """
+    Someone mentioned `recipient` in the review discussion (ADR-032 §7,
+    IR-877): one notice per comment that posts at once, and one per finished
+    review counting its drafts that name them. In-app only, like the
+    discussion itself. Who may be mentioned is `apps.reviews.mentions`'s.
+    """
+    try:
+        who = actor.get_full_name() or "Someone"
+        said = "a comment" if comments == 1 else f"{comments} comments"
+        on = f"v{version} of " if version else ""
+        Notification.objects.create(
+            sender=actor, recipient=recipient, record=record,
+            notif_type=NotificationType.objects.get_or_create(name="Review Mention")[0],
+            message=f'{who} mentioned you in {said} on {on}"{record.title}".',
+        )
+    except Exception:
+        _log_failure("notify_mentioned", record=record)
+
+
 def notify_document_requested(document_request, *, party_label: str):
     """
     Tell every owner that a party has asked for documents (ADR-022 §3.1).

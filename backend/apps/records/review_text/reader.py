@@ -33,7 +33,8 @@ import sys
 import unicodedata
 from collections import Counter, defaultdict
 
-#: Raise on any change that can alter what a stored text says.
+#: Raise on any change that can alter what a stored text says, and raise
+#: `deployed_reader.RULES_VERSION` with it (the web side names the reader from it).
 RULES_VERSION = 2
 
 #: pdfplumber's default word gap (3 pt) is a 12 pt Times space, so a line that
@@ -1118,8 +1119,13 @@ def _preload():
     import pdfplumber  # noqa: F401
     import pdfplumber.table  # noqa: F401
 
-    for codec in ("latin-1", "utf-16be", "utf-16le", "ascii", "cp1252"):
-        b"".decode(codec)
+    # `codecs.lookup` imports each codec's module. Decoding empty bytes would
+    # not: CPython takes a fast path that loads nothing, so a ToUnicode CMap
+    # (UTF-16BE) failed once confined, and its paper read as no text (IR-1005).
+    import codecs
+
+    for codec in ("latin-1", "utf-16", "utf-16be", "utf-16le", "ascii", "cp1252"):
+        codecs.lookup(codec)
 
 
 def confine():

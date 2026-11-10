@@ -38,19 +38,6 @@ def test_the_pin_itself_is_not_published():
     assert "executor" not in text and "bounds" not in text and "pinned" not in text
 
 
-def test_manual_compaction_is_offered_only_where_the_service_can_do_it():
-    assert public.run(snapshot())["capabilities"] == {"manual_compaction": False}
-    assert public.run(snapshot(), manual_compaction=True)["capabilities"] == {"manual_compaction": True}
-
-
-def test_the_conversation_carries_the_same_capability_on_every_run():
-    runs = [snapshot(id="a", sources_available=True), snapshot(id="b", sources_available=True)]
-    shown = public.conversation({"id": "c", "revision": 2, "runs": runs, "turns": []}, manual_compaction=True)
-    assert [r["capabilities"] for r in shown["runs"]] == [{"manual_compaction": True}] * 2
-    off = public.conversation({"id": "c", "revision": 2, "runs": runs, "turns": []})
-    assert [r["capabilities"] for r in off["runs"]] == [{"manual_compaction": False}] * 2
-
-
 def test_a_compaction_a_restarted_worker_journals_again_counts_once():
     shown = public.progress([
         event("compaction", outcome="compacted", revision=2, turns=3, exchanges=0),

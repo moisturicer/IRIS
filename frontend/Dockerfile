@@ -36,6 +36,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Browser security headers (IR-663). Outside conf.d, which nginx includes at
 # http level on its own; nginx.conf includes this per location instead.
 COPY security-headers.conf /etc/nginx/iris/security-headers.conf
+COPY runtime-edge.conf /etc/nginx/iris/runtime-edge.conf
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html

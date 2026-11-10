@@ -109,7 +109,7 @@ def test_the_results_file_carries_the_rule_set_digest_and_an_empty_model_slot(
     assert len(data["rule_set_digest"]) == 64
     assert data["provenance"]["rule_set_digest"] == data["rule_set_digest"]
     assert data["provenance"]["question_set_sha256"] != "unknown"
-    assert data["provenance"]["AI_EVIDENCE_DECISION"] == "off"
+    assert "AI_EVIDENCE_DECISION" not in data["provenance"]
     assert data["model"] is None
     assert data["provenance"]["model"] is None
     assert data["rule_set"]["definition"]["codes"]

@@ -19,7 +19,6 @@ REQUIRED = (
     "AGENT_LLM_API_KEY",
     "AGENT_LLM_MODELS",
     "AGENT_LLM_CAPABILITIES",
-    "AGENT_LLM_DATA_POLICY",
     "AGENT_LLM_CAPACITIES",
 )
 #: Every `Capacity` field must be stated; `max_reasoning_tokens` may be null.
@@ -37,6 +36,8 @@ class AgentProviderConfig:
     data_policy: str
     capacities: Mapping[str, Capacity]
     routing: Mapping | None = None
+    #: PROMPT_CACHE_OFF or PROMPT_CACHE_RUN (IR-953); off unless set.
+    prompt_cache: str = "off"
 
     def __repr__(self) -> str:
         return f"AgentProviderConfig(endpoint={self.endpoint!r}, models={sorted(self.models)!r})"
@@ -109,4 +110,16 @@ def read(values) -> AgentProviderConfig:
         data_policy=_raw(values, "AGENT_LLM_DATA_POLICY"),
         capacities={model: _capacity(model, entry) for model, entry in declared.items()},
         routing=routing,
+        prompt_cache=_prompt_cache(values),
     )
+
+
+PROMPT_CACHE_OFF, PROMPT_CACHE_RUN = "off", "run"
+
+
+def _prompt_cache(values) -> str:
+    """Optional: blank is off. "run" keys the vendor's prompt cache to one run, never wider (IR-953)."""
+    chosen = _raw(values, "AGENT_LLM_PROMPT_CACHE") or PROMPT_CACHE_OFF
+    if chosen not in (PROMPT_CACHE_OFF, PROMPT_CACHE_RUN):
+        raise NotConfigured("AGENT_LLM_PROMPT_CACHE must be off or run")
+    return chosen
