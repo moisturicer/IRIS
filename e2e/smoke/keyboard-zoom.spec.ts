@@ -382,6 +382,7 @@ test("the Publish dialog traps focus and Escape returns it to its keyboard opene
   await expectVisibleFocus(trigger);
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Publish your research" });
+  await expect(dialog.getByRole("radio", { name: /Thesis \/ Research/ })).toBeVisible();
   await expectDialogKeyboardContract(page, dialog, trigger);
 });
 
