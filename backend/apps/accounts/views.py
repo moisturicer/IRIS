@@ -22,7 +22,7 @@ from core.throttling import UserBurstThrottle
 from apps.audit.services import create_audit_event
 from apps.audit import retention
 from apps.audit.models import AuditEvent
-from . import profile, public_profile
+from . import people_search, profile, public_profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
@@ -508,6 +508,14 @@ class InterestSuggestionsView(APIView):
 
     def get(self, request):
         return Response(profile.suggest_interests(request.query_params.get("q", "")))
+
+
+class PeopleSearchView(APIView):
+    """`GET /users/search/`: Discover's people results, for signed-in readers."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(people_search.search(request))
 
 
 class UserListView(generics.ListAPIView):
