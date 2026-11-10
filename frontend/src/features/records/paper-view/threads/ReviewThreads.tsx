@@ -7,8 +7,9 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import type { Capability } from "@/features/records/capabilities";
 import { errorDetail } from "@/lib/errorDetail";
 import { cn, formatDate } from "@/lib/utils";
-import type { ResponseLetter, ReviewComment, ThreadSeverity } from "@/types/records";
+import type { MentionedPerson, ResponseLetter, ReviewComment, ThreadSeverity } from "@/types/records";
 
+import { MentionPicker, MentionedPeople } from "../Mentions";
 import { SavedReplies } from "../SavedReplies";
 import type { Passage } from "./passage";
 import { ResponseLetterPanel } from "./ResponseLetter";
@@ -248,6 +249,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           {root.author_name ?? "Someone"} · {formatDate(root.created_at)}{root.edited_at ? " · edited" : ""}
         </p>
         <p className="whitespace-pre-wrap break-words">{root.body}</p>
+        <MentionedPeople people={root.mentions} />
       </div>
 
       {root.answer && (
@@ -271,10 +273,12 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
 
       {form === "reply" && (
         <TextForm
-          label="Reply" submitLabel="Reply" required busy={busy} savedReplies
+          label="Reply" submitLabel="Reply" required busy={busy} savedReplies mentionsRecordId={id}
           hint="Posted now, not held with your review."
           onCancel={() => setForm(null)}
-          onSubmit={(body) => act(() => recordsApi.postReviewComment(id, { body, reply_to: root.id }), "Your reply could not be sent.")}
+          onSubmit={(body, mentions) => act(() => recordsApi.postReviewComment(id, {
+            body, reply_to: root.id, ...(mentions.length ? { mentions } : {}),
+          }), "Your reply could not be sent.")}
         />
       )}
       {(form === "addressed" || form === "declined") && (
@@ -414,23 +418,27 @@ function Reply({ reply }: { reply: ReviewComment }) {
         {reply.author_name ?? "Someone"} · {formatDate(reply.created_at)}{reply.edited_at ? " · edited" : ""}
       </p>
       <p className="whitespace-pre-wrap break-words">{reply.body}</p>
+      <MentionedPeople people={reply.mentions} />
     </li>
   );
 }
 
-function TextForm({ label, submitLabel, hint, required, busy, savedReplies, onSubmit, onCancel }: {
+function TextForm({ label, submitLabel, hint, required, busy, savedReplies, mentionsRecordId, onSubmit, onCancel }: {
   label: string; submitLabel: string; hint?: string; required?: boolean; busy: boolean;
   /** Offer saved replies (IR-877): a reply is a comment; an answer's note is not. */
   savedReplies?: boolean;
-  onSubmit: (text: string) => void; onCancel: () => void;
+  /** Offer mentions on this record (IR-877): a reply's, never an answer note's. */
+  mentionsRecordId?: number;
+  onSubmit: (text: string, mentions: number[]) => void; onCancel: () => void;
 }) {
   const id = useId();
   const [text, setText] = useState("");
+  const [mentioned, setMentioned] = useState<MentionedPerson[]>([]);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => ref.current?.focus(), []);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (text.trim() || !required) onSubmit(text.trim());
+    if (text.trim() || !required) onSubmit(text.trim(), mentioned.map((p) => p.id));
   };
   return (
     <form onSubmit={submit} className="space-y-1.5">
@@ -439,6 +447,7 @@ function TextForm({ label, submitLabel, hint, required, busy, savedReplies, onSu
         aria-describedby={hint ? `${id}-hint` : undefined} className={fieldClasses(false)} />
       {hint && <p id={`${id}-hint`} className="text-2xs text-stone-600">{hint}</p>}
       {savedReplies && <SavedReplies textareaRef={ref} value={text} onChange={setText} />}
+      {mentionsRecordId !== undefined && <MentionPicker recordId={mentionsRecordId} value={mentioned} onChange={setMentioned} />}
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button type="submit" size="sm" disabled={busy || (required && !text.trim())}>{submitLabel}</Button>
@@ -459,6 +468,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   const [body, setBody] = useState("");
   const [severity, setSeverity] = useState<ThreadSeverity>("suggestion");
   const [wording, setWording] = useState("");
+  const [mentioned, setMentioned] = useState<MentionedPerson[]>([]);
   // Only a reviewer's thread on a passage carries wording (IR-876).
   const canSuggest = drafting && target.kind === "passage";
   const [busy, setBusy] = useState(false);
@@ -476,6 +486,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
         body: body.trim(),
         ...(drafting ? { severity } : {}),
         ...(canSuggest && wording.trim() ? { suggestion: wording.trim() } : {}),
+        ...(mentioned.length ? { mentions: mentioned.map((p) => p.id) } : {}),
         ...(target.kind === "passage" ? {
           anchor: {
             version: target.version, page: target.passage.page, quote: target.passage.quote,
@@ -507,6 +518,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
       <textarea ref={ref} id={`${ids}-body`} rows={3} value={body} onChange={(e) => setBody(e.target.value)}
         placeholder="What should the authors look at here?" className={fieldClasses(false)} />
       <SavedReplies textareaRef={ref} value={body} onChange={setBody} />
+      <MentionPicker recordId={recordId} value={mentioned} onChange={setMentioned} />
       {drafting && (
         <fieldset className="flex flex-wrap items-center gap-3">
           <legend className="sr-only">Severity</legend>

@@ -26,6 +26,7 @@ const api = vi.hoisted(() => ({
   answerThread: vi.fn(),
   changeThreadSeverity: vi.fn(),
   deleteReviewComment: vi.fn(),
+  reviewMentionable: vi.fn(),
 }));
 vi.mock("@/api/records", () => ({ recordsApi: api }));
 
@@ -200,6 +201,9 @@ describe("the composer", () => {
     // Saved replies (IR-877) sit right under the box.
     await user.tab();
     expect(screen.getByRole("button", { name: "Saved replies" })).toHaveFocus();
+    // Then whom to mention (IR-877).
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Mention someone" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("radio", { name: "Suggestion" })).toHaveFocus();
     await user.keyboard("{ArrowUp}");
