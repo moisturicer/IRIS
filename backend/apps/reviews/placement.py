@@ -7,7 +7,7 @@ threads*; IR-876). Pure: two readings in, one place out.
   an edited passage. The thread is Outdated, beside the new passage.
 - **Removed:** neither. The thread is Outdated, *passage removed*.
 
-Matching is the comparison's own (`comparison.norm`, `appears_in`,
+Matching is the comparison's own (`comparison.locate`, `appears_in`,
 `_diff_passages`), so a thread and the Changes tab never disagree about what
 changed. Moving never resolves anything: this module only says where.
 """
@@ -55,20 +55,7 @@ def _key(ref) -> tuple:
 
 
 def _touched(reading: dict, text: str) -> set:
-    """The passages of ``reading`` that ``text`` falls in, as the comparison
-    names them: matched the way `comparison.appears_in` matches."""
-    wanted = comparison.norm(text).lower()
-    flat = comparison._flat(reading)
-    pieces = [comparison.norm(p["text"]).lower() for _, p in flat]
-    whole, spans, at = " ".join(pieces), [], 0
-    for piece in pieces:
-        spans.append((at, at + len(piece)))
-        at += len(piece) + 1
-    start = whole.find(wanted) if wanted else -1
-    if start == -1:
-        return set()
-    end = start + len(wanted)
-    return {
-        (key, p["page"], p["text"])
-        for (key, p), (s, e) in zip(flat, spans) if s < end and e > start
-    }
+    """The passages of ``reading`` that ``text`` first falls in, as the
+    comparison names them (`comparison.locate`)."""
+    spots = comparison.locate(reading, text)
+    return {(key, p["page"], p["text"]) for key, p in spots[0]} if spots else set()
