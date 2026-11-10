@@ -122,21 +122,6 @@ def _threads(record, old, new, readings_, result) -> list:
     return out
 
 
-def _mark_viewed(result, compared, user, record) -> None:
-    """Each section's `viewed`, for `user` alone (IR-877): its text, on the
-    side it is marked on, is one `user` marked viewed on this record."""
-    from .viewed import Marks, mark_side
-
-    marks = Marks(record, user)
-    by_key = {side: {s["key"]: s for s in reading["sections"]}
-              for side, reading in zip(("from", "to"), compared)}
-    for section in result["sections"]:
-        side = mark_side(section)
-        stored = by_key[side][section[side]["key"]]
-        section["viewed"] = marks.has(key=stored["key"], text_hash=stored["text_hash"],
-                                      empty=not stored["passages"])
-
-
 def payload(record, user, old_number=None, new_number=None) -> dict:
     """The comparison as `GET /records/<id>/versions/compare/` serves it."""
     old, new = choose(record, user, old_number, new_number)
@@ -159,5 +144,7 @@ def payload(record, user, old_number=None, new_number=None) -> dict:
     for notice in result["notices"]:
         notice["message"] = _notice_message(notice, old, new)
     result["threads"] = _threads(record, old, new, compared, result)
-    _mark_viewed(result, compared, user, record)
+    from .viewed import annotate
+
+    annotate(result, compared, record, user)
     return {**body, "message": None, **result}

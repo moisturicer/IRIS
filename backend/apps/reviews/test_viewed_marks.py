@@ -283,6 +283,15 @@ class RefusalTests(ViewedTestBase):
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, body)
         self.assertFalse(ViewedMark.objects.exists())
 
+    def test_a_section_is_marked_only_on_the_side_the_comparison_reads_it_from(self):
+        record = self.two_versions()
+
+        # The problem statement is in both Versions, so it is marked on v2's side.
+        response = self.mark(record, self.ierc, PROBLEM, side="from")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(ViewedMark.objects.exists())
+
     def test_a_comparison_still_being_prepared_is_refused(self):
         record = self.thesis(Party.IERC)
         self.resubmitted(record, body=V2)   # neither Version read yet

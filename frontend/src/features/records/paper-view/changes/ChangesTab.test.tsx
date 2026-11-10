@@ -289,6 +289,22 @@ describe("Viewed marks (IR-877)", () => {
     expect(api.markSectionViewed).toHaveBeenCalledWith(7, expect.objectContaining({ side: "from", key: "methods" }));
   });
 
+  it("waits for one answer before the box can be clicked again", async () => {
+    let answer: (value: unknown) => void = () => {};
+    api.markSectionViewed.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    const user = userEvent.setup();
+    open();
+    const box = await viewedBox("1.1 Background of the Study");
+
+    await user.click(box);
+    expect(box).toBeDisabled();
+    await act(async () => answer({ data: { viewed: true } }));
+
+    expect(box).toBeEnabled();
+    expect(box).toBeChecked();
+    expect(api.markSectionViewed).toHaveBeenCalledTimes(1);
+  });
+
   it("puts the box back and says so when the server refuses", async () => {
     api.markSectionViewed.mockRejectedValue({ response: { status: 400, data: { detail: "That section isn't in this comparison." } } });
     const user = userEvent.setup();

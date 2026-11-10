@@ -105,9 +105,13 @@ const SAVE_FAILED = "Couldn't save that. Please try again.";
 function useViewed(recordId: number, data: VersionComparisonPayload) {
   const [ticked, setTicked] = useState<Map<number, boolean>>(new Map());
   const [errors, setErrors] = useState<Map<number, string>>(new Map());
+  // A box waits for its answer before it can be clicked again, so two quick
+  // clicks never leave it out of step with the server.
+  const [pending, setPending] = useState<Set<number>>(new Set());
   useEffect(() => {
     setTicked(new Map());
     setErrors(new Map());
+    setPending(new Set());
   }, [data]);
   const sections = data.sections ?? [];
 
@@ -122,23 +126,32 @@ function useViewed(recordId: number, data: VersionComparisonPayload) {
     const section = sections[i];
     const side = section.to ? "to" : "from";
     const key = section[side]?.key;
-    if (!key) return;
+    if (!key || pending.has(i)) return;
     const wanted = !isViewed(i);
+    const fail = (message: string) => {
+      setTicked((m) => put(m, i, !wanted));
+      setErrors((m) => put(m, i, message));
+    };
+    setPending((p) => new Set(p).add(i));
     setTicked((m) => put(m, i, wanted));
     setErrors((m) => put(m, i, undefined));
     try {
       const { data: answer } = await recordsApi.markSectionViewed(recordId, {
         from: data.from, to: data.to, side, key, viewed: wanted,
       });
-      if (typeof answer?.viewed !== "boolean") throw new Error("wrong shape");
-      setTicked((m) => put(m, i, answer.viewed));
+      if (typeof answer?.viewed === "boolean") setTicked((m) => put(m, i, answer.viewed));
+      else fail(SAVE_FAILED);
     } catch (err) {
-      setTicked((m) => put(m, i, !wanted));
-      setErrors((m) => put(m, i, err instanceof Error && err.message === "wrong shape"
-        ? SAVE_FAILED : errorDetail(err, SAVE_FAILED)));
+      fail(errorDetail(err, SAVE_FAILED));
+    } finally {
+      setPending((p) => { const next = new Set(p); next.delete(i); return next; });
     }
   };
-  return { isViewed, toggle, error: (i: number) => errors.get(i) ?? null };
+  return {
+    isViewed, toggle,
+    isPending: (i: number) => pending.has(i),
+    error: (i: number) => errors.get(i) ?? null,
+  };
 }
 
 interface ComparisonProps {
@@ -240,7 +253,8 @@ function Comparison({ recordId, data, ids, view, threads, showUnchanged, onShowU
           )}
           {shown.map(({ s, i }) => (
             <Section key={i} section={s} id={`${ids}-s${i}`} from={from} to={to} view={view}
-              viewed={viewed.isViewed(i)} viewedError={viewed.error(i)} onToggleViewed={() => void viewed.toggle(i)}
+              viewed={viewed.isViewed(i)} viewedPending={viewed.isPending(i)} viewedError={viewed.error(i)}
+              onToggleViewed={() => void viewed.toggle(i)}
               placed={placed.get(i) ?? []} thread={thread} nameOf={nameOf}
               onShowInPaper={onShowInPaper} onOpenThread={onOpenThread} />
           ))}
@@ -259,6 +273,7 @@ interface SectionProps {
   to: number;
   view: ChangesView;
   viewed: boolean;
+  viewedPending: boolean;
   viewedError: string | null;
   onToggleViewed: () => void;
   placed: PlacedThread[];
@@ -269,7 +284,7 @@ interface SectionProps {
 }
 
 function Section({
-  section, id, from, to, view, viewed, viewedError, onToggleViewed, placed, thread, nameOf, onShowInPaper, onOpenThread,
+  section, id, from, to, view, viewed, viewedPending, viewedError, onToggleViewed, placed, thread, nameOf, onShowInPaper, onOpenThread,
 }: SectionProps) {
   const marks = sectionMarks(section, from, to);
   const title = sectionTitle(section);
@@ -281,7 +296,8 @@ function Section({
         </h3>
         {/* Private and decides nothing; it only folds the changes away (IR-877). */}
         <label className="review-control inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-2xs text-stone-700">
-          <input type="checkbox" checked={viewed} onChange={onToggleViewed} aria-label={`Viewed: ${title}`}
+          <input type="checkbox" checked={viewed} onChange={onToggleViewed} disabled={viewedPending}
+            aria-label={`Viewed: ${title}`}
             className="accent-brand" />
           Viewed
         </label>
