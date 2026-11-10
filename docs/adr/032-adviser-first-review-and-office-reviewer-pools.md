@@ -400,7 +400,7 @@ The review discussion remains one record-level timeline, with the same readers, 
 3. **Nothing offers reporting until reports exist** (IR-691). Until then, `can_report` is false on every comment.
 4. **Posting has its own request budget**, 10 a minute and 200 a day per person, set by `API_THROTTLE_COMMENT_BURST` and `API_THROTTLE_COMMENT`. Reading, editing and deleting spend nothing.
 
-**Proposed while building IR-690, awaiting Hermoine Zozobrado's confirmation.** Written by an agent, not decided in the design session; until confirmed, these are the code's behaviour and not this ADR's decisions.
+**Choices made while building IR-690, confirmed 2026-11-10 by Hermoine Zozobrado (Accepted).** An agent proposed them while building, outside the design session, and she confirmed each one as written. Transcribed by an agent.
 
 - *Who sees what.* A paper that is not published answers the same 404 as a missing paper, to its owners too. A reply may answer a reply; the thread stays flat.
 - *A deleted account.* Its comments stay, shown as "Former user", like a Call's poster. Its personal-data export lists the comments it wrote: a deleted or removed one without its text, since no response carries that text.
