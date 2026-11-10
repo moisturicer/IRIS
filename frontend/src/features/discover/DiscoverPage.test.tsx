@@ -71,6 +71,9 @@ let recommended: { mode: "for_you" | "latest"; results: (RecordListItem & { reas
 const page = <T,>(results: T[], count = results.length) =>
   Promise.resolve({ data: { results, count } });
 
+const peoplePage = (data: Awaited<ReturnType<typeof peopleApi.search>>["data"]) =>
+  Promise.resolve({ data } as Awaited<ReturnType<typeof peopleApi.search>>);
+
 const discoverPerson = (id: number) => ({
   id,
   first_name: "Lena",
@@ -138,7 +141,7 @@ vi.mock("@/api/accounts", () => ({
 }));
 
 vi.mock("@/api/people", () => ({
-  peopleApi: { search: vi.fn(() => page(people)) },
+  peopleApi: { search: vi.fn(() => peoplePage({ results: people, count: people.length })) },
 }));
 
 vi.mock("@/api/notifications", () => ({
@@ -201,7 +204,7 @@ beforeEach(() => {
   useLibraryStore.setState({ load: "idle", items: {}, failure: null });
   listed = [publishedThesis];
   people = [];
-  vi.mocked(peopleApi.search).mockImplementation(() => page(people));
+  vi.mocked(peopleApi.search).mockImplementation(() => peoplePage({ results: people, count: people.length }));
   total = null;
   recommended = { mode: "latest", results: [{ ...publishedThesis, reason: { kind: "latest" } }], next_cursor: null, count: 1 };
   signInAs("Student");
