@@ -148,6 +148,8 @@ A server this template made already has the role Session Manager needs. One laun
 3. **EC2 → Instances →** the server **→ Actions → Security → Modify IAM role**, choose the role, **Update IAM role**.
 4. About five minutes later, **Connect → Session Manager → Connect** works.
 
+**If it still won't connect** ("unable to acquire credentials" in the agent's log): the agent started before the role existed and hasn't looked again. Over SSH, run `sudo snap restart amazon-ssm-agent`, then try again a minute later. That is what the first `iris-demo` needed.
+
 If the server already has a role, add `AmazonSSMManagedInstanceCore` to that role instead (**IAM → Roles →** it **→ Add permissions**): a server holds one role at a time.
 
 ### Read the logs
@@ -163,6 +165,8 @@ docker compose -f docker-compose.prod.yml logs -f ai-gateway       # follow live
 ```
 
 Other services: `celery-default`, `celery-extraction`, `celery-embedding`, `celery-beat`, `ai-runs-worker`, `migrate`, `frontend`, `caddy`. `--since 30m` limits it to the last half hour.
+
+**Which log shows what:** `frontend` (nginx) logs every request, sign-ins included. `backend` logs only warnings and errors, so a quiet backend log is normal.
 
 These logs live on the server only: nothing can be read while it is stopped, and they go with the disk. Sending them to CloudWatch, where they'd be searchable and survive a broken server, is deferred; the plan is kept on IR-1016's card.
 
