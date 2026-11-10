@@ -87,8 +87,7 @@ UNCHANGED, REPLACED = "unchanged", "replaced"
 def compare(old: dict, new: dict) -> dict:
     """Compare reading ``old`` (the earlier Version) with ``new``."""
     notices, doubtful_side = _notices(old, new)
-    by_page = any(_unreliable(r) for r in (old, new))
-    if by_page:
+    if by_page(old, new):
         changes = _merge_moves_in_list(_diff_passages(_flat(old), _flat(new)))
         result = {"mode": "pages", "changes": changes, "sections": []}
         every_change = changes
@@ -108,6 +107,12 @@ def compare(old: dict, new: dict) -> dict:
         "counts": counts,
     })
     return result
+
+
+def by_page(old: dict, new: dict) -> bool:
+    """Is this pair compared by page, with no sections, because either side's
+    sections are unreliable?"""
+    return any(_unreliable(r) for r in (old, new))
 
 
 def _unreliable(reading) -> bool:

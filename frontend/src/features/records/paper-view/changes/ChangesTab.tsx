@@ -7,11 +7,13 @@
  * Everything shown is what the server sent. No state, message or warning
  * names how a Version's text was read.
  */
-import { Fragment, useId, useState } from "react";
+import { Fragment, useEffect, useId, useState } from "react";
 
+import { recordsApi } from "@/api/records";
 import { Select } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { errorDetail } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
 import type {
   DocumentComparison, PlacedThread, RecordVersion, SectionComparison, VersionComparisonPayload,
@@ -85,14 +87,62 @@ export function ChangesTab({ recordId, versions, threads, onShowInPaper, onOpenT
           <button type="button" onClick={retry} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>
         </div>
       )}
-      {data && <Comparison data={data} ids={ids} view={view} threads={threads} showUnchanged={showUnchanged}
+      {data && <Comparison recordId={recordId} data={data} ids={ids} view={view} threads={threads} showUnchanged={showUnchanged}
         onShowUnchanged={() => setShowUnchanged((v) => !v)} onRetry={retry}
         onShowInPaper={onShowInPaper} onOpenThread={onOpenThread} />}
     </div>
   );
 }
 
+const SAVE_FAILED = "Couldn't save that. Please try again.";
+
+/**
+ * Each section's Viewed tick (IR-877): the server's answer, then the
+ * viewer's own clicks, put back with a reason when the server refuses. The
+ * mark follows the section's text, so the server alone says what is ticked
+ * when a comparison loads.
+ */
+function useViewed(recordId: number, data: VersionComparisonPayload) {
+  const [ticked, setTicked] = useState<Map<number, boolean>>(new Map());
+  const [errors, setErrors] = useState<Map<number, string>>(new Map());
+  useEffect(() => {
+    setTicked(new Map());
+    setErrors(new Map());
+  }, [data]);
+  const sections = data.sections ?? [];
+
+  const isViewed = (i: number) => ticked.get(i) ?? sections[i]?.viewed === true;
+  const put = <T,>(map: Map<number, T>, i: number, value: T | undefined) => {
+    const next = new Map(map);
+    if (value === undefined) next.delete(i); else next.set(i, value);
+    return next;
+  };
+
+  const toggle = async (i: number) => {
+    const section = sections[i];
+    const side = section.to ? "to" : "from";
+    const key = section[side]?.key;
+    if (!key) return;
+    const wanted = !isViewed(i);
+    setTicked((m) => put(m, i, wanted));
+    setErrors((m) => put(m, i, undefined));
+    try {
+      const { data: answer } = await recordsApi.markSectionViewed(recordId, {
+        from: data.from, to: data.to, side, key, viewed: wanted,
+      });
+      if (typeof answer?.viewed !== "boolean") throw new Error("wrong shape");
+      setTicked((m) => put(m, i, answer.viewed));
+    } catch (err) {
+      setTicked((m) => put(m, i, !wanted));
+      setErrors((m) => put(m, i, err instanceof Error && err.message === "wrong shape"
+        ? SAVE_FAILED : errorDetail(err, SAVE_FAILED)));
+    }
+  };
+  return { isViewed, toggle, error: (i: number) => errors.get(i) ?? null };
+}
+
 interface ComparisonProps {
+  recordId: number;
   data: VersionComparisonPayload;
   ids: string;
   view: ChangesView;
@@ -104,8 +154,9 @@ interface ComparisonProps {
   onOpenThread: (thread: Thread) => void;
 }
 
-function Comparison({ data, ids, view, threads, showUnchanged, onShowUnchanged, onRetry, onShowInPaper, onOpenThread }: ComparisonProps) {
+function Comparison({ recordId, data, ids, view, threads, showUnchanged, onShowUnchanged, onRetry, onShowInPaper, onOpenThread }: ComparisonProps) {
   const { from, to } = data;
+  const viewed = useViewed(recordId, data);
   if (data.state !== "ready") {
     return (
       <div className="space-y-4">
@@ -170,6 +221,7 @@ function Comparison({ data, ids, view, threads, showUnchanged, onShowUnchanged, 
                       <span className="truncate text-stone-900">{sectionTitle(s)}</span>
                       <span className="shrink-0 text-2xs text-stone-600">
                         {s.changes.length ? countsLabel(s.counts) : sectionMarks(s, from, to).join(" · ")}
+                        {viewed.isViewed(i) && " · Viewed"}
                       </span>
                     </button>
                   </li>
@@ -188,6 +240,7 @@ function Comparison({ data, ids, view, threads, showUnchanged, onShowUnchanged, 
           )}
           {shown.map(({ s, i }) => (
             <Section key={i} section={s} id={`${ids}-s${i}`} from={from} to={to} view={view}
+              viewed={viewed.isViewed(i)} viewedError={viewed.error(i)} onToggleViewed={() => void viewed.toggle(i)}
               placed={placed.get(i) ?? []} thread={thread} nameOf={nameOf}
               onShowInPaper={onShowInPaper} onOpenThread={onOpenThread} />
           ))}
@@ -205,6 +258,9 @@ interface SectionProps {
   from: number;
   to: number;
   view: ChangesView;
+  viewed: boolean;
+  viewedError: string | null;
+  onToggleViewed: () => void;
   placed: PlacedThread[];
   thread: (t: PlacedThread) => Thread | undefined;
   nameOf: (side: "from" | "to", key: string) => string | null;
@@ -212,18 +268,30 @@ interface SectionProps {
   onOpenThread: (thread: Thread) => void;
 }
 
-function Section({ section, id, from, to, view, placed, thread, nameOf, onShowInPaper, onOpenThread }: SectionProps) {
+function Section({
+  section, id, from, to, view, viewed, viewedError, onToggleViewed, placed, thread, nameOf, onShowInPaper, onOpenThread,
+}: SectionProps) {
   const marks = sectionMarks(section, from, to);
+  const title = sectionTitle(section);
   return (
     <section aria-labelledby={id} className="space-y-2">
-      <h3 id={id} tabIndex={-1} className={cn("font-display text-base font-semibold text-stone-900", FOCUS_RING)}>
-        {sectionTitle(section)}
-      </h3>
+      <div className="flex items-start justify-between gap-3">
+        <h3 id={id} tabIndex={-1} className={cn("font-display text-base font-semibold text-stone-900", FOCUS_RING)}>
+          {title}
+        </h3>
+        {/* Private and decides nothing; it only folds the changes away (IR-877). */}
+        <label className="review-control inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-2xs text-stone-700">
+          <input type="checkbox" checked={viewed} onChange={onToggleViewed} aria-label={`Viewed: ${title}`}
+            className="accent-brand" />
+          Viewed
+        </label>
+      </div>
+      {viewedError && <p role="alert" className="text-2xs text-brand">{viewedError}</p>}
       {marks.length > 0 && (
         <p className="flex flex-wrap gap-1.5">{marks.map((m) => <span key={m} className="review-tag">{m}</span>)}</p>
       )}
       <Threads placed={placed} thread={thread} onOpenThread={onOpenThread} />
-      {section.changes.length > 0 && (
+      {section.changes.length > 0 && !viewed && (
         <ul className="space-y-2">
           {section.changes.map((c, n) => (
             <li key={n}><ChangeItem change={c} from={from} to={to} view={view} sectionName={nameOf} onShow={onShowInPaper} /></li>

@@ -698,3 +698,39 @@ class SavedReply(models.Model):
 
     def __str__(self):
         return f"SavedReply(owner={self.owner_id}, title={self.title!r})"
+
+
+class ViewedMark(models.Model):
+    """
+    A person ticked a compared section as viewed (ADR-032 §7 Conveniences and
+    its IR-877 build notes; ADR-058 §3 as amended, point 7). Private: read
+    only for its own `user`, and decides nothing.
+
+    **It belongs to the reading it was made on**, so it keeps that reading,
+    its Version, and the section's `key` and `text_hash` there. A section's
+    key can differ between two readings of one file, so a comparison shows a
+    section as Viewed when this person marked a section with **its
+    `text_hash`**, on this record, in any Version or reading. A later Version
+    that changes the section has another hash, which is how the mark clears;
+    nothing is deleted.
+    """
+
+    user       = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="viewed_marks",
+    )
+    record     = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="+")
+    version    = models.ForeignKey("records.RecordVersion", on_delete=models.CASCADE, related_name="+")
+    reading    = models.ForeignKey("records.ReviewText", on_delete=models.CASCADE, related_name="+")
+    section_key = models.CharField(max_length=255)
+    text_hash  = models.CharField(max_length=64)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "reading", "section_key"],
+                                    name="one_viewed_mark_per_reading_section"),
+        ]
+        indexes = [models.Index(fields=["user", "record", "text_hash"], name="viewed_mark_lookup")]
+
+    def __str__(self):
+        return f"Viewed by {self.user_id}: {self.section_key[:40]} in reading {self.reading_id}"

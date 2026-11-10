@@ -489,6 +489,7 @@ Moving an anchor never resolves a thread, and a removed passage still needs reso
 **Proposed while building IR-877, awaiting Hermoine Zozobrado's confirmation.** Written by an agent, not decided in the design session; until confirmed, these are the code's behaviour and not this ADR's decisions.
 
 - *Saved replies.* A title of at most 60 characters, unique to its owner ignoring case, so the menu never shows two the same; at most 50 per person, a ceiling because each is stored and listed in full. Offered where a comment or reply is written or edited, not in an *Addressed* or *Declined* note, which is an answer.
+- *Viewed marks.* A section with no text of its own (a chapter heading before its first subsection) has the hash of nothing, which every such section shares, so it is matched by its `key` as well; otherwise ticking one would tick them all. A section is marked on its later Version's side, or on the earlier side when the later Version removed it, and the server refuses any other side. Unticking removes every mark of that text on the paper, since any of them would keep it ticked. Ticking folds the section's changes away and adds *Viewed* to its row in *Changed sections*; it decides nothing else.
 
 ### 8. Discover: research, and Discoverable Proposals
 

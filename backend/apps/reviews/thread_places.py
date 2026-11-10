@@ -29,7 +29,7 @@ from core.enums import ThreadPlaceOutcome, ThreadState
 
 from . import comparison, placement
 from .models import ReviewComment, ThreadPlace
-from .version_comparison import _reading
+from .version_comparison import as_reading
 
 #: Places a later Version can still follow.
 FOLLOWED = (ThreadPlaceOutcome.FOUND, ThreadPlaceOutcome.CHANGED)
@@ -50,7 +50,7 @@ def _place_in(record, previous, version) -> int:
     pair = readings.pair(previous, version)
     if pair.state != readings.READY:
         return 0
-    old, new = _reading(pair.old), _reading(pair.new)
+    old, new = as_reading(pair.old), as_reading(pair.new)
     rows = []
     for thread, text in texts:
         place = placement.place(old, new, text)

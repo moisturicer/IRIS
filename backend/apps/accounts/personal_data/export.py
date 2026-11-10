@@ -305,6 +305,18 @@ def saved_replies(user) -> list[dict]:
     ]
 
 
+def viewed_marks(user) -> list[dict]:
+    """The sections the person ticked as viewed in a review comparison (IR-877):
+    which paper and Version, and the section's heading as the reader keyed it."""
+    from apps.reviews.models import ViewedMark
+
+    return [
+        {"record_id": row.record_id, "version": row.version.number, "section": row.section_key,
+         "created_at": row.created_at}
+        for row in ViewedMark.objects.filter(user=user).select_related("version").order_by("id")
+    ]
+
+
 def discovery(user) -> dict:
     from apps.records.models import DiscoveryDismissal, DiscoveryInterests
 
@@ -614,6 +626,7 @@ SECTIONS: dict[str, Callable] = {
     "saved_papers": saved_papers,
     "saved_feeds": saved_feeds,
     "saved_replies": saved_replies,
+    "viewed_marks": viewed_marks,
     "discovery": discovery,
     "conversations": conversations,
     "download_requests": download_requests,

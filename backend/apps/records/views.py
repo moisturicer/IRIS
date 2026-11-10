@@ -814,6 +814,32 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "private, no-store"
         return response
 
+    @action(
+        detail=True, methods=["post"],
+        url_path=r"versions/compare/viewed", url_name="version-compare-viewed",
+    )
+    def version_compare_viewed(self, request, pk=None):
+        """
+        POST /records/<id>/versions/compare/viewed/ -- tick or untick one
+        section of a comparison as viewed, for the caller alone (ADR-032 §7
+        Conveniences, IR-877; `apps.reviews.viewed`).
+
+        Review material: a viewer `may_read_review` refuses gets the 404 a
+        missing paper gets. A mark decides nothing and is never audited.
+        """
+        from core.permissions import may_read_review
+
+        from apps.reviews import viewed
+
+        record = self.get_object()
+        if not may_read_review(request.user, record):
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            state = viewed.set_viewed(record, request.user, request.data)
+        except viewed.ViewedError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"viewed": state})
+
     @action(detail=True, methods=["get"])
     def similar(self, request, pk=None):
         """

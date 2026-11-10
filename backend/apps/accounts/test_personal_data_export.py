@@ -277,6 +277,20 @@ class ExportContentTests(APITestCase):
         replies = self.export()["saved_replies"]
         self.assertEqual([(r["title"], r["body"]) for r in replies], [("Typo", "There's a typo here.")])
 
+    def test_viewed_marks_are_the_persons_own(self):
+        from apps.records.models import RecordVersion, ReviewText
+        from apps.reviews.models import ViewedMark
+
+        paper = _paper("Compared", self.stranger, status=PipelineStatus.PUBLISHED)
+        version = RecordVersion.objects.create(record=paper, number=1)
+        reading = ReviewText.objects.create(record=paper, source_file="x.pdf")
+        for who in (self.me, self.stranger):
+            ViewedMark.objects.create(user=who, record=paper, version=version, reading=reading,
+                                      section_key="methods", text_hash="a" * 64)
+        marks = self.export()["viewed_marks"]
+        self.assertEqual([(m["record_id"], m["version"], m["section"]) for m in marks],
+                         [(paper.pk, 1, "methods")])
+
     def test_a_finished_review_round_is_in_the_acts_of_its_actor_only(self):
         from apps.reviews.models import ReviewRound
 
