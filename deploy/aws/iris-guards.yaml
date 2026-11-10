@@ -145,10 +145,12 @@ Resources:
           - Effect: Allow
             Principal: { Service: scheduler.amazonaws.com }
             Action: sts:AssumeRole
+            # Scheduler names its schedule group, not the schedule, as the
+            # source: a schedule ARN here makes it refuse the role.
             Condition:
-              StringEquals: { "aws:SourceAccount": !Ref AWS::AccountId }
-              ArnLike:
-                "aws:SourceArn": !Sub "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/${AWS::StackName}-*"
+              StringEquals:
+                "aws:SourceAccount": !Ref AWS::AccountId
+                "aws:SourceArn": !Sub "arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/default"
       Policies:
         - PolicyName: stop-and-start-one-instance
           PolicyDocument:
