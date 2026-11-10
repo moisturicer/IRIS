@@ -139,6 +139,33 @@ grep "IRIS bootstrap" /var/log/cloud-init-output.log    # ends with "finished"
 
 Then carry on from **Next** above. A new instance can take a minute or two after boot to appear in Session Manager.
 
+### Session Manager on a server built by hand
+
+A server this template made already has the role Session Manager needs. One launched by hand, like the first `iris-demo`, doesn't, until it's given one. This is a one-time step: free, no restart, no port opened.
+
+1. **IAM → Roles → Create role.** Trusted entity **AWS service**, use case **EC2**, **Next**.
+2. Tick **`AmazonSSMManagedInstanceCore`** and nothing else, **Next**. Name it, for example `iris-demo-ssm`, and **Create role**.
+3. **EC2 → Instances →** the server **→ Actions → Security → Modify IAM role**, choose the role, **Update IAM role**.
+4. About five minutes later, **Connect → Session Manager → Connect** works.
+
+If the server already has a role, add `AmazonSSMManagedInstanceCore` to that role instead (**IAM → Roles →** it **→ Add permissions**): a server holds one role at a time.
+
+### Read the logs
+
+In a Session Manager shell (or SSH):
+
+```bash
+sudo -iu ubuntu
+cd ~/IRIS
+docker compose -f docker-compose.prod.yml ps                       # which services are up
+docker compose -f docker-compose.prod.yml logs --tail 100 backend  # one service's latest lines
+docker compose -f docker-compose.prod.yml logs -f ai-gateway       # follow live; Ctrl+C stops
+```
+
+Other services: `celery-default`, `celery-extraction`, `celery-embedding`, `celery-beat`, `ai-runs-worker`, `migrate`, `frontend`, `caddy`. `--since 30m` limits it to the last half hour.
+
+These logs live on the server only: nothing can be read while it is stopped, and they go with the disk. Sending them to CloudWatch, where they'd be searchable and survive a broken server, is deferred; the plan is kept on IR-1016's card.
+
 ### Delete it
 
 **CloudFormation →** the stack **→ Delete.** That deletes the instance, its disk, the Elastic IP, the security group and the role, so nothing keeps billing. Everything on the server's disk goes with it, the database included. Back up anything you need first.
