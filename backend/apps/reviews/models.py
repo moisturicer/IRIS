@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from core.enums import (
@@ -659,3 +661,40 @@ class ResponseLetter(models.Model):
 
     def __str__(self):
         return f"Response letter for version {self.version_id}"
+
+
+#: How many saved replies one person keeps (IR-877). Enough for a reviewer's
+#: stock phrases; a ceiling because each is stored and listed in full.
+MAX_SAVED_REPLIES = 50
+#: The longest title a saved reply takes: a label in a menu, not a sentence.
+MAX_SAVED_REPLY_TITLE = 60
+
+
+class SavedReply(models.Model):
+    """
+    A person's own reusable text, inserted into a review comment (ADR-032 §7,
+    2026-11-04 Conveniences; IR-877). Private: every queryset starts from
+    `owner=request.user`, so another person's reply cannot be addressed and is
+    the same 404 as a missing one. It belongs to no record, so no review
+    predicate applies, and inserting one only adds text to a comment box.
+
+    The title is unique per person ignoring case, which the database enforces.
+    Kept until its owner deletes it or the account goes (the key cascades).
+    Not in Django admin and writes no `AuditEvent`, like a saved feed.
+    """
+
+    owner      = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_replies",
+    )
+    title      = models.CharField(max_length=MAX_SAVED_REPLY_TITLE)
+    body       = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("title"), "owner", name="unique_saved_reply_title"),
+        ]
+
+    def __str__(self):
+        return f"SavedReply(owner={self.owner_id}, title={self.title!r})"

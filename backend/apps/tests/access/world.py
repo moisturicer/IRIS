@@ -33,7 +33,7 @@ from apps.library.models import SavedFeed
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
 from apps.records.models import DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
-from apps.reviews.models import ReviewComment, ReviewerSeat
+from apps.reviews.models import ReviewComment, ReviewerSeat, SavedReply
 from apps.reviews.routing import accept_and_route, enter_at_adviser, route
 from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName, ThreadSeverity
 
@@ -125,7 +125,7 @@ class World:
         from apps.opportunities.models import Opportunity
         if isinstance(obj, Opportunity):
             return user is not None
-        if isinstance(obj, SavedFeed):
+        if isinstance(obj, (SavedFeed, SavedReply)):
             return user is not None and obj.owner_id == user.pk
         return Record.objects.visible_to(user).filter(pk=self.record_of(name).pk).exists()
 
@@ -346,6 +346,10 @@ def build_world() -> World:
     # refused it as it would a missing one.
     o["feed"] = SavedFeed.objects.create(
         owner=owner, name="Owner fixture feed", query={"q": "flood"},
+    )
+    # IR-877: a saved reply is private to its owner in the same way.
+    o["saved_reply"] = SavedReply.objects.create(
+        owner=owner, title="Owner fixture reply", body="Thank you, this reads well.",
     )
     o["adviser_opportunity"] = Opportunity.objects.create(
         title="Adviser's matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),

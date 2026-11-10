@@ -295,6 +295,16 @@ def saved_feeds(user) -> list[dict]:
     ]
 
 
+def saved_replies(user) -> list[dict]:
+    """The person's own reusable review texts (IR-877): the title and the text."""
+    from apps.reviews.models import SavedReply
+
+    return [
+        {"title": row.title, "body": row.body, "created_at": row.created_at, "updated_at": row.updated_at}
+        for row in SavedReply.objects.filter(owner=user).order_by("id")
+    ]
+
+
 def discovery(user) -> dict:
     from apps.records.models import DiscoveryDismissal, DiscoveryInterests
 
@@ -603,6 +613,7 @@ SECTIONS: dict[str, Callable] = {
     "papers_owned": papers_owned,
     "saved_papers": saved_papers,
     "saved_feeds": saved_feeds,
+    "saved_replies": saved_replies,
     "discovery": discovery,
     "conversations": conversations,
     "download_requests": download_requests,

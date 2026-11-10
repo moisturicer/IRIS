@@ -19,6 +19,9 @@ vi.mock("@/api/records", () => ({
   recordsApi: { tracker: vi.fn(), postReviewComment: vi.fn(), editReviewComment: vi.fn() },
 }));
 
+const reviews = vi.hoisted(() => ({ savedReplies: vi.fn() }));
+vi.mock("@/api/reviews", () => ({ reviewsApi: reviews }));
+
 const tracker = vi.mocked(recordsApi.tracker);
 const postComment = vi.mocked(recordsApi.postReviewComment);
 const editComment = vi.mocked(recordsApi.editReviewComment);
@@ -223,6 +226,19 @@ describe("ReviewTimeline", () => {
       expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("");
       expect(tracker).toHaveBeenCalledTimes(2);
       await expectNoBlockingA11yViolations(container);
+    });
+
+    it("inserts a saved reply into the comment box (IR-877)", async () => {
+      respond(discussion([]));
+      reviews.savedReplies.mockResolvedValue({ data: { results: [
+        { id: 1, title: "Thanks", body: "Thank you, noted.", created_at: "", updated_at: "" },
+      ], limit: 50 } });
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Saved replies" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Insert “Thanks”" }));
+
+      expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Thank you, noted.");
     });
 
     it("will not post an empty comment", async () => {

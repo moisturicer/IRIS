@@ -16,6 +16,9 @@ import { ReviewThreads, type CommentTarget, type ReviewThreadsProps } from "./Re
 import { comment } from "./threadFixtures";
 import { groupThreads } from "./threadModel";
 
+const reviews = vi.hoisted(() => ({ savedReplies: vi.fn() }));
+vi.mock("@/api/reviews", () => ({ reviewsApi: reviews }));
+
 const api = vi.hoisted(() => ({
   postReviewComment: vi.fn(),
   resolveThread: vi.fn(),
@@ -194,6 +197,9 @@ describe("the composer", () => {
     const box = screen.getByRole("textbox", { name: "Comment" });
     expect(box).toHaveFocus();
     await user.keyboard("94% of what?");
+    // Saved replies (IR-877) sit right under the box.
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Saved replies" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("radio", { name: "Suggestion" })).toHaveFocus();
     await user.keyboard("{ArrowUp}");
@@ -233,6 +239,17 @@ describe("the composer", () => {
     await user.click(screen.getByRole("button", { name: "Comment" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Quote the passage you're commenting on. Your text is kept.");
     expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Hmm.");
+  });
+
+  it("inserts a saved reply into the comment (IR-877)", async () => {
+    reviews.savedReplies.mockResolvedValue({ data: { results: [
+      { id: 1, title: "Cite", body: "Please cite the source.", created_at: "", updated_at: "" },
+    ], limit: 50 } });
+    const user = userEvent.setup();
+    setup([], { composing: { kind: "general" } });
+    await user.click(screen.getByRole("button", { name: "Saved replies" }));
+    await user.click(await screen.findByRole("button", { name: "Insert “Cite”" }));
+    expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Please cite the source.");
   });
 
   it("opens a general thread from New comment", async () => {

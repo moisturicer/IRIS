@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { recordsApi } from "@/api/records";
@@ -12,6 +12,7 @@ import type { RecordTracker, ReviewComment } from "@/types/records";
 
 import { RailHeading } from "./headings";
 import { ReviewStatus } from "./ReviewStatus";
+import { SavedReplies } from "./SavedReplies";
 import { timelineEntries, type TimelineEntry, type TimelineKind } from "./timelineEntries";
 
 /** A glyph per kind of entry, beside its words, never instead of them. */
@@ -356,6 +357,7 @@ function CommentForm({ label, submitLabel, initial = "", onSubmit, onCancel, cle
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const ready = body.trim() !== "";
+  const ref = useRef<HTMLTextAreaElement>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -378,12 +380,14 @@ function CommentForm({ label, submitLabel, initial = "", onSubmit, onCancel, cle
         {label}
       </label>
       <textarea
+        ref={ref}
         id={id}
         rows={3}
         value={body}
         onChange={(e) => setBody(e.target.value)}
         className={fieldClasses(false)}
       />
+      <SavedReplies textareaRef={ref} value={body} onChange={setBody} />
       {error && (
         <p role="alert" className={LOAD_ERROR}>
           <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
