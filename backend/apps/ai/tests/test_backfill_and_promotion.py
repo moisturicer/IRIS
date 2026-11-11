@@ -391,8 +391,18 @@ class PromotionTests:
         # its Passage vectors are there, so the build (both) replaces the
         # passage-only fill this test used, and the query provider that would
         # serve the space must name its model.
+        from django.db import connection
+
+        from apps.ai.models.embedding import RecordSpaceEmbedding
         from apps.ai.space_build import build_pending_space
 
+        # IR-470: promotion measures index recall, and earlier tests' rolled-back
+        # vectors stay in the HNSW graph and crowd the scan. TRUNCATE rolls back.
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"TRUNCATE {ChunkEmbedding._meta.db_table}, "
+                f"{RecordSpaceEmbedding._meta.db_table}"
+            )
         _record(chunks=("alpha", "beta"))
         build_pending_space(
             pending.id,
