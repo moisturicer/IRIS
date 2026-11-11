@@ -2,20 +2,30 @@
 
 A web-based platform for Cebu Institute of Technology - University (CIT-U) that centralises the management of student and faculty research outputs and intellectual property records. It supports the full lifecycle — submission, peer review, IP tagging, document storage, download requests, and AI-assisted discovery — across all colleges and departments.
 
+## Live deployment
+
+| | |
+| --- | --- |
+| URL | **https://iris-citu.duckdns.org/** |
+| Hosting | Amazon Web Services EC2, one Ubuntu 24.04 instance running `docker-compose.prod.yml` |
+| HTTPS | Caddy terminates TLS 1.2/1.3 ([ADR-057](docs/adr/057-caddy-terminates-tls.md)); nginx and the other services are not published |
+| Server setup and updates | [`deploy/README.md`](deploy/README.md): CloudFormation template, `deploy/bootstrap_server.sh`, `scripts/deploy.sh` |
+
 **Documentation**
 
 | Guide                                                                    | Description                                                   |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | [Documentation hub](docs/README.md)                                      | Governance index — what is authoritative and what is legacy   |
-| [SRS](docs/SRS.md)                                                       | **Requirements authority.** Functional and non-functional     |
-| [SDD](docs/SDD.md)                                                       | **Design authority.** Architecture, data model, interfaces    |
-| [Architecture decisions](docs/adr/README.md)                             | ADR index — every accepted decision and its rationale         |
+| [SRS](docs/SRS.md)                                                       | Frozen 2026-09-03; thesis deliverable, not maintained         |
+| [SDD](docs/SDD.md)                                                       | Frozen 2026-09-03; thesis deliverable, not maintained         |
+| [Architecture decisions](docs/adr/README.md)                             | **Requirements and design authority.** ADR index              |
+| [Deployment](deploy/README.md)                                           | AWS server setup, HTTPS edge, one-command updates             |
 | [SDLC process](docs/engineering/SDLC.md)                                 | Branching, commits, PRs, review, release, traceability        |
 | [Work item lifecycle](docs/engineering/WORK_ITEM_LIFECYCLE.md)           | DoR, pull-based Kanban, and the **Definition of Done** (§9)   |
 | [Development guide](docs/engineering/DEVELOPMENT.md)                     | Local setup, known-broken commands, troubleshooting           |
 | [Security](docs/security/SECURITY.md)                                    | Threat model, controls, NFR-S mapping, open defects           |
 | [Test plan](docs/testing/TEST_PLAN.md)                                   | Test levels, evaluation design, evidence requirements         |
-| [Traceability](docs/testing/TRACEABILITY.md)                             | SRS FR/NFR → code → tests → evidence                          |
+| [Traceability](docs/testing/TRACEABILITY.md)                             | Requirement status → code → tests → evidence                  |
 | [Frontend implementation plan](frontend/docs/FRONTEND_IMPLEMENTATION.md) | UI tasks, wireframes, routes, design tokens                   |
 | [Changelog](CHANGELOG.md)                                                | Version history                                               |
 
@@ -44,14 +54,25 @@ A web-based platform for Cebu Institute of Technology - University (CIT-U) that 
 | Database      | PostgreSQL 16 (`pgvector/pgvector:pg16`) |
 | Task Queue    | Celery + Redis                         |
 | Email         | SMTP (configurable, defaults to Gmail) |
-| Rate Limiting | django-axes                            |
+| Rate Limiting | DRF throttles; django-axes login lockout (off unless `AXES_ENABLED=True`) |
+| Vector search | pgvector (HNSW) |
+
+### AI services
+
+|                    |                                                                |
+| ------------------ | -------------------------------------------------------------- |
+| AI runtime         | FastAPI service in `ai/` (gateway and run workers) that answers Ask IRIS and Paper Chat |
+| PDF extraction     | LlamaParse                                                     |
+| Embedding, rerank  | Voyage (`voyage-context-4`)                                    |
+| Language model     | Any OpenAI-compatible chat-completions endpoint (OpenRouter by default) |
 
 ### Infrastructure
 
-|                   |                         |
-| ----------------- | ----------------------- |
-| Containerisation  | Docker + Docker Compose |
-| Web Server (prod) | Gunicorn + Nginx        |
+|                   |                                                           |
+| ----------------- | --------------------------------------------------------- |
+| Containerisation  | Docker + Docker Compose                                   |
+| Web Server (prod) | Caddy (HTTPS) → nginx → Gunicorn with Uvicorn workers (ASGI) |
+| Hosting           | AWS EC2 (see [Live deployment](#live-deployment))         |
 
 ---
 
@@ -62,13 +83,16 @@ IRIS/
 ├── backend/
 │   ├── apps/
 │   │   ├── accounts/      # Users, roles, colleges, departments, courses
-│   │   ├── records/       # Research records, workflow state
-│   │   ├── reviews/       # Review and multi-office clearance
+│   │   ├── records/       # Research records, workflow state, embargo
+│   │   ├── reviews/       # Adviser-first review, office pools, clearances
 │   │   ├── documents/     # File uploads per record
 │   │   ├── notifications/ # In-app notifications
 │   │   ├── audit/         # Audit log
-│   │   ├── storage/       # Folder/file browser
-│   │   └── ai/            # Semantic search & RAG Q&A
+│   │   ├── library/       # Saved records and feeds
+│   │   ├── opportunities/ # Calls & Conferences
+│   │   ├── publication/   # Durable processing work for published papers
+│   │   ├── tests/         # Cross-app tests (authorization matrix)
+│   │   └── ai/            # Extraction, chunking, embedding, reader grants
 │   ├── config/
 │   │   └── settings/      # base / development / production
 │   ├── core/              # Shared permissions, pagination, utils
@@ -77,6 +101,11 @@ IRIS/
 │   │   ├── development.txt
 │   │   └── production.txt
 │   └── manage.py
+├── ai/                    # AI runtime (FastAPI gateway, run workers, agent)
+├── deploy/                # Caddyfile, AWS templates, server bootstrap
+├── e2e/                   # Playwright core journeys
+├── scripts/               # setup_env.py, deploy.sh
+├── docs/                  # ADRs, engineering, testing, security
 └── frontend/
     └── src/
         ├── api/           # Axios API clients per domain
@@ -244,22 +273,25 @@ celery -A config worker -l info
 
 ## Environment Variables Reference
 
-| Variable              | Default                    | Description                            |
-| --------------------- | -------------------------- | -------------------------------------- |
-| `SECRET_KEY`          | _(required)_               | Django secret key                      |
-| `DEBUG`               | `False`                    | Set `True` for local development       |
-| `ALLOWED_HOSTS`       | `localhost`                | Comma-separated list of allowed hosts  |
-| `DB_NAME`             | _(required)_               | PostgreSQL database name               |
-| `DB_USER`             | _(required)_               | PostgreSQL user                        |
-| `DB_PASSWORD`         | _(required)_               | PostgreSQL password                    |
-| `DB_HOST`             | `localhost`                | PostgreSQL host                        |
-| `DB_PORT`             | `5432`                     | PostgreSQL port                        |
-| `FRONTEND_URL`        | `http://localhost:5173`    | Used to build email verification links |
-| `EMAIL_HOST`          | `smtp.gmail.com`           | SMTP server                            |
-| `EMAIL_PORT`          | `587`                      | SMTP port                              |
-| `EMAIL_HOST_USER`     | _(blank)_                  | SMTP username                          |
-| `EMAIL_HOST_PASSWORD` | _(blank)_                  | SMTP password / app password           |
-| `CELERY_BROKER_URL`   | `redis://localhost:6379/0` | Redis broker URL                       |
+Names only. Each `.env.example` file lists every variable with a comment, and none holds a real value. Copy a file to `.env` beside it and fill it in; the real `.env` files are gitignored.
+
+| File | Read by | Variables |
+| ---- | ------- | --------- |
+| [`.env.example`](.env.example) | Docker Compose (repo root) | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `AI_GATEWAY_SERVICE_SECRET`; production also `IRIS_DOMAIN`, `REDIS_PASSWORD`, `TRUSTED_PROXY_COUNT`, `DJANGO_ADMIN_ALLOWED_NETWORKS` |
+| [`backend/.env.example`](backend/.env.example) | Django and Celery | see below |
+| [`ai/.env.example`](ai/.env.example) | AI runtime | `SERVICE_SECRET`, `RUNS_DATABASE_URL`, `RUNS_REDIS_URL`, the `RUNS_*` limits, `RUNS_EXECUTOR`, `RUNS_AGENT_*`, the `AGENT_LLM_*` model settings (`AGENT_LLM_ENDPOINT`, `AGENT_LLM_API_KEY`, …), `VOYAGE_API_KEY`, the `AI_ADMISSION_*` limits |
+
+Main names in `backend/.env`:
+
+| Group | Variables |
+| ----- | --------- |
+| Required (Django will not start without them) | `SECRET_KEY`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, the `RECOVERY_*` secrets (`RECOVERY_COUNTER_HMAC_KEY`, `RECOVERY_MAIL_ENCRYPTION_KEY`) |
+| Required in production | `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXY_COUNT`, `REGISTRATION_EMAIL_DOMAINS`, `LLAMAPARSE_API_KEY`, `LLAMAPARSE_VERSION`, `LLAMAPARSE_TIER` |
+| Database and cache | `DB_HOST`, `DB_PORT`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, `REDIS_URL`, `REDIS_CACHE_URL` |
+| General | `DEBUG`, `FRONTEND_URL`, `SESSION_IDLE_TIMEOUT_MINUTES`, `AXES_ENABLED`, `AXES_FAILURE_LIMIT`, `AXES_COOLOFF_TIME_MINUTES`, `API_THROTTLE_*` |
+| Email | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` |
+| Extraction | `EXTRACTION_BACKEND`, `LLAMAPARSE_*` |
+| Embedding and AI | `VOYAGE_API_KEY`, `VOYAGE_EMBED_MODEL`, `VOYAGE_RERANK_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, the per-task `LLM_<TASK>_*` settings, `AI_GATEWAY_SERVICE_SECRET`, `AI_RESEARCH_*`, `AI_PROVIDER_ADMISSION` and the `AI_ADMISSION_*` limits |
 
 ---
 
