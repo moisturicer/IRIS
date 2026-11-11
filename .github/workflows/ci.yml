@@ -598,8 +598,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Lint the bootstrap scripts
-        run: shellcheck deploy/bootstrap_server.sh deploy/tests/bootstrap_checks.sh
+      - name: Lint the server scripts
+        run: shellcheck deploy/bootstrap_server.sh deploy/tests/bootstrap_checks.sh scripts/deploy.sh deploy/tests/deploy_checks.sh
+
+      # The update script's decisions, against a fake docker (IR-1018). The real
+      # stack is proven on the server (docs/testing/traceability/IR-1018.md).
+      - name: Check what the update script does on success and on each failure
+        run: deploy/tests/deploy_checks.sh
 
       - name: Run the bootstrap twice and check what it left
         run: sudo deploy/tests/bootstrap_checks.sh

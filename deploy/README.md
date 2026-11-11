@@ -9,6 +9,8 @@ What belongs to the server, not to a laptop.
 | `tests/bootstrap_checks.sh` | CI's check of `bootstrap_server.sh`, run on a throwaway VM |
 | `aws/iris-demo.yaml` | CloudFormation template: the whole AWS server from one file, running `bootstrap_server.sh` at first boot (IR-1013) |
 | `aws/iris-guards.yaml` | CloudFormation template: budget alert, auto-recover and a daily stop and start for one server (IR-1015) |
+| `../scripts/deploy.sh` | Updates a running server to the latest `main` with one command, and checks it came back (IR-1018) |
+| `tests/deploy_checks.sh` | CI's check of `deploy.sh`, against a fake `docker` |
 | `tests/check_compose_prod.py` | CI's check of `docker-compose.prod.yml`: every long-running service comes back after a start, and every service's logs are rotated (10 MB × 3) |
 
 ## bootstrap_server.sh
@@ -23,7 +25,7 @@ What belongs to the server, not to a laptop.
 
 **What it never does:** start IRIS, or write a `.env` file. Secrets and vendor keys stay a separate step, done by a person.
 
-**Safe to run again.** A finished step is left alone, and a step a stopped run left halfway (a swap file never made swap, Docker installed but not running) is finished. It never updates an existing clone: use `git pull` for that.
+**Safe to run again.** A finished step is left alone, and a step a stopped run left halfway (a swap file never made swap, Docker installed but not running) is finished. It never updates an existing clone: use [`scripts/deploy.sh`](#updating-the-server-scriptsdeploysh) for that.
 
 ### Run it
 
@@ -88,7 +90,50 @@ cd ~/IRIS
 python3 scripts/setup_env.py
 ```
 
-and fill in `backend/.env` and `ai/.env` (domain, vendor keys, Gmail) before `docker compose -f docker-compose.prod.yml up -d --build`.
+and fill in `backend/.env` and `ai/.env` (domain, vendor keys, Gmail). Then start IRIS the first time with `bash scripts/deploy.sh`, which builds it and checks it came up (below).
+
+## Updating the server: scripts/deploy.sh
+
+**Why:** an update by hand is `git pull`, a rebuild, then checking each service yourself. A step skipped or a problem missed leaves the server half updated: a database update that failed, or a site that loads but can't sign anyone in (IR-200). This does all of it, the same way every time.
+
+**Not yet run on a real server.** CI checks every step and failure against a fake Docker. The first real update on `iris-demo` is still to be recorded in `docs/testing/traceability/IR-1018.md`. Until then, watch that first run, and keep the manual steps in **After a scheduled start** below as the fallback.
+
+```bash
+sudo -iu ubuntu        # in a Session Manager shell; skip it over SSH as ubuntu
+bash ~/IRIS/scripts/deploy.sh
+```
+
+It reports five steps, and the first that fails stops the run and names itself:
+
+| Step | What it does | Stops when |
+|---|---|---|
+| 1. pull | Fast-forwards the clone to GitHub's `main` | the clone isn't on `main`, has uncommitted changes, or has commits GitHub doesn't. Nothing is changed |
+| 2. check | Checks `.env`, `backend/.env` and `ai/.env` exist, the compose file is valid, and 5 GB is free | any is missing. Nothing is rebuilt |
+| 3. rebuild | `docker compose -f docker-compose.prod.yml up -d --build` | the build fails, or `migrate` (the database update) fails: its log is shown |
+| 4. health | Waits until every service is running, and healthy where it has a check, on three checks in a row, so a crash-looping one doesn't pass. After a rebuild it restarts `frontend` (IR-200). Then it fetches the home page and `/api/v1/colleges/` over HTTPS | a service isn't ready, or the site doesn't answer, within 10 minutes for the whole step. The logs of what failed are shown |
+| 5. report | Prints `done, running <commit> (<title>)` | |
+
+**Nothing new?** It says "already up to date", skips the rebuild and only runs the health check. That makes it the check to run after a scheduled start too: when the page answers but the API doesn't, it restarts `frontend` once by itself (IR-200). It remembers the last commit it deployed, in `.git/iris-deployed`, so a run after a failed one rebuilds, even with nothing new to pull.
+
+**When it fails** after pulling new code, it prints the command to go back to the version that ran before:
+
+```bash
+git checkout --detach <commit> && docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Going back never undoes a database migration. Run `git checkout main` before the next deploy, since it refuses any other branch. It never goes back by itself: a person decides.
+
+**A change to `deploy.sh` itself** takes effect from the next run. The run that pulls it carries on with the copy it started with.
+
+**Settings,** in front of the command, for example `IRIS_DEPLOY_TIMEOUT=900 bash ~/IRIS/scripts/deploy.sh`:
+
+| Setting | Default |
+|---|---|
+| `IRIS_DEPLOY_TIMEOUT` | `600`: seconds step 4 may take in all |
+| `IRIS_DEPLOY_POLL` | `5`: seconds between checks |
+| `IRIS_DEPLOY_MIN_FREE_GB` | `5`: free disk a rebuild needs |
+
+It doesn't back up the database first; do that yourself before an update that migrates.
 
 ## aws/iris-demo.yaml
 
@@ -205,6 +250,12 @@ Docker starts at boot, and every IRIS service comes back by itself because each 
 At boot Docker doesn't wait for the database the way `docker compose up` does, so the backend and the workers may restart a few times until it is ready. The site is back a few minutes after the start time.
 
 **Check that you can sign in, not only that the page loads.** The frontend looks up the backend's internal address once, when it starts (IR-200). If the backend came up later at a new address, the page loads but sign-in fails. The fix is one command:
+
+```bash
+bash ~/IRIS/scripts/deploy.sh    # "already up to date", then the health check; restarts frontend if the API doesn't answer
+```
+
+Or by hand, which works with or without the script:
 
 ```bash
 cd ~/IRIS

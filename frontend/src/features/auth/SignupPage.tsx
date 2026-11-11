@@ -491,10 +491,11 @@ export default function SignupPage() {
           </p>
           {/* Not "contact RDCO": an email is read-only to every IRIS screen,
               RDCO's included, so the only fix IRIS offers is a fresh registration.
-              Correcting it in place is IR-705. */}
+              An unverified account is deleted after UNVERIFIED_REGISTRATION_DAYS
+              (30), and registering again on its address replaces it (IR-705). */}
           <p className="mt-section text-pretty text-small text-stone-600">
-            If that address is wrong, register again with the right one. Your first request stays pending until
-            an administrator declines it.
+            If that address is wrong, register again with the right one. An account that is never verified is
+            deleted after 30 days.
           </p>
           <ButtonLink to="/login" size="full" className="mt-section-lg">
             Go to sign in
