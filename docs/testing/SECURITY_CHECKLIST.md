@@ -6,8 +6,8 @@
 
 | Status | Meaning | Items |
 |---|---|---|
-| Pass | Evidence named in the row | 81 |
-| Partial | Met in part, and the row says which part | 15 |
+| Pass | Evidence named in the row | 84 |
+| Partial | Met in part, and the row says which part | 12 |
 | Gap | Not met; the row names the ticket | 14 |
 | Deferred | Deliberately deferred | 3 |
 | N/A | Does not apply, for the reason given | 10 |
@@ -138,9 +138,9 @@
 
 | Item | Requirement | Status | Evidence |
 |---|---|---|---|
-| 9.1.1 | TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. | Partial | Caddy serves HTTPS and redirects plain HTTP, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-057). CI shows this on the real Caddy with a local certificate. Not yet seen on a deployed domain |
-| 9.1.2 | using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred. | Partial | CI's OpenSSL probe refuses weak ciphers on the real Caddy (IR-847). A full scan on a deployed domain is still owed |
-| 9.1.3 | only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option. | Partial | The Caddyfile allows only 1.2 and 1.3, and CI's probe confirms it (IR-847). Not yet seen on a deployed domain |
+| 9.1.1 | TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. | Pass | Caddy serves HTTPS and redirects plain HTTP, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-057). CI shows this on the real Caddy with a local certificate. On iris-demo 2026-11-11, plain HTTP answered `308` to `https://iris-citu.duckdns.org/` (IR-806) |
+| 9.1.2 | using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred. | Partial | CI's OpenSSL probe refuses weak ciphers on the real Caddy (IR-847). On iris-demo 2026-11-11, TLS 1.2 negotiated `ECDHE-ECDSA-AES128-GCM-SHA256` and TLS 1.3 `TLS_AES_128_GCM_SHA256` (IR-806). A full scan on the deployed domain is still owed |
+| 9.1.3 | only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option. | Pass | The Caddyfile allows only 1.2 and 1.3, and CI's probe confirms it (IR-847). On iris-demo 2026-11-11, TLS 1.2 and 1.3 connected and TLS 1.1 was refused with `alert protocol version`; TLS 1.0 was checked in CI only (IR-806) |
 
 ## V10 · Malicious Code
 
@@ -200,7 +200,7 @@
 | 14.4.2 | all API responses contain a Content-Disposition: attachment; filename="api.json" header (or other appropriate filename for the content type). | Gap | API responses have no `Content-Disposition`. [IR-821](https://citiris.atlassian.net/browse/IR-821) records whether it applies |
 | 14.4.3 | a Content Security Policy (CSP) response header is in place that helps mitigate impact for XSS attacks like HTML, DOM, JSON, and JavaScript injection vulnerabilities. | Partial | Report-only, so it blocks nothing. [IR-823](https://citiris.atlassian.net/browse/IR-823) |
 | 14.4.4 | all responses contain a X-Content-Type-Options: nosniff header. | Pass | `SECURE_CONTENT_TYPE_NOSNIFF`, `security-headers.conf`; `test_security_headers.py` |
-| 14.4.5 | a Strict-Transport-Security header is included on all responses and for all subdomains, such as Strict-Transport-Security: max-age=15724800; includeSubdomains. | Partial | Caddy adds `max-age=31536000; includeSubDomains; preload` to every HTTPS response, nginx's included, once; CI checks it (IR-806). Before that, iris-demo sent none on nginx's pages (2026-11-11). Partial until checked on the server |
+| 14.4.5 | a Strict-Transport-Security header is included on all responses and for all subdomains, such as Strict-Transport-Security: max-age=15724800; includeSubdomains. | Pass | Caddy adds `max-age=31536000; includeSubDomains; preload` to every HTTPS response, nginx's included, once; CI checks it (IR-806). Checked on iris-demo 2026-11-11 after the deploy: the home page carries it, and `/api/v1/colleges/` carries exactly one |
 | 14.4.6 | a suitable Referrer-Policy header is included to avoid exposing sensitive information in the URL through the Referer header to untrusted parties. | Pass | `same-origin` in both places ([IR-663](https://citiris.atlassian.net/browse/IR-663)) |
 | 14.4.7 | the content of a web application cannot be embedded in a third-party site by default and that embedding of the exact resources is only allowed where necessary by using suitable Content-Security-Policy: frame-ancestors and X-Frame-Options response headers. | Pass | `X-Frame-Options: DENY` in both places, until CSP enforces frame-ancestors ([IR-823](https://citiris.atlassian.net/browse/IR-823)) |
 | 14.5.1 | the application server only accepts the HTTP methods in use by the application/API, including pre-flight OPTIONS, and logs/alerts on any requests that are not valid for the application context. | Pass | nginx and DRF answer 405 to unused methods, CORS pre-flight answers only IRIS's origin, and nginx's access log records refusals. Tested 2026-11-05. [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
