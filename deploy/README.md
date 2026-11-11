@@ -96,7 +96,9 @@ and fill in `backend/.env` and `ai/.env` (domain, vendor keys, Gmail). Then star
 
 **Why:** an update by hand is `git pull`, a rebuild, then checking each service yourself. A step skipped or a problem missed leaves the server half updated: a database update that failed, or a site that loads but can't sign anyone in (IR-200). This does all of it, the same way every time.
 
-**Not yet run on a real server.** CI checks every step and failure against a fake Docker. The first real update on `iris-demo` is still to be recorded in `docs/testing/traceability/IR-1018.md`. Until then, watch that first run, and keep the manual steps in **After a scheduled start** below as the fallback.
+**On a server set up before the script existed,** its clone doesn't have it yet. Pull once by hand first: `cd ~/IRIS && git pull && bash scripts/deploy.sh`. The script does every pull after that.
+
+Step 4 prints nothing while it waits for the services. A minute or two of silence after the rebuild is normal.
 
 ```bash
 sudo -iu ubuntu        # in a Session Manager shell; skip it over SSH as ubuntu
