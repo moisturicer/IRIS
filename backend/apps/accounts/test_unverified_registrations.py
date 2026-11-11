@@ -236,6 +236,40 @@ class RdcoSeesVerifiedOnlyTests(Base):
         self.assertFalse(detail.json()["is_verified"])
 
 
+class RolesAndPickerTests(Base):
+    """An unverified account can't be given a role by id, and never reaches the
+    Adviser picker (ADR-051 decision 22, IR-705)."""
+
+    def setUp(self):
+        super().setUp()
+        self.rdco = make("rdco@cit.edu", RoleName.RDCO)
+        self.sysadmin = make("sysadmin@cit.edu", RoleName.SYSTEM_ADMIN)
+        self.pending = self.unverified()
+        self.adviser_role = Role.objects.get(name=RoleName.ADVISER)
+
+    def test_rdco_cannot_give_a_role_to_an_unverified_account_by_id(self):
+        response = self.as_(self.rdco).patch(reverse("user-change-role", args=[self.pending.pk]),
+                                             {"role_name": RoleName.ADVISER}, format="json")
+        self.assertEqual(response.status_code, 404, response.content)
+        self.pending.refresh_from_db()
+        self.assertIsNone(self.pending.role)
+
+    def test_the_system_admin_can_still_give_one(self):
+        response = self.as_(self.sysadmin).patch(reverse("user-change-role", args=[self.pending.pk]),
+                                                 {"role_name": RoleName.ADVISER}, format="json")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.pending.refresh_from_db()
+        self.assertEqual(self.pending.role, self.adviser_role)
+
+    def test_the_adviser_picker_leaves_unverified_accounts_out(self):
+        self.pending.assign_role(self.adviser_role)
+        make("verified-adviser@cit.edu", RoleName.ADVISER)
+        data = self.as_(self.rdco).get(reverse("user-advisers")).json()
+        emails = {row["email"] for row in data.get("results", data)}
+        self.assertIn("verified-adviser@cit.edu", emails)
+        self.assertNotIn(ADDRESS, emails)
+
+
 # --- Co-owners must be verified -----------------------------------------------------
 
 class CoOwnersMustBeVerifiedTests(Base):

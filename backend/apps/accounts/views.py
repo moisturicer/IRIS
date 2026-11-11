@@ -580,7 +580,7 @@ class AdviserListView(generics.ListAPIView):
     def get_queryset(self):
         return (
             User.objects
-            .filter(role__name=RoleName.ADVISER, is_active=True)
+            .filter(role__name=RoleName.ADVISER, is_active=True, is_verified=True)
             .select_related("role")
             .order_by("last_name", "first_name")
         )
@@ -609,7 +609,9 @@ class ChangeUserRoleView(APIView):
 
     def patch(self, request, pk):
         from .models import Role
-        user = User.objects.get(pk=pk)
+        # An unverified account is a 404 to RDCO, as in UserDetailView (ADR-051
+        # decision 22, IR-705); the System Admin still sees it.
+        user = get_object_or_404(_verified_unless_system_admin(request.user, User.objects.all()), pk=pk)
 
         role_name = request.data.get("role_name")
         role_id   = request.data.get("role")
