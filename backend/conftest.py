@@ -172,8 +172,8 @@ def _use_in_process_celery_broker() -> None:
 
     Side effect, stated rather than hidden: `os.environ` stays set for the
     session, so a test's `override_settings(CELERY_BROKER_URL=...)` no longer
-    changes the broker. `apps/ai/tests/test_celery_routing.py` relies on that
-    override to prove the IR-196 fix; flagged on IR-199 for its owner.
+    changes the broker. `apps/ai/tests/test_celery_routing.py` removes these
+    variables around its override, so it still proves the IR-196 fix (IR-199).
     """
     try:
         from config.celery import app as celery_app
