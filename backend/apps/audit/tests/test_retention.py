@@ -368,8 +368,12 @@ class ScheduleTests(TestCase):
         entry = settings.CELERY_BEAT_SCHEDULE["retention-cleanup"]
 
         self.assertEqual(entry["task"], "apps.audit.tasks.erase_expired_personal_data")
-        # Celery runs on UTC here, and Manila is UTC+8 with no daylight saving.
-        self.assertEqual(entry["schedule"].hour, {19})
+        # Celery's clock is Manila's (CELERY_TIMEZONE = TIME_ZONE), so the hour is
+        # Manila's. It said {19} on the belief that Celery ran on UTC, which made
+        # the cleanup run at 19:00 Manila (IR-1019).
+        from config.celery import app
+        self.assertEqual(str(app.timezone), "Asia/Manila")
+        self.assertEqual(entry["schedule"].hour, {3})
         self.assertEqual(entry["schedule"].minute, {0})
 
     def test_the_task_runs_the_cleanup(self):
