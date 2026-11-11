@@ -130,7 +130,7 @@ class RegisteringAgainTests(Base):
 
     def test_an_unverified_address_something_links_to_says_already_registered(self):
         owner = make("owner@cit.edu", RoleName.STUDENT)
-        for link in ("co-owner", "adviser", "seat"):
+        for link in ("co-owner", "adviser", "seat", "upload review"):
             with self.subTest(link=link):
                 User.objects.filter(email=ADDRESS).delete()
                 linked = self.unverified()
@@ -138,6 +138,12 @@ class RegisteringAgainTests(Base):
                     self.paper([owner, linked])
                 elif link == "adviser":
                     self.paper([owner], adviser=linked)
+                elif link == "upload review":
+                    from apps.documents.models import RecordUpload, UploadReview, UploadSlot
+                    record = self.paper([owner])
+                    slot = UploadSlot.objects.get_or_create(name="Manuscript T705", record_type=self.thesis)[0]
+                    upload = RecordUpload.objects.create(record=record, slot=slot, file="uploads/t705.pdf")
+                    UploadReview.objects.create(upload=upload, reviewed_by=linked)
                 else:
                     ReviewerSeat.objects.create(
                         assignment=RecordAssignment.objects.create(record=self.paper([owner]), party="itso"),
@@ -161,9 +167,29 @@ class RegisteringAgainTests(Base):
         self.assertEqual(body["code"], "rate_limited")
         self.assertGreater(body["retry_after"], 0)
         self.assertEqual(response["Retry-After"], str(body["retry_after"]))
+        self.assertEqual(response["Cache-Control"], "no-store")
         self.assertTrue(User.objects.filter(pk=earlier.pk, first_name="Old").exists())
         self.assertEqual(RecoveryIntent.objects.count(), intents)
         self.assertFalse(AuditEvent.objects.filter(event_type=AuditEvent.REGISTRATION_REPLACED).exists())
+
+
+    def test_changing_the_letter_case_does_not_dodge_the_send_limit(self):
+        self.unverified("Ana.Cruz@cit.edu")
+        self.assertEqual(self.as_(None).post("/api/v1/auth/verification/resend/",
+                                             {"email": "Ana.Cruz@cit.edu"}, format="json").status_code, 202)
+
+        response = self.register(email="ana.cruz@cit.edu")
+
+        self.assertEqual(response.status_code, 429, response.content)
+        self.assertEqual(list(User.objects.filter(email__iexact="ana.cruz@cit.edu").values_list("email", flat=True)),
+                         ["Ana.Cruz@cit.edu"])
+
+    def test_a_case_variant_replaces_once_the_limit_allows_and_leaves_one_account(self):
+        earlier = self.unverified("Ana.Cruz@cit.edu")
+        self.clock.advance(seconds=3600)
+        self.assertEqual(self.register(email="ana.cruz@cit.edu").status_code, 201)
+        self.assertFalse(User.objects.filter(pk=earlier.pk).exists())
+        self.assertEqual(User.objects.filter(email__iexact="ana.cruz@cit.edu").count(), 1)
 
 
 # --- RDCO sees verified accounts only -----------------------------------------------
@@ -288,7 +314,10 @@ class ExpiryTests(Base):
         from django.conf import settings
         entry = settings.CELERY_BEAT_SCHEDULE["unverified-registrations"]
         self.assertEqual(entry["task"], "apps.accounts.tasks.expire_unverified_registrations")
-        self.assertEqual((entry["schedule"].hour, entry["schedule"].minute), ({19}, {0}))
+        # Celery takes Django's TIME_ZONE, Asia/Manila, so the hour is Manila's.
+        from config.celery import app
+        self.assertEqual(str(app.timezone), "Asia/Manila")
+        self.assertEqual((entry["schedule"].hour, entry["schedule"].minute), ({3}, {0}))
 
 
 # --- The email says who registered --------------------------------------------------

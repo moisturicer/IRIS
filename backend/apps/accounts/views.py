@@ -77,13 +77,19 @@ class RegisterView(generics.CreateAPIView):
 
         email = serializer.validated_data["email"]
         with transaction.atomic():
+            unverified.lock_address(email)
+            earlier = unverified.replaceable_for(email)
             # Refuse before replacing anything: a full recipient would otherwise
-            # get no link, because the send path drops it quietly (IR-705).
-            if (wait := recovery_service.recipient_wait(email)) is not None:
-                raise limits.Throttled(wait)
-            unverified.replace(unverified.replaceable_for(email))
+            # get no link, because the send path drops it quietly (IR-705). The
+            # earlier accounts' addresses count too, since the limit's key keeps
+            # the letter case as typed, so "Ana@" can't dodge what "ana@" spent.
+            waits = [recovery_service.recipient_wait(address)
+                     for address in {email, *(user.email for user in earlier)}]
+            if any(wait is not None for wait in waits):
+                raise limits.Throttled(max(wait for wait in waits if wait is not None))
+            unverified.replace(earlier)
             if not unverified.address_is_free(email):  # linked since validation
-                raise ValidationError({"email": ["This email address is already registered."]})
+                raise ValidationError({"email": [unverified.ALREADY_REGISTERED]})
             user = serializer.save()
 
             # Create a RoleRequest so admins can approve/decline
@@ -104,16 +110,10 @@ class RegisterView(generics.CreateAPIView):
 
     def handle_exception(self, exc):
         from .recovery import limits
+        from .recovery.views import rate_limited
 
         if isinstance(exc, limits.Throttled):
-            # ADR-045's retry guidance, as the recovery endpoints give it.
-            response = Response(
-                {"code": "rate_limited", "detail": "Too many requests. Try again later.",
-                 "retry_after": exc.retry_after},
-                status=429,
-            )
-            response["Retry-After"] = str(exc.retry_after)
-            return response
+            return rate_limited(exc.retry_after)  # ADR-045's retry guidance
         return super().handle_exception(exc)
 
 
@@ -545,7 +545,7 @@ class PeopleSearchView(APIView):
         return Response(people_search.search(request))
 
 
-def _seen_by(actor, users):
+def _verified_unless_system_admin(actor, users):
     """RDCO sees verified accounts only; the System Admin sees every one
     (ADR-051 decision 22, IR-705). An unverified one is then a 404 to RDCO,
     the same as an account that doesn't exist."""
@@ -562,7 +562,7 @@ class UserListView(generics.ListAPIView):
     search_fields      = ["email", "first_name", "last_name"]
 
     def get_queryset(self):
-        return _seen_by(self.request.user, super().get_queryset())
+        return _verified_unless_system_admin(self.request.user, super().get_queryset())
 
 
 class AdviserListView(generics.ListAPIView):
@@ -592,7 +592,7 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
     queryset           = User.objects.filter(deleted_at__isnull=True)
 
     def get_queryset(self):
-        return _seen_by(self.request.user, super().get_queryset())
+        return _verified_unless_system_admin(self.request.user, super().get_queryset())
 
     def update(self, request, *args, **kwargs):
         return _refuse_system_admin(self.get_object()) or super().update(request, *args, **kwargs)

@@ -269,10 +269,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Register with your institutional email address, ending in {named}.")
         # An unverified registration nothing links to is replaced instead (ADR-051
         # decision 25, IR-705): the view removes it once the send limit allows.
-        from .unverified import address_is_free
+        from .unverified import ALREADY_REGISTERED, address_is_free
 
         if not address_is_free(value):
-            raise serializers.ValidationError("This email address is already registered.")
+            raise serializers.ValidationError(ALREADY_REGISTERED)
         return value
 
     def validate_agree_dpa(self, value):

@@ -110,6 +110,13 @@ def production_problems(
     return tuple(problems)
 
 
+def positive_whole_number(name: str, value: object) -> str | None:
+    """Why ``value`` is not a positive whole number for ``name``, or None."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return f"{name} must be a positive whole number, not {value!r}."
+    return None
+
+
 def recovery_problems(
     *,
     limits: Mapping[str, object],

@@ -25,7 +25,8 @@ from pathlib import Path
 import pytest
 
 from config.settings.validation import (
-    missing_required, production_problems, recovery_problems, recovery_transport_problems,
+    missing_required, positive_whole_number, production_problems, recovery_problems,
+    recovery_transport_problems,
 )
 
 
@@ -362,3 +363,26 @@ def test_the_settings_module_refuses_to_start_without_the_recovery_secrets():
     source = (SETTINGS_DIR / "base.py").read_text(encoding="utf-8")
     assert "recovery_problems(" in source
     assert "raise ImproperlyConfigured(" in source.split("_recovery_problems = recovery_problems(")[1]
+
+
+# ---- UNVERIFIED_REGISTRATION_DAYS (ADR-051 decision 24, IR-705) -------------
+
+@pytest.mark.parametrize("value", [0, -1, True, "30", None])
+def test_unverified_registration_days_must_be_a_positive_whole_number(value):
+    # 0 or less would move the cut-off to now, and the next run would remove
+    # every unverified registration.
+    assert positive_whole_number("UNVERIFIED_REGISTRATION_DAYS", value) == (
+        f"UNVERIFIED_REGISTRATION_DAYS must be a positive whole number, not {value!r}."
+    )
+
+
+@pytest.mark.parametrize("value", [1, 30])
+def test_a_positive_number_of_days_is_accepted(value):
+    assert positive_whole_number("UNVERIFIED_REGISTRATION_DAYS", value) is None
+
+
+def test_the_settings_module_refuses_to_start_with_too_few_days():
+    source = (SETTINGS_DIR / "base.py").read_text(encoding="utf-8")
+    after = source.split('positive_whole_number("UNVERIFIED_REGISTRATION_DAYS"')[1]
+    assert after.lstrip().startswith(", UNVERIFIED_REGISTRATION_DAYS):")
+    assert "raise ImproperlyConfigured(_problem)" in after.splitlines()[1]
