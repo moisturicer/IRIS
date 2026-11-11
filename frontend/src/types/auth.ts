@@ -148,6 +148,8 @@ export interface UserListItem {
   role_name:  string;
   is_active:  boolean;
   is_locked:  boolean;
+  /** False for an unverified registration, which only the System Admin's list holds (IR-705). */
+  is_verified: boolean;
   /** May assign, reassign and withdraw reviewers in their office (ADR-032 §4). */
   is_office_coordinator: boolean;
   date_joined: string;

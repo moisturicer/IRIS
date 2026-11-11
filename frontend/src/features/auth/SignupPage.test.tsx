@@ -827,12 +827,45 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     expect(screen.getByText(
       "You can sign in once it is verified. Signing in shows that your request is waiting.",
     )).toBeInTheDocument();
+    // IR-804: the earlier request no longer waits for a decline. An account
+    // nobody verifies is deleted after 30 days (ADR-051 decision 24, IR-705).
     expect(screen.getByText(
       "If that address is wrong, register again with the right one. "
-      + "Your first request stays pending until an administrator declines it.",
+      + "An account that is never verified is deleted after 30 days.",
     )).toBeInTheDocument();
+    expect(screen.queryByText(/stays pending until/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows the server's retry guidance when registering again too soon (IR-804)", async () => {
+    const user = userEvent.setup();
+    const register = vi.spyOn(authApi, "register").mockRejectedValueOnce({
+      response: {
+        status: 429,
+        data: { code: "rate_limited", detail: "Too many requests. Try again later.", retry_after: 42 },
+      },
+    });
+    const { container } = renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Too many requests — try again in about 42 seconds.");
+    // The form stays, with what was typed, so Register can be pressed again.
+    expect(screen.getByRole("button", { name: "Register" })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("reads the wait from the throttle's words when the body names none (IR-804)", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(authApi, "register").mockRejectedValueOnce({
+      response: { status: 429, data: { detail: "Request was throttled. Expected available in 9 seconds." } },
+    });
+    renderSignup();
+    await submit(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests — try again in about 9 seconds.");
   });
 
   it("shows no password anywhere on the confirmation (IR-709)", async () => {

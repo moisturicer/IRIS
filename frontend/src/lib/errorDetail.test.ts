@@ -32,6 +32,11 @@ describe("reader-facing API errors", () => {
       .toBe("Too many requests — try again in about 30 seconds.");
   });
 
+  it("reads the wait ADR-045's answers carry in the body (IR-804)", () => {
+    expect(errorDetail({ response: { status: 429, data: { code: "rate_limited", detail: "Too many requests. Try again later.", retry_after: 42 } } }, "Failed"))
+      .toBe("Too many requests — try again in about 42 seconds.");
+  });
+
   it("preserves another server refusal", () => {
     expect(errorDetail({ response: { status: 403, data: { detail: "You cannot review this record." } } }, "Failed"))
       .toBe("You cannot review this record.");
