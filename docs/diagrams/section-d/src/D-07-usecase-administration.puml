@@ -1,0 +1,44 @@
+@startuml
+!include ../iris-style.puml
+skinparam LineType splines
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #0369A1
+}
+left to right direction
+title D-7  Use cases: administration
+caption From the RDCO and Administration screens in frontend/src/lib/access.ts and their API views on main (IR-1021).
+
+actor RDCO
+actor "System Admin" as Admin
+
+rectangle "Administration" {
+  usecase "Manage users and roles" as UC1
+  usecase "Decide role requests" as UC2
+  usecase "Decide download requests" as UC3
+  usecase "Decide delete requests" as UC4
+  usecase "Import records from Excel" as UC5
+  usecase "Publish a new data notice version" as UC6
+  usecase "Read every data notice version" as UC7
+  usecase "Read and export the audit log (CSV)" as UC8
+  usecase "Set retention periods" as UC9
+  usecase "Confirm or reject account deletions" as UC10
+  usecase "Grant office roles and coordinators" as UC11
+  usecase "View and end user sessions\n(API only, no screen)" as UC12
+}
+
+RDCO --> UC1
+RDCO --> UC2
+RDCO --> UC3
+RDCO --> UC4
+RDCO --> UC5
+RDCO --> UC6
+RDCO --> UC7
+RDCO --> UC12
+Admin --> UC1
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+Admin --> UC11
+@enduml

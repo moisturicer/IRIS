@@ -1,0 +1,55 @@
+@startuml
+!include ../iris-style.puml
+skinparam LineType splines
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #0369A1
+}
+left to right direction
+title D-2  Use cases: accounts and access
+caption From apps/accounts (urls/auth.py, urls/users.py, views.py) and frontend routes on main (IR-1021).
+
+actor "Visitor" as Visitor
+actor "Signed-in user" as User
+actor RDCO
+actor "System Admin" as Admin
+actor "Email service" as Mail <<external>>
+
+rectangle "Accounts and access" {
+  usecase "Register with an institutional email\nand answer the data notice" as UC1
+  usecase "Verify email from link" as UC2
+  usecase "Sign in" as UC3
+  usecase "Reset a forgotten password" as UC4
+  usecase "Request the Student or Adviser role" as UC5
+  usecase "Answer a new data notice;\nchange the AI-use answer" as UC6
+  usecase "Edit own profile and photo" as UC7
+  usecase "Download my data" as UC8
+  usecase "Request account deletion" as UC9
+  usecase "Approve or decline role requests" as UC10
+  usecase "Lock or unlock an account;\nview and end sessions" as UC11
+  usecase "Change a user's role" as UC12
+  usecase "Grant or remove office coordinators;\ngive office roles" as UC13
+  usecase "Confirm or reject account deletion" as UC14
+}
+
+Visitor --> UC1
+Visitor --> UC2
+Visitor --> UC3
+Visitor --> UC4
+UC1 ..> UC5 : <<include>>
+User --> UC6
+User --> UC7
+User --> UC8
+User --> UC9
+RDCO --> UC10
+RDCO --> UC11
+RDCO --> UC12
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+UC1 --> Mail
+UC4 --> Mail
+
+note right of UC11 : RDCO only (IsAdmin)
+note right of UC12 : RDCO gives non-office roles;\nthe System Admin gives office roles
+@enduml

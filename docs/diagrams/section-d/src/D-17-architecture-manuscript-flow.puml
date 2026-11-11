@@ -1,0 +1,38 @@
+@startuml
+!include ../iris-style.puml
+title D-17  Manuscript processing: upload to searchable passages
+caption From apps/documents/tasks.py, apps/ai/tasks.py, CELERY_TASK_ROUTES and ADR-052, ADR-054, ADR-056, ADR-058 on main (IR-1021).
+
+|Author|
+start
+:Upload the manuscript PDF;
+|Django (backend)|
+:Check it is a real PDF with at least one page\nand at most 50 MB (validators, IR-665);
+:Save the Version and its file;
+:Read the review text on campus with pdfplumber\n(no AI, every Version, ADR-058);
+|celery-extraction|
+:extract_manuscript_text;
+if (Embargo released and Contact person\nanswered Yes to AI use? (ADR-052, ADR-054)) then (yes)
+  :Admit the paid call when provider\nadmission is enforced (ADR-041);
+  |LlamaParse|
+  :Parse the PDF into structure;
+  |celery-extraction|
+  :Store PdfExtraction and Figures;
+else (no)
+  :Stop: nothing leaves campus;
+  stop
+endif
+|celery-default|
+:chunk_extraction: labelled-structure chunks\n(voyage-context-4 tokens, ceiling 700);
+:Swap in the new ChunkSet atomically;
+|celery-embedding|
+:embed_chunk_set;
+|Voyage AI|
+:Contextualized chunk embeddings;
+|celery-embedding|
+:Store ChunkEmbedding (pgvector, HNSW);
+:generate_record_overview\n(needs a summary model);
+|AI runtime|
+:Search, read and cite the passages\nfor readers who may read the paper;
+stop
+@enduml
