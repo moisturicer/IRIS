@@ -18,6 +18,9 @@ a developer machine and failed in CI. It now overrides the Django setting and
 drops Celery's cached connection, and asserts the broker really changed.
 """
 
+import os
+from unittest import mock
+
 import pytest
 from celery.contrib.testing.worker import start_worker
 from django.conf import settings
@@ -162,6 +165,19 @@ def test_a_dispatched_task_is_consumed_by_a_worker_listening_on_its_queue():
     """
     from apps.ai.tasks import chunk_extraction
 
+    # IR-199: conftest puts the memory broker in os.environ, which Celery reads
+    # before settings. Remove it here so only the override can switch the broker.
+    with mock.patch.dict(os.environ):
+        for name in ("CELERY_BROKER_URL", "CELERY_RESULT_BACKEND"):
+            os.environ.pop(name, None)
+        assert celery_app.conf.broker_url != "memory://", (
+            "the broker is memory:// without the override, so the check below "
+            "would pass whatever override_settings does"
+        )
+        _dispatch_under_the_override(chunk_extraction)
+
+
+def _dispatch_under_the_override(chunk_extraction) -> None:
     with override_settings(
         CELERY_BROKER_URL="memory://",
         CELERY_RESULT_BACKEND="cache+memory://",
