@@ -4,7 +4,7 @@
 
 **Run on 2026-11-05 (IR-829).** Groups A and B ran on a local Core journeys stack: production settings, served through nginx, synthetic accounts and data only, `main` at `14768455`. **An AI agent ran them and wrote each Pass or Fail, at Ashlee Sean's direction. They are the agent's results until she confirms them below.** Ashlee made the group C decisions as owner of S2 Epic QA & Security (IR-687), except 7.1.2, which is the DPO's. Group D waits for IR-806's server.
 
-Results: 6 Pass, 7 Fail, 2 Deferred and 1 N/A by decision, 5 not yet runnable. Every Fail has an `area-security` ticket: IR-923 (5.1.3 and 5.1.4, one defect), IR-924, IR-925, IR-926, IR-928 and IR-929. In `SECURITY_CHECKLIST.md` a Fail is a Gap, or Partial where the row says which part holds. Since then IR-925 has fixed 14.2.2, so the checklist marks it Pass; its record below keeps the 2026-11-05 result.
+Results: 6 Pass, 7 Fail, 2 Deferred and 1 N/A by decision, 5 not yet runnable. Every Fail has an `area-security` ticket: IR-923 (5.1.3 and 5.1.4, one defect), IR-924, IR-925, IR-926, IR-928 and IR-929. In `SECURITY_CHECKLIST.md` a Fail is a Gap, or Partial where the row says which part holds. Since then IR-923 has fixed 5.1.3 and 5.1.4 and IR-925 has fixed 14.2.2, so the checklist marks them Pass; their records below keep the 2026-11-05 result.
 
 `Confirmed` by Ashlee Sean that the group A and B results stand: Yes. Date: 2026-11-06
 
@@ -114,6 +114,8 @@ Go through the app URL files that `backend/config/urls.py` includes. For each vi
 
 `Record` Result: **Fail** Date: 2026-11-05 Person: AI agent, at Ashlee Sean's direction (her confirmation pending) Evidence: 74 raw reads (`request.data.get`, `query_params`) found by `git grep` across 13 view modules. Most are re-checked downstream (routing, decisions, seats and documents resolve ids through permission helpers; Discover uses a filter form). On the local Core journeys stack, production settings through nginx, `main` at `14768455`, three public routes answer 500 to malformed input: `/departments/?college=abc`, `/courses/?department=abc`, and `POST /auth/login/` with non-text fields. [IR-923](https://citiris.atlassian.net/browse/IR-923).
 
+`Fixed` by [IR-923](traceability/IR-923.md), 2026-11-11: the three routes answer 400, shown by `apps/accounts/test_malformed_input.py`. Not yet re-run on the Core journeys stack.
+
 ### 5.1.4 Structured data has a defined format
 **Requirement:** structured data is typed, with its allowed characters, length and pattern defined.
 
@@ -122,6 +124,8 @@ Using the same list as 5.1.3, check that emails, identifiers, dates and choice f
 **Pass:** no structured field is accepted as free text with no limit.
 
 `Record` Result: **Fail** Date: 2026-11-05 Person: AI agent, at Ashlee Sean's direction (her confirmation pending) Evidence: the same defect as 5.1.3, so it shares [IR-923](https://citiris.atlassian.net/browse/IR-923). The department and course filters accept an untyped id that reaches an integer lookup. Discover's typed filters answer 400 (`year_from=abc` gives "Enter a number."), and email is validated on reset (a 300-character address gives 400).
+
+`Fixed` by [IR-923](traceability/IR-923.md), 2026-11-11: the three routes answer 400, shown by `apps/accounts/test_malformed_input.py`. Not yet re-run on the Core journeys stack.
 
 ### 5.2.2 Free text is limited
 **Requirement:** unstructured data has safety limits such as length.

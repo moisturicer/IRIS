@@ -6,9 +6,9 @@
 
 | Status | Meaning | Items |
 |---|---|---|
-| Pass | Evidence named in the row | 79 |
+| Pass | Evidence named in the row | 81 |
 | Partial | Met in part, and the row says which part | 15 |
-| Gap | Not met; the row names the ticket | 16 |
+| Gap | Not met; the row names the ticket | 14 |
 | Deferred | Deliberately deferred | 3 |
 | N/A | Does not apply, for the reason given | 10 |
 | Needs manual check | Reading the code can't settle it, or a person must judge it | 5 |
@@ -82,8 +82,8 @@
 |---|---|---|---|
 | 5.1.1 | the application has defenses against HTTP parameter pollution attacks, particularly if the application framework makes no distinction about the source of request parameters (GET, POST, cookies, headers, or environment variables). | Pass | A repeated parameter uses its last value, consistently, with no 500. Tested 2026-11-05 on a production-settings stack. [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
 | 5.1.2 | frameworks protect against mass parameter assignment attacks, or that the application has countermeasures to protect against unsafe parameter assignment, such as marking fields private or similar. | Pass | No `fields = "__all__"` in app serializers |
-| 5.1.3 | all input (HTML form fields, REST requests, URL parameters, HTTP headers, cookies, batch files, RSS feeds, etc) is validated using positive validation (allow lists). | Gap | Three public routes answer 500 to malformed input (department and course filters, login with non-text fields), tested 2026-11-05. [IR-923](https://citiris.atlassian.net/browse/IR-923) · [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
-| 5.1.4 | structured data is strongly typed and validated against a defined schema including allowed characters, length and pattern (e.g. credit card numbers, e-mail addresses, telephone numbers, or validating that two related fields are reasonable, such as checking that suburb and zip/postcode match). | Gap | Department and course filters take an untyped id into an integer lookup. [IR-923](https://citiris.atlassian.net/browse/IR-923) · [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
+| 5.1.3 | all input (HTML form fields, REST requests, URL parameters, HTTP headers, cookies, batch files, RSS feeds, etc) is validated using positive validation (allow lists). | Pass | Of the 74 raw reads IR-829 listed, these three answered 500 to malformed input: the department and course filters and login with non-text fields. They now answer 400, with the ids allow-listed to 1–18 digits (`apps/accounts/test_malformed_input.py`). IR-829 found the other reads re-checked downstream. [IR-923](traceability/IR-923.md) · [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
+| 5.1.4 | structured data is strongly typed and validated against a defined schema including allowed characters, length and pattern (e.g. credit card numbers, e-mail addresses, telephone numbers, or validating that two related fields are reasonable, such as checking that suburb and zip/postcode match). | Pass | The department and course filters accept only a whole-number id and answer 400 to anything else; login accepts only text fields. `apps/accounts/test_malformed_input.py`. [IR-923](traceability/IR-923.md) · [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
 | 5.1.5 | URL redirects and forwards only allow destinations which appear on an allow list, or show a warning when redirecting to potentially untrusted content. | Pass | The one client redirect goes to the app's own `/login`, `authSession.ts` |
 | 5.2.1 | all untrusted HTML input from WYSIWYG editors or similar is properly sanitized with an HTML sanitizer library or framework feature. | Pass | No WYSIWYG input; `react-markdown` sanitizes link schemes |
 | 5.2.2 | unstructured data is sanitized to enforce safety measures such as allowed characters and length. | Gap | An abstract of 2,000,000 characters is accepted; reasons, decision comments and request messages have no limit either. Questions, review comments and notes are limited. [IR-926](https://citiris.atlassian.net/browse/IR-926) · [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
