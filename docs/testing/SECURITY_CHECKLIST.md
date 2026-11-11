@@ -6,8 +6,8 @@
 
 | Status | Meaning | Items |
 |---|---|---|
-| Pass | Evidence named in the row | 81 |
-| Partial | Met in part, and the row says which part | 14 |
+| Pass | Evidence named in the row | 83 |
+| Partial | Met in part, and the row says which part | 12 |
 | Gap | Not met; the row names the ticket | 15 |
 | Deferred | Deliberately deferred | 3 |
 | N/A | Does not apply, for the reason given | 10 |
@@ -138,9 +138,9 @@
 
 | Item | Requirement | Status | Evidence |
 |---|---|---|---|
-| 9.1.1 | TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. | Partial | Caddy serves HTTPS and redirects plain HTTP, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-057). CI shows this on the real Caddy with a local certificate. Not yet seen on a deployed domain |
-| 9.1.2 | using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred. | Partial | CI's OpenSSL probe refuses weak ciphers on the real Caddy (IR-847). A full scan on a deployed domain is still owed |
-| 9.1.3 | only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option. | Partial | The Caddyfile allows only 1.2 and 1.3, and CI's probe confirms it (IR-847). Not yet seen on a deployed domain |
+| 9.1.1 | TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. | Pass | Caddy serves HTTPS and redirects plain HTTP, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-057). CI shows this on the real Caddy with a local certificate. On iris-demo 2026-11-11, plain HTTP answered `308` to `https://iris-citu.duckdns.org/` (IR-806) |
+| 9.1.2 | using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred. | Partial | CI's OpenSSL probe refuses weak ciphers on the real Caddy (IR-847). On iris-demo 2026-11-11, TLS 1.2 negotiated `ECDHE-ECDSA-AES128-GCM-SHA256` and TLS 1.3 `TLS_AES_128_GCM_SHA256` (IR-806). A full scan on the deployed domain is still owed |
+| 9.1.3 | only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option. | Pass | The Caddyfile allows only 1.2 and 1.3, and CI's probe confirms it (IR-847). On iris-demo 2026-11-11, TLS 1.2 and 1.3 connected and TLS 1.1 was refused with `alert protocol version`; TLS 1.0 was checked in CI only (IR-806) |
 
 ## V10 · Malicious Code
 
