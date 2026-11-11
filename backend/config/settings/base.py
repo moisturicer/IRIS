@@ -8,7 +8,7 @@ from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
 from .dotenv import restrict_dotenv
-from .validation import missing_required, non_blank, recovery_problems
+from .validation import missing_required, non_blank, positive_whole_number, recovery_problems
 
 restrict_dotenv(config)
 
@@ -378,6 +378,13 @@ CELERY_BEAT_SCHEDULE = {
     "retention-cleanup": {
         "task": "apps.audit.tasks.erase_expired_personal_data",
         "schedule": crontab(hour=19, minute=0),
+    },
+    # ADR-051 decision 24 (IR-705): remove unverified registrations older than
+    # UNVERIFIED_REGISTRATION_DAYS, daily at 03:00 Manila.
+    "unverified-registrations": {
+        "task": "apps.accounts.tasks.expire_unverified_registrations",
+        # Celery reads TIME_ZONE (Asia/Manila), so this hour is Manila's.
+        "schedule": crontab(hour=3, minute=0),
     },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due
@@ -1096,6 +1103,14 @@ def email_domains(value):
 # refused. Development may leave it empty to accept any domain; production
 # requires it (settings/production.py). Existing accounts are never re-checked.
 REGISTRATION_EMAIL_DOMAINS = config("REGISTRATION_EMAIL_DOMAINS", default="", cast=email_domains)
+
+# Days an unverified registration lasts before the daily job removes it (ADR-051
+# decision 24, IR-705). A setting, not one of the System Admin's retention
+# periods. Below 1 would remove every unverified registration, so Django refuses.
+UNVERIFIED_REGISTRATION_DAYS = config("UNVERIFIED_REGISTRATION_DAYS", default=30, cast=int)
+if _problem := positive_whole_number("UNVERIFIED_REGISTRATION_DAYS", UNVERIFIED_REGISTRATION_DAYS):
+    raise ImproperlyConfigured(_problem)
+del _problem
 
 # ---- Axes (brute force protection) --------------------------------------
 

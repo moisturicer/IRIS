@@ -116,6 +116,13 @@ class AuditEvent(models.Model):
     # is `sections` and `format` only: never a byte of what was downloaded.
     PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
 
+    # Unverified registrations (ADR-051 decisions 24-25, IR-705). REPLACED's
+    # `user` is the earlier account, removed because its address registered
+    # again, with empty metadata. EXPIRED is one per daily run, no actor, and
+    # metadata `expired` and `skipped` counts: never a name or an address.
+    REGISTRATION_REPLACED            = "REGISTRATION_REPLACED"
+    UNVERIFIED_REGISTRATIONS_EXPIRED = "UNVERIFIED_REGISTRATIONS_EXPIRED"
+
     # Account deletion (ADR-051 §8-§12, IR-785)
     ACCOUNT_DELETION_REQUESTED = "ACCOUNT_DELETION_REQUESTED"
     ACCOUNT_DELETION_CANCELLED = "ACCOUNT_DELETION_CANCELLED"
@@ -193,6 +200,8 @@ class AuditEvent(models.Model):
         (ACCOUNT_DELETION_CONFIRMED, "Account Deleted"),
         (ACCOUNT_DELETION_REJECTED,  "Account Deletion Rejected"),
         (RETENTION_CLEANUP_RUN,        "Retention Cleanup Run"),
+        (REGISTRATION_REPLACED,            "Registration Replaced"),
+        (UNVERIFIED_REGISTRATIONS_EXPIRED, "Unverified Registrations Expired"),
         (NOTICE_ANSWERED,              "Data Notice Answered"),
         (NOTICE_PUBLISHED,             "Data Notice Published"),
         (AI_ANSWER_CHANGED,            "AI Answer Changed"),

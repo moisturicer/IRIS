@@ -20,3 +20,11 @@ def send_email_task(self, subject: str, message: str, recipient_list: list):
         )
     except Exception as exc:
         raise self.retry(exc=exc)
+
+
+@shared_task
+def expire_unverified_registrations():
+    """ADR-051 decision 24 (IR-705): beat calls this daily at 03:00 Manila."""
+    from .unverified import expire_unverified_registrations as run
+
+    return run()

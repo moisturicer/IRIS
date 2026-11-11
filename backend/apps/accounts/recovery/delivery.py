@@ -186,15 +186,18 @@ def _compose(intent) -> EmailMessage:
     expires = token.expires_at.astimezone(dt_timezone.utc)
     if intent.purpose == RecoveryPurpose.EMAIL_VERIFICATION:
         # Never a role decision or a restriction (§6): verifying proves the
-        # mailbox, and RDCO's approval is still a separate step.
+        # mailbox, and RDCO's approval is still a separate step. It names who
+        # registered and what happens if that wasn't the reader (ADR-051
+        # decision 26, IR-705); a resend says the same.
         return EmailMessage(
             subject="Verify your IRIS email address",
             body=(
-                "Someone asked to verify this email address for an IRIS account.\n\n"
+                f"{token.user.get_full_name()} registered for an IRIS account with this email address.\n\n"
                 "To verify it, open this link and choose \"Verify email\":\n\n"
                 f"{settings.FRONTEND_URL}/verify-email#token={raw}\n\n"
                 f"The link works once and expires at {expires.isoformat()} UTC.\n\n"
-                "If you did not request this, ignore this email.\n\n"
+                "If this wasn't you, ignore it. The account is deleted in "
+                f"{settings.UNVERIFIED_REGISTRATION_DAYS} days.\n\n"
                 f"{help_line}\n"
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,

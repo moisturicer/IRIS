@@ -344,6 +344,10 @@ _Avoid_: Login, log in, sign on.
 Asking for an IRIS account as a Student or an [[Adviser]], with a CIT-U email address. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request. A registration nobody verifies is eventually deleted, and registering again replaces it.
 _Avoid_: Sign up, signup, create account (the screen's title, not the act).
 
+**Unverified registration**:
+An account whose registrant has not yet verified their email. RDCO never sees it, nobody can make it a co-owner, and its role request can't be approved. It expires a fixed time after registering unless something links to it, and registering again on its address replaces it. Expiring and replacing are not [[Account deletion]], and the time is not a [[Retention period]].
+_Avoid_: Abandoned signup, pending account, inactive account.
+
 **Adviser**:
 The role of the person who reviews their advisees' Records first and routes them onward. It is a role someone asks for when they register, not a job title.
 _Avoid_: Faculty, faculty adviser, professor.
