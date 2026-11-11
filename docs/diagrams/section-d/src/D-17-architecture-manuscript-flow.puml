@@ -1,7 +1,7 @@
 @startuml
 !include ../iris-style.puml
 title D-17  Manuscript processing: upload to searchable passages
-caption From apps/documents/tasks.py, apps/ai/tasks.py, CELERY_TASK_ROUTES and ADR-052, ADR-054, ADR-056, ADR-058 on main (IR-1021).
+caption From apps/documents/tasks.py, apps/ai/tasks.py, apps/records/tasks.py, CELERY_TASK_ROUTES and ADR-052, ADR-054, ADR-056, ADR-058 on main (IR-1021).
 
 |Author|
 start
@@ -9,9 +9,14 @@ start
 |Django (backend)|
 :Check it is a real PDF with at least one page\nand at most 50 MB (validators, IR-665);
 :Save the Version and its file;
-:Read the review text on campus with pdfplumber\n(no AI, every Version, ADR-058);
-|celery-extraction|
-:extract_manuscript_text;
+fork
+  |celery-default|
+  :read_review_text: pdfplumber on campus\n(no AI, every Version, ADR-058);
+  detach
+fork again
+  |celery-extraction|
+  :extract_manuscript_text;
+end fork
 if (Embargo released and Contact person\nanswered Yes to AI use? (ADR-052, ADR-054)) then (yes)
   :Admit the paid call when provider\nadmission is enforced (ADR-041);
   |LlamaParse|
