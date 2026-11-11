@@ -1,3 +1,5 @@
+# The production stack (deploy/README.md). Update a running server with
+# scripts/deploy.sh (IR-1018).
 services:
   db:
     networks:
