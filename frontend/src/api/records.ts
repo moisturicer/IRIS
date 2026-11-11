@@ -302,6 +302,11 @@ export const recordsApi = {
     apiClient.post<{ owners: { id: number; name: string; is_primary: boolean }[] }>(
       `/records/${id}/add-owner/`, { email },
     ),
+  /** Any owner names another owner the Contact person (ADR-051 decision 27, IR-801). */
+  changeContactPerson: (id: number, owner: number) =>
+    apiClient.post<{ owners: { id: number; name: string; is_primary: boolean }[] }>(
+      `/records/${id}/contact-person/`, { owner },
+    ),
   rdcoWithdraw:   (id: number, reason: string) =>
     apiClient.post<{ id: number; withdrawn: true }>(`/records/${id}/withdraw/`, { reason }),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),

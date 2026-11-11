@@ -273,6 +273,8 @@ export type Capability =
   | "replace_adviser"
   | "add_owner"
   | "withdraw_paper"
+  /** Any owner names another owner the Contact person (ADR-051 decision 27, IR-803). */
+  | "change_contact_person"
   | "set_visibility"
   | "tag_ip"
   | "attach_file"

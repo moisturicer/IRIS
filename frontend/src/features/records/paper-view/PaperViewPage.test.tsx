@@ -221,6 +221,8 @@ vi.mock("@/api/records", () => ({
     releaseIp:        vi.fn(),
     // RDCO's acts on a paper in review (IR-798); their own behaviour is `RdcoPaperControls.test.tsx`'s.
     rdcoWithdraw:     vi.fn(() => Promise.resolve({ data: { id: 7, withdrawn: true } })),
+    // The Contact person card (IR-803); its own behaviour is `ContactPersonCard.test.tsx`'s.
+    changeContactPerson: vi.fn(() => Promise.resolve({ data: { owners: [] } })),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
@@ -2857,6 +2859,46 @@ describe("the embargo in Record details (IR-817)", () => {
 
     const governance = screen.getByRole("region", { name: "Institutional Governance" });
     expect(within(governance).getByText("Released for the AI by KTTO")).toBeInTheDocument();
+  });
+});
+
+
+// Any owner names the Contact person from Record details, on every paper
+// (ADR-051 decision 27, IR-803). What the card does is `ContactPersonCard.test.tsx`'s.
+describe("the Contact person in Record details (IR-803)", () => {
+  const owned: RecordDetail = {
+    ...record,
+    owners: [
+      { id: 1, user: 42, email: "ana@cit.edu", full_name: "Ana Reyes", is_primary: true },
+      { id: 2, user: 43, email: "ben@cit.edu", full_name: "Ben Cruz", is_primary: false },
+    ],
+    capabilities: [...record.capabilities, "change_contact_person"],
+  };
+
+  beforeEach(() => {
+    shownRecord = owned;
+    signInAs(42, "Student");
+  });
+
+  it("shows an owner the dropdown in the rail, and a save reads the paper again", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    const rail = screen.getByRole("complementary", { name: "Record details" });
+    const card = within(rail).getByRole("region", { name: "Contact person" });
+    expect(within(card).getByRole("combobox", { name: "Contact person" })).toHaveDisplayValue("Ana Reyes");
+
+    shownRecord = {
+      ...owned,
+      owners: owned.owners.map((owner) => ({ ...owner, is_primary: owner.user === 43 })),
+    };
+    await userEvent.selectOptions(within(card).getByRole("combobox", { name: "Contact person" }), "Ben Cruz");
+    await userEvent.click(within(card).getByRole("button", { name: "Make Contact person" }));
+
+    expect(recordsApi.changeContactPerson).toHaveBeenCalledWith(RECORD_ID, 43);
+    expect(await within(card).findByRole("status")).toHaveTextContent("Ben Cruz is now the Contact person.");
+    await waitFor(() => expect(within(card).getByRole("button", { name: "Make Contact person" })).toBeDisabled());
+    expect(within(card).getByRole("combobox", { name: "Contact person" })).toHaveDisplayValue("Ben Cruz");
   });
 });
 

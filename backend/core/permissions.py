@@ -467,6 +467,10 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         delete_act = DELETE_CAPABILITY.get(record.pipeline_status)
         if delete_act is not None:
             offered.append(delete_act)
+        # `contact-person/` (ADR-051 decision 27, IR-801): any owner, on every
+        # paper in every state. Offered with one owner too, so Paper View can
+        # show who it is; the screen hides the choice when there is none (IR-803).
+        offered.append("change_contact_person")
 
     # `embargo-set/` and `embargo-release/` (ADR-052 §5, §6), once submitted. A
     # draft has nothing to change: every paper starts embargoed (IR-882).

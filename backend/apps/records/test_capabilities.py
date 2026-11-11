@@ -276,6 +276,11 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "add_owner": lambda r, u, d: self._call(
                 u, "post", url("record-add-owner", r), {"email": self.reader.email},
             ),
+            # Naming the sole owner again: an owner is answered 400 ("already the
+            # Contact person"), anyone else 403 or 404 (IR-801, IR-803).
+            "change_contact_person": lambda r, u, d: self._call(
+                u, "post", url("record-contact-person", r), {"owner": self.owner.pk},
+            ),
             "withdraw_paper": lambda r, u, d: self._call(
                 u, "post", url("record-withdraw", r), {"reason": "Withdrawn by RDCO."},
             ),
@@ -317,8 +322,12 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         "cite", "tag_ip", "attach_file", "request_document", "open_review",
         "office_review", "add_reviewer", "route", "comment_review",
     } | SEATED
+    # Any owner names the Contact person, on every paper in every state, and
+    # nobody else does (ADR-051 decision 27, IR-801; offered since IR-803).
+    OWNS = {"change_contact_person"}
     # An owner is offered the one delete its record's status names (IR-508).
-    OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"}
+    OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"} | OWNS
+    OWNER_PUBLISHED = {"cite", "request_deletion", "comment_review"} | OWNS
     # RDCO publishes only a released paper (ADR-052 §14 as amended), so while
     # these are held it keeps them unlisted or rejects them.
     RDCO_UNSEATED = OFFICE | EMBARGO_ACTS
@@ -331,7 +340,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                    "keep_unlisted", "reject"} | EMBARGO_ACTS | SEATED | RDCO_ACTS
     EXPECTED = {
         "draft": {
-            "owner": {"cite", "continue_draft", "edit_details", "delete_record"}, "adviser": {"cite"},
+            "owner": {"cite", "continue_draft", "edit_details", "delete_record"} | OWNS, "adviser": {"cite"},
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         "with_adviser_unopened": {
@@ -366,14 +375,14 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         # Published once its Adviser released it, so nothing is left to release.
         "published": {
-            "owner": {"cite", "request_deletion", "comment_review"},
+            "owner": OWNER_PUBLISHED,
             "adviser": TAKES_PART | {"set_embargo"},
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review", "set_embargo"},
             "stranger": {"cite"},
         },
         # A stranger reading the paper learns nothing of its embargo.
         "under_embargo": {
-            "owner": {"cite", "request_deletion", "comment_review"},
+            "owner": OWNER_PUBLISHED,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
             "rdco": OFFICE | {"comment_review"} | EMBARGO_ACTS, "stranger": {"cite"},
@@ -381,13 +390,13 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         # Unlisted (IR-878): any RDCO member is offered the later publish, held
         # back while the embargo is Active so its reason can be shown.
         "unlisted_embargoed": {
-            "owner": {"cite", "request_deletion", "comment_review"},
+            "owner": OWNER_PUBLISHED,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
             "rdco": OFFICE | {"comment_review", "publish_unlisted"} | EMBARGO_ACTS, "stranger": None,
         },
         "unlisted_released": {
-            "owner": {"cite", "request_deletion", "comment_review"},
+            "owner": OWNER_PUBLISHED,
             "adviser": TAKES_PART | {"set_embargo"},
             "itso": OFFICE, "ierc": OFFICE,
             "rdco": OFFICE | {"comment_review", "set_embargo", "publish_unlisted"}, "stranger": None,
@@ -403,12 +412,12 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         # An accepted Proposal's owner may continue it once (ADR-032 §6, IR-417).
         "accepted_proposal": {
-            "owner": {"cite", "continue_as", "request_deletion", "comment_review"},
+            "owner": OWNER_PUBLISHED | {"continue_as"},
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },
         "continued_proposal": {
-            "owner": {"cite", "request_deletion", "comment_review"},
+            "owner": OWNER_PUBLISHED,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },
