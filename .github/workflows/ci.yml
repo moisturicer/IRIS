@@ -143,12 +143,16 @@ jobs:
           DB_PORT: '5432'
           TRUSTED_PROXY_COUNT: '2'
           REGISTRATION_EMAIL_DOMAINS: cit.edu
+          # The sign-in lockout is required in production (IR-1001).
+          AXES_ENABLED: 'True'
         run: |
           ALLOWED_HOSTS=iris.example.edu           CORS_ALLOWED_ORIGINS=https://iris.example.edu             python -c "import django; django.setup(); from django.conf import settings; assert settings.DEBUG is False; assert settings.ALLOWED_HOSTS == ['iris.example.edu']; print('production settings boot OK')"
           ! ALLOWED_HOSTS=             CORS_ALLOWED_ORIGINS=https://iris.example.edu             python -c "import django; django.setup()"
           echo "production settings correctly refused an empty ALLOWED_HOSTS"
           ! REGISTRATION_EMAIL_DOMAINS= ALLOWED_HOSTS=iris.example.edu CORS_ALLOWED_ORIGINS=https://iris.example.edu python -c "import django; django.setup()"
           echo "production settings correctly refused an empty REGISTRATION_EMAIL_DOMAINS (IR-660)"
+          ! AXES_ENABLED=False ALLOWED_HOSTS=iris.example.edu CORS_ALLOWED_ORIGINS=https://iris.example.edu python -c "import django; django.setup()"
+          echo "production settings correctly refused the sign-in lockout switched off (IR-1001)"
 
       - name: Migration consistency
         # The DB_* vars matter: without them this step reached for the settings

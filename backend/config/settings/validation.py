@@ -59,10 +59,11 @@ def production_problems(
     allowed_hosts: Sequence[object],
     cors_allowed_origins: Sequence[object],
     cors_allow_all_origins: bool,
+    axes_enabled: bool,
 ) -> tuple[str, ...]:
     """What is wrong with this configuration for a publicly reachable deployment.
 
-    Keyword-only on purpose: four values, three of them list-shaped, is exactly
+    Keyword-only on purpose: five values, three of them list-shaped, is exactly
     the signature where a positional swap type-checks and silently inverts a
     security check.
     """
@@ -106,6 +107,13 @@ def production_problems(
     # requires an interim deployment running with DEBUG=False. Refusing an
     # http origin would stop that deployment booting at all. Worth adding the
     # day TLS lands, not before.
+
+    if not axes_enabled:
+        problems.append(
+            "AXES_ENABLED is not True — without the sign-in lockout only the "
+            "per-address rate limit slows password guessing (IR-1001). Set "
+            "AXES_ENABLED=True; see backend/.env.example."
+        )
 
     return tuple(problems)
 

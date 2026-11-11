@@ -60,6 +60,8 @@ _problems = production_problems(
     # Absent is the point — `globals()` rather than a reference, so this reads
     # False when no settings module defines it and stays honest if one does.
     cors_allow_all_origins=globals().get("CORS_ALLOW_ALL_ORIGINS", False),
+    # Off by default for development (IR-865); a public deployment must have it (IR-1001).
+    axes_enabled=AXES_ENABLED,  # noqa: F405
 ) + recovery_transport_problems(
     frontend_url=FRONTEND_URL,  # noqa: F405
     email_host=EMAIL_HOST, email_user=EMAIL_HOST_USER,  # noqa: F405

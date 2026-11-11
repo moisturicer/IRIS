@@ -117,6 +117,7 @@ def _production_kwargs(**overrides):
         "allowed_hosts": ["iris.cit.edu"],
         "cors_allowed_origins": ["https://iris.cit.edu"],
         "cors_allow_all_origins": False,
+        "axes_enabled": True,
     }
     base.update(overrides)
     return base
@@ -167,6 +168,13 @@ def test_empty_cors_allowed_origins_is_a_problem():
     assert any("CORS_ALLOWED_ORIGINS" in p for p in problems), problems
 
 
+def test_the_sign_in_lockout_switched_off_is_a_problem():
+    """IR-1001: development may leave it off (IR-865); production may not."""
+    problems = production_problems(**_production_kwargs(axes_enabled=False))
+
+    assert any("AXES_ENABLED" in p for p in problems), problems
+
+
 def test_a_plaintext_http_origin_is_allowed_for_now():
     """Deliberately NOT a problem.
 
@@ -193,6 +201,7 @@ def test_problems_accumulate_rather_than_short_circuiting():
         allowed_hosts=[],
         cors_allowed_origins=[],
         cors_allow_all_origins=True,
+        axes_enabled=False,
     )
 
     joined = " | ".join(problems)
@@ -201,6 +210,7 @@ def test_problems_accumulate_rather_than_short_circuiting():
         "ALLOWED_HOSTS",
         "CORS_ALLOW_ALL_ORIGINS",
         "CORS_ALLOWED_ORIGINS is empty",
+        "AXES_ENABLED",
     ):
         assert expected in joined, (expected, problems)
 
