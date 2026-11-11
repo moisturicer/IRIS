@@ -176,7 +176,7 @@ export default function UserListPage() {
             {row.original.is_locked ? "Locked" : row.original.is_active ? "Active" : "Inactive"}
           </Badge>
           {/* Only the System Admin's list holds these; RDCO's leaves them out (IR-705, IR-804). */}
-          {!row.original.is_verified && <Badge variant="warning">Unverified</Badge>}
+          {row.original.is_verified === false && <Badge variant="warning">Unverified</Badge>}
         </span>
       ),
     },

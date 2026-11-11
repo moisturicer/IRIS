@@ -9,9 +9,9 @@ export function errorDetail(err: unknown, fallback: string): string {
   if (response?.status === 429) {
     // ADR-045's answers, registration's included (IR-705), carry the wait in the
     // body as `retry_after` as well as in the header (IR-804).
-    const header = response.data?.retry_after
+    const retryAfter = response.data?.retry_after
       ?? response.headers?.["retry-after"] ?? response.headers?.["Retry-After"];
-    let seconds = typeof header === "string" || typeof header === "number" ? Number(header) : NaN;
+    let seconds = typeof retryAfter === "string" || typeof retryAfter === "number" ? Number(retryAfter) : NaN;
     if (!Number.isFinite(seconds) || seconds <= 0) {
       const match = typeof detail === "string" ? /available in (\d+(?:\.\d+)?) seconds?/i.exec(detail) : null;
       seconds = match ? Number(match[1]) : NaN;
