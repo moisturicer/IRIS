@@ -29,7 +29,7 @@ vi.mock("@/api/accounts", () => ({
 function user(overrides: Partial<UserListItem>): UserListItem {
   return {
     id: 1, email: "someone@cit.edu", first_name: "Some", last_name: "One",
-    role_name: "Student", is_active: true, is_locked: false,
+    role_name: "Student", is_active: true, is_locked: false, is_verified: true,
     is_office_coordinator: false, date_joined: "2026-01-01",
     ...overrides,
   };
@@ -227,6 +227,19 @@ describe("the Change role dialog", () => {
     await userEvent.click(within(await rowFor("itso@cit.edu")).getByRole("button", { name: "Change role" }));
 
     expect(screen.getByRole("dialog", { name: "Change Role" })).not.toHaveTextContent(/coordinator/i);
+  });
+});
+
+describe("unverified registrations (IR-804)", () => {
+  // Only the System Admin's list holds them: RDCO's leaves them out (IR-705).
+  it("marks an account whose email is not verified, and no other", async () => {
+    const pending = user({ id: 7, email: "newcomer@cit.edu", is_verified: false });
+    userList.mockResolvedValue(listing([STUDENT, pending]));
+    const { container } = renderScreen(<UserListPage />);
+
+    expect(within(await rowFor("newcomer@cit.edu")).getByText("Unverified")).toBeInTheDocument();
+    expect(within(await rowFor("student@cit.edu")).queryByText("Unverified")).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 });
 

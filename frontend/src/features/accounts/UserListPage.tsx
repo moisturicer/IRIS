@@ -171,9 +171,13 @@ export default function UserListPage() {
       header: "Status",
       accessorKey: "is_active",
       cell: ({ row }) => (
-        <Badge variant={row.original.is_locked ? "danger" : row.original.is_active ? "success" : "neutral"}>
-          {row.original.is_locked ? "Locked" : row.original.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <span className="inline-flex flex-wrap gap-1">
+          <Badge variant={row.original.is_locked ? "danger" : row.original.is_active ? "success" : "neutral"}>
+            {row.original.is_locked ? "Locked" : row.original.is_active ? "Active" : "Inactive"}
+          </Badge>
+          {/* Only the System Admin's list holds these; RDCO's leaves them out (IR-705, IR-804). */}
+          {!row.original.is_verified && <Badge variant="warning">Unverified</Badge>}
+        </span>
       ),
     },
     {
