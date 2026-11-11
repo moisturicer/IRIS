@@ -130,14 +130,16 @@ class LoginView(APIView):
         # A list, an object or a number used to reach the password hasher and
         # answer 500 (IR-923). It is not a credential attempt, so it is refused
         # before authenticate: not audited, and not counted towards the lock.
-        body = request.data if isinstance(request.data, dict) else None
-        email = body.get("email") if body is not None else None
-        password = body.get("password") if body is not None else None
-        if body is None or not all(isinstance(v, (str, type(None))) for v in (email, password)):
-            return Response(
-                {"detail": "Email and password must be text."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        malformed = Response(
+            {"detail": "Email and password must be text."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+        if not isinstance(request.data, dict):
+            return malformed
+        email    = request.data.get("email")
+        password = request.data.get("password")
+        if any(v is not None and not isinstance(v, str) for v in (email, password)):
+            return malformed
         # The Django request, not DRF's wrapper: axes marks a lockout by setting
         # `axes_locked_out` on the request it is given, and its middleware reads
         # it from the Django one. Through the wrapper the mark was lost, so a
@@ -826,16 +828,18 @@ class CollegeListView(generics.ListAPIView):
     queryset           = College.objects.all()
 
 
-def _id_filter(request, name):
+def _id_query_param(request, name):
     """The id in query parameter `name`, or None when it is absent or empty.
 
-    Only plain ASCII digits are accepted (IR-923). Anything else used to reach
-    an integer lookup and answer 500, on routes anyone can call signed out.
+    Only 1 to 18 plain ASCII digits are accepted (IR-923), which holds every
+    id a column can store. Anything else used to reach an integer lookup and
+    answer 500, on routes anyone can call signed out; past 4,300 digits even
+    int() refuses.
     """
     value = request.query_params.get(name)
     if not value:
         return None
-    if not re.fullmatch(r"[0-9]+", value):
+    if not re.fullmatch(r"[0-9]{1,18}", value):
         raise ValidationError({name: ["Must be a whole number."]})
     return int(value)
 
@@ -848,7 +852,7 @@ class DepartmentListView(generics.ListAPIView):
 
     def get_queryset(self):
         qs = Department.objects.select_related("college")
-        college_id = _id_filter(self.request, "college")
+        college_id = _id_query_param(self.request, "college")
         if college_id is not None:
             qs = qs.filter(college_id=college_id)
         return qs
@@ -862,7 +866,7 @@ class CourseListView(generics.ListAPIView):
 
     def get_queryset(self):
         qs = Course.objects.select_related("department")
-        dept_id = _id_filter(self.request, "department")
+        dept_id = _id_query_param(self.request, "department")
         if dept_id is not None:
             qs = qs.filter(department_id=dept_id)
         return qs

@@ -26,11 +26,13 @@ class DepartmentFilterTests(APITestCase):
                 response = self.client.get(reverse("department-list"), {"college": value})
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_an_id_too_large_for_the_column_finds_nothing(self):
-        response = self.client.get(reverse("department-list"), {"college": "9" * 30})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json()["results"], [])
+    def test_an_id_longer_than_any_column_holds_is_refused(self):
+        # 5,000 digits is past Python's int() limit of 4,300, which raised
+        # ValueError even after the digits-only check.
+        for value in ("9" * 19, "9" * 5000):
+            with self.subTest(digits=len(value)):
+                response = self.client.get(reverse("department-list"), {"college": value})
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_a_valid_college_filter_still_narrows_the_list(self):
         college = College.objects.filter(departments__isnull=False).first()
