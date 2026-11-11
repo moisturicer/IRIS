@@ -17,6 +17,15 @@
 		protocols tls1.2 tls1.3
 	}
 
+	# HSTS on every HTTPS response (IR-806, ASVS 14.4.5). Django sent it only on
+	# its own responses, so the pages and files nginx serves went without. The
+	# value is production.py's (ADR-057). `defer` sets it after the upstream
+	# answers, so a Django response carries one header, not two.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		defer
+	}
+
 	# With no trusted_proxies set, Caddy discards the client's X-Forwarded-For and
 	# X-Forwarded-Proto and sends its own. TRUSTED_PROXY_COUNT=2 relies on that.
 	reverse_proxy frontend:8080
