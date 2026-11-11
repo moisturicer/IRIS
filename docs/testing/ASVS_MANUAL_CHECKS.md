@@ -4,7 +4,7 @@
 
 **Run on 2026-11-05 (IR-829).** Groups A and B ran on a local Core journeys stack: production settings, served through nginx, synthetic accounts and data only, `main` at `14768455`. **An AI agent ran them and wrote each Pass or Fail, at Ashlee Sean's direction. They are the agent's results until she confirms them below.** Ashlee made the group C decisions as owner of S2 Epic QA & Security (IR-687), except 7.1.2, which is the DPO's. Group D waits for IR-806's server.
 
-Results: 6 Pass, 7 Fail, 2 Deferred and 1 N/A by decision, 5 not yet runnable. Every Fail has an `area-security` ticket: IR-923 (5.1.3 and 5.1.4, one defect), IR-924, IR-925, IR-926, IR-928 and IR-929. In `SECURITY_CHECKLIST.md` a Fail is a Gap, or Partial where the row says which part holds.
+Results: 6 Pass, 7 Fail, 2 Deferred and 1 N/A by decision, 5 not yet runnable. Every Fail has an `area-security` ticket: IR-923 (5.1.3 and 5.1.4, one defect), IR-924, IR-925, IR-926, IR-928 and IR-929. In `SECURITY_CHECKLIST.md` a Fail is a Gap, or Partial where the row says which part holds. Since then IR-925 has fixed 14.2.2, so the checklist marks it Pass; its record below keeps the 2026-11-05 result.
 
 `Confirmed` by Ashlee Sean that the group A and B results stand: Yes. Date: 2026-11-06
 
@@ -178,6 +178,8 @@ Check what production includes: `INSTALLED_APPS` in `config/settings/production.
 **Pass:** you can give a reason for everything you find. List anything to remove.
 
 `Record` Result: **Fail** Date: 2026-11-05 Person: AI agent, at Ashlee Sean's direction (her confirmation pending) Evidence: production `INSTALLED_APPS` holds no debug app (the debug toolbar is development only), and every test-data command (`seed_demo`, `load_corpus`, `reset_demo_records`, `review_clock_for_testing`, `backfill_abstracts`) refuses with `DEBUG` off unless `--force`. But DRF's browsable API is on in production: on the local Core journeys stack, production settings through nginx, `main` at `14768455`, `GET /api/v1/courses/` with `Accept: text/html` returned DRF's HTML page. [IR-925](https://citiris.atlassian.net/browse/IR-925).
+
+`Fixed` by [IR-925](traceability/IR-925.md), 2026-11-11: production renders JSON only, shown by `apps/tests/test_production_renderers.py` under the real production settings. Not yet re-run on the Core journeys stack.
 
 ## C. Make a decision
 
