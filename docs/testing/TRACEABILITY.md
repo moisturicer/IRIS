@@ -238,7 +238,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1017** | Every production service rotates its logs (10 MB × 3), so none can fill the disk, and CI checks it — epic IR-805; no FR- id. PR [#679](https://github.com/moisturicer/IRIS/pull/679); applied on iris-demo 2026-11-11 | [details](traceability/IR-1017.md) | **VERIFIED** |
 | **IR-1018** | The server updates to `main` with one command that pulls, checks, rebuilds, waits for health and reports, and stops at the first failing step; CI checks it against a fake docker — epic IR-805; no FR- id. PR [#683](https://github.com/moisturicer/IRIS/pull/683); run on iris-demo 2026-11-11 | [details](traceability/IR-1018.md) | **VERIFIED** |
 | **IR-923** | Malformed input to the public department and course filters and to sign-in answers 400, not 500 — from IR-829, ASVS 5.1.3/5.1.4; no FR- id. PR [#686](https://github.com/moisturicer/IRIS/pull/686) | [details](traceability/IR-923.md) | **VERIFIED** |
-| **IR-806** | The demo server, iris-demo, reachable over HTTPS with demo accounts only, no seeded papers — epic IR-805; no FR- id. HTTPS and `/media/` checked on 2026-11-11; HSTS added on every response, not yet on the server; smoke test and runbook open | [details](traceability/IR-806.md) | **PARTIAL** |
+| **IR-806** | The demo server, iris-demo, reachable over HTTPS with demo accounts only, no seeded papers — epic IR-805; no FR- id. HTTPS, `/media/` and HSTS on every response checked on the server 2026-11-11 (PR #689); smoke test, `ai-gateway` and runbook open | [details](traceability/IR-806.md) | **PARTIAL** |
 
 ### Non-functional
 
