@@ -1,8 +1,11 @@
+import re
+
 from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
 from django.utils.cache import add_never_cache_headers
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.parsers import JSONParser, MultiPartParser
@@ -124,8 +127,19 @@ class LoginView(APIView):
     @transaction.atomic
     def post(self, request):
         from django.contrib.auth import authenticate
+        # A list, an object or a number used to reach the password hasher and
+        # answer 500 (IR-923). It is not a credential attempt, so it is refused
+        # before authenticate: not audited, and not counted towards the lock.
+        malformed = Response(
+            {"detail": "Email and password must be text."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+        if not isinstance(request.data, dict):
+            return malformed
         email    = request.data.get("email")
         password = request.data.get("password")
+        if any(v is not None and not isinstance(v, str) for v in (email, password)):
+            return malformed
         # The Django request, not DRF's wrapper: axes marks a lockout by setting
         # `axes_locked_out` on the request it is given, and its middleware reads
         # it from the Django one. Through the wrapper the mark was lost, so a
@@ -580,7 +594,7 @@ class AdviserListView(generics.ListAPIView):
     def get_queryset(self):
         return (
             User.objects
-            .filter(role__name=RoleName.ADVISER, is_active=True)
+            .filter(role__name=RoleName.ADVISER, is_active=True, is_verified=True)
             .select_related("role")
             .order_by("last_name", "first_name")
         )
@@ -609,7 +623,9 @@ class ChangeUserRoleView(APIView):
 
     def patch(self, request, pk):
         from .models import Role
-        user = User.objects.get(pk=pk)
+        # An unverified account is a 404 to RDCO, as in UserDetailView (ADR-051
+        # decision 22, IR-705); the System Admin still sees it.
+        user = get_object_or_404(_verified_unless_system_admin(request.user, User.objects.all()), pk=pk)
 
         role_name = request.data.get("role_name")
         role_id   = request.data.get("role")
@@ -814,6 +830,22 @@ class CollegeListView(generics.ListAPIView):
     queryset           = College.objects.all()
 
 
+def _id_query_param(request, name):
+    """The id in query parameter `name`, or None when it is absent or empty.
+
+    Only 1 to 18 plain ASCII digits are accepted (IR-923), which holds every
+    id a column can store. Anything else used to reach an integer lookup and
+    answer 500, on routes anyone can call signed out; past 4,300 digits even
+    int() refuses.
+    """
+    value = request.query_params.get(name)
+    if not value:
+        return None
+    if not re.fullmatch(r"[0-9]{1,18}", value):
+        raise ValidationError({name: ["Must be a whole number."]})
+    return int(value)
+
+
 class DepartmentListView(generics.ListAPIView):
     """Public — needed on the signup page before the user has a token."""
     serializer_class   = DepartmentSerializer
@@ -822,8 +854,8 @@ class DepartmentListView(generics.ListAPIView):
 
     def get_queryset(self):
         qs = Department.objects.select_related("college")
-        college_id = self.request.query_params.get("college")
-        if college_id:
+        college_id = _id_query_param(self.request, "college")
+        if college_id is not None:
             qs = qs.filter(college_id=college_id)
         return qs
 
@@ -836,8 +868,8 @@ class CourseListView(generics.ListAPIView):
 
     def get_queryset(self):
         qs = Course.objects.select_related("department")
-        dept_id = self.request.query_params.get("department")
-        if dept_id:
+        dept_id = _id_query_param(self.request, "department")
+        if dept_id is not None:
             qs = qs.filter(department_id=dept_id)
         return qs
 
