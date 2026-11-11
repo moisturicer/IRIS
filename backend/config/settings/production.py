@@ -13,10 +13,18 @@ tested in `apps/tests/test_settings_validation.py` against crafted inputs.
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401,F403
-from .base import csv_list, email_domains, required
+from .base import REST_FRAMEWORK, csv_list, email_domains, required
 from .validation import production_problems, recovery_transport_problems
 
 DEBUG = False
+
+# JSON only (IR-925). DRF's default adds the browsable API, an HTML page with
+# forms for every endpoint, served to any browser that opens an API address.
+# It is a developer tool, so development keeps it and production does not.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+}
 
 # TLS ends in a proxy in front of nginx, so Django only ever sees plain HTTP and
 # would redirect every request to HTTPS, forever, without this (IR-662). nginx

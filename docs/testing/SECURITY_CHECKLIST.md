@@ -6,9 +6,9 @@
 
 | Status | Meaning | Items |
 |---|---|---|
-| Pass | Evidence named in the row | 80 |
+| Pass | Evidence named in the row | 81 |
 | Partial | Met in part, and the row says which part | 15 |
-| Gap | Not met; the row names the ticket | 15 |
+| Gap | Not met; the row names the ticket | 14 |
 | Deferred | Deliberately deferred | 3 |
 | N/A | Does not apply, for the reason given | 10 |
 | Needs manual check | Reading the code can't settle it, or a person must judge it | 5 |
@@ -192,7 +192,7 @@
 | Item | Requirement | Status | Evidence |
 |---|---|---|---|
 | 14.2.1 | all components are up to date, preferably using a dependency checker during build or compile time. | Pass | `pip-audit` and `npm audit` gate in CI ([IR-613](https://citiris.atlassian.net/browse/IR-613), [IR-633](https://citiris.atlassian.net/browse/IR-633)) |
-| 14.2.2 | all unneeded features, documentation, sample applications and configurations are removed. | Gap | No debug app in production and test-data commands refuse without `--force`, but DRF's browsable API is on. [IR-925](https://citiris.atlassian.net/browse/IR-925) · [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
+| 14.2.2 | all unneeded features, documentation, sample applications and configurations are removed. | Pass | No debug app in production, test-data commands refuse without `--force`, and production renders JSON only, so DRF's browsable API is off (`apps/tests/test_production_renderers.py`). [IR-925](traceability/IR-925.md) · [IR-829 worksheet](ASVS_MANUAL_CHECKS.md) |
 | 14.2.3 | if application assets, such as JavaScript libraries, CSS or web fonts, are hosted externally on a Content Delivery Network (CDN) or external provider, Subresource Integrity (SRI) is used to validate the integrity of the asset. | Gap | As 10.3.2. [IR-822](https://citiris.atlassian.net/browse/IR-822) |
 | 14.3.2 | web or application server and application framework debug modes are disabled in production to eliminate debug features, developer consoles, and unintended security disclosures. | Pass | `production_problems()` refuses `DEBUG`; `apps/tests/test_settings_validation.py` |
 | 14.3.3 | the HTTP headers or any part of the HTTP response do not expose detailed version information of system components. | Gap | No `server_tokens off`. [IR-821](https://citiris.atlassian.net/browse/IR-821) |
