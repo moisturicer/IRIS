@@ -450,8 +450,9 @@ jobs:
 
       # IR-847: the real Caddy with the real Caddyfile, in front of a stand-in that
       # echoes the forwarded headers. A local certificate replaces ACME, because
-      # a test has no public domain.
-      - name: Caddy serves HTTPS only, with strong TLS
+      # a test has no public domain. Under /api/ the stand-in sends its own HSTS,
+      # as Django does; elsewhere it sends none, as nginx does (IR-806).
+      - name: Caddy serves HTTPS only, with strong TLS and HSTS
         run: |
           docker network create iris-tls
           docker run -d --name frontend --network iris-tls python:3.11-alpine python -c '
@@ -459,7 +460,10 @@ jobs:
           class H(http.server.BaseHTTPRequestHandler):
               def do_GET(self):
                   body = ("xff=%s proto=%s" % (self.headers.get("X-Forwarded-For"), self.headers.get("X-Forwarded-Proto"))).encode()
-                  self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+                  self.send_response(200)
+                  if self.path.startswith("/api/"):
+                      self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+                  self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
           http.server.HTTPServer(("0.0.0.0", 8080), H).serve_forever()
           '
           image=$(docker compose -f docker-compose.prod.yml config --images | grep '^caddy')
@@ -479,6 +483,15 @@ jobs:
           echo "forged headers: $echo_back"
           case "$echo_back" in *203.0.113.9*) echo "::error::Caddy passed on a forged X-Forwarded-For"; exit 1 ;; esac
           case "$echo_back" in *proto=https*) ;; *) echo "::error::Caddy did not set X-Forwarded-Proto: https"; exit 1 ;; esac
+
+          # IR-806: exactly one HSTS header, with production.py's value, whether
+          # the upstream sent its own or not.
+          for path in / /api/x; do
+            hsts=$(curl -sk -D - -o /dev/null "https://localhost:18443$path" | tr -d '\r' | grep -i '^strict-transport-security:' || true)
+            echo "HSTS on $path: $hsts"
+            [ "$(printf '%s\n' "$hsts" | grep -c .)" = 1 ] || { echo "::error::$path did not carry exactly one Strict-Transport-Security header"; exit 1; }
+            case "$hsts" in *": max-age=31536000; includeSubDomains; preload") ;; *) echo "::error::$path has the wrong Strict-Transport-Security value"; exit 1 ;; esac
+          done
 
           probe() { openssl s_client -connect localhost:18443 -servername localhost "$@" </dev/null 2>&1; }
           for version in -tls1_2 -tls1_3; do
