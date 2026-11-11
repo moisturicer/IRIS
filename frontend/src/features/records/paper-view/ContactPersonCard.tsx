@@ -26,7 +26,7 @@ import { RailHeading } from "./headings";
  * (IR-421), so the screen doesn't say it yet.
  */
 const PURPOSE = "This person gets the review emails.";
-const FAILED = "The Contact person couldn't be changed. Try again.";
+const SAVE_FAILED = "The Contact person couldn't be changed. Try again.";
 
 /** An owner's name as the paper shows it, or their email when they gave none. */
 function nameOf(owner: RecordOwner): string {
@@ -43,6 +43,9 @@ export function ContactPersonCard({ record, onChanged }: ContactPersonCardProps)
   const headingId = useId();
   const current = record.owners.find((owner) => owner.is_primary) ?? null;
   const currentId = current?.user ?? null;
+  // Who can be chosen: a closed account can't (IR-801 refuses it), unless it
+  // already holds the role, so the dropdown still shows who has it.
+  const choices = record.owners.filter((owner) => owner.is_primary || !owner.account_closed);
   const [chosen, setChosen] = useState<number | null>(currentId);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export function ContactPersonCard({ record, onChanged }: ContactPersonCardProps)
   if (!capabilitiesFor(record).has("change_contact_person")) return null;
 
   const save = async () => {
-    const target = record.owners.find((owner) => owner.user === chosen);
+    const target = choices.find((owner) => owner.user === chosen);
     if (!target) return;
     setSaving(true);
     setNotice(null);
@@ -64,7 +67,7 @@ export function ContactPersonCard({ record, onChanged }: ContactPersonCardProps)
       setNotice(`${nameOf(target)} is now the Contact person.`);
       onChanged();
     } catch (err) {
-      setError(fieldError(err, "owner") ?? errorDetail(err, FAILED));
+      setError(fieldError(err, "owner") ?? errorDetail(err, SAVE_FAILED));
       setChosen(currentId);
     } finally {
       setSaving(false);
@@ -77,7 +80,7 @@ export function ContactPersonCard({ record, onChanged }: ContactPersonCardProps)
       className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card space-y-3"
     >
       <RailHeading id={headingId}>Contact person</RailHeading>
-      {record.owners.length < 2 ? (
+      {choices.length < 2 ? (
         <div>
           {current && <p className="text-sm font-bold text-stone-900 [overflow-wrap:anywhere]">{nameOf(current)}</p>}
           <p className="mt-1 text-xs text-stone-600">{PURPOSE}</p>
@@ -87,6 +90,7 @@ export function ContactPersonCard({ record, onChanged }: ContactPersonCardProps)
           <Select
             label="Contact person"
             hint={PURPOSE}
+            size="lg"
             // A native select is as wide as its longest option; a long name
             // must not push the rail past a phone's width (IR-921).
             className="min-w-0 max-w-full"
@@ -97,7 +101,7 @@ export function ContactPersonCard({ record, onChanged }: ContactPersonCardProps)
               setError(null);
             }}
           >
-            {record.owners.map((owner) => (
+            {choices.map((owner) => (
               <option key={owner.user} value={owner.user}>
                 {nameOf(owner)}
               </option>

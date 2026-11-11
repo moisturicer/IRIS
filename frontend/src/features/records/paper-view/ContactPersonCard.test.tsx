@@ -76,6 +76,23 @@ describe("what an owner sees", () => {
     expect(screen.getByRole("combobox", { name: "Contact person" })).toHaveDisplayValue("ana@cit.edu");
   });
 
+  it("leaves an owner whose account is closed out of the choice", () => {
+    const FORMER = { ...owner(4, "Former Owner"), account_closed: true };
+    renderCard(paper([ANA, FORMER, BEN]));
+
+    const select = screen.getByRole("combobox", { name: "Contact person" });
+    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual(["Ana Reyes", "Ben Cruz"]);
+  });
+
+  it("shows the name alone when every other owner's account is closed", () => {
+    renderCard(paper([ANA, { ...owner(4, "Former Owner"), account_closed: true }]));
+
+    const card = screen.getByRole("region", { name: "Contact person" });
+    expect(within(card).getByText("Ana Reyes")).toBeInTheDocument();
+    expect(within(card).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Former Owner")).not.toBeInTheDocument();
+  });
+
   it("is not there for anyone the server doesn't offer it to", () => {
     renderCard(paper([ANA, BEN], ["cite", "comment_review"]));
     expect(screen.queryByRole("region", { name: "Contact person" })).not.toBeInTheDocument();
@@ -147,6 +164,12 @@ describe("naming another owner", () => {
 });
 
 describe("accessibility", () => {
+  it("makes the dropdown and its button 44 px touch targets", () => {
+    renderCard(paper([ANA, BEN]));
+    expect(screen.getByRole("combobox", { name: "Contact person" }).className).toMatch(/\bmin-h-11\b/);
+    expect(screen.getByRole("button", { name: "Make Contact person" }).className).toMatch(/\bmin-h-11\b/);
+  });
+
   it("has no serious or critical axe findings with the dropdown", async () => {
     const { container } = renderCard(paper([ANA, BEN]));
     await expectNoBlockingA11yViolations(container);
@@ -186,7 +209,8 @@ describe("at 360 px", () => {
 
   it("wraps a long name, and clips no control", () => {
     renderCard(paper([owner(4, LONG, true)]));
-    expect(screen.getByText(LONG).className).toContain("[overflow-wrap:anywhere]");
-    expect(screen.getByRole("region", { name: "Contact person" }).querySelector(".truncate, .whitespace-nowrap")).toBeNull();
+    const name = screen.getByText(LONG);
+    expect(name.className).toContain("[overflow-wrap:anywhere]");
+    expect(name.closest(".truncate, .whitespace-nowrap")).toBeNull();
   });
 });

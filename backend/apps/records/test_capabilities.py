@@ -324,10 +324,10 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     } | SEATED
     # Any owner names the Contact person, on every paper in every state, and
     # nobody else does (ADR-051 decision 27, IR-801; offered since IR-803).
-    OWNS = {"change_contact_person"}
+    NAMES_CONTACT = {"change_contact_person"}
     # An owner is offered the one delete its record's status names (IR-508).
-    OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"} | OWNS
-    OWNER_PUBLISHED = {"cite", "request_deletion", "comment_review"} | OWNS
+    OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"} | NAMES_CONTACT
+    OWNER_AFTER_REVIEW = {"cite", "request_deletion", "comment_review"} | NAMES_CONTACT
     # RDCO publishes only a released paper (ADR-052 §14 as amended), so while
     # these are held it keeps them unlisted or rejects them.
     RDCO_UNSEATED = OFFICE | EMBARGO_ACTS
@@ -340,7 +340,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                    "keep_unlisted", "reject"} | EMBARGO_ACTS | SEATED | RDCO_ACTS
     EXPECTED = {
         "draft": {
-            "owner": {"cite", "continue_draft", "edit_details", "delete_record"} | OWNS, "adviser": {"cite"},
+            "owner": {"cite", "continue_draft", "edit_details", "delete_record"} | NAMES_CONTACT, "adviser": {"cite"},
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         "with_adviser_unopened": {
@@ -375,14 +375,14 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         # Published once its Adviser released it, so nothing is left to release.
         "published": {
-            "owner": OWNER_PUBLISHED,
+            "owner": OWNER_AFTER_REVIEW,
             "adviser": TAKES_PART | {"set_embargo"},
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review", "set_embargo"},
             "stranger": {"cite"},
         },
         # A stranger reading the paper learns nothing of its embargo.
         "under_embargo": {
-            "owner": OWNER_PUBLISHED,
+            "owner": OWNER_AFTER_REVIEW,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
             "rdco": OFFICE | {"comment_review"} | EMBARGO_ACTS, "stranger": {"cite"},
@@ -390,13 +390,13 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         # Unlisted (IR-878): any RDCO member is offered the later publish, held
         # back while the embargo is Active so its reason can be shown.
         "unlisted_embargoed": {
-            "owner": OWNER_PUBLISHED,
+            "owner": OWNER_AFTER_REVIEW,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
             "rdco": OFFICE | {"comment_review", "publish_unlisted"} | EMBARGO_ACTS, "stranger": None,
         },
         "unlisted_released": {
-            "owner": OWNER_PUBLISHED,
+            "owner": OWNER_AFTER_REVIEW,
             "adviser": TAKES_PART | {"set_embargo"},
             "itso": OFFICE, "ierc": OFFICE,
             "rdco": OFFICE | {"comment_review", "set_embargo", "publish_unlisted"}, "stranger": None,
@@ -412,12 +412,12 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         # An accepted Proposal's owner may continue it once (ADR-032 §6, IR-417).
         "accepted_proposal": {
-            "owner": OWNER_PUBLISHED | {"continue_as"},
+            "owner": OWNER_AFTER_REVIEW | {"continue_as"},
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },
         "continued_proposal": {
-            "owner": OWNER_PUBLISHED,
+            "owner": OWNER_AFTER_REVIEW,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },

@@ -27,6 +27,11 @@ interface PaginatedResponse<T> {
   results:  T[];
 }
 
+/** A paper's owners after an act that changes them, the Contact person first (`rdco_acts.owners_payload`). */
+interface OwnersAnswer {
+  owners: { id: number; name: string; is_primary: boolean }[];
+}
+
 export const recordsApi = {
   // Published records (paginated, filterable)
   list:           (params?: Record<string, unknown>) =>
@@ -299,14 +304,10 @@ export const recordsApi = {
       `/records/${id}/replace-adviser/`, { adviser, reason },
     ),
   addOwner:       (id: number, email: string) =>
-    apiClient.post<{ owners: { id: number; name: string; is_primary: boolean }[] }>(
-      `/records/${id}/add-owner/`, { email },
-    ),
-  /** Any owner names another owner the Contact person (ADR-051 decision 27, IR-801). */
-  changeContactPerson: (id: number, owner: number) =>
-    apiClient.post<{ owners: { id: number; name: string; is_primary: boolean }[] }>(
-      `/records/${id}/contact-person/`, { owner },
-    ),
+    apiClient.post<OwnersAnswer>(`/records/${id}/add-owner/`, { email }),
+  /** Any owner names another owner, by their user id, the Contact person (ADR-051 decision 27, IR-801). */
+  changeContactPerson: (id: number, ownerUserId: number) =>
+    apiClient.post<OwnersAnswer>(`/records/${id}/contact-person/`, { owner: ownerUserId }),
   rdcoWithdraw:   (id: number, reason: string) =>
     apiClient.post<{ id: number; withdrawn: true }>(`/records/${id}/withdraw/`, { reason }),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
