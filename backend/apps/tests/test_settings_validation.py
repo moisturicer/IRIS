@@ -386,3 +386,12 @@ def test_the_settings_module_refuses_to_start_with_too_few_days():
     after = source.split('positive_whole_number("UNVERIFIED_REGISTRATION_DAYS"')[1]
     assert after.lstrip().startswith(", UNVERIFIED_REGISTRATION_DAYS):")
     assert "raise ImproperlyConfigured(_problem)" in after.splitlines()[1]
+
+
+# ---- Celery's clock (IR-1019) ------------------------------------------------
+
+def test_celery_keeps_djangos_time_zone_explicitly():
+    # Every beat hour is written in Manila's time. Celery would follow TIME_ZONE
+    # anyway; naming it keeps a later change to either from moving them silently.
+    source = (SETTINGS_DIR / "base.py").read_text(encoding="utf-8")
+    assert "CELERY_TIMEZONE = TIME_ZONE" in source

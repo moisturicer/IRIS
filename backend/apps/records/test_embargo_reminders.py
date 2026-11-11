@@ -282,8 +282,12 @@ class ScheduleTests(TestCase):
         entry = settings.CELERY_BEAT_SCHEDULE["embargo-reminders"]
 
         self.assertEqual(entry["task"], "apps.records.tasks.send_embargo_reminders")
-        # Celery runs on UTC here, and Manila is UTC+8 with no daylight saving.
-        self.assertEqual(entry["schedule"].hour, {0})
+        # Celery's clock is Manila's (CELERY_TIMEZONE = TIME_ZONE), so the hour is
+        # Manila's. It said {0} on the belief that Celery ran on UTC, which sent
+        # the reminders at midnight Manila (IR-1019).
+        from config.celery import app
+        self.assertEqual(str(app.timezone), "Asia/Manila")
+        self.assertEqual(entry["schedule"].hour, {8})
         self.assertEqual(entry["schedule"].minute, {0})
 
     def test_the_task_runs_the_reminders(self):

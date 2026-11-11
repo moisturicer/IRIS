@@ -358,7 +358,10 @@ CELERY_TASK_ROUTES = {
     # IR-466: its own concurrency-1 worker, apart from reader work.
 }
 
-# The `celery-beat` service's entries. Each reminder task asks the database what
+# The `celery-beat` service's entries. **Every hour here is Manila's**: Celery's
+# clock is CELERY_TIMEZONE, set to TIME_ZONE below (IR-1019). Two entries once
+# converted Manila to UTC by hand and ran 8 hours early.
+# Each reminder task asks the database what
 # is owed, so the schedule of reminders lives in data and a missed tick is
 # caught up by the next one. Deadlines are ADR-043 §8 (IR-620): hourly, on `default`.
 CELERY_BEAT_SCHEDULE = {
@@ -367,23 +370,21 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute=0),
     },
     # ADR-052 §9 (IR-814): embargo review reminders, daily at 08:00 Manila.
-    # Celery runs on UTC here, and Manila is UTC+8 with no daylight saving.
     "embargo-reminders": {
         "task": "apps.records.tasks.send_embargo_reminders",
-        "schedule": crontab(hour=0, minute=0),
+        "schedule": crontab(hour=8, minute=0),
     },
     # ADR-051 decision 19 (IR-794): erase personal data past the periods the System
     # Admin set, daily at 03:00 Manila. Each type's period is a system setting, and
     # a blank one erases nothing.
     "retention-cleanup": {
         "task": "apps.audit.tasks.erase_expired_personal_data",
-        "schedule": crontab(hour=19, minute=0),
+        "schedule": crontab(hour=3, minute=0),
     },
     # ADR-051 decision 24 (IR-705): remove unverified registrations older than
     # UNVERIFIED_REGISTRATION_DAYS, daily at 03:00 Manila.
     "unverified-registrations": {
         "task": "apps.accounts.tasks.expire_unverified_registrations",
-        # Celery reads TIME_ZONE (Asia/Manila), so this hour is Manila's.
         "schedule": crontab(hour=3, minute=0),
     },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
@@ -1140,6 +1141,9 @@ AXES_LOCKOUT_CALLABLE = "apps.accounts.lockout.lockout_response"
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Manila"
+# Celery would follow TIME_ZONE on its own. Named so the beat hours above, all
+# written in Manila's time, can't move with a change to either one (IR-1019).
+CELERY_TIMEZONE = TIME_ZONE
 USE_I18N = True
 USE_TZ = True
 
