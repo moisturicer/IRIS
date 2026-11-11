@@ -106,7 +106,7 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 **Development** (`docker-compose.yml`) publishes Postgres and Redis on `127.0.0.1` only, and Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)). `backend` and `frontend` are still published on every interface (§11). The `docling` service was removed by IR-843.
 
-**TLS.** nginx listens on plain 8080 and takes the scheme from the proxy in front of it, so TLS must end upstream. This repository doesn't configure that proxy (§11).
+**TLS.** nginx listens on plain 8080 and takes the scheme from the proxy in front of it, so TLS ends upstream. In production that proxy is Caddy (`deploy/caddy/Caddyfile`, ADR-057, [IR-847](https://citiris.atlassian.net/browse/IR-847)). It allows only TLS 1.2 and 1.3, redirects plain HTTP with a 308, and adds HSTS to every response. All three were checked on iris-demo on 2026-11-11 ([IR-806](https://citiris.atlassian.net/browse/IR-806)). A full cipher scan of the deployed domain is still owed (ASVS 9.1.2).
 
 **Django admin.** Django serves its admin only at `/django-admin/` ([IR-782](https://citiris.atlassian.net/browse/IR-782)), and nginx closes that path except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)). `/admin/...` and `/rdco/...` are IRIS's own pages: nginx serves them the app and proxies nothing there to Django.
 
@@ -190,7 +190,6 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 1 | Django's admin has no MFA. Since IR-782 it is served only at `/django-admin/`, and nginx's network allowlist is the one control in front of `is_staff` | **High** | One stolen staff password, from an allowlisted network, opens a separate path to the database | MFA, once CIT-U IT provides an identity provider ([IR-652](https://citiris.atlassian.net/browse/IR-652)); the allowlist is [IR-668](https://citiris.atlassian.net/browse/IR-668) |
 | 2 | Uploads aren't scanned for malware | **High** | A hostile file reaches the parser and the people who download it | [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)) |
 | 3 | No backups and no rehearsed restore | **High** | A lost disk loses records that can't be recreated | [IR-167](https://citiris.atlassian.net/browse/IR-167) (parent [IR-151](https://citiris.atlassian.net/browse/IR-151)) |
-| 4 | TLS is configured but hasn't run on a deployed domain, and HSTS isn't confirmed for one | **High** | Passwords, tokens and unpublished work could be read in transit until it has | [IR-847](https://citiris.atlassian.net/browse/IR-847), [IR-806](https://citiris.atlassian.net/browse/IR-806) |
 | 5 | Security-relevant sign-in events leave no audit row | **Medium** | Password guessing leaves nothing to investigate | [IR-659](https://citiris.atlassian.net/browse/IR-659) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 6 | Registration accepts any email domain | **Medium** | Anyone can get a signed-in account | [IR-660](https://citiris.atlassian.net/browse/IR-660) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 8 | Consent has no version and can't be withdrawn, and the notice lacks DPO review | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-789](https://citiris.atlassian.net/browse/IR-789), [IR-791](https://citiris.atlassian.net/browse/IR-791), [IR-123](https://citiris.atlassian.net/browse/IR-123) |
@@ -233,6 +232,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | Manuscript downloads without a time-limited, signed-in grant | [IR-675](https://citiris.atlassian.net/browse/IR-675) |
 | Downloaded manuscripts didn't identify the downloader | [IR-676](https://citiris.atlassian.net/browse/IR-676) |
 | No authorization matrix across every route | [IR-615](https://citiris.atlassian.net/browse/IR-615), [IR-616](https://citiris.atlassian.net/browse/IR-616) |
+| TLS configured but never run on a deployed domain, and HSTS not confirmed there | [IR-847](https://citiris.atlassian.net/browse/IR-847), [IR-806](https://citiris.atlassian.net/browse/IR-806) |
 
 ---
 
