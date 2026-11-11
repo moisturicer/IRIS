@@ -233,6 +233,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1015** | Cost and uptime guards for one server: an account budget alert, an alarm that recovers the instance, and an optional daily stop and start, each optional — epic IR-805; no FR- id. PR [#676](https://github.com/moisturicer/IRIS/pull/676); verified on iris-demo 2026-11-11 | [details](traceability/IR-1015.md) | **VERIFIED** |
 | **IR-1016** | The server's logs are read without SSH, through a free Session Manager shell; CloudWatch Logs deferred — epic IR-805; no FR- id. PR [#678](https://github.com/moisturicer/IRIS/pull/678); checked on iris-demo 2026-11-11 | [details](traceability/IR-1016.md) | **VERIFIED** |
 | **IR-1017** | Every production service rotates its logs (10 MB × 3), so none can fill the disk, and CI checks it — epic IR-805; no FR- id. Awaits applying on iris-demo | [details](traceability/IR-1017.md) | **IMPLEMENTED** |
+| **IR-1018** | The server updates to `main` with one command that pulls, checks, rebuilds, waits for health and reports, and stops at the first failing step; CI checks it against a fake docker — epic IR-805; no FR- id. Awaits a real update on iris-demo | [details](traceability/IR-1018.md) | **IMPLEMENTED** |
 
 ### Non-functional
 
