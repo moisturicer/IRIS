@@ -47,6 +47,17 @@ def request_received() -> dict:
     }
 
 
+def rate_limited(retry_after: int):
+    """ADR-045's retry guidance: a 429 saying how long to wait. Registration
+    answers a full recipient the same way (IR-705)."""
+    response = Response(
+        {"code": "rate_limited", "detail": "Too many requests. Try again later.", "retry_after": retry_after},
+        status=429,
+    )
+    response["Retry-After"] = str(retry_after)
+    return _no_store(response)
+
+
 class FieldErrors(Exception):
     def __init__(self, errors: dict):
         super().__init__(errors)
@@ -122,13 +133,7 @@ class RecoveryView(APIView):
 
     def handle_exception(self, exc):
         if isinstance(exc, limits.Throttled):
-            response = Response(
-                {"code": "rate_limited", "detail": "Too many requests. Try again later.",
-                 "retry_after": exc.retry_after},
-                status=429,
-            )
-            response["Retry-After"] = str(exc.retry_after)
-            return _no_store(response)
+            return rate_limited(exc.retry_after)
         if isinstance(exc, FieldErrors):
             return _no_store(Response({"code": "validation_error", "errors": exc.errors}, status=400))
         if isinstance(exc, service.PasswordRejected):

@@ -170,6 +170,29 @@ class AuthorizationMatrixTests(APITestCase):
         """
         self.assert_only(["RDCO", "System Admin"], "get", reverse("user-list"))
 
+    def test_rdco_sees_verified_accounts_only(self):
+        """
+        ADR-051 decision 22 (IR-705): RDCO never sees an unverified registration.
+        Its user detail and its role request are not found to RDCO, as if they
+        didn't exist, while the System Admin still sees the account. The other
+        roles are refused by the role gate before any lookup. The 404s here are
+        object-level hiding, not a refusal, which is why this case names them.
+        """
+        from apps.accounts.models import RoleRequest
+
+        pending = make_user("unverified@cit.edu", is_verified=False)
+        request = RoleRequest.objects.create(user=pending, requested_role=Role.objects.get(name="Student"))
+        for role in ALL_ROLES:
+            self.client.force_authenticate(self.users[role])
+            detail = self.client.get(reverse("user-detail", args=[pending.pk])).status_code
+            approve = self.client.patch(reverse("role-request-detail", args=[request.pk]),
+                                        {"action": "approve"}, format="json").status_code
+            with self.subTest(role=role):
+                self.assertEqual(detail, {"RDCO": 404, "System Admin": 200}.get(role, 403))
+                self.assertEqual(approve, 404 if role == "RDCO" else 403)
+        pending.refresh_from_db()
+        self.assertIsNone(pending.role)
+
     def test_change_user_role_is_rdco_and_the_system_admin_only(self):
         target = make_user("target@cit.edu", "Student")
         self.assert_only(

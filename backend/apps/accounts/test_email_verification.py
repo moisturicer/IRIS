@@ -127,7 +127,10 @@ class JourneyTests(VerificationTestCase):
         self.assertEqual(message.subject, "Verify your IRIS email address")
         self.assertIn("https://iris.example.edu/verify-email#token=", message.body)
         self.assertIn(f"expires at {token.expires_at.isoformat()} UTC", message.body)
-        self.assertIn("If you did not request this, ignore this email.", message.body)
+        # ADR-051 decision 26 (IR-705) replaced "If you did not request this,
+        # ignore this email." with who registered and when the account goes.
+        self.assertIn("New Comer registered for an IRIS account", message.body)
+        self.assertIn("If this wasn't you, ignore it. The account is deleted in 30 days.", message.body)
         self.assertIn("contact RDCO or your department administrator", message.body)
         for word in ("approve", "Student", "role", "password"):
             self.assertNotIn(word, message.body)

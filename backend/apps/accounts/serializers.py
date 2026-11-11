@@ -253,6 +253,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             "agree_dpa", "ai_consent", "notice_version",
             "role_name", "course_id", "college_id", "department_id",
         ]
+        # The model's unique check would refuse an unverified registration that
+        # registering again replaces (IR-705); `validate_email` decides instead,
+        # and the view checks again under its lock before saving.
+        extra_kwargs = {"email": {"validators": []}}
 
     def validate_email(self, value):
         # Only the institution's domains may register (IR-660). Exact and case-
@@ -263,8 +267,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         if domains and value.rsplit("@", 1)[-1].strip().lower() not in domains:
             named = " or ".join(f"@{domain}" for domain in domains)
             raise serializers.ValidationError(f"Register with your institutional email address, ending in {named}.")
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError("This email address is already registered.")
+        # An unverified registration nothing links to is replaced instead (ADR-051
+        # decision 25, IR-705): the view removes it once the send limit allows.
+        from .unverified import ALREADY_REGISTERED, address_is_free
+
+        if not address_is_free(value):
+            raise serializers.ValidationError(ALREADY_REGISTERED)
         return value
 
     def validate_agree_dpa(self, value):
