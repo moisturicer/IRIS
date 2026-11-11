@@ -1,0 +1,52 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+left to right direction
+skinparam nodesep 6
+skinparam ranksep 30
+title D-14b  AI runtime schema (iris_ai): manuscripts and indexing
+caption Generated from ai/runs/migrations/*.sql on main (IR-1021). Owned by the AI runtime; Django never writes it (ADR-049).\nCrow's foot: three prongs many, bar exactly one, circle zero allowed. PK primary key, FK foreign key.\nM2M many-to-many. Grey box: drawn in full on another diagram.\nDashed arrow: a Django id held without a DB constraint.
+class "manuscript_receipt" as ia_manuscript_receipt <<ai>> {
+  <b>work_id</b> : PK
+  record_id : Django id, no DB constraint
+  <i>+ 3 more columns</i>
+}
+class "manuscript_invalidation_receipt" as ia_manuscript_invalidation_receipt <<ai>> {
+  <b>event_id</b> : PK
+  <i>+ 1 more columns</i>
+}
+class "extraction_job" as ia_extraction_job <<ai>> {
+  <b>work_id</b> : PK
+  <b>pipeline</b> : PK
+  <i>+ 5 more columns</i>
+}
+class "extraction_revision" as ia_extraction_revision <<ai>> {
+  <b>work_id</b> : PK
+  <b>pipeline</b> : PK
+  record_id : Django id, no DB constraint
+  <i>+ 3 more columns</i>
+}
+class "index_job" as ia_index_job <<ai>> {
+  <b>id</b> : PK
+  record_id : Django id, no DB constraint
+  space_id : Django id, no DB constraint
+  <i>+ 12 more columns</i>
+}
+class "embedding_batch" as ia_embedding_batch <<ai>> {
+  <b>job_id</b> : PK, FK → index_job
+  <b>ordinal</b> : PK
+  <i>+ 2 more columns</i>
+}
+class "active_source" as ia_active_source <<ai>> {
+  <b>record_id</b> : PK
+  job_id : FK → index_job
+}
+class "Record\n<size:9>(records, Django)</size>" as dj_record <<ref>>
+ia_embedding_batch |o--|| ia_index_job
+ia_active_source }o--|| ia_index_job
+ia_manuscript_receipt ..> dj_record
+ia_extraction_revision ..> dj_record
+ia_index_job ..> dj_record
+ia_active_source ..> dj_record
+@enduml

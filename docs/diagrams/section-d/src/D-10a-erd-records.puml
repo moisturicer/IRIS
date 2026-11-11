@@ -1,0 +1,119 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+left to right direction
+skinparam nodesep 6
+skinparam ranksep 30
+title D-10a  Records, versions and authorship
+caption Generated from backend/apps/*/models*.py on main (IR-1021). Every key shown; other fields counted. Links to User appear as FK attributes only.\nCrow's foot: three prongs many, bar exactly one, circle zero allowed. PK primary key, FK foreign key.\nM2M many-to-many. Grey box: drawn in full on another diagram.
+  class "Author" as records_Author {
+    <b>id</b> : PK
+    record : FK → Record
+    role : FK → AuthorRole
+    <i>+ 1 more fields</i>
+  }
+  class "AuthorRole" as records_AuthorRole {
+    <b>id</b> : PK
+    <i>+ 1 more fields</i>
+  }
+  class "Classification" as records_Classification {
+    <b>id</b> : PK
+    <i>+ 1 more fields</i>
+  }
+  class "Conference" as records_Conference {
+    <b>id</b> : PK
+    record : FK → Record
+    level : FK → ConferenceLevel
+    <i>+ 3 more fields</i>
+  }
+  class "ConferenceLevel" as records_ConferenceLevel {
+    <b>id</b> : PK
+    <i>+ 1 more fields</i>
+  }
+  class "PSCEDClassification" as records_PSCEDClassification {
+    <b>id</b> : PK
+    <i>+ 1 more fields</i>
+  }
+  class "Publication" as records_Publication {
+    <b>id</b> : PK
+    record : FK unique → Record
+    level : FK → PublicationLevel
+    <i>+ 4 more fields</i>
+  }
+  class "PublicationLevel" as records_PublicationLevel {
+    <b>id</b> : PK
+    <i>+ 1 more fields</i>
+  }
+  class "Record" as records_Record {
+    <b>id</b> : PK
+    classification : FK → Classification
+    psced : FK → PSCEDClassification
+    record_type : FK → RecordType
+    adviser : FK → User
+    added_by : FK → User
+    dpa_accepted_by : FK → User
+    embargo_date_set_by : FK → User
+    embargo_released_by : FK → User
+    ip_released_by : FK → User
+    deleted_by : FK → User
+    derived_from : FK → Record
+    <i>+ 40 more fields</i>
+  }
+  class "RecordOwner" as records_RecordOwner {
+    <b>id</b> : PK
+    record : FK → Record
+    user : FK → User
+    <i>+ 1 more fields</i>
+  }
+  class "RecordType" as records_RecordType {
+    <b>id</b> : PK
+    <i>+ 1 more fields</i>
+  }
+  class "RecordVersion" as records_RecordVersion {
+    <b>id</b> : PK
+    record : FK → Record
+    created_by : FK → User
+    review_text : FK → ReviewText
+    <i>+ 8 more fields</i>
+  }
+  class "RecordVersionDocument" as records_RecordVersionDocument {
+    <b>id</b> : PK
+    version : FK → RecordVersion
+    upload : FK → RecordUpload
+  }
+  class "ResearchLink" as records_ResearchLink {
+    <b>id</b> : PK
+    proposal : FK unique → Record
+    thesis : FK unique → Record
+  }
+  class "ReviewText" as records_ReviewText {
+    <b>id</b> : PK
+    record : FK → Record
+    <i>+ 11 more fields</i>
+  }
+  class "ReviewTextSection" as records_ReviewTextSection {
+    <b>id</b> : PK
+    text : FK → ReviewText
+    <i>+ 6 more fields</i>
+  }
+class "RecordUpload\n<size:9>(documents)</size>" as documents_RecordUpload <<ref>>
+records_Author }o--o| records_AuthorRole
+records_Author }o--|| records_Record
+records_Conference }o--o| records_ConferenceLevel
+records_Conference }o--|| records_Record
+records_Publication |o--|| records_Record
+records_Publication }o--o| records_PublicationLevel
+records_Record }o--o| records_Classification
+records_Record }o--o| records_PSCEDClassification
+records_Record }o--o| records_Record
+records_Record }o--o| records_RecordType
+records_RecordOwner }o--|| records_Record
+records_RecordVersion }o--o| records_ReviewText
+records_RecordVersion }o--|| records_Record
+records_RecordVersionDocument }o--|| documents_RecordUpload
+records_RecordVersionDocument }o--|| records_RecordVersion
+records_ResearchLink |o--|| records_Record
+records_ReviewText }o--|| records_Record
+records_ReviewTextSection }o--|| records_ReviewText
+@enduml

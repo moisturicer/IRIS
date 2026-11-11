@@ -1,43 +1,30 @@
 @startuml
 !include ../iris-style.puml
+skinparam ranksep 24
 title D-17  Manuscript processing: upload to searchable passages
-caption From apps/documents/tasks.py, apps/ai/tasks.py, apps/records/tasks.py, CELERY_TASK_ROUTES and ADR-052, ADR-054, ADR-056, ADR-058 on main (IR-1021).
+caption From apps/documents/tasks.py, apps/ai/tasks.py, apps/records/tasks.py, CELERY_TASK_ROUTES and ADR-052, ADR-054, ADR-056, ADR-058 on main (IR-1021).\nEach step names, in bold, the service that runs it (IR-1022: one column instead of seven swimlanes).
 
-|Author|
 start
-:Upload the manuscript PDF;
-|Django (backend)|
-:Check it is a real PDF with at least one page\nand at most 50 MB (validators, IR-665);
-:Save the Version and its file;
+:<b>Author</b>\nUpload the manuscript PDF;
+:<b>Django (backend)</b>\n1. Check it is a real PDF, at least one page, at most 50 MB (validators, IR-665)\n2. Save the Version and its file;
 fork
-  |celery-default|
-  :read_review_text: pdfplumber on campus\n(no AI, every Version, ADR-058);
+  :<b>celery-default</b>\nread_review_text: pdfplumber on campus\n(no AI, every Version, ADR-058);
   detach
 fork again
-  |celery-extraction|
-  :extract_manuscript_text;
+  :<b>celery-extraction</b>\nextract_manuscript_text;
 end fork
 if (Embargo released and Contact person\nanswered Yes to AI use? (ADR-052, ADR-054)) then (yes)
-  :Admit the paid call when provider\nadmission is enforced (ADR-041);
-  |LlamaParse|
-  :Parse the PDF into structure;
-  |celery-extraction|
-  :Store PdfExtraction and Figures;
+  :<b>celery-extraction</b>\nAdmit the paid call when provider\nadmission is enforced (ADR-041);
+  :<b>LlamaParse</b> (external)\nParse the PDF into structure;
+  :<b>celery-extraction</b>\nStore PdfExtraction and Figures;
 else (no)
   :Stop: nothing leaves campus;
   stop
 endif
-|celery-default|
-:chunk_extraction: labelled-structure chunks\n(voyage-context-4 tokens, ceiling 700);
-:Swap in the new ChunkSet atomically;
-|celery-embedding|
-:embed_chunk_set;
-|Voyage AI|
-:Contextualized chunk embeddings;
-|celery-embedding|
-:Store ChunkEmbedding (pgvector, HNSW);
-:generate_record_overview\n(needs a summary model);
-|AI runtime|
-:Search, read and cite the passages\nfor readers who may read the paper;
+:<b>celery-default</b>\n1. chunk_extraction: labelled-structure chunks (voyage-context-4 tokens, ceiling 700)\n2. Swap in the new ChunkSet atomically;
+:<b>celery-embedding</b>\nembed_chunk_set;
+:<b>Voyage AI</b> (external)\nContextualized chunk embeddings;
+:<b>celery-embedding</b>\n1. Store ChunkEmbedding (pgvector, HNSW)\n2. generate_record_overview (needs a summary model);
+:<b>AI runtime</b>\nSearch, read and cite the passages\nfor readers who may read the paper;
 stop
 @enduml

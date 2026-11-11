@@ -1,0 +1,111 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+left to right direction
+skinparam nodesep 6
+skinparam ranksep 30
+title D-13b  Earlier conversations and Ask IRIS runs (Django side)
+caption Generated from backend/apps/*/models*.py on main (IR-1021). Every key shown; other fields counted. Links to User appear as FK attributes only.\nCrow's foot: three prongs many, bar exactly one, circle zero allowed. PK primary key, FK foreign key.\nM2M many-to-many. Grey box: drawn in full on another diagram.\nMuted box: table kept, read only since IR-957.
+  class "AskRun" as ai_AskRun {
+    <b>id</b> : PK
+    user : FK → User
+    conversation : FK → Conversation
+    current_attempt : FK → AskRunAttempt
+    turn : FK unique → Turn
+    retry_of : FK unique → AskRun
+    <i>+ 7 more fields</i>
+  }
+  class "AskRunAttempt" as ai_AskRunAttempt {
+    <b>id</b> : PK
+    run : FK → AskRun
+    research_run : FK → ResearchRun
+    <i>+ 4 more fields</i>
+  }
+  class "AskRunEvent" as ai_AskRunEvent {
+    <b>id</b> : PK
+    run : FK → AskRun
+    attempt : FK → AskRunAttempt
+    <i>+ 4 more fields</i>
+  }
+  class "ChatSubmission" as ai_ChatSubmission <<retained>> {
+    <b>id</b> : PK
+    conversation : FK → Conversation
+    turn : FK unique → Turn
+    run : FK unique → AskRun
+    <i>+ 5 more fields</i>
+  }
+  class "Conversation" as ai_Conversation {
+    <b>id</b> : PK
+    user : FK → User
+    record : FK → Record
+    <i>+ 4 more fields</i>
+  }
+  class "ConversationState" as ai_ConversationState <<retained>> {
+    <b>conversation</b> : PK
+    answer_turn : FK → Turn
+    <i>+ 12 more fields</i>
+  }
+  class "ResearchRun" as ai_ResearchRun <<retained>> {
+    <b>id</b> : PK
+    user : FK → User
+    conversation : FK → Conversation
+    <i>+ 7 more fields</i>
+  }
+  class "ResearchStep" as ai_ResearchStep <<retained>> {
+    <b>id</b> : PK
+    run : FK → ResearchRun
+    <i>+ 9 more fields</i>
+  }
+  class "ScreeningJudgment" as ai_ScreeningJudgment <<retained>> {
+    <b>id</b> : PK
+    user : FK → User
+    record : FK → Record
+    <i>+ 6 more fields</i>
+  }
+  class "ShadowEvidenceDecision" as ai_ShadowEvidenceDecision <<retained>> {
+    <b>id</b> : PK
+    turn : FK unique → Turn
+    <i>+ 15 more fields</i>
+  }
+  class "ShadowEvidenceTally" as ai_ShadowEvidenceTally <<retained>> {
+    <b>id</b> : PK
+    <i>+ 2 more fields</i>
+  }
+  class "Turn" as ai_Turn {
+    <b>id</b> : PK
+    conversation : FK → Conversation
+    <i>+ 16 more fields</i>
+  }
+  class "TurnCitation" as ai_TurnCitation {
+    <b>id</b> : PK
+    turn : FK → Turn
+    record : FK → Record
+    chunk : FK → DocumentChunk
+    <i>+ 2 more fields</i>
+  }
+class "DocumentChunk\n<size:9>(ai)</size>" as ai_DocumentChunk <<ref>>
+class "Record\n<size:9>(records)</size>" as records_Record <<ref>>
+ai_AskRun |o--o| ai_AskRun
+ai_AskRun |o--o| ai_Turn
+ai_AskRun }o--o| ai_AskRunAttempt
+ai_AskRun }o--|| ai_Conversation
+ai_AskRunAttempt }o--o| ai_ResearchRun
+ai_AskRunAttempt }o--|| ai_AskRun
+ai_AskRunEvent }o--o| ai_AskRunAttempt
+ai_AskRunEvent }o--|| ai_AskRun
+ai_ChatSubmission |o--o| ai_AskRun
+ai_ChatSubmission |o--o| ai_Turn
+ai_ChatSubmission }o--|| ai_Conversation
+ai_Conversation }o--o| records_Record
+ai_ConversationState |o--|| ai_Conversation
+ai_ConversationState }o--o| ai_Turn
+ai_ResearchRun }o--o| ai_Conversation
+ai_ResearchStep }o--|| ai_ResearchRun
+ai_ScreeningJudgment }o--|| records_Record
+ai_ShadowEvidenceDecision |o--|| ai_Turn
+ai_Turn }o--|| ai_Conversation
+ai_TurnCitation }o--o| ai_DocumentChunk
+ai_TurnCitation }o--|| ai_Turn
+ai_TurnCitation }o--|| records_Record
+@enduml

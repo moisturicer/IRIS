@@ -1,6 +1,6 @@
 @startuml
 !include ../iris-style.puml
-skinparam LineType polyline
+skinparam LineType ortho
 title D-20  Workflow core classes (the thesis contribution)
 caption Models from backend/apps/records and backend/apps/reviews; operations are the service functions in reviews/routing.py, seats.py, revisions.py, new_version.py, decisions.py, office_review.py and records/embargo.py on main (IR-1021).
 show methods

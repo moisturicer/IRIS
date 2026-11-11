@@ -1,6 +1,6 @@
 @startuml
 !include ../iris-style.puml
-skinparam LineType splines
+skinparam LineType ortho
 skinparam rectangle {
   BackgroundColor #FFFFFF
   BorderColor #0369A1

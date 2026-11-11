@@ -1,13 +1,13 @@
 @startuml
 !include ../iris-style.puml
-skinparam LineType splines
+skinparam LineType ortho
 skinparam rectangle {
   BackgroundColor #FFFFFF
   BorderColor #0369A1
 }
 left to right direction
 title D-1  Use case overview: actors and subsystems
-caption Roles from frontend/src/lib/access.ts and core/permissions.py on main (IR-1021). Each subsystem is drawn in full on D-2 to D-7.
+caption Roles from frontend/src/lib/access.ts and core/permissions.py on main (IR-1021). Each subsystem is drawn in full on D-2 to D-7.\nHollow arrowhead: the actor is a kind of the actor it points to. Yellow: external system; green: AI-assisted.\nThe System Admin does not use the research screens (Ask IRIS, My Library).
 
 actor "Visitor\n(not signed in)" as Visitor
 actor "Signed-in user" as User
@@ -51,10 +51,4 @@ Admin --> S6
 S1 --> Mail
 S2 --> AIP
 S5 --> AIP
-
-legend right
-  Arrow with hollow head: the actor is a kind of the actor it points to
-  Yellow: external system · green: AI-assisted
-  The System Admin does not use the research screens (Ask IRIS, My Library)
-endlegend
 @enduml

@@ -1,8 +1,10 @@
 @startuml
 !include ../iris-style.puml
-skinparam LineType polyline
+skinparam LineType ortho
+skinparam nodesep 8
+skinparam ranksep 28
 title D-21  AI runtime classes: ports and adapters
-caption From ai/ on main (IR-1021): api/, runs/, agent/, research/, admission/, domain/ports.py and infrastructure/. ADR-014, ADR-049.
+caption From ai/ on main (IR-1021): api/, runs/, agent/, research/, admission/, domain/ports.py and infrastructure/. ADR-014, ADR-049.\nDashed arrow with hollow head: implements the port. Muted classes: test doubles (recording and fake adapters).
 show methods
 skinparam class<<test>> {
   BackgroundColor #F1F5F9
@@ -74,6 +76,9 @@ package "infrastructure (adapters)" {
 }
 class "PostgreSQL iris_ai schema" as db <<ref>>
 
+OpenAICompatibleAgentProvider -[hidden]down- RecordingAgentProvider
+OpenAIEmbeddingProvider -[hidden]down- DeterministicFakeEmbeddingProvider
+
 api --> RunService
 worker --> RunService
 RunService --> RunStore
@@ -91,8 +96,4 @@ DeterministicFakeEmbeddingProvider ..|> EmbeddingProvider
 RunStore --> db
 ResearchTools --> db : under the reader's grant
 
-legend right
-  Dashed arrow with hollow head: implements the port
-  Muted classes: test doubles (recording and fake adapters)
-endlegend
 @enduml

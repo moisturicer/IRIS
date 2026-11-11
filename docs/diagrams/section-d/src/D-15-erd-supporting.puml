@@ -2,34 +2,30 @@
 !include ../iris-style.puml
 hide methods
 skinparam LineType ortho
+left to right direction
+skinparam nodesep 6
+skinparam ranksep 30
 title D-15  Notifications, audit, library and opportunities
-caption Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. Links to User appear as FK attributes only.
+caption Generated from backend/apps/*/models*.py on main (IR-1021). Every key shown; other fields counted. Links to User appear as FK attributes only.\nCrow's foot: three prongs many, bar exactly one, circle zero allowed. PK primary key, FK foreign key.\nM2M many-to-many. Grey box: drawn in full on another diagram.
 package "audit" {
   class "AuditEvent" as audit_AuditEvent {
     <b>id</b> : PK
     user : FK → User
     record : FK → Record
-    event_type : Char
-    metadata : JSON
-    created_at : DateTime
+    <i>+ 3 more fields</i>
   }
 }
 package "library" {
   class "SavedFeed" as library_SavedFeed {
     <b>id</b> : PK
     owner : FK → User
-    name : Char
-    query : JSON
-    created_at : DateTime
-    updated_at : DateTime
+    <i>+ 4 more fields</i>
   }
   class "SavedRecord" as library_SavedRecord {
     <b>id</b> : PK
     owner : FK → User
     record : FK → Record
-    reading_status : Char
-    saved_at : DateTime
-    updated_at : DateTime
+    <i>+ 3 more fields</i>
   }
 }
 package "notifications" {
@@ -40,29 +36,24 @@ package "notifications" {
     broadcast_to_role : FK → Role
     record : FK → Record
     notif_type : FK → NotificationType
-    message : Text
-    created_at : DateTime
+    <i>+ 2 more fields</i>
   }
   class "NotificationRead" as notifications_NotificationRead {
     <b>id</b> : PK
     notification : FK → Notification
     user : FK → User
-    read_at : DateTime
+    <i>+ 1 more fields</i>
   }
   class "NotificationType" as notifications_NotificationType {
     <b>id</b> : PK
-    name : Char
+    <i>+ 1 more fields</i>
   }
 }
 package "opportunities" {
   class "Opportunity" as opportunities_Opportunity {
     <b>id</b> : PK
     posted_by : FK → User
-    opportunity_type : Char
-    title : Char
-    posting_office : Char
-    audience : Char
-    <i>… 9 more fields</i>
+    <i>+ 13 more fields</i>
   }
 }
 class "Role\n<size:9>(accounts)</size>" as accounts_Role <<ref>>
@@ -73,10 +64,4 @@ notifications_Notification }o--o| accounts_Role
 notifications_Notification }o--o| records_Record
 notifications_Notification }o--|| notifications_NotificationType
 notifications_NotificationRead }o--|| notifications_Notification
-legend right
-  <b>Notation</b> (crow's foot)
-  three-pronged end: many · bar: exactly one · circle: zero allowed
-  PK primary key · FK foreign key · M2M many-to-many
-  grey box: entity drawn in full on another diagram
-endlegend
 @enduml

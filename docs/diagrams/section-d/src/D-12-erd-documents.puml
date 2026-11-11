@@ -2,8 +2,11 @@
 !include ../iris-style.puml
 hide methods
 skinparam LineType ortho
+left to right direction
+skinparam nodesep 6
+skinparam ranksep 30
 title D-12  Documents, extraction and manuscript processing
-caption Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. Links to User appear as FK attributes only.
+caption Generated from backend/apps/*/models*.py on main (IR-1021). Every key shown; other fields counted. Links to User appear as FK attributes only.\nCrow's foot: three prongs many, bar exactly one, circle zero allowed. PK primary key, FK foreign key.\nM2M many-to-many. Grey box: drawn in full on another diagram.
 package "documents" {
   class "DocumentRequest" as documents_DocumentRequest {
     <b>id</b> : PK
@@ -11,59 +14,36 @@ package "documents" {
     assignment : FK → RecordAssignment
     requested_by : FK → User
     closed_by_decision : FK → Review
-    party : Char
-    message : Text
-    state : Char
-    created_at : DateTime
-    <i>… 1 more fields</i>
+    <i>+ 5 more fields</i>
   }
   class "DocumentRequestItem" as documents_DocumentRequestItem {
     <b>id</b> : PK
     request : FK → DocumentRequest
     slot : FK → UploadSlot
     upload : FK → RecordUpload
-    label : Char
-    state : Char
-    sort_order : PositiveInteger
-    rejection_reason : Text
-    <i>… 1 more fields</i>
+    <i>+ 5 more fields</i>
   }
   class "ExtractionFigure" as documents_ExtractionFigure {
     <b>id</b> : PK
     extraction : FK → PdfExtraction
-    source_revision : UUID
-    page : PositiveInteger
-    bbox : JSON
-    caption : Text
-    <i>… 5 more fields</i>
+    <i>+ 9 more fields</i>
   }
   class "ManuscriptMetadata" as documents_ManuscriptMetadata {
     <b>id</b> : PK
     extraction : FK → PdfExtraction
-    source_revision : UUID
-    status : Char
-    attempt : UUID
-    result : JSON
-    <i>… 4 more fields</i>
+    <i>+ 8 more fields</i>
   }
   class "PdfExtraction" as documents_PdfExtraction {
     <b>id</b> : PK
     upload : FK unique → RecordUpload
     record : FK unique → Record
-    status : Char
-    source_revision : UUID
-    source_file : Char
-    attempt : UUID
-    <i>… 16 more fields</i>
+    <i>+ 20 more fields</i>
   }
   class "RecordFile" as documents_RecordFile {
     <b>id</b> : PK
     record : FK → Record
     uploaded_by : FK → User
-    file : File
-    filename : Char
-    party : Char
-    created_at : DateTime
+    <i>+ 4 more fields</i>
   }
   class "RecordUpload" as documents_RecordUpload {
     <b>id</b> : PK
@@ -71,47 +51,35 @@ package "documents" {
     slot : FK → UploadSlot
     status : FK → UploadStatus
     uploaded_by : FK → User
-    file : File
-    version : PositiveInteger
-    created_at : DateTime
+    <i>+ 3 more fields</i>
   }
   class "UploadReview" as documents_UploadReview {
     <b>id</b> : PK
     upload : FK → RecordUpload
     reviewed_by : FK → User
     status : FK → UploadStatus
-    comment : Text
-    created_at : DateTime
+    <i>+ 2 more fields</i>
   }
   class "UploadSlot" as documents_UploadSlot {
     <b>id</b> : PK
     record_type : FK → RecordType
     record : FK → Record
-    name : Char
-    is_required : Boolean
+    <i>+ 2 more fields</i>
   }
   class "UploadStatus" as documents_UploadStatus {
     <b>id</b> : PK
-    name : Char
+    <i>+ 1 more fields</i>
   }
 }
 package "publication" {
   class "ManuscriptInvalidation" as publication_ManuscriptInvalidation {
     <b>id</b> : PK
-    record_id : BigInteger
-    work_id : UUID
-    reason : Char
-    authority_generation : PositiveBigInteger
-    <i>… 1 more fields</i>
+    <i>+ 5 more fields</i>
   }
   class "ManuscriptWork" as publication_ManuscriptWork {
     <b>id</b> : PK
     record : FK → Record
-    revision : UUID
-    source_file : Text
-    operation : Char
-    created_at : DateTime
-    <i>… 4 more fields</i>
+    <i>+ 8 more fields</i>
   }
 }
 class "Record\n<size:9>(records)</size>" as records_Record <<ref>>
@@ -137,10 +105,4 @@ documents_UploadReview }o--|| documents_RecordUpload
 documents_UploadSlot }o--o| records_Record
 documents_UploadSlot }o--|| records_RecordType
 publication_ManuscriptWork }o--|| records_Record
-legend right
-  <b>Notation</b> (crow's foot)
-  three-pronged end: many · bar: exactly one · circle: zero allowed
-  PK primary key · FK foreign key · M2M many-to-many
-  grey box: entity drawn in full on another diagram
-endlegend
 @enduml

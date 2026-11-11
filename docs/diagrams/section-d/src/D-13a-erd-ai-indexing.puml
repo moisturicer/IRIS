@@ -1,0 +1,106 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+left to right direction
+skinparam nodesep 6
+skinparam ranksep 30
+title D-13a  AI indexing and provider admission (Django side)
+caption Generated from backend/apps/*/models*.py on main (IR-1021). Every key shown; other fields counted. Links to User appear as FK attributes only.\nCrow's foot: three prongs many, bar exactly one, circle zero allowed. PK primary key, FK foreign key.\nM2M many-to-many. Grey box: drawn in full on another diagram.
+  class "ChunkEmbedding" as ai_ChunkEmbedding {
+    <b>id</b> : PK
+    chunk : FK → DocumentChunk
+    space : FK → EmbeddingSpace
+    <i>+ 2 more fields</i>
+  }
+  class "ChunkSet" as ai_ChunkSet {
+    <b>id</b> : PK
+    record : FK → Record
+    <i>+ 8 more fields</i>
+  }
+  class "DocumentChunk" as ai_DocumentChunk {
+    <b>id</b> : PK
+    chunk_set : FK → ChunkSet
+    record : FK → Record
+    <i>+ 13 more fields</i>
+  }
+  class "DocumentMetadata" as ai_DocumentMetadata {
+    <b>id</b> : PK
+  }
+  class "EmbeddingJob" as ai_EmbeddingJob {
+    <b>id</b> : PK
+    record : FK → Record
+    <i>+ 5 more fields</i>
+  }
+  class "EmbeddingSpace" as ai_EmbeddingSpace {
+    <b>id</b> : PK
+    <i>+ 5 more fields</i>
+  }
+  class "EmbeddingSpaceActivation" as ai_EmbeddingSpaceActivation {
+    <b>id</b> : PK
+    <i>+ 6 more fields</i>
+  }
+  class "IngestionJob" as ai_IngestionJob {
+    <b>id</b> : PK
+    record : FK → Record
+    space : FK → EmbeddingSpace
+    <i>+ 9 more fields</i>
+  }
+  class "PaperBrief" as ai_PaperBrief {
+    <b>id</b> : PK
+    record : FK → Record
+    chunk_set : FK → ChunkSet
+    requested_by : FK → User
+    <i>+ 14 more fields</i>
+  }
+  class "ProviderCampaign" as ai_ProviderCampaign {
+    <b>id</b> : PK
+    <i>+ 7 more fields</i>
+  }
+  class "ProviderReservation" as ai_ProviderReservation {
+    <b>id</b> : PK
+    campaign : FK → ProviderCampaign
+    <i>+ 25 more fields</i>
+  }
+  class "RecordEmbedding" as ai_RecordEmbedding {
+    <b>id</b> : PK
+    record : FK unique → Record
+    <i>+ 4 more fields</i>
+  }
+  class "RecordOverview" as ai_RecordOverview {
+    <b>id</b> : PK
+    record : FK unique → Record
+    <i>+ 10 more fields</i>
+  }
+  class "RecordSpaceEmbedding" as ai_RecordSpaceEmbedding {
+    <b>id</b> : PK
+    record : FK → Record
+    space : FK → EmbeddingSpace
+    <i>+ 4 more fields</i>
+  }
+  class "TurnEmbedding" as ai_TurnEmbedding {
+    <b>id</b> : PK
+    turn : FK → Turn
+    space : FK → EmbeddingSpace
+    <i>+ 3 more fields</i>
+  }
+class "Turn\n<size:9>(ai)</size>" as ai_Turn <<ref>>
+class "Record\n<size:9>(records)</size>" as records_Record <<ref>>
+ai_ChunkEmbedding }o--|| ai_DocumentChunk
+ai_ChunkEmbedding }o--|| ai_EmbeddingSpace
+ai_ChunkSet }o--|| records_Record
+ai_DocumentChunk }o--|| ai_ChunkSet
+ai_DocumentChunk }o--|| records_Record
+ai_EmbeddingJob }o--|| records_Record
+ai_IngestionJob }o--|| ai_EmbeddingSpace
+ai_IngestionJob }o--|| records_Record
+ai_PaperBrief }o--|| ai_ChunkSet
+ai_PaperBrief }o--|| records_Record
+ai_ProviderReservation }o--|| ai_ProviderCampaign
+ai_RecordEmbedding |o--|| records_Record
+ai_RecordOverview |o--|| records_Record
+ai_RecordSpaceEmbedding }o--|| ai_EmbeddingSpace
+ai_RecordSpaceEmbedding }o--|| records_Record
+ai_TurnEmbedding }o--|| ai_EmbeddingSpace
+ai_TurnEmbedding }o--|| ai_Turn
+@enduml

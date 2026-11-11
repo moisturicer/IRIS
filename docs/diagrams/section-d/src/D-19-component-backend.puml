@@ -1,6 +1,6 @@
 @startuml
 !include ../iris-style.puml
-skinparam LineType polyline
+skinparam LineType ortho
 title D-19  Backend components: Django apps and their dependencies
 caption Generated from import statements in backend/apps on main (IR-1021); tests, migrations, management commands and evaluation tools excluded. Edge label: number of import lines.
 package "Django backend (backend/)" {

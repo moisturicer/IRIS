@@ -1,0 +1,74 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+left to right direction
+skinparam nodesep 6
+skinparam ranksep 30
+title D-10b  Publication, requests and discovery
+caption Generated from backend/apps/*/models*.py on main (IR-1021). Every key shown; other fields counted. Links to User appear as FK attributes only.\nCrow's foot: three prongs many, bar exactly one, circle zero allowed. PK primary key, FK foreign key.\nM2M many-to-many. Grey box: drawn in full on another diagram.
+  class "DeleteRequest" as records_DeleteRequest {
+    <b>id</b> : PK
+    record : FK → Record
+    requested_by : FK → User
+    reviewed_by : FK → User
+    <i>+ 5 more fields</i>
+  }
+  class "DiscoveryDismissal" as records_DiscoveryDismissal {
+    <b>id</b> : PK
+    user : FK → User
+    record : FK → Record
+    <i>+ 1 more fields</i>
+  }
+  class "DiscoveryFeedSnapshot" as records_DiscoveryFeedSnapshot {
+    <b>id</b> : PK
+    user : FK → User
+    <i>+ 5 more fields</i>
+  }
+  class "DiscoveryInterests" as records_DiscoveryInterests {
+    <b>id</b> : PK
+    user : FK unique → User
+    classifications : M2M → Classification
+    psced : M2M → PSCEDClassification
+    <i>+ 1 more fields</i>
+  }
+  class "DownloadRequest" as records_DownloadRequest {
+    <b>id</b> : PK
+    record : FK → Record
+    requested_by : FK → User
+    reviewed_by : FK → User
+    revoked_by : FK → User
+    <i>+ 8 more fields</i>
+  }
+  class "EmbargoReminder" as records_EmbargoReminder {
+    <b>id</b> : PK
+    record : FK → Record
+    <i>+ 3 more fields</i>
+  }
+  class "PublicComment" as records_PublicComment {
+    <b>id</b> : PK
+    record : FK → Record
+    author : FK → User
+    reply_to : FK → PublicComment
+    deleted_by : FK → User
+    <i>+ 6 more fields</i>
+  }
+  class "UnlistedPublication" as records_UnlistedPublication {
+    <b>id</b> : PK
+    record : FK unique → Record
+    published_by : FK → User
+    <i>+ 2 more fields</i>
+  }
+class "Classification\n<size:9>(records)</size>" as records_Classification <<ref>>
+class "PSCEDClassification\n<size:9>(records)</size>" as records_PSCEDClassification <<ref>>
+class "Record\n<size:9>(records)</size>" as records_Record <<ref>>
+records_DeleteRequest }o--|| records_Record
+records_DiscoveryDismissal }o--|| records_Record
+records_DiscoveryInterests }o--o{ records_Classification
+records_DiscoveryInterests }o--o{ records_PSCEDClassification
+records_DownloadRequest }o--|| records_Record
+records_EmbargoReminder }o--|| records_Record
+records_PublicComment }o--o| records_PublicComment
+records_PublicComment }o--|| records_Record
+records_UnlistedPublication |o--|| records_Record
+@enduml

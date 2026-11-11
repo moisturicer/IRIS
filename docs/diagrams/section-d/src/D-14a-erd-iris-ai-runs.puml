@@ -1,0 +1,81 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+left to right direction
+skinparam nodesep 6
+skinparam ranksep 30
+title D-14a  AI runtime schema (iris_ai): conversations and runs
+caption Generated from ai/runs/migrations/*.sql on main (IR-1021). Owned by the AI runtime; Django never writes it (ADR-049).\nCrow's foot: three prongs many, bar exactly one, circle zero allowed. PK primary key, FK foreign key.\nM2M many-to-many. Grey box: drawn in full on another diagram.\nDashed arrow: a Django id held without a DB constraint.
+class "conversation" as ia_conversation <<ai>> {
+  <b>id</b> : PK
+  reader_id : Django id, no DB constraint
+  scope_record_id : Django id, no DB constraint
+  <i>+ 4 more columns</i>
+}
+class "ask_run" as ia_ask_run <<ai>> {
+  <b>id</b> : PK
+  reader_id : Django id, no DB constraint
+  conversation_id : FK → conversation
+  turn_id : FK → turn
+  retry_of : FK → ask_run
+  <i>+ 19 more columns</i>
+}
+class "turn" as ia_turn <<ai>> {
+  <b>id</b> : PK
+  conversation_id : FK → conversation
+  run_id : FK → ask_run
+  <i>+ 7 more columns</i>
+}
+class "citation" as ia_citation <<ai>> {
+  <b>turn_id</b> : PK, FK → turn
+  <b>position</b> : PK
+  record_id : Django id, no DB constraint
+  <i>+ 3 more columns</i>
+}
+class "run_event" as ia_run_event <<ai>> {
+  <b>run_id</b> : PK, FK → ask_run
+  <b>sequence</b> : PK
+  <i>+ 3 more columns</i>
+}
+class "attempt_accounting" as ia_attempt_accounting <<ai>> {
+  <b>id</b> : PK
+  <i>+ 7 more columns</i>
+}
+class "research_handle" as ia_research_handle <<ai>> {
+  <b>handle</b> : PK
+  run_id : FK → ask_run
+  record_id : Django id, no DB constraint
+  chunk_set_id : Django id, no DB constraint
+  chunk_id : Django id, no DB constraint
+  <i>+ 2 more columns</i>
+}
+class "run_checkpoint" as ia_run_checkpoint <<ai>> {
+  <b>run_id</b> : PK, FK → ask_run
+  <i>+ 4 more columns</i>
+}
+class "conversation_handoff" as ia_conversation_handoff <<ai>> {
+  <b>conversation_id</b> : PK, FK → conversation
+  <b>revision</b> : PK
+  run_id : FK → ask_run
+  <i>+ 10 more columns</i>
+}
+class "User\n<size:9>(accounts, Django)</size>" as dj_user <<ref>>
+class "Record\n<size:9>(records, Django)</size>" as dj_record <<ref>>
+ia_ask_run }o--|| ia_conversation
+ia_ask_run }o--o| ia_turn
+ia_ask_run }o--o| ia_ask_run
+ia_turn }o--|| ia_conversation
+ia_turn }o--|| ia_ask_run
+ia_citation |o--|| ia_turn
+ia_run_event |o--|| ia_ask_run
+ia_research_handle }o--|| ia_ask_run
+ia_run_checkpoint |o--|| ia_ask_run
+ia_conversation_handoff |o--|| ia_conversation
+ia_conversation_handoff }o--|| ia_ask_run
+ia_conversation ..> dj_user : reader_id
+ia_conversation ..> dj_record
+ia_ask_run ..> dj_user : reader_id
+ia_citation ..> dj_record
+ia_research_handle ..> dj_record
+@enduml

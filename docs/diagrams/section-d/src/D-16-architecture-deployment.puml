@@ -1,33 +1,39 @@
 @startuml
 !include ../iris-style.puml
-skinparam LineType polyline
+skinparam LineType ortho
+skinparam nodesep 10
+skinparam ranksep 30
 title D-16  Deployment architecture (production)
-caption From docker-compose.prod.yml, deploy/caddy/Caddyfile, frontend/nginx.conf and deploy/aws/iris-demo.yaml on main (IR-1021). Only Caddy publishes ports.
+caption From docker-compose.prod.yml, deploy/caddy/Caddyfile, frontend/nginx.conf and deploy/aws/iris-demo.yaml on main (IR-1021).\nOnly Caddy publishes ports. Every container rotates its logs (10 MB × 3) and restarts after a reboot.\nBlue: IRIS service · green: AI runtime · yellow: external service. An arrow to a group means every service in it.
 
 actor "Browser" as browser
 cloud "Internet" as net
+rectangle "DuckDNS\n<size:9>iris-citu.duckdns.org</size>" as dns <<external>>
 
 node "AWS EC2 instance (Ubuntu 24.04, Docker Compose)" as ec2 {
-  component "caddy\n<size:10>TLS 1.2/1.3, ports 80 and 443</size>" as caddy
-  component "frontend (nginx)\n<size:10>React build, /api proxy,</size>\n<size:10>runtime edge with auth_request</size>" as nginx
-  component "backend\n<size:10>Django 5 + DRF, Gunicorn</size>\n<size:10>with Uvicorn workers (ASGI)</size>" as django
-  component "migrate\n<size:10>runs once before the others</size>" as migrate
-  component "celery-default" as cdef
-  component "celery-extraction\n<size:10>concurrency 2</size>" as cext
-  component "celery-embedding\n<size:10>concurrency 4</size>" as cemb
-  component "celery-beat\n<size:10>scheduled jobs, Manila time</size>" as beat
-  component "ai-gateway\n<size:10>FastAPI, no public port</size>" as gw <<ai>>
-  component "ai-runs-worker\n<size:10>python -m ai.runs.worker</size>" as rw <<ai>>
-  database "db\n<size:10>PostgreSQL 16 + pgvector</size>\n<size:10>Django tables + iris_ai schema</size>" as db
-  queue "redis\n<size:10>Celery broker, cache,</size>\n<size:10>run wake-ups</size>" as redis
-  storage "media_files volume\n<size:10>uploaded manuscripts</size>" as media
+  component "caddy\n<size:9>TLS 1.2/1.3, ports 80, 443</size>" as caddy
+  component "frontend (nginx)\n<size:9>React build, /api proxy,</size>\n<size:9>runtime edge (auth_request)</size>" as nginx
+  component "backend\n<size:9>Django 5 + DRF, Gunicorn</size>\n<size:9>with Uvicorn workers (ASGI)</size>" as django
+  component "migrate\n<size:9>runs once, first</size>" as migrate
+  component "celery-beat\n<size:9>scheduled jobs, Manila time</size>" as beat
+  package "Celery workers" as workers {
+    component "celery-default" as cdef
+    component "celery-extraction\n<size:9>concurrency 2</size>" as cext
+    component "celery-embedding\n<size:9>concurrency 4</size>" as cemb
+  }
+  package "AI runtime: writes the iris_ai schema as iris_ai_runtime; redis carries run wake-ups" as airt {
+    component "ai-gateway\n<size:9>FastAPI, no public port</size>" as gw <<ai>>
+    component "ai-runs-worker\n<size:9>python -m ai.runs.worker</size>" as rw <<ai>>
+  }
+  database "db\n<size:9>PostgreSQL 16 + pgvector</size>\n<size:9>Django tables, iris_ai schema</size>" as db
+  queue "redis\n<size:9>Celery broker, cache,</size>\n<size:9>run wake-ups</size>" as redis
+  storage "media_files volume\n<size:9>uploaded manuscripts</size>" as media
 }
 
-rectangle "LlamaParse\n<size:10>manuscript extraction</size>" as llp <<external>>
-rectangle "Voyage AI\n<size:10>embedding, rerank</size>" as voy <<external>>
-rectangle "Language model\n<size:10>OpenAI-compatible endpoint</size>\n<size:10>(OpenRouter)</size>" as llm <<external>>
 rectangle "SMTP email" as smtp <<external>>
-rectangle "DuckDNS\n<size:10>iris-citu.duckdns.org</size>" as dns <<external>>
+rectangle "LlamaParse\n<size:9>extraction</size>" as llp <<external>>
+rectangle "Voyage AI\n<size:9>embedding, rerank;</size>\n<size:9>query embedding for runs</size>" as voy <<external>>
+rectangle "Language model\n<size:9>OpenAI-compatible (OpenRouter);</size>\n<size:9>answers, AI Overview</size>" as llm <<external>>
 
 browser --> net : HTTPS
 net --> caddy
@@ -35,31 +41,32 @@ dns ..> caddy : name
 caddy --> nginx : HTTP, internal
 nginx --> django : /api/, /static/,\nedge-grant check
 nginx --> gw : /api/v1/ai/runtime/…\n+ service secret
+
 django --> db
 django --> redis
-migrate --> db
-cdef --> db
-cext --> db
-cemb --> db
-beat --> redis
-cdef --> redis
-cext --> redis
-cemb --> redis
 django --> media
+migrate --> db
+beat --> redis
+workers --> db
+workers --> redis
 cext --> media
-gw --> db : iris_ai, as iris_ai_runtime
-gw --> redis : wake workers
-rw --> db
-rw --> redis
+airt --> db
+airt --> redis
+
+cdef --> smtp
 cext --> llp
 cemb --> voy
-cemb --> llm : AI Overview
-rw --> voy : query embedding
-rw --> llm : answers
-cdef --> smtp
+cemb --> llm
+rw --> voy
+rw --> llm
 
-legend right
-  Blue: IRIS service · green: AI runtime · yellow: external service
-  Every container rotates its logs (10 MB × 3); restart policy brings services back after a reboot
-endlegend
+' Tiers, top to bottom: edge, apps, workers, data, vendors (layout only)
+django -[hidden]down- migrate
+gw -[hidden]down- beat
+migrate -[hidden]right- cdef
+cdef -[hidden]down- db
+db -[hidden]down- smtp
+smtp -[hidden]right- llp
+llp -[hidden]right- voy
+voy -[hidden]right- llm
 @enduml

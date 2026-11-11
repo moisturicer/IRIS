@@ -28,7 +28,7 @@ ROLE = {
 
 
 def is_source(path):
-    s = str(path)
+    s = path.as_posix()  # forward slashes on every OS, so the checks below hold on Windows too
     return not ("/tests" in s or "/test_" in s or "/migrations/" in s or path.name.startswith("test")
                 or "/management/" in s or "/evaluation/" in s)
 
@@ -47,7 +47,7 @@ def main():
     out = [
         "@startuml",
         "!include ../iris-style.puml",
-        "skinparam LineType polyline",
+        "skinparam LineType ortho",
         "title D-19  Backend components: Django apps and their dependencies",
         "caption Generated from import statements in backend/apps on main (IR-1021); tests, migrations, management commands and evaluation tools excluded. Edge label: number of import lines.",
         'package "Django backend (backend/)" {',
