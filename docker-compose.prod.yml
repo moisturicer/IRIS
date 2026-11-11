@@ -64,6 +64,11 @@ services:
       args:
         REQUIREMENT_FILE: production.txt
     restart: "no"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: python manage.py migrate --noinput
     env_file:
       - ./backend/.env
@@ -136,6 +141,11 @@ services:
       context: ./ai
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     env_file:
       - ./ai/.env
     environment:
@@ -173,6 +183,11 @@ services:
       context: ./ai
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: python -m ai.runs.worker
     env_file:
       - ./ai/.env
@@ -200,6 +215,11 @@ services:
       args:
         REQUIREMENT_FILE: production.txt
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: celery -A config worker -l info -Q default -n default@%h
     healthcheck:
       test: ["CMD-SHELL", "celery -A config inspect ping -d default@$$HOSTNAME || exit 1"]
@@ -244,6 +264,11 @@ services:
       args:
         REQUIREMENT_FILE: production.txt
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: celery -A config worker -l info -Q extraction -n extraction@%h --concurrency=2
     healthcheck:
       test: ["CMD-SHELL", "celery -A config inspect ping -d extraction@$$HOSTNAME || exit 1"]
@@ -285,6 +310,11 @@ services:
       args:
         REQUIREMENT_FILE: production.txt
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: celery -A config worker -l info -Q embedding -n embedding@%h --concurrency=4
     healthcheck:
       test: ["CMD-SHELL", "celery -A config inspect ping -d embedding@$$HOSTNAME || exit 1"]
@@ -326,6 +356,11 @@ services:
       args:
         REQUIREMENT_FILE: production.txt
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: celery -A config beat -l info --schedule=/tmp/celerybeat-schedule
     volumes:
       - media_files:/app/media
