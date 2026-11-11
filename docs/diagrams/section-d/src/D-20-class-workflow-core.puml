@@ -1,0 +1,99 @@
+@startuml
+!include ../iris-style.puml
+skinparam LineType polyline
+title D-20  Workflow core classes (the thesis contribution)
+caption Models from backend/apps/records and backend/apps/reviews; operations are the service functions in reviews/routing.py, seats.py, revisions.py, new_version.py, decisions.py, office_review.py and records/embargo.py on main (IR-1021).
+show methods
+
+class Record {
+  pipeline_status
+  record_type → RecordType
+  adviser → User
+  origin
+  embargoed_until, embargo_released_at
+  --
+  set_embargo() / release_embargo()
+}
+class RecordVersion {
+  number
+  manuscript
+  manuscript_sha256
+  review_text → ReviewText
+  --
+  submit_new_version()
+}
+class RecordAssignment {
+  party
+  state
+  due_at
+  opened_at / closed_at
+  --
+  accept_and_route()
+  route()
+}
+class ReviewerSeat {
+  reviewer → User
+  state
+  source
+  assigned_at / opened_at / done_at
+  --
+  claim() / assign() / reassign()
+  open_review() / complete_seat()
+}
+class RecordClearance {
+  office
+  status
+  comment
+  reviewed_by → User
+  --
+  is_preserved()
+  carryover()
+}
+class ResubmissionRequest {
+  party
+  state
+  reason
+  --
+  request_revision()
+  withdraw_revision_request()
+}
+class Review {
+  stage
+  status
+  comment
+  version → RecordVersion
+  --
+  record_office_review()
+  decide()
+}
+class ReviewComment {
+  severity (Must fix, Suggestion)
+  is_draft
+  anchor_version
+}
+class RoutingEvent {
+  from_party
+  to_party
+  suggested_offices
+}
+
+Record "1" *-- "1..*" RecordVersion
+Record "1" *-- "0..*" RecordAssignment
+RecordAssignment "1" *-- "0..*" ReviewerSeat
+Record "1" *-- "0..*" RecordClearance
+Record "1" *-- "0..*" ResubmissionRequest
+ResubmissionRequest "0..*" --> "1" RecordAssignment
+RecordAssignment "1" o-- "0..*" Review
+Review "0..*" --> "1" RecordVersion : reviewed against
+Record "1" *-- "0..*" ReviewComment
+Record "1" *-- "0..*" RoutingEvent
+
+note right of RecordClearance
+  Clearance-aware resubmission (ADR-003):
+  a new Version resets only the clearance
+  of the office whose ResubmissionRequest
+  it answers; the others are preserved.
+  RESUBMISSION_POLICY=restart_all is the
+  comparison arm (ADR-004).
+end note
+@enduml

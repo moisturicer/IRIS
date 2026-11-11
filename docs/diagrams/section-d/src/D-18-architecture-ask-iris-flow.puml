@@ -1,0 +1,40 @@
+@startuml
+!include ../iris-style.puml
+skinparam SequenceMessageAlign left
+skinparam ParticipantPadding 8
+skinparam BoxPadding 6
+title D-18  Ask IRIS request flow
+caption From frontend/runtime-edge.conf, apps/ai/views/grants.py, ai/api/runs.py, ai/runs (service, store, worker) and ai/agent on main (IR-1021). ADR-049.
+
+actor Reader
+participant "React\nRuntimeReader" as spa
+participant "nginx\nruntime edge" as edge
+participant "Django\nedge-grant" as dj
+box "AI runtime" #DCFCE7
+participant "ai-gateway\n(FastAPI)" as gw
+participant "ai-runs-worker\n(AgentExecutor)" as w
+end box
+database "PostgreSQL\n(iris_ai + Django tables)" as db
+participant "Voyage /\nlanguage model" as ext #FEF3C7
+
+Reader -> spa : ask a question
+spa -> edge : POST /api/v1/ai/runtime/runs
+edge -> dj : auth_request (JWT)
+dj --> edge : reader grant, or 401/403
+edge -> gw : run request + grant + service secret
+gw -> db : verify grant; insert ask_run (queued)
+gw --> spa : run id
+gw -> w : wake through Redis (hint only)
+w -> db : claim the run (lease, fence)
+loop research steps within the run's bounds
+  w -> db : search / read passages under the reader's row policy
+  w -> ext : admitted query embedding / model call
+end
+w -> w : check the draft; repair once if it fails
+w -> db : commit Turn and citations (fenced)
+spa -> edge : GET /runs/<id>?after=N
+edge -> gw : (grant re-checked)
+gw -> db : read the run journal
+gw --> spa : events and final answer
+spa -> Reader : answer with page citations
+@enduml

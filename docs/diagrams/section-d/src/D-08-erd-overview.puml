@@ -1,0 +1,42 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+title D-8  Data model overview: domains and the links between them
+caption Generated from the Django models on main (IR-1021). Edge labels: number of foreign keys from one app's tables to the other's.
+skinparam LineType polyline
+rectangle "<b>accounts</b> (20 tables, D-9)\n<size:10>AccountDeletionRequest, AdviserProfile, College, Course, DataNotice, Department, NoticeAnswer, RecoveryAttempt …</size>" as accounts
+rectangle "<b>ai</b> (28 tables, D-13)\n<size:10>AskRun, AskRunAttempt, AskRunEvent, ChatSubmission, ChunkEmbedding, ChunkSet, Conversation, ConversationState …</size>" as ai
+rectangle "<b>audit</b> (1 table, D-15)\n<size:10>AuditEvent</size>" as audit
+rectangle "<b>documents</b> (10 tables, D-12)\n<size:10>DocumentRequest, DocumentRequestItem, ExtractionFigure, ManuscriptMetadata, PdfExtraction, RecordFile, RecordUpload, UploadReview …</size>" as documents
+rectangle "<b>library</b> (2 tables, D-15)\n<size:10>SavedFeed, SavedRecord</size>" as library
+rectangle "<b>notifications</b> (3 tables, D-15)\n<size:10>Notification, NotificationRead, NotificationType</size>" as notifications
+rectangle "<b>opportunities</b> (1 table, D-15)\n<size:10>Opportunity</size>" as opportunities
+rectangle "<b>publication</b> (2 tables, D-12)\n<size:10>ManuscriptInvalidation, ManuscriptWork</size>" as publication
+rectangle "<b>records</b> (24 tables, D-10)\n<size:10>Author, AuthorRole, Classification, Conference, ConferenceLevel, DeleteRequest, DiscoveryDismissal, DiscoveryFeedSnapshot …</size>" as records
+rectangle "<b>reviews</b> (18 tables, D-11)\n<size:10>DeadlineMoment, Extension, Holiday, RecordAssignment, RecordClearance, ResponseLetter, ResubmissionRequest, Review …</size>" as reviews
+rectangle "<b>iris_ai schema</b> (AI runtime, 16 tables, D-14)\n<size:10>conversation, ask_run, turn, citation, …</size>" as iris_ai <<ai>>
+ai --> accounts : 5
+ai --> records : 11
+audit --> accounts : 1
+audit --> records : 1
+documents --> accounts : 4
+documents --> records : 6
+documents --> reviews : 2
+library --> accounts : 2
+library --> records : 1
+notifications --> accounts : 4
+notifications --> records : 1
+opportunities --> accounts : 1
+publication --> records : 1
+records --> accounts : 20
+records --> documents : 1
+reviews --> accounts : 18
+reviews --> records : 16
+iris_ai ..> accounts : reader_id\n(no DB constraint)
+iris_ai ..> records : record_id\n(no DB constraint)
+legend right
+  109 Django tables in 10 apps, plus 16 tables in the iris_ai schema
+  solid arrow: foreign keys (count) · dashed: id reference without a DB constraint
+endlegend
+@enduml

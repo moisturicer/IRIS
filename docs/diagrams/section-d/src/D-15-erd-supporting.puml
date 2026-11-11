@@ -1,0 +1,82 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+title D-15  Notifications, audit, library and opportunities
+caption Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. Links to User appear as FK attributes only.
+package "audit" {
+  class "AuditEvent" as audit_AuditEvent {
+    <b>id</b> : PK
+    user : FK → User
+    record : FK → Record
+    event_type : Char
+    metadata : JSON
+    created_at : DateTime
+  }
+}
+package "library" {
+  class "SavedFeed" as library_SavedFeed {
+    <b>id</b> : PK
+    owner : FK → User
+    name : Char
+    query : JSON
+    created_at : DateTime
+    updated_at : DateTime
+  }
+  class "SavedRecord" as library_SavedRecord {
+    <b>id</b> : PK
+    owner : FK → User
+    record : FK → Record
+    reading_status : Char
+    saved_at : DateTime
+    updated_at : DateTime
+  }
+}
+package "notifications" {
+  class "Notification" as notifications_Notification {
+    <b>id</b> : PK
+    sender : FK → User
+    recipient : FK → User
+    broadcast_to_role : FK → Role
+    record : FK → Record
+    notif_type : FK → NotificationType
+    message : Text
+    created_at : DateTime
+  }
+  class "NotificationRead" as notifications_NotificationRead {
+    <b>id</b> : PK
+    notification : FK → Notification
+    user : FK → User
+    read_at : DateTime
+  }
+  class "NotificationType" as notifications_NotificationType {
+    <b>id</b> : PK
+    name : Char
+  }
+}
+package "opportunities" {
+  class "Opportunity" as opportunities_Opportunity {
+    <b>id</b> : PK
+    posted_by : FK → User
+    opportunity_type : Char
+    title : Char
+    posting_office : Char
+    audience : Char
+    <i>… 9 more fields</i>
+  }
+}
+class "Role\n<size:9>(accounts)</size>" as accounts_Role <<ref>>
+class "Record\n<size:9>(records)</size>" as records_Record <<ref>>
+audit_AuditEvent }o--o| records_Record
+library_SavedRecord }o--|| records_Record
+notifications_Notification }o--o| accounts_Role
+notifications_Notification }o--o| records_Record
+notifications_Notification }o--|| notifications_NotificationType
+notifications_NotificationRead }o--|| notifications_Notification
+legend right
+  <b>Notation</b> (crow's foot)
+  three-pronged end: many · bar: exactly one · circle: zero allowed
+  PK primary key · FK foreign key · M2M many-to-many
+  grey box: entity drawn in full on another diagram
+endlegend
+@enduml

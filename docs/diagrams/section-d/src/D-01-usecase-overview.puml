@@ -1,0 +1,60 @@
+@startuml
+!include ../iris-style.puml
+skinparam LineType splines
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #0369A1
+}
+left to right direction
+title D-1  Use case overview: actors and subsystems
+caption Roles from frontend/src/lib/access.ts and core/permissions.py on main (IR-1021). Each subsystem is drawn in full on D-2 to D-7.
+
+actor "Visitor\n(not signed in)" as Visitor
+actor "Signed-in user" as User
+actor Student
+actor Adviser
+actor "Office reviewer\n(ITSO, IERC, KTTO)" as Office
+actor "Office coordinator" as Coord
+actor RDCO
+actor "System Admin" as Admin
+actor "Email service" as Mail <<external>>
+actor "AI providers\n(LlamaParse, Voyage,\nlanguage model)" as AIP <<external>>
+
+Student -up-|> User
+Adviser -up-|> User
+Office -up-|> User
+Coord -up-|> Office
+RDCO -up-|> User
+Admin -up-|> User
+
+rectangle "IRIS" {
+  usecase "Accounts and access\n(D-2)" as S1
+  usecase "Submission and versions\n(D-3)" as S2
+  usecase "Review workflow\n(D-4)" as S3
+  usecase "Discovery and reading\n(D-5)" as S4
+  usecase "Ask IRIS and Paper Chat\n(D-6)" as S5 <<ai>>
+  usecase "Administration\n(D-7)" as S6
+}
+
+Visitor --> S1
+User --> S1
+User --> S4
+User --> S5
+Student --> S2
+Adviser --> S2
+Adviser --> S3
+Office --> S3
+Coord --> S3
+RDCO --> S3
+RDCO --> S6
+Admin --> S6
+S1 --> Mail
+S2 --> AIP
+S5 --> AIP
+
+legend right
+  Arrow with hollow head: the actor is a kind of the actor it points to
+  Yellow: external system · green: AI-assisted
+  The System Admin does not use the research screens (Ask IRIS, My Library)
+endlegend
+@enduml

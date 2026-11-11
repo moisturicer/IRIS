@@ -1,0 +1,67 @@
+@startuml
+!include ../iris-style.puml
+skinparam LineType polyline
+title D-19  Backend components: Django apps and their dependencies
+caption Generated from import statements in backend/apps on main (IR-1021); tests, migrations, management commands and evaluation tools excluded. Edge label: number of import lines.
+package "Django backend (backend/)" {
+  component "config\n<size:10>settings, URLs,</size>\n<size:10>ASGI, Celery</size>" as config
+  component "core\n<size:10>permissions, pagination,</size>\n<size:10>utilities</size>" as core
+  component "accounts\n<size:10>users, roles, consent,</size>\n<size:10>sessions, recovery</size>" as accounts
+  component "ai\n<size:10>chunking, embedding, reader</size>\n<size:10>grants, admission, overview</size>" as ai <<ai>>
+  component "audit\n<size:10>insert-only audit log,</size>\n<size:10>CSV export</size>" as audit
+  component "documents\n<size:10>uploads, PDF checks,</size>\n<size:10>extraction tasks</size>" as documents
+  component "library\n<size:10>saved records</size>\n<size:10>and feeds</size>" as library
+  component "notifications\n<size:10>in-app and email</size>\n<size:10>notifications</size>" as notifications
+  component "opportunities\n<size:10>Calls & Conferences</size>" as opportunities
+  component "publication\n<size:10>manuscript processing</size>\n<size:10>work for the AI runtime</size>" as publication <<ai>>
+  component "records\n<size:10>records, versions, embargo,</size>\n<size:10>download and delete requests</size>" as records
+  component "reviews\n<size:10>adviser-first review, seats,</size>\n<size:10>clearances, threads</size>" as reviews
+}
+rectangle "React SPA\n(frontend/)" as spa
+component "AI runtime\n(ai/, FastAPI)" as runtime <<ai>>
+database "PostgreSQL" as db
+spa --> config : REST /api/v1/
+config --> core
+accounts --> ai : 4
+accounts --> audit : 14
+accounts --> documents : 3
+accounts --> library : 2
+accounts --> notifications : 4
+accounts --> opportunities : 1
+accounts --> records : 14
+accounts --> reviews : 7
+ai --> documents : 10
+ai --> records : 27
+audit --> accounts : 1
+audit --> records : 1
+documents --> ai : 16
+documents --> audit : 3
+documents --> notifications : 2
+documents --> records : 14
+documents --> reviews : 10
+library --> accounts : 1
+library --> records : 4
+notifications --> accounts : 4
+notifications --> reviews : 3
+publication --> ai : 3
+publication --> records : 2
+records --> accounts : 4
+records --> ai : 11
+records --> audit : 9
+records --> documents : 19
+records --> library : 1
+records --> notifications : 11
+records --> publication : 1
+records --> reviews : 55
+reviews --> accounts : 2
+reviews --> audit : 13
+reviews --> documents : 13
+reviews --> notifications : 9
+reviews --> records : 34
+runtime ..> ai : reader grant\n(edge-grant)
+runtime ..> db : iris_ai schema,\nrow policy
+legend right
+  Solid arrow: Python imports (count). Every app except publication also uses core.
+  Dashed arrow: runtime boundary, no Python import
+endlegend
+@enduml

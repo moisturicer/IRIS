@@ -1,0 +1,174 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+title D-9  Accounts, roles and consent
+caption Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity.
+package "accounts" {
+  class "AccountDeletionRequest" as accounts_AccountDeletionRequest {
+    <b>id</b> : PK
+    user : FK → User
+    decided_by : FK → User
+    status : Char
+    created_at : DateTime
+    decided_at : DateTime
+    reason : Text
+  }
+  class "AdviserProfile" as accounts_AdviserProfile {
+    <b>id</b> : PK
+    user : FK unique → User
+    department : FK → Department
+    college : FK → College
+  }
+  class "College" as accounts_College {
+    <b>id</b> : PK
+    name : Char
+    code : Char
+  }
+  class "Course" as accounts_Course {
+    <b>id</b> : PK
+    department : FK → Department
+    name : Char
+  }
+  class "DataNotice" as accounts_DataNotice {
+    <b>id</b> : PK
+    published_by : FK → User
+    number : PositiveInteger
+    title : Char
+    subtitle : Char
+    sections : JSON
+    <i>… 2 more fields</i>
+  }
+  class "Department" as accounts_Department {
+    <b>id</b> : PK
+    college : FK → College
+    name : Char
+    code : Char
+  }
+  class "NoticeAnswer" as accounts_NoticeAnswer {
+    <b>id</b> : PK
+    user : FK → User
+    notice : FK → DataNotice
+    agreed_dpa : Boolean
+    ai_consent : Boolean
+    answered_at : DateTime
+  }
+  class "RecoveryAttempt" as accounts_RecoveryAttempt {
+    <b>id</b> : PK
+    bucket : FK → RecoveryBucket
+    at : DateTime
+  }
+  class "RecoveryBucket" as accounts_RecoveryBucket {
+    <b>key</b> : PK
+  }
+  class "RecoveryGeneration" as accounts_RecoveryGeneration {
+    <b>id</b> : PK
+    recipient : Char
+    purpose : Char
+    current : PositiveInteger
+  }
+  class "RecoveryIntent" as accounts_RecoveryIntent {
+    <b>id</b> : PK
+    user : FK → User
+    purpose : Char
+    recipient : Char
+    generation : PositiveInteger
+    address_encrypted : Text
+    <i>… 9 more fields</i>
+  }
+  class "RecoveryToken" as accounts_RecoveryToken {
+    <b>id</b> : PK
+    user : FK → User
+    intent : FK unique → RecoveryIntent
+    digest : Char
+    purpose : Char
+    email : Email
+    credential_version : PositiveInteger
+    <i>… 4 more fields</i>
+  }
+  class "ResearchInterest" as accounts_ResearchInterest {
+    <b>id</b> : PK
+    name : Char
+  }
+  class "Role" as accounts_Role {
+    <b>id</b> : PK
+    name : Char
+  }
+  class "RoleRequest" as accounts_RoleRequest {
+    <b>id</b> : PK
+    user : FK → User
+    requested_role : FK → Role
+    reviewed_by : FK → User
+    status : Char
+    created_at : DateTime
+    reviewed_at : DateTime
+  }
+  class "StudentProfile" as accounts_StudentProfile {
+    <b>id</b> : PK
+    user : FK unique → User
+    course : FK → Course
+  }
+  class "SystemSetting" as accounts_SystemSetting {
+    <b>id</b> : PK
+    updated_by : FK → User
+    key : Char
+    value : Text
+    updated_at : DateTime
+  }
+  class "User" as accounts_User {
+    <b>id</b> : PK
+    role : FK → Role
+    research_interests : M2M → ResearchInterest
+    email : Email
+    first_name : Char
+    middle_initial : Char
+    last_name : Char
+    <i>… 15 more fields</i>
+  }
+  class "UserInterest" as accounts_UserInterest {
+    <b>id</b> : PK
+    user : FK → User
+    interest : FK → ResearchInterest
+    position : PositiveSmallInteger
+  }
+  class "UserSession" as accounts_UserSession {
+    <b>id</b> : PK
+    user : FK → User
+    created_at : DateTime
+    last_activity_at : DateTime
+    ended_at : DateTime
+    ended_reason : Char
+  }
+}
+accounts_AccountDeletionRequest }o--o| accounts_User
+accounts_AccountDeletionRequest }o--|| accounts_User
+accounts_AdviserProfile |o--|| accounts_User
+accounts_AdviserProfile }o--o| accounts_College
+accounts_AdviserProfile }o--o| accounts_Department
+accounts_Course }o--|| accounts_Department
+accounts_DataNotice }o--o| accounts_User
+accounts_Department }o--|| accounts_College
+accounts_NoticeAnswer }o--|| accounts_DataNotice
+accounts_NoticeAnswer }o--|| accounts_User
+accounts_RecoveryAttempt }o--|| accounts_RecoveryBucket
+accounts_RecoveryIntent }o--o| accounts_User
+accounts_RecoveryToken |o--o| accounts_RecoveryIntent
+accounts_RecoveryToken }o--|| accounts_User
+accounts_RoleRequest }o--o| accounts_User
+accounts_RoleRequest }o--|| accounts_Role
+accounts_RoleRequest }o--|| accounts_User
+accounts_StudentProfile |o--|| accounts_User
+accounts_StudentProfile }o--o| accounts_Course
+accounts_SystemSetting }o--o| accounts_User
+accounts_User }o--o{ accounts_ResearchInterest
+accounts_User }o--o| accounts_Role
+accounts_UserInterest }o--|| accounts_ResearchInterest
+accounts_UserInterest }o--|| accounts_User
+accounts_UserSession }o--|| accounts_User
+legend right
+  <b>Notation</b> (crow's foot)
+  three-pronged end: many · bar: exactly one · circle: zero allowed
+  PK primary key · FK foreign key · M2M many-to-many
+  grey box: entity drawn in full on another diagram
+endlegend
+@enduml

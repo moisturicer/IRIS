@@ -1,0 +1,302 @@
+@startuml
+!include ../iris-style.puml
+hide methods
+skinparam LineType ortho
+title D-13  AI indexing, provider admission and conversations (Django side)
+caption Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. Links to User appear as FK attributes only.
+package "ai" {
+  class "AskRun" as ai_AskRun {
+    <b>id</b> : PK
+    user : FK → User
+    conversation : FK → Conversation
+    current_attempt : FK → AskRunAttempt
+    turn : FK unique → Turn
+    retry_of : FK unique → AskRun
+    request : JSON
+    state : Char
+    created_at : DateTime
+    deadline_at : DateTime
+    <i>… 3 more fields</i>
+  }
+  class "AskRunAttempt" as ai_AskRunAttempt {
+    <b>id</b> : PK
+    run : FK → AskRun
+    research_run : FK → ResearchRun
+    number : PositiveSmallInteger
+    state : Char
+    started_at : DateTime
+    finished_at : DateTime
+  }
+  class "AskRunEvent" as ai_AskRunEvent {
+    <b>id</b> : PK
+    run : FK → AskRun
+    attempt : FK → AskRunAttempt
+    sequence : PositiveInteger
+    name : Char
+    data : JSON
+    created_at : DateTime
+  }
+  class "ChatSubmission" as ai_ChatSubmission <<retained>> {
+    <b>id</b> : PK
+    conversation : FK → Conversation
+    turn : FK unique → Turn
+    run : FK unique → AskRun
+    request_id : UUID
+    fingerprint : Char
+    finished : Boolean
+    source_refs : JSON
+    <i>… 1 more fields</i>
+  }
+  class "ChunkEmbedding" as ai_ChunkEmbedding {
+    <b>id</b> : PK
+    chunk : FK → DocumentChunk
+    space : FK → EmbeddingSpace
+    embedding : Vector
+    created_at : DateTime
+  }
+  class "ChunkSet" as ai_ChunkSet {
+    <b>id</b> : PK
+    record : FK → Record
+    extraction_hash : Char
+    source_revision : UUID
+    strategy_id : Char
+    options : JSON
+    <i>… 4 more fields</i>
+  }
+  class "Conversation" as ai_Conversation {
+    <b>id</b> : PK
+    user : FK → User
+    record : FK → Record
+    title : Char
+    is_default : Boolean
+    created_at : DateTime
+    updated_at : DateTime
+  }
+  class "ConversationState" as ai_ConversationState <<retained>> {
+    <b>conversation</b> : PK
+    answer_turn : FK → Turn
+    revision : PositiveInteger
+    basis : Char
+    request : Text
+    retrieval_query : Text
+    <i>… 8 more fields</i>
+  }
+  class "DocumentChunk" as ai_DocumentChunk {
+    <b>id</b> : PK
+    chunk_set : FK → ChunkSet
+    record : FK → Record
+    sequence : PositiveInteger
+    max_sequence : PositiveInteger
+    text : Text
+    content : Text
+    <i>… 9 more fields</i>
+  }
+  class "DocumentMetadata" as ai_DocumentMetadata {
+    <b>id</b> : PK
+  }
+  class "EmbeddingJob" as ai_EmbeddingJob {
+    <b>id</b> : PK
+    record : FK → Record
+    status : Char
+    celery_task_id : Char
+    error : Text
+    created_at : DateTime
+    <i>… 1 more fields</i>
+  }
+  class "EmbeddingSpace" as ai_EmbeddingSpace {
+    <b>id</b> : PK
+    model_id : Char
+    dimensions : PositiveInteger
+    metric : Char
+    state : Char
+    <i>… 1 more fields</i>
+  }
+  class "EmbeddingSpaceActivation" as ai_EmbeddingSpaceActivation {
+    <b>id</b> : PK
+    kind : Char
+    space_id : BigInteger
+    previous_space_id : BigInteger
+    actor : Char
+    <i>… 2 more fields</i>
+  }
+  class "IngestionJob" as ai_IngestionJob {
+    <b>id</b> : PK
+    record : FK → Record
+    space : FK → EmbeddingSpace
+    extraction_hash : Char
+    strategy_id : Char
+    idempotency_key : Char
+    state : Char
+    <i>… 5 more fields</i>
+  }
+  class "PaperBrief" as ai_PaperBrief {
+    <b>id</b> : PK
+    record : FK → Record
+    chunk_set : FK → ChunkSet
+    requested_by : FK → User
+    content_hash : Char
+    prompt_version : PositiveSmallInteger
+    profile_hash : Char
+    model_id : Char
+    <i>… 10 more fields</i>
+  }
+  class "ProviderCampaign" as ai_ProviderCampaign {
+    <b>id</b> : PK
+    key : Char
+    created_at : DateTime
+    charged_attempts : PositiveInteger
+    charged_input_tokens : BigInteger
+    <i>… 3 more fields</i>
+  }
+  class "ProviderReservation" as ai_ProviderReservation {
+    <b>id</b> : PK
+    campaign : FK → ProviderCampaign
+    lane : Char
+    account : Char
+    operation : Char
+    model : Char
+    <i>… 21 more fields</i>
+  }
+  class "RecordEmbedding" as ai_RecordEmbedding {
+    <b>id</b> : PK
+    record : FK unique → Record
+    embedding : Vector
+    model_name : Char
+    created_at : DateTime
+    updated_at : DateTime
+  }
+  class "RecordOverview" as ai_RecordOverview {
+    <b>id</b> : PK
+    record : FK unique → Record
+    state : Char
+    text : Text
+    citations : JSON
+    degraded : Boolean
+    <i>… 6 more fields</i>
+  }
+  class "RecordSpaceEmbedding" as ai_RecordSpaceEmbedding {
+    <b>id</b> : PK
+    record : FK → Record
+    space : FK → EmbeddingSpace
+    embedding : Vector
+    source_hash : Char
+    created_at : DateTime
+    updated_at : DateTime
+  }
+  class "ResearchRun" as ai_ResearchRun <<retained>> {
+    <b>id</b> : PK
+    user : FK → User
+    conversation : FK → Conversation
+    created_at : DateTime
+    status : Char
+    stop_reason : Char
+    latency_ms : PositiveInteger
+    <i>… 3 more fields</i>
+  }
+  class "ResearchStep" as ai_ResearchStep <<retained>> {
+    <b>id</b> : PK
+    run : FK → ResearchRun
+    position : PositiveInteger
+    kind : Char
+    tool : Char
+    argument_digest : Char
+    <i>… 5 more fields</i>
+  }
+  class "ScreeningJudgment" as ai_ScreeningJudgment <<retained>> {
+    <b>id</b> : PK
+    user : FK → User
+    record : FK → Record
+    key : Char
+    state : Char
+    quote : Text
+    source : JSON
+    <i>… 2 more fields</i>
+  }
+  class "ShadowEvidenceDecision" as ai_ShadowEvidenceDecision <<retained>> {
+    <b>id</b> : PK
+    turn : FK unique → Turn
+    status : Char
+    outcome : Char
+    claim_token : UUID
+    claimed_at : DateTime
+    <i>… 11 more fields</i>
+  }
+  class "ShadowEvidenceTally" as ai_ShadowEvidenceTally <<retained>> {
+    <b>id</b> : PK
+    code : Char
+    count : PositiveInteger
+  }
+  class "Turn" as ai_Turn {
+    <b>id</b> : PK
+    conversation : FK → Conversation
+    question : Text
+    resolved_question : Text
+    answer : Text
+    state : Char
+    <i>… 12 more fields</i>
+  }
+  class "TurnCitation" as ai_TurnCitation {
+    <b>id</b> : PK
+    turn : FK → Turn
+    record : FK → Record
+    chunk : FK → DocumentChunk
+    marker : PositiveSmallInteger
+    page : PositiveInteger
+  }
+  class "TurnEmbedding" as ai_TurnEmbedding {
+    <b>id</b> : PK
+    turn : FK → Turn
+    space : FK → EmbeddingSpace
+    kind : Char
+    embedding : Vector
+    created_at : DateTime
+  }
+}
+class "Record\n<size:9>(records)</size>" as records_Record <<ref>>
+ai_AskRun |o--o| ai_AskRun
+ai_AskRun |o--o| ai_Turn
+ai_AskRun }o--o| ai_AskRunAttempt
+ai_AskRun }o--|| ai_Conversation
+ai_AskRunAttempt }o--o| ai_ResearchRun
+ai_AskRunAttempt }o--|| ai_AskRun
+ai_AskRunEvent }o--o| ai_AskRunAttempt
+ai_AskRunEvent }o--|| ai_AskRun
+ai_ChatSubmission |o--o| ai_AskRun
+ai_ChatSubmission |o--o| ai_Turn
+ai_ChatSubmission }o--|| ai_Conversation
+ai_ChunkEmbedding }o--|| ai_DocumentChunk
+ai_ChunkEmbedding }o--|| ai_EmbeddingSpace
+ai_ChunkSet }o--|| records_Record
+ai_Conversation }o--o| records_Record
+ai_ConversationState |o--|| ai_Conversation
+ai_ConversationState }o--o| ai_Turn
+ai_DocumentChunk }o--|| ai_ChunkSet
+ai_DocumentChunk }o--|| records_Record
+ai_EmbeddingJob }o--|| records_Record
+ai_IngestionJob }o--|| ai_EmbeddingSpace
+ai_IngestionJob }o--|| records_Record
+ai_PaperBrief }o--|| ai_ChunkSet
+ai_PaperBrief }o--|| records_Record
+ai_ProviderReservation }o--|| ai_ProviderCampaign
+ai_RecordEmbedding |o--|| records_Record
+ai_RecordOverview |o--|| records_Record
+ai_RecordSpaceEmbedding }o--|| ai_EmbeddingSpace
+ai_RecordSpaceEmbedding }o--|| records_Record
+ai_ResearchRun }o--o| ai_Conversation
+ai_ResearchStep }o--|| ai_ResearchRun
+ai_ScreeningJudgment }o--|| records_Record
+ai_ShadowEvidenceDecision |o--|| ai_Turn
+ai_Turn }o--|| ai_Conversation
+ai_TurnCitation }o--o| ai_DocumentChunk
+ai_TurnCitation }o--|| ai_Turn
+ai_TurnCitation }o--|| records_Record
+ai_TurnEmbedding }o--|| ai_EmbeddingSpace
+ai_TurnEmbedding }o--|| ai_Turn
+legend right
+  <b>Notation</b> (crow's foot)
+  three-pronged end: many · bar: exactly one · circle: zero allowed
+  PK primary key · FK foreign key · M2M many-to-many
+  grey box: entity drawn in full on another diagram
+  muted box: table kept, read only since IR-957
+endlegend
+@enduml
