@@ -29,9 +29,9 @@ import json, django
 django.setup()
 from django.test import Client
 
-def ask(accept):
+def ask(accept, path="/api/v1/records/"):
     response = Client(raise_request_exception=False).get(
-        "/api/v1/records/", HTTP_ACCEPT=accept, HTTP_X_FORWARDED_PROTO="https",
+        path, HTTP_ACCEPT=accept, HTTP_X_FORWARDED_PROTO="https",
     )
     body = response.content.decode("utf-8", "replace")
     return {
@@ -40,10 +40,14 @@ def ask(accept):
         "browsable": "Django REST framework" in body or "<html" in body.lower(),
     }
 
+BROWSER = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+
 print("RESULT" + json.dumps({
-    "browser": ask("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"),
+    "browser": ask(BROWSER),
     "html_only": ask("text/html"),
     "json": ask("application/json"),
+    # DRF's `?format=api` asks for the browsable renderer by name.
+    "format_api": ask(BROWSER, path="/api/v1/records/?format=api"),
 }))
 """
 
@@ -81,8 +85,17 @@ def test_a_browser_gets_json_not_the_browsable_page(production):
     assert not answer["browsable"], answer
 
 
-def test_asking_for_html_alone_still_gets_no_browsable_page(production):
-    assert not production["html_only"]["browsable"], production["html_only"]
+def test_asking_for_html_alone_is_refused_in_json(production):
+    answer = production["html_only"]
+    assert answer["status"] == 406, answer
+    assert answer["content_type"].startswith("application/json"), answer
+    assert not answer["browsable"], answer
+
+
+def test_naming_the_browsable_renderer_in_the_url_finds_nothing(production):
+    answer = production["format_api"]
+    assert answer["status"] == 404, answer
+    assert not answer["browsable"], answer
 
 
 def test_a_json_client_is_answered_as_before(production):
