@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
 from django.utils.cache import add_never_cache_headers
@@ -69,8 +70,20 @@ class RegisterView(generics.CreateAPIView):
     throttle_classes   = [RegisterBurstThrottle, RegisterThrottle]
 
     def perform_create(self, serializer):
-        from django.db import transaction
+        from rest_framework.exceptions import ValidationError
+
+        from . import unverified
+        from .recovery import limits
+
+        email = serializer.validated_data["email"]
         with transaction.atomic():
+            # Refuse before replacing anything: a full recipient would otherwise
+            # get no link, because the send path drops it quietly (IR-705).
+            if (wait := recovery_service.recipient_wait(email)) is not None:
+                raise limits.Throttled(wait)
+            unverified.replace(unverified.replaceable_for(email))
+            if not unverified.address_is_free(email):  # linked since validation
+                raise ValidationError({"email": ["This email address is already registered."]})
             user = serializer.save()
 
             # Create a RoleRequest so admins can approve/decline
@@ -88,6 +101,20 @@ class RegisterView(generics.CreateAPIView):
             # commit, under the same limits. A rollback leaves no intent and
             # sends nothing.
             recovery_service.admit_request(RecoveryPurpose.EMAIL_VERIFICATION, user.email)
+
+    def handle_exception(self, exc):
+        from .recovery import limits
+
+        if isinstance(exc, limits.Throttled):
+            # ADR-045's retry guidance, as the recovery endpoints give it.
+            response = Response(
+                {"code": "rate_limited", "detail": "Too many requests. Try again later.",
+                 "retry_after": exc.retry_after},
+                status=429,
+            )
+            response["Retry-After"] = str(exc.retry_after)
+            return response
+        return super().handle_exception(exc)
 
 
 class LoginView(APIView):
@@ -518,6 +545,13 @@ class PeopleSearchView(APIView):
         return Response(people_search.search(request))
 
 
+def _seen_by(actor, users):
+    """RDCO sees verified accounts only; the System Admin sees every one
+    (ADR-051 decision 22, IR-705). An unverified one is then a 404 to RDCO,
+    the same as an account that doesn't exist."""
+    return users if is_system_admin(actor) else users.filter(is_verified=True)
+
+
 class UserListView(generics.ListAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAccountAdmin]
@@ -526,6 +560,9 @@ class UserListView(generics.ListAPIView):
     # The default SearchFilter matches nothing until a view names its fields,
     # so the Users page's search box listed everyone (IR-478).
     search_fields      = ["email", "first_name", "last_name"]
+
+    def get_queryset(self):
+        return _seen_by(self.request.user, super().get_queryset())
 
 
 class AdviserListView(generics.ListAPIView):
@@ -553,6 +590,9 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAccountAdmin]
     queryset           = User.objects.filter(deleted_at__isnull=True)
+
+    def get_queryset(self):
+        return _seen_by(self.request.user, super().get_queryset())
 
     def update(self, request, *args, **kwargs):
         return _refuse_system_admin(self.get_object()) or super().update(request, *args, **kwargs)
@@ -737,14 +777,18 @@ class RoleRequestListView(generics.ListAPIView):
     """
     serializer_class   = RoleRequestSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
-    queryset           = RoleRequest.objects.filter(status=RequestStatus.PENDING).select_related("user", "requested_role")
+    # Verified accounts only (ADR-051 decision 22, IR-705).
+    queryset           = (RoleRequest.objects.filter(status=RequestStatus.PENDING, user__is_verified=True)
+                          .select_related("user", "requested_role"))
 
 
 class RoleRequestDetailView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def patch(self, request, pk):
-        role_request = RoleRequest.objects.get(pk=pk)
+        # An unverified account's request is not found, so it can't be decided
+        # (ADR-051 decision 22, IR-705).
+        role_request = get_object_or_404(RoleRequest, pk=pk, user__is_verified=True)
         if refused := _refuse_system_admin(role_request.user):
             return refused
         action = request.data.get("action")  # "approve" or "decline"

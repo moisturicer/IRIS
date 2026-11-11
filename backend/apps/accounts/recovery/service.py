@@ -49,6 +49,18 @@ def purpose_applies(user, purpose) -> bool:
     return not (purpose == RecoveryPurpose.EMAIL_VERIFICATION and user.is_verified)
 
 
+def recipient_wait(address: str) -> int | None:
+    """Seconds until ``address`` may be sent another email, or None if it may now.
+
+    Counts nothing. Registration asks first (IR-705) because it must refuse
+    *before* it replaces an unverified registration: `admit_request` answers a
+    full recipient by quietly sending nothing, which suits a resend but would
+    leave a new account with no link. Run it in the transaction that then calls
+    `admit_request`, so both decide under the same bucket lock.
+    """
+    return limits.wait(f"rcpt:{crypto.identifier('recipient', address)}", limits.recipient_windows())
+
+
 def admit_request(purpose: str, address: str) -> None:
     """Admit a request for ``purpose`` mail to ``address``, or suppress it.
 

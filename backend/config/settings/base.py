@@ -379,6 +379,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.audit.tasks.erase_expired_personal_data",
         "schedule": crontab(hour=19, minute=0),
     },
+    # ADR-051 decision 24 (IR-705): remove unverified registrations older than
+    # UNVERIFIED_REGISTRATION_DAYS, daily at 03:00 Manila.
+    "unverified-registrations": {
+        "task": "apps.accounts.tasks.expire_unverified_registrations",
+        "schedule": crontab(hour=19, minute=0),
+    },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due
     # retries, expires stale intents and purges terminal records. Its interval
@@ -1035,6 +1041,9 @@ AI_CHUNK_EXCLUDE_SECTIONS = config(
 # never quietly switch a protection off. Links are built on FRONTEND_URL only,
 # never on the request's Host.
 RECOVERY_RESET_TTL_SECONDS        = config("RECOVERY_RESET_TTL_SECONDS", default=1800, cast=int)
+# ADR-051 decision 24 (IR-705): days an unverified registration lasts before the
+# daily job removes it. A setting, not one of the System Admin's retention periods.
+UNVERIFIED_REGISTRATION_DAYS      = config("UNVERIFIED_REGISTRATION_DAYS", default=30, cast=int)
 RECOVERY_VERIFICATION_TTL_SECONDS = config("RECOVERY_VERIFICATION_TTL_SECONDS", default=86400, cast=int)
 RECOVERY_COOLDOWN_SECONDS         = config("RECOVERY_COOLDOWN_SECONDS", default=60, cast=int)
 RECOVERY_REQUEST_IP_10M           = config("RECOVERY_REQUEST_IP_10M", default=10, cast=int)

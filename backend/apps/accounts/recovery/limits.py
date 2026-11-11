@@ -74,6 +74,22 @@ def admit(key: str, windows, at) -> int | None:
     """
     bucket = _locked(key)
     at = clock.now()
+    wait = _wait(bucket, windows, at)
+    if wait is None:
+        RecoveryAttempt.objects.create(bucket=bucket, at=at)
+    return wait
+
+
+def wait(key: str, windows) -> int | None:
+    """The seconds until one more attempt on ``key`` would fit, counting nothing.
+
+    Must run inside a transaction: the bucket stays locked until it commits, so
+    an attempt the same transaction then makes is decided on what this saw.
+    """
+    return _wait(_locked(key), windows, clock.now())
+
+
+def _wait(bucket, windows, at) -> int | None:
     longest = max(window.seconds for window in windows)
     recent = list(
         RecoveryAttempt.objects.filter(bucket=bucket, at__gt=at - timedelta(seconds=longest))
@@ -85,10 +101,7 @@ def admit(key: str, windows, at) -> int | None:
         if len(inside) >= window.limit:
             leaves = inside[window.limit - 1] + timedelta(seconds=window.seconds)
             waits.append(max(1, math.ceil((leaves - at).total_seconds())))
-    if waits:
-        return max(waits)
-    RecoveryAttempt.objects.create(bucket=bucket, at=at)
-    return None
+    return max(waits) if waits else None
 
 
 def admit_address(action: str, ip: str, windows) -> None:
