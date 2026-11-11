@@ -39,6 +39,7 @@ check() {
 said()       { grep -qF -- "$1" "$OUT"; }
 ran()        { grep -qF -- "$1" "$FAKE/calls"; }
 not_ran()    { ! ran "$1"; }
+not_said()   { ! said "$1"; }
 head_is()    { [ "$(git -C "$CLONE" rev-parse HEAD)" = "$1" ]; }
 
 # ---- the fake docker and curl ------------------------------------------
@@ -59,11 +60,19 @@ case "$1" in
         touch "$FAKE/up_ran"
         exit "$(cat "$FAKE/up_rc" 2>/dev/null || echo 0)" ;;
     ps)
+        [ -e "$FAKE/ps_fails" ] && { echo "Cannot connect to the Docker daemon" >&2; exit 1; }
         # ps_after_up, when present, is what ps shows once `up` has run.
-        if [ -e "$FAKE/up_ran" ] && [ -e "$FAKE/ps_after_up" ]; then cat "$FAKE/ps_after_up"; else cat "$FAKE/ps"; fi ;;
+        if [ -e "$FAKE/up_ran" ] && [ -e "$FAKE/ps_after_up" ]; then cat "$FAKE/ps_after_up"; else cat "$FAKE/ps"; fi |
+        # flap: backend is caught restarting on every other look.
+        if [ -e "$FAKE/flap" ] && [ $(( $(wc -l < "$FAKE/calls") % 2 )) = 0 ]; then
+            sed 's/^backend|running|/backend|restarting|/'
+        else
+            cat
+        fi ;;
     logs)
         echo "last lines of ${*: -1}" ;;
     restart)
+        touch "$FAKE/restart_ran"
         exit 0 ;;
     *)
         echo "fake docker: unexpected compose command: $*" >&2; exit 99 ;;
@@ -71,7 +80,12 @@ esac
 EOF
     cat > "$FAKE/bin/curl" <<'EOF'
 #!/usr/bin/env bash
-echo "curl ${*: -1}" >> "$FAKE/calls"
+# curl_rc fails every address; curl_fails_on fails those containing its text;
+# stale_frontend fails the API until frontend has been restarted (IR-200).
+url="${*: -1}"
+echo "curl $url" >> "$FAKE/calls"
+if [ -e "$FAKE/curl_fails_on" ] && [[ "$url" == *"$(cat "$FAKE/curl_fails_on")"* ]]; then exit 22; fi
+if [ -e "$FAKE/stale_frontend" ] && [ ! -e "$FAKE/restart_ran" ] && [[ "$url" == */api/* ]]; then exit 22; fi
 exit "$(cat "$FAKE/curl_rc" 2>/dev/null || echo 0)"
 EOF
     chmod +x "$FAKE/bin/docker" "$FAKE/bin/curl"
@@ -188,7 +202,7 @@ check "says the database update failed"           said "migrate didn't finish"
 check "shows migrate's log"                       said "last lines of migrate"
 check "says how to go back to the old commit"     said "git checkout --detach ${old:0:8}"
 check "doesn't restart frontend"                  not_ran "restart frontend"
-check "doesn't report success"                    not_ran "curl"
+check "never checks the site"                    not_ran "curl"
 
 : > "$FAKE/calls"
 rm -f "$FAKE/up_rc" "$FAKE/ps_after_up" "$FAKE/up_ran"
@@ -222,7 +236,7 @@ deploy; rc=$?
 check "fails when the site doesn't answer"        [ "$rc" -ne 0 ]
 check "names the step"                            said "FAILED at step 4/5 (health)"
 check "names the address"                         said "https://iris.example.invalid/ didn't answer"
-check "suggests restarting frontend (IR-200)"     said "restart frontend"
+check "points at DNS and the certificate"         said "DNS"
 check "shows caddy's and frontend's logs"         said "last lines of caddy"
 
 : > "$FAKE/calls"
@@ -262,11 +276,56 @@ deploy; rc=$?
 check "refuses when main can't fast-forward"      [ "$rc" -ne 0 ]
 check "names the step"                            said "FAILED at step 1/5 (pull)"
 check "doesn't rebuild"                           not_ran " up "
+check "doesn't offer to go back: nothing moved"   not_said "to go back"
+
+new_case ahead
+local_commit="$(echo "committed on the server" > "$CLONE/LOCAL"; git -C "$CLONE" add LOCAL; git -C "$CLONE" commit -q -m local; git -C "$CLONE" rev-parse HEAD)"
+deploy; rc=$?
+check "refuses a commit made on the server"       [ "$rc" -ne 0 ]
+check "names the step and the commit"             said "FAILED at step 1/5 (pull): main has 1 commit(s) GitHub doesn't"
+check "leaves it alone"                           head_is "$local_commit"
+check "doesn't rebuild"                           not_ran " up "
+
+new_case api-down
+push_change "second"
+echo /api/ > "$FAKE/curl_fails_on"
+deploy; rc=$?
+check "fails when only the API doesn't answer"    [ "$rc" -ne 0 ]
+check "names the address"                         said "https://iris.example.invalid/api/v1/colleges/ didn't answer"
+check "shows the backend's log"                   said "last lines of backend"
+
+new_case stale-frontend
+push_change "second"
+deploy
+: > "$FAKE/calls"
+rm -f "$FAKE/restart_ran"
+touch "$FAKE/stale_frontend"
+deploy; rc=$?
+check "after a restart with nothing new, an API that fails (IR-200)" ran "restart frontend"
+check "is fixed by restarting frontend once"      [ "$rc" -eq 0 ]
+check "and says so"                               said "restarted frontend"
+
+new_case flapping
+push_change "second"
+touch "$FAKE/flap"
+deploy; rc=$?
+check "fails on a service that keeps restarting"  [ "$rc" -ne 0 ]
+check "names it"                                  said "backend (restarting)"
+
+new_case docker-down
+push_change "second"
+touch "$FAKE/ps_fails"
+deploy; rc=$?
+check "fails when docker can't list the services" [ "$rc" -ne 0 ]
+check "still names the step"                      said "FAILED at step 4/5 (health)"
 
 new_case bad-setting
 TIMEOUT=soon deploy; rc=$?
 check "refuses a setting that isn't a number"     [ "$rc" -ne 0 ]
 check "names it"                                  said "IRIS_DEPLOY_TIMEOUT must be a whole number"
+TIMEOUT=08 deploy; rc=$?
+check "refuses a leading zero"                    [ "$rc" -ne 0 ]
+check "with the same message"                    said "IRIS_DEPLOY_TIMEOUT must be a whole number"
 
 echo
 if [ "$failures" -eq 0 ]; then

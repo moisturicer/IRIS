@@ -96,6 +96,8 @@ and fill in `backend/.env` and `ai/.env` (domain, vendor keys, Gmail). Then star
 
 **Why:** an update by hand is `git pull`, a rebuild, then checking each service yourself. A step skipped or a problem missed leaves the server half updated: a database update that failed, or a site that loads but can't sign anyone in (IR-200). This does all of it, the same way every time.
 
+**Not yet run on a real server.** CI checks every step and failure against a fake Docker. The first real update on `iris-demo` is still to be recorded in `docs/testing/traceability/IR-1018.md`. Until then, watch that first run, and keep the manual steps in **After a scheduled start** below as the fallback.
+
 ```bash
 sudo -iu ubuntu        # in a Session Manager shell; skip it over SSH as ubuntu
 bash ~/IRIS/scripts/deploy.sh
@@ -105,13 +107,13 @@ It reports five steps, and the first that fails stops the run and names itself:
 
 | Step | What it does | Stops when |
 |---|---|---|
-| 1. pull | Fast-forwards the clone to GitHub's `main` | the clone isn't on `main`, has local changes, or can't fast-forward. Nothing is changed |
+| 1. pull | Fast-forwards the clone to GitHub's `main` | the clone isn't on `main`, has uncommitted changes, or has commits GitHub doesn't. Nothing is changed |
 | 2. check | Checks `.env`, `backend/.env` and `ai/.env` exist, the compose file is valid, and 5 GB is free | any is missing. Nothing is rebuilt |
 | 3. rebuild | `docker compose -f docker-compose.prod.yml up -d --build` | the build fails, or `migrate` (the database update) fails: its log is shown |
-| 4. health | Waits until every service is running, and healthy where it has a check. Then restarts `frontend` (IR-200) and fetches the home page and `/api/v1/colleges/` over HTTPS | a service isn't ready within 10 minutes (its log is shown), or the site doesn't answer |
+| 4. health | Waits until every service is running, and healthy where it has a check, on three checks in a row, so a crash-looping one doesn't pass. After a rebuild it restarts `frontend` (IR-200). Then it fetches the home page and `/api/v1/colleges/` over HTTPS | a service isn't ready, or the site doesn't answer, within 10 minutes for the whole step. The logs of what failed are shown |
 | 5. report | Prints `done, running <commit> (<title>)` | |
 
-**Nothing new?** It says "already up to date", skips the rebuild and only runs the health check. That makes it the check to run after a scheduled start too. It remembers the last commit it deployed, in `.git/iris-deployed`, so a run after a failed one rebuilds, even with nothing new to pull.
+**Nothing new?** It says "already up to date", skips the rebuild and only runs the health check. That makes it the check to run after a scheduled start too: when the page answers but the API doesn't, it restarts `frontend` once by itself (IR-200). It remembers the last commit it deployed, in `.git/iris-deployed`, so a run after a failed one rebuilds, even with nothing new to pull.
 
 **When it fails** after pulling new code, it prints the command to go back to the version that ran before:
 
@@ -121,11 +123,13 @@ git checkout --detach <commit> && docker compose -f docker-compose.prod.yml up -
 
 Going back never undoes a database migration. Run `git checkout main` before the next deploy, since it refuses any other branch. It never goes back by itself: a person decides.
 
+**A change to `deploy.sh` itself** takes effect from the next run. The run that pulls it carries on with the copy it started with.
+
 **Settings,** in front of the command, for example `IRIS_DEPLOY_TIMEOUT=900 bash ~/IRIS/scripts/deploy.sh`:
 
 | Setting | Default |
 |---|---|
-| `IRIS_DEPLOY_TIMEOUT` | `600`: seconds to wait for the services, and for the site |
+| `IRIS_DEPLOY_TIMEOUT` | `600`: seconds step 4 may take in all |
 | `IRIS_DEPLOY_POLL` | `5`: seconds between checks |
 | `IRIS_DEPLOY_MIN_FREE_GB` | `5`: free disk a rebuild needs |
 
@@ -248,8 +252,15 @@ At boot Docker doesn't wait for the database the way `docker compose up` does, s
 **Check that you can sign in, not only that the page loads.** The frontend looks up the backend's internal address once, when it starts (IR-200). If the backend came up later at a new address, the page loads but sign-in fails. The fix is one command:
 
 ```bash
-bash ~/IRIS/scripts/deploy.sh    # "already up to date", then the health check
-cd ~/IRIS && docker compose -f docker-compose.prod.yml restart frontend   # if it says the API didn't answer
+bash ~/IRIS/scripts/deploy.sh    # "already up to date", then the health check; restarts frontend if the API doesn't answer
+```
+
+Or by hand, which works with or without the script:
+
+```bash
+cd ~/IRIS
+docker compose -f docker-compose.prod.yml ps                 # all "Up", migrate "Exited (0)"
+docker compose -f docker-compose.prod.yml restart frontend   # if sign-in fails
 ```
 
 **Encrypted disks:** the scheduled start works with the default EBS encryption key (`aws/ebs`), which both templates use. A disk encrypted with a key of your own would need that key to allow the scheduler's role, or the start fails and the instance goes back to stopped.
