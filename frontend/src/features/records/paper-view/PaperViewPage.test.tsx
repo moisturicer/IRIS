@@ -2971,3 +2971,112 @@ describe("RDCO's controls on a paper in review (IR-798)", () => {
     await expectNoBlockingA11yViolations(document.body);
   });
 });
+
+// "On this page" (IR-1000): the Overview's own index. Where it sits at each
+// width is CSS, which jsdom does not apply, so placement is held as classes;
+// OverviewIndex.test.tsx holds what the links do.
+describe("the Overview's section index (IR-1000)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+  });
+
+  it("links Abstract, AI Overview, Related works and Comments, each to a section the page has", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    // Two copies, one per placement; CSS shows one of them.
+    const navs = screen.getAllByRole("navigation", { name: "On this page" });
+    expect(navs).toHaveLength(2);
+    for (const nav of navs) {
+      const links = within(nav).getAllByRole("link");
+      expect(links.map((l) => l.textContent)).toEqual(["Abstract", "AI Overview", "Related works", "Comments"]);
+      for (const link of links) {
+        const target = document.getElementById(link.getAttribute("href")!.slice(1));
+        expect(target).not.toBeNull();
+        expect(target).toHaveAttribute("tabindex", "-1");
+      }
+    }
+    expect(document.getElementById("overview-abstract")).toContainElement(
+      screen.getByRole("heading", { level: 2, name: "Abstract" }),
+    );
+    expect(document.getElementById("overview-comments")).toContainElement(
+      screen.getByRole("heading", { level: 2, name: /Comments/ }),
+    );
+  });
+
+  it("leaves Comments out of the index where the page has no Comments", async () => {
+    shownRecord = { ...record, pipeline_status: "approved", workflow_state: "approved" };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    for (const nav of screen.getAllByRole("navigation", { name: "On this page" })) {
+      expect(within(nav).queryByRole("link", { name: "Comments" })).not.toBeInTheDocument();
+    }
+    expect(document.getElementById("overview-comments")).toBeNull();
+  });
+
+  it("sits in the Record details column wide, and above the Abstract narrow", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    const rail = within(details).getByRole("navigation", { name: "On this page" });
+    expect(rail.className).toContain("overview-wide:block");
+    expect(rail.className).toMatch(/\bhidden\b/);
+
+    const inline = screen
+      .getAllByRole("navigation", { name: "On this page" })
+      .find((nav) => !details.contains(nav))!;
+    expect(inline.className).toContain("overview-wide:hidden");
+    // Ahead of the reading sections, so it is met before the Abstract.
+    expect(
+      inline.compareDocumentPosition(document.getElementById("overview-abstract")!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("keeps the narrow copy while Ask IRIS has folded the rail away", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", { name: /Ask IRIS/i }));
+
+    const details = screen.getByRole("complementary", { hidden: true, name: "Record details" });
+    const inline = screen
+      .getAllByRole("navigation", { name: "On this page" })
+      .find((nav) => !details.contains(nav))!;
+    expect(inline.className).not.toContain("overview-wide:hidden");
+  });
+
+  it("justifies the abstract and lets the browser hyphenate it, at the same measure", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const abstract = screen.getByText(record.abstract!);
+    // Justified from `sm` up: at 360px a line holds about thirty characters and
+    // justifying it opens gaps wider than the words, so a phone gets a ragged edge.
+    expect(abstract).toHaveClass("sm:text-justify", "break-words", "[hyphens:auto]");
+    expect(abstract).not.toHaveClass("text-justify");
+    // Hyphenation needs the text's language; the measure is the column's, unchanged.
+    expect(abstract).toHaveAttribute("lang", "en");
+    expect(abstract.className).not.toMatch(/\bmax-w-/);
+  });
+
+  it("keeps the record details, the actions beside the abstract and the Paper and Review tabs", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByRole("heading", { name: "Institutional Governance" })).toBeInTheDocument();
+    const abstract = document.getElementById("overview-abstract")!;
+    expect(within(abstract).getByRole("button", { name: "Cite" })).toBeInTheDocument();
+    expect(within(abstract).getByRole("button", { name: "Share" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Paper" })).toBeEnabled();
+  });
+
+  it("is not on the Paper tab, which has no Overview to move through", async () => {
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByRole("tab", { name: "Paper", selected: true });
+    expect(screen.queryByRole("navigation", { name: "On this page" })).not.toBeInTheDocument();
+  });
+});

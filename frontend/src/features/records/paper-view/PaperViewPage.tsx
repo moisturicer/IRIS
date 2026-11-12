@@ -1,5 +1,5 @@
 import { INSTITUTION } from "@/config/institution";
-import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { readFailureKind } from "@/lib/readFailure";
@@ -76,6 +76,13 @@ import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type Readin
 import { ReadingHeader } from "./ReadingHeader";
 import { SubmissionStatus } from "./SubmissionStatus";
 import { useFragmentFocus } from "./useFragmentFocus";
+import {
+  OVERVIEW_TARGET,
+  OVERVIEW_TARGET_CLASS,
+  OverviewIndex,
+  overviewIndexItems,
+  useCurrentSection,
+} from "./OverviewIndex";
 import { useCitationReference, type CitationResolution } from "./useCitationReference";
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
@@ -354,6 +361,12 @@ export default function PaperViewPage() {
   const documentsOpen = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
   // Still on the record being left while the next one loads.
   const arriving = loading || !record || record.id !== Number(id);
+  // "On this page" (IR-1000): the Overview's sections, and the one being read.
+  const indexItems = useMemo(() => overviewIndexItems(record?.pipeline_status === "published"), [record?.pipeline_status]);
+  const [currentOverviewSection, setCurrentOverviewSection] = useCurrentSection(
+    indexItems.map((item) => item.id),
+    section === "overview" && !arriving,
+  );
   const onPaperTab = record != null && section === "paper";
   const onReviewTab = section === "review";
   // Never beside the paper, where there is no sheet to tuck away.
@@ -1133,13 +1146,36 @@ export default function PaperViewPage() {
                   </div>
                 )}
 
+                {/* Where the sections are, for a narrow page, and for a wide one
+                    while Ask IRIS has folded the rail (and its copy) away. The
+                    rail carries the wide one (IR-1000). */}
+                <OverviewIndex
+                  variant="inline"
+                  items={indexItems}
+                  current={currentOverviewSection}
+                  onJump={setCurrentOverviewSection}
+                  className={cn(!railHidden && "overview-wide:hidden")}
+                />
+
                 {/* Reading sections are separated by space. */}
                 <div className="space-y-8">
                 {/* The abstract shares the reading column with its heading and actions. */}
-                <section>
-                  <SectionHeading>Abstract</SectionHeading>
+                <section
+                  id={OVERVIEW_TARGET.abstract}
+                  tabIndex={-1}
+                  aria-labelledby={OVERVIEW_TARGET.abstract + "-heading"}
+                  className={OVERVIEW_TARGET_CLASS}
+                >
+                  <SectionHeading id={OVERVIEW_TARGET.abstract + "-heading"}>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="text-lg text-stone-700 leading-7">
+                    // Justified, hyphenated by the browser in the record's
+                    // language, and broken only at word edges otherwise: the
+                    // hyphens keep a justified line from opening into rivers
+                    // at the 60rem measure, which is unchanged (IR-1000).
+                    <p
+                      lang="en"
+                      className="text-lg text-stone-700 leading-7 sm:text-justify break-words [hyphens:auto] [hyphenate-limit-chars:6_3_3]"
+                    >
                       {record.abstract}
                     </p>
                   ) : (
@@ -1153,7 +1189,9 @@ export default function PaperViewPage() {
                   </div>
                 </section>
 
-                <PaperAiOverview record={record} />
+                <div id={OVERVIEW_TARGET.ai} tabIndex={-1} className={OVERVIEW_TARGET_CLASS}>
+                  <PaperAiOverview record={record} />
+                </div>
 
                 {can.has("tag_ip") && (
                   <IpTagger
@@ -1169,11 +1207,15 @@ export default function PaperViewPage() {
                   <RelatedPublishedResearch recordId={record.id} />
                 )}
 
-                <RelatedWorks recordId={record.id} />
+                <div id={OVERVIEW_TARGET.related} tabIndex={-1} className={OVERVIEW_TARGET_CLASS}>
+                  <RelatedWorks recordId={record.id} />
+                </div>
 
                 {/* Public comments belong to published papers' Overview only. */}
                 {record.pipeline_status === "published" && (
-                  <CommentsSection recordId={record.id} viewerId={user?.id ?? null} />
+                  <div id={OVERVIEW_TARGET.comments} tabIndex={-1} className={OVERVIEW_TARGET_CLASS}>
+                    <CommentsSection recordId={record.id} viewerId={user?.id ?? null} />
+                  </div>
                 )}
                 </div>
               </>
@@ -1231,6 +1273,15 @@ export default function PaperViewPage() {
                 aria-labelledby={`${tabsId}-details`}
                 className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible"
               >
+                {/* Wide: where the sections are, held with the rail as it
+                    sticks. Narrow, the row above the Abstract does this (IR-1000). */}
+                <OverviewIndex
+                  variant="rail"
+                  items={indexItems}
+                  current={currentOverviewSection}
+                  onJump={setCurrentOverviewSection}
+                  className="hidden overview-wide:block"
+                />
                 <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
                   Record details
                 </h2>
