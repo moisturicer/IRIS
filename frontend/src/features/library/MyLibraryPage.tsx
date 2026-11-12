@@ -287,6 +287,7 @@ export default function MyLibraryPage() {
             onRetry={() => void loadResearch()}
             filter={researchFilter}
             onFilterChange={setResearchFilter}
+            onDeleted={(id) => setResearch((items) => items.filter((item) => item.id !== id))}
           />
         )}
         {tab === "saved" && savedPanel}
