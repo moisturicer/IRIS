@@ -53,6 +53,51 @@ class SavedRecord(models.Model):
         return f"SavedRecord(owner={self.owner_id}, record={self.record_id})"
 
 
+#: The longest note body, in characters (ADR-064 §4). The editor's own copy is
+#: `MAX_NOTE_LENGTH` in `useReadingNote.ts`: change both together.
+MAX_NOTE_LENGTH = 20_000
+
+
+class ReadingNote(models.Model):
+    """
+    One reader's private note on one Record (IR-580, ADR-064).
+
+    `revision` is what makes two devices safe: a write names the revision it
+    started from and is refused, with the server's text, if the note has moved
+    on, so no save silently replaces another. A note has no quotation of the
+    paper in it, only what the reader typed.
+
+    Unique on `(owner, record)`. Both foreign keys cascade: removing an account
+    removes its notes and a deleted Record removes the notes on it. A Record
+    that is merely withdrawn or restricted keeps them (the retention rule,
+    ADR-064 §6); they are unreachable until access returns, because every
+    endpoint rechecks `Record.objects.visible_to()`.
+
+    Not in Django admin, no `AuditEvent`, and never imported by anything that
+    recommends, discusses, reviews or prompts (a guard test enforces it).
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reading_notes"
+    )
+    record = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="+"
+    )
+    body = models.TextField(blank=True, default="")
+    #: 1 on the first save; the API treats "no note yet" as revision 0.
+    revision = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "record"], name="unique_reading_note"),
+        ]
+
+    def __str__(self):
+        return f"ReadingNote(owner={self.owner_id}, record={self.record_id})"
+
+
 #: How many saved feeds one account may hold (IR-577). One constant, so changing
 #: the decision is one edit; the interface reads the number from the API.
 MAX_SAVED_FEEDS = 10

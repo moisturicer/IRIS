@@ -107,6 +107,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-540** | Register gets informed consent and an honest finish: an interim data notice, next steps, an in-place confirmation — no FR- id of its own; … | [details](traceability/IR-540.md) | **IMPLEMENTED** |
 | **IR-565** | A long Manuscript opens at its first or cited page, and only a bounded window of pages is painted — no FR- id; subtask 12 of IR-552 (User … | [details](traceability/IR-565.md) | **IMPLEMENTED** |
 | **IR-569** | Paper view: one record bar, a full-height reading workspace that follows the content width, and one Ask IRIS everywhere — no FR- id; … | [details](traceability/IR-569.md) | **IMPLEMENTED** |
+| **IR-580** | Private notes in the reading workspace, with autosave I can trust: owner-only `ReadingNote`, revision conflicts keep both texts, a failed save never shows Saved — no FR- id; … | [details](traceability/IR-580.md) | **IMPLEMENTED** (backend tests not yet run; ADR-064 Proposed) |
 | **IR-674** | RDCO alone decides a download request, cannot decide their own, and only RDCO is notified of a new one | [details](traceability/IR-674.md) | **IMPLEMENTED** |
 | **IR-675** | An approved download request is a time-limited grant used while signed in; no bearer link is issued | [details](traceability/IR-675.md) | **PARTIAL** |
 | **IR-676** | Every copy saved through the download route names who downloaded it, or is not served | [details](traceability/IR-676.md) | **PARTIAL** |

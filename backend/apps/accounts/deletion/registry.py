@@ -110,6 +110,7 @@ RELATIONS: dict[str, Rule] = {
     "opportunities.Opportunity.posted_by": Rule(KEEP, "A Call's Posted by shows \"Former user\""),
     "library.SavedRecord.owner":           Rule(DELETE, "Saved papers and reading status"),
     "library.SavedFeed.owner":             Rule(DELETE, "Private custom feeds (IR-577)"),
+    "library.ReadingNote.owner":           Rule(DELETE, "Private reading notes (IR-580)"),
     "reviews.SavedReply.owner":            Rule(DELETE, "Private saved review replies (IR-877)"),
     "reviews.ViewedMark.user":             Rule(DELETE, "Private Viewed marks in a comparison (IR-877)"),
     "reviews.ReviewMention.user":          Rule(DELETE, "Mentions of the person in review comments (IR-877)"),

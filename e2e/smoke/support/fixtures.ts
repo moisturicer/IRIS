@@ -130,6 +130,7 @@ export const PAPER_DETAIL = {
   files: [],
   workflow_state: "published",
   workflow_state_label: "Published",
+  pipeline_status: "published",
   current_holders: [],
   capabilities: ["cite"],
   can_request_document: [],

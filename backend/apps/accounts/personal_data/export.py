@@ -285,6 +285,28 @@ def saved_papers(user) -> list[dict]:
     ]
 
 
+def reading_notes(user) -> list[dict]:
+    """
+    The person's own private notes (IR-580, ADR-064 §8): the text they typed and
+    its revision. The Record's title is given only while they may still read it;
+    the note text is theirs either way (the retention rule, §6).
+    """
+    from apps.library.models import ReadingNote
+
+    rows = list(ReadingNote.objects.filter(owner=user).order_by("id"))
+    titles = _readable_titles(user, [row.record_id for row in rows])
+    return [
+        {
+            **_paper(row.record_id, titles),
+            "body": row.body,
+            "revision": row.revision,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+        for row in rows
+    ]
+
+
 def saved_feeds(user) -> list[dict]:
     """The person's private custom feeds: the name they gave and the filters they saved."""
     from apps.library.models import SavedFeed
@@ -653,6 +675,7 @@ SECTIONS: dict[str, Callable] = {
     "papers_owned": papers_owned,
     "saved_papers": saved_papers,
     "saved_feeds": saved_feeds,
+    "reading_notes": reading_notes,
     "saved_replies": saved_replies,
     "viewed_marks": viewed_marks,
     "review_mentions": review_mentions,

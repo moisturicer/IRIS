@@ -31,7 +31,7 @@ from apps.records.serializers import RecordListSerializer
 from core.enums import ReadingStatus
 
 from . import feeds
-from .models import MAX_SAVED_FEEDS, SavedFeed, SavedRecord
+from .models import MAX_NOTE_LENGTH, MAX_SAVED_FEEDS, ReadingNote, SavedFeed, SavedRecord
 
 #: Absent from the body means "leave the status as it is".
 _UNSET = object()
@@ -124,6 +124,108 @@ class SavedRecordDetailView(APIView):
             deleted, _ = SavedRecord.objects.filter(owner=request.user, record_id=record_id).delete()
             if deleted:
                 invalidate_feed(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# -- IR-580: private reading notes (ADR-064) ------------------------------------
+#
+# The owner is the authenticated user and every queryset starts from
+# `ReadingNote.objects.filter(owner=request.user)`, so another reader's note --
+# staff's, the Record owner's, anyone's -- cannot be addressed. Every call,
+# DELETE included, rechecks `Record.objects.visible_to()`: an unreadable Record
+# is the same 404 as a missing one, and the text is kept until access returns.
+
+
+def _readable_or_404(user, record_id):
+    if not Record.objects.visible_to(user).filter(pk=record_id).exists():
+        raise NotFound()
+
+
+def _own_note(user, record_id):
+    return ReadingNote.objects.filter(owner=user, record_id=record_id)
+
+
+def _note_entry(note):
+    if note is None:
+        return {"body": "", "revision": 0, "updated_at": None}
+    return {"body": note.body, "revision": note.revision, "updated_at": note.updated_at}
+
+
+def _conflict(note):
+    return Response(
+        {
+            "code": "revision_conflict",
+            "detail": "This note changed on another device. Your text is kept; reconcile the two.",
+            **_note_entry(note),
+        },
+        status=status.HTTP_409_CONFLICT,
+    )
+
+
+def _note_payload(data):
+    """`(body, base_revision)` from a PUT, or a 400. A refused write stores nothing."""
+    data = data if isinstance(data, dict) else {}
+    body, base = data.get("body"), data.get("base_revision")
+    if not isinstance(body, str):
+        raise ValidationError({"body": ["Send the note as text."]})
+    if isinstance(base, bool) or not isinstance(base, int) or base < 0:
+        raise ValidationError({"base_revision": ["Send the revision this edit started from (0 for a new note)."]})
+    return body, base
+
+
+class ReadingNoteView(APIView):
+    """
+    GET    /library/notes/<record_id>/ -- the reader's note, or an empty one at
+           revision 0 (nothing is created by reading).
+    PUT    /library/notes/<record_id>/ -- `{body, base_revision}`. Stored only if
+           `base_revision` is the stored revision; otherwise a 409 carrying the
+           server's `body` and `revision`, and nothing is written.
+    DELETE -- removes the note; deleting what is not there is still a 204.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, record_id):
+        _readable_or_404(request.user, record_id)
+        return Response(_note_entry(_own_note(request.user, record_id).first()))
+
+    def put(self, request, record_id):
+        body, base = _note_payload(request.data)
+        if len(body) > MAX_NOTE_LENGTH:
+            return Response(
+                {
+                    "code": "note_too_long",
+                    "detail": f"A note holds at most {MAX_NOTE_LENGTH:,} characters.",
+                    "max_length": MAX_NOTE_LENGTH,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        _readable_or_404(request.user, record_id)
+
+        with transaction.atomic():
+            note = _own_note(request.user, record_id).select_for_update().first()
+            if (note.revision if note else 0) != base:
+                return _conflict(note)
+            if note is None:
+                try:
+                    with transaction.atomic():
+                        note = ReadingNote.objects.create(owner=request.user, record_id=record_id, body=body)
+                except IntegrityError:
+                    # Another device's first save landed between the read and
+                    # the insert; the database's unique rule caught it.
+                    return _conflict(_own_note(request.user, record_id).first())
+            else:
+                note.body = body
+                note.revision += 1
+                note.save(update_fields=["body", "revision", "updated_at"])
+
+        return Response(_note_entry(note))
+
+    def delete(self, request, record_id):
+        # A Record the reader cannot read is a 404 here too (ADR-064 §3), so the
+        # endpoint never confirms that a hidden Record exists.
+        _readable_or_404(request.user, record_id)
+        _own_note(request.user, record_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

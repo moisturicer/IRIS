@@ -11,7 +11,7 @@ import { RecentChats } from "./RecentChats";
 import { CONTROL_BASE } from "./controls";
 
 /** A square icon control in the panel's header: quiet at rest, a grey wash on hover. */
-const ICON_BUTTON =
+export const ICON_BUTTON =
   "relative inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-stone-600 transition-colors " +
   "hover:bg-stone-200 hover:text-stone-900 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent";
 
@@ -39,14 +39,21 @@ export function fitPanelWidth(preferred: number, room: number): number {
   return Math.round(Math.max(PANEL_WIDTH_MIN, Math.min(preferred, room)));
 }
 
+/** What occupies the reading workspace's one panel: Ask IRIS, or the reader's private Notes (IR-580). */
+export type PanelTool = "ask" | "notes";
+
 /**
- * Open and size state for Ask IRIS beside a paper.
+ * Open and size state for the panel beside a paper: Ask IRIS, or Notes in its
+ * place, one at a time (IR-580).
  *
  * Held by the page, not the panel: the page lays out around it, and closing
- * the panel must keep the draft and the width the reader chose.
+ * the panel must keep the draft and the width the reader chose. `setOpen(true)`
+ * always opens Ask IRIS, which is what every existing way in means; Notes is
+ * opened by `openNotes`.
  */
 export function usePaperChat() {
   const [open, setOpenState] = useState(false);
+  const [tool, setTool] = useState<PanelTool>("ask");
   // A followed citation tucks the panel away to a bar when it would cover the
   // passage (IR-354). Opening or closing always starts it unminimized.
   const [minimized, setMinimized] = useState(false);
@@ -55,6 +62,13 @@ export function usePaperChat() {
 
   const setOpen = (next: boolean) => {
     setOpenState(next);
+    setMinimized(false);
+    if (next) setTool("ask");
+  };
+
+  const openNotes = () => {
+    setTool("notes");
+    setOpenState(true);
     setMinimized(false);
   };
 
@@ -68,7 +82,7 @@ export function usePaperChat() {
     }
   };
 
-  return { open, setOpen, minimized, setMinimized, draft, setDraft, width, setWidth };
+  return { open, setOpen, tool, openNotes, minimized, setMinimized, draft, setDraft, width, setWidth };
 }
 
 /**
@@ -126,6 +140,11 @@ interface PaperChatPanelProps {
    * same answer a request again.
    */
   returnTo?: AnswerReturn | null;
+  /**
+   * Switch this panel's place to the reader's private Notes (IR-580). Absent
+   * where Notes is not offered, and the control is not drawn.
+   */
+  onOpenNotes?: () => void;
 }
 
 /**
@@ -219,6 +238,10 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
         <button type="button" onClick={newChat} aria-label="New chat" title="New chat" className={ICON_BUTTON}>
           <i className="fas fa-plus text-xs" aria-hidden />
         </button>
+        {props.onOpenNotes && <button type="button" onClick={props.onOpenNotes} aria-label="Notes" title="Your private notes"
+          className={ICON_BUTTON}>
+          <i className="fas fa-note-sticky text-xs" aria-hidden />
+        </button>}
         <Button variant="ghost" size="icon" onClick={props.onClose} aria-label="Close Ask IRIS" className="-mr-2">
           <i className="fas fa-xmark" aria-hidden />
         </Button>
@@ -244,14 +267,17 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
  * (IR-569). The panel is anchored to the right, so its width is how far the
  * pointer is from the right edge.
  */
-function ResizeEdge({
+export function ResizeEdge({
   width,
   max,
   onChange,
+  label = "Resize Ask IRIS",
 }: {
   width: number;
   max: number;
   onChange: (width: number) => void;
+  /** Names the panel being resized: Ask IRIS and Notes share this edge. */
+  label?: string;
 }) {
   const clampTo = (n: number) => Math.max(PANEL_WIDTH_MIN, Math.min(n, max));
   const drag = (e: PointerEvent<HTMLDivElement>) => {
@@ -272,7 +298,7 @@ function ResizeEdge({
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize Ask IRIS"
+      aria-label={label}
       aria-valuemin={PANEL_WIDTH_MIN}
       aria-valuemax={max}
       aria-valuenow={width}
