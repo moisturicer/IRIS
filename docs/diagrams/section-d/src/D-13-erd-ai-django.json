@@ -1,0 +1,1234 @@
+{
+ "title": "D-13  AI indexing, provider admission and conversations (Django side)",
+ "caption": "Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. A line is drawn for every foreign key between two entities on this figure; a key to an entity on another figure is named in its attribute row.",
+ "kind": "erd",
+ "format": "landscape",
+ "gutter": 36,
+ "nodes": [
+  {
+   "id": "ai_AskRun",
+   "shape": "table",
+   "label": "AskRun",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "conversation",
+      "v": "FK → Conversation"
+     },
+     {
+      "k": "current_attempt",
+      "v": "FK → AskRunAttempt"
+     },
+     {
+      "k": "turn",
+      "v": "FK unique → Turn"
+     },
+     {
+      "k": "retry_of",
+      "v": "FK unique → AskRun"
+     },
+     {
+      "k": "request",
+      "v": "JSON"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "deadline_at",
+      "v": "DateTime"
+     },
+     "… 3 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_AskRunAttempt",
+   "shape": "table",
+   "label": "AskRunAttempt",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "run",
+      "v": "FK → AskRun"
+     },
+     {
+      "k": "research_run",
+      "v": "FK → ResearchRun"
+     },
+     {
+      "k": "number",
+      "v": "PositiveSmallInteger"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "started_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "finished_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_AskRunEvent",
+   "shape": "table",
+   "label": "AskRunEvent",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "run",
+      "v": "FK → AskRun"
+     },
+     {
+      "k": "attempt",
+      "v": "FK → AskRunAttempt"
+     },
+     {
+      "k": "sequence",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "data",
+      "v": "JSON"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_ChatSubmission",
+   "shape": "table",
+   "label": "ChatSubmission",
+   "tone": "muted",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "conversation",
+      "v": "FK → Conversation"
+     },
+     {
+      "k": "turn",
+      "v": "FK unique → Turn"
+     },
+     {
+      "k": "run",
+      "v": "FK unique → AskRun"
+     },
+     {
+      "k": "request_id",
+      "v": "UUID"
+     },
+     {
+      "k": "fingerprint",
+      "v": "Char"
+     },
+     {
+      "k": "finished",
+      "v": "Boolean"
+     },
+     {
+      "k": "source_refs",
+      "v": "JSON"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_ChunkEmbedding",
+   "shape": "table",
+   "label": "ChunkEmbedding",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "chunk",
+      "v": "FK → DocumentChunk"
+     },
+     {
+      "k": "space",
+      "v": "FK → EmbeddingSpace"
+     },
+     {
+      "k": "embedding",
+      "v": "Vector"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_ChunkSet",
+   "shape": "table",
+   "label": "ChunkSet",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "extraction_hash",
+      "v": "Char"
+     },
+     {
+      "k": "source_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "strategy_id",
+      "v": "Char"
+     },
+     {
+      "k": "options",
+      "v": "JSON"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_Conversation",
+   "shape": "table",
+   "label": "Conversation",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "is_default",
+      "v": "Boolean"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_ConversationState",
+   "shape": "table",
+   "label": "ConversationState",
+   "tone": "muted",
+   "sections": [
+    [
+     {
+      "k": "conversation",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "answer_turn",
+      "v": "FK → Turn"
+     },
+     {
+      "k": "revision",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "basis",
+      "v": "Char"
+     },
+     {
+      "k": "request",
+      "v": "Text"
+     },
+     {
+      "k": "retrieval_query",
+      "v": "Text"
+     },
+     "… 8 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_DocumentChunk",
+   "shape": "table",
+   "label": "DocumentChunk",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "chunk_set",
+      "v": "FK → ChunkSet"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "sequence",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "max_sequence",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "text",
+      "v": "Text"
+     },
+     {
+      "k": "content",
+      "v": "Text"
+     },
+     "… 9 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_DocumentMetadata",
+   "shape": "table",
+   "label": "DocumentMetadata",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_EmbeddingJob",
+   "shape": "table",
+   "label": "EmbeddingJob",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "celery_task_id",
+      "v": "Char"
+     },
+     {
+      "k": "error",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_EmbeddingSpace",
+   "shape": "table",
+   "label": "EmbeddingSpace",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "model_id",
+      "v": "Char"
+     },
+     {
+      "k": "dimensions",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "metric",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_EmbeddingSpaceActivation",
+   "shape": "table",
+   "label": "EmbeddingSpaceActivation",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "kind",
+      "v": "Char"
+     },
+     {
+      "k": "space_id",
+      "v": "BigInteger"
+     },
+     {
+      "k": "previous_space_id",
+      "v": "BigInteger"
+     },
+     {
+      "k": "actor",
+      "v": "Char"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_IngestionJob",
+   "shape": "table",
+   "label": "IngestionJob",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "space",
+      "v": "FK → EmbeddingSpace"
+     },
+     {
+      "k": "extraction_hash",
+      "v": "Char"
+     },
+     {
+      "k": "strategy_id",
+      "v": "Char"
+     },
+     {
+      "k": "idempotency_key",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     "… 5 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_PaperBrief",
+   "shape": "table",
+   "label": "PaperBrief",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "chunk_set",
+      "v": "FK → ChunkSet"
+     },
+     {
+      "k": "requested_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "content_hash",
+      "v": "Char"
+     },
+     {
+      "k": "prompt_version",
+      "v": "PositiveSmallInteger"
+     },
+     {
+      "k": "profile_hash",
+      "v": "Char"
+     },
+     {
+      "k": "model_id",
+      "v": "Char"
+     },
+     "… 10 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_ProviderCampaign",
+   "shape": "table",
+   "label": "ProviderCampaign",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "key",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "charged_attempts",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "charged_input_tokens",
+      "v": "BigInteger"
+     },
+     "… 3 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_ProviderReservation",
+   "shape": "table",
+   "label": "ProviderReservation",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "campaign",
+      "v": "FK → ProviderCampaign"
+     },
+     {
+      "k": "lane",
+      "v": "Char"
+     },
+     {
+      "k": "account",
+      "v": "Char"
+     },
+     {
+      "k": "operation",
+      "v": "Char"
+     },
+     {
+      "k": "model",
+      "v": "Char"
+     },
+     "… 21 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_RecordEmbedding",
+   "shape": "table",
+   "label": "RecordEmbedding",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK unique → Record (D-10)"
+     },
+     {
+      "k": "embedding",
+      "v": "Vector"
+     },
+     {
+      "k": "model_name",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_RecordOverview",
+   "shape": "table",
+   "label": "RecordOverview",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK unique → Record (D-10)"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "text",
+      "v": "Text"
+     },
+     {
+      "k": "citations",
+      "v": "JSON"
+     },
+     {
+      "k": "degraded",
+      "v": "Boolean"
+     },
+     "… 6 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_RecordSpaceEmbedding",
+   "shape": "table",
+   "label": "RecordSpaceEmbedding",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "space",
+      "v": "FK → EmbeddingSpace"
+     },
+     {
+      "k": "embedding",
+      "v": "Vector"
+     },
+     {
+      "k": "source_hash",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_ResearchRun",
+   "shape": "table",
+   "label": "ResearchRun",
+   "tone": "muted",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "conversation",
+      "v": "FK → Conversation"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "stop_reason",
+      "v": "Char"
+     },
+     {
+      "k": "latency_ms",
+      "v": "PositiveInteger"
+     },
+     "… 3 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_ResearchStep",
+   "shape": "table",
+   "label": "ResearchStep",
+   "tone": "muted",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "run",
+      "v": "FK → ResearchRun"
+     },
+     {
+      "k": "position",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "kind",
+      "v": "Char"
+     },
+     {
+      "k": "tool",
+      "v": "Char"
+     },
+     {
+      "k": "argument_digest",
+      "v": "Char"
+     },
+     "… 5 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_ScreeningJudgment",
+   "shape": "table",
+   "label": "ScreeningJudgment",
+   "tone": "muted",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "key",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "quote",
+      "v": "Text"
+     },
+     {
+      "k": "source",
+      "v": "JSON"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_ShadowEvidenceDecision",
+   "shape": "table",
+   "label": "ShadowEvidenceDecision",
+   "tone": "muted",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "turn",
+      "v": "FK unique → Turn"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "outcome",
+      "v": "Char"
+     },
+     {
+      "k": "claim_token",
+      "v": "UUID"
+     },
+     {
+      "k": "claimed_at",
+      "v": "DateTime"
+     },
+     "… 11 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_ShadowEvidenceTally",
+   "shape": "table",
+   "label": "ShadowEvidenceTally",
+   "tone": "muted",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "code",
+      "v": "Char"
+     },
+     {
+      "k": "count",
+      "v": "PositiveInteger"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_Turn",
+   "shape": "table",
+   "label": "Turn",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "conversation",
+      "v": "FK → Conversation"
+     },
+     {
+      "k": "question",
+      "v": "Text"
+     },
+     {
+      "k": "resolved_question",
+      "v": "Text"
+     },
+     {
+      "k": "answer",
+      "v": "Text"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     "… 12 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_TurnCitation",
+   "shape": "table",
+   "label": "TurnCitation",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "turn",
+      "v": "FK → Turn"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "chunk",
+      "v": "FK → DocumentChunk"
+     },
+     {
+      "k": "marker",
+      "v": "PositiveSmallInteger"
+     },
+     {
+      "k": "page",
+      "v": "PositiveInteger"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_TurnEmbedding",
+   "shape": "table",
+   "label": "TurnEmbedding",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "turn",
+      "v": "FK → Turn"
+     },
+     {
+      "k": "space",
+      "v": "FK → EmbeddingSpace"
+     },
+     {
+      "k": "kind",
+      "v": "Char"
+     },
+     {
+      "k": "embedding",
+      "v": "Vector"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "ai_AskRun",
+   "to": "ai_Conversation",
+   "field": "conversation",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_AskRun",
+   "to": "ai_AskRunAttempt",
+   "field": "current_attempt",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_AskRun",
+   "to": "ai_Turn",
+   "field": "turn",
+   "tail": "zero-one",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_AskRun",
+   "to": "ai_AskRun",
+   "field": "retry_of",
+   "tail": "zero-one",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_AskRunAttempt",
+   "to": "ai_AskRun",
+   "field": "run",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_AskRunAttempt",
+   "to": "ai_ResearchRun",
+   "field": "research_run",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_AskRunEvent",
+   "to": "ai_AskRun",
+   "field": "run",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_AskRunEvent",
+   "to": "ai_AskRunAttempt",
+   "field": "attempt",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_ChatSubmission",
+   "to": "ai_Conversation",
+   "field": "conversation",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_ChatSubmission",
+   "to": "ai_Turn",
+   "field": "turn",
+   "tail": "zero-one",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_ChatSubmission",
+   "to": "ai_AskRun",
+   "field": "run",
+   "tail": "zero-one",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_ChunkEmbedding",
+   "to": "ai_DocumentChunk",
+   "field": "chunk",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_ChunkEmbedding",
+   "to": "ai_EmbeddingSpace",
+   "field": "space",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_ConversationState",
+   "to": "ai_Conversation",
+   "field": "conversation",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "ai_ConversationState",
+   "to": "ai_Turn",
+   "field": "answer_turn",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_DocumentChunk",
+   "to": "ai_ChunkSet",
+   "field": "chunk_set",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_IngestionJob",
+   "to": "ai_EmbeddingSpace",
+   "field": "space",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_PaperBrief",
+   "to": "ai_ChunkSet",
+   "field": "chunk_set",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_ProviderReservation",
+   "to": "ai_ProviderCampaign",
+   "field": "campaign",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_RecordSpaceEmbedding",
+   "to": "ai_EmbeddingSpace",
+   "field": "space",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_ResearchRun",
+   "to": "ai_Conversation",
+   "field": "conversation",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_ResearchStep",
+   "to": "ai_ResearchRun",
+   "field": "run",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_ShadowEvidenceDecision",
+   "to": "ai_Turn",
+   "field": "turn",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "ai_Turn",
+   "to": "ai_Conversation",
+   "field": "conversation",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_TurnCitation",
+   "to": "ai_Turn",
+   "field": "turn",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_TurnCitation",
+   "to": "ai_DocumentChunk",
+   "field": "chunk",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "ai_TurnEmbedding",
+   "to": "ai_Turn",
+   "field": "turn",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_TurnEmbedding",
+   "to": "ai_EmbeddingSpace",
+   "field": "space",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  {
+   "tone": "muted",
+   "text": "table kept, read only since IR-957"
+  },
+  "FK → Name (D-n): the entity is drawn on figure D-n"
+ ]
+}

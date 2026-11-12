@@ -1,0 +1,43 @@
+import { A, U, UC_LEGEND, GEN_LEGEND } from '../tools/dsl.mjs';
+
+export default {
+  kind: 'usecase',
+  title: 'D-4  Use cases: review workflow',
+  caption: 'From apps/reviews (routing.py, seats.py, new_version.py), RecordViewSet actions and ADR-032, ADR-047, ADR-052 on main (IR-1021).',
+  system: 'Review workflow',
+  left: [A('Adviser', 'Adviser'), A('Office', 'Office reviewer\n(ITSO, IERC, KTTO)'), A('Coord', 'Office coordinator')],
+  right: [A('RDCO', 'RDCO')],
+  cases: [
+    U('UC4', 'Request documents'),
+    U('UC6', 'Decide a Proposal: accept, revise or reject', 130),
+    U('UC7', 'Accept a Thesis/Research or Project and send it to RDCO', 170),
+    U('UC9', 'Route a record to office pools (ITSO, IERC, KTTO in parallel)', 170),
+    U('UC8', 'Date or release the embargo'),
+    U('UC14', 'Publish an Unlisted paper once its embargo is released', 150),
+    U('UC13', 'Decide and publish, or keep Unlisted', 120),
+    U('UC3', 'Finish review'),
+    U('UC2', 'Comment in anchored threads (Must fix, Suggestion)', 160),
+    U('UC5', 'Request a revision'),
+    U('UC1', 'See My Reviews (own seats and office pool)', 150),
+    U('UC16', 'View workflow analytics'),
+    U('UC10', 'Claim a seat in the office pool'),
+    U('UC12', 'Clear the record or record a finding', 110),
+    U('UC15', 'Compare two Versions (Changes tab)', 120),
+    U('UC11', 'Assign, reassign or add a reviewer; extend a due date', 170),
+  ],
+  links: [
+    ['Adviser', 'UC4', 'UC6', 'UC7', 'UC8', 'UC3', 'UC2', 'UC5', 'UC1'],
+    ['Office', 'UC2', 'UC5', 'UC1', 'UC16', 'UC10', 'UC12'],
+    ['Coord', 'UC11'],
+    ['RDCO', 'UC9', 'UC8', 'UC14', 'UC13', 'UC16'],
+  ],
+  gens: [['Coord', 'Office']],
+  deps: [
+    { from: 'UC3', to: 'UC2', label: '«include»' },
+    { from: 'UC12', to: 'UC15', label: '«extend»' },
+    { from: 'UC7', to: 'UC9', label: '«precedes»' },
+    { from: 'UC14', to: 'UC8', label: '«requires»' },
+  ],
+  notes: [{ on: 'UC5', text: "Clearance-aware resubmission (ADR-003): the new Version resets only the requesting office's clearance" }],
+  legend: [...UC_LEGEND, GEN_LEGEND],
+};

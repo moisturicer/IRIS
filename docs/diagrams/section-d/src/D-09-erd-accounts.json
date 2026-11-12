@@ -1,0 +1,778 @@
+{
+ "title": "D-9  Accounts, roles and consent",
+ "caption": "Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. A line is drawn for every foreign key between two entities on this figure; a key to an entity on another figure is named in its attribute row.",
+ "kind": "erd",
+ "format": "landscape",
+ "nodes": [
+  {
+   "id": "accounts_AccountDeletionRequest",
+   "shape": "table",
+   "label": "AccountDeletionRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "decided_by",
+      "v": "FK → User"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "decided_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "reason",
+      "v": "Text"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_AdviserProfile",
+   "shape": "table",
+   "label": "AdviserProfile",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK unique → User"
+     },
+     {
+      "k": "department",
+      "v": "FK → Department"
+     },
+     {
+      "k": "college",
+      "v": "FK → College"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_College",
+   "shape": "table",
+   "label": "College",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "code",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_Course",
+   "shape": "table",
+   "label": "Course",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "department",
+      "v": "FK → Department"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_DataNotice",
+   "shape": "table",
+   "label": "DataNotice",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "published_by",
+      "v": "FK → User"
+     },
+     {
+      "k": "number",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "subtitle",
+      "v": "Char"
+     },
+     {
+      "k": "sections",
+      "v": "JSON"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "accounts_Department",
+   "shape": "table",
+   "label": "Department",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "college",
+      "v": "FK → College"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "code",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_NoticeAnswer",
+   "shape": "table",
+   "label": "NoticeAnswer",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "notice",
+      "v": "FK → DataNotice"
+     },
+     {
+      "k": "agreed_dpa",
+      "v": "Boolean"
+     },
+     {
+      "k": "ai_consent",
+      "v": "Boolean"
+     },
+     {
+      "k": "answered_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RecoveryAttempt",
+   "shape": "table",
+   "label": "RecoveryAttempt",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "bucket",
+      "v": "FK → RecoveryBucket"
+     },
+     {
+      "k": "at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RecoveryBucket",
+   "shape": "table",
+   "label": "RecoveryBucket",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "key",
+      "v": "PK",
+      "pk": true
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RecoveryGeneration",
+   "shape": "table",
+   "label": "RecoveryGeneration",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "recipient",
+      "v": "Char"
+     },
+     {
+      "k": "purpose",
+      "v": "Char"
+     },
+     {
+      "k": "current",
+      "v": "PositiveInteger"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RecoveryIntent",
+   "shape": "table",
+   "label": "RecoveryIntent",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "purpose",
+      "v": "Char"
+     },
+     {
+      "k": "recipient",
+      "v": "Char"
+     },
+     {
+      "k": "generation",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "address_encrypted",
+      "v": "Text"
+     },
+     "… 9 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RecoveryToken",
+   "shape": "table",
+   "label": "RecoveryToken",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "intent",
+      "v": "FK unique → RecoveryIntent"
+     },
+     {
+      "k": "digest",
+      "v": "Char"
+     },
+     {
+      "k": "purpose",
+      "v": "Char"
+     },
+     {
+      "k": "email",
+      "v": "Email"
+     },
+     {
+      "k": "credential_version",
+      "v": "PositiveInteger"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "accounts_ResearchInterest",
+   "shape": "table",
+   "label": "ResearchInterest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_Role",
+   "shape": "table",
+   "label": "Role",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RoleRequest",
+   "shape": "table",
+   "label": "RoleRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "requested_role",
+      "v": "FK → Role"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "reviewed_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_StudentProfile",
+   "shape": "table",
+   "label": "StudentProfile",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK unique → User"
+     },
+     {
+      "k": "course",
+      "v": "FK → Course"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_SystemSetting",
+   "shape": "table",
+   "label": "SystemSetting",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "updated_by",
+      "v": "FK → User"
+     },
+     {
+      "k": "key",
+      "v": "Char"
+     },
+     {
+      "k": "value",
+      "v": "Text"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_User",
+   "shape": "table",
+   "label": "User",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "role",
+      "v": "FK → Role"
+     },
+     {
+      "k": "research_interests",
+      "v": "M2M → ResearchInterest"
+     },
+     {
+      "k": "email",
+      "v": "Email"
+     },
+     {
+      "k": "first_name",
+      "v": "Char"
+     },
+     {
+      "k": "middle_initial",
+      "v": "Char"
+     },
+     {
+      "k": "last_name",
+      "v": "Char"
+     },
+     "… 15 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "accounts_UserInterest",
+   "shape": "table",
+   "label": "UserInterest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "interest",
+      "v": "FK → ResearchInterest"
+     },
+     {
+      "k": "position",
+      "v": "PositiveSmallInteger"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_UserSession",
+   "shape": "table",
+   "label": "UserSession",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "last_activity_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "ended_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "ended_reason",
+      "v": "Char"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "accounts_AccountDeletionRequest",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_AccountDeletionRequest",
+   "to": "accounts_User",
+   "field": "decided_by",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_AdviserProfile",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "accounts_AdviserProfile",
+   "to": "accounts_Department",
+   "field": "department",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_AdviserProfile",
+   "to": "accounts_College",
+   "field": "college",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_Course",
+   "to": "accounts_Department",
+   "field": "department",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_DataNotice",
+   "to": "accounts_User",
+   "field": "published_by",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_Department",
+   "to": "accounts_College",
+   "field": "college",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_NoticeAnswer",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_NoticeAnswer",
+   "to": "accounts_DataNotice",
+   "field": "notice",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RecoveryAttempt",
+   "to": "accounts_RecoveryBucket",
+   "field": "bucket",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RecoveryIntent",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_RecoveryToken",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RecoveryToken",
+   "to": "accounts_RecoveryIntent",
+   "field": "intent",
+   "tail": "zero-one",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_RoleRequest",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RoleRequest",
+   "to": "accounts_Role",
+   "field": "requested_role",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RoleRequest",
+   "to": "accounts_User",
+   "field": "reviewed_by",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_StudentProfile",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "accounts_StudentProfile",
+   "to": "accounts_Course",
+   "field": "course",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_SystemSetting",
+   "to": "accounts_User",
+   "field": "updated_by",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_User",
+   "to": "accounts_Role",
+   "field": "role",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_User",
+   "to": "accounts_ResearchInterest",
+   "field": "research_interests",
+   "tail": "zero-many",
+   "head": "zero-many"
+  },
+  {
+   "from": "accounts_UserInterest",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_UserInterest",
+   "to": "accounts_ResearchInterest",
+   "field": "interest",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_UserSession",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): the entity is drawn on figure D-n"
+ ]
+}

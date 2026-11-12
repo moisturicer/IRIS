@@ -1,0 +1,540 @@
+{
+ "title": "D-12  Documents, extraction and manuscript processing",
+ "caption": "Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. A line is drawn for every foreign key between two entities on this figure; a key to an entity on another figure is named in its attribute row.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "documents_DocumentRequest",
+   "shape": "table",
+   "label": "DocumentRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "assignment",
+      "v": "FK → RecordAssignment (D-11)"
+     },
+     {
+      "k": "requested_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "closed_by_decision",
+      "v": "FK → Review (D-11)"
+     },
+     {
+      "k": "party",
+      "v": "Char"
+     },
+     {
+      "k": "message",
+      "v": "Text"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     "… 1 more fields"
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_DocumentRequestItem",
+   "shape": "table",
+   "label": "DocumentRequestItem",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "request",
+      "v": "FK → DocumentRequest"
+     },
+     {
+      "k": "slot",
+      "v": "FK → UploadSlot"
+     },
+     {
+      "k": "upload",
+      "v": "FK → RecordUpload"
+     },
+     {
+      "k": "label",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "sort_order",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "rejection_reason",
+      "v": "Text"
+     },
+     "… 1 more fields"
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_ExtractionFigure",
+   "shape": "table",
+   "label": "ExtractionFigure",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "extraction",
+      "v": "FK → PdfExtraction"
+     },
+     {
+      "k": "source_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "page",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "bbox",
+      "v": "JSON"
+     },
+     {
+      "k": "caption",
+      "v": "Text"
+     },
+     "… 5 more fields"
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_ManuscriptMetadata",
+   "shape": "table",
+   "label": "ManuscriptMetadata",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "extraction",
+      "v": "FK → PdfExtraction"
+     },
+     {
+      "k": "source_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "attempt",
+      "v": "UUID"
+     },
+     {
+      "k": "result",
+      "v": "JSON"
+     },
+     "… 4 more fields"
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_PdfExtraction",
+   "shape": "table",
+   "label": "PdfExtraction",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "upload",
+      "v": "FK unique → RecordUpload"
+     },
+     {
+      "k": "record",
+      "v": "FK unique → Record (D-10)"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "source_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "source_file",
+      "v": "Char"
+     },
+     {
+      "k": "attempt",
+      "v": "UUID"
+     },
+     "… 16 more fields"
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_RecordFile",
+   "shape": "table",
+   "label": "RecordFile",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "uploaded_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "file",
+      "v": "File"
+     },
+     {
+      "k": "filename",
+      "v": "Char"
+     },
+     {
+      "k": "party",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_RecordUpload",
+   "shape": "table",
+   "label": "RecordUpload",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "slot",
+      "v": "FK → UploadSlot"
+     },
+     {
+      "k": "status",
+      "v": "FK → UploadStatus"
+     },
+     {
+      "k": "uploaded_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "file",
+      "v": "File"
+     },
+     {
+      "k": "version",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_UploadReview",
+   "shape": "table",
+   "label": "UploadReview",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "upload",
+      "v": "FK → RecordUpload"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "status",
+      "v": "FK → UploadStatus"
+     },
+     {
+      "k": "comment",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_UploadSlot",
+   "shape": "table",
+   "label": "UploadSlot",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record_type",
+      "v": "FK → RecordType (D-10)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "is_required",
+      "v": "Boolean"
+     }
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "documents_UploadStatus",
+   "shape": "table",
+   "label": "UploadStatus",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ],
+   "stereotype": "documents"
+  },
+  {
+   "id": "publication_ManuscriptInvalidation",
+   "shape": "table",
+   "label": "ManuscriptInvalidation",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record_id",
+      "v": "BigInteger"
+     },
+     {
+      "k": "work_id",
+      "v": "UUID"
+     },
+     {
+      "k": "reason",
+      "v": "Char"
+     },
+     {
+      "k": "authority_generation",
+      "v": "PositiveBigInteger"
+     },
+     "… 1 more fields"
+    ]
+   ],
+   "stereotype": "publication"
+  },
+  {
+   "id": "publication_ManuscriptWork",
+   "shape": "table",
+   "label": "ManuscriptWork",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "revision",
+      "v": "UUID"
+     },
+     {
+      "k": "source_file",
+      "v": "Text"
+     },
+     {
+      "k": "operation",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     "… 4 more fields"
+    ]
+   ],
+   "stereotype": "publication"
+  }
+ ],
+ "edges": [
+  {
+   "from": "documents_DocumentRequestItem",
+   "to": "documents_DocumentRequest",
+   "field": "request",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "documents_DocumentRequestItem",
+   "to": "documents_UploadSlot",
+   "field": "slot",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "documents_DocumentRequestItem",
+   "to": "documents_RecordUpload",
+   "field": "upload",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "documents_ExtractionFigure",
+   "to": "documents_PdfExtraction",
+   "field": "extraction",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "documents_ManuscriptMetadata",
+   "to": "documents_PdfExtraction",
+   "field": "extraction",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "documents_PdfExtraction",
+   "to": "documents_RecordUpload",
+   "field": "upload",
+   "tail": "zero-one",
+   "head": "zero-one"
+  },
+  {
+   "from": "documents_RecordUpload",
+   "to": "documents_UploadSlot",
+   "field": "slot",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "documents_RecordUpload",
+   "to": "documents_UploadStatus",
+   "field": "status",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "documents_UploadReview",
+   "to": "documents_RecordUpload",
+   "field": "upload",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "documents_UploadReview",
+   "to": "documents_UploadStatus",
+   "field": "status",
+   "tail": "zero-many",
+   "head": "zero-one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): the entity is drawn on figure D-n"
+ ]
+}

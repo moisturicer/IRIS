@@ -6,12 +6,14 @@ non-migration modules on the current checkout.
     python docs/diagrams/section-d/tools/gen_components.py
 """
 import collections
+import json
 import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[4]
 APPS = ROOT / "backend" / "apps"
-OUT = pathlib.Path(__file__).resolve().parent.parent / "src" / "D-19-component-backend.puml"
+OUT = pathlib.Path(__file__).resolve().parent.parent / "src" / "D-19-component-backend.json"
+WRAP = 120  # text width of a component box
 
 ROLE = {
     "accounts": "users, roles, consent,\\nsessions, recovery",
@@ -28,7 +30,7 @@ ROLE = {
 
 
 def is_source(path):
-    s = str(path)
+    s = path.as_posix()  # the same answer on Windows and Linux
     return not ("/tests" in s or "/test_" in s or "/migrations/" in s or path.name.startswith("test")
                 or "/management/" in s or "/evaluation/" in s)
 
@@ -44,38 +46,37 @@ def main():
                 target = m.group(1)
                 if target != app and target in ROLE:
                     deps[(app, target)] += 1
-    out = [
-        "@startuml",
-        "!include ../iris-style.puml",
-        "skinparam LineType polyline",
-        "title D-19  Backend components: Django apps and their dependencies",
-        "caption Generated from import statements in backend/apps on main (IR-1021); tests, migrations, management commands and evaluation tools excluded. Edge label: number of import lines.",
-        'package "Django backend (backend/)" {',
-        '  component "config\\n<size:10>settings, URLs,</size>\\n<size:10>ASGI, Celery</size>" as config',
-        '  component "core\\n<size:10>permissions, pagination,</size>\\n<size:10>utilities</size>" as core',
+    nodes = [
+        {"id": "spa", "shape": "box", "tone": "plain", "label": "React SPA", "sub": "frontend/", "wrap": WRAP},
+        {"id": "config", "shape": "box", "label": "config", "sub": "settings, URLs, ASGI, Celery", "wrap": WRAP},
+        {"id": "core", "shape": "box", "label": "core", "sub": "permissions, pagination, utilities", "wrap": WRAP},
     ]
     for app in apps:
-        stereo = " <<ai>>" if app in ("ai", "publication") else ""
-        label = ROLE[app].replace("\\n", "</size>\\n<size:10>")
-        out.append(f'  component "{app}\\n<size:10>{label}</size>" as {app}{stereo}')
-    out.append("}")
-    out.append('rectangle "React SPA\\n(frontend/)" as spa')
-    out.append('component "AI runtime\\n(ai/, FastAPI)" as runtime <<ai>>')
-    out.append('database "PostgreSQL" as db')
-    out.append("spa --> config : REST /api/v1/")
-    out.append("config --> core")
-    for (a, b), n in sorted(deps.items()):
-        out.append(f"{a} --> {b} : {n}")
-    out.append("runtime ..> ai : reader grant\\n(edge-grant)")
-    out.append("runtime ..> db : iris_ai schema,\\nrow policy")
-    out += [
-        "legend right",
-        "  Solid arrow: Python imports (count). Every app except publication also uses core.",
-        "  Dashed arrow: runtime boundary, no Python import",
-        "endlegend",
-        "@enduml",
-    ]
-    OUT.write_text("\n".join(out) + "\n")
+        node = {"id": app, "shape": "box", "label": app, "sub": ROLE[app].replace("\\n", " "), "wrap": WRAP}
+        if app in ("ai", "publication"):
+            node["tone"] = "ai"
+        nodes.append(node)
+    nodes.append({"id": "runtime", "shape": "box", "tone": "ai", "label": "AI runtime", "sub": "ai/, FastAPI", "wrap": WRAP})
+    nodes.append({"id": "db", "shape": "db", "label": "PostgreSQL", "wrap": WRAP})
+    edges = [{"from": "spa", "to": "config", "label": "REST /api/v1/"}, {"from": "config", "to": "core"}]
+    edges += [{"from": a, "to": b, "label": str(n)} for (a, b), n in sorted(deps.items())]
+    edges.append({"from": "runtime", "to": "ai", "label": "reader grant (edge-grant)", "dash": True, "wrap": 64})
+    edges.append({"from": "runtime", "to": "db", "label": "iris_ai schema, row policy", "dash": True, "wrap": 64})
+    spec = {
+        "kind": "columns", "format": "portrait", "gutter": 96, "vgap": 30, "columnCount": 3, "level": 10,
+        "title": "D-19  Backend components: Django apps and their dependencies",
+        "caption": "Generated from import statements in backend/apps on main (IR-1021); tests, migrations, management "
+                   "commands and evaluation tools excluded. The number on a line is the count of import lines. "
+                   "Every app except publication also uses core.",
+        "nodes": nodes, "edges": edges,
+        "legend": [
+            {"line": "arrow", "text": "Python imports (count)"},
+            {"line": "dash arrow", "text": "runtime boundary, no Python import"},
+            {"tone": "core", "text": "Django app (backend/)"}, {"tone": "ai", "text": "AI indexing / AI runtime"},
+            "lines to the same component share a trunk, joined with a dot",
+        ],
+    }
+    OUT.write_text(json.dumps(spec, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"{len(deps)} dependencies written to {OUT.name}")
 
 

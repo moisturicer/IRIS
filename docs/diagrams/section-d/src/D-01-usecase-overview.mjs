@@ -1,0 +1,45 @@
+import { A, X, U, AI, GEN_LEGEND } from '../tools/dsl.mjs';
+
+export default {
+  kind: 'usecase',
+  title: 'D-1  Use case overview: actors and subsystems',
+  caption: 'Roles from frontend/src/lib/access.ts and core/permissions.py on main (IR-1021). Each subsystem is drawn in full on D-2 to D-7. The System Admin does not use the research screens (Ask IRIS, My Library).',
+  system: 'IRIS',
+  gap: 16,
+  left: [
+    A('Visitor', 'Visitor\n(not signed in)'),
+    A('User', 'Signed-in user'),
+    A('Student', 'Student'),
+    A('Adviser', 'Adviser'),
+    A('Office', 'Office reviewer\n(ITSO, IERC, KTTO)'),
+    A('Coord', 'Office coordinator'),
+    A('RDCO', 'RDCO'),
+    A('Admin', 'System Admin'),
+  ],
+  right: [
+    X('Mail', 'Email service'),
+    X('AIP', 'AI providers\n(LlamaParse, Voyage,\nlanguage model)'),
+  ],
+  cases: [
+    U('S1', 'Accounts and access (D-2)', 130),
+    U('S4', 'Discovery and reading (D-5)', 130),
+    AI('S5', 'Ask IRIS and Paper Chat (D-6)', 130),
+    U('S2', 'Submission and versions (D-3)', 130),
+    U('S3', 'Review workflow (D-4)', 130),
+    U('S6', 'Administration (D-7)', 130),
+  ],
+  links: [
+    ['Visitor', 'S1'],
+    ['User', 'S1', 'S4', 'S5'],
+    ['Student', 'S2'],
+    ['Adviser', 'S2', 'S3'],
+    ['Office', 'S3'],
+    ['Coord', 'S3'],
+    ['RDCO', 'S3', 'S6'],
+    ['Admin', 'S6'],
+    ['Mail', 'S1'],
+    ['AIP', 'S5', 'S2'],
+  ],
+  gens: [['Student', 'User'], ['Adviser', 'User'], ['Office', 'User'], ['RDCO', 'User'], ['Admin', 'User'], ['Coord', 'Office']],
+  legend: [{ line: 'solid', text: 'actor takes part' }, GEN_LEGEND, { tone: 'core' }, { tone: 'ai', text: 'AI-assisted' }, { tone: 'ext', text: 'external system' }],
+};

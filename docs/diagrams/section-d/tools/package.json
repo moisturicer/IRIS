@@ -1,0 +1,13 @@
+{
+  "name": "iris-section-d-diagrams",
+  "private": true,
+  "type": "module",
+  "description": "Renders the Section D diagrams (IR-1021): ELK layout, SVG, PNG.",
+  "scripts": { "render": "node render.mjs" },
+  "dependencies": {
+    "@expo-google-fonts/inter": "0.2.3",
+    "@resvg/resvg-js": "2.6.2",
+    "elkjs": "0.9.3",
+    "opentype.js": "1.3.4"
+  }
+}

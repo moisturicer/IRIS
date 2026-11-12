@@ -1,0 +1,984 @@
+{
+ "title": "D-10  Records, versions and publication",
+ "caption": "Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. A line is drawn for every foreign key between two entities on this figure; a key to an entity on another figure is named in its attribute row.",
+ "kind": "erd",
+ "format": "landscape",
+ "nodes": [
+  {
+   "id": "records_Author",
+   "shape": "table",
+   "label": "Author",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "role",
+      "v": "FK → AuthorRole"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_AuthorRole",
+   "shape": "table",
+   "label": "AuthorRole",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_Classification",
+   "shape": "table",
+   "label": "Classification",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_Conference",
+   "shape": "table",
+   "label": "Conference",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "level",
+      "v": "FK → ConferenceLevel"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "date",
+      "v": "Date"
+     },
+     {
+      "k": "venue",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_ConferenceLevel",
+   "shape": "table",
+   "label": "ConferenceLevel",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_DeleteRequest",
+   "shape": "table",
+   "label": "DeleteRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "requested_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "reason",
+      "v": "Text"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "previous_pipeline_status",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_DiscoveryDismissal",
+   "shape": "table",
+   "label": "DiscoveryDismissal",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_DiscoveryFeedSnapshot",
+   "shape": "table",
+   "label": "DiscoveryFeedSnapshot",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "interest_revision",
+      "v": "PositiveBigInteger"
+     },
+     {
+      "k": "recipe_version",
+      "v": "PositiveSmallInteger"
+     },
+     {
+      "k": "mode",
+      "v": "Char"
+     },
+     {
+      "k": "entries",
+      "v": "JSON"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_DiscoveryInterests",
+   "shape": "table",
+   "label": "DiscoveryInterests",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK unique → User (D-9)"
+     },
+     {
+      "k": "classifications",
+      "v": "M2M → Classification"
+     },
+     {
+      "k": "psced",
+      "v": "M2M → PSCEDClassification"
+     },
+     {
+      "k": "revision",
+      "v": "PositiveBigInteger"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_DownloadRequest",
+   "shape": "table",
+   "label": "DownloadRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "requested_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "revoked_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "reviewed_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "grant_expires_at",
+      "v": "DateTime"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_EmbargoReminder",
+   "shape": "table",
+   "label": "EmbargoReminder",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "embargo_set_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "step",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "sent_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_PSCEDClassification",
+   "shape": "table",
+   "label": "PSCEDClassification",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_PublicComment",
+   "shape": "table",
+   "label": "PublicComment",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "author",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "reply_to",
+      "v": "FK → PublicComment"
+     },
+     {
+      "k": "deleted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "body",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "edited_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "deletion_kind",
+      "v": "Char"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_Publication",
+   "shape": "table",
+   "label": "Publication",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK unique → Record"
+     },
+     {
+      "k": "level",
+      "v": "FK → PublicationLevel"
+     },
+     {
+      "k": "isbn",
+      "v": "Char"
+     },
+     {
+      "k": "issn",
+      "v": "Char"
+     },
+     {
+      "k": "isi",
+      "v": "Char"
+     },
+     {
+      "k": "year_published",
+      "v": "PositiveInteger"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_PublicationLevel",
+   "shape": "table",
+   "label": "PublicationLevel",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_Record",
+   "shape": "table",
+   "label": "Record",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "classification",
+      "v": "FK → Classification"
+     },
+     {
+      "k": "psced",
+      "v": "FK → PSCEDClassification"
+     },
+     {
+      "k": "record_type",
+      "v": "FK → RecordType"
+     },
+     {
+      "k": "adviser",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "added_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "dpa_accepted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "embargo_date_set_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "embargo_released_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "ip_released_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "deleted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "derived_from",
+      "v": "FK → Record"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "origin",
+      "v": "Char"
+     },
+     {
+      "k": "publication_year",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "year_accomplished",
+      "v": "PositiveInteger"
+     },
+     "… 36 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordOwner",
+   "shape": "table",
+   "label": "RecordOwner",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "is_primary",
+      "v": "Boolean"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordType",
+   "shape": "table",
+   "label": "RecordType",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordVersion",
+   "shape": "table",
+   "label": "RecordVersion",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "created_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "review_text",
+      "v": "FK → ReviewText"
+     },
+     {
+      "k": "number",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "manuscript",
+      "v": "File"
+     },
+     {
+      "k": "manuscript_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "manuscript_sha256",
+      "v": "Char"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordVersionDocument",
+   "shape": "table",
+   "label": "RecordVersionDocument",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "version",
+      "v": "FK → RecordVersion"
+     },
+     {
+      "k": "upload",
+      "v": "FK → RecordUpload (D-12)"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_ResearchLink",
+   "shape": "table",
+   "label": "ResearchLink",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "proposal",
+      "v": "FK unique → Record"
+     },
+     {
+      "k": "thesis",
+      "v": "FK unique → Record"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_ReviewText",
+   "shape": "table",
+   "label": "ReviewText",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "source_file",
+      "v": "Char"
+     },
+     {
+      "k": "manuscript_sha256",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "reason",
+      "v": "Char"
+     },
+     "… 7 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_ReviewTextSection",
+   "shape": "table",
+   "label": "ReviewTextSection",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "text",
+      "v": "FK → ReviewText"
+     },
+     {
+      "k": "ordinal",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "key",
+      "v": "Char"
+     },
+     {
+      "k": "heading",
+      "v": "Text"
+     },
+     {
+      "k": "page",
+      "v": "PositiveInteger"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_UnlistedPublication",
+   "shape": "table",
+   "label": "UnlistedPublication",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK unique → Record"
+     },
+     {
+      "k": "published_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "published_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "note",
+      "v": "Text"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "records_Author",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_Author",
+   "to": "records_AuthorRole",
+   "field": "role",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_Conference",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_Conference",
+   "to": "records_ConferenceLevel",
+   "field": "level",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_DeleteRequest",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_DiscoveryDismissal",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_DiscoveryInterests",
+   "to": "records_Classification",
+   "field": "classifications",
+   "tail": "zero-many",
+   "head": "zero-many"
+  },
+  {
+   "from": "records_DiscoveryInterests",
+   "to": "records_PSCEDClassification",
+   "field": "psced",
+   "tail": "zero-many",
+   "head": "zero-many"
+  },
+  {
+   "from": "records_DownloadRequest",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_EmbargoReminder",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_PublicComment",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_PublicComment",
+   "to": "records_PublicComment",
+   "field": "reply_to",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_Publication",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "records_Publication",
+   "to": "records_PublicationLevel",
+   "field": "level",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_Record",
+   "to": "records_Classification",
+   "field": "classification",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_Record",
+   "to": "records_PSCEDClassification",
+   "field": "psced",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_Record",
+   "to": "records_RecordType",
+   "field": "record_type",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_Record",
+   "to": "records_Record",
+   "field": "derived_from",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_RecordOwner",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_RecordVersion",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_RecordVersion",
+   "to": "records_ReviewText",
+   "field": "review_text",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_RecordVersionDocument",
+   "to": "records_RecordVersion",
+   "field": "version",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_ResearchLink",
+   "to": "records_Record",
+   "field": "proposal",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "records_ResearchLink",
+   "to": "records_Record",
+   "field": "thesis",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "records_ReviewText",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_ReviewTextSection",
+   "to": "records_ReviewText",
+   "field": "text",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_UnlistedPublication",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-one",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): the entity is drawn on figure D-n"
+ ]
+}
