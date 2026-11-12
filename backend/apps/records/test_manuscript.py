@@ -67,6 +67,22 @@ class ManuscriptEndpointTests(APITestCase):
 
         self.assertEqual(response["Cache-Control"], "private, no-store")
 
+    def test_it_names_the_revision_it_serves_so_a_highlight_can_say_what_it_was_made_on(self):
+        """IR-583: the reader keeps this revision and sends it back with a
+        highlight, and the server refuses the highlight if it has moved on."""
+        import uuid
+
+        revision = uuid.uuid4()
+        Record.objects.filter(pk=self.record.pk).update(manuscript_revision=revision)
+        self.client.force_authenticate(self.owner)
+
+        self.assertEqual(self._get()["X-Manuscript-Revision"], str(revision))
+
+    def test_a_manuscript_with_no_recorded_identity_names_no_revision(self):
+        self.client.force_authenticate(self.owner)
+
+        self.assertNotIn("X-Manuscript-Revision", self._get())
+
     def test_a_reader_who_may_not_see_the_record_gets_404_not_403(self):
         """The same rule every other record endpoint follows (IR-153): a
         refusal must read identically to a missing record, or the response

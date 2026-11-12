@@ -307,6 +307,28 @@ def reading_notes(user) -> list[dict]:
     ]
 
 
+def reading_highlights(user) -> list[dict]:
+    """
+    The person's own highlights (IR-583, ADR-065 §7): the page of each passage
+    they saved and, while they may still read the Record, its quotation. The
+    quotation is a copy of the paper, so it is withheld once the Record is
+    unreadable; the fact that they saved something on that page is theirs.
+    """
+    from apps.library.models import ReadingHighlight
+
+    rows = list(ReadingHighlight.objects.filter(owner=user).order_by("id"))
+    titles = _readable_titles(user, [row.record_id for row in rows])
+    return [
+        {
+            **_paper(row.record_id, titles),
+            "page": row.page,
+            "quote": row.quote if row.record_id in titles else None,
+            "created_at": row.created_at,
+        }
+        for row in rows
+    ]
+
+
 def saved_feeds(user) -> list[dict]:
     """The person's private custom feeds: the name they gave and the filters they saved."""
     from apps.library.models import SavedFeed
@@ -676,6 +698,7 @@ SECTIONS: dict[str, Callable] = {
     "saved_papers": saved_papers,
     "saved_feeds": saved_feeds,
     "reading_notes": reading_notes,
+    "reading_highlights": reading_highlights,
     "saved_replies": saved_replies,
     "viewed_marks": viewed_marks,
     "review_mentions": review_mentions,

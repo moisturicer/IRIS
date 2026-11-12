@@ -11,7 +11,7 @@
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
-import type { ReactElement } from "react";
+import type { ComponentProps, ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -1090,6 +1090,111 @@ describe("find in this paper (IR-353)", () => {
     });
   });
 
+});
+
+/**
+ * The selection menu and drawn highlights (IR-583, ADR-065). Find's current
+ * match is the keyboard's way to a passage, as it is for Comment, so the tests
+ * make one the way a keyboard reader would.
+ */
+describe("selected text actions (IR-583)", () => {
+  const PAPER: TextRun[][] = [
+    [line("Vision-language-action models", 0.1)],
+    [line("Nothing to see here.", 0.2)],
+    [line("A robot arm, and another ROBOT.", 0.5)],
+  ];
+
+  async function openWith(props: Partial<ComponentProps<typeof PaperPdfReader>> = {}) {
+    paperText = PAPER;
+    render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" {...props} />,
+    );
+    await screen.findByText("Page 1 / 3");
+  }
+
+  async function selectByFind(query = "robot arm") {
+    await userEvent.click(screen.getByRole("button", { name: "Find in this paper" }));
+    const input = await screen.findByRole("searchbox", { name: "Find in this paper" });
+    await waitFor(() => expect(input).toHaveFocus());
+    await userEvent.type(input, query);
+  }
+
+  const menu = () => screen.queryByRole("group", { name: "Selected text actions" });
+
+  it("offers nothing when the page gave no actions", async () => {
+    await openWith();
+    await selectByFind();
+
+    expect(menu()).not.toBeInTheDocument();
+  });
+
+  it("offers the actions it was given for a passage, and only while there is one", async () => {
+    await openWith({ selectionActions: [{ id: "save-highlight", label: "Save highlight", icon: "fa-highlighter", run: vi.fn() }] });
+    expect(menu()).not.toBeInTheDocument();
+
+    await selectByFind();
+
+    const group = await screen.findByRole("group", { name: "Selected text actions" });
+    expect(within(group).getByRole("button", { name: "Save highlight" })).toBeInTheDocument();
+  });
+
+  it("runs an action with the passage and the Manuscript revision this paper was opened at", async () => {
+    manuscriptBlob.mockResolvedValue({ data: pdfBlob(), headers: { "x-manuscript-revision": "rev-1" } });
+    const run = vi.fn();
+    await openWith({ selectionActions: [{ id: "save-highlight", label: "Save highlight", icon: "fa-highlighter", run }] });
+    await selectByFind();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Save highlight" }));
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), "rev-1");
+  });
+
+  it("hands over no revision when the server named none", async () => {
+    const run = vi.fn();
+    await openWith({ selectionActions: [{ id: "save-highlight", label: "Save highlight", icon: "fa-highlighter", run }] });
+    await selectByFind();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Save highlight" }));
+
+    expect(run).toHaveBeenCalledWith(expect.anything(), null);
+  });
+
+  it("offers nothing on an earlier version: its bytes are not the paper a highlight belongs to", async () => {
+    versionManuscriptBlob.mockResolvedValue({ data: pdfBlob() });
+    await openWith({
+      version: 2,
+      selectionActions: [{ id: "save-highlight", label: "Save highlight", icon: "fa-highlighter", run: vi.fn() }],
+    });
+    await selectByFind();
+
+    expect(menu()).not.toBeInTheDocument();
+  });
+
+  it("draws each saved highlight on its own page and no other", async () => {
+    await openWith({
+      highlights: [
+        { key: 1, regions: [{ page: 3, left: 0.1, top: 0.5, right: 0.6, bottom: 0.55 }] },
+        { key: 2, regions: [{ page: 1, left: 0.2, top: 0.1, right: 0.5, bottom: 0.12 }] },
+      ],
+    });
+
+    const marks = (page: number) =>
+      screen.getByRole("group", { name: `Page ${page}` }).querySelectorAll("[aria-hidden='true'] > span.reader-highlight");
+    expect(marks(3)).toHaveLength(1);
+    expect(marks(1)).toHaveLength(1);
+    expect(marks(2)).toHaveLength(0);
+    expect(parseFloat((marks(3)[0] as HTMLElement).style.left)).toBeCloseTo(10);
+    expect(parseFloat((marks(3)[0] as HTMLElement).style.width)).toBeCloseTo(50);
+  });
+
+  it("has no serious or critical violations with the menu open", async () => {
+    await openWith({ selectionActions: [{ id: "save-highlight", label: "Save highlight", icon: "fa-highlighter", run: vi.fn() }] });
+    await selectByFind();
+    await screen.findByRole("group", { name: "Selected text actions" });
+
+    await expectNoBlockingA11yViolations(document.body);
+  });
 });
 
 /**

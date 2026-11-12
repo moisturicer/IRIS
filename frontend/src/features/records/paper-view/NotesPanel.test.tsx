@@ -17,9 +17,15 @@ import { renderScreen, screen, waitFor, within } from "@/test/render";
 import type { RecordDetail } from "@/types/records";
 
 import { NotesPanel } from "./NotesPanel";
+import { useReadingHighlights } from "./useReadingHighlights";
 import { useReadingNote } from "./useReadingNote";
+import type { HighlightEntry } from "@/api/library";
+import type { ReadableHighlight } from "./useReadingHighlights";
 
-const api = vi.hoisted(() => ({ note: vi.fn(), saveNote: vi.fn() }));
+const api = vi.hoisted(() => ({
+  note: vi.fn(), saveNote: vi.fn(),
+  highlights: vi.fn(), saveHighlight: vi.fn(), deleteHighlight: vi.fn(),
+}));
 vi.mock("@/api/library", async (original) => ({
   ...(await original<typeof import("@/api/library")>()),
   libraryApi: api,
@@ -34,9 +40,20 @@ const conflict = (body: string, revision: number) =>
     response: { status: 409, data: { code: "revision_conflict", body, revision } },
   });
 
-function Harness({ onAsk }: { onAsk?: () => void }) {
+function Harness({ onAsk, onOpenHighlight = () => {}, openableVersions = [] }: {
+  onAsk?: () => void;
+  onOpenHighlight?: (h: ReadableHighlight) => void;
+  openableVersions?: number[];
+}) {
   const state = useReadingNote(record.id, true, 5);
-  return <NotesPanel record={record} note={state} onClose={() => {}} onOpenAsk={onAsk} />;
+  const highlights = useReadingHighlights(record.id, true);
+  return (
+    <NotesPanel
+      record={record} note={state} onClose={() => {}} onOpenAsk={onAsk}
+      highlights={highlights} onOpenHighlight={onOpenHighlight}
+      canOpenVersion={(n) => openableVersions.includes(n)}
+    />
+  );
 }
 
 const editor = () => screen.getByRole("textbox", { name: "Your note on this paper" }) as HTMLTextAreaElement;
@@ -44,6 +61,14 @@ const editor = () => screen.getByRole("textbox", { name: "Your note on this pape
 beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset());
   api.note.mockResolvedValue(note("", 0));
+  api.highlights.mockResolvedValue({ data: { results: [] } });
+});
+
+const highlight = (over: Partial<Extract<HighlightEntry, { available: true }>> = {}): HighlightEntry => ({
+  id: 1, record_id: 7, available: true, state: "current", page: 3,
+  quote: "Rainfall explained 62% of the variance in discharge.", prefix: "", suffix: "",
+  regions: [{ page: 3, left: 0.1, top: 0.2, right: 0.9, bottom: 0.23 }], open_version: null,
+  created_at: "2026-11-12T00:00:00Z", ...over,
 });
 
 describe("opening Notes", () => {
@@ -219,3 +244,108 @@ describe("the panel", () => {
     expect(onAsk).toHaveBeenCalled();
   });
 });
+
+describe("highlights (IR-583)", () => {
+  const list = (...results: HighlightEntry[]) => api.highlights.mockResolvedValue({ data: { results } });
+  const highlightsSection = () => screen.findByRole("region", { name: "Highlights" });
+
+  it("says how to make one when there are none", async () => {
+    renderScreen(<Harness />);
+
+    const section = await highlightsSection();
+
+    expect(within(section).getByText(/select text in the paper/i)).toBeInTheDocument();
+  });
+
+  it("lists each saved passage with its page, apart from the note editor", async () => {
+    list(highlight(), highlight({ id: 2, page: 5, quote: "A second passage." }));
+    renderScreen(<Harness />);
+
+    const section = await highlightsSection();
+
+    expect(within(section).getByText(/rainfall explained 62%/i)).toBeInTheDocument();
+    expect(within(section).getByText("Page 3")).toBeInTheDocument();
+    expect(within(section).getByText("Page 5")).toBeInTheDocument();
+    expect(within(section).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(editor()).toHaveValue("");
+  });
+
+  it("opens a current highlight on its own page and region", async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    list(highlight());
+    renderScreen(<Harness onOpenHighlight={onOpen} />);
+
+    await user.click(await within(await highlightsSection()).findByRole("button", { name: /^Open page 3/ }));
+
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 1, page: 3, state: "current" }));
+  });
+
+  it("says a highlight is from an earlier version, in words, and does not offer to open it on the paper shown", async () => {
+    list(highlight({ state: "stale", open_version: null }));
+    renderScreen(<Harness />);
+
+    const section = await highlightsSection();
+
+    expect(within(section).getByText(/earlier version of this paper/i)).toBeInTheDocument();
+    expect(within(section).getByText(/rainfall explained 62%/i)).toBeInTheDocument();
+    expect(within(section).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
+  });
+
+  it("opens a stale highlight in the version that still has its bytes, when the reader may open it", async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    list(highlight({ state: "stale", open_version: 1 }));
+    renderScreen(<Harness onOpenHighlight={onOpen} openableVersions={[1]} />);
+
+    await user.click(await within(await highlightsSection()).findByRole("button", { name: /^Open page 3 in v1/ }));
+
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ state: "stale", open_version: 1 }));
+  });
+
+  it("does not offer a version the reader may not open", async () => {
+    list(highlight({ state: "stale", open_version: 1 }));
+    renderScreen(<Harness openableVersions={[]} />);
+
+    const section = await highlightsSection();
+
+    expect(within(section).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
+  });
+
+  it("removes one, and keeps it on screen with a message if that fails", async () => {
+    const user = userEvent.setup();
+    list(highlight());
+    api.deleteHighlight.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({});
+    renderScreen(<Harness />);
+    const section = await highlightsSection();
+
+    await user.click(await within(section).findByRole("button", { name: /^Remove highlight/ }));
+    expect(await within(section).findByText(/could not remove/i)).toBeInTheDocument();
+    expect(within(section).getByText(/rainfall explained 62%/i)).toBeInTheDocument();
+
+    await user.click(within(section).getByRole("button", { name: /^Remove highlight/ }));
+    await waitFor(() => expect(within(section).queryByText(/rainfall explained 62%/i)).not.toBeInTheDocument());
+    expect(api.deleteHighlight).toHaveBeenLastCalledWith(7, 1);
+  });
+
+  it("says when they could not be loaded, and tries again", async () => {
+    const user = userEvent.setup();
+    api.highlights.mockRejectedValueOnce(new Error("offline"));
+    renderScreen(<Harness />);
+
+    expect(await screen.findByText(/could not load your highlights/i)).toBeInTheDocument();
+    list(highlight());
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText(/rainfall explained 62%/i)).toBeInTheDocument();
+  });
+
+  it("has no serious or critical violations with a current and a stale highlight", async () => {
+    list(highlight(), highlight({ id: 2, state: "stale", open_version: 1, quote: "An older passage." }));
+    const { container } = renderScreen(<Harness openableVersions={[1]} />);
+    await highlightsSection();
+
+    await expectNoBlockingA11yViolations(container);
+  });
+});
+

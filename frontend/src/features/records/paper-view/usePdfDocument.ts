@@ -34,6 +34,12 @@ export interface PdfDocumentState {
   pageProxy: (pageNumber: number) => Promise<PdfPage>;
   /** Loads a page out of turn and shows it: one a citation or a find is landing on. */
   prioritize: (pageNumber: number) => void;
+  /**
+   * The Manuscript revision the server said these bytes are (`X-Manuscript-Revision`),
+   * or null when it named none. A highlight sends it back, so the server can
+   * refuse one made on a paper that has since been replaced (IR-583).
+   */
+  revision: string | null;
 }
 
 /** One opened document's page requests, so each page is asked of pdf.js once. */
@@ -59,6 +65,7 @@ export function usePdfDocument({ recordId, version, attempt, firstPage }: PdfDoc
   const [status, setStatus] = useState<PdfDocumentState["status"]>("loading");
   const [pages, setPages] = useState<(PdfPage | undefined)[]>([]);
   const [source, setSource] = useState<Source | null>(null);
+  const [revision, setRevision] = useState<string | null>(null);
   const sourceRef = useRef(source);
   sourceRef.current = source;
   const firstPageRef = useRef(firstPage);
@@ -71,14 +78,18 @@ export function usePdfDocument({ recordId, version, attempt, firstPage }: PdfDoc
     setStatus("loading");
     setPages([]);
     setSource(null);
+    setRevision(null);
 
     (async () => {
       try {
         const options = { signal: controller.signal };
-        const { data } = version == null
+        const { data, headers } = version == null
           ? await recordsApi.manuscriptBlob(recordId, options)
           : await recordsApi.versionManuscriptBlob(recordId, version, options);
         if (cancelled) return;
+        // The identity of these bytes, named by the server (IR-583). Only the
+        // current paper's response carries one.
+        setRevision((headers?.["x-manuscript-revision"] as string | undefined) ?? null);
         const buffer = await data.arrayBuffer();
         if (cancelled) return;
         const { document: doc, destroy } = await loadPdfDocument(buffer, controller.signal);
@@ -175,5 +186,6 @@ export function usePdfDocument({ recordId, version, attempt, firstPage }: PdfDoc
     pages,
     pageProxy,
     prioritize,
+    revision,
   } satisfies PdfDocumentState;
 }

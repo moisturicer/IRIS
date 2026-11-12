@@ -60,7 +60,9 @@ import {
 } from "./PaperChatDock";
 import { AskIrisFab, NotesFab } from "./AskIrisFab";
 import { NotesPanel } from "./NotesPanel";
+import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
 import { useReadingNote } from "./useReadingNote";
+import type { SelectionAction } from "./SelectionMenu";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { EmbargoCard } from "./EmbargoCard";
@@ -253,6 +255,12 @@ export default function PaperViewPage() {
     focusPanel.current = true;
     chat.setOpen(true);
   };
+  // The highlight the reader asked to open from Notes (IR-583): where to land,
+  // in which version, and the navigation it belongs to, so a later arrival
+  // (a citation, Back) is not held to it.
+  const [opened, setOpened] = useState<{
+    key: number; page: number; regions: Region[]; version: number | null; arrival: string;
+  } | null>(null);
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
   /**
@@ -375,6 +383,9 @@ export default function PaperViewPage() {
   const arriving = loading || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
   const onReviewTab = section === "review";
+  // The reader draws the reader's own highlights wherever the paper shows, so
+  // they are read then, and when Notes lists them (IR-583).
+  const highlights = useReadingHighlights(Number(id), !arriving && (onPaperTab || onReviewTab || notesWanted));
   // Never beside the paper, where there is no sheet to tuck away.
   // Only Ask IRIS tucks away to a bar; Notes has nothing to answer back to.
   const chatMinimized = chat.minimized && chat.open && chat.tool === "ask" && !onReviewTab && tier !== "wide";
@@ -649,6 +660,33 @@ export default function PaperViewPage() {
       (v) =>
         v.number === askedVersion && (v !== latestVersion || record.manuscript_unsubmitted) && v.manuscript_url,
     ) ?? null;
+  // A highlight opened from Notes lands like a citation: its page and region,
+  // in the version it belongs to. It holds only for the navigation it was
+  // opened in, and only once the version it names is the one shown.
+  const openedHere = opened && opened.arrival === arrivalKey.current ? opened : null;
+  const openedInShown =
+    openedHere && openedHere.version === (viewedVersion?.number ?? null) ? openedHere : null;
+  // What the reader draws: highlights made on the bytes it shows. A stale one is
+  // drawn only on the version that still holds its bytes -- never on the paper now.
+  const drawnHighlights = highlights.items
+    .filter((h) => (viewedVersion ? h.state === "stale" && h.open_version === viewedVersion.number : h.state === "current"))
+    .map((h) => ({ key: h.id, regions: h.regions }));
+  const selectionActions: SelectionAction[] = [
+    {
+      id: "save-highlight", label: "Save highlight", icon: "fa-highlighter",
+      run: (passage, manuscriptRevision) => void highlights.save(passage, manuscriptRevision),
+    },
+  ];
+  const openHighlight = (h: ReadableHighlight) => {
+    const version = h.state === "stale" ? h.open_version : null;
+    setOpened((last) => ({
+      key: (last?.key ?? 0) + 1, page: h.page, regions: h.regions, version, arrival: arrivalKey.current,
+    }));
+    // The paper, in the version that has its bytes; a panel that would cover
+    // the passage steps aside, as it does for a citation.
+    setViewParams({ section: readerSection, version: version == null ? null : String(version) });
+    if (chat.open && tier !== "wide") chat.setOpen(false);
+  };
   /** Open version `n`, or the current paper for null, in a section that shows the paper. */
   const chooseVersion = (n: number | null) =>
     setViewParams({
@@ -659,13 +697,14 @@ export default function PaperViewPage() {
     });
   // A citation's regions and page are the current paper's (ADR-031), so an
   // earlier version opens at its start with nothing highlighted.
-  const highlightRegions: Region[] =
-    !viewedVersion && navCitation && navCitation.record_id === record.id && hasCitationQuote(navCitation)
+  const highlightRegions: Region[] = openedInShown
+    ? openedInShown.regions
+    : !viewedVersion && navCitation && navCitation.record_id === record.id && hasCitationQuote(navCitation)
       ? pageContext
         ? navCitation.regions.filter((region) => region.page === navCitation.page)
         : navCitation.regions
       : [];
-  const landingNotice = viewedVersion
+  const landingNotice = viewedVersion || openedInShown
     ? null
     : citationLandingNotice(resolution, pageContext, openAtPage, highlightRegions.length > 0);
   // The one reader (IR-352), for the Paper tab and the Review section alike:
@@ -706,13 +745,20 @@ export default function PaperViewPage() {
           {landingNotice}
         </p>
       )}
+      {highlights.notice && (
+        <p role="status" className={cn("text-small", highlights.notice.kind === "saved" ? "text-stone-600" : "font-semibold text-brand", onPaperTab ? "px-4 pt-3" : "mb-3")}>
+          {highlights.notice.text}
+        </p>
+      )}
       <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
         <PaperPdfReader
           recordId={record.id}
           version={viewedVersion?.number ?? null}
-          scrollToPage={viewedVersion ? null : landingPage}
+          scrollToPage={openedInShown ? openedInShown.page : viewedVersion ? null : landingPage}
           highlightRegions={highlightRegions}
-          navKey={arrivalKey.current}
+          navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
+          highlights={drawnHighlights}
+          selectionActions={selectionActions}
           contained={onPaperTab || reviewerWorkspace || tier === "wide"}
           fill={onPaperTab || reviewerWorkspace}
           bottomInset={onReviewTab ? reviewBarInset : 0}
@@ -1347,6 +1393,9 @@ export default function PaperViewPage() {
         <NotesPanel
           record={record}
           note={note}
+          highlights={highlights}
+          onOpenHighlight={openHighlight}
+          canOpenVersion={(n) => versions.some((v) => v.number === n && v.manuscript_url && (v !== latestVersion || record.manuscript_unsubmitted))}
           onClose={closeChat}
           onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
           onOpenAsk={openAskFromNotes}

@@ -8,6 +8,7 @@ the person's details and private data go, the row is kept, and nobody can sign
 in as them.
 """
 
+import uuid
 from unittest import mock
 
 from django.urls import reverse
@@ -24,7 +25,7 @@ from apps.accounts.models import (
 from apps.accounts.test_system_admin import make
 from apps.ai.models import Conversation
 from apps.audit.models import AuditEvent
-from apps.library.models import ReadingNote, SavedRecord
+from apps.library.models import ReadingHighlight, ReadingNote, SavedRecord
 from apps.notifications.models import Notification, NotificationType
 from apps.records.models import DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews.models import RecordAssignment, Review, ReviewerSeat
@@ -310,6 +311,10 @@ class ConfirmTests(DeletionBase):
         profile.set_interests(self.person, ["Only this person uses it"])
         SavedFeed.objects.create(owner=self.person, name="Water", query={"q": "water"})
         ReadingNote.objects.create(owner=self.person, record=self.published, body="Private thoughts.")
+        ReadingHighlight.objects.create(
+            owner=self.person, record=self.published, manuscript_revision=uuid.uuid4(),
+            manuscript_sha256="a" * 64, page=1, quote="A kept passage.",
+        )
 
         response, _send = self.confirm(self.sysadmin, self.made.pk)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
@@ -321,6 +326,7 @@ class ConfirmTests(DeletionBase):
         self.assertFalse(ResearchInterest.objects.filter(name="Only this person uses it").exists())
         self.assertFalse(SavedFeed.objects.filter(owner=self.person).exists())
         self.assertFalse(ReadingNote.objects.filter(owner=self.person).exists())
+        self.assertFalse(ReadingHighlight.objects.filter(owner=self.person).exists())
 
     def test_the_row_and_the_history_that_points_at_it_survive(self):
         self.confirm(self.sysadmin, self.made.pk)

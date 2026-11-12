@@ -586,6 +586,13 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
         response["Cache-Control"] = "private, no-store"
+        # The identity of these bytes (IR-583): a highlight names it, and is
+        # refused if the paper has been replaced since.
+        from .versions import served_manuscript_identity
+
+        revision, _sha256 = served_manuscript_identity(record, request.user)
+        if revision is not None:
+            response["X-Manuscript-Revision"] = str(revision)
         return response
 
     @action(detail=True, methods=["get"], url_path=r"figures/(?P<figure_id>[0-9]+)", url_name="figure")
