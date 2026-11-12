@@ -98,6 +98,21 @@ describe("RequestRevisionDialog", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
+  it("discards an unsent reason from the box and from the tab's session", async () => {
+    open();
+    expect(screen.queryByRole("button", { name: "Discard draft" })).not.toBeInTheDocument();
+
+    await userEvent.type(reasonBox(), "Not sure about this yet.");
+    expect(readRevisionDraft(1, 7)).toBe("Not sure about this yet.");
+    await userEvent.click(screen.getByRole("button", { name: "Discard draft" }));
+
+    expect(reasonBox()).toHaveValue("");
+    expect(reasonBox()).toHaveFocus();
+    expect(readRevisionDraft(1, 7)).toBe("");
+    expect(screen.queryByRole("button", { name: "Discard draft" })).not.toBeInTheDocument();
+    expect(requestRevision).not.toHaveBeenCalled();
+  });
+
   it("keeps the reason when the dialog is closed to read a document, and forgets it once sent", async () => {
     const first = open();
     await userEvent.type(reasonBox(), "Missing assent forms.");
