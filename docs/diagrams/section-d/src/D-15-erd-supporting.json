@@ -1,0 +1,270 @@
+{
+ "title": "D-15  Notifications, audit, library and opportunities",
+ "caption": "Generated from backend/apps/*/models*.py on main (IR-1021). All keys shown, up to four other fields per entity. A line is drawn for every foreign key between two entities on this figure; a key to an entity on another figure is named in its attribute row.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "audit_AuditEvent",
+   "shape": "table",
+   "label": "AuditEvent",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "event_type",
+      "v": "Char"
+     },
+     {
+      "k": "metadata",
+      "v": "JSON"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ],
+   "stereotype": "audit"
+  },
+  {
+   "id": "library_SavedFeed",
+   "shape": "table",
+   "label": "SavedFeed",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "query",
+      "v": "JSON"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ],
+   "stereotype": "library"
+  },
+  {
+   "id": "library_SavedRecord",
+   "shape": "table",
+   "label": "SavedRecord",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "reading_status",
+      "v": "Char"
+     },
+     {
+      "k": "saved_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ],
+   "stereotype": "library"
+  },
+  {
+   "id": "notifications_Notification",
+   "shape": "table",
+   "label": "Notification",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "sender",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "recipient",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "broadcast_to_role",
+      "v": "FK → Role (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "notif_type",
+      "v": "FK → NotificationType"
+     },
+     {
+      "k": "message",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ],
+   "stereotype": "notifications"
+  },
+  {
+   "id": "notifications_NotificationRead",
+   "shape": "table",
+   "label": "NotificationRead",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "notification",
+      "v": "FK → Notification"
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "read_at",
+      "v": "DateTime"
+     }
+    ]
+   ],
+   "stereotype": "notifications"
+  },
+  {
+   "id": "notifications_NotificationType",
+   "shape": "table",
+   "label": "NotificationType",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ],
+   "stereotype": "notifications"
+  },
+  {
+   "id": "opportunities_Opportunity",
+   "shape": "table",
+   "label": "Opportunity",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "posted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "opportunity_type",
+      "v": "Char"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "posting_office",
+      "v": "Char"
+     },
+     {
+      "k": "audience",
+      "v": "Char"
+     },
+     "… 9 more fields"
+    ]
+   ],
+   "stereotype": "opportunities"
+  }
+ ],
+ "edges": [
+  {
+   "from": "notifications_Notification",
+   "to": "notifications_NotificationType",
+   "field": "notif_type",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "notifications_NotificationRead",
+   "to": "notifications_Notification",
+   "field": "notification",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): the entity is drawn on figure D-n"
+ ]
+}

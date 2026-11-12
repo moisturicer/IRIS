@@ -1,0 +1,661 @@
+{
+ "title": "D-14  AI runtime schema (iris_ai): runs, conversations and indexing",
+ "caption": "Generated from ai/runs/migrations/*.sql on main (IR-1021). Owned by the AI runtime; Django never writes it (ADR-049). Ids of Django rows are held without a database constraint: reader_id names a User (D-9) in ask_run, conversation; record_id or scope_record_id names a Record (D-10) in active_source, citation, conversation, extraction_revision, index_job, manuscript_receipt, research_handle.",
+ "kind": "erd",
+ "format": "landscape",
+ "nodes": [
+  {
+   "id": "ia_conversation",
+   "shape": "table",
+   "label": "conversation",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "reader_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "scope_record_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "revision",
+      "v": "integer"
+     },
+     {
+      "k": "created_at",
+      "v": "timestamptz"
+     },
+     {
+      "k": "deleted_at",
+      "v": "timestamptz"
+     },
+     {
+      "k": "state",
+      "v": "jsonb"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_ask_run",
+   "shape": "table",
+   "label": "ask_run",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "reader_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "conversation_id",
+      "v": "FK → conversation"
+     },
+     {
+      "k": "turn_id",
+      "v": "FK → turn"
+     },
+     {
+      "k": "retry_of",
+      "v": "FK → ask_run"
+     },
+     {
+      "k": "request_key",
+      "v": "text"
+     },
+     {
+      "k": "request_hash",
+      "v": "text"
+     },
+     {
+      "k": "question",
+      "v": "text"
+     },
+     {
+      "k": "base_revision",
+      "v": "integer"
+     },
+     "… 15 more columns"
+    ]
+   ]
+  },
+  {
+   "id": "ia_turn",
+   "shape": "table",
+   "label": "turn",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "conversation_id",
+      "v": "FK → conversation"
+     },
+     {
+      "k": "run_id",
+      "v": "FK → ask_run"
+     },
+     {
+      "k": "ordinal",
+      "v": "integer"
+     },
+     {
+      "k": "question",
+      "v": "text"
+     },
+     {
+      "k": "answer",
+      "v": "text"
+     },
+     {
+      "k": "created_at",
+      "v": "timestamptz"
+     },
+     "… 3 more columns"
+    ]
+   ]
+  },
+  {
+   "id": "ia_citation",
+   "shape": "table",
+   "label": "citation",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "turn_id",
+      "v": "PK, FK → turn",
+      "pk": true
+     },
+     {
+      "k": "position",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "page",
+      "v": "integer"
+     },
+     {
+      "k": "quote",
+      "v": "text"
+     },
+     {
+      "k": "revision",
+      "v": "text"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_run_event",
+   "shape": "table",
+   "label": "run_event",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "run_id",
+      "v": "PK, FK → ask_run",
+      "pk": true
+     },
+     {
+      "k": "sequence",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "text"
+     },
+     {
+      "k": "data",
+      "v": "jsonb"
+     },
+     {
+      "k": "created_at",
+      "v": "timestamptz"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_attempt_accounting",
+   "shape": "table",
+   "label": "attempt_accounting",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "run_id",
+      "v": "uuid"
+     },
+     {
+      "k": "fence",
+      "v": "bigint"
+     },
+     {
+      "k": "executor",
+      "v": "text"
+     },
+     {
+      "k": "reserved_units",
+      "v": "bigint"
+     },
+     "… 3 more columns"
+    ]
+   ]
+  },
+  {
+   "id": "ia_research_handle",
+   "shape": "table",
+   "label": "research_handle",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "handle",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "run_id",
+      "v": "FK → ask_run"
+     },
+     {
+      "k": "record_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "chunk_set_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "chunk_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "expires_at",
+      "v": "timestamptz"
+     },
+     {
+      "k": "created_at",
+      "v": "timestamptz"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_manuscript_receipt",
+   "shape": "table",
+   "label": "manuscript_receipt",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "work_id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "revision",
+      "v": "uuid"
+     },
+     {
+      "k": "acknowledged_at",
+      "v": "timestamptz"
+     },
+     {
+      "k": "authority_generation",
+      "v": "bigint"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_manuscript_invalidation_receipt",
+   "shape": "table",
+   "label": "manuscript_invalidation_receipt",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "event_id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "acknowledged_at",
+      "v": "timestamptz"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_extraction_job",
+   "shape": "table",
+   "label": "extraction_job",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "work_id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "pipeline",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "generation",
+      "v": "bigint"
+     },
+     {
+      "k": "attempt",
+      "v": "uuid"
+     },
+     {
+      "k": "state",
+      "v": "text"
+     },
+     {
+      "k": "lease_until",
+      "v": "timestamptz"
+     },
+     "… 1 more columns"
+    ]
+   ]
+  },
+  {
+   "id": "ia_extraction_revision",
+   "shape": "table",
+   "label": "extraction_revision",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "work_id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "pipeline",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "revision",
+      "v": "uuid"
+     },
+     {
+      "k": "payload",
+      "v": "jsonb"
+     },
+     {
+      "k": "created_at",
+      "v": "timestamptz"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_index_job",
+   "shape": "table",
+   "label": "index_job",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "space_id",
+      "v": "Django id, no constraint"
+     },
+     {
+      "k": "work_id",
+      "v": "uuid"
+     },
+     {
+      "k": "revision",
+      "v": "uuid"
+     },
+     {
+      "k": "generation",
+      "v": "bigint"
+     },
+     {
+      "k": "pipeline",
+      "v": "text"
+     },
+     "… 8 more columns"
+    ]
+   ]
+  },
+  {
+   "id": "ia_embedding_batch",
+   "shape": "table",
+   "label": "embedding_batch",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "job_id",
+      "v": "PK, FK → index_job",
+      "pk": true
+     },
+     {
+      "k": "ordinal",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "vectors",
+      "v": "jsonb"
+     },
+     {
+      "k": "reservation_id",
+      "v": "bigint"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_active_source",
+   "shape": "table",
+   "label": "active_source",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "record_id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "job_id",
+      "v": "FK → index_job"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_run_checkpoint",
+   "shape": "table",
+   "label": "run_checkpoint",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "run_id",
+      "v": "PK, FK → ask_run",
+      "pk": true
+     },
+     {
+      "k": "fence",
+      "v": "bigint"
+     },
+     {
+      "k": "step",
+      "v": "integer"
+     },
+     {
+      "k": "body",
+      "v": "jsonb"
+     },
+     {
+      "k": "saved_at",
+      "v": "timestamptz"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ia_conversation_handoff",
+   "shape": "table",
+   "label": "conversation_handoff",
+   "tone": "ai",
+   "sections": [
+    [
+     {
+      "k": "conversation_id",
+      "v": "PK, FK → conversation",
+      "pk": true
+     },
+     {
+      "k": "revision",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "run_id",
+      "v": "FK → ask_run"
+     },
+     {
+      "k": "fence",
+      "v": "bigint"
+     },
+     {
+      "k": "base_revision",
+      "v": "integer"
+     },
+     {
+      "k": "through_ordinal",
+      "v": "integer"
+     },
+     {
+      "k": "turns",
+      "v": "integer[]"
+     },
+     "… 6 more columns"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "ia_ask_run",
+   "to": "ia_conversation",
+   "field": "conversation_id",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ia_ask_run",
+   "to": "ia_turn",
+   "field": "turn_id",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "ia_ask_run",
+   "to": "ia_ask_run",
+   "field": "retry_of",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "ia_turn",
+   "to": "ia_conversation",
+   "field": "conversation_id",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ia_turn",
+   "to": "ia_ask_run",
+   "field": "run_id",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ia_citation",
+   "to": "ia_turn",
+   "field": "turn_id",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "ia_run_event",
+   "to": "ia_ask_run",
+   "field": "run_id",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "ia_research_handle",
+   "to": "ia_ask_run",
+   "field": "run_id",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ia_embedding_batch",
+   "to": "ia_index_job",
+   "field": "job_id",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "ia_active_source",
+   "to": "ia_index_job",
+   "field": "job_id",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ia_run_checkpoint",
+   "to": "ia_ask_run",
+   "field": "run_id",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "ia_conversation_handoff",
+   "to": "ia_conversation",
+   "field": "conversation_id",
+   "tail": "zero-one",
+   "head": "one"
+  },
+  {
+   "from": "ia_conversation_handoff",
+   "to": "ia_ask_run",
+   "field": "run_id",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  {
+   "tone": "ai",
+   "text": "table in the iris_ai schema"
+  }
+ ]
+}

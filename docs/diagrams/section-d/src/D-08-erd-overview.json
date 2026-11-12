@@ -1,0 +1,207 @@
+{
+ "title": "D-8  Data model overview: domains and the links between them",
+ "caption": "Generated from the Django models on main (IR-1021). 109 Django tables in 10 apps, plus 16 tables in the iris_ai schema.",
+ "kind": "columns",
+ "format": "portrait",
+ "gutter": 96,
+ "vgap": 30,
+ "columnCount": 3,
+ "level": 8,
+ "nodes": [
+  {
+   "id": "accounts",
+   "shape": "box",
+   "wrap": 132,
+   "label": "accounts  (20 tables, D-9)",
+   "sub": "AccountDeletionRequest, AdviserProfile, College, Course …"
+  },
+  {
+   "id": "ai",
+   "shape": "box",
+   "wrap": 132,
+   "label": "ai  (28 tables, D-13)",
+   "sub": "AskRun, AskRunAttempt, AskRunEvent, ChatSubmission …"
+  },
+  {
+   "id": "audit",
+   "shape": "box",
+   "wrap": 132,
+   "label": "audit  (1 table, D-15)",
+   "sub": "AuditEvent"
+  },
+  {
+   "id": "documents",
+   "shape": "box",
+   "wrap": 132,
+   "label": "documents  (10 tables, D-12)",
+   "sub": "DocumentRequest, DocumentRequestItem, ExtractionFigure, ManuscriptMetadata …"
+  },
+  {
+   "id": "library",
+   "shape": "box",
+   "wrap": 132,
+   "label": "library  (2 tables, D-15)",
+   "sub": "SavedFeed, SavedRecord"
+  },
+  {
+   "id": "notifications",
+   "shape": "box",
+   "wrap": 132,
+   "label": "notifications  (3 tables, D-15)",
+   "sub": "Notification, NotificationRead, NotificationType"
+  },
+  {
+   "id": "opportunities",
+   "shape": "box",
+   "wrap": 132,
+   "label": "opportunities  (1 table, D-15)",
+   "sub": "Opportunity"
+  },
+  {
+   "id": "publication",
+   "shape": "box",
+   "wrap": 132,
+   "label": "publication  (2 tables, D-12)",
+   "sub": "ManuscriptInvalidation, ManuscriptWork"
+  },
+  {
+   "id": "records",
+   "shape": "box",
+   "wrap": 132,
+   "label": "records  (24 tables, D-10)",
+   "sub": "Author, AuthorRole, Classification, Conference …"
+  },
+  {
+   "id": "reviews",
+   "shape": "box",
+   "wrap": 132,
+   "label": "reviews  (18 tables, D-11)",
+   "sub": "DeadlineMoment, Extension, Holiday, RecordAssignment …"
+  },
+  {
+   "id": "iris_ai",
+   "shape": "box",
+   "tone": "ai",
+   "wrap": 132,
+   "label": "iris_ai schema  (16 tables, D-14)",
+   "sub": "AI runtime: conversation, ask_run, turn, citation, …"
+  }
+ ],
+ "edges": [
+  {
+   "from": "ai",
+   "to": "accounts",
+   "label": "5"
+  },
+  {
+   "from": "ai",
+   "to": "records",
+   "label": "11"
+  },
+  {
+   "from": "audit",
+   "to": "accounts",
+   "label": "1"
+  },
+  {
+   "from": "audit",
+   "to": "records",
+   "label": "1"
+  },
+  {
+   "from": "documents",
+   "to": "accounts",
+   "label": "4"
+  },
+  {
+   "from": "documents",
+   "to": "records",
+   "label": "6"
+  },
+  {
+   "from": "documents",
+   "to": "reviews",
+   "label": "2"
+  },
+  {
+   "from": "library",
+   "to": "accounts",
+   "label": "2"
+  },
+  {
+   "from": "library",
+   "to": "records",
+   "label": "1"
+  },
+  {
+   "from": "notifications",
+   "to": "accounts",
+   "label": "4"
+  },
+  {
+   "from": "notifications",
+   "to": "records",
+   "label": "1"
+  },
+  {
+   "from": "opportunities",
+   "to": "accounts",
+   "label": "1"
+  },
+  {
+   "from": "publication",
+   "to": "records",
+   "label": "1"
+  },
+  {
+   "from": "records",
+   "to": "accounts",
+   "label": "20"
+  },
+  {
+   "from": "records",
+   "to": "documents",
+   "label": "1"
+  },
+  {
+   "from": "reviews",
+   "to": "accounts",
+   "label": "18"
+  },
+  {
+   "from": "reviews",
+   "to": "records",
+   "label": "16"
+  },
+  {
+   "from": "iris_ai",
+   "to": "accounts",
+   "label": "reader_id",
+   "dash": true
+  },
+  {
+   "from": "iris_ai",
+   "to": "records",
+   "label": "record_id",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "foreign keys from one app's tables to the other's (count)"
+  },
+  {
+   "line": "dash arrow",
+   "text": "id held without a database constraint"
+  },
+  {
+   "tone": "core",
+   "text": "Django app"
+  },
+  {
+   "tone": "ai",
+   "text": "AI runtime schema"
+  }
+ ]
+}

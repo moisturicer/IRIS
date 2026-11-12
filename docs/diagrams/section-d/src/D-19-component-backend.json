@@ -1,0 +1,344 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "gutter": 96,
+ "vgap": 30,
+ "columnCount": 3,
+ "level": 10,
+ "title": "D-19  Backend components: Django apps and their dependencies",
+ "caption": "Generated from import statements in backend/apps on main (IR-1021); tests, migrations, management commands and evaluation tools excluded. The number on a line is the count of import lines. Every app except publication also uses core.",
+ "nodes": [
+  {
+   "id": "spa",
+   "shape": "box",
+   "tone": "plain",
+   "label": "React SPA",
+   "sub": "frontend/",
+   "wrap": 120
+  },
+  {
+   "id": "config",
+   "shape": "box",
+   "label": "config",
+   "sub": "settings, URLs, ASGI, Celery",
+   "wrap": 120
+  },
+  {
+   "id": "core",
+   "shape": "box",
+   "label": "core",
+   "sub": "permissions, pagination, utilities",
+   "wrap": 120
+  },
+  {
+   "id": "accounts",
+   "shape": "box",
+   "label": "accounts",
+   "sub": "users, roles, consent, sessions, recovery",
+   "wrap": 120
+  },
+  {
+   "id": "ai",
+   "shape": "box",
+   "label": "ai",
+   "sub": "chunking, embedding, reader grants, admission, overview",
+   "wrap": 120,
+   "tone": "ai"
+  },
+  {
+   "id": "audit",
+   "shape": "box",
+   "label": "audit",
+   "sub": "insert-only audit log, CSV export",
+   "wrap": 120
+  },
+  {
+   "id": "documents",
+   "shape": "box",
+   "label": "documents",
+   "sub": "uploads, PDF checks, extraction tasks",
+   "wrap": 120
+  },
+  {
+   "id": "library",
+   "shape": "box",
+   "label": "library",
+   "sub": "saved records and feeds",
+   "wrap": 120
+  },
+  {
+   "id": "notifications",
+   "shape": "box",
+   "label": "notifications",
+   "sub": "in-app and email notifications",
+   "wrap": 120
+  },
+  {
+   "id": "opportunities",
+   "shape": "box",
+   "label": "opportunities",
+   "sub": "Calls & Conferences",
+   "wrap": 120
+  },
+  {
+   "id": "publication",
+   "shape": "box",
+   "label": "publication",
+   "sub": "manuscript processing work for the AI runtime",
+   "wrap": 120,
+   "tone": "ai"
+  },
+  {
+   "id": "records",
+   "shape": "box",
+   "label": "records",
+   "sub": "records, versions, embargo, download and delete requests",
+   "wrap": 120
+  },
+  {
+   "id": "reviews",
+   "shape": "box",
+   "label": "reviews",
+   "sub": "adviser-first review, seats, clearances, threads",
+   "wrap": 120
+  },
+  {
+   "id": "runtime",
+   "shape": "box",
+   "tone": "ai",
+   "label": "AI runtime",
+   "sub": "ai/, FastAPI",
+   "wrap": 120
+  },
+  {
+   "id": "db",
+   "shape": "db",
+   "label": "PostgreSQL",
+   "wrap": 120
+  }
+ ],
+ "edges": [
+  {
+   "from": "spa",
+   "to": "config",
+   "label": "REST /api/v1/"
+  },
+  {
+   "from": "config",
+   "to": "core"
+  },
+  {
+   "from": "accounts",
+   "to": "ai",
+   "label": "4"
+  },
+  {
+   "from": "accounts",
+   "to": "audit",
+   "label": "14"
+  },
+  {
+   "from": "accounts",
+   "to": "documents",
+   "label": "3"
+  },
+  {
+   "from": "accounts",
+   "to": "library",
+   "label": "2"
+  },
+  {
+   "from": "accounts",
+   "to": "notifications",
+   "label": "4"
+  },
+  {
+   "from": "accounts",
+   "to": "opportunities",
+   "label": "1"
+  },
+  {
+   "from": "accounts",
+   "to": "records",
+   "label": "14"
+  },
+  {
+   "from": "accounts",
+   "to": "reviews",
+   "label": "7"
+  },
+  {
+   "from": "ai",
+   "to": "documents",
+   "label": "10"
+  },
+  {
+   "from": "ai",
+   "to": "records",
+   "label": "27"
+  },
+  {
+   "from": "audit",
+   "to": "accounts",
+   "label": "1"
+  },
+  {
+   "from": "audit",
+   "to": "records",
+   "label": "1"
+  },
+  {
+   "from": "documents",
+   "to": "ai",
+   "label": "16"
+  },
+  {
+   "from": "documents",
+   "to": "audit",
+   "label": "3"
+  },
+  {
+   "from": "documents",
+   "to": "notifications",
+   "label": "2"
+  },
+  {
+   "from": "documents",
+   "to": "records",
+   "label": "14"
+  },
+  {
+   "from": "documents",
+   "to": "reviews",
+   "label": "10"
+  },
+  {
+   "from": "library",
+   "to": "accounts",
+   "label": "1"
+  },
+  {
+   "from": "library",
+   "to": "records",
+   "label": "4"
+  },
+  {
+   "from": "notifications",
+   "to": "accounts",
+   "label": "4"
+  },
+  {
+   "from": "notifications",
+   "to": "reviews",
+   "label": "3"
+  },
+  {
+   "from": "publication",
+   "to": "ai",
+   "label": "3"
+  },
+  {
+   "from": "publication",
+   "to": "records",
+   "label": "2"
+  },
+  {
+   "from": "records",
+   "to": "accounts",
+   "label": "4"
+  },
+  {
+   "from": "records",
+   "to": "ai",
+   "label": "11"
+  },
+  {
+   "from": "records",
+   "to": "audit",
+   "label": "9"
+  },
+  {
+   "from": "records",
+   "to": "documents",
+   "label": "19"
+  },
+  {
+   "from": "records",
+   "to": "library",
+   "label": "1"
+  },
+  {
+   "from": "records",
+   "to": "notifications",
+   "label": "11"
+  },
+  {
+   "from": "records",
+   "to": "publication",
+   "label": "1"
+  },
+  {
+   "from": "records",
+   "to": "reviews",
+   "label": "55"
+  },
+  {
+   "from": "reviews",
+   "to": "accounts",
+   "label": "2"
+  },
+  {
+   "from": "reviews",
+   "to": "audit",
+   "label": "13"
+  },
+  {
+   "from": "reviews",
+   "to": "documents",
+   "label": "13"
+  },
+  {
+   "from": "reviews",
+   "to": "notifications",
+   "label": "9"
+  },
+  {
+   "from": "reviews",
+   "to": "records",
+   "label": "34"
+  },
+  {
+   "from": "runtime",
+   "to": "ai",
+   "label": "reader grant (edge-grant)",
+   "dash": true,
+   "wrap": 64
+  },
+  {
+   "from": "runtime",
+   "to": "db",
+   "label": "iris_ai schema, row policy",
+   "dash": true,
+   "wrap": 64
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "Python imports (count)"
+  },
+  {
+   "line": "dash arrow",
+   "text": "runtime boundary, no Python import"
+  },
+  {
+   "tone": "core",
+   "text": "Django app (backend/)"
+  },
+  {
+   "tone": "ai",
+   "text": "AI indexing / AI runtime"
+  },
+  "lines to the same component share a trunk, joined with a dot"
+ ]
+}

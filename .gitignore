@@ -114,3 +114,9 @@ e2e/.auth/
 # IR-871: real papers for testing the review text reader. Never committed:
 # they are other people's work, read only on this machine.
 /samples/
+
+# Section D diagram renderer (docs/diagrams/section-d/render.sh)
+docs/diagrams/section-d/tools/node_modules/
+docs/diagrams/section-d/tools/build/
+docs/diagrams/section-d/tools/models.json
+docs/diagrams/section-d/tools/iris_ai.json
