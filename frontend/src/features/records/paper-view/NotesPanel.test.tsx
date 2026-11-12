@@ -45,7 +45,7 @@ function Harness({ onAsk, onOpenHighlight = () => {}, openableVersions = [] }: {
   onOpenHighlight?: (h: ReadableHighlight) => void;
   openableVersions?: number[];
 }) {
-  const state = useReadingNote(record.id, true, 5);
+  const state = useReadingNote(record.id, true, 50);
   const highlights = useReadingHighlights(record.id, true);
   return (
     <NotesPanel

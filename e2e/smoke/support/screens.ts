@@ -203,6 +203,7 @@ export const SCREENS: Screen[] = [
       api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
       api.on("GET", `/records/${PAPER.id}/comments/`, { comments: [], count: 0 });
       api.on("GET", "/library/saves/", { results: [] });
+      api.on("GET", `/library/highlights/${PAPER.id}/`, { results: [] });
       api.on("GET", `/ai/records/${PAPER.id}/overview/`, { state: "not_indexed", overview: null });
       api.on("GET", `/records/${PAPER.id}/similar/`, { results: [] });
       // Review threads (IR-875): the review workspace reads them beside the tracker.
