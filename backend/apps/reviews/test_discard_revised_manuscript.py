@@ -202,6 +202,6 @@ class DiscardIsRecorded(DiscardBase):
         [event] = AuditEvent.objects.filter(record=record, event_type=AuditEvent.REVISION_DRAFT_DISCARDED)
         self.assertEqual(event.user, self.owner)
         self.assertEqual(event.metadata["version"], 1)
-        self.assertEqual(event.metadata["discarded_revision"], dropped)
+        self.assertEqual(event.metadata["discarded_revision"], str(dropped))
         # By revision, never by file name or text.
         self.assertNotIn("revised.pdf", str(event.metadata))

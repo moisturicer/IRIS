@@ -186,7 +186,7 @@ def revision_draft_discarded(record, actor, *, discarded_revision):
     """
     _write(
         AuditEvent.REVISION_DRAFT_DISCARDED, actor, record,
-        version=_version(record), discarded_revision=discarded_revision,
+        version=_version(record), discarded_revision=str(discarded_revision),
     )
 
 
