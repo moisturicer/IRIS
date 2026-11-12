@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -19,6 +19,9 @@ import type { ShowPlace } from "./changes/ChangeItem";
 import { ChangesTab } from "./changes/ChangesTab";
 import { ReviewThreads } from "./threads/ReviewThreads";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
+import { GuidedTour } from "./tour/GuidedTour";
+import { markTourSeen, tourSeen } from "./tour/tourStorage";
+import { reviewTourSteps } from "./tour/tourSteps";
 import type { ReviewWorkspaceProps } from "./ReviewWorkspace";
 import "./reviewWorkspace.css";
 
@@ -81,7 +84,18 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const [routed, setRouted] = useState("");
   const pane = useRef<HTMLElement>(null);
   const launcher = useRef<HTMLButtonElement>(null);
+  const tourButton = useRef<HTMLButtonElement>(null);
   const ids = useId();
+  // The guided tour (IR-997): offered once per browser, startable any time. It
+  // holds only its own opener; it reads and changes nothing about the review.
+  const [offered, setOffered] = useState(() => !tourSeen());
+  const [tour, setTour] = useState<{ opener: HTMLElement | null } | null>(null);
+  const startTour = (opener: HTMLElement | null) => {
+    markTourSeen();
+    setOffered(false);
+    setTour({ opener });
+  };
+  const closeTour = useCallback(() => setTour(null), []);
   const drawer = width > 0 && width < 900 && Boolean(reader);
   const folded = width > 0 && width < 1200;
   const drag = useRef<{ key: keyof Widths; x: number; mid: number; side: number } | null>(null);
@@ -243,7 +257,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     <div ref={observe} className="review-workspace-container">
       <div className={cn("review-workspace", !reader && "review-without-paper")}
         style={{ "--mid-w": `${sizes.mid}px`, "--side-w": `${sizes.side}px` } as CSSProperties}>
-        {reader && <div className="review-paper" {...(drawer && open ? { inert: "" } : {})}>{tw.wrapReader(reader)}</div>}
+        {reader && <div id={`${ids}-paper`} className="review-paper" {...(drawer && open ? { inert: "" } : {})}>{tw.wrapReader(reader)}</div>}
         <section ref={pane} id={`${ids}-mid`} aria-label="Review pane" tabIndex={-1}
           role={drawer && open ? "dialog" : "region"} aria-modal={drawer && open || undefined}
           aria-hidden={drawer && !open || undefined} {...(drawer && !open ? { inert: "" } : {})}
@@ -261,9 +275,23 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
                 )}
                 <h2 className="font-display text-xl font-semibold text-stone-900 mt-1">Review</h2>
               </div>
-              {drawer && <button type="button" className={cn("review-control text-brand", FOCUS_RING)}
-                onClick={closeDrawer}>Back to paper</button>}
+              <div className="flex items-center gap-1">
+                <button ref={tourButton} type="button" className={cn("review-control text-brand", FOCUS_RING)}
+                  onClick={(e) => startTour(e.currentTarget)}>Take a tour</button>
+                {drawer && <button type="button" className={cn("review-control text-brand", FOCUS_RING)}
+                  onClick={closeDrawer}>Back to paper</button>}
+              </div>
             </div>
+            {offered && (
+              <div role="group" aria-label="Guided tour" className="mt-3 rounded-lg border border-stone-300 bg-white p-3">
+                <p className="text-small text-stone-800">New to the Review workspace? Take a short tour of its main parts.</p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} onClick={() => startTour(tourButton.current)}>Start tour</button>
+                  <button type="button" className={cn("review-control font-semibold text-stone-700", FOCUS_RING)}
+                    onClick={() => { markTourSeen(); setOffered(false); }}>Not now</button>
+                </div>
+              </div>
+            )}
             {record.readiness && (
               <ReadinessSummary readiness={record.readiness} onShow={() => {
                 setTab("conversation");
@@ -274,7 +302,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
                 });
               }} />
             )}
-            <div role="tablist" aria-label="Review pane sections" onKeyDown={(e) => {
+            <div role="tablist" id={`${ids}-tabs`} aria-label="Review pane sections" onKeyDown={(e) => {
               if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
               e.preventDefault();
               const at = tabs.indexOf(tab);
@@ -318,7 +346,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             )}
             {folded && <div role="tabpanel" id={`${ids}-details`} aria-labelledby={`${ids}-tab-details`} hidden={tab !== "details"} className="p-4">{details}</div>}
           </div>
-          <footer ref={footer} className="review-pane-foot" aria-label="Your review">
+          <footer ref={footer} id={`${ids}-foot`} className="review-pane-foot" aria-label="Your review">
             <p className="text-small font-semibold text-stone-900"><i className="fas fa-clipboard-check mr-2" aria-hidden />Your review: {ownSeat?.verdict_label ?? ownSeat?.state_label ?? "No verdict recorded"}</p>
             {finishing && (
               <p className="text-2xs text-stone-600">
@@ -353,7 +381,17 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             onDone={(outcome) => { setRequesting(false); setRouted(outcome); onChanged(); }} />,
           document.body,
         )}
-        {drawer && <div className="review-paper-foot"><button ref={launcher} type="button" className={cn("review-control text-brand font-semibold", FOCUS_RING)} onClick={() => setOpen(true)}>Open review pane</button></div>}
+        {drawer && (
+          <div className="review-paper-foot">
+            {/* The pane's own Take a tour is out of reach while it is closed. */}
+            {!open && <button type="button" className={cn("review-control text-brand", FOCUS_RING)} onClick={(e) => startTour(e.currentTarget)}>Take a tour</button>}
+            <button ref={launcher} id={`${ids}-launcher`} type="button" className={cn("review-control text-brand font-semibold", FOCUS_RING)} onClick={() => setOpen(true)}>Open review pane</button>
+          </div>
+        )}
+        {tour && (
+          <GuidedTour opener={tour.opener} onClose={closeTour}
+            steps={reviewTourSteps({ ids, hasPaper: Boolean(reader), drawer, paneOpen: open, folded, tabs })} />
+        )}
       </div>
     </div>
   );
