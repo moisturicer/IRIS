@@ -98,6 +98,62 @@ class ReadingNote(models.Model):
         return f"ReadingNote(owner={self.owner_id}, record={self.record_id})"
 
 
+#: What a highlight's quotation, its surrounding text and its regions may hold
+#: (ADR-065 §3). They are the review threads' own bounds (`reviews.comments`),
+#: because the same selection code produces both.
+MAX_HIGHLIGHT_QUOTE = 2_000
+MAX_HIGHLIGHT_CONTEXT = 500
+MAX_HIGHLIGHT_REGIONS = 50
+
+
+class ReadingHighlight(models.Model):
+    """
+    A passage one reader saved from a Manuscript (IR-583, ADR-065).
+
+    **It belongs to the bytes it was made on.** `manuscript_revision` and
+    `manuscript_sha256` are the identity the server was serving that reader when
+    the highlight was saved (`records.versions.served_manuscript_identity`), and
+    they never change. The regions are fractions of pages of *those* bytes, so a
+    highlight is current only while the reader is served exactly that identity;
+    after a replacement it is stale, and nothing here rewrites it to point at the
+    new file.
+
+    The reader's own words about a paper are `ReadingNote.body`. A highlight
+    holds source text only -- the quotation, a little context either side, the
+    page and the regions -- so the two are never mixed (ADR-065 §1).
+
+    Both foreign keys cascade, as for notes (ADR-064 §1). A Record that is merely
+    withdrawn or restricted keeps its highlights; they are withheld, quote and
+    anchor together, until access returns, because every presentation rechecks
+    `Record.objects.visible_to()`.
+
+    Not in Django admin, no `AuditEvent`, and never imported by anything that
+    recommends, discusses, reviews or prompts (a guard test enforces it).
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reading_highlights"
+    )
+    record = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="+"
+    )
+    manuscript_revision = models.UUIDField()
+    manuscript_sha256 = models.CharField(max_length=64)
+    page = models.PositiveIntegerField()
+    quote = models.TextField()
+    prefix = models.TextField(blank=True, default="")
+    suffix = models.TextField(blank=True, default="")
+    #: ADR-031's page-fraction rectangles, `{page, left, top, right, bottom}`.
+    regions = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["owner", "record", "-created_at"], name="library_highlight_idx")]
+
+    def __str__(self):
+        return f"ReadingHighlight(owner={self.owner_id}, record={self.record_id})"
+
+
 #: How many saved feeds one account may hold (IR-577). One constant, so changing
 #: the decision is one edit; the interface reads the number from the API.
 MAX_SAVED_FEEDS = 10

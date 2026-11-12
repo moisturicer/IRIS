@@ -207,6 +207,15 @@
   mix-blend-mode: multiply;
 }
 
+/* The reader's own highlight (IR-583): a warm wash with an underline, so it is
+   told from a thread's maroon and from find's orange without relying on hue
+   alone. Over the text layer without taking its pointer. */
+.reader-highlight {
+  background-color: rgb(250 204 21 / 0.28);
+  box-shadow: inset 0 -2px 0 rgb(161 98 7 / 0.7);
+  mix-blend-mode: multiply;
+}
+
 /* A thread's pin grows and shrinks with the page, so at a low zoom it no
    longer covers the words it marks; 12px is the least it shrinks to, the
    smallest a pointer can still hit (the page box sets the factor). */

@@ -733,6 +733,22 @@ LIBRARY = {
         "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={"body": "A note", "base_revision": 0}),
         "DELETE": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
     }),
+    # IR-583, ADR-065: a highlight is the caller's own, so the account list is
+    # anyone's own and removing one answers 204 to everybody (it discloses
+    # nothing). Reading or saving on a Record is gated by the Record: a caller
+    # who cannot read it gets the 404 of a missing one. A permitted save may
+    # still be refused for its body or its Manuscript revision (a 400 or 409).
+    "library-highlights": Entry({"GET": _case(SIGNED_IN)}),
+    "library-record-highlights": Entry({
+        "GET": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
+        "POST": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={
+            "manuscript_revision": "00000000-0000-4000-8000-000000000000",
+            "page": 1, "quote": "A passage", "regions": [],
+        }),
+    }),
+    "library-highlight": Entry({
+        "DELETE": _case(SIGNED_IN, kwargs={"record_id": Ref("record"), "highlight_id": 999_999}),
+    }),
     # IR-577: a saved feed is the caller's own, so listing and saving are
     # anyone's, and another account's feed is the same 404 as a missing one.
     "library-feeds": Entry({

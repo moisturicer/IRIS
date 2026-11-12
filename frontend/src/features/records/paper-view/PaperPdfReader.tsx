@@ -12,6 +12,8 @@ import {
 import type { Region } from "@/types/ai";
 import { CitationOverlay } from "./CitationOverlay";
 import { FIND_HIT_CURRENT_CLASS, paintFindHits } from "./findHighlights";
+import { HighlightMarks, type ReaderHighlight } from "./ReaderHighlights";
+import { SelectionMenu, menuPosition, type MenuPosition, type SelectionAction } from "./SelectionMenu";
 import { passageFromRange, type Passage } from "./threads/passage";
 import { ThreadMarks, useReaderAnnotations, type ReaderMark } from "./threads/readerAnnotations";
 import type { FindHit } from "./findInPaper";
@@ -64,6 +66,8 @@ const SETTLE_AFTER_LANDING_MS = 1500;
 
 /** A page with no find hits: one value, so such pages never repaint. */
 const NO_HITS: FindHit[] = [];
+const NO_HIGHLIGHTS: ReaderHighlight[] = [];
+const NO_ACTIONS: SelectionAction[] = [];
 
 /**
  * A page's canvas and text layer (IR-353): mounted only while the page is in
@@ -158,6 +162,7 @@ function PdfPageView({
   scale,
   regions,
   marks,
+  highlights,
   hits,
   registerRef,
   onPaint,
@@ -170,6 +175,8 @@ function PdfPageView({
   regions: Region[];
   /** Review threads' highlights and pins (IR-875); empty outside Review. */
   marks: ReaderMark[];
+  /** The reader's own saved highlights (IR-583). */
+  highlights: ReaderHighlight[];
   hits: FindHit[];
   registerRef: (pageNumber: number, el: HTMLDivElement | null) => void;
   onPaint: (page: number, scale: number | null) => void;
@@ -192,6 +199,7 @@ function PdfPageView({
       style={{ width, height, ["--total-scale-factor" as string]: scale }}
     >
       {live && page && <LivePageLayers page={page} scale={scale} hits={hits} onPaint={onPaint} />}
+      <HighlightMarks highlights={highlights} page={pageNumber} />
       <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
       <ThreadMarks marks={marks} page={pageNumber} />
     </div>
@@ -239,6 +247,17 @@ export interface PaperPdfReaderProps {
    * `contained`: there the caller's chrome sits beside the pane, not over it.
    */
   bottomInset?: number;
+  /**
+   * The reader's own saved highlights to draw (IR-583): the caller has already
+   * chosen the ones that belong to the bytes shown. Nothing here decides that.
+   */
+  highlights?: ReaderHighlight[];
+  /**
+   * What may be done with a selected passage (IR-583): the caller's actions, in
+   * one menu. Offered only on the current paper -- an earlier version's bytes
+   * are not what a highlight is bound to.
+   */
+  selectionActions?: SelectionAction[];
 }
 
 /**
@@ -278,9 +297,11 @@ function PaperPdfReaderSource({
   fill = false,
   downloadControl,
   bottomInset = 0,
+  highlights = NO_HIGHLIGHTS,
+  selectionActions = NO_ACTIONS,
 }: PaperPdfReaderProps) {
   const [attempt, setAttempt] = useState(0);
-  const { status, pageCount, pages, pageProxy, prioritize } = usePdfDocument({
+  const { status, pageCount, pages, pageProxy, prioritize, revision } = usePdfDocument({
     recordId,
     version,
     attempt,
@@ -474,27 +495,34 @@ function PaperPdfReaderSource({
   }, [threadLanding, painted, scale]);
 
   /**
-   * The passage *Comment* would anchor to: the reader's text selection, else
-   * find's current match -- the keyboard's way to a passage, since a text
-   * layer can't be selected without a pointer (IR-875).
+   * The range *Comment* and the selection menu act on: the reader's text
+   * selection, else find's current match -- the keyboard's way to a passage,
+   * since a text layer can't be selected without a pointer (IR-875).
    */
-  const currentPassage = (): Passage | null => {
+  const currentRange = (): Range | null => {
     const root = scrollAreaRef.current;
     if (!root) return null;
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
-      if (root.contains(range.commonAncestorContainer)) return passageFromRange(range, root);
+      if (root.contains(range.commonAncestorContainer)) return range;
     }
     const current = root.querySelectorAll(`mark.${FIND_HIT_CURRENT_CLASS}`);
     if (current.length === 0) return null;
     const range = document.createRange();
     range.setStartBefore(current[0]);
     range.setEndAfter(current[current.length - 1]);
-    return passageFromRange(range, root);
+    return range;
+  };
+  const currentPassage = (): Passage | null => {
+    const root = scrollAreaRef.current;
+    const range = currentRange();
+    return root && range ? passageFromRange(range, root) : null;
   };
   const currentPassageRef = useRef(currentPassage);
   currentPassageRef.current = currentPassage;
+  const currentRangeRef = useRef(currentRange);
+  currentRangeRef.current = currentRange;
   // Only a passage of a known Version can be anchored (ADR-032 §7).
   const commentOn = shownVersion !== null ? annotations?.onComment ?? null : null;
   const commentOnRef = useRef(commentOn);
@@ -507,13 +535,41 @@ function PaperPdfReaderSource({
   );
   const findMatch = find.open && find.targetPage !== null;
 
+  // The selection menu belongs to the current paper only (IR-583, ADR-065 §2).
+  const menuActions = version === null ? selectionActions : NO_ACTIONS;
+  const menuOffered = menuActions.length > 0;
+  const [menuAt, setMenuAt] = useState<MenuPosition | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   useEffect(() => {
-    if (!onComment) return;
-    const arm = () => setCommentable(currentPassageRef.current() !== null);
+    if (!onComment && !menuOffered) return;
+    const arm = () => {
+      const passage = currentPassageRef.current();
+      setCommentable(passage !== null);
+      if (!menuOffered) return;
+      setMenuOpen(passage !== null);
+      const range = passage ? currentRangeRef.current() : null;
+      // jsdom's ranges have no layout at all.
+      const rect = range && typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : null;
+      // No layout (or an empty box) leaves the menu a plain row under the toolbar.
+      const at = rect && (rect.width > 0 || rect.height > 0)
+        ? menuPosition(rect, { width: window.innerWidth, height: window.innerHeight })
+        : null;
+      setMenuAt((previous) => (previous?.top === at?.top && previous?.left === at?.left ? previous : at));
+    };
     arm();
     document.addEventListener("selectionchange", arm);
     return () => document.removeEventListener("selectionchange", arm);
-  }, [onComment, findMatch, find.hitsByPage, painted]);
+  }, [onComment, menuOffered, findMatch, find.hitsByPage, painted]);
+
+  const chooseAction = (action: SelectionAction) => {
+    const passage = currentPassageRef.current();
+    if (!passage) return;
+    action.run(passage, revision);
+    // Done with the passage: the menu goes with the selection.
+    window.getSelection()?.removeAllRanges();
+    setMenuOpen(false);
+  };
 
   const comment = () => {
     const passage = currentPassageRef.current();
@@ -742,10 +798,13 @@ function PaperPdfReaderSource({
               regions={highlightRegions}
               marks={marks}
               hits={find.hitsByPage.get(index + 1) ?? NO_HITS}
+              highlights={highlights}
               registerRef={registerRef}
             />
           ))}
       </div>
+
+      {menuOffered && menuOpen && <SelectionMenu actions={menuActions} position={menuAt} onChoose={chooseAction} />}
     </div>
   );
 }

@@ -147,6 +147,7 @@ function mockReadyDraft(api: MockApi, initialDraft = draftDetail()) {
   api.on("GET", "/records/42/document-requests/", []);
   api.on("GET", "/records/42/review-comments/", []);
   api.on("GET", "/records/42/response-letters/", []);
+  api.on("GET", "/library/highlights/42/", { results: [] });
   api.on("POST", "/records/42/submit/", (route: Route) => {
     state = "submitted";
     return route.fulfill({ json: { detail: "Submitted." } });

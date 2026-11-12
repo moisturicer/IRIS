@@ -28,10 +28,18 @@ from rest_framework.views import APIView
 from apps.records.discovery import invalidate_feed
 from apps.records.models import Record
 from apps.records.serializers import RecordListSerializer
+from apps.records.versions import served_manuscript_identity
 from core.enums import ReadingStatus
 
-from . import feeds
-from .models import MAX_NOTE_LENGTH, MAX_SAVED_FEEDS, ReadingNote, SavedFeed, SavedRecord
+from . import feeds, highlights
+from .models import (
+    MAX_NOTE_LENGTH,
+    MAX_SAVED_FEEDS,
+    ReadingHighlight,
+    ReadingNote,
+    SavedFeed,
+    SavedRecord,
+)
 
 #: Absent from the body means "leave the status as it is".
 _UNSET = object()
@@ -226,6 +234,113 @@ class ReadingNoteView(APIView):
         # endpoint never confirms that a hidden Record exists.
         _readable_or_404(request.user, record_id)
         _own_note(request.user, record_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# -- IR-583: highlights (ADR-065) -------------------------------------------------
+#
+# Same two rules as notes. The owner is the authenticated user and every queryset
+# starts from `ReadingHighlight.objects.filter(owner=request.user)`; and every
+# presentation of a quotation or an anchor rechecks `Record.objects.visible_to()`.
+# A third rule is this slice's own: a highlight is bound to the Manuscript bytes
+# it was made on. The identity is never taken from the client -- the client only
+# says which revision it was shown, and the server refuses the write unless that
+# is still what the reader is served.
+
+
+def _manuscript_conflict(code, detail):
+    return Response({"code": code, "detail": detail}, status=status.HTTP_409_CONFLICT)
+
+
+class HighlightListView(APIView):
+    """
+    GET /library/highlights/ -- every highlight the reader has saved, newest
+    first. A highlight whose Record the reader cannot read is listed as
+    `{id, record_id, available: false}` and nothing else (ADR-065 §4).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rows = list(ReadingHighlight.objects.filter(owner=request.user).order_by("-created_at", "-pk"))
+        readable = {r.pk: r for r in Record.objects.visible_to(request.user).filter(pk__in={h.record_id for h in rows})}
+        contexts = {pk: highlights.context_for(record, request.user) for pk, record in readable.items()}
+        results = [
+            highlights.entry(h, contexts[h.record_id]) if h.record_id in readable else highlights.unavailable(h)
+            for h in rows
+        ]
+        return Response({"results": results})
+
+
+class RecordHighlightsView(APIView):
+    """
+    GET  /library/highlights/<record_id>/ -- the reader's highlights on one Record.
+    POST /library/highlights/<record_id>/ -- save the passage the reader selected:
+         `{manuscript_revision, page, quote, prefix, suffix, regions}`.
+
+    A Record the reader cannot read is the same 404 as a missing one on both.
+    `manuscript_revision` is what the reader's own reader showed; it must be the
+    revision the server serves them now, else a `409 manuscript_changed` and
+    nothing is stored. Saving the same passage again returns the one already there.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, record_id):
+        record = Record.objects.visible_to(request.user).filter(pk=record_id).first()
+        if record is None:
+            raise NotFound()
+        context = highlights.context_for(record, request.user)
+        rows = ReadingHighlight.objects.filter(owner=request.user, record=record).order_by("-created_at", "-pk")
+        return Response({"results": [highlights.entry(h, context) for h in rows]})
+
+    def post(self, request, record_id):
+        fields = highlights.clean(request.data)
+        record = Record.objects.visible_to(request.user).filter(pk=record_id).first()
+        if record is None:
+            raise NotFound()
+
+        revision, sha256 = served_manuscript_identity(record, request.user)
+        if revision is None:
+            return _manuscript_conflict(
+                "manuscript_unavailable", "This paper's Manuscript has no recorded identity, so it cannot be highlighted.",
+            )
+        if fields["manuscript_revision"] != revision:
+            return _manuscript_conflict(
+                "manuscript_changed",
+                "This paper's Manuscript was replaced while you were reading. Reload it, then select the passage again.",
+            )
+
+        with transaction.atomic():
+            existing = ReadingHighlight.objects.filter(
+                owner=request.user, record=record, manuscript_revision=revision, manuscript_sha256=sha256,
+                page=fields["page"], quote=fields["quote"], regions=fields["regions"],
+            ).first()
+            if existing is not None:
+                created, row = False, existing
+            else:
+                created = True
+                row = ReadingHighlight.objects.create(
+                    owner=request.user, record=record, manuscript_sha256=sha256, **fields,
+                )
+        return Response(
+            highlights.entry(row, highlights.context_for(record, request.user)),
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class HighlightDetailView(APIView):
+    """
+    DELETE /library/highlights/<record_id>/<highlight_id>/ -- remove one of the
+    reader's own. Another reader's, a missing one and one on an unreadable Record
+    all answer 204: removing your own row discloses nothing, and a reader must be
+    able to drop a highlight whose source they can no longer open (ADR-065 §5).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, record_id, highlight_id):
+        ReadingHighlight.objects.filter(owner=request.user, record_id=record_id, pk=highlight_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

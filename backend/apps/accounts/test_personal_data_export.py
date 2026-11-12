@@ -289,6 +289,35 @@ class ExportContentTests(APITestCase):
         self.assertNotIn("Someone's draft", text)
         self.assertNotIn("Not mine.", text)
 
+    def test_highlights_are_the_persons_own_and_keep_their_quote_only_while_readable(self):
+        import uuid
+
+        from apps.library.models import ReadingHighlight
+
+        published = _paper("Public work", self.stranger, status=PipelineStatus.PUBLISHED)
+        hidden = _paper("Someone's draft", self.stranger)
+        for record, quote, owner in (
+            (published, "A passage I kept.", self.me),
+            (hidden, "Quoted before access went.", self.me),
+            (published, "Not mine.", self.stranger),
+        ):
+            ReadingHighlight.objects.create(
+                owner=owner, record=record, manuscript_revision=uuid.uuid4(),
+                manuscript_sha256="a" * 64, page=2, quote=quote,
+            )
+
+        rows = {h["record_id"]: h for h in self.export()["reading_highlights"]}
+
+        self.assertEqual(set(rows), {published.pk, hidden.pk})
+        self.assertEqual(rows[published.pk]["quote"], "A passage I kept.")
+        self.assertEqual(rows[published.pk]["title"], "Public work")
+        self.assertIsNone(rows[hidden.pk]["quote"])
+        self.assertIsNone(rows[hidden.pk]["title"])
+        self.assertEqual(rows[hidden.pk]["page"], 2)
+        text = _text(self.client.get(URL))
+        self.assertNotIn("Quoted before access went.", text)
+        self.assertNotIn("Not mine.", text)
+
     def test_saved_replies_are_the_persons_own(self):
         from apps.reviews.models import SavedReply
 

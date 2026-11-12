@@ -248,6 +248,10 @@ vi.mock("@/api/library", () => ({
     // Private notes (IR-580): read only once Notes is first opened.
     note: vi.fn(() => Promise.resolve({ data: { body: "", revision: 0, updated_at: null } })),
     saveNote: vi.fn(),
+    // Highlights (IR-583): read whenever the paper is shown, so the reader can draw them.
+    highlights: vi.fn(() => Promise.resolve({ data: { results: [] } })),
+    saveHighlight: vi.fn(),
+    deleteHighlight: vi.fn(),
   },
 }));
 
@@ -277,23 +281,42 @@ vi.mock("@/api/ai", () => ({
 // component's own test file's job (`PaperPdfReader.test.tsx`). This screen
 // only has to hand it the right props -- asserted below by rendering what
 // they were.
+/** The passage the mocked reader says the reader selected (IR-583). */
+const SELECTED = {
+  page: 3, quote: "robot arm", prefix: "A ", suffix: ", and another",
+  regions: [{ page: 3, left: 0.1, top: 0.5, right: 0.4, bottom: 0.52 }],
+};
+
 vi.mock("./PaperPdfReader", () => ({
   PaperPdfReader: ({
     scrollToPage,
     highlightRegions,
     toolbarStart,
     version,
+    highlights,
+    selectionActions,
   }: {
     scrollToPage: number | null;
     highlightRegions: unknown[];
     toolbarStart?: ReactNode;
     version?: number | null;
+    highlights?: { key: string | number }[];
+    selectionActions?: { id: string; label: string; run: (passage: unknown, revision: string | null) => void }[];
   }) => (
-    <div>
-      {toolbarStart}
-      Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
-      highlight{version != null ? `, reading v${version}` : ", reading the current paper"}
-    </div>
+    <>
+      <div>
+        {toolbarStart}
+        Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
+        highlight{version != null ? `, reading v${version}` : ", reading the current paper"}
+      </div>
+      {/* IR-583: what the page hands the reader to draw and to offer on a selection. */}
+      <p>{highlights?.length ?? 0} saved highlight(s) drawn</p>
+      {(selectionActions ?? []).map((a) => (
+        <button key={a.id} type="button" onClick={() => a.run(SELECTED, "rev-1")}>
+          Selection: {a.label}
+        </button>
+      ))}
+    </>
   ),
 }));
 
@@ -3196,5 +3219,115 @@ describe("Notes in the reading workspace (IR-580)", () => {
     await screen.findByRole("textbox", { name: "Your note on this paper" });
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+
+// Highlights (IR-583, ADR-065): the page asks for them whenever the paper is
+// shown, hands the reader only those that belong to the bytes it shows, and
+// saves a selection against the revision the reader was opened at.
+describe("highlights on the paper (IR-583)", () => {
+  const entry = (over: Record<string, unknown> = {}) => ({
+    id: 1, record_id: RECORD_ID, available: true, state: "current", page: 3,
+    quote: "Rainfall explained 62% of the variance in discharge.", prefix: "", suffix: "",
+    regions: [{ page: 3, left: 0.1, top: 0.2, right: 0.9, bottom: 0.23 }], open_version: null,
+    created_at: "2026-11-12T00:00:00Z", ...over,
+  });
+  const list = (...results: unknown[]) =>
+    vi.mocked(libraryApi.highlights).mockResolvedValue({ data: { results } } as never);
+
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+    useUIStore.setState({ sidebarCollapsed: false, sidebarOpen: false, readingRail: null });
+    vi.mocked(libraryApi.saveHighlight).mockReset();
+    vi.mocked(libraryApi.highlights).mockReset();
+    list();
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(PANEL_WIDTH_KEY);
+    vi.unstubAllGlobals();
+  });
+
+  it("saves the selected passage against the revision the reader opened, and draws it", async () => {
+    workspaceAt(1400);
+    vi.mocked(libraryApi.saveHighlight).mockResolvedValue({ data: entry() } as never);
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open/i);
+
+    await userEvent.click(screen.getByRole("button", { name: "Selection: Save highlight" }));
+
+    expect(libraryApi.saveHighlight).toHaveBeenCalledWith(RECORD_ID, {
+      manuscript_revision: "rev-1", page: 3, quote: "robot arm", prefix: "A ", suffix: ", and another",
+      regions: [{ page: 3, left: 0.1, top: 0.5, right: 0.4, bottom: 0.52 }],
+    });
+    expect(await screen.findByText("Highlight saved.")).toBeInTheDocument();
+    expect(screen.getByText("1 saved highlight(s) drawn")).toBeInTheDocument();
+  });
+
+  it("says the paper was replaced, and draws and saves nothing, when the server refuses the revision", async () => {
+    workspaceAt(1400);
+    vi.mocked(libraryApi.saveHighlight).mockRejectedValue(
+      Object.assign(new Error("conflict"), {
+        isAxiosError: true, response: { status: 409, data: { code: "manuscript_changed" } },
+      }),
+    );
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open/i);
+
+    await userEvent.click(screen.getByRole("button", { name: "Selection: Save highlight" }));
+
+    expect(await screen.findByText(/paper was replaced while you were reading/i)).toBeInTheDocument();
+    expect(screen.queryByText("Highlight saved.")).not.toBeInTheDocument();
+    expect(screen.getByText("0 saved highlight(s) drawn")).toBeInTheDocument();
+  });
+
+  it("hands the reader a highlight made on the bytes it shows, and not one from an earlier version", async () => {
+    workspaceAt(1400);
+    list(entry({ id: 1 }), entry({ id: 2, state: "stale", open_version: 1 }));
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+
+    expect(await screen.findByText("1 saved highlight(s) drawn")).toBeInTheDocument();
+  });
+
+  it("opens a highlight from Notes on its page and region", async () => {
+    workspaceAt(1400);
+    list(entry());
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open at page none/i);
+    await userEvent.click(screen.getByRole("button", { name: "Notes" }));
+
+    await userEvent.click(await screen.findByRole("button", { name: /^Open page 3/ }));
+
+    expect(await screen.findByText(/open at page 3, 1 region\(s\) to highlight, reading the current paper/i))
+      .toBeInTheDocument();
+  });
+
+  it("opens a stale highlight in the version that still has its bytes, and draws it only there", async () => {
+    workspaceAt(1400);
+    const version = (number: number) => ({
+      number, cause: number === 1 ? "submission" : "revision", cause_label: "Version",
+      created_at: `2026-09-0${number}T08:00:00Z`, created_by_name: "Rhea Owner",
+      manuscript_url: `/api/v1/records/${RECORD_ID}/versions/${number}/manuscript/`,
+    });
+    shownRecord = { ...record, versions: [version(1), version(2)] } as never;
+    list(entry({ id: 2, state: "stale", open_version: 1 }));
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    expect(await screen.findByText("0 saved highlight(s) drawn")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Notes" }));
+
+    await userEvent.click(await screen.findByRole("button", { name: /^Open page 3 in v1/ }));
+
+    expect(await screen.findByText(/open at page 3, 1 region\(s\) to highlight, reading v1/i)).toBeInTheDocument();
+    expect(screen.getByText("1 saved highlight(s) drawn")).toBeInTheDocument();
+  });
+
+  it("asks for no highlights while only the overview is showing", async () => {
+    workspaceAt(1400);
+    renderPaper(`/records/${RECORD_ID}`);
+    await waitForRecord(record.title);
+
+    expect(libraryApi.highlights).not.toHaveBeenCalled();
   });
 });

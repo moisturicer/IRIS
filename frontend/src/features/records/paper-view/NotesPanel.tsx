@@ -7,6 +7,7 @@ import type { RecordDetail } from "@/types/records";
 
 import { CONTROL_BASE, CONTROL_FILLED, CONTROL_OUTLINE } from "./controls";
 import { ICON_BUTTON, ResizeEdge } from "./PaperChatDock";
+import type { ReadableHighlight, ReadingHighlightsState } from "./useReadingHighlights";
 import { MAX_NOTE_LENGTH, type ReadingNoteState } from "./useReadingNote";
 
 interface NotesPanelProps {
@@ -14,6 +15,12 @@ interface NotesPanelProps {
   record: RecordDetail;
   /** The note, held by the page so closing the panel keeps the draft. */
   note: ReadingNoteState;
+  /** The reader's highlights on this paper, held by the page for the reader too (IR-583). */
+  highlights: ReadingHighlightsState;
+  /** Land the paper on a highlight's page and region (or on its original version). */
+  onOpenHighlight: (highlight: ReadableHighlight) => void;
+  /** Whether the reader may open Version `n` of this paper here. */
+  canOpenVersion: (version: number) => boolean;
   onClose: () => void;
   /** One view at a time (IR-569): the way back to the paper. */
   onBackToPaper?: () => void;
@@ -36,7 +43,7 @@ interface NotesPanelProps {
  * Saving, Saved or Could not save, and a note changed on another device shows
  * both texts and waits for the reader to choose.
  */
-export function NotesPanel({ record, note, onClose, onBackToPaper, onOpenAsk, panelRef, modal, style, resize, className }: NotesPanelProps) {
+export function NotesPanel({ record, note, highlights, onOpenHighlight, canOpenVersion, onClose, onBackToPaper, onOpenAsk, panelRef, modal, style, resize, className }: NotesPanelProps) {
   const headingId = useId();
   const editorId = useId();
   const hintId = useId();
@@ -97,8 +104,92 @@ export function NotesPanel({ record, note, onClose, onBackToPaper, onOpenAsk, pa
             <SaveStatus note={note} />
           </>
         )}
+        <HighlightsSection highlights={highlights} onOpen={onOpenHighlight} canOpenVersion={canOpenVersion} />
       </div>
     </aside>
+  );
+}
+
+/**
+ * The passages the reader saved from this paper (IR-583, ADR-065): source text,
+ * shown apart from their own note. A highlight made on an earlier version says
+ * so in words and is never drawn on the paper now shown; it opens only in the
+ * version that still holds its bytes, and only where the reader may open that.
+ */
+function HighlightsSection({ highlights, onOpen, canOpenVersion }: {
+  highlights: ReadingHighlightsState;
+  onOpen: (highlight: ReadableHighlight) => void;
+  canOpenVersion: (version: number) => boolean;
+}) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="max-h-[45%] shrink-0 overflow-y-auto border-t border-stone-200 px-4 py-3">
+      <h3 id={headingId} className="text-3xs font-semibold uppercase tracking-wider text-stone-600">Highlights</h3>
+
+      {highlights.phase === "load_failed" && (
+        <div className="mt-2">
+          <p className="text-small text-stone-900">Could not load your highlights.</p>
+          <button type="button" onClick={highlights.reload} className={cn("mt-2 px-3", CONTROL_BASE, CONTROL_OUTLINE)}>Try again</button>
+        </div>
+      )}
+
+      {highlights.phase !== "load_failed" && highlights.items.length === 0 && (
+        <p className="mt-2 text-2xs text-stone-600">
+          {highlights.phase === "ready"
+            ? "Select text in the paper, then choose Save highlight. Your highlights are private, like your note."
+            : "Opening your highlights…"}
+        </p>
+      )}
+
+      <ul className="mt-2 space-y-2">
+        {highlights.items.map((h) => (
+          <HighlightItem key={h.id} highlight={h} onOpen={onOpen} canOpenVersion={canOpenVersion}
+            removeFailed={highlights.removeFailed === h.id} onRemove={() => void highlights.remove(h.id)} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function HighlightItem({ highlight: h, onOpen, canOpenVersion, removeFailed, onRemove }: {
+  highlight: ReadableHighlight;
+  onOpen: (highlight: ReadableHighlight) => void;
+  canOpenVersion: (version: number) => boolean;
+  removeFailed: boolean;
+  onRemove: () => void;
+}) {
+  const quoteId = useId();
+  const stale = h.state === "stale";
+  const version = stale ? h.open_version : null;
+  // A current highlight opens on the paper shown; a stale one only on its own version.
+  const openable = !stale || (version !== null && canOpenVersion(version) === true);
+  const where = `page ${h.page}${stale && version !== null ? ` in v${version}` : ""}`;
+  return (
+    <li className="rounded-lg border border-stone-300 bg-white p-2">
+      <p className="text-3xs font-semibold uppercase tracking-wider text-stone-600">
+        Page {h.page}
+        {stale && <span className="ml-2 normal-case tracking-normal text-brand">· From an earlier version of this paper</span>}
+      </p>
+      <blockquote id={quoteId} className="mt-1 max-h-24 overflow-y-auto border-l-2 border-stone-300 pl-2 text-2xs text-stone-900">
+        {h.quote}
+      </blockquote>
+      {stale && !openable && (
+        <p className="mt-1 text-2xs text-stone-600">That version is no longer shown, so this passage can’t be opened here.</p>
+      )}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {openable && (
+          <button type="button" aria-describedby={quoteId} onClick={() => onOpen(h)}
+            className={cn("px-3", CONTROL_BASE, CONTROL_OUTLINE)}>
+            Open {where}
+          </button>
+        )}
+        <button type="button" aria-describedby={quoteId} onClick={onRemove}
+          className={cn("px-3", CONTROL_BASE, CONTROL_OUTLINE)}>
+          Remove highlight on page {h.page}
+        </button>
+        {removeFailed && <span role="alert" className="text-2xs font-semibold text-brand">Could not remove it. Try again.</span>}
+      </div>
+    </li>
   );
 }
 

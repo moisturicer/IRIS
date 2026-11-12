@@ -142,6 +142,16 @@ def served_manuscript_revision(record, user):
     return record.manuscript_revision
 
 
+def served_manuscript_identity(record, user) -> tuple:
+    """
+    `(revision, sha256)` of ``served_manuscript(record, user)``: the identity of
+    the bytes this reader is shown. `(None, "")` where nothing identified has
+    been accepted. A reader's highlight is bound to it (IR-583, ADR-065).
+    """
+    source = latest_version(record) if _reads_submitted_version(record, user) else record
+    return source.manuscript_revision, source.manuscript_sha256
+
+
 def _reads_submitted_version(record, user) -> bool:
     """Is ``user`` served the latest version rather than the stored file?"""
     return stored_manuscript_unsubmitted(record) and not is_record_owner(user, record)
