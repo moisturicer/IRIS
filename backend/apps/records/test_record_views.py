@@ -107,6 +107,16 @@ class OneViewPerAccountTests(APITestCase):
         self.record.delete()
         self.assertFalse(RecordView.objects.filter(user=self.reader).exists())
 
+    def test_an_approved_deletion_deletes_who_viewed_it(self):
+        """Approving a delete request is the final deletion: the paper is
+        removed, never restored (`DeleteRequestViewSet.approve`)."""
+        from apps.records.models import RecordView
+        from apps.records.services import soft_delete_record
+
+        self.open_as(self.reader)
+        soft_delete_record(self.record, deleted_by=person("views-deleter@cit.edu", RoleName.RDCO))
+        self.assertFalse(RecordView.objects.filter(user=self.reader).exists())
+
     def test_a_paper_the_account_cannot_see_is_still_a_404(self):
         draft = paper(self.owner, PipelineStatus.DRAFT, "Hidden draft")
         self.client.force_authenticate(self.reader)
@@ -338,7 +348,46 @@ class RebuildFromAccessHistoryTests(APITestCase):
 
         self.rebuild()
 
-        self.assertEqual(self.views_of(published), 2)
+        # Rule change, decided 2026-11-12 by Hermoine Zozobrado: a deleted
+        # account's view stays in the count, as it does when an account is
+        # deleted after viewing. Its row is never stored.
+        self.assertEqual(self.views_of(published), 3)
+
+    def test_a_deleted_account_is_counted_but_not_remembered(self):
+        from apps.records.models import RecordView
+
+        published = paper(self.owner, title="Published")
+        self.event("ACCESS", self.gone, published, self.T0)
+
+        self.rebuild()
+
+        self.assertEqual(self.views_of(published), 1)
+        self.assertFalse(RecordView.objects.filter(user=self.gone).exists())
+
+    def test_a_published_paper_awaiting_deletion_keeps_its_views(self):
+        from apps.records.models import DeleteRequest
+
+        waiting = paper(self.owner, PipelineStatus.PENDING_DELETE, title="Awaiting deletion")
+        DeleteRequest.objects.create(
+            record=waiting, requested_by=self.owner, status="pending",
+            previous_pipeline_status=PipelineStatus.PUBLISHED,
+        )
+        self.event("ACCESS", self.first, waiting, self.T0)
+
+        self.rebuild()
+
+        self.assertEqual(self.views_of(waiting), 1)
+
+    def test_a_paper_whose_deletion_was_approved_has_no_views(self):
+        from apps.records.models import RecordView
+
+        gone = paper(self.owner, PipelineStatus.PENDING_DELETE, title="Deleted")
+        Record._base_manager.filter(pk=gone.pk).update(is_deleted=True)
+        self.event("ACCESS", self.first, gone, self.T0)
+
+        self.rebuild()
+
+        self.assertFalse(RecordView.objects.filter(record=gone).exists())
 
     def test_a_view_is_dated_by_the_first_opening_after_publication(self):
         from apps.records.models import RecordView

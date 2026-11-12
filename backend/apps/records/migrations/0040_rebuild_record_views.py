@@ -5,12 +5,15 @@ paper. After this a view is one account's first opening of a published paper
 (CONTEXT.md **View**), so the old numbers are replaced, not adjusted:
 
 - one view per distinct account per published paper, from its `ACCESS` events;
-- never the paper's owners, never an account that has been deleted, never an
-  event with no account;
+- never the paper's owners (as owned today), never an event with no account;
+- an account deleted since still counts, but no row is stored for it: that is
+  what deleting an account does to a view it made (decided 2026-11-12);
 - dated by that account's earliest opening after publication. Publication is
   the paper's first `PUBLISHED` audit event, which exists only for papers
   published since IR-144; a paper with none counts every opening it has;
-- a paper that isn't published has no views.
+- a published paper whose delete request is still awaiting review counts as
+  published, because declining the request restores it. Any other paper,
+  including one whose deletion was approved, has no views.
 
 Reversing drops the rows and keeps the rebuilt counts: the per-load numbers
 can't be recovered, and nothing should need them.
@@ -20,25 +23,38 @@ from django.db import migrations
 from django.db.models import Min
 
 PUBLISHED = "published"
+PENDING_DELETE = "pending_delete"
+PENDING = "pending"
 
 
 def rebuild_views(apps, schema_editor):
     Record = apps.get_model("records", "Record")
     RecordOwner = apps.get_model("records", "RecordOwner")
     RecordView = apps.get_model("records", "RecordView")
+    DeleteRequest = apps.get_model("records", "DeleteRequest")
     AuditEvent = apps.get_model("audit", "AuditEvent")
     User = apps.get_model("accounts", "User")
 
     RecordView.objects.all().delete()
-    Record._base_manager.exclude(pipeline_status=PUBLISHED).exclude(access_count=0).update(access_count=0)
 
-    published = set(Record._base_manager.filter(pipeline_status=PUBLISHED).values_list("pk", flat=True))
+    awaiting_deletion = set(
+        DeleteRequest.objects.filter(
+            status=PENDING, previous_pipeline_status=PUBLISHED,
+            record__pipeline_status=PENDING_DELETE, record__is_deleted=False,
+        ).values_list("record_id", flat=True)
+    )
+    published = set(
+        Record._base_manager.filter(pipeline_status=PUBLISHED, is_deleted=False)
+        .values_list("pk", flat=True)
+    ) | awaiting_deletion
+    Record._base_manager.exclude(pk__in=published).exclude(access_count=0).update(access_count=0)
+
     published_at = dict(
         AuditEvent.objects.filter(event_type="PUBLISHED", record_id__in=published)
         .values("record_id").annotate(at=Min("created_at")).values_list("record_id", "at")
     )
     owners = set(RecordOwner.objects.filter(record_id__in=published).values_list("record_id", "user_id"))
-    live_accounts = set(User.objects.filter(deleted_at__isnull=True).values_list("pk", flat=True))
+    accounts = dict(User.objects.values_list("pk", "deleted_at"))
 
     first_openings = {}
     openings = (
@@ -46,7 +62,7 @@ def rebuild_views(apps, schema_editor):
         .values_list("record_id", "user_id", "created_at")
     )
     for record_id, user_id, at in openings.iterator():
-        if user_id not in live_accounts or (record_id, user_id) in owners:
+        if user_id not in accounts or (record_id, user_id) in owners:
             continue
         since = published_at.get(record_id)
         if since is not None and at < since:
@@ -56,7 +72,11 @@ def rebuild_views(apps, schema_editor):
             first_openings[key] = at
 
     RecordView.objects.bulk_create(
-        [RecordView(record_id=r, user_id=u, viewed_at=at) for (r, u), at in first_openings.items()],
+        [
+            RecordView(record_id=r, user_id=u, viewed_at=at)
+            for (r, u), at in first_openings.items()
+            if accounts[u] is None
+        ],
         batch_size=1000,
     )
     counts = {}

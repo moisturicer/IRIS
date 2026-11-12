@@ -35,6 +35,12 @@ AUDIT_WINDOW = timedelta(hours=24)
 #: How far back Trending counts a paper's views (CONTEXT.md **Trending**).
 TRENDING_WINDOW = timedelta(days=30)
 
+#: Trending's order: views in the window, then all-time views, then newest.
+TRENDING_ORDER = ("-recent_views", "-access_count", "-created_at")
+
+#: Keeps these advisory locks apart from every other use of the same function.
+LOCK_NAMESPACE = 369
+
 
 def counts_as_view(record: Record, user) -> bool:
     if record.pipeline_status != PipelineStatus.PUBLISHED:
@@ -67,8 +73,8 @@ def _one_opening_at_a_time(record: Record, user) -> None:
     """
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT pg_advisory_xact_lock(hashtextextended(%s, 369))",
-            [f"record-view:{record.pk}:{user.pk}"],
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s, %s))",
+            [f"record-view:{record.pk}:{user.pk}", LOCK_NAMESPACE],
         )
 
 
@@ -79,6 +85,11 @@ def _audit(record: Record, user, now) -> None:
     )
     if not recent.exists():
         create_audit_event(AuditEvent.ACCESS, user, record=record)
+
+
+def order_by_trending(queryset):
+    """`queryset` in Trending's order (CONTEXT.md **Trending**)."""
+    return with_recent_views(queryset).order_by(*TRENDING_ORDER)
 
 
 def with_recent_views(queryset):
