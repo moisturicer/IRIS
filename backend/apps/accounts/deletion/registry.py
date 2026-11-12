@@ -59,6 +59,7 @@ RELATIONS: dict[str, Rule] = {
     "records.DiscoveryInterests.user":    Rule(DELETE, "Private discovery interests"),
     "records.DiscoveryDismissal.user":    Rule(DELETE, "Private discovery dismissals"),
     "records.DiscoveryFeedSnapshot.user": Rule(DELETE, "Private feed snapshots"),
+    "records.RecordView.user":        Rule(DELETE, "Which papers the person opened, kept only to count each account once (IR-369); the papers' counts stay"),
     "records.Record.adviser":         Rule(ANONYMIZE, "On a published paper the name is kept as text and the link cleared"),
     "records.Record.added_by":        Rule(KEEP, "Who added a paper"),
     "records.Record.dpa_accepted_by": Rule(KEEP, "Who accepted the agreement on a paper"),

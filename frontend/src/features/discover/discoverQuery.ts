@@ -173,7 +173,9 @@ export function feedCriteria(stored: FeedQuery, options: FeedLabelOptions): stri
 /** The list endpoint's params for `query`, before paging. */
 export function listParams(query: DiscoverQuery): Record<string, unknown> {
   const { q, filters, sort, feed } = query;
-  const params: Record<string, unknown> = { ordering: feed === "trending" ? "-access_count" : ORDERING[sort] };
+  // Trending is the server's own ordering: views gained in the last 30 days,
+  // then all-time views, then newest (IR-369).
+  const params: Record<string, unknown> = { ordering: feed === "trending" ? "trending" : ORDERING[sort] };
 
   if (q) params.search = q;
   if (filters.recordType !== ALL_VALUE) params.record_type = filters.recordType;

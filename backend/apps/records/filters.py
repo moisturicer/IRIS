@@ -1,5 +1,7 @@
 import django_filters
+from rest_framework.filters import OrderingFilter
 from .models import Record
+from .views_count import order_by_trending
 
 
 class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
@@ -44,3 +46,19 @@ class RecordFilter(django_filters.FilterSet):
             "record_type", "is_ip", "ip_type", "pipeline_status", "department",
             "college", "for_commercialization",
         ]
+
+
+class RecordOrderingFilter(OrderingFilter):
+    """DRF's `?ordering=`, plus `?ordering=trending` (IR-369, CONTEXT.md **Trending**).
+
+    The rule itself is `views_count.order_by_trending`, on the server rather
+    than in the browser, so every caller gets the same tie-breaks. Most
+    Viewed stays `-access_count`.
+    """
+
+    TRENDING = "trending"
+
+    def filter_queryset(self, request, queryset, view):
+        if request.query_params.get(self.ordering_param) == self.TRENDING:
+            return order_by_trending(queryset)
+        return super().filter_queryset(request, queryset, view)

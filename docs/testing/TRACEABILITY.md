@@ -269,6 +269,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-948** | Your own Profile mounts the shared view; IR-949 adds its own papers and collaborators — IR-694; no FR- id | [details](traceability/IR-948.md) | **PARTIAL** |
 | **IR-949** | Your own Profile reads its Research, Advised and Collaborators lists from IR-696; own-ID backend check returns 200; browser review at 375 and 1280 px remains | [details](traceability/IR-949.md) | **PARTIAL** |
 | **IR-326** | Streaming Ask IRIS endpoint — no FR- id; part C of IR-323's "event-shaped answer path", under ADR-028 (one deterministic retrieval call … | [details](traceability/IR-326.md) | **IMPLEMENTED** |
+| **IR-369** | A paper's views count each account once (owners never, published papers only); Trending is views gained in the last 30 days — no FR- id | [details](traceability/IR-369.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

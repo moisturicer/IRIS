@@ -48,6 +48,7 @@ INCLUDED: dict[str, str] = {
     "documents.UploadSlot": "papers_owned",
     "documents.RecordFile": "papers_owned",
     "documents.RecordUpload": "papers_owned",
+    "records.RecordView": "papers_viewed",
     "library.SavedRecord": "saved_papers",
     "library.SavedFeed": "saved_feeds",
     "library.ReadingNote": "reading_notes",

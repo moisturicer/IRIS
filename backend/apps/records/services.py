@@ -4,7 +4,7 @@ from datetime import date
 import pyexcel
 from django.contrib.postgres.search import SearchVector
 from core.enums import RecordTypeName
-from .models import Record, RecordOwner
+from .models import Record, RecordOwner, RecordView
 
 
 def update_search_vector(record: Record):
@@ -64,6 +64,9 @@ def soft_delete_record(record: Record, deleted_by, *, reason=None):
     record.deleted_at = timezone.now()
     record.deleted_by = deleted_by
     record.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+    # Who viewed the paper goes with it (IR-369). This is the final deletion:
+    # only a paper still awaiting its delete review can be restored.
+    RecordView.objects.filter(record=record).delete()
 
 
 def parse_excel_import(file) -> tuple[list[dict], list[str]]:

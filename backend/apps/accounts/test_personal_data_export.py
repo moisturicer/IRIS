@@ -297,6 +297,19 @@ class ExportContentTests(APITestCase):
         replies = self.export()["saved_replies"]
         self.assertEqual([(r["title"], r["body"]) for r in replies], [("Typo", "There's a typo here.")])
 
+    def test_papers_viewed_are_the_persons_own_with_when_first_opened(self):
+        from datetime import datetime, timezone as tz
+
+        from apps.records.models import RecordView
+
+        paper = _paper("Opened", self.stranger, status=PipelineStatus.PUBLISHED)
+        first = datetime(2026, 11, 1, 8, 0, tzinfo=tz.utc)
+        RecordView.objects.create(record=paper, user=self.me, viewed_at=first)
+        RecordView.objects.create(record=paper, user=self.stranger, viewed_at=first)
+        viewed = self.export()["papers_viewed"]
+        self.assertEqual([(v["record_id"], v["title"]) for v in viewed], [(paper.pk, "Opened")])
+        self.assertEqual(viewed[0]["first_viewed_at"], "2026-11-01T08:00:00Z")
+
     def test_viewed_marks_are_the_persons_own(self):
         from apps.records.models import RecordVersion, ReviewText
         from apps.reviews.models import ViewedMark
