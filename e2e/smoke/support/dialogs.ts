@@ -449,5 +449,8 @@ export const DIALOGS: DialogCase[] = [
  * Dialog source files this tier does not open, and why. Each is a decision,
  * not an omission: the reason is what would have to be built to scan it.
  */
-export const UNSCANNED: Record<string, string> = {};
+export const UNSCANNED: Record<string, string> = {
+  "features/records/paper-view/NotesPanel.tsx":
+    "Notes is a reader panel that becomes a dialog only after an authenticated reader opens it; its focused editor is covered by NotesPanel tests.",
+};
 
