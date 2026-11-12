@@ -177,6 +177,19 @@ def revision_request_withdrawn(request, actor, *, closed_by=BY_REQUESTING_PARTY)
     )
 
 
+def revision_draft_discarded(record, actor, *, discarded_revision):
+    """
+    An owner threw away the revised manuscript they had uploaded and not yet
+    submitted (IR-1047). `version` is the submitted version the record reads
+    again; `discarded_revision` names the file that was dropped, by its
+    manuscript revision, never by a file name or text.
+    """
+    _write(
+        AuditEvent.REVISION_DRAFT_DISCARDED, actor, record,
+        version=_version(record), discarded_revision=discarded_revision,
+    )
+
+
 def resubmitted(record, actor, *, version, policy, requests, rereview_parties,
                 reset_parties, preserved_parties):
     """

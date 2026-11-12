@@ -284,6 +284,11 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-new-version": Entry({
         "POST": _case(OWNER_ACTS, kwargs={"pk": Ref("revising")}, data={}),
     }),
+    # Owner only. On `revising` nothing is unsent, so the owner is authorized
+    # and told so (400), the way `new-version/` is (IR-1047).
+    "record-discard-revised-manuscript": Entry({
+        "POST": _case(OWNER_ACTS, kwargs={"pk": Ref("revising")}, data={}),
+    }),
     # The review discussion (IR-419, ADR-032 §7): read under `may_read_review`
     # (participants, and the pool of a party holding the record now), written by
     # participants alone, so ITSO's unseated pool reads and is refused. RDCO

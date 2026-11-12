@@ -116,6 +116,7 @@ rows whose `metadata.via` is `publish_unlisted`.
 |---|---|---|
 | `RESUBMISSION_REQUESTED` | A party asks the owners to revise the work | `party`, `request`, `reason`, `version` (the version it was made against) |
 | `REVISION_REQUEST_WITHDRAWN` | The request is withdrawn unanswered | `party`, `request`, `closed_by` (`requesting_party`, or `record_withdrawn` when the owner withdrew the record) |
+| `REVISION_DRAFT_DISCARDED` | An owner throws away the revised manuscript they uploaded and had not yet submitted (IR-1047) | `version` (the submitted version the record reads again), `discarded_revision` (the dropped file's manuscript revision) |
 | `RESUBMITTED` | The owner submits a new version answering every open request | `version`, `policy` (`clearance_aware` or `restart_all`, the active ADR-004 arm), `requests` (the request ids it answered), `rereview_parties` (the parties that review the new version: those that asked, and under `restart_all` the offices it reopens, IR-632), `reset_parties` (the offices whose clearance the policy reset), `preserved_parties` (the offices whose `cleared` clearance it kept) |
 | `CLEARANCE_PRESERVED` | One row per office in `preserved_parties`, right after its `RESUBMITTED` | `party`, `version`, `policy` |
 

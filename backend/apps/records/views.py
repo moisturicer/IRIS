@@ -1437,6 +1437,32 @@ class RecordViewSet(viewsets.ModelViewSet):
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
 
+    @action(detail=True, methods=["post"], url_path="discard-revised-manuscript")
+    def discard_revised_manuscript(self, request, pk=None):
+        """
+        POST /records/<id>/discard-revised-manuscript/  (no body)
+
+        An owner throws away the revised manuscript they uploaded for the
+        next version and have not submitted (IR-1047). The record's
+        manuscript is the latest version's again; reviewers never saw the
+        upload, so nobody is told. Answers with the record's detail. 404 for a
+        record the caller cannot see, 403 for a caller who does not own it, 400
+        when no revision is asked for or nothing is waiting to be discarded.
+        """
+        from apps.reviews import new_version
+
+        record = self.get_object()
+        try:
+            new_version.discard_revised_manuscript(record, request.user)
+        except new_version.NewVersionRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except new_version.NewVersionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        record = self.get_queryset().get(pk=record.pk)
+        return Response(
+            RecordDetailSerializer(record, context=self.get_serializer_context()).data,
+        )
+
     @action(detail=True, methods=["post"], url_path="continue-as")
     def continue_as(self, request, pk=None):
         """
