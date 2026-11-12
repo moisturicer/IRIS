@@ -760,6 +760,33 @@ describe("names that open a Profile (IR-700)", () => {
     expect(screen.queryByText(/Owners:/)).not.toBeInTheDocument();
   });
 
+  it("says why a chip is not a link, and adds nothing to one that is (IR-1025)", async () => {
+    shownRecord = {
+      ...record,
+      authors: [
+        { id: 1, name: "Ana Reyes", role: null },
+        { id: 2, name: "Jomar Ybanez", role: null },
+      ],
+      adviser: ASSIGNED_ADVISER_ID,
+      adviser_name: "Maria Santos",
+      adviser_has_profile: false,
+      owners: [
+        { id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true, has_profile: true },
+        { id: 2, user: 42, email: "j@x.edu", full_name: "Jomar Ybanez", is_primary: false, has_profile: false },
+      ],
+    };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    const hint = "No public profile available";
+    const authors = screen.getByRole("list", { name: "Authors" });
+    expect(within(authors).getAllByText(hint)).toHaveLength(1);
+    const linked = screen.getByRole("link", { name: "Ana Reyes, Author" });
+    expect(linked).toHaveAttribute("href", "/people/41");
+    expect(within(linked).queryByText(hint)).not.toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Adviser" })).getByText(hint)).toBeInTheDocument();
+  });
+
   it("does not expose owner metadata when an author has no Profile", async () => {
     shownRecord = {
       ...record,
