@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { useAuthStore } from "@/store/auth.store";
+import { useUIStore } from "@/store/ui.store";
 import { renderScreen, screen, waitFor } from "@/test/render";
 import type { User } from "@/types/auth";
 import type { RecordDetail } from "@/types/records";
@@ -45,6 +46,7 @@ function signInAs(id: number | null) {
 }
 
 beforeEach(() => {
+  useUIStore.setState({ toasts: [] });
   sessionStorage.clear();
   signInAs(1);
   requestRevision.mockReset().mockResolvedValue({ data: {} });
@@ -83,9 +85,15 @@ describe("RequestRevisionDialog", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Request Revision" }));
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("A revision request from IERC is already open.");
-    expect(alert).toHaveTextContent("Your reason is kept.");
+    // A toast (it floats and can be dismissed), never a line that grows the dialog.
+    await waitFor(() => expect(useUIStore.getState().toasts).toHaveLength(1));
+    const [toast] = useUIStore.getState().toasts;
+    expect(toast.type).toBe("error");
+    // Long enough that it may not be read in four seconds: stays until X.
+    expect(toast.persist).toBe(true);
+    expect(toast.message).toContain("A revision request from IERC is already open.");
+    expect(toast.message).toContain("Your reason is kept.");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(reasonBox()).toHaveValue("Sampling frame is unclear.");
     expect(onDone).not.toHaveBeenCalled();
   });

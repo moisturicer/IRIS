@@ -8,6 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { useUIStore } from "@/store/ui.store";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
 import type { NewVersionHint } from "@/types/records";
 
@@ -33,6 +34,7 @@ function open(hint: NewVersionHint = HINT, newManuscript = false) {
 }
 
 beforeEach(() => {
+  useUIStore.setState({ toasts: [] });
   submitNewVersion.mockReset().mockResolvedValue({ data: {} });
 });
 
@@ -82,7 +84,14 @@ describe("NewVersionDialog", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Submit v3" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Nothing has changed since IERC asked for a revision.");
+    // A toast, not a line inside the dialog.
+    await waitFor(() => expect(useUIStore.getState().toasts).toHaveLength(1));
+    expect(useUIStore.getState().toasts[0]).toMatchObject({
+      type: "error",
+      persist: true,
+      message: "Nothing has changed since IERC asked for a revision.",
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(onDone).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Submit new version" })).toBeInTheDocument();
   });

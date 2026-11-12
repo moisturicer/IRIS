@@ -1122,12 +1122,7 @@ export default function PaperViewPage() {
                     announcement lands when it fills; nowhere else, so the page
                     keeps one status region (Share's) otherwise. */}
                 {(record.revision.new_version != null || newVersionDone) && (
-                  <p
-                    role="status"
-                    aria-live="polite"
-                    className={newVersionDone ? "text-sm text-stone-700 flex items-center gap-2" : "sr-only"}
-                  >
-                    {newVersionDone && <i className="fas fa-check text-brand text-xs" aria-hidden />}
+                  <p role="status" aria-live="polite" className="sr-only">
                     {newVersionDone ?? ""}
                   </p>
                 )}
@@ -1140,6 +1135,7 @@ export default function PaperViewPage() {
                     onDone={(outcome) => {
                       setNewVersionOpen(false);
                       setNewVersionDone(outcome);
+                      addToast({ type: "success", message: outcome });
                       setTrackerVersion((n) => n + 1);
                       // A failed reload leaves the page as it was; the next visit catches up.
                       recordsApi.detail(record.id).then(({ data }) => setRecord(data)).catch(() => {});

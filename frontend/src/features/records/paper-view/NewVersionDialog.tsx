@@ -2,9 +2,9 @@ import { useId, useState } from "react";
 
 import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
-import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
 import { joinLabels } from "@/lib/utils";
+import { useUIStore } from "@/store/ui.store";
 import type { NewVersionHint, ResponseLetterEntry } from "@/types/records";
 
 import { LetterEntries } from "./threads/ResponseLetter";
@@ -47,20 +47,24 @@ export function newVersionSummary(hint: NewVersionHint): string {
  * stand, and holds *Submit* while the server says a *Must fix* has none.
  */
 export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDone }: NewVersionDialogProps) {
-  const [error, setError] = useState<string | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
   const [sending, setSending] = useState(false);
   const blockedId = useId();
   const letter = hint.letter ?? [];
 
   const submit = async () => {
     if (sending) return;
-    setError(null);
     setSending(true);
     try {
       await recordsApi.submitNewVersion(recordId);
       onDone(`v${hint.number} submitted. The reviewers who asked for changes have been notified.`);
     } catch (err) {
-      setError(errorDetail(err, "The new version could not be submitted. Please try again."));
+      // A toast, not a line in the dialog, so the confirmation keeps its size.
+      addToast({
+        type: "error",
+        persist: true,
+        message: errorDetail(err, "The new version could not be submitted. Please try again."),
+      });
     } finally {
       setSending(false);
     }
@@ -100,12 +104,6 @@ export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDon
         {letter.length > 0 && <LetterPreview entries={letter} />}
         {hint.blocked && (
           <p id={blockedId} className="text-[14px] text-brand leading-relaxed">{hint.blocked}</p>
-        )}
-        {error && (
-          <p role="alert" className={LOAD_ERROR}>
-            <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-            {error}
-          </p>
         )}
       </div>
     </Modal>
