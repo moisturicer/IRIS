@@ -146,7 +146,7 @@ _Avoid_: IP office.
 The Institutional Ethics Review Committee, responsible for ethics compliance review of research submissions.
 
 **KTTO**:
-The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions.
+The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions. Under proposed ADR-066 it owns a paper's [[IP application]]s, and commercialization moves to TBI (IR-977).
 
 **Specialist path**:
 A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
@@ -333,6 +333,26 @@ _Avoid_: Post request, pending post, submission (that is a Record's).
 **Saved Call**:
 A [[Call]] a reader has kept in their [[Library]]. A reader saves a Call at most once, and it stays saved after the Call is over, until the reader removes it or RDCO deletes the Call.
 _Avoid_: Bookmark, reminder.
+
+### IP and commercialization
+
+These terms come from ADR-066, proposed 2026-11-13 and not accepted. None is built yet.
+
+**IP application**:
+A request to protect one kind of intellectual property in a paper (Patent, Utility Model, Industrial Design, Trademark or Copyright), owned by KTTO and running beside the paper's publishing rather than inside its review. It moves forward through For Application, Reviewed, Filed, and then Approved or Disapproved by the IP office; KTTO can end it as Not filed, and the owners can withdraw it before filing. A Thesis/Research or Project can have several, at most one open per kind.
+_Avoid_: IP review (that is a [[Specialist office]]'s clearance in the paper's review), patent request, IP status.
+
+**Commercialization application**:
+A request for TBI to review a paper's commercial potential and record its recommendations, running beside the paper's publishing like an [[IP application]]. Designed in IR-979, once TBI is an office.
+_Avoid_: Commercialization flag (the paper's old Yes/No), KTTO review.
+
+**Inventor**:
+A person named on an [[IP application]] as having contributed to what it protects. Kept as a name, not an account. The list starts as the paper's byline and KTTO edits it, so it can differ from the paper's owners.
+_Avoid_: Author (a byline name on the paper), owner (an account that owns the paper), applicant.
+
+**Publishing gate**:
+The warning RDCO sees before publishing a paper whose [[IP application]] hasn't been filed yet, because making an invention public first can cost it its novelty. RDCO can publish anyway, with a reason that is recorded.
+_Avoid_: Publication block, IP hold (RDCO is warned, not stopped).
 
 ### Accounts
 
