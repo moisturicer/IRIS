@@ -670,6 +670,25 @@ describe("the new-version control follows revision requests", () => {
     expect(await screen.findByRole("dialog", { name: "Submit new version" })).toBeInTheDocument();
   });
 
+  it("lets the owner upload the revised manuscript from the card, and says when one is waiting (IR-1046)", async () => {
+    shownRecord = { ...asked(null), manuscript_unsubmitted: true };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const banner = await screen.findByRole("region", { name: "Revision requested" });
+    expect(within(banner).getByLabelText("Replace revised manuscript")).toBeInTheDocument();
+    expect(banner).toHaveTextContent("Revised manuscript ready, not yet submitted");
+  });
+
+  it("offers no manuscript upload in the card without the replace_manuscript capability (IR-1046)", async () => {
+    shownRecord = { ...asked(null), capabilities: ["cite", "create_version"] };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const banner = await screen.findByRole("region", { name: "Revision requested" });
+    expect(within(banner).queryByLabelText(/revised manuscript/i)).not.toBeInTheDocument();
+  });
+
   it("holds the new version, saying why, until something has changed (IR-273)", async () => {
     shownRecord = asked("Nothing has changed since IERC asked for a revision.");
     signInAs(OWNER_ID, "Student");

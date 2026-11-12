@@ -4,7 +4,16 @@ export interface Toast {
   id:      string;
   type:    "success" | "error" | "info";
   message: string;
+  /**
+   * Stay until the reader presses X, instead of leaving after a few seconds.
+   * For a message long enough that it may not be read in time (an error with
+   * the server's reason in it). Off unless a caller asks.
+   */
+  persist?: boolean;
 }
+
+/** How long a toast stays when it does not persist. */
+const TOAST_MS = 4000;
 
 const COLLAPSED_KEY = "iris_sidebar_collapsed";
 
@@ -78,7 +87,8 @@ export const useUIStore = create<UIState>((set) => ({
   addToast: (toast) => {
     const id = crypto.randomUUID();
     set((s) => ({ toasts: [...s.toasts, { id, ...toast }] }));
-    setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 4000);
+    if (toast.persist) return;
+    setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), TOAST_MS);
   },
 
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),

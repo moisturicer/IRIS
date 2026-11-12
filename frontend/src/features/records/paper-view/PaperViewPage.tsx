@@ -72,6 +72,7 @@ import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
+import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
 import { ReviewWorkspace } from "./ReviewWorkspace";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
@@ -1097,9 +1098,18 @@ export default function PaperViewPage() {
                     {can.has("create_version") && record.revision.new_version && (
                       <div className="mt-4 border-t border-brand-200 pt-3">
                         <p className="text-sm text-stone-700 leading-relaxed">
-                          Upload a revised manuscript or a requested document in Files, or edit the
-                          details, then submit. {newVersionSummary(record.revision.new_version)}
+                          Upload your revised manuscript here, add any requested document below, or edit
+                          the details, then submit. {newVersionSummary(record.revision.new_version)}
                         </p>
+                        {can.has("replace_manuscript") && (
+                          <div className="mt-3">
+                            <RevisionManuscriptUpload
+                              recordId={record.id}
+                              staged={record.manuscript_unsubmitted}
+                              onUploaded={handleDocumentRequestChanged}
+                            />
+                          </div>
+                        )}
                         {record.revision.new_version.blocked && (
                           <p id="new-version-blocked" className="text-sm text-brand mt-2">
                             {record.revision.new_version.blocked}
@@ -1122,12 +1132,7 @@ export default function PaperViewPage() {
                     announcement lands when it fills; nowhere else, so the page
                     keeps one status region (Share's) otherwise. */}
                 {(record.revision.new_version != null || newVersionDone) && (
-                  <p
-                    role="status"
-                    aria-live="polite"
-                    className={newVersionDone ? "text-sm text-stone-700 flex items-center gap-2" : "sr-only"}
-                  >
-                    {newVersionDone && <i className="fas fa-check text-brand text-xs" aria-hidden />}
+                  <p role="status" aria-live="polite" className="sr-only">
                     {newVersionDone ?? ""}
                   </p>
                 )}
@@ -1140,6 +1145,7 @@ export default function PaperViewPage() {
                     onDone={(outcome) => {
                       setNewVersionOpen(false);
                       setNewVersionDone(outcome);
+                      addToast({ type: "success", message: outcome });
                       setTrackerVersion((n) => n + 1);
                       // A failed reload leaves the page as it was; the next visit catches up.
                       recordsApi.detail(record.id).then(({ data }) => setRecord(data)).catch(() => {});

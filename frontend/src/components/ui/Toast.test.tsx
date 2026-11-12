@@ -3,7 +3,7 @@
  * white, black, grey and maroon, so a kind is carried by its glyph and by a
  * word a screen reader hears, never by the tone alone.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useUIStore } from "@/store/ui.store";
 import { renderScreen, screen, userEvent } from "@/test/render";
@@ -40,6 +40,30 @@ describe("ToastContainer", () => {
       expect(toast.className).toMatch(/\bbg-(overlay|brand|stone-900)\b/);
     },
   );
+
+  describe("how long a toast stays", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("leaves after a few seconds by default", () => {
+      useUIStore.getState().addToast({ type: "info", message: "Saved" });
+      expect(useUIStore.getState().toasts).toHaveLength(1);
+
+      vi.advanceTimersByTime(4000);
+
+      expect(useUIStore.getState().toasts).toEqual([]);
+    });
+
+    it("stays until dismissed when asked to persist", () => {
+      useUIStore.getState().addToast({ type: "error", message: "Not saved", persist: true });
+
+      vi.advanceTimersByTime(60_000);
+
+      expect(useUIStore.getState().toasts).toHaveLength(1);
+      useUIStore.getState().removeToast(useUIStore.getState().toasts[0].id);
+      expect(useUIStore.getState().toasts).toEqual([]);
+    });
+  });
 
   it("still dismisses", async () => {
     show("info", "Record saved");

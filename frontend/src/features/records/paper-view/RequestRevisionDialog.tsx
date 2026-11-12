@@ -1,10 +1,11 @@
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 
 import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
-import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
+import { LABEL, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
 import { useAuthStore } from "@/store/auth.store";
+import { useUIStore } from "@/store/ui.store";
 import type { RecordDetail } from "@/types/records";
 
 import { clearRevisionDraft, readRevisionDraft, writeRevisionDraft } from "./revisionDraft";
@@ -37,8 +38,9 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
   const version = record.versions?.length ? record.versions[record.versions.length - 1].number : null;
   const userId = useAuthStore(s => s.user?.id);
   const [reason, setReason] = useState(() => readRevisionDraft(userId, record.id));
-  const [error, setError] = useState<string | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
   const [sending, setSending] = useState(false);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
 
   const ready = reason.trim() !== "";
 
@@ -47,20 +49,32 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
     writeRevisionDraft(userId, record.id, value);
   };
 
+  /** Throw the unsent reason away, here and in the tab's session. */
+  const discard = () => {
+    setReason("");
+    clearRevisionDraft(userId, record.id);
+    addToast({ type: "info", message: "Draft discarded." });
+    reasonRef.current?.focus();
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!ready || sending) return;
-    setError(null);
     setSending(true);
     try {
       await recordsApi.requestRevision(record.id, { reason: reason.trim() });
       clearRevisionDraft(userId, record.id);
       onDone("Revision requested. The owner has been notified.");
     } catch (err) {
-      setError(
-        `${errorDetail(err, "Your request could not be sent. Please try again.")} ` +
+      // A toast, not a line in the dialog: the form keeps its size, and the
+      // reason stays in the box.
+      addToast({
+        type: "error",
+        persist: true,
+        message:
+          `${errorDetail(err, "Your request could not be sent. Please try again.")} ` +
           "Your reason is kept.",
-      );
+      });
     } finally {
       setSending(false);
     }
@@ -77,13 +91,23 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
       title="Request Revision"
       sheet
       footer={
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>
-            Cancel
-          </Button>
-          <Button type="submit" form={formId} disabled={!ready} loading={sending}>
-            Request Revision
-          </Button>
+        <div className="flex items-center justify-between gap-2">
+          {reason !== "" ? (
+            <Button type="button" variant="ghost" onClick={discard} disabled={sending}>
+              <i className="fas fa-trash-can text-label" aria-hidden />
+              Discard draft
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>
+              Cancel
+            </Button>
+            <Button type="submit" form={formId} disabled={!ready} loading={sending}>
+              Request Revision
+            </Button>
+          </div>
         </div>
       }
     >
@@ -99,6 +123,7 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
             What needs revising?
           </label>
           <textarea
+            ref={reasonRef}
             id={reasonId}
             required
             rows={5}
@@ -112,13 +137,6 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
             {version != null ? `, against v${version}, the version you reviewed` : ""}.
           </p>
         </div>
-
-        {error && (
-          <p role="alert" className={LOAD_ERROR}>
-            <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-            {error}
-          </p>
-        )}
       </form>
     </Modal>
   );

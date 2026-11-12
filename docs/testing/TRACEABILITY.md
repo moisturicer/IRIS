@@ -79,6 +79,9 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-416** | Record versions: v1 at submission, the next at each resubmission, a review made against one, and the version picker — ADR-032 §14's T2; … | [details](traceability/IR-416.md) | **IMPLEMENTED** |
 | **IR-419** | Review comments: a private, versioned discussion in the review timeline — ADR-032 §14's "review timeline and `ReviewComment`", renamed T5 … | [details](traceability/IR-419.md) | **IMPLEMENTED** |
 | **IR-273** | The owner answers the open revision requests with a new version; only the requesting parties' clearances and seats reset — ADR-003's … | [details](traceability/IR-273.md) | **IMPLEMENTED** |
+| **IR-1044** | Revision workflow errors and confirmations appear as dismissible toasts, so a card or dialog never grows because of a message — follows IR-272 and IR-273; no FR- id | [details](traceability/IR-1044.md) | **PARTIAL** |
+| **IR-1045** | A reviewer can discard an unsent Request Revision draft — follows IR-272, IR-143 and IR-931; no FR- id | [details](traceability/IR-1045.md) | **PARTIAL** |
+| **IR-1046** | An owner sends the revised manuscript from the Revision requested card, as they send a requested document from its row — follows IR-273; no FR- id | [details](traceability/IR-1046.md) | **PARTIAL** |
 | **IR-632** | Under `RESTART_ALL` every reset office that had completed reviews the new version again, with the same reviewer — ADR-004's control arm … | [details](traceability/IR-632.md) | **IMPLEMENTED** |
 | **IR-268** | My Reviews: a reviewer's own seats plus their office's pool, as To review · In review · Done — touches FR-M5-01 (stable label only) | [details](traceability/IR-268.md) | **IMPLEMENTED** |
 | **IR-478** | RDCO grants and removes office coordinators on the Users page; demo coordinators — ADR-032 §4, after IR-415; touches FR-M5-01 (stable label … | [details](traceability/IR-478.md) | **IMPLEMENTED** |
