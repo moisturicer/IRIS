@@ -50,6 +50,7 @@ INCLUDED: dict[str, str] = {
     "documents.RecordUpload": "papers_owned",
     "library.SavedRecord": "saved_papers",
     "library.SavedFeed": "saved_feeds",
+    "library.ReadingNote": "reading_notes",
     "reviews.SavedReply": "saved_replies",
     "reviews.ViewedMark": "viewed_marks",
     "reviews.ReviewMention": "review_mentions",

@@ -58,7 +58,9 @@ import {
   PAPER_WORKSPACE_PANEL_CLASS,
   fitPanelWidth,
 } from "./PaperChatDock";
-import { AskIrisFab } from "./AskIrisFab";
+import { AskIrisFab, NotesFab } from "./AskIrisFab";
+import { NotesPanel } from "./NotesPanel";
+import { useReadingNote } from "./useReadingNote";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { EmbargoCard } from "./EmbargoCard";
@@ -235,6 +237,22 @@ export default function PaperViewPage() {
   const tabsId = useId();
 
   const chat = usePaperChat();
+  // The reader's private note (IR-580): held here so closing Notes keeps the
+  // draft, and read only once Notes is first opened.
+  const [notesWanted, setNotesWanted] = useState(false);
+  const note = useReadingNote(Number(id), notesWanted);
+  // Focus follows a swap of Ask IRIS and Notes into the new panel, in every
+  // layout: the control that was clicked is gone with the old panel.
+  const focusPanel = useRef(false);
+  const openNotes = () => {
+    setNotesWanted(true);
+    focusPanel.current = true;
+    chat.openNotes();
+  };
+  const openAskFromNotes = () => {
+    focusPanel.current = true;
+    chat.setOpen(true);
+  };
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
   /**
@@ -334,6 +352,7 @@ export default function PaperViewPage() {
   const addToast = useUIStore((s) => s.addToast);
   const panelRef = useRef<HTMLElement>(null);
   const askButtonRef = useRef<HTMLButtonElement>(null);
+  const notesButtonRef = useRef<HTMLButtonElement>(null);
   const refocusAsk = useRef(false);
 
   // Before the early returns below, so the hooks that follow can use them.
@@ -357,7 +376,8 @@ export default function PaperViewPage() {
   const onPaperTab = record != null && section === "paper";
   const onReviewTab = section === "review";
   // Never beside the paper, where there is no sheet to tuck away.
-  const chatMinimized = chat.minimized && chat.open && !onReviewTab && tier !== "wide";
+  // Only Ask IRIS tucks away to a bar; Notes has nothing to answer back to.
+  const chatMinimized = chat.minimized && chat.open && chat.tool === "ask" && !onReviewTab && tier !== "wide";
   // Ask IRIS over the paper, or instead of the page: the rest waits (IR-569).
   const chatModal =
     chat.open &&
@@ -408,12 +428,15 @@ export default function PaperViewPage() {
   }, [onPaperTab, enterReadingRail, leaveReadingRail]);
 
   const closeChat = () => {
-    if (chatModal) refocusAsk.current = true;
+    // Notes returns focus to its icon in every layout; Ask IRIS only where it was a dialog.
+    if (chatModal || chat.tool === "notes") refocusAsk.current = true;
     chat.setOpen(false);
   };
   const backToPaper = () => {
     refocusAsk.current = true;
-    chat.setMinimized(true);
+    // Notes has no minimized bar: back to the paper is closing it.
+    if (chat.tool === "notes") chat.setOpen(false);
+    else chat.setMinimized(true);
   };
 
   // Over the paper, focus moves in and stays in, and Escape leaves; on
@@ -443,20 +466,30 @@ export default function PaperViewPage() {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("focusin", onFocusIn);
     };
+    // `chat.tool`: swapping Ask IRIS for Notes replaces the panel, so focus follows it in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatModal, tier, onPaperTab]);
+  }, [chatModal, tier, onPaperTab, chat.tool]);
   useEffect(() => {
+    if (focusPanel.current && chat.open && panelRef.current) {
+      focusPanel.current = false;
+      panelRef.current.focus();
+    }
     if (!refocusAsk.current || chatModal) return;
     refocusAsk.current = false;
     const bar = panelRef.current?.querySelector<HTMLElement>('button[aria-label="Ask IRIS: back to the answer"]');
-    (bar ?? askButtonRef.current)?.focus();
+    (bar ?? (chat.tool === "notes" ? notesButtonRef.current : askButtonRef.current))?.focus();
   });
 
   useEffect(() => {
     if (openAtPage == null) return;
     // A citation followed while the chat covers the paper would land its
     // passage under it, so it tucks away to a bar (IR-354).
-    if (chat.open && tier !== "wide") chat.setMinimized(true);
+    if (chat.open && tier !== "wide") {
+      // Notes would cover the passage just as the chat would, and has no bar
+      // to tuck into: it closes, and the Notes icon brings it back.
+      if (chat.tool === "notes") chat.setOpen(false);
+      else chat.setMinimized(true);
+    }
     // The arrival key is unique per navigation, including a second click on
     // the very citation already open -- without it in the dependency list,
     // clicking the same marker twice would not re-fire this effect. The
@@ -1274,7 +1307,7 @@ export default function PaperViewPage() {
           className="hidden reading-split:block reading-wide:hidden absolute inset-0 z-30 bg-stone-900/25"
         />
       )}
-      {chat.open && (
+      {chat.open && chat.tool === "ask" && (
         <PaperChatPanel
           record={record}
           // Whether a citation inside the chat brought the reader here, which
@@ -1306,13 +1339,35 @@ export default function PaperViewPage() {
           onRestore={() => chat.setMinimized(false)}
           viewingVersion={viewedVersion?.number ?? null}
           returnTo={chatReturn}
+          onOpenNotes={onReviewTab ? undefined : openNotes}
+          className={chatPanelClass}
+        />
+      )}
+      {chat.open && chat.tool === "notes" && (
+        <NotesPanel
+          record={record}
+          note={note}
+          onClose={closeChat}
+          onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
+          onOpenAsk={openAskFromNotes}
+          panelRef={panelRef}
+          modal={chatModal}
+          resize={
+            panelWidth
+              ? { width: panelWidth, max: Math.max(PANEL_WIDTH_MIN, panelRoom), onChange: chat.setWidth }
+              : undefined
+          }
+          style={panelWidth ? { width: panelWidth } : undefined}
           className={chatPanelClass}
         />
       )}
       {/* Closed: one round icon at the bottom right (IR-569). On the bar
           while minimized, which is its way back. */}
       {!chat.open && !onReviewTab && (
-        <AskIrisFab onOpen={() => chat.setOpen(true)} buttonRef={askButtonRef} />
+        <>
+          <NotesFab onOpen={openNotes} buttonRef={notesButtonRef} />
+          <AskIrisFab onOpen={() => chat.setOpen(true)} buttonRef={askButtonRef} />
+        </>
       )}
       </div>
     </div>

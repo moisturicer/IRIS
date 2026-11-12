@@ -24,7 +24,7 @@ from apps.accounts.models import (
 from apps.accounts.test_system_admin import make
 from apps.ai.models import Conversation
 from apps.audit.models import AuditEvent
-from apps.library.models import SavedRecord
+from apps.library.models import ReadingNote, SavedRecord
 from apps.notifications.models import Notification, NotificationType
 from apps.records.models import DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews.models import RecordAssignment, Review, ReviewerSeat
@@ -309,6 +309,7 @@ class ConfirmTests(DeletionBase):
         self.person.save(update_fields=["bio", "photo"])
         profile.set_interests(self.person, ["Only this person uses it"])
         SavedFeed.objects.create(owner=self.person, name="Water", query={"q": "water"})
+        ReadingNote.objects.create(owner=self.person, record=self.published, body="Private thoughts.")
 
         response, _send = self.confirm(self.sysadmin, self.made.pk)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
@@ -319,6 +320,7 @@ class ConfirmTests(DeletionBase):
         self.assertFalse(self.person.interest_links.exists())
         self.assertFalse(ResearchInterest.objects.filter(name="Only this person uses it").exists())
         self.assertFalse(SavedFeed.objects.filter(owner=self.person).exists())
+        self.assertFalse(ReadingNote.objects.filter(owner=self.person).exists())
 
     def test_the_row_and_the_history_that_points_at_it_survive(self):
         self.confirm(self.sysadmin, self.made.pk)

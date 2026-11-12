@@ -269,6 +269,26 @@ class ExportContentTests(APITestCase):
         feeds = self.export()["saved_feeds"]
         self.assertEqual([(f["name"], f["query"]) for f in feeds], [("Water", {"q": "water"})])
 
+    def test_reading_notes_are_the_persons_own_and_keep_their_text_without_the_title(self):
+        from apps.library.models import ReadingNote
+
+        published = _paper("Public work", self.stranger, status=PipelineStatus.PUBLISHED)
+        hidden = _paper("Someone's draft", self.stranger)
+        ReadingNote.objects.create(owner=self.me, record=published, body="Worth a second read.")
+        ReadingNote.objects.create(owner=self.me, record=hidden, body="Kept after access went.")
+        ReadingNote.objects.create(owner=self.stranger, record=published, body="Not mine.")
+
+        notes = {n["record_id"]: n for n in self.export()["reading_notes"]}
+
+        self.assertEqual(set(notes), {published.pk, hidden.pk})
+        self.assertEqual(notes[published.pk]["title"], "Public work")
+        self.assertEqual(notes[published.pk]["body"], "Worth a second read.")
+        self.assertEqual(notes[hidden.pk]["body"], "Kept after access went.")
+        self.assertIsNone(notes[hidden.pk]["title"])
+        text = _text(self.client.get(URL))
+        self.assertNotIn("Someone's draft", text)
+        self.assertNotIn("Not mine.", text)
+
     def test_saved_replies_are_the_persons_own(self):
         from apps.reviews.models import SavedReply
 

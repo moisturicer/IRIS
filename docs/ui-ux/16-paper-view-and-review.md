@@ -11,6 +11,8 @@ The decisions behind this are [ADR-032](../adr/032-adviser-first-review-and-offi
 - A Discoverable Proposal is listed only while in review.
 - Proposal cards carry no similarity count.
 
+**Amended 2026-11-12 (IR-580, private Notes):** the panel has a second occupant. **Notes** is a smaller round icon just above Ask IRIS (in every section but Review), and opens in Ask IRIS's place: one tool at a time, the same column, drawer or whole view, the same width, focus and Escape rules. Each panel has a small icon in its header to swap to the other (Ask IRIS keeps its conversation and unsent question). Notes is one focused editor, never a grid of cards: a private notice ("only you can read your notes"), an empty-state prompt, and a status line that says Saving, Saved or Could not save (with Try again). A note changed on another device shows both texts and three choices (Keep both, Keep this device’s text, Use the saved note); nothing is saved until the reader chooses. Entering Paper still opens Ask IRIS. See [ADR-064](../adr/064-private-reading-notes.md).
+
 **Amended 2026-10-14 (IR-569, Paper mode):**
 
 - **One record bar** replaces the floating section switch and the floating *Ask about this paper* button (supersedes IR-527): Back and the sections, as a recessed track whose maroon thumb slides to the chosen one; in Paper also the title in one line (full title in the heading and its tooltip) and the manuscript version. Overview keeps its editorial header; Paper drops it.

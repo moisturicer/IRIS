@@ -724,6 +724,15 @@ LIBRARY = {
         "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),
         "DELETE": _case(SIGNED_IN, kwargs={"record_id": Ref("record")}),
     }),
+    # IR-580, ADR-064 §2-§3: a note is the caller's own, so it never differs by
+    # role -- staff, the Record's owner and an administrator all read their own,
+    # empty one. What the matrix pins is the Record gate: every call, DELETE
+    # included, is a 404 for a caller who cannot read the Record.
+    "library-note": Entry({
+        "GET": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
+        "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={"body": "A note", "base_revision": 0}),
+        "DELETE": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
+    }),
     # IR-577: a saved feed is the caller's own, so listing and saving are
     # anyone's, and another account's feed is the same 404 as a missing one.
     "library-feeds": Entry({

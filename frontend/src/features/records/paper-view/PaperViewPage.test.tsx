@@ -44,6 +44,7 @@ import type { User } from "@/types/auth";
 import type { PaperDetails, PaperPerson, Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
+import { libraryApi } from "@/api/library";
 import { RequestTimeoutError } from "@/api/requestPolicy";
 import { documentsApi } from "@/api/documents";
 import * as utils from "@/lib/utils";
@@ -242,6 +243,9 @@ vi.mock("@/api/library", () => ({
     saves: vi.fn(() => Promise.resolve({ data: { results: [] } })),
     save: vi.fn(),
     unsave: vi.fn(),
+    // Private notes (IR-580): read only once Notes is first opened.
+    note: vi.fn(() => Promise.resolve({ data: { body: "", revision: 0, updated_at: null } })),
+    saveNote: vi.fn(),
   },
 }));
 
@@ -2969,5 +2973,140 @@ describe("RDCO's controls on a paper in review (IR-798)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Withdraw paper" }));
     expect(screen.getByRole("dialog", { name: "Withdraw this paper?" })).toBeInTheDocument();
     await expectNoBlockingA11yViolations(document.body);
+  });
+});
+
+// Private notes share Ask IRIS's one panel slot (IR-580, ADR-064): one tool
+// open at a time, an icon for each beside the other when closed, and the note
+// is read only once Notes is first opened.
+describe("Notes in the reading workspace (IR-580)", () => {
+  const ASK = { name: "Ask IRIS" };
+  const NOTES = { name: "Notes" };
+
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+    useUIStore.setState({ sidebarCollapsed: false, sidebarOpen: false, readingRail: null });
+    vi.mocked(libraryApi.note).mockClear();
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(PANEL_WIDTH_KEY);
+    vi.unstubAllGlobals();
+  });
+
+  it("offers Notes beside the Ask IRIS icon, and reads no note until it is opened", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(screen.getByRole("button", ASK)).toBeInTheDocument();
+    expect(screen.getByRole("button", NOTES)).toBeInTheDocument();
+    expect(libraryApi.note).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", NOTES));
+
+    expect(await screen.findByRole("complementary", NOTES)).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", ASK)).not.toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: "Your note on this paper" })).toBeInTheDocument();
+    expect(libraryApi.note).toHaveBeenCalledWith(RECORD_ID);
+  });
+
+  it("is the panel's only occupant: Notes and Ask IRIS swap, and the question draft is kept", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", ASK));
+    await userEvent.type(await screen.findByRole("textbox", { name: "Ask about this paper" }), "What was measured?");
+
+    await userEvent.click(screen.getByRole("button", NOTES));
+    expect(await screen.findByRole("complementary", NOTES)).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", ASK)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", ASK));
+    expect(await screen.findByRole("textbox", { name: "Ask about this paper" })).toHaveValue("What was measured?");
+    expect(screen.queryByRole("complementary", NOTES)).not.toBeInTheDocument();
+  });
+
+  it("closing Notes shows both icons again, and the note is not read a second time", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", NOTES));
+    await screen.findByRole("textbox", { name: "Your note on this paper" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Close Notes" }));
+    expect(screen.queryByRole("complementary", NOTES)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", NOTES));
+
+    expect(await screen.findByRole("textbox", { name: "Your note on this paper" })).toBeInTheDocument();
+    expect(libraryApi.note).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens Ask IRIS, not Notes, when the reader enters the Paper section", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", NOTES));
+    await screen.findByRole("complementary", NOTES);
+
+    await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
+
+    expect(await screen.findByRole("heading", { name: "Ask IRIS" })).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", NOTES)).not.toBeInTheDocument();
+  });
+
+  it("over the paper it is a dialog: Escape closes it and focus returns to the Notes icon", async () => {
+    workspaceAt(924);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
+    await screen.findByRole("heading", { name: "Ask IRIS" });
+
+    await userEvent.click(screen.getByRole("button", NOTES));
+    const dialog = await screen.findByRole("dialog", NOTES);
+    await waitFor(() => expect(dialog).toHaveFocus());
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", NOTES)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", NOTES)).toHaveFocus());
+  });
+
+  it("beside the page, focus moves into Notes on opening and back to its icon on closing", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await userEvent.click(screen.getByRole("button", NOTES));
+    const panel = await screen.findByRole("complementary", NOTES);
+    await waitFor(() => expect(panel).toHaveFocus());
+
+    await userEvent.click(screen.getByRole("button", { name: "Close Notes" }));
+
+    await waitFor(() => expect(screen.getByRole("button", NOTES)).toHaveFocus());
+  });
+
+  it("swapping to Ask IRIS and back moves focus into each panel", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", NOTES));
+    await screen.findByRole("complementary", NOTES);
+
+    await userEvent.click(screen.getByRole("button", ASK));
+
+    const ask = await screen.findByRole("complementary", ASK);
+    await waitFor(() => expect(ask).toHaveFocus());
+  });
+
+  it("has no serious or critical accessibility violations with Notes open", async () => {
+    workspaceAt(1400);
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+    await userEvent.click(screen.getByRole("button", NOTES));
+    await screen.findByRole("textbox", { name: "Your note on this paper" });
+
+    await expectNoBlockingA11yViolations(container);
   });
 });
