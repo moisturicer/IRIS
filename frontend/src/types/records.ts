@@ -18,6 +18,11 @@ export interface RecordOwner {
   full_name:  string;
   is_primary: boolean;
   /**
+   * A deleted account kept on the paper as "Former ..." (ADR-051 decision 28).
+   * It can't be the Contact person, so the choice leaves it out (IR-803).
+   */
+  account_closed?: boolean;
+  /**
    * Draft IR-696: true only when this person's Profile can be opened from a
    * published paper's page. Absent or false means the name is plain text: a
    * suspended or former user's Profile answers 404, and a link there would land
@@ -273,6 +278,8 @@ export type Capability =
   | "replace_adviser"
   | "add_owner"
   | "withdraw_paper"
+  /** Any owner names another owner the Contact person (ADR-051 decision 27, IR-803). */
+  | "change_contact_person"
   | "set_visibility"
   | "tag_ip"
   | "attach_file"

@@ -190,6 +190,20 @@ class TestRefusals:
         assert response.data["owner"] == [ACCOUNT_CLOSED]
         assert contacts(record) == [ana.pk]
 
+    def test_the_paper_says_which_owners_account_is_closed(self, ana, ben, carla):
+        """So Paper View offers only owners who can take it (IR-803)."""
+        record = make_paper([ana, ben, carla])
+        ben.is_active = False
+        ben.save(update_fields=["is_active"])
+        client = APIClient()
+        client.force_authenticate(ana)
+
+        response = client.get(reverse("record-detail", args=[record.pk]))
+
+        assert response.status_code == status.HTTP_200_OK
+        closed = {row["user"]: row["account_closed"] for row in response.data["owners"]}
+        assert closed == {ana.pk: False, ben.pk: True, carla.pk: False}
+
 
 class TestSetPrimaryOwnerNeverAddsAStranger:
     def test_a_stranger_raises_and_nothing_changes(self, ana, ben, carla):

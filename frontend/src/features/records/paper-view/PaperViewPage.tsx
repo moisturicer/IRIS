@@ -63,6 +63,7 @@ import { NotesPanel } from "./NotesPanel";
 import { useReadingNote } from "./useReadingNote";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
+import { ContactPersonCard } from "./ContactPersonCard";
 import { EmbargoCard } from "./EmbargoCard";
 import { UnlistedCard } from "./UnlistedCard";
 import { RdcoPaperControls } from "./RdcoPaperControls";
@@ -1269,6 +1270,7 @@ export default function PaperViewPage() {
                 </h2>
                 {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
                 <PaperGovernance record={record} />
+                <ContactPersonCard record={record} onChanged={reloadRecord} />
                 <EmbargoCard record={record} onChanged={reloadRecord} />
                 <UnlistedCard record={record} onChanged={reloadRecord} />
                 <RdcoPaperControls

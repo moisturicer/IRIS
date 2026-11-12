@@ -20,10 +20,17 @@ class AuthorSerializer(serializers.ModelSerializer):
 class RecordOwnerSerializer(serializers.ModelSerializer):
     email      = serializers.CharField(source="user.email", read_only=True)
     full_name  = serializers.CharField(source="user.get_full_name", read_only=True)
+    # A deleted account keeps its ownership row as "Former ..." (ADR-051
+    # decision 28) and can't be the Contact person, so Paper View leaves it out
+    # of the choice (IR-803). Deletion is the only thing that clears is_active.
+    account_closed = serializers.SerializerMethodField()
 
     class Meta:
         model  = RecordOwner
-        fields = ["id", "user", "email", "full_name", "is_primary"]
+        fields = ["id", "user", "email", "full_name", "is_primary", "account_closed"]
+
+    def get_account_closed(self, obj) -> bool:
+        return not obj.user.is_active
 
 
 def ai_hook(record):
