@@ -285,6 +285,17 @@ def saved_papers(user) -> list[dict]:
     ]
 
 
+def papers_viewed(user) -> list[dict]:
+    """The published papers the person has opened, each counted once as a View
+    (IR-369), and when they first opened it. The title is given only while they
+    may still read the paper."""
+    from apps.records.models import RecordView
+
+    rows = list(RecordView.objects.filter(user=user).order_by("id"))
+    titles = _readable_titles(user, [row.record_id for row in rows])
+    return [{**_paper(row.record_id, titles), "first_viewed_at": row.viewed_at} for row in rows]
+
+
 def reading_notes(user) -> list[dict]:
     """
     The person's own private notes (IR-580, ADR-064 §8): the text they typed and
@@ -674,6 +685,7 @@ SECTIONS: dict[str, Callable] = {
     "sessions": sessions,
     "papers_owned": papers_owned,
     "saved_papers": saved_papers,
+    "papers_viewed": papers_viewed,
     "saved_feeds": saved_feeds,
     "reading_notes": reading_notes,
     "saved_replies": saved_replies,
