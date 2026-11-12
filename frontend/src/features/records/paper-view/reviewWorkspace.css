@@ -30,8 +30,9 @@
   .review-workspace:not(.review-without-paper) > .review-pane { position: absolute; inset: 0 0 0 auto; width: min(440px, 100%); z-index: 20; visibility: hidden; transform: translateX(100%); background: theme('colors.stone.50'); }
   .review-workspace:not(.review-without-paper) > .review-pane-open { visibility: visible; transform: none; }
   .review-resize-edge { display: none; }
-  .review-paper-foot { display: flex; justify-content: flex-end; gap: 8px; position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 16px; border-top: 1px solid theme('colors.stone.300'); background: theme('colors.stone.100'); }
+  .review-paper-foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 16px; border-top: 1px solid theme('colors.stone.300'); background: theme('colors.stone.100'); }
   .review-paper { padding-bottom: 60px; }
+  .review-paper-offered { padding-bottom: 160px; }
 }
 .review-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
 .review-kv dt { color: theme('colors.stone.600'); }

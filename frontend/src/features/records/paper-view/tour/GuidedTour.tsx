@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
 
@@ -9,8 +10,6 @@ import type { TourStep } from "./tourSteps";
 
 const MARGIN = 12;
 const CARD_WIDTH = 320;
-const BUTTON = "inline-flex items-center justify-center min-h-11 px-4 rounded-full text-small font-semibold " +
-  "disabled:opacity-60 disabled:cursor-not-allowed";
 
 interface Box { top: number; left: number; width: number; height: number }
 
@@ -62,12 +61,17 @@ export interface GuidedTourProps {
 export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
   const panel = useRef<HTMLDivElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
-  const [index, setIndex] = useState(0);
+  // The step is remembered by id, not position: opening the pane or resizing
+  // changes which steps are reachable, and a position would then skip or repeat one.
+  const [cursor, setCursor] = useState<string | null>(null);
   const [box, setBox] = useState<Box | null>(null);
   const [card, setCard] = useState({ width: CARD_WIDTH, height: 200 });
   // Read from the page on purpose: reachability is a fact about the DOM now.
   const usable = steps.filter((s) => reachable(s.target));
-  const at = Math.min(index, usable.length - 1);
+  const found = usable.findIndex((s) => s.id === cursor);
+  // A step that vanished (the launcher, once the pane is open) restarts the walk.
+  const at = Math.max(found, 0);
+  const goTo = (n: number) => setCursor(usable[n].id);
   const step = usable[at];
   const last = at === usable.length - 1;
 
@@ -87,8 +91,9 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
 
   const targetId = step?.target;
   useLayoutEffect(() => {
+    const find = () => (targetId ? reachable(targetId) : null);
     const measure = () => {
-      const el = targetId ? reachable(targetId) : null;
+      const el = find();
       if (el) {
         const r = el.getBoundingClientRect();
         setBox({ top: r.top, left: r.left, width: r.width, height: r.height });
@@ -97,7 +102,7 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
       }
       if (panel.current) setCard({ width: panel.current.offsetWidth, height: panel.current.offsetHeight });
     };
-    const el = targetId ? reachable(targetId) : null;
+    const el = find();
     if (typeof el?.scrollIntoView === "function") el.scrollIntoView({ block: "nearest", inline: "nearest" });
     measure();
     window.addEventListener("resize", measure);
@@ -135,16 +140,16 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={onClose}
-            className={cn(BUTTON, FOCUS_RING, "px-2 text-stone-700 hover:text-stone-900 underline underline-offset-2")}>
+            className={cn(PILL_SECONDARY, FOCUS_RING, "px-2 ring-0 bg-transparent underline underline-offset-2")}>
             Skip tour
           </button>
           <span className="flex-1" />
-          <button type="button" disabled={at === 0} onClick={() => setIndex(at - 1)}
-            className={cn(BUTTON, FOCUS_RING, "ring-1 ring-stone-300 text-stone-700 hover:bg-stone-100")}>
+          <button type="button" disabled={at === 0} onClick={() => goTo(at - 1)}
+            className={cn(PILL_SECONDARY, FOCUS_RING)}>
             Previous
           </button>
-          <button ref={primary} type="button" onClick={() => (last ? onClose() : setIndex(at + 1))}
-            className={cn(BUTTON, FOCUS_RING, "bg-brand text-white hover:bg-brand-light")}>
+          <button ref={primary} type="button" onClick={() => (last ? onClose() : goTo(at + 1))}
+            className={cn(PILL_PRIMARY, FOCUS_RING)}>
             {last ? "Done" : "Next"}
           </button>
         </div>

@@ -164,6 +164,27 @@ describe("walking through the tour (IR-997)", () => {
     expect(stepTitle()).toBe("The review pane");
   });
 
+  it("offers the tour on a narrow workspace too, where the pane is closed", async () => {
+    widthOf(700);
+    const user = userEvent.setup();
+    openWorkspace();
+    await user.click(screen.getByRole("button", { name: "Start tour" }));
+    expect(progress()).toBe("Step 1 of 2");
+  });
+
+  it("starts the walk again when opening the pane changes which steps there are", async () => {
+    widthOf(700);
+    const user = userEvent.setup();
+    openWorkspace();
+    await user.click(screen.getByRole("button", { name: "Take a tour" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(stepTitle()).toBe("The review pane");
+
+    await user.click(screen.getByRole("button", { name: "Open review pane" }));
+    expect(progress()).toBe("Step 1 of 3");
+    expect(stepTitle()).toBe("Review pane sections");
+  });
+
   it("points a folded workspace at the Details tab", async () => {
     widthOf(1000);
     const user = userEvent.setup();

@@ -9,6 +9,19 @@
  */
 export type TourTab = "conversation" | "threads" | "changes" | "details";
 
+/**
+ * The DOM ids the tour points at. The layout puts these on its landmarks and
+ * the steps read them from here, so renaming one cannot silently hide a step.
+ */
+export const tourTargets = (ids: string) => ({
+  paper: `${ids}-paper`,
+  launcher: `${ids}-launcher`,
+  tabs: `${ids}-tabs`,
+  foot: `${ids}-foot`,
+  side: `${ids}-side`,
+  detailsTab: `${ids}-tab-details`,
+});
+
 export interface TourStep {
   id: string;
   /** The DOM id of the control or area this step highlights. */
@@ -41,37 +54,38 @@ export interface TourContext {
 
 export function reviewTourSteps({ ids, hasPaper, drawer, paneOpen, folded, tabs }: TourContext): TourStep[] {
   const paneShown = !drawer || paneOpen;
+  const at = tourTargets(ids);
   const steps: TourStep[] = [];
 
   if (hasPaper) {
     steps.push({
-      id: "paper", target: `${ids}-paper`, title: "The paper",
+      id: "paper", target: at.paper, title: "The paper",
       body: "The paper you are reviewing. A pin on the page marks where a thread is anchored.",
     });
   }
   if (!paneShown) {
     steps.push({
-      id: "launcher", target: `${ids}-launcher`, title: "The review pane",
+      id: "launcher", target: at.launcher, title: "The review pane",
       body: "On a narrow screen the review pane sits behind this button. It holds the tabs, your review status and the actions open to you.",
     });
   }
   if (paneShown) {
     steps.push({
-      id: "tabs", target: `${ids}-tabs`, title: "Review pane sections",
+      id: "tabs", target: at.tabs, title: "Review pane sections",
       body: "Switch between the pane's sections:",
       items: tabs.map((t) => TAB_ABOUT[t]),
     });
     steps.push({
-      id: "foot", target: `${ids}-foot`, title: "Your review",
+      id: "foot", target: at.foot, title: "Your review",
       body: "Your own review status, and the actions open to you right now, such as opening or finishing your review. Which ones show depends on your role and the review's state.",
     });
     steps.push(folded
       ? {
-        id: "details", target: `${ids}-tab-details`, title: "Details tab",
+        id: "details", target: at.detailsTab, title: "Details tab",
         body: "The people on this review and the record's details, folded into this tab because the window is narrow.",
       }
       : {
-        id: "details", target: `${ids}-side`, title: "People & details",
+        id: "details", target: at.side, title: "People & details",
         body: "Who is on this review and the record's details. Requesting review from another office or adding a colleague is here, when your role allows it.",
       });
   }
