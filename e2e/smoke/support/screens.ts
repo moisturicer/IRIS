@@ -322,7 +322,7 @@ export const SCREENS: Screen[] = [
     id: "office-console", path: "/review/office", route: "/review/office", role: "RDCO",
     mocks: wrap("RDCO", (api) =>
       api.on("GET", "/reviews/office/", { office: "rdco", office_label: "RDCO", rows: [], load: [] })),
-    heading: "Office console",
+    heading: /console$/,
     primary: (p) => p.getByRole("link", { name: "Home" }).first(), primaryLabel: "Home (breadcrumb)",
   },
   {
