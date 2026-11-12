@@ -140,7 +140,7 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={onClose}
-            className={cn(PILL_SECONDARY, FOCUS_RING, "px-2 ring-0 bg-transparent underline underline-offset-2")}>
+            className={cn("inline-flex items-center min-h-11 px-2 rounded-full text-sm font-semibold text-stone-700 hover:text-stone-900 underline underline-offset-2", FOCUS_RING)}>
             Skip tour
           </button>
           <span className="flex-1" />

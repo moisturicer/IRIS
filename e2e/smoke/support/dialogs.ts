@@ -314,6 +314,8 @@ export const DIALOGS: DialogCase[] = [
   reviewAction("reject a paper", "reject", "Reject…", "features/records/paper-view/DecisionDialog.tsx"),
   // Finish review (IR-875): the footer's one way to finish where `finish_review` is granted.
   reviewAction("finish a review", "finish_review", "Finish review…", "features/records/paper-view/threads/FinishReviewDialog.tsx"),
+  // The guided tour (IR-997): a non-modal dialog opened from the pane header's Take a tour.
+  reviewAction("take the review workspace tour", "comment_review", "Take a tour", "features/records/paper-view/tour/GuidedTour.tsx"),
   reviewAction("request a revision", "request_revision", "Request Revision…", "features/records/paper-view/RequestRevisionDialog.tsx"),
   reviewAction("clear a paper at an office", "office_review", "Clear…", "features/records/paper-view/OfficeReviewDialog.tsx"),
   reviewAction("record an office finding", "office_review", "Record finding…", "features/records/paper-view/OfficeReviewDialog.tsx"),
