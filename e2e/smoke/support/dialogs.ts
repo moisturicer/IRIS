@@ -115,7 +115,10 @@ export const DIALOGS: DialogCase[] = [
       }],
       count: 1,
     }),
-    open: async (page) => { await page.getByRole("button", { name: "Report", exact: true }).click(); },
+    open: async (page) => {
+      await page.getByRole("button", { name: "More actions for Sam Student's comment" }).click();
+      await page.getByRole("button", { name: "Report", exact: true }).click();
+    },
     dialog: (page) => page.getByRole("dialog", { name: "Report comment" }),
   },
   {
@@ -128,7 +131,10 @@ export const DIALOGS: DialogCase[] = [
       }],
       count: 1,
     }),
-    open: async (page) => { await page.getByRole("button", { name: "Delete", exact: true }).click(); },
+    open: async (page) => {
+      await page.getByRole("button", { name: "More actions for Sam Student's comment" }).click();
+      await page.getByRole("button", { name: "Delete", exact: true }).click();
+    },
     dialog: (page) => page.getByRole("dialog", { name: "Delete this comment?" }),
   },
   {

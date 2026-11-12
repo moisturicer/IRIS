@@ -1207,7 +1207,7 @@ export default function PaperViewPage() {
 
                 {/* Public comments belong to published papers' Overview only. */}
                 {record.pipeline_status === "published" && (
-                  <CommentsSection recordId={record.id} viewerId={user?.id ?? null} />
+                  <CommentsSection recordId={record.id} viewerId={user?.id ?? null} viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null} />
                 )}
                 </div>
               </>
