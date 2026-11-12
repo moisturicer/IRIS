@@ -11,7 +11,7 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.db import transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.filters import SearchFilter
 
 from core.enums import (
     DELETE_REVIEW_STATUSES,
@@ -56,7 +56,7 @@ from .serializers import (
     DownloadRequestSerializer,
     DeleteRequestSerializer,
 )
-from .filters import RecordFilter
+from .filters import RecordFilter, RecordOrderingFilter
 from .services import ImportChoices, check_import_row, soft_delete_record, parse_excel_import
 from apps.notifications.services import (
     notify_new_record,
@@ -81,7 +81,7 @@ class RecordViewSet(viewsets.ModelViewSet):
     # Restrict pk lookups to integers so that sub-paths like record-types/,
     # classifications/, etc. are not consumed by this ViewSet's detail route.
     lookup_value_regex = r'\d+'
-    filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends  = [DjangoFilterBackend, SearchFilter, RecordOrderingFilter]
     filterset_class  = RecordFilter
     search_fields    = ["title", "abstract", "authors__name"]
     ordering_fields  = ["created_at", "year_accomplished", "title", "access_count"]
@@ -1526,11 +1526,17 @@ class RecordViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def increment_access(self, request, pk=None):
-        """POST /records/<id>/increment_access/"""
+        """POST /records/<id>/increment_access/ -- Paper View's opening of a paper.
+
+        Counts a view only on an account's first opening of a published paper
+        it doesn't own, and answers the paper's views either way (IR-369,
+        `apps.records.views_count`). A record the caller can't see is still
+        the 404 of a missing one (IR-153): `get_object()` reads `visible_to`.
+        """
+        from . import views_count
+
         record = self.get_object()
-        Record.objects.filter(pk=record.pk).update(access_count=record.access_count + 1)
-        create_audit_event("ACCESS", request.user, record=record)
-        return Response({"access_count": record.access_count + 1})
+        return Response({"access_count": views_count.record_opening(record, request.user)})
 
     # See the comment on get_permissions() -- a decorator-level permission_classes
     # kwarg here would be dead code; the "tags" branch there is what enforces this.

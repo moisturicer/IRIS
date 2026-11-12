@@ -694,6 +694,27 @@ class RecordOwner(models.Model):
         return f"{self.user.email} -> {self.record.title[:40]}{tag}"
 
 
+class RecordView(models.Model):
+    """One account's first opening of a published paper (IR-369, CONTEXT.md **View**).
+
+    Kept only to count each account once and to date the view for Trending.
+    No serializer or endpoint reads it, and it isn't part of the Library or
+    Reading history. It goes with the account (`accounts.deletion.registry`)
+    and with the paper (the cascade below). `Record.access_count` is the
+    count; `apps.records.views_count` writes both together.
+    """
+
+    record = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="views")
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="+")
+    viewed_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["record", "user"], name="record_view_once_per_account"),
+        ]
+        indexes = [models.Index(fields=["record", "viewed_at"], name="record_view_recent")]
+
+
 class ResearchLink(models.Model):
     """Links a Proposal record to its Thesis/Research record."""
     proposal = models.OneToOneField(

@@ -350,7 +350,6 @@ class Command(BaseCommand):
                 added_by=owner,
                 adviser=adviser,
                 pipeline_status=lifecycle.INITIAL_STATUS,
-                access_count=(year - 2020) * 7 + len(title) % 13,
             )
             RecordOwner.objects.create(record=record, user=owner, is_primary=True)
             store_on_new_draft(record, owner)

@@ -299,6 +299,22 @@ class ConfirmTests(DeletionBase):
         self.assertTrue(AuditEvent.objects.filter(
             event_type=AuditEvent.ACCOUNT_DELETION_CONFIRMED, metadata__target_user=email).exists())
 
+    def test_which_papers_they_viewed_is_forgotten_and_the_count_kept(self):
+        """IR-369: the record of who viewed a paper goes; the paper's views stay."""
+        from apps.records.models import RecordView
+
+        self.client.force_authenticate(self.person)
+        opened = self.client.post(f"/api/v1/records/{self.published.pk}/increment_access/")
+        self.assertEqual(opened.data["access_count"], 1)
+        self.client.force_authenticate(None)
+
+        response, _send = self.confirm(self.sysadmin, self.made.pk)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+
+        self.assertFalse(RecordView.objects.filter(user=self.person).exists())
+        self.published.refresh_from_db()
+        self.assertEqual(self.published.access_count, 1)
+
     def test_the_optional_profile_goes_with_the_person(self):
         from apps.accounts import profile
         from apps.accounts.models import ResearchInterest

@@ -308,11 +308,11 @@ describe("browsing", () => {
     expect(lastListParams()).toMatchObject({ ordering: "-created_at" });
   });
 
-  it("shows most viewed research in Trending and retains catalogue filters", async () => {
+  it("asks the server for Trending (views gained lately) and retains catalogue filters", async () => {
     renderDiscover("/?type=2");
     await screen.findByText(publishedThesis.title);
     await userEvent.click(screen.getByRole("button", { name: "Trending" }));
-    await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-access_count", record_type: "2" }));
+    await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "trending", record_type: "2" }));
     expect(screen.getByRole("button", { name: "Trending" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent("feed=trending");
     await userEvent.click(screen.getByRole("button", { name: "Latest" }));

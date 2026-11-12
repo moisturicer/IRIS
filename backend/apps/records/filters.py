@@ -1,4 +1,5 @@
 import django_filters
+from rest_framework.filters import OrderingFilter
 from .models import Record
 
 
@@ -44,3 +45,23 @@ class RecordFilter(django_filters.FilterSet):
             "record_type", "is_ip", "ip_type", "pipeline_status", "department",
             "college", "for_commercialization",
         ]
+
+
+class RecordOrderingFilter(OrderingFilter):
+    """DRF's `?ordering=`, plus `?ordering=trending` (IR-369, CONTEXT.md **Trending**).
+
+    Trending is the views a paper gained in the last 30 days, then its
+    all-time views, then newest first. The rule lives here, not in the
+    browser, so every caller gets the same tie-breaks. Most Viewed stays
+    `-access_count`.
+    """
+
+    TRENDING = "trending"
+    TRENDING_ORDER = ("-recent_views", "-access_count", "-created_at")
+
+    def filter_queryset(self, request, queryset, view):
+        if request.query_params.get(self.ordering_param) == self.TRENDING:
+            from .views_count import with_recent_views
+
+            return with_recent_views(queryset).order_by(*self.TRENDING_ORDER)
+        return super().filter_queryset(request, queryset, view)

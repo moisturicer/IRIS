@@ -168,8 +168,9 @@ export function removeFromCollections(
 /* ────────────────────────────────────────────────────────────────────────────
  * Reading history (browser-only; cleared on sign-out and account switch)
  *
- * Nothing server-side records who read what -- `Record.access_count` is a global
- * counter, not a per-user log -- so this is written when the paper view opens.
+ * The server keeps no reading history: it notes only an account's first opening
+ * of a published paper, to count views (IR-369), and never returns it. So this
+ * is written when the paper view opens.
  * It is genuinely this browser's history, and is labelled as such.
  * ──────────────────────────────────────────────────────────────────────────*/
 

@@ -35,8 +35,8 @@ export interface ProfilePaper {
   record_type_name:    string;
   publication_year:    number | null;
   /**
-   * The paper's `access_count`: it rises on every opening, so it is not a count
-   * of distinct accounts (that counter is IR-369's, not built). Never summed.
+   * The paper's `access_count`: the distinct accounts that have opened it since
+   * it was published, its owners never counted (IR-369). Never summed.
    */
   views:               number;
 }
