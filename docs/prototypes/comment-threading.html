@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRIS comments: threaded prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --canvas: #fafaf9;
+    --surface: #ffffff;
+    --stone-100: #f5f5f4;
+    --stone-200: #e7e5e4;
+    --stone-300: #d6d3d1;
+    --stone-500: #78716c;
+    --stone-600: #57534e;
+    --stone-700: #44403c;
+    --stone-800: #292524;
+    --stone-900: #1c1917;
+    --brand: #6b0f12;
+    --brand-50: #fdf2f2;
+    --brand-100: #fce4e4;
+    --line: #d6d3d1;
+    --flash: #fde68a;
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-display: "EB Garamond", Georgia, Cambria, serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--stone-800);
+    font: 14px/21px var(--font-sans);
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+  /* ---- prototype-only controls ---- */
+  .proto {
+    position: sticky; top: 0; z-index: 20;
+    background: #fff; border-bottom: 1px dashed var(--stone-300);
+    padding: 10px 16px;
+  }
+  .proto-inner {
+    max-width: 760px; margin: 0 auto;
+    display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center;
+    font-size: 13px; color: var(--stone-600);
+  }
+  .proto strong { color: var(--stone-900); }
+  .proto fieldset { border: 0; margin: 0; padding: 0; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .proto legend { float: left; padding: 0; margin-right: 8px; font-weight: 600; color: var(--stone-800); }
+  .seg { position: relative; }
+  .seg input { position: absolute; opacity: 0; inset: 0; }
+  .seg span {
+    display: inline-block; padding: 4px 10px; border: 1px solid var(--stone-300);
+    border-radius: 999px; background: #fff;
+  }
+  .seg input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .seg input:focus-visible + span { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .proto button.reset { border: 1px solid var(--stone-300); background: #fff; border-radius: 999px; padding: 4px 10px; }
+
+  /* ---- page ---- */
+  .page { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  .paper-stub {
+    border: 1px dashed var(--stone-300); border-radius: 12px; padding: 16px 20px;
+    color: var(--stone-600); font-size: 13px; margin-bottom: 28px; background: var(--surface);
+  }
+  .paper-stub b { color: var(--stone-800); }
+
+  .comments { border-top: 1px solid var(--stone-200); padding-top: 28px; }
+  .c-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; margin-bottom: 16px; }
+  .c-head h2 {
+    margin: 0; font: 600 22px/28px var(--font-display); color: var(--brand);
+  }
+  .sort { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--stone-600); }
+  .sort select {
+    font: inherit; font-weight: 500; color: var(--stone-800);
+    border: 1px solid var(--stone-300); background: #fff; border-radius: 8px;
+    padding: 6px 28px 6px 10px; min-height: 36px;
+  }
+
+  /* ---- avatar ---- */
+  .av {
+    width: var(--s); height: var(--s); flex: none; border-radius: 50%;
+    display: grid; place-items: center; background: var(--bg); color: var(--fg);
+    font-size: calc(var(--s) * 0.36); font-weight: 600; letter-spacing: .02em; user-select: none;
+  }
+
+  /* ---- composer ---- */
+  .composer { display: flex; gap: 10px; align-items: flex-start; }
+  .composer--main { margin-bottom: 24px; }
+  .field { position: relative; flex: 1; min-width: 0; }
+  .field textarea, .edit textarea {
+    display: block; width: 100%; resize: none; overflow-y: auto;
+    border: 1px solid var(--stone-300); background: var(--stone-100); color: var(--stone-900);
+    border-radius: 20px; padding: 9px 46px 9px 14px;
+    font: inherit; line-height: 21px; min-height: 40px; max-height: 260px;
+  }
+  .field textarea::placeholder { color: var(--stone-600); }
+  .field textarea:focus-visible, .edit textarea:focus-visible { background: #fff; outline-offset: 1px; }
+  .send {
+    position: absolute; right: 5px; bottom: 5px; width: 30px; height: 30px;
+    display: grid; place-items: center; border: 0; border-radius: 50%;
+    background: var(--brand); color: #fff;
+  }
+  .send:disabled { background: transparent; color: var(--stone-500); cursor: not-allowed; }
+  .send svg { width: 16px; height: 16px; }
+  .counter { display: block; text-align: right; font-size: 12px; line-height: 16px; color: var(--stone-600); margin-top: 4px; }
+  .counter[hidden] { display: none; }
+  .hint { font-size: 12px; line-height: 16px; color: var(--stone-600); margin-top: 6px; }
+  .reply-meta { font-size: 12px; line-height: 16px; color: var(--stone-600); margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .link-btn { background: none; border: 0; padding: 0; color: var(--stone-700); text-decoration: underline; }
+  .signin {
+    margin: 0 0 24px; padding: 14px 16px; border: 1px solid var(--stone-200);
+    border-radius: 12px; background: var(--surface); color: var(--stone-700);
+  }
+
+  /* ---- comment ---- */
+  .list, .replies { list-style: none; margin: 0; padding: 0; }
+  .thread { margin: 0; padding: 0 0 18px; }
+  .cm { display: grid; grid-template-columns: var(--s) minmax(0, 1fr); gap: 8px; scroll-margin-top: 80px; }
+  .side { display: flex; flex-direction: column; align-items: center; }
+  .rail { flex: 1; width: 2px; margin-top: 4px; background: var(--line); border-radius: 1px; }
+  .cm-main { min-width: 0; }
+  .bubble-row { display: flex; align-items: center; gap: 2px; max-width: 100%; }
+  .bubble {
+    background: var(--stone-100); border-radius: 18px; padding: 8px 14px 9px;
+    min-width: 0; max-width: 100%; transition: background-color .3s;
+  }
+  .cm--reply .bubble { padding: 7px 12px 8px; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+  .name { font-weight: 600; color: var(--stone-900); font-size: 13px; line-height: 18px; }
+  .badge {
+    border-radius: 999px; background: var(--brand-100); color: var(--brand);
+    font-size: 11px; line-height: 16px; font-weight: 600; padding: 0 8px;
+  }
+  .body { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--stone-800); }
+  .body.is-gone { color: var(--stone-600); font-style: italic; }
+  .mention { color: var(--brand); font-weight: 600; text-decoration: none; }
+  .mention:hover { text-decoration: underline; }
+  .see-more { background: none; border: 0; padding: 0; color: var(--stone-700); font-weight: 600; }
+  .see-more:hover { text-decoration: underline; }
+  .flash > .cm-main .bubble, .cm.flash .bubble { background: var(--flash); }
+
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0 2px; padding: 0 0 0 10px; font-size: 12px; line-height: 16px; color: var(--stone-600); }
+  .actions button {
+    background: none; border: 0; padding: 6px 6px; min-height: 28px;
+    font-size: 12px; font-weight: 600; color: var(--stone-700); border-radius: 6px;
+  }
+  .actions button:hover { text-decoration: underline; }
+  .actions time { padding: 0 4px; }
+  .dot { padding: 0 1px; }
+
+  .more { position: relative; }
+  .more-btn {
+    width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent;
+    display: grid; place-items: center; color: var(--stone-600); opacity: 0;
+  }
+  .more-btn svg { width: 18px; height: 18px; }
+  .more-btn:hover { background: var(--stone-100); }
+  .cm:hover .more-btn, .cm:focus-within .more-btn, .more-btn[aria-expanded="true"] { opacity: 1; }
+  .menu {
+    position: absolute; z-index: 10; top: 100%; left: 0; min-width: 160px;
+    background: #fff; border: 1px solid var(--stone-200); border-radius: 12px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / .1); padding: 4px;
+  }
+  .menu button {
+    display: block; width: 100%; text-align: left; border: 0; background: none;
+    padding: 8px 12px; min-height: 40px; border-radius: 8px; color: var(--stone-800);
+  }
+  .menu button:hover { background: var(--stone-100); }
+  .menu .danger { color: var(--brand); }
+
+  .cm--gone .av { background: var(--stone-200); color: var(--stone-500); }
+  .cm--gone .bubble { background: transparent; border: 1px dashed var(--stone-300); }
+
+  /* ---- replies + thread rail ---- */
+  .replies { margin-left: 17px; }
+  .reply { position: relative; padding: 12px 0 0 28px; }
+  .reply::before {
+    content: ""; position: absolute; left: 0; top: 0; width: 22px; height: 27px;
+    border-left: 2px solid var(--line); border-bottom: 2px solid var(--line);
+    border-bottom-left-radius: 14px;
+  }
+  .reply:not(:last-child)::after {
+    content: ""; position: absolute; left: 0; top: 27px; bottom: 0;
+    border-left: 2px solid var(--line);
+  }
+  .reply--toggle { min-height: 40px; }
+  .reply--toggle button {
+    display: inline-flex; align-items: center; gap: 6px; background: none; border: 0;
+    padding: 4px 6px; min-height: 28px; margin-top: 1px; font-size: 13px; font-weight: 600; color: var(--stone-700); border-radius: 6px;
+  }
+  .reply--toggle button:hover { text-decoration: underline; }
+  .reply--toggle svg { width: 14px; height: 14px; }
+
+  .more-comments {
+    display: block; margin: 4px 0 0; background: none; border: 0; padding: 8px 4px;
+    min-height: 40px; font-weight: 600; color: var(--stone-700);
+  }
+  .more-comments:hover { text-decoration: underline; }
+
+  /* ---- edit ---- */
+  .edit textarea { border-radius: 18px; padding: 9px 14px; background: #fff; }
+  .edit-row { display: flex; gap: 14px; align-items: center; margin-top: 6px; padding-left: 4px; font-size: 13px; }
+  .edit-row .save { background: var(--brand); color: #fff; border: 0; border-radius: 999px; padding: 5px 14px; min-height: 32px; font-weight: 600; }
+  .edit-row .save:disabled { background: var(--stone-300); color: var(--stone-600); cursor: not-allowed; }
+  .edit-row .cancel { background: none; border: 0; color: var(--stone-700); text-decoration: underline; min-height: 32px; }
+
+  /* ---- states ---- */
+  .state { padding: 24px 4px; color: var(--stone-600); }
+  .state-error { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--brand); }
+  .skel { display: grid; grid-template-columns: 36px 1fr; gap: 8px; margin-bottom: 18px; }
+  .skel i { display: block; border-radius: 50%; width: 36px; height: 36px; background: var(--stone-200); }
+  .skel b { display: block; height: 58px; max-width: 420px; border-radius: 18px; background: var(--stone-100); }
+  @media (prefers-reduced-motion: no-preference) {
+    .skel i, .skel b { animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .5; } }
+  }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    background: var(--stone-900); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px;
+    z-index: 40;
+  }
+  .toast[hidden] { display: none; }
+
+  dialog { border: 0; border-radius: 16px; padding: 20px; max-width: min(92vw, 420px); width: 100%; box-shadow: 0 12px 40px rgb(0 0 0 / .25); color: var(--stone-800); }
+  dialog::backdrop { background: rgb(28 25 23 / .45); }
+  dialog h3 { margin: 0 0 6px; font: 600 20px/28px var(--font-display); color: var(--brand); }
+  dialog p { margin: 0; color: var(--stone-700); }
+  dialog fieldset { border: 0; margin: 12px 0 0; padding: 0; }
+  dialog label.opt { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+  dialog textarea { width: 100%; margin-top: 8px; border: 1px solid var(--stone-300); border-radius: 10px; padding: 8px 10px; font: inherit; }
+  .dlg-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px; align-items: center; }
+  .btn { border: 0; border-radius: 999px; background: var(--brand); color: #fff; padding: 8px 18px; min-height: 40px; font-weight: 600; }
+  .btn:disabled { background: var(--stone-300); color: var(--stone-600); cursor: not-allowed; }
+  .btn-quiet { background: none; border: 0; text-decoration: underline; color: var(--stone-700); min-height: 40px; padding: 0 8px; }
+
+  details.notes { margin-top: 40px; border: 1px solid var(--stone-200); border-radius: 12px; background: var(--surface); padding: 4px 18px; font-size: 13px; }
+  details.notes summary { cursor: pointer; font-weight: 600; padding: 12px 0; min-height: 44px; }
+  details.notes ul { margin: 0 0 14px; padding-left: 18px; color: var(--stone-700); }
+  details.notes li { margin: 4px 0; }
+
+  @media (pointer: coarse) {
+    .actions button { min-height: 44px; padding: 10px 8px; }
+    .more-btn { opacity: 1; width: 44px; height: 44px; }
+    .reply--toggle button { min-height: 44px; }
+  }
+  @media (max-width: 480px) {
+    .proto { position: static; }
+    .page { padding-inline: 12px; }
+    .reply { padding-left: 24px; }
+    .reply::before { width: 18px; }
+    .composer { gap: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="proto" role="region" aria-label="Prototype controls">
+  <div class="proto-inner">
+    <strong>Prototype controls (not part of the design)</strong>
+    <fieldset>
+      <legend>Viewer</legend>
+      <label class="seg"><input type="radio" name="viewer" value="in" checked><span>Signed in (Lee)</span></label>
+      <label class="seg"><input type="radio" name="viewer" value="out"><span>Signed out</span></label>
+    </fieldset>
+    <fieldset>
+      <legend>State</legend>
+      <label class="seg"><input type="radio" name="data" value="loaded" checked><span>Loaded</span></label>
+      <label class="seg"><input type="radio" name="data" value="loading"><span>Loading</span></label>
+      <label class="seg"><input type="radio" name="data" value="empty"><span>Empty</span></label>
+      <label class="seg"><input type="radio" name="data" value="error"><span>Error</span></label>
+    </fieldset>
+    <button type="button" class="reset" id="reset">Reset sample data</button>
+  </div>
+</div>
+
+<main class="page">
+  <div class="paper-stub"><b>Paper page</b> (title, abstract, Overview and so on sit above). The comments section below replaces <code>CommentsSection.tsx</code>.</div>
+  <section class="comments" aria-labelledby="c-h" id="app"></section>
+
+  <details class="notes">
+    <summary>Design notes for review</summary>
+    <ul>
+      <li><b>Two levels, like Facebook.</b> Top-level comments and their replies. A reply to a reply stays in the same thread and shows an @name link to the comment it answers.</li>
+      <li><b>Thread line.</b> A line runs from the parent's avatar down to each reply, so the conversation reads as one unit.</li>
+      <li><b>Replies collapse.</b> A thread with more than two replies starts collapsed behind "View N replies".</li>
+      <li><b>Bubble plus quiet actions.</b> Reply stays visible under each comment. Edit, Delete and Report move into a "..." menu.</li>
+      <li><b>Inline reply and edit.</b> No jump back to the top of the page. Ctrl or Cmd + Enter posts, Esc cancels, Enter adds a line.</li>
+      <li><b>Relative time</b> (5m, 2h, 3d) with the full date on hover and for screen readers.</li>
+      <li><b>Deleted comment with replies</b> stays as a placeholder so the thread keeps its context.</li>
+    </ul>
+  </details>
+</main>
+
+<dialog id="dlg-delete" aria-labelledby="dlg-delete-h">
+  <h3 id="dlg-delete-h">Delete this comment?</h3>
+  <p>This cannot be undone. If it has replies, they stay and this comment shows as [deleted].</p>
+  <div class="dlg-actions">
+    <button type="button" class="btn-quiet" data-close>Cancel</button>
+    <button type="button" class="btn" id="dlg-delete-ok">Delete comment</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-report" aria-labelledby="dlg-report-h">
+  <form method="dialog" id="report-form">
+    <h3 id="dlg-report-h">Report comment</h3>
+    <p>Choose the reason that best describes this comment.</p>
+    <fieldset>
+      <legend class="sr-only">Reason for reporting</legend>
+      <label class="opt"><input type="radio" name="reason" value="spam" checked> Spam</label>
+      <label class="opt"><input type="radio" name="reason" value="harassment"> Harassment</label>
+      <label class="opt"><input type="radio" name="reason" value="off_topic"> Off-topic</label>
+      <label class="opt"><input type="radio" name="reason" value="other"> Other</label>
+      <div id="report-note-wrap" hidden>
+        <label for="report-note" class="sr-only">Note</label>
+        <textarea id="report-note" rows="3" placeholder="Tell us more"></textarea>
+      </div>
+    </fieldset>
+    <div class="dlg-actions">
+      <button type="button" class="btn-quiet" data-close>Cancel</button>
+      <button type="submit" class="btn" id="report-ok">Submit report</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-atomic="true" hidden></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const MAX = 2000;
+  const PAGE = 5;
+  const NOW = Date.parse("2026-11-12T10:30:00+08:00");
+  const ME = { id: 100, name: "Lee Jasmin Adolfo" };
+
+  const LONG = "I read the methodology section twice and want to separate two things.\n\nFirst, the instrument itself looks sound: the items are adapted from a validated scale and the pilot results in Appendix B are consistent. Second, the sampling frame is the weak point. A single campus and a convenience sample make it hard to claim the result holds for the wider student population, and the abstract currently reads as if it does. I would suggest softening the abstract and moving the campus limitation up into the introduction.";
+
+  const seed = () => [
+    c(1,  "Hermoine Joyce Zozobrado", 1, "This is a comment.", "2026-11-11T23:01:00+08:00"),
+    c(2,  "Lee Jasmin Adolfo", 0, "Nice", "2026-11-12T09:54:00+08:00", { reply_to: 1, author_id: 100 }),
+    c(3,  "Lee Jasmin Adolfo", 0, "Comment 2", "2026-11-12T09:55:00+08:00", { author_id: 100 }),
+    c(4,  "Mark Dela Cruz", 0, "Did you consider a sample larger than 120 respondents? The confidence interval in Table 3 looks wide for the claims in the abstract.", "2026-11-10T14:20:00+08:00", { edited_at: "2026-11-10T14:25:00+08:00" }),
+    c(5,  "Hermoine Joyce Zozobrado", 1, "Thanks for reading closely. We were limited to one campus. Section 5.2 lists this as a limitation, and a follow-up across three campuses is planned.", "2026-11-10T16:05:00+08:00", { reply_to: 4 }),
+    c(6,  "Mark Dela Cruz", 0, "That makes sense. Would you share the survey instrument?", "2026-11-10T16:40:00+08:00", { reply_to: 5 }),
+    c(7,  "Hermoine Joyce Zozobrado", 1, "Yes. It is in Appendix B, and I will attach the raw responses once the embargo is released.", "2026-11-10T17:12:00+08:00", { reply_to: 6 }),
+    c(8,  "Ana Reyes", 0, "I had the same question about Table 3.", "2026-11-11T08:15:00+08:00", { reply_to: 4 }),
+    c(9,  "Lee Jasmin Adolfo", 0, "Appendix B was really helpful, thanks!", "2026-11-12T08:00:00+08:00", { reply_to: 7, author_id: 100 }),
+    c(10, "Ana Reyes", 0, null, "2026-11-09T10:00:00+08:00", { deletion_kind: "writer" }),
+    c(11, "Paolo Villanueva", 0, "Which part was this about? The thread lost its context.", "2026-11-09T13:30:00+08:00", { reply_to: 10 }),
+    c(12, "Carlo Tan", 0, null, "2026-11-08T09:10:00+08:00", { deletion_kind: "moderator" }),
+    c(13, "Dr. Santos", 0, LONG, "2026-11-07T15:45:00+08:00"),
+    c(14, "Bea Lim", 0, "Congratulations on the publication!", "2026-11-06T11:00:00+08:00"),
+    c(15, "Joaquin Pineda", 0, "Is the dataset going to be public?", "2026-11-05T19:20:00+08:00"),
+  ];
+  function c(id, author_name, is_author, body, created_at, extra = {}) {
+    return { id, author_name, is_author: !!is_author, body, created_at, edited_at: null, reply_to: null, deletion_kind: null, author_id: id + 1000, ...extra };
+  }
+
+  const state = {
+    comments: seed(),
+    nextId: 100,
+    viewer: "in",
+    data: "loaded",
+    sort: "relevant",
+    pageSize: PAGE,
+    expansion: {},     // rootId -> boolean (explicit choice)
+    seeMore: new Set(),
+    replyTo: null,     // id of the comment being answered
+    editing: null,
+    menu: null,
+    drafts: { main: "", reply: {}, edit: {} },
+    flash: null,
+    focus: null,
+  };
+
+  const $app = document.getElementById("app");
+  const byId = (id) => state.comments.find((x) => x.id === id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+  const rootOf = (cm) => { let x = cm; while (x.reply_to !== null) x = byId(x.reply_to); return x; };
+  const descendants = (rootId) =>
+    state.comments.filter((x) => x.reply_to !== null && rootOf(x).id === rootId)
+      .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const hasChildren = (id) => state.comments.some((x) => x.reply_to === id);
+  /** Deleted comments with nothing under them vanish; with replies they stay as a placeholder. */
+  const visible = (cm) => !cm.deletion_kind || hasChildren(cm.id) || descendants(cm.id).length > 0;
+
+  /* ---- formatting ---- */
+  const palette = [["#fce4e4", "#6b0f12"], ["#e7e5e4", "#292524"], ["#fef3c7", "#78350f"], ["#e0e7ff", "#312e81"], ["#dcfce7", "#14532d"], ["#fae8ff", "#701a75"]];
+  const initials = (n) => { const p = n.replace(/\./g, "").split(/\s+/).filter(Boolean); return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase(); };
+  const tone = (n) => { let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return palette[h % palette.length]; };
+  const avatar = (name, s) => { const [bg, fg] = tone(name); return `<span class="av" style="--s:${s}px;--bg:${bg};--fg:${fg}" aria-hidden="true">${esc(initials(name))}</span>`; };
+  const full = (iso) => new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  function rel(iso) {
+    const m = Math.floor((NOW - Date.parse(iso)) / 60000);
+    if (m < 1) return { short: "Just now", long: "just now" };
+    if (m < 60) return { short: `${m}m`, long: `${m} minute${m > 1 ? "s" : ""} ago` };
+    const h = Math.floor(m / 60);
+    if (h < 24) return { short: `${h}h`, long: `${h} hour${h > 1 ? "s" : ""} ago` };
+    const d = Math.floor(h / 24);
+    if (d < 7) return { short: `${d}d`, long: `${d} day${d > 1 ? "s" : ""} ago` };
+    const sameYear = new Date(iso).getFullYear() === new Date(NOW).getFullYear();
+    const s = new Intl.DateTimeFormat("en", sameYear ? { month: "short", day: "numeric" } : { dateStyle: "medium" }).format(new Date(iso));
+    return { short: s, long: s };
+  }
+
+  const icons = {
+    send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>',
+    more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+    reply: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></svg>',
+    up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>',
+  };
+
+  /* ---- sorting ---- */
+  function topLevel() {
+    const list = state.comments.filter((x) => x.reply_to === null && visible(x));
+    const t = (x) => Date.parse(x.created_at);
+    const replies = (x) => descendants(x.id).length;
+    if (state.sort === "newest") return list.sort((a, b) => t(b) - t(a));
+    if (state.sort === "oldest") return list.sort((a, b) => t(a) - t(b));
+    return list.sort((a, b) => (b.is_author - a.is_author) || (replies(b) - replies(a)) || (t(b) - t(a)));
+  }
+
+  /* ---- composers ---- */
+  function composer(kind, key, o) {
+    const value = o.value || "";
+    const rem = MAX - value.length;
+    const sm = o.small;
+    return `<form class="composer${kind === "main" ? " composer--main" : ""}" data-form="${kind}" data-key="${key}" novalidate>
+      ${avatar(ME.name, sm ? 28 : 36)}
+      <div class="field">
+        <label class="sr-only" for="ta-${kind}">${esc(o.label)}</label>
+        <textarea id="ta-${kind}" data-draft="${kind}" data-key="${key}" rows="1" maxlength="${MAX}" placeholder="${esc(o.placeholder)}" aria-describedby="ct-${kind}">${esc(value)}</textarea>
+        <button class="send" type="submit" aria-label="${esc(o.submit)}"${value.trim() ? "" : " disabled"}>${icons.send}</button>
+        <span class="counter" id="ct-${kind}" data-counter${rem > 300 ? " hidden" : ""}>${rem} characters remaining</span>
+        ${o.meta || ""}
+      </div>
+    </form>`;
+  }
+
+  /* ---- a comment ---- */
+  function commentHtml(cm, { reply, rootId, rail }) {
+    const s = reply ? 28 : 36;
+    const gone = !!cm.deletion_kind;
+    const mine = !gone && state.viewer === "in" && cm.author_id === ME.id;
+    const canReport = !gone && state.viewer === "in" && !mine;
+    const t = rel(cm.created_at);
+
+    if (gone) {
+      const label = cm.deletion_kind === "writer" ? "[deleted]" : "[removed]";
+      return `<article class="cm cm--gone${reply ? " cm--reply" : ""}" id="comment-${cm.id}" style="--s:${s}px">
+        <div class="side"><span class="av" style="--s:${s}px" aria-hidden="true">?</span>${rail ? '<span class="rail"></span>' : ""}</div>
+        <div class="cm-main"><div class="bubble-row"><div class="bubble"><p class="body is-gone">${label}</p></div></div></div>
+      </article>`;
+    }
+
+    if (state.editing === cm.id) {
+      const v = state.drafts.edit[cm.id] ?? cm.body;
+      return `<article class="cm${reply ? " cm--reply" : ""}" id="comment-${cm.id}" style="--s:${s}px">
+        <div class="side">${avatar(cm.author_name, s)}${rail ? '<span class="rail"></span>' : ""}</div>
+        <form class="cm-main edit" data-form="edit" data-key="${cm.id}" novalidate>
+          <label class="sr-only" for="ta-edit">Edit comment</label>
+          <textarea id="ta-edit" data-draft="edit" data-key="${cm.id}" rows="2" maxlength="${MAX}">${esc(v)}</textarea>
+          <span class="counter" id="ct-edit" data-counter${MAX - v.length > 300 ? " hidden" : ""}>${MAX - v.length} characters remaining</span>
+          <div class="edit-row">
+            <button type="submit" class="save"${v.trim() ? "" : " disabled"}>Save</button>
+            <button type="button" class="cancel" data-action="cancel-edit">Cancel</button>
+            <span class="hint" style="margin:0">Esc to cancel</span>
+          </div>
+        </form>
+      </article>`;
+    }
+
+    // Reply to a reply: the thread is flat, so name who is being answered.
+    let mention = "";
+    if (cm.reply_to !== null && cm.reply_to !== rootId) {
+      const p = byId(cm.reply_to);
+      const nm = p.deletion_kind ? "[deleted comment]" : p.author_name;
+      mention = `<a class="mention" href="#comment-${p.id}" data-action="jump" data-id="${p.id}">@${esc(nm)}</a> `;
+    }
+    let text = cm.body;
+    let more = "";
+    if (text.length > 300 && !state.seeMore.has(cm.id)) {
+      text = text.slice(0, 300).replace(/\s+\S*$/, "") + "…";
+      more = ` <button type="button" class="see-more" data-action="see-more" data-id="${cm.id}">See more</button>`;
+    }
+
+    const menu = state.menu === cm.id ? `<div class="menu" id="menu-${cm.id}">
+        ${mine ? `<button type="button" data-action="edit" data-id="${cm.id}">Edit</button><button type="button" class="danger" data-action="delete" data-id="${cm.id}">Delete</button>` : ""}
+        ${canReport ? `<button type="button" data-action="report" data-id="${cm.id}">Report</button>` : ""}
+      </div>` : "";
+    const hasMenu = mine || canReport;
+
+    return `<article class="cm${reply ? " cm--reply" : ""}" id="comment-${cm.id}" style="--s:${s}px">
+      <div class="side">${avatar(cm.author_name, s)}${rail ? '<span class="rail"></span>' : ""}</div>
+      <div class="cm-main">
+        <div class="bubble-row">
+          <div class="bubble">
+            <div class="meta"><span class="name">${esc(cm.author_name)}</span>${cm.is_author ? '<span class="badge">Author</span>' : ""}</div>
+            <p class="body">${mention}${esc(text)}${more}</p>
+          </div>
+          ${hasMenu ? `<div class="more"><button type="button" class="more-btn" data-action="menu" data-id="${cm.id}" aria-haspopup="true" aria-expanded="${state.menu === cm.id}" aria-label="More actions for ${esc(cm.author_name)}'s comment">${icons.more}</button>${menu}</div>` : ""}
+        </div>
+        <div class="actions">
+          ${state.viewer === "in" ? `<button type="button" data-action="reply" data-id="${cm.id}" aria-label="Reply to ${esc(cm.author_name)}">Reply</button><span class="dot" aria-hidden="true">·</span>` : ""}
+          <time datetime="${cm.created_at}" title="${esc(full(cm.created_at))}" aria-label="${esc(t.long)}">${esc(t.short)}</time>
+          ${cm.edited_at ? `<span class="dot" aria-hidden="true">·</span><span title="${esc(full(cm.edited_at))}">Edited</span>` : ""}
+        </div>
+      </div>
+    </article>`;
+  }
+
+  function threadHtml(root) {
+    const kids = descendants(root.id).filter(visible);
+    const composing = state.replyTo !== null && rootOf(byId(state.replyTo)).id === root.id;
+    const explicit = state.expansion[root.id];
+    const expanded = composing || (explicit ?? kids.length <= 2);
+    const n = kids.length;
+    let items = "";
+    if (n) {
+      if (expanded) {
+        items += kids.map((k) => `<li class="reply">${commentHtml(k, { reply: true, rootId: root.id })}</li>`).join("");
+        if (n > 2 && !composing) items += `<li class="reply reply--toggle"><button type="button" data-action="collapse" data-id="${root.id}">${icons.up}Hide replies</button></li>`;
+      } else {
+        items += `<li class="reply reply--toggle"><button type="button" data-action="expand" data-id="${root.id}" aria-expanded="false">${icons.reply}View ${n} ${n === 1 ? "reply" : "replies"}</button></li>`;
+      }
+    }
+    if (composing) {
+      const target = byId(state.replyTo);
+      items += `<li class="reply">${composer("reply", target.id, {
+        small: true,
+        label: `Reply to ${target.author_name}`,
+        placeholder: `Reply to ${target.author_name}…`,
+        submit: "Post reply",
+        value: state.drafts.reply[target.id] || "",
+        meta: `<div class="reply-meta"><span>Replying to <b>${esc(target.deletion_kind ? "[deleted comment]" : target.author_name)}</b></span><span aria-hidden="true">·</span><button type="button" class="link-btn" data-action="cancel-reply">Cancel</button><span aria-hidden="true">·</span><span>Ctrl+Enter to post</span></div>`,
+      })}</li>`;
+    }
+    return `<li class="thread">
+      ${commentHtml(root, { reply: false, rootId: root.id, rail: n > 0 || composing })}
+      ${items ? `<ol class="replies" aria-label="Replies to ${esc(root.author_name)}">${items}</ol>` : ""}
+    </li>`;
+  }
+
+  /* ---- render ---- */
+  function render() {
+    const count = state.data === "loaded" ? state.comments.filter((x) => !x.deletion_kind).length : null;
+    const head = `<header class="c-head">
+      <h2 id="c-h">Comments${count === null ? "" : ` (${count})`}</h2>
+      ${state.data === "loaded" && count > 1 ? `<label class="sort">Sort by
+        <select id="sort">
+          <option value="relevant"${state.sort === "relevant" ? " selected" : ""}>Most relevant</option>
+          <option value="newest"${state.sort === "newest" ? " selected" : ""}>Newest</option>
+          <option value="oldest"${state.sort === "oldest" ? " selected" : ""}>Oldest</option>
+        </select></label>` : ""}
+    </header>`;
+
+    const top = state.viewer === "in"
+      ? composer("main", "main", { label: "Add a comment", placeholder: "Write a comment…", submit: "Post comment", value: state.drafts.main })
+      : `<p class="signin">Sign in to join the discussion.</p>`;
+
+    let body = "";
+    if (state.data === "loading") {
+      body = `<div role="status" aria-label="Loading comments">${[0, 1, 2].map(() => '<div class="skel"><i></i><b></b></div>').join("")}</div>`;
+    } else if (state.data === "error") {
+      body = `<div class="state state-error"><p role="alert" style="margin:0">Comments could not be loaded. Please try again.</p><button type="button" class="link-btn" data-action="retry">Retry</button></div>`;
+    } else if (state.data === "empty" || !state.comments.some((x) => !x.deletion_kind)) {
+      body = `<p class="state">No comments yet. Start the discussion.</p>`;
+    } else {
+      const all = topLevel();
+      const shown = all.slice(0, state.pageSize);
+      const left = all.length - shown.length;
+      body = `<ol class="list" aria-label="Comments">${shown.map(threadHtml).join("")}</ol>
+        ${left > 0 ? `<button type="button" class="more-comments" data-action="more-comments">View ${Math.min(left, PAGE)} more comment${Math.min(left, PAGE) > 1 ? "s" : ""}${left > PAGE ? ` (${left} left)` : ""}</button>` : ""}`;
+    }
+
+    $app.innerHTML = head + top + body;
+    $app.querySelectorAll("textarea[data-draft]").forEach(autosize);
+
+    if (state.flash) {
+      const el = document.getElementById(`comment-${state.flash}`);
+      if (el) { el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1600); }
+      state.flash = null;
+    }
+    if (state.focus) {
+      const el = document.querySelector(state.focus);
+      state.focus = null;
+      if (el) { el.focus(); if (el.setSelectionRange && el.tagName === "TEXTAREA") el.setSelectionRange(el.value.length, el.value.length); }
+    }
+  }
+
+  function autosize(ta) {
+    ta.style.height = "auto";
+    // An empty field keeps its one-row height; its placeholder must not size it.
+    if (!ta.value) return;
+    ta.style.height = Math.min(ta.scrollHeight + 2, 260) + "px";
+  }
+
+  function ensureVisible(id) {
+    const cm = byId(id);
+    if (!cm) return;
+    const root = rootOf(cm);
+    if (root.id !== cm.id) state.expansion[root.id] = true;
+    const idx = topLevel().findIndex((x) => x.id === root.id);
+    if (idx >= state.pageSize) state.pageSize = idx + 1;
+  }
+  function reveal(id) {
+    ensureVisible(id);
+    state.flash = id;
+    render();
+    document.getElementById(`comment-${id}`)?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3200);
+  }
+
+  /* ---- events ---- */
+  let pendingDelete = null, pendingReport = null;
+
+  $app.addEventListener("click", (e) => {
+    const el = e.target.closest("[data-action]");
+    if (!el) return;
+    const id = el.dataset.id ? Number(el.dataset.id) : null;
+    switch (el.dataset.action) {
+      case "reply": {
+        state.replyTo = id; state.editing = null; state.menu = null;
+        state.expansion[rootOf(byId(id)).id] = true;
+        state.focus = "#ta-reply"; render(); break;
+      }
+      case "cancel-reply": { const t = state.replyTo; state.replyTo = null; render(); focusBtn(`[data-action="reply"][data-id="${t}"]`); break; }
+      case "edit": {
+        state.editing = id; state.replyTo = null; state.menu = null;
+        state.drafts.edit[id] = byId(id).body; state.focus = "#ta-edit"; render(); break;
+      }
+      case "cancel-edit": { const t = state.editing; state.editing = null; render(); focusBtn(`[data-action="menu"][data-id="${t}"]`); break; }
+      case "menu": { state.menu = state.menu === id ? null : id; render(); if (state.menu) focusBtn(`#menu-${id} button`); else focusBtn(`[data-action="menu"][data-id="${id}"]`); break; }
+      case "delete": { state.menu = null; pendingDelete = id; render(); document.getElementById("dlg-delete").showModal(); break; }
+      case "report": {
+        state.menu = null; pendingReport = id; render();
+        document.getElementById("report-form").reset();
+        document.getElementById("report-note-wrap").hidden = true;
+        document.getElementById("dlg-report").showModal(); break;
+      }
+      case "see-more": { state.seeMore.add(id); render(); break; }
+      case "expand": { state.expansion[id] = true; render(); break; }
+      case "collapse": { state.expansion[id] = false; render(); focusBtn(`#comment-${id}`); break; }
+      case "jump": { e.preventDefault(); reveal(id); break; }
+      case "more-comments": { state.pageSize += PAGE; render(); break; }
+      case "retry": { state.data = "loaded"; syncRadio("data", "loaded"); render(); break; }
+    }
+  });
+  function focusBtn(sel) { state.focus = sel; const el = document.querySelector(sel); if (el) { state.focus = null; el.focus(); } }
+
+  document.addEventListener("click", (e) => {
+    if (state.menu !== null && !e.target.closest(".more")) { state.menu = null; render(); }
+  });
+
+  $app.addEventListener("input", (e) => {
+    const ta = e.target.closest("textarea[data-draft]");
+    if (!ta) return;
+    const { draft, key } = ta.dataset;
+    if (draft === "main") state.drafts.main = ta.value;
+    else state.drafts[draft][key] = ta.value;
+    autosize(ta);
+    const form = ta.closest("form");
+    const ok = ta.value.trim().length > 0;
+    form.querySelectorAll('.send, .save').forEach((b) => (b.disabled = !ok));
+    const ct = form.querySelector("[data-counter]");
+    const rem = MAX - ta.value.length;
+    ct.textContent = `${rem} characters remaining`;
+    ct.hidden = rem > 300;
+  });
+
+  $app.addEventListener("keydown", (e) => {
+    const ta = e.target.closest("textarea[data-draft]");
+    if (ta) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ta.closest("form").requestSubmit(); return; }
+      if (e.key === "Escape") {
+        if (ta.dataset.draft === "reply") { e.preventDefault(); const t = state.replyTo; state.replyTo = null; render(); focusBtn(`[data-action="reply"][data-id="${t}"]`); }
+        if (ta.dataset.draft === "edit") { e.preventDefault(); const t = state.editing; state.editing = null; render(); focusBtn(`[data-action="menu"][data-id="${t}"]`); }
+      }
+    }
+    if (e.key === "Escape" && state.menu !== null) { const t = state.menu; state.menu = null; render(); focusBtn(`[data-action="menu"][data-id="${t}"]`); }
+  });
+
+  $app.addEventListener("change", (e) => {
+    if (e.target.id === "sort") { state.sort = e.target.value; state.pageSize = PAGE; render(); document.getElementById("sort").focus(); }
+  });
+
+  $app.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const form = e.target.closest("form[data-form]");
+    if (!form) return;
+    const kind = form.dataset.form;
+    const ta = form.querySelector("textarea");
+    const text = ta.value.trim();
+    if (!text || text.length > MAX) return;
+
+    if (kind === "edit") {
+      const cm = byId(Number(form.dataset.key));
+      if (text !== cm.body) { cm.body = text; cm.edited_at = new Date(NOW).toISOString(); }
+      state.editing = null; delete state.drafts.edit[cm.id];
+      state.flash = cm.id; render(); toast("Comment updated"); return;
+    }
+    const id = state.nextId++;
+    const parent = kind === "reply" ? Number(form.dataset.key) : null;
+    state.comments.push(c(id, ME.name, 0, text, new Date(NOW).toISOString(), { reply_to: parent, author_id: ME.id }));
+    if (kind === "reply") { delete state.drafts.reply[parent]; state.replyTo = null; }
+    else { state.drafts.main = ""; if (state.sort === "oldest") state.pageSize = Infinity; }
+    reveal(id);
+  });
+
+  /* ---- dialogs ---- */
+  document.querySelectorAll("dialog [data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
+  document.getElementById("dlg-delete-ok").addEventListener("click", () => {
+    const cm = byId(pendingDelete);
+    if (cm) { cm.deletion_kind = "writer"; cm.body = null; }
+    document.getElementById("dlg-delete").close();
+    pendingDelete = null; render(); toast("Comment deleted");
+  });
+  const noteWrap = document.getElementById("report-note-wrap");
+  document.getElementById("report-form").addEventListener("change", () => {
+    const other = document.querySelector('#report-form input[name="reason"]:checked').value === "other";
+    noteWrap.hidden = !other;
+    if (other) document.getElementById("report-note").focus();
+  });
+  document.getElementById("report-form").addEventListener("submit", (e) => {
+    const other = document.querySelector('#report-form input[name="reason"]:checked').value === "other";
+    if (other && !document.getElementById("report-note").value.trim()) { e.preventDefault(); document.getElementById("report-note").focus(); return; }
+    pendingReport = null; toast("Comment reported");
+  });
+
+  /* ---- prototype controls ---- */
+  function syncRadio(name, value) { const r = document.querySelector(`input[name="${name}"][value="${value}"]`); if (r) r.checked = true; }
+  document.querySelectorAll('input[name="viewer"], input[name="data"]').forEach((r) =>
+    r.addEventListener("change", () => {
+      state[r.name] = r.value; state.menu = null; state.replyTo = null; state.editing = null; render();
+    }));
+  document.getElementById("reset").addEventListener("click", () => {
+    Object.assign(state, { comments: seed(), nextId: 100, expansion: {}, seeMore: new Set(), replyTo: null, editing: null, menu: null, pageSize: PAGE, sort: "relevant", drafts: { main: "", reply: {}, edit: {} } });
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
