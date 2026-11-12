@@ -10,7 +10,10 @@ const ROLE_AVATAR_STYLES: Record<PersonRole, string> = {
   Adviser: "bg-stone-700",
 };
 
-/** A compact author/adviser chip. A profile link is rendered only when the API allows it. */
+/**
+ * A compact author/adviser chip. A profile link is rendered only when the API
+ * allows it; otherwise the chip is plain text that says it has no public profile.
+ */
 export function PersonChip({ id, name, role, hasProfile = false }: {
   id?: number;
   name: string;
@@ -46,8 +49,18 @@ export function PersonChip({ id, name, role, hasProfile = false }: {
       </Link>
     );
   }
-  return <span className={classes}>{chip}</span>;
+  // Not a link: the API withholds a profile that would not open (an unverified
+  // account, a paper that is not published). Say so, rather than leave a chip
+  // that looks like its linked neighbours and does nothing (IR-1025).
+  return (
+    <span className={classes} title={NO_PROFILE_HINT}>
+      {chip}
+      <span className="sr-only">{NO_PROFILE_HINT}</span>
+    </span>
+  );
 }
+
+const NO_PROFILE_HINT = "No public profile available";
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
