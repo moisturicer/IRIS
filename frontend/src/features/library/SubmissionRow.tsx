@@ -6,6 +6,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ContinueProposal } from "@/features/records/ContinueProposal";
 import { waitingHref } from "@/features/records/waitingOnYou";
+import { DeleteDraft } from "./DeleteDraft";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
@@ -39,10 +40,15 @@ function ReviewTrack({ item }: { item: MyResearchItem }) {
   );
 }
 
-function RowActions({ item }: { item: MyResearchItem }) {
+function RowActions({ item, onDeleted }: { item: MyResearchItem; onDeleted?: (id: number) => void }) {
   if (item.can_continue) return <ContinueProposal recordId={item.id} />;
   if (item.pipeline_status === "draft") {
-    return <Link to={`/?publish=${item.id}`} className={cn(PILL_SECONDARY, "min-h-9 px-4", FOCUS_RING)}>Continue</Link>;
+    return (
+      <>
+        <Link to={`/?publish=${item.id}`} className={cn(PILL_SECONDARY, "min-h-9 px-4", FOCUS_RING)}>Continue</Link>
+        {onDeleted && <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />}
+      </>
+    );
   }
   // One link per open request, straight to the act on Paper View (IR-625).
   const waiting = item.submitter_status.waiting_on_you;
@@ -67,6 +73,8 @@ interface SubmissionRowProps {
   item: MyResearchItem;
   /** The Overview's short list: no review track and no actions. */
   brief?: boolean;
+  /** Offered on a draft: the row is gone once the server deleted it. */
+  onDeleted?: (id: number) => void;
 }
 
 /**
@@ -74,12 +82,12 @@ interface SubmissionRowProps {
  * the row's one link, stretched over the row; only the actions sit above it.
  * The status words are the server's (`submitter_status.line`).
  */
-export function SubmissionRow({ item, brief = false }: SubmissionRowProps) {
+export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowProps) {
   const people = [
     item.authors.map((author) => author.name).join(", "),
     item.adviser_name && `Adviser: ${item.adviser_name}`,
   ].filter(Boolean).join(" · ");
-  const actions = brief ? null : <RowActions item={item} />;
+  const actions = brief ? null : <RowActions item={item} onDeleted={onDeleted} />;
 
   return (
     <li className={cn("group relative flex gap-4 px-4 py-4 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>

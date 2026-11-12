@@ -18,6 +18,7 @@ vi.mock("@/api/records", () => ({
     cancelDownloadRequest: vi.fn(),
     requestDownload: vi.fn(),
     downloadCopy: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -129,6 +130,40 @@ describe("My Library: an author's research", () => {
     expect(screen.getByRole("link", { name: "Continue" })).toHaveAttribute("href", "/?publish=12");
     expect(recordsApi.mine).toHaveBeenCalledOnce();
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("deletes a draft after one confirmation and drops its row", async () => {
+    mine([ownRecord({}), ownRecord({ id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review", submitter_status: { line: "In review", waiting_on_you: [] } })]);
+    vi.mocked(recordsApi.delete).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.delete>>);
+    const user = userEvent.setup();
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    await user.click(await screen.findByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(recordsApi.delete).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Delete draft" }));
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Community Water Monitoring" })).not.toBeInTheDocument());
+    expect(recordsApi.delete).toHaveBeenCalledWith(12);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // Only a draft offers it.
+    expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the draft and says why when the delete fails", async () => {
+    mine([ownRecord({})]);
+    vi.mocked(recordsApi.delete).mockRejectedValue({ response: { status: 400, data: { detail: "A delete decision is already pending for this record." } } });
+    const user = userEvent.setup();
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    await user.click(await screen.findByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
+    await user.click(screen.getByRole("button", { name: "Delete draft" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("A delete decision is already pending for this record.");
+    expect(screen.getByRole("dialog", { name: "Delete this draft?" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
   });
 
   it("puts what waits on the author first, each request linking straight to the act that answers it", async () => {

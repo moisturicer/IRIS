@@ -22,7 +22,7 @@ import { SubmissionPanel, SubmissionRow } from "./SubmissionRow";
  * One filter's records, folded like a chapter: a summary line with the
  * group's name and what it means, and the ruled rows under it.
  */
-function Group({ group, open }: { group: FilterGroup; open: boolean }) {
+function Group({ group, open, onDeleted }: { group: FilterGroup; open: boolean; onDeleted?: (id: number) => void }) {
   const titleId = `research-${group.id}`;
   const waiting = group.id === "waiting";
   return (
@@ -40,7 +40,7 @@ function Group({ group, open }: { group: FilterGroup; open: boolean }) {
       </summary>
       <div className="mt-3">
         <SubmissionPanel tone={waiting ? "waiting" : "plain"}>
-          {group.items.map((item) => <SubmissionRow key={item.id} item={item} />)}
+          {group.items.map((item) => <SubmissionRow key={item.id} item={item} onDeleted={onDeleted} />)}
         </SubmissionPanel>
       </div>
     </details>
@@ -56,6 +56,8 @@ interface MyResearchListProps {
   onRetry:  () => void;
   filter:   ResearchFilter;
   onFilterChange: (filter: ResearchFilter) => void;
+  /** A draft was deleted on the server. */
+  onDeleted?: (id: number) => void;
 }
 
 /**
@@ -65,7 +67,7 @@ interface MyResearchListProps {
  * starts folded. Picking a filter shows that group alone, open. Who has a
  * record now is on its own row, in the server's words. No counts.
  */
-export function MyResearchList({ items, loading, failed, interrupted = false, onRetry, filter, onFilterChange }: MyResearchListProps) {
+export function MyResearchList({ items, loading, failed, interrupted = false, onRetry, filter, onFilterChange, onDeleted }: MyResearchListProps) {
   const [query, setQuery] = useState("");
 
   const all = useMemo(() => groupByFilter(items), [items]);
@@ -147,7 +149,7 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
         <div className="space-y-section-lg">
           {groups.map((group) => (
             // Keyed on the filter so a group re-opens when it is picked alone.
-            <Group key={`${filter}-${group.id}`} group={group} open={filter !== "all" || group.id !== "finished"} />
+            <Group key={`${filter}-${group.id}`} group={group} open={filter !== "all" || group.id !== "finished"} onDeleted={onDeleted} />
           ))}
         </div>
       )}

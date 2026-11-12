@@ -238,6 +238,18 @@ export const DIALOGS: DialogCase[] = [
     open: press("Request again"), dialog: anyDialog,
   },
   {
+    id: "delete a draft", screen: "my-library", path: "/records/mine?section=research",
+    sources: ["features/library/DeleteDraft.tsx"],
+    override: (api) => api.on("GET", "/records/mine/", [{
+      id: 12, title: "Community Water Monitoring", authors: [{ id: 1, name: "Lee Cruz", role: null }],
+      adviser_name: "Dr Santos", record_type_name: "Thesis / Research", pipeline_status: "draft",
+      workflow_state: "draft", workflow_state_label: "Draft", holders: [], cleared_offices: [],
+      submitter_status: { line: "Draft: not yet submitted", waiting_on_you: [] },
+      created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-02T08:00:00+08:00",
+    }]),
+    open: press(/^Delete draft/), dialog: anyDialog,
+  },
+  {
     id: "crop a profile photo", screen: "profile-edit", sources: ["features/profile/PhotoCropDialog.tsx"],
     open: async (page) => {
       await page.locator('input[type="file"]').first().setInputFiles({ name: "me.png", mimeType: "image/png", buffer: PNG });
