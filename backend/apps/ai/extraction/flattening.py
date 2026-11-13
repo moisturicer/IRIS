@@ -22,7 +22,7 @@ Pure: no Django, no I/O, no clock.
 import re
 
 from apps.ai.chunking.document import NormalizedDocument
-from apps.ai.chunking.formulas import without_formulas
+from apps.ai.extraction.formulas import without_formulas
 
 # Lines shorter than this are page furniture — a folio, a rule, a stray
 # glyph — not content worth indexing.

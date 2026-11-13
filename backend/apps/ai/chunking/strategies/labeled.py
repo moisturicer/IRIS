@@ -1,145 +1,157 @@
-"""Chunk authoritative structure at its declared heading depth (IR-840)."""
+"""Chunk authoritative structure at its declared heading depth (IR-840).
+
+Headings open sections at their declared level. Formulas are shown to readers
+and never embedded. Tables split only between rows and repeat their header.
+Prose packs to the target size with its trail counted in; a figure, a list or
+a table row is kept whole up to the safety ceiling (ADR-067 decision 14).
+"""
 
 from dataclasses import replace
 from html import escape
 import hashlib
 import json
 
-from ..context_path import _truncate_middle
+from ..assembly import Draft, Joiners, body_budget, finalize, fold_heading_only, merge_short_siblings
 from ..document import FORMULA, HEADING, DocumentElement, NormalizedDocument
-from ..formulas import without_formulas
+from apps.ai.extraction.formulas import without_formulas
 from ..hashing import chunkset_hash
+from ..outline import HeadingStack, bounded_trail, embedded_text
 from ..regions import dedupe_regions
-from ..text_splitting import grapheme_safe_split, split_into_sentences
+from ..registry import register_chunker
 from ..table_html import TableHTML
+from ..text_splitting import split_to_fit
 from ..tokens import count_tokens
-from ..values import Chunk, ChunkingOptions, ChunkSet
+from ..values import ChunkingOptions, ChunkSet
 
 
 STRATEGY_ID = "labeled-structure-v1"
 
+_PROSE = {HEADING, "text", "paragraph", "code", "link"}
+_JOINERS = Joiners(body="\n", content="\n\n")
 
+
+@register_chunker(STRATEGY_ID)
 class LabeledStructureChunker:
     """Headings open sections at their declared depth. Math is display only."""
 
     def chunk(self, document: NormalizedDocument, options: ChunkingOptions) -> ChunkSet:
-        chunks = []
-        stack: list[tuple[int, str]] = []
+        stack = HeadingStack(document.title)
+        drafts: list[Draft] = []
         section: list[DocumentElement] = []
-        path: tuple[str, ...] = (document.title,) if document.title else ()
+
+        def flush() -> None:
+            if section:
+                key = stack.path
+                trail = bounded_trail(tuple(without_formulas(t).strip() for t in key), options)
+                drafts.extend(_pack_section(section, trail, key, options))
+
         for element in document.elements:
+            if not _has_content(element):
+                continue
             if element.kind == HEADING:
-                if section:
-                    chunks.extend(_pack_section(section, path, options))
+                flush()
                 section = []
-                level = element.level or 1
-                stack = [(depth, text) for depth, text in stack if depth < level]
-                stack.append((level, element.text))
-                headings = tuple(text for _, text in stack)
-                path = headings if headings[0] == document.title else ((document.title,) if document.title else ()) + headings
-                path = _bounded_path(path, options)
+                stack.push(element)
             section.append(element)
-        if section:
-            chunks.extend(_pack_section(section, path, options))
-        chunks = [replace(chunk, sequence=index) for index, chunk in enumerate(chunks)]
-        return ChunkSet(
-            chunks=tuple(chunks), strategy_id=STRATEGY_ID, options=options,
-            content_hash=_content_hash(chunks, document.page_sizes), page_sizes=document.page_sizes,
+        flush()
+
+        def fits(draft: Draft) -> bool:
+            return count_tokens(embedded_text(draft.trail, draft.body)) <= options.effective_target_tokens
+
+        # A Figure is its own retrievable unit (IR-852): never merged.
+        drafts = merge_short_siblings(
+            drafts, options, lambda d: fits(d) and "image" not in d.element_kinds, _JOINERS
+        )
+        drafts = fold_heading_only(drafts, options, fits, _JOINERS)
+        return finalize(
+            drafts,
+            strategy_id=STRATEGY_ID,
+            options=options,
+            page_sizes=document.page_sizes,
+            content_hash=lambda chunks: _content_hash(chunks, document.page_sizes),
         )
 
 
-def _bounded_path(path, options):
-    # Leave most of the total budget for the author's text, including the
-    # separator. The legacy helper alone can retain an oversized first word.
-    budget = min(options.context_path_max_tokens, options.max_tokens // 3)
-    if budget < 1:
-        return ()
-    path = _truncate_middle(path, budget)
-    if count_tokens(" > ".join(path)) <= budget:
-        return path
-    label = ""
-    for cluster in grapheme_safe_split(path[0], 1):
-        if count_tokens(label + cluster) > budget:
-            break
-        label += cluster
-    return (label,) if label else ()
+def _has_content(element: DocumentElement) -> bool:
+    # An undescribed Figure is kept: its description is appended on a later pass.
+    return element.kind == "image" or bool(
+        element.text.split() or element.description.split() or element.rows
+    )
 
 
-def _embedded(elements, path):
-    body = "\n".join(
+def _body(elements) -> str:
+    return "\n".join(
         without_formulas(e.text + ("\n" + e.description if e.kind == "image" and e.description else ""))
         for e in elements if e.kind != FORMULA
     ).strip()
-    prefix = without_formulas(" > ".join(path)).strip()
-    return f"{prefix}\n\n{body}" if prefix and body else prefix or body
 
 
-def _fits(elements, path, options):
-    return count_tokens(_embedded(elements, path)) <= options.max_tokens
+def _fits(elements, trail, limit) -> bool:
+    return count_tokens(embedded_text(trail, _body(elements))) <= limit
 
 
-def _pack_section(elements, path, options):
-    chunks = []
+def _pack_section(elements, trail, key, options) -> list[Draft]:
+    target = options.effective_target_tokens
+    drafts: list[Draft] = []
     window: list[DocumentElement] = []
     for element in elements:
         if element.kind in {"table", "image"}:
             if window:
-                chunks.append(_chunk(window, path))
+                drafts.append(_draft(window, trail, key))
                 window = []
-            parts = _table_parts(element, path, options) if element.kind == "table" else [element]
-            chunks.extend(_chunk([part], path) for part in parts)
+            parts = _table_parts(element, trail, target) if element.kind == "table" else [element]
+            drafts.extend(_draft([part], trail, key) for part in parts)
         else:
-            for part in _prose_parts(element, path, options):
-                if window and not _fits(window + [part], path, options):
-                    chunks.append(_chunk(window, path))
+            for part in _prose_parts(element, trail, options):
+                if window and not _fits(window + [part], trail, target):
+                    drafts.append(_draft(window, trail, key))
                     window = []
                 window.append(part)
     if window:
-        chunks.append(_chunk(window, path))
-    return chunks
+        drafts.append(_draft(window, trail, key))
+    return [split for d in drafts for split in _within_ceiling(d, options)]
 
 
-def _prose_parts(element, path, options):
-    if element.kind not in {HEADING, "text", "paragraph", "code", "link"} or _fits([element], path, options):
+def _prose_parts(element, trail, options):
+    target = options.effective_target_tokens
+    if element.kind not in _PROSE or _fits([element], trail, target):
         return [element]
-    atoms = []
-    for sentence in split_into_sentences(element.text):
-        if _fits([replace(element, text=sentence)], path, options):
-            atoms.append(sentence)
-        else:
-            for word in sentence.split():
-                atoms.extend(_word_parts(word, element, path, options))
-    parts = []
+    pieces = split_to_fit(element.text, body_budget(trail, options))
+    parts: list[DocumentElement] = []
     current = ""
-    for atom in atoms:
-        candidate = (current + " " + atom).strip()
-        if current and not _fits([replace(element, text=candidate)], path, options):
+    for piece in pieces:
+        candidate = f"{current} {piece}".strip()
+        if current and not _fits([replace(element, text=candidate)], trail, target):
             parts.append(replace(element, text=current))
-            current = ""
-        current = (current + " " + atom).strip()
+            candidate = piece
+        current = candidate
     if current:
         parts.append(replace(element, text=current))
     return parts
 
 
-def _word_parts(word, element, path, options):
-    if _fits([replace(element, text=word)], path, options) or len(word) <= 1:
-        return [word]
-    pieces = grapheme_safe_split(word, max(1, len(word) // 2))
-    if len(pieces) == 1:  # A single grapheme is indivisible too.
-        return [word]
-    return [part for piece in pieces for part in _word_parts(piece, element, path, options)]
+def _within_ceiling(draft: Draft, options: ChunkingOptions) -> list[Draft]:
+    """A kept-whole atom past the safety ceiling is split as plain text.
+    Its display form (table HTML, formulas) is lost; only for pathological
+    atoms."""
+    if count_tokens(embedded_text(draft.trail, draft.body)) <= options.max_tokens:
+        return [draft]
+    budget = body_budget(draft.trail, options, options.max_tokens)
+    return [
+        replace(draft, body=piece, content=piece)
+        for piece in split_to_fit(draft.body, budget)
+    ]
 
 
-def _table_parts(table, path, options):
-    if _fits([table], path, options) or len(table.rows) < 2:
+def _table_parts(table, trail, target):
+    if _fits([table], trail, target) or len(table.rows) < 2:
         return [table]
     layout = TableHTML.parse(table.html, table.rows)
     parts = []
     start = 1
     for stop in range(2, len(table.rows) + 1):
         candidate = _table_fragment(table, start, stop, layout)
-        if stop > start + 1 and not _fits([candidate], path, options):
+        if stop > start + 1 and not _fits([candidate], trail, target):
             parts.append(_table_fragment(table, start, stop - 1, layout))
             start = stop - 1
     parts.append(_table_fragment(table, start, len(table.rows), layout))
@@ -161,15 +173,17 @@ def _table_fragment(table, start, stop, layout):
                    text="\n".join(" | ".join(row) for row in (header, *rows)))
 
 
-def _chunk(elements, path):
-    text = _embedded(elements, path)
+def _draft(elements, trail, key) -> Draft:
     content = "\n\n".join(
         f"$$\n{e.text.strip()}\n$$" if e.kind == FORMULA else (e.html or e.text) if e.kind == "table" else e.text
         for e in elements
     ).strip()
-    return Chunk(
-        text=text, content=content, context_path=path, sequence=0,
-        token_count=count_tokens(text), source_page=elements[0].page,
+    return Draft(
+        body=_body(elements),
+        content=content,
+        trail=trail,
+        section_key=key,
+        source_page=elements[0].page,
         element_kinds=frozenset(e.kind for e in elements),
         bboxes=dedupe_regions(tuple(box for e in elements for box in e.bboxes)),
     )
@@ -178,9 +192,8 @@ def _chunk(elements, path):
 def _content_hash(chunks, page_sizes):
     """Refresh display/evidence edits while reusing unchanged text vectors.
 
-    Legacy strategies retain their pinned semantic-only set hash. This new
-    strategy must also notice formulas, HTML and evidence, which deliberately
-    do not enter embedding text. Per-chunk text hashes remain unchanged.
+    Formulas, HTML and evidence do not enter embedding text, so the set hash
+    also covers them. Per-chunk text hashes are unchanged.
     """
     payload = {
         "semantic": chunkset_hash(chunks), "page_sizes": page_sizes,

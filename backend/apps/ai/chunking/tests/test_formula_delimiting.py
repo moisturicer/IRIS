@@ -6,7 +6,6 @@ here may re-embed a stored chunk.
 
 import pytest
 
-from apps.ai.chunking.context_path import build_context_path_chunker
 from apps.ai.chunking.document import (
     FORMULA,
     HEADING,
@@ -74,9 +73,9 @@ def test_delimiting_changes_no_hash_so_nothing_is_re_embedded(strategy):
     assert delimited.content_hash == chunkset_hash(delimited.chunks)
 
 
-def test_the_context_path_decorator_keeps_text_undelimited():
+def test_the_heading_trail_keeps_text_undelimited():
     options = ChunkingOptions(strategy="structural-markdown-v1")
-    (chunk,) = build_context_path_chunker(options).chunk(_with_formula(), options).chunks
+    (chunk,) = build_chunker(options).chunk(_with_formula(), options).chunks
 
     assert "$" not in chunk.text
     assert "$$" in chunk.content

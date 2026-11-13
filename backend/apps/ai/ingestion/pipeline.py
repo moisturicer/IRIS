@@ -51,10 +51,11 @@ from apps.ai.chunking import (
     DEFAULT_STRATEGY,
     ChunkingOptions,
     ChunkSet,
-    build_context_path_chunker,
+    build_chunker,
     normalize,
 )
 from apps.ai.chunking.document import NormalizedDocument
+from apps.ai.chunking.strategies.labeled import STRATEGY_ID as LABELED_STRATEGY
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from apps.ai.repositories import ChunkRepository
@@ -108,6 +109,7 @@ def default_chunking_options() -> ChunkingOptions:
         # id in settings, which could drift from the registry unnoticed.
         strategy=settings.AI_CHUNK_STRATEGY or DEFAULT_STRATEGY,
         max_tokens=settings.AI_CHUNK_MAX_TOKENS,
+        target_tokens=settings.AI_CHUNK_TARGET_TOKENS,
         min_tokens=settings.AI_CHUNK_MIN_TOKENS,
         context_path_max_tokens=settings.AI_CHUNK_CONTEXT_PATH_MAX_TOKENS,
         exclude_sections=tuple(settings.AI_CHUNK_EXCLUDE_SECTIONS),
@@ -117,29 +119,19 @@ def default_chunking_options() -> ChunkingOptions:
 def build_chunk_set(
     document: NormalizedDocument, options: ChunkingOptions
 ) -> ChunkSet:
-    """Normalize ``document`` and chunk it, with the context path applied.
+    """Normalize ``document`` and chunk it with the registered strategy.
 
-    Pure and deterministic, like both halves it composes. ``build_context_
-    path_chunker`` rather than ``build_chunker``: a chunk embedded without
-    its heading trail is the failure the decorator exists to prevent, and
-    this is the one place in the codebase that builds the chunker for real
-    ingestion.
+    Pure and deterministic. Every strategy attaches each chunk's heading
+    trail itself, inside the target size (IR-1050).
     """
-    if document.structure_is_authoritative:
-        from apps.ai.chunking.strategies.labeled import LabeledStructureChunker
-
-        options = _options_for_document(document, options)
-        return LabeledStructureChunker().chunk(normalize(document, options), options)
-    return build_context_path_chunker(options).chunk(
-        normalize(document, options), options
-    )
+    options = _options_for_document(document, options)
+    return build_chunker(options).chunk(normalize(document, options), options)
 
 
 def _options_for_document(document, options):
+    """Authoritative structure is chunked at its declared levels (IR-840)."""
     if document.structure_is_authoritative:
-        from apps.ai.chunking.strategies.labeled import STRATEGY_ID
-
-        return replace(options, strategy=STRATEGY_ID)
+        return replace(options, strategy=LABELED_STRATEGY)
     return options
 
 
