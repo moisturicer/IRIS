@@ -162,7 +162,7 @@ _Avoid_: IP office.
 The Institutional Ethics Review Committee, responsible for ethics compliance review of research submissions.
 
 **KTTO**:
-The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions. Under proposed ADR-066 it owns a paper's [[IP application]]s, and commercialization moves to TBI (IR-977).
+The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions. Under ADR-066 it owns a paper's [[IP application]]s, and commercialization moves to TBI (IR-977).
 
 **Specialist path**:
 A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
@@ -352,7 +352,7 @@ _Avoid_: Bookmark, reminder.
 
 ### IP and commercialization
 
-These terms come from ADR-066, proposed 2026-11-13 and not accepted. None is built yet.
+These terms come from ADR-066, accepted 2026-11-13. None is built yet.
 
 **IP application**:
 A request to protect one kind of intellectual property in a paper (Patent, Utility Model, Industrial Design, Trademark or Copyright), owned by KTTO and running beside the paper's publishing rather than inside its review. It moves forward through For Application, Reviewed, Filed, and then Approved or Disapproved by the IP office; KTTO can end it as Not filed, and the owners can withdraw it before filing. A Thesis/Research or Project can have several, at most one open per kind.

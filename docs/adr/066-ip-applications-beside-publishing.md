@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** — 2026-11-13 (IR-978), awaiting acceptance by Lee Jasmin Adolfo. The decisions come from a design session with Hermoine Zozobrado on 2026-11-12–13. Nothing in it is authorised until it is accepted.
+**Accepted** — 2026-11-13 (IR-978): reviewed, accepted and merged by Ashlee Sean (PR #712), as relayed by Hermoine Zozobrado. The decisions come from a design session with Hermoine Zozobrado on 2026-11-12–13. Not built yet.
 
 It amends [ADR-018](018-conditional-parallel-office-routing.md) (KTTO, not ITSO, owns IP), [ADR-063](063-rdco-sets-requirements-and-templates.md) (the IP and commercialization upload slots move into applications) and [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) (starting an application sets the IP mark). It sets the shape that IR-979's commercialization application follows.
 
@@ -127,7 +127,7 @@ Keeping the tracks apart lets publication move in weeks while an IP office takes
 - **Trade Secret disappears** from what readers see.
 - **Inventors are names, not accounts,** so IRIS can't link an inventor to a Profile or notify them.
 - **An application can be recorded wrongly** (a wrong number, an outcome entered early). Corrections are audited, but IRIS doesn't check the IP office.
-- **ADR-018, ADR-052 and ADR-063** each need an amendment note pointing here once this is accepted.
+- **ADR-018, ADR-052 and ADR-063** each carry a note pointing here (added 2026-11-13).
 
 ## MVP Impact
 
