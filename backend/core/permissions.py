@@ -463,6 +463,11 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         elif workflow["workflow_state"] == WorkflowState.AWAITING_RESUBMISSION:
             if revision["new_version"] is not None:
                 offered.extend(["create_version", "replace_manuscript"])
+                # An upload no version carries yet can be thrown away (IR-1047).
+                from apps.records.versions import manuscript_unsubmitted
+
+                if manuscript_unsubmitted(record, user):
+                    offered.append("discard_revised_manuscript")
             offered.append("edit_details")
         delete_act = DELETE_CAPABILITY.get(record.pipeline_status)
         if delete_act is not None:

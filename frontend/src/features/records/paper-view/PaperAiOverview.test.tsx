@@ -176,6 +176,17 @@ describe("the AI overview on a paper", () => {
     expect(await screen.findByText(/AI summary unavailable/i)).toBeTruthy();
   });
 
+  // IR-792: a No paper says why, and offers no retry that could change it.
+  it("says the owner did not consent when the paper's answer is No", async () => {
+    overview.mockResolvedValue({ data: { state: "unavailable", overview: null, reason: "no_consent" } });
+    renderScreen(<PaperAiOverview record={record} />);
+
+    expect(await screen.findByText(/owner did not consent/i)).toBeTruthy();
+    expect(screen.queryByText(/could not be reached/i)).toBeNull();
+    expect(screen.queryByText(/embargo/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Try again/i })).toBeNull();
+  });
+
   // IR-526: updated deliberately. This used to find a card's title ("Nothing indexed to
   // summarise") and a second explanatory sentence; the state is now one quiet line, so the
   // test asserts that single line and that no second sentence or button comes with it.

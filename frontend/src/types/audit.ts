@@ -31,6 +31,7 @@ export const AUDIT_EVENT_GROUPS = {
     ASSIGNMENT_ESCALATED: "Assignment Overdue Escalated",
     PUBLISHED: "Published", RESUBMISSION_REQUESTED: "Revision Requested",
     REVISION_REQUEST_WITHDRAWN: "Revision Request Withdrawn", RESUBMITTED: "New Version Submitted",
+    REVISION_DRAFT_DISCARDED: "Revised Manuscript Discarded",
     CLEARANCE_PRESERVED: "Clearance Preserved", RECORD_WITHDRAWN: "Record Withdrawn",
   },
   "Document requests": {

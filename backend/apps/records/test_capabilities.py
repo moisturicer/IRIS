@@ -18,7 +18,8 @@ Every row is a record state and a viewer. For each row it checks:
 Every probe runs inside a savepoint that is rolled back, so no probe changes
 the state the next one sees. `cite` and `replace_manuscript` have no endpoint
 of their own (`replace_manuscript` rides on the owner's record update and is
-offered exactly with `create_version`), so they are checked by set only. The
+offered exactly with `create_version`), so they are checked by set only.
+`discard_revised_manuscript` is offered on top of them while an upload waits. The
 three delete keys share `DELETE /records/<id>/` (IR-508), so each is probed only
 in the statuses whose act it names.
 
@@ -98,6 +99,16 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     def revision_asked_by_itso(self):
         record = self.itso_open()
         self.asked(record, self.itso)
+        return record
+
+    def revision_asked_and_revised(self):
+        """
+        ITSO asked, and the owner has uploaded a revised manuscript no version
+        carries yet (IR-1047): the one state that offers `discard_revised_manuscript`.
+        """
+        record = self.revision_asked_by_itso()
+        Record.objects.filter(pk=record.pk).update(abstract_file="manuscripts/revised-unsent.pdf")
+        record.refresh_from_db()
         return record
 
     def rdco_open(self):
@@ -250,6 +261,9 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 u, "post", url("record-submit", r), {"dpa_accepted": True},
             ),
             "create_version": lambda r, u, d: self._call(u, "post", url("record-new-version", r)),
+            "discard_revised_manuscript": lambda r, u, d: self._call(
+                u, "post", url("record-discard-revised-manuscript", r),
+            ),
             "continue_as": lambda r, u, d: self._call(
                 u, "post", url("record-continue-as", r), {"record_type": self._thesis_type_id()},
             ),
@@ -365,6 +379,14 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         # ITSO asked once, so it is offered the withdrawal, not a second ask.
         "revision_asked_by_itso": {
             "owner": OWNER_IN_REVIEW | {"create_version", "replace_manuscript", "edit_details"},
+            "adviser": ADVISER_TAKES_PART, "itso": ITSO_SEATED | {"withdraw_revision"},
+            "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
+        },
+        # The owner has an upload waiting, so only they may throw it away (IR-1047).
+        "revision_asked_and_revised": {
+            "owner": OWNER_IN_REVIEW | {
+                "create_version", "replace_manuscript", "edit_details", "discard_revised_manuscript",
+            },
             "adviser": ADVISER_TAKES_PART, "itso": ITSO_SEATED | {"withdraw_revision"},
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },

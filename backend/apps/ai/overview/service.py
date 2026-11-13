@@ -18,6 +18,7 @@ from apps.ai.answers.service import generate_cited, model_that_answered
 from apps.ai.composition import composition_root
 from apps.ai.inference import InferenceTask
 from apps.ai.models import ChunkSet, RecordOverview
+from apps.ai.policy import reader_refusal
 from apps.ai.presentation import citations as citations_wire
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.records.models import Record
@@ -78,7 +79,11 @@ def overview_for(record: Record, *, retry: bool = False) -> dict:
     # Disclosure applies to every read, including a previously generated row.
     if not composition_root().vendor_permits()(record):
         logger.info("overview not generated for record %s: disclosure gate", record.pk)
-        return {"state": "unavailable", "overview": None}
+        refused = {"state": "unavailable", "overview": None}
+        reason = reader_refusal(record)
+        if reason:
+            refused["reason"] = reason
+        return refused
 
     chunk_set = (
         ChunkSet.objects.filter(record=record, is_active=True)
