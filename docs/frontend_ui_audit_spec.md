@@ -7,7 +7,7 @@
 - [`redesign-recommendations.md`](../iris-uiux-audit/redesign-recommendations.md): before and after, page by page;
 - [`design-system.md`](../iris-uiux-audit/design-system.md): proposed tokens and components;
 - [`implementation-roadmap.md`](../iris-uiux-audit/implementation-roadmap.md): the files each slice touches;
-- **`prototype/`**: a standalone HTML prototype of every redesigned page, for five roles. **It is the reference for how a screen should look and behave.** The screenshots beside it are a convenience: some predate the colour change in §4.9 (the list is in `redesign-recommendations.md` §18).
+- **`prototype/`**: a standalone HTML prototype of every redesigned page, for five roles. **It is the reference for how a screen should look and behave.** The screenshots the notes link to are a local convenience: the repository ignores `screenshots/` folders, so they are not committed, and some predate the colour change in §4.9 (`redesign-recommendations.md` §18).
 
 **How it relates to other documents.**
 - **[`frontend_redesign_spec.md`](frontend_redesign_spec.md) (IR-374) stays the redesign's authority.** This spec amends it only where §4 says *Amends IR-374*.
@@ -20,7 +20,7 @@ Sections 1–6 follow the project's `to-spec` template. Appendix A lists the tic
 
 ## 1. Problem statement
 
-The audit inspected live IRIS on 12–13 Nov 2026, read-only, as a student, an adviser, an ITSO coordinator, RDCO and a system admin, at 1440, 1024, 768, 390 and 360 px. It recorded 73 findings with ids. The ones that matter most:
+The audit inspected live IRIS on 12–13 Nov 2026, read-only, as a student, an adviser, an ITSO coordinator, RDCO and a system admin, at 1440, 1024, 768, 390 and 360 px. It recorded 70 findings (2 Critical, 9 High, 31 Medium, 28 Low). The ones that matter most:
 
 - **The workflow is hard to follow outside the record.** A notification still says "waiting for you" after the review is cleared (WF-01). Delete Requests' *Pending* tab lists a declined request (WF-02). A draft has no next step on My Library (WF-03). Which clearances survived a resubmission, the thesis contribution, is visible only inside the record (WF-06).
 - **Accessibility basics fail.** Every page is titled "IRIS" (NAV-01, WCAG 2.4.2, level A). Field outlines and placeholders fall below contrast minimums (A11Y-01, A11Y-02).

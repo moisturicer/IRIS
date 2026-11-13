@@ -19,6 +19,8 @@ An independent audit of the deployed IRIS (`https://iris-citu.duckdns.org/`), wi
 
 Original and prototype screenshots never share a folder, and prototype file names always start with `R`.
 
+**The screenshots are not in git.** The repository ignores every `screenshots/` folder (`.gitignore`: local design captures are not part of the repo), so on GitHub the images in these notes don't render. They exist only on the machine that took them. **The prototype is the reference:** open it at the route a note names. Some prototype captures also predate the colour change (`redesign-recommendations.md` §18).
+
 ## How the audit was done
 
 - **When and how.** On 12–13 Nov 2026, in a browser on the live site. One reviewer had the Student, Adviser, ITSO coordinator and RDCO accounts, and signed in to each themself. Pages were inspected at 1440, 1280, 768, 390 and 360 px by resizing the viewport. No action that changes a record was taken. The review workspace was added on 13 Nov, signed in as an ITSO reviewer, at 1440 and 1024 px.
