@@ -1,0 +1,185 @@
+{
+  "id": "a35b9d3e-9c48-4ea6-bdc3-b9990eeec45e",
+  "status": "completed",
+  "profile": "best",
+  "markdown": null,
+  "format_version": "2.0",
+  "metadata": {
+    "page_count": 1
+  },
+  "extracted_data": [],
+  "warnings": [],
+  "elements": [
+    {
+      "element_id": "07aa705f448b2b57ba455d680cd8fbf1",
+      "type": "Header",
+      "text": "IRIS contract fixture",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              245.49560546875,
+              124.74365234375
+            ],
+            [
+              245.49560546875,
+              158.31298828125
+            ],
+            [
+              495.9716796875,
+              158.31298828125
+            ],
+            [
+              495.9716796875,
+              124.74365234375
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "36eefd67b5a22cecde33bf448c018a85",
+      "type": "Title",
+      "text": "Two column study",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              244.04296875,
+              248.54736328125
+            ],
+            [
+              244.04296875,
+              307.2265625
+            ],
+            [
+              679.833984375,
+              307.2265625
+            ],
+            [
+              679.833984375,
+              248.54736328125
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "1a5e464c47482c899852da6ea30a7286",
+      "type": "NarrativeText",
+      "text": "Left column one opens.\nLeft column two continues.\n$$E = m c^2$$\nRight column one resumes.\nRight column two continues.\nRight column three ends.",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              245.2880859375,
+              384.3017578125
+            ],
+            [
+              245.2880859375,
+              669.23828125
+            ],
+            [
+              1556.396484375,
+              669.23828125
+            ],
+            [
+              1556.396484375,
+              384.3017578125
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 0.8066
+      }
+    },
+    {
+      "element_id": "39777069707c4231f64375acf84be820",
+      "type": "NarrativeText",
+      "text": "Left column three ends.",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              242.59033203125,
+              765.91796875
+            ],
+            [
+              242.59033203125,
+              806.201171875
+            ],
+            [
+              614.2578125,
+              806.201171875
+            ],
+            [
+              614.2578125,
+              765.91796875
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "b67f2f2ab05fbdae7195f7e846569f54",
+      "type": "PageNumber",
+      "text": "Page 1",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              1001.904296875,
+              2603.90625
+            ],
+            [
+              1001.904296875,
+              2640.4296875
+            ],
+            [
+              1094.873046875,
+              2640.4296875
+            ],
+            [
+              1094.873046875,
+              2603.90625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    }
+  ],
+  "source": {
+    "file_id": "two_columns-d7886720.pdf",
+    "filename": "two_columns.pdf",
+    "mimetype": "application/pdf",
+    "expires_at": "2026-11-14T14:23:35.850916Z"
+  }
+}

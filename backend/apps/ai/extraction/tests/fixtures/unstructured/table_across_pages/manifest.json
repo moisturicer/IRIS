@@ -1,0 +1,37 @@
+{
+  "fixture": "table_across_pages.pdf",
+  "pdf_sha256": "a7f05f3a7115fdb8cc87e55f2e66b203dd4cc502e44b9646711e11638e52195b",
+  "endpoint": "POST https://transform.unstructured.io/api/v2/parse",
+  "options": {
+    "output": "elements",
+    "profile": "balanced",
+    "include": [
+      "coordinates",
+      "table_html"
+    ]
+  },
+  "prefer": null,
+  "http_status": 200,
+  "location": null,
+  "polls": 0,
+  "job_id": "3323d2cc-e49d-4ccb-85db-efb6a8af9c65",
+  "status": "completed",
+  "profile": "balanced",
+  "format_version": "2.0",
+  "latency_seconds": 10.5,
+  "response_headers": {
+    "date": "Fri, 13 Nov 2026 14:22:45 GMT",
+    "content-type": "application/json",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive",
+    "server": "uvicorn"
+  },
+  "final_response_headers": {
+    "date": "Fri, 13 Nov 2026 14:22:45 GMT",
+    "content-type": "application/json",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive",
+    "server": "uvicorn"
+  },
+  "recorded_at": "2026-11-13T14:22:45+00:00"
+}

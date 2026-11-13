@@ -1,0 +1,311 @@
+{
+  "id": "3323d2cc-e49d-4ccb-85db-efb6a8af9c65",
+  "status": "completed",
+  "profile": "balanced",
+  "markdown": null,
+  "format_version": "2.0",
+  "metadata": {
+    "page_count": 2
+  },
+  "extracted_data": [],
+  "warnings": [],
+  "elements": [
+    {
+      "element_id": "1e0ac7d4cedab4ca068aeabdc9483ad5",
+      "type": "Header",
+      "text": "IRIS contract fixture",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              246.1181640625,
+              124.8779296875
+            ],
+            [
+              246.1181640625,
+              158.58154296875
+            ],
+            [
+              495.556640625,
+              158.58154296875
+            ],
+            [
+              495.556640625,
+              124.8779296875
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "16e67375f1a26b93f6ce5dc3bab7031f",
+      "type": "Title",
+      "text": "Measurements",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              245.91064453125,
+              249.755859375
+            ],
+            [
+              245.91064453125,
+              299.169921875
+            ],
+            [
+              592.67578125,
+              299.169921875
+            ],
+            [
+              592.67578125,
+              249.755859375
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "84492b19439b973d83ab8343d7dbe0da",
+      "type": "NarrativeText",
+      "text": "The table below continues onto the next page.",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              244.66552734375,
+              328.4423828125
+            ],
+            [
+              244.66552734375,
+              372.216796875
+            ],
+            [
+              958.740234375,
+              372.216796875
+            ],
+            [
+              958.740234375,
+              328.4423828125
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "c568b08221f8786c3e2f031ddba3a354",
+      "type": "Table",
+      "text": "Sample Mass Row 01 401 g Row 02 402 g Row 03 403 g Row 04 404 g Row 05 405 g Row 06 406 g Row 07 407 g Row 08 408 g Row 09 409 g Row 10 410 g Row 11 411 g Row 12 412 g Row 13 413 g Row 14 414 g Row 15 415 g Row 16 416 g Row 17 417 g Row 18 418 g Row 19 419 g Row 20 420 g Row 21 421 g Row 22 422 g Row 23 423 g Row 24 424 g Row 25 425 g Row 26 426 g Row 27 427 g Row 28 428 g\nRow 29 429 g Row 30 430 g",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": [
+          {
+            "points": [
+              [
+                243.212890625,
+                418.408203125
+              ],
+              [
+                243.212890625,
+                2401.953125
+              ],
+              [
+                527.5146484375,
+                2401.953125
+              ],
+              [
+                527.5146484375,
+                418.408203125
+              ]
+            ],
+            "system": "PixelSpace",
+            "layout_width": 2125,
+            "layout_height": 2750,
+            "page_number": 1
+          },
+          {
+            "points": [
+              [
+                245.91064453125,
+                278.22265625
+              ],
+              [
+                245.91064453125,
+                393.701171875
+              ],
+              [
+                523.779296875,
+                393.701171875
+              ],
+              [
+                523.779296875,
+                278.22265625
+              ]
+            ],
+            "system": "PixelSpace",
+            "layout_width": 2125,
+            "layout_height": 2750,
+            "page_number": 2
+          }
+        ],
+        "text_as_html": "<table><thead><tr><th>Sample</th><th>Mass</th></tr></thead><tbody><tr><td>Row 01</td><td>401 g</td></tr><tr><td>Row 02</td><td>402 g</td></tr><tr><td>Row 03</td><td>403 g</td></tr><tr><td>Row 04</td><td>404 g</td></tr><tr><td>Row 05</td><td>405 g</td></tr><tr><td>Row 06</td><td>406 g</td></tr><tr><td>Row 07</td><td>407 g</td></tr><tr><td>Row 08</td><td>408 g</td></tr><tr><td>Row 09</td><td>409 g</td></tr><tr><td>Row 10</td><td>410 g</td></tr><tr><td>Row 11</td><td>411 g</td></tr><tr><td>Row 12</td><td>412 g</td></tr><tr><td>Row 13</td><td>413 g</td></tr><tr><td>Row 14</td><td>414 g</td></tr><tr><td>Row 15</td><td>415 g</td></tr><tr><td>Row 16</td><td>416 g</td></tr><tr><td>Row 17</td><td>417 g</td></tr><tr><td>Row 18</td><td>418 g</td></tr><tr><td>Row 19</td><td>419 g</td></tr><tr><td>Row 20</td><td>420 g</td></tr><tr><td>Row 21</td><td>421 g</td></tr><tr><td>Row 22</td><td>422 g</td></tr><tr><td>Row 23</td><td>423 g</td></tr><tr><td>Row 24</td><td>424 g</td></tr><tr><td>Row 25</td><td>425 g</td></tr><tr><td>Row 26</td><td>426 g</td></tr><tr><td>Row 27</td><td>427 g</td></tr><tr><td>Row 28</td><td>428 g</td></tr><tr><td>Row 29</td><td>429 g</td></tr><tr><td>Row 30</td><td>430 g</td></tr></tbody></table>",
+        "parse_confidence": 0.9896
+      }
+    },
+    {
+      "element_id": "304460f97d8cc93406d472881dfa1840",
+      "type": "PageNumber",
+      "text": "Page 1",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              1002.734375,
+              2603.90625
+            ],
+            [
+              1002.734375,
+              2640.4296875
+            ],
+            [
+              1094.04296875,
+              2640.4296875
+            ],
+            [
+              1094.04296875,
+              2603.90625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "9455934e45aca826196bc2bf9a1ee072",
+      "type": "Header",
+      "text": "IRIS contract fixture",
+      "metadata": {
+        "page_number": 2,
+        "coordinates": {
+          "points": [
+            [
+              245.703125,
+              124.20654296875
+            ],
+            [
+              245.703125,
+              158.31298828125
+            ],
+            [
+              495.556640625,
+              158.31298828125
+            ],
+            [
+              495.556640625,
+              124.20654296875
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "931e2bf6a0060e8428529543595d386b",
+      "type": "NarrativeText",
+      "text": "The paragraph after the table.",
+      "metadata": {
+        "page_number": 2,
+        "coordinates": {
+          "points": [
+            [
+              244.25048828125,
+              486.3525390625
+            ],
+            [
+              244.25048828125,
+              530.126953125
+            ],
+            [
+              709.3017578125,
+              530.126953125
+            ],
+            [
+              709.3017578125,
+              486.3525390625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "ba5bb5100cf761f36bdf785ba4b6873e",
+      "type": "PageNumber",
+      "text": "Page 2",
+      "metadata": {
+        "page_number": 2,
+        "coordinates": {
+          "points": [
+            [
+              1002.734375,
+              2603.90625
+            ],
+            [
+              1002.734375,
+              2640.4296875
+            ],
+            [
+              1099.0234375,
+              2640.4296875
+            ],
+            [
+              1099.0234375,
+              2603.90625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    }
+  ],
+  "source": {
+    "file_id": "table_across_pages-94e37831.pdf",
+    "filename": "table_across_pages.pdf",
+    "mimetype": "application/pdf",
+    "expires_at": "2026-11-14T14:22:35.073700Z"
+  }
+}

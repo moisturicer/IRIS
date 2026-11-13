@@ -1,0 +1,411 @@
+{
+  "notes": "hi_res Formula boxes cropped at 300 dpi and transcribed by each model via OpenRouter (temperature 0), scored against the authors' arXiv LaTeX after expanding their macros and normalizing typesetting-equivalent notation (latex_truth.py). 'hand' classifies every non-exact row, read by hand. Counts only; no paper text. Proxy tier (ADR-023). The measured run's prompt lost two backslashes to shell quoting: the tag instruction reached the models as a tab plus 'ag{n}', and the display-math delimiter as a bare bracket. latex_ocr.py here holds the corrected prompt and has not been re-run.",
+  "arxiv_ids": {
+    "38": "2609.20331v1",
+    "58": "2609.19207v1",
+    "25": "2609.35471v1",
+    "40": "2609.35661v1"
+  },
+  "models": {
+    "anthropic/claude-haiku-5.5": {
+      "equations": 36,
+      "exact_after_normalization": 30,
+      "cost_usd": 0.0036,
+      "rows": [
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": false,
+          "similarity": 0.988,
+          "hand": "format slip: $ delimiters"
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "25",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "25",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "25",
+          "exact": false,
+          "similarity": 0.974,
+          "hand": "notation only"
+        },
+        {
+          "paper": "25",
+          "exact": false,
+          "similarity": 0.74,
+          "hand": "notation only"
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": false,
+          "similarity": 0.984,
+          "hand": "format slip: $$ delimiters"
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": false,
+          "similarity": 0.771,
+          "hand": "notation only (rightarrow for to)"
+        },
+        {
+          "paper": "40",
+          "exact": false,
+          "similarity": 0.836,
+          "hand": "error: three aligned equations run onto one line"
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        }
+      ]
+    },
+    "anthropic/claude-sonnet-5.5": {
+      "equations": 36,
+      "exact_after_normalization": 31,
+      "cost_usd": 0.0595,
+      "rows": [
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "38",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": false,
+          "similarity": 0.937,
+          "hand": "cosmetic: 'bytes' set bold"
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "58",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "25",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "25",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "25",
+          "exact": false,
+          "similarity": 0.974,
+          "hand": "notation only"
+        },
+        {
+          "paper": "25",
+          "exact": false,
+          "similarity": 0.74,
+          "hand": "cosmetic: brackets sized with left/right"
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        },
+        {
+          "paper": "40",
+          "exact": false,
+          "similarity": 0.996,
+          "hand": "notation only"
+        },
+        {
+          "paper": "40",
+          "exact": false,
+          "similarity": 0.836,
+          "hand": "notation only"
+        },
+        {
+          "paper": "40",
+          "exact": true,
+          "similarity": 1.0
+        }
+      ]
+    }
+  },
+  "unstructured_generative_ocr": {
+    "paper": "38",
+    "formulas": 7,
+    "changed": 0,
+    "reason": "every Formula is_extracted=true (text layer); Generative OCR skips those, as documented"
+  },
+  "unstructured_vlm_formulas": {
+    "papers": [
+      "38",
+      "58"
+    ],
+    "formulas": 14,
+    "exact_after_normalization": 5,
+    "similarity_ge_0_95": 12
+  }
+}

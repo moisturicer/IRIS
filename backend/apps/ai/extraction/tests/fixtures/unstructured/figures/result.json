@@ -1,0 +1,284 @@
+{
+  "id": "817c46d6-1abf-4126-a4f2-3d41dc22f9aa",
+  "status": "completed",
+  "profile": "balanced",
+  "markdown": null,
+  "format_version": "2.0",
+  "metadata": {
+    "page_count": 1
+  },
+  "extracted_data": [],
+  "warnings": [],
+  "elements": [
+    {
+      "element_id": "4a4b0d9d0ea95290d6d0b7e40b8c559b",
+      "type": "NarrativeText",
+      "text": "IRIS contract fixture",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              245.703125,
+              124.3408203125
+            ],
+            [
+              245.703125,
+              158.58154296875
+            ],
+            [
+              495.556640625,
+              158.58154296875
+            ],
+            [
+              495.556640625,
+              124.3408203125
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "b4e1546469d1fa4a5b752d872601eb59",
+      "type": "NarrativeText",
+      "text": "Figures and formulas",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              244.25048828125,
+              247.8759765625
+            ],
+            [
+              244.25048828125,
+              305.078125
+            ],
+            [
+              746.240234375,
+              305.078125
+            ],
+            [
+              746.240234375,
+              247.8759765625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "e0359a714407a257e597d94a22cdf76f",
+      "type": "NarrativeText",
+      "text": "A captioned figure comes first.",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              243.6279296875,
+              327.3681640625
+            ],
+            [
+              243.6279296875,
+              370.3369140625
+            ],
+            [
+              718.4326171875,
+              370.3369140625
+            ],
+            [
+              718.4326171875,
+              327.3681640625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 0.8763
+      }
+    },
+    {
+      "element_id": "3c57cf08336f942471696ca83998192f",
+      "type": "NarrativeText",
+      "text": "Figure 1: A captioned rectangle.",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              244.66552734375,
+              833.056640625
+            ],
+            [
+              244.66552734375,
+              874.951171875
+            ],
+            [
+              693.9453125,
+              874.951171875
+            ],
+            [
+              693.9453125,
+              833.056640625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "102c50f14622a574afd5817db74f15bd",
+      "type": "NarrativeText",
+      "text": "An uncaptioned figure follows.",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              243.212890625,
+              941.015625
+            ],
+            [
+              243.212890625,
+              983.984375
+            ],
+            [
+              713.4521484375,
+              983.984375
+            ],
+            [
+              713.4521484375,
+              941.015625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 0.8746
+      }
+    },
+    {
+      "element_id": "7feb8e9d12e9f203a14659b53cee497a",
+      "type": "NarrativeText",
+      "text": "a^2 + b^2 = c^2",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              410.4736328125,
+              1497.4609375
+            ],
+            [
+              410.4736328125,
+              1540.4296875
+            ],
+            [
+              710.1318359375,
+              1540.4296875
+            ],
+            [
+              710.1318359375,
+              1497.4609375
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 0.2729
+      }
+    },
+    {
+      "element_id": "68e377c09cc346581d31f31a6de40ba8",
+      "type": "NarrativeText",
+      "text": "The formula above closes the page.",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              243.83544921875,
+              1599.51171875
+            ],
+            [
+              243.83544921875,
+              1644.62890625
+            ],
+            [
+              802.685546875,
+              1644.62890625
+            ],
+            [
+              802.685546875,
+              1599.51171875
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    },
+    {
+      "element_id": "b1e0e5684fd812fe574d63f8879b79ae",
+      "type": "NarrativeText",
+      "text": "Page 1",
+      "metadata": {
+        "page_number": 1,
+        "coordinates": {
+          "points": [
+            [
+              1002.734375,
+              2603.90625
+            ],
+            [
+              1002.734375,
+              2640.4296875
+            ],
+            [
+              1094.873046875,
+              2640.4296875
+            ],
+            [
+              1094.873046875,
+              2603.90625
+            ]
+          ],
+          "system": "PixelSpace",
+          "layout_width": 2125,
+          "layout_height": 2750
+        },
+        "text_as_html": null,
+        "parse_confidence": 1.0
+      }
+    }
+  ],
+  "source": {
+    "file_id": "figures-1529f7b7.pdf",
+    "filename": "figures.pdf",
+    "mimetype": "application/pdf",
+    "expires_at": "2026-11-14T14:22:46.026274Z"
+  }
+}

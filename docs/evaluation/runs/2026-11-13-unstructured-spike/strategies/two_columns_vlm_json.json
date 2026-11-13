@@ -1,0 +1,287 @@
+[
+  {
+    "type": "UncategorizedText",
+    "element_id": "6b37173e9c5180e77bfe620773f2ef81",
+    "text": "",
+    "metadata": {
+      "page_number": 1,
+      "text_as_html": "<div class=\"Page\" data-page-number=\"1\"></div>",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "Header",
+    "element_id": "8d939f9d4f5fdf54f6a8aa53e497bcc8",
+    "text": "IRIS contract fixture",
+    "metadata": {
+      "page_number": 1,
+      "text_as_html": "<header class=\"Header\"><p class=\"Paragraph\">IRIS contract fixture</p></header>",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "6e9223d5ab68fb32782e9c0001a54021",
+    "text": "Two column study",
+    "metadata": {
+      "category_depth": 0,
+      "page_number": 1,
+      "text_as_html": "<h1 class=\"Title\">Two column study</h1>",
+      "parent_id": "8d939f9d4f5fdf54f6a8aa53e497bcc8",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "UncategorizedText",
+    "element_id": "46a00f49ac4707e94aef48456d972513",
+    "text": "",
+    "metadata": {
+      "page_number": 1,
+      "parent_id": "6b37173e9c5180e77bfe620773f2ef81",
+      "text_as_html": "<div class=\"Column\"></div>",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "95d141d9cc28118155774c26ed1475d1",
+    "text": "Left column one opens. Left column two continues.",
+    "metadata": {
+      "page_number": 1,
+      "text_as_html": "<p class=\"NarrativeText\">Left column one opens.</p><p class=\"NarrativeText\">Left column two continues.</p>",
+      "parent_id": "6e9223d5ab68fb32782e9c0001a54021",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "Formula",
+    "element_id": "4efb7c33be4b40d71540216b86e43ae2",
+    "text": "$$E = m c^2$$",
+    "metadata": {
+      "page_number": 1,
+      "text_as_html": "<math class=\"Equation\">$$E = m c^2$$</math>",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "9263239a617c5210df7d7722a9c9e8bd",
+    "text": "Left column three ends.",
+    "metadata": {
+      "page_number": 1,
+      "text_as_html": "<p class=\"NarrativeText\">Left column three ends.</p>",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "UncategorizedText",
+    "element_id": "fd4170c22a24ebf771bd04cf5837fc8e",
+    "text": "",
+    "metadata": {
+      "page_number": 1,
+      "parent_id": "6b37173e9c5180e77bfe620773f2ef81",
+      "text_as_html": "<div class=\"Column\"></div>",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "a564abd30159e1b806bf00f80a63ee63",
+    "text": "Right column one resumes. Right column two continues. Right column three ends.",
+    "metadata": {
+      "page_number": 1,
+      "text_as_html": "<p class=\"NarrativeText\">Right column one resumes.</p><p class=\"NarrativeText\">Right column two continues.</p><p class=\"NarrativeText\">Right column three ends.</p>",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "Footer",
+    "element_id": "44300994d71739b0a980d7b787469715",
+    "text": "Page 1",
+    "metadata": {
+      "page_number": 1,
+      "text_as_html": "<footer class=\"Footer\"><span class=\"PageNumber\">Page 1</span></footer>",
+      "enrichment_origins": {
+        "text": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ],
+        "text_as_html": [
+          {
+            "type": "vlm_partition",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6"
+          }
+        ]
+      },
+      "partitioner_type": "vlm_partition",
+      "filename": "two_columns-485a69b0.pdf",
+      "filetype": "application/pdf"
+    }
+  }
+]
