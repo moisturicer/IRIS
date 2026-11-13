@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** — 2026-11-14 (IR-977). The decisions come from a design session with Hermoine Zozobrado on 2026-11-13–14. Not built yet.
+**Accepted** — 2026-11-14 (IR-977): approved by Jive Tyler Revalde and merged (PR #720), as relayed by Hermoine Zozobrado. The decisions come from a design session with Hermoine Zozobrado on 2026-11-13–14. Not built yet.
 
 It amends [ADR-018](018-conditional-parallel-office-routing.md) (KTTO's review question is IP; commercial potential is TBI's, and `for_commercialization` hints at TBI) and [ADR-066](066-ip-applications-beside-publishing.md) (a publishing-gate override notifies the office that owns the application). It follows [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) for TBI's pool, seats and coordinators, and [ADR-051](051-system-admin-account-deletion-and-consent.md) §4 for who grants its role.
 

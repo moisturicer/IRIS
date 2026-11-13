@@ -17,7 +17,7 @@
 > beside the paper's review. ITSO's review may recommend one but owns none. KTTO's "commercial
 > potential" scope in the table below moves to TBI (IR-977, IR-979).
 
-> **Amended by [ADR-068](068-tbi-is-a-specialist-office.md)** (Proposed 2026-11-14, IR-977): TBI is a
+> **Amended by [ADR-068](068-tbi-is-a-specialist-office.md)** (Accepted 2026-11-14, IR-977): TBI is a
 > fourth specialist office, and commercial potential is its review question. KTTO's row in the table
 > below now reads "IP: whether to protect, and whether to file before publication", and
 > `for_commercialization` hints at TBI, not KTTO.
