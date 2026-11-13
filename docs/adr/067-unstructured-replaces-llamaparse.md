@@ -2,11 +2,11 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-13 (IR-981). The decisions are Jive Tyler Revalde's, from the IR-980 design session on 2026-11-13. Merging this PR records acceptance. No adviser confirmation and no CIT-U data protection officer's review is recorded (IR-123).
+**Accepted on merge** — 2026-11-13 (IR-981). The decisions are Jive Tyler Revalde's, from the IR-980 design session on 2026-11-13. Merging this PR records acceptance by the reviewer who approves it; the PR names them. No adviser confirmation and no CIT-U data protection officer's review is recorded (IR-123).
 
 **Not built.** LlamaParse stays the running Extractor until both gates in decision 2 pass and IR-988 runs. Until then this ADR decides what IRIS is moving to and how the move is judged; it changes no behaviour.
 
-**Supersedes [ADR-056](056-manuscript-extraction-moves-to-llamaparse.md) decisions 1, 2, 3, 8 and 9** (the vendor, its pinning, what is requested, its labels and its Figure crops) once the cutover runs. **Amends ADR-056 decision 4** (what the stored raw result is). ADR-056 decisions 5–7, 10–13 and 16 carry over unchanged, and so do its IR-851, IR-859 and IR-879/IR-883 amendments where they still apply (decision 12). ADR-056 stays `Accepted` until IR-988, then becomes `Superseded by ADR-067`.
+**Supersedes [ADR-056](056-manuscript-extraction-moves-to-llamaparse.md) decisions 1, 2, 3, 8 and 9** (the vendor, its pinning, what is requested, its labels and its Figure crops) once the cutover runs. **Amends ADR-056 decision 4** (what the stored raw result is). **Replaces ADR-056 decision 14** (LlamaParse's acceptance check against Docling) with this ADR's two gates (decision 2). Decision 15 was already withdrawn. ADR-056 decisions 5–7, 10, 12 and 16 carry over unchanged, decisions 11 and 13 carry over adapted to Unstructured (decision 9), and so do its IR-851, IR-859 and IR-879/IR-883 amendments where they still apply (decision 12). ADR-056 stays `Accepted` until IR-988, then becomes `Superseded by ADR-067`.
 
 **Amends [ADR-013](013-chunk-level-rag-pipeline.md)'s 2026-09-21 amendment**: the 700-token ceiling becomes a tested target size plus a safety ceiling (decision 14).
 
@@ -80,7 +80,7 @@ The chunker also has more strategies than it needs: `structural-markdown-v1` (th
    | `CodeSnippet` | code, kept whole |
    | `Header`, `Footer` | page furniture, not chunked; `Footer` feeds the printed page number |
    | `PageNumber` | printed page number, not chunked |
-   | `PageBreak` | a check on page boundaries |
+   | `PageBreak` | confirms the page boundary `page_number` gives |
    | `Address`, `EmailAddress` | **dropped from chunks and embedded text** as personal data; kept in the stored raw result |
    | `CompositeElement` | refused: IRIS does not use Unstructured's chunking |
 
@@ -98,7 +98,9 @@ The chunker also has more strategies than it needs: `structural-markdown-v1` (th
 
 ### Carried over from ADR-056
 
-9. **Unchanged:** the disclosure gate decides every call (decision 5); every attempt is admitted and charged under ADR-041 (decision 6), at Unstructured's price (IR-983); vendor copies are removed, with the uploaded file deleted on success and failure (decision 7); Figures are described for retrieval only and never shown (decision 10); formulas are display only (decisions 11, 12); IRIS builds chunks and Voyage embeds them, and Unstructured's chunking and embedders are not used (decision 13); low-confidence pages are flagged, not dropped (decision 16).
+9. **Carried over from ADR-056.**
+   - **Unchanged:** the disclosure gate decides every call (decision 5); every attempt is admitted and charged under ADR-041 (decision 6), at Unstructured's price (IR-983); vendor copies are removed, with the uploaded file deleted on success and failure (decision 7); Figures are described for retrieval only and never shown (decision 10); ADR-025's carried-forward rules (decision 12); low-confidence pages are flagged, not dropped (decision 16).
+   - **Adapted:** formulas stay display only and out of the embedded text (decision 11), but are found as Unstructured `Formula` elements rather than by LaTeX delimiters in LlamaParse's text. IRIS still builds chunks and Voyage embeds them, and Unstructured's chunking and embedders are not used (decision 13), but chunks start at the headings the cascade places (decision 7) and their length follows decision 14, not one chunk limit.
 10. **Figures.** A Figure is the image Unstructured returns as `image_base64`, stored by IRIS with the Manuscript and served only through Django's permission layer, as ADR-056 decision 9 required of LlamaParse's crops.
 
 ### Chunking
@@ -108,7 +110,7 @@ The chunker also has more strategies than it needs: `structural-markdown-v1` (th
 13. **Every chunking change ships off or behind measurement** (ADR-033 §5). Run files record the extractor, strategy, options and tokenizer.
 14. **Amends ADR-013's 2026-09-21 amendment: one ceiling becomes two numbers.**
     - The **target size** is the chunk length the packer aims for. It starts at 700 tokens and is chosen by a sweep over 300, 400, 550, 700 and 1,000 on the winning strategy (IR-1054).
-    - The **safety ceiling** (about 2,000 tokens) is the length no chunk may exceed. The chunker's property tests guarantee it, whatever the target.
+    - The **safety ceiling** is 2,000 tokens: no chunk may exceed it, and the chunker's property tests check that whatever the target. Changing the number needs an amendment here.
 
     The unit stays real `voyage-context-4` tokens (IR-287).
 
@@ -164,7 +166,7 @@ Extraction stays per tenant and per page. Unstructured's Asia-Pacific regions an
 ## Security Impact
 
 - **Manuscripts leave the deployment for Unstructured instead of LlamaParse**, behind the same consent and embargo gate and ADR-041 admission.
-- Unstructured's VLM partitioner sends pages to a model provider (Anthropic by default, through Unstructured's own key). Which provider, and whose key, is an open condition (below).
+- Unstructured's VLM partitioner sends pages to a model provider (Anthropic by default, through Unstructured's own key, per [the vendor comparison](proposals/056-extraction-vendor-comparison.md) §5). Which provider, and whose key, is an open condition (below).
 - `Address` and `EmailAddress` elements are kept out of chunks and embedded text, so they never reach Voyage, a prompt or a citation. They stay in the stored raw result, which is never served to readers.
 - Figure images are served only through the permission layer.
 
@@ -178,7 +180,7 @@ Extraction and chunking become measured choices: two gate reports, a strategy co
 
 ## Open conditions
 
-These block the cutover, not construction:
+These are terms and price checks, like ADR-056's, not quality gates: the gates decide whether Unstructured reads well enough, and these decide whether IRIS may send it real Manuscripts. They block production enablement, not construction:
 
 1. **Retention in writing.** How long Transform keeps uploaded files and results, and whether the shared service trains on them.
 2. **Model provider.** Which provider reads pages and whether IRIS passes its own `provider_api_key`.
