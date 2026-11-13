@@ -20,8 +20,10 @@ ending is remembered on the notification:
   left `open`/`pending`);
 - `settle_record` runs **before** each of the two reopening paths, so a task
   that ended is stamped before its row is reopened;
-- the notification endpoints settle what the reader can see before answering,
-  so anything else that ended is stamped the first time it is looked at.
+- the notification list endpoint settles what the reader can see before
+  answering, so anything else that ended is stamped the first time it is
+  looked at. Only unresolved, task-bound notifications are read, one small
+  lookup each; a notification that has settled is never read again.
 
 The label is built only from workflow facts the recipient already sees (the
 office, the seat holder, the date): it never names a record they cannot read.
@@ -85,7 +87,8 @@ def _assignment(notification):
             .order_by("assigned_at", "pk").first()
         )
         if seat is not None:
-            who = seat.reviewer.get_full_name() or seat.reviewer.email if seat.reviewer else "a colleague"
+            holder = seat.reviewer
+            who = (holder.get_full_name() or holder.email) if holder else "a colleague"
             verb = "Claimed by" if seat.source == "claimed" else "Taken by"
             return seat.assigned_at, f"{verb} {who} on {_day(seat.assigned_at)}"
     return _closed_assignment(assignment, notification)
@@ -201,7 +204,7 @@ def settle(notifications) -> int:
 
 
 def settle_for(user) -> int:
-    """Settle what `user` can see: called before a list, a read or a mark-all."""
+    """Settle what `user` can see: called by the list endpoint before it answers."""
     return settle(Notification.objects.visible_to(user))
 
 

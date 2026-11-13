@@ -15,6 +15,11 @@ describe("notificationTypeLabel", () => {
     expect(notificationTypeLabel("Some New Thing (internal)")).toBe("Some new thing");
   });
 
+  it("keeps an acronym's capitals", () => {
+    expect(notificationTypeLabel("IERC Decision Recorded")).toBe("IERC decision recorded");
+    expect(notificationTypeLabel("Sent To RDCO")).toBe("Sent to RDCO");
+  });
+
   it("says nothing for a blank type", () => {
     expect(notificationTypeLabel("")).toBe("");
   });

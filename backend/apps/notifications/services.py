@@ -53,7 +53,12 @@ def _task(kind, row) -> dict:
     """
     if row is None:
         return {}
-    return {"task_kind": kind, "task_id": row.pk}
+    return _task_id(kind, row.pk)
+
+
+def _task_id(kind, pk) -> dict:
+    """The same binding, for a task known only by its id (a seat the caller looked up)."""
+    return {"task_kind": kind, "task_id": pk}
 
 
 def _log_failure(event: str, *, record=None, request=None, user=None):
@@ -222,7 +227,7 @@ def notify_routed(
             Notification.objects.create(
                 sender=actor, recipient=nominee, record=record,
                 notif_type=notif_type, message=message,
-                **({"task_kind": TaskKind.SEAT, "task_id": seat} if seat else {}),
+                **(_task_id(TaskKind.SEAT, seat) if seat else {}),
             )
             send_email_async(
                 subject=f"[IRIS] You were nominated to review: {title[:60]}",
@@ -497,7 +502,7 @@ def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: st
                 record=record,
                 notif_type=notif_type,
                 message=message,
-                **({"task_kind": TaskKind.SEAT, "task_id": seat_ids[reviewer.pk]}
+                **(_task_id(TaskKind.SEAT, seat_ids[reviewer.pk])
                    if reviewer.pk in seat_ids else {}),
             )
     except Exception:

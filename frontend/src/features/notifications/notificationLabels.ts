@@ -21,5 +21,13 @@ export function notificationTypeLabel(name: string): string {
   if (known) return known;
   const base = name.split(/\s+[(-]/)[0].trim();
   if (!base) return "";
-  return base.charAt(0).toUpperCase() + base.slice(1).toLowerCase();
+  // Sentence case, but an acronym ("IERC", "RDCO") keeps its capitals.
+  const words = base.split(/\s+/).map((word, i) =>
+    word.length > 1 && word === word.toUpperCase() ? word : i === 0 ? word : word.toLowerCase(),
+  );
+  const first = words[0];
+  words[0] = first.length > 1 && first === first.toUpperCase()
+    ? first
+    : first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+  return words.join(" ");
 }
