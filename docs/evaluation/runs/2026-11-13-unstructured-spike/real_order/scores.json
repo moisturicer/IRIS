@@ -1,5 +1,5 @@
 {
-  "notes": "Proxy tier (ADR-023): never a finding about CIT-U research. Counts only. inversions = right-to-left column back-jumps within a page; merged_across_columns = blocks that start in one column and end in the other, excluding a paragraph flowing from the foot of the left column to the head of the right. Only two-column pages (<5% of lines cross the middle) and blocks of >=100 characters are scored.",
+  "notes": "Proxy tier (ADR-023): never a finding about CIT-U research. Counts only. inversions = right-to-left column back-jumps within a page; merged_across_columns = blocks that start in one column and end in the other, excluding a paragraph flowing from the foot of the left column to the head of the right. Only two-column pages (<5% of lines cross the middle) and blocks of >=100 characters are scored. Platform fast/auto/hi_res re-run 2026-11-14 on all four papers; hi_res paper 40 completed in 43 s on retry. The single remaining back-jump for hi_res (paper 40 p12) and LlamaParse (paper 25 p12) is a figure caption placed before body text, read by hand.",
   "papers": {
     "38": "State-Space-Based FIR Filtering on a Quantum Computer",
     "58": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
@@ -101,7 +101,33 @@
       "25": null,
       "40": null
     },
-    "Unstructured hi_res": {
+    "Unstructured Platform fast": {
+      "38": {
+        "two_column_pages": 5,
+        "blocks_scored": 67,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "58": {
+        "two_column_pages": 5,
+        "blocks_scored": 54,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "25": {
+        "two_column_pages": 16,
+        "blocks_scored": 105,
+        "inversions": 2,
+        "merged_across_columns": 1
+      },
+      "40": {
+        "two_column_pages": 14,
+        "blocks_scored": 155,
+        "inversions": 2,
+        "merged_across_columns": 0
+      }
+    },
+    "Unstructured Platform auto": {
       "38": {
         "two_column_pages": 5,
         "blocks_scored": 47,
@@ -120,9 +146,40 @@
         "inversions": 0,
         "merged_across_columns": 1
       },
-      "40": null
+      "40": {
+        "two_column_pages": 14,
+        "blocks_scored": 121,
+        "inversions": 1,
+        "merged_across_columns": 0
+      }
     },
-    "Unstructured vlm": {
+    "Unstructured Platform hi_res": {
+      "38": {
+        "two_column_pages": 5,
+        "blocks_scored": 47,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "58": {
+        "two_column_pages": 5,
+        "blocks_scored": 64,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "25": {
+        "two_column_pages": 16,
+        "blocks_scored": 91,
+        "inversions": 0,
+        "merged_across_columns": 1
+      },
+      "40": {
+        "two_column_pages": 14,
+        "blocks_scored": 121,
+        "inversions": 1,
+        "merged_across_columns": 0
+      }
+    },
+    "Unstructured Platform vlm": {
       "38": {
         "two_column_pages": 5,
         "blocks_scored": 44,

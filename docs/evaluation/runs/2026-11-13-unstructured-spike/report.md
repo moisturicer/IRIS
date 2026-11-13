@@ -8,14 +8,16 @@ because the `two_columns` fixture also fails LlamaParse and Docling (see
 
 | Gate rule (ADR-067 §2) | `hi_res`, Platform API | Transform (as first recorded) |
 |---|---|---|
-| Coordinates on >90% of text elements | ✅ 0 missing of 492 (papers 38, 58, 25) | ✅ 0 missing of 939 |
-| Reading order on real two-column pages | ✅ 0 back-jumps on 35 pages (LlamaParse: 1, Docling: 0) | ❌ 14 back-jumps on 40 pages |
+| Coordinates on >90% of text elements | ✅ 0 missing of 772 (papers 38, 58, 25, 40) | ✅ 0 missing of 939 |
+| Reading order on real two-column pages | ✅ 1 back-jump on 40 pages, a figure caption (LlamaParse: 1, also a caption; Docling: 0) | ❌ 14 back-jumps on 40 pages |
 | Reading order on the `two_columns` fixture | ❌ but every vendor fails it | ❌ |
 
-**Not measured:**
-- `hi_res` on paper 40 (14 two-column pages): the synchronous call timed out
-  after 900 s. It is the paper where Transform made 8 of its 14 errors.
-- `hi_res` on the coordinate gate's other proxy papers (21, 40, 52).
+**Not measured:** `hi_res` on proxy papers 21 and 52. Both are single-column,
+so they do not test column order; only their coordinate coverage is missing.
+
+**`auto` matched `hi_res` exactly** on all four papers, so it routed every one
+of these pages to `hi_res`. **`fast`** made 4 back-jumps and returned no
+`Formula` elements and no table HTML.
 
 **Follow-ups:**
 - ADR-067 names Transform, so adopting `hi_res` needs an amendment.
@@ -267,13 +269,23 @@ Scorer and counts are in `real_order/`.
 | Docling (previous Extractor) | 0 | 0 | 0 | 0 | **0** |
 | Unstructured Transform `balanced` | 1 | 2 | 3 | 8 | **14** |
 | Unstructured Transform `best` | 1 | 2 | — | — | 3 on two papers |
-| Unstructured Platform `hi_res` | 0 | 0 | 0 | — (timed out) | **0** on three papers |
+| Unstructured Platform `fast` | 0 | 0 | 2 | 2 | **4**, with no `Formula` and no table HTML |
+| Unstructured Platform `auto` | 0 | 0 | 0 | 1 | **1**, identical to `hi_res` |
+| Unstructured Platform `hi_res` | 0 | 0 | 0 | 1 | **1** |
 | Unstructured Platform `vlm` (forced) | 0 | 0 | — | — | 0 on two papers, but no coordinates |
 
 On these pages, cross-column merges are 0 or 1 for every extractor.
 
+**The two single back-jumps are figure captions.** For `hi_res` (paper 40,
+page 12) and LlamaParse (paper 25, page 12), a figure caption was placed just
+before body text. Read by hand, neither is a column misread.
+
+**Paper 40 timed out only once.** The first `hi_res` call gave up after 900 s;
+on retry, the same paper finished in 43 s. The timeout was transient, not
+caused by the paper.
+
 **`hi_res` meets both rules on real papers.** It reads them in order, and
-every text element on papers 38, 58 and 25 has a box: 0 missing of 492. It
+every text element on all four papers has a box: 0 missing of 772. It
 also returns `Formula` elements, table HTML, `parent_id` and, when asked,
 `image_base64`.
 
@@ -311,7 +323,8 @@ Transform.
 
 **For the client (IR-985):**
 - Use a background job, or a client-side page split, instead of the
-  synchronous partition call: paper 40 timed out on it.
+  synchronous partition call: paper 40 timed out once on it
+  (it took 43 s on retry).
 - Send `coordinates=true`, `pdf_infer_table_structure=true` and
   `extract_image_block_types`.
 
@@ -324,6 +337,5 @@ Transform.
 - An ADR-067 amendment recording this decision, that the gate was restated
   on real pages, and these numbers.
 - The Platform API's billing and retention terms.
-- A `hi_res` read of paper 40.
 - A Platform recording of the four fixtures for IR-985's tests. The recordings
   committed under `fixtures/unstructured/` are Transform's.
