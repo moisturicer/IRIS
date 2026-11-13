@@ -4,6 +4,8 @@
 
 **Accepted on merge** — 2026-11-13 (IR-981). The decisions are Jive Tyler Revalde's, from the IR-980 design session on 2026-11-13. Merging this PR records acceptance by the reviewer who approves it; the PR names them. No adviser confirmation and no CIT-U data protection officer's review is recorded (IR-123).
 
+**Amended 2026-11-14 (IR-984):** the Extractor is Unstructured's Platform API with `strategy=hi_res`, not Transform, and the spike gate's reading-order rule is judged on real two-column pages. The spike gate passed on that basis; see the amendment at the end.
+
 **Not built.** LlamaParse stays the running Extractor until both gates in decision 2 pass and IR-988 runs. Until then this ADR decides what IRIS is moving to and how the move is judged; it changes no behaviour.
 
 **Supersedes [ADR-056](056-manuscript-extraction-moves-to-llamaparse.md) decisions 1, 2, 3, 8 and 9** (the vendor, its pinning, what is requested, its labels and its Figure crops) once the cutover runs. **Amends ADR-056 decision 4** (what the stored raw result is). **Replaces ADR-056 decision 14** (LlamaParse's acceptance check against Docling) with this ADR's two gates (decision 2). Decision 15 was already withdrawn. ADR-056 decisions 5–7, 10, 12 and 16 carry over unchanged, decisions 11 and 13 carry over adapted to Unstructured (decision 9), and so do its IR-851, IR-859 and IR-879/IR-883 amendments where they still apply (decision 12). ADR-056 stays `Accepted` until IR-988, then becomes `Superseded by ADR-067`.
@@ -186,6 +188,98 @@ These are terms and price checks, like ADR-056's, not quality gates: the gates d
 2. **Model provider.** Which provider reads pages and whether IRIS passes its own `provider_api_key`.
 3. **Account features.** Whether a self-serve Transform account returns `image_base64`, `text_as_html` and coordinates (the comparison's section 0).
 4. **Price.** Unstructured's per-page price, for IR-983.
+
+## Amendment — 2026-11-14 (IR-984): the Platform API's `hi_res` strategy, and the spike gate on real pages
+
+Decided by Jive Tyler Revalde on 2026-11-14, from the IR-984 spike report
+(`docs/evaluation/runs/2026-11-13-unstructured-spike/report.md`). Proxy-tier
+numbers (ADR-023): never a finding about CIT-U research.
+
+**1. The Extractor is Unstructured's Platform API with `strategy=hi_res`, not
+Transform.** This amends decision 1.
+
+- **Request:** the partition endpoint (`api.unstructuredapp.io/general/v0/general`)
+  with `strategy=hi_res`, `coordinates=true`, `pdf_infer_table_structure=true`,
+  `include_page_breaks=true` and `extract_image_block_types=["Image","Table"]`.
+- **Credentials:** the Platform API has its own account and key, separate from
+  Transform's. Transform keys are refused there.
+- **Why not Transform:** on 40 real two-column pages, Transform made 14
+  column-order errors. `hi_res` made one, a figure caption placed before body
+  text, as did LlamaParse.
+
+**2. `hi_res`, not `auto`.** The two returned identical output on all four
+papers and cost the same, so `auto` sent every page to `hi_res`. Pinning
+`hi_res` keeps that guaranteed.
+
+- **What `auto` risks:** it may send a page to `vlm`, which returns no
+  coordinates, or to `fast`, which made 4 column-order errors and returns no
+  `Formula` elements or table HTML.
+- **What pinning `hi_res` costs:** no page is ever read by a VLM, even a page a
+  VLM would read better. Scanned pages are the likely case, and decision 15
+  already accepts element-level boxes for them.
+
+**3. The spike gate's reading-order rule is judged on real two-column pages.**
+This amends decision 2.
+
+- **Why:** the `two_columns` fixture also fails LlamaParse and Docling, because
+  its three-line columns read as rows. So it cannot separate vendors.
+- **The measure:** column back-jumps on two-column proxy pages, where a
+  right-column block is followed by a left-column block on the same page. It is
+  scored against `pdfplumber`'s character positions; the scorer is in the
+  report's `real_order/`.
+- **What would have failed it:** more back-jumps than LlamaParse on the same
+  pages.
+
+| Extractor | Back-jumps (40 pages) | Text elements without coordinates |
+|---|---|---|
+| LlamaParse (running) | 1 (a caption) | — |
+| Docling (previous) | 0 | — |
+| Platform `hi_res` | 1 (a caption) | 0 of 772 |
+| Platform `auto` | 1, identical to `hi_res` | 0 of 772 |
+| Platform `fast` | 4 | 0 |
+| Platform `vlm` | 0 (10 pages) | all |
+| Transform `balanced` | 14 | 0 of 939 |
+
+**4. What `hi_res` returns, against decision 8's mapping:**
+
+- **`Formula` is a real element type, but its text is OCR, not LaTeX**
+  (e.g. `N-1 |A) = >> 2(n)|n). n=0`). Decision 11 still holds: formulas stay
+  display-only and out of the embedded text. But displayed formulas will be
+  poorer than LlamaParse's, and the quality gate's formula rule (IR-989) is at
+  risk. If it fails, that gate decides, as decision 2 says.
+- **`parent_id` is returned** and joins decision 7's cascade as one signal,
+  ranked below the PDF's own signals until IR-989 measures it.
+- **Not returned:** `category_depth`, `emphasized_text_*` and
+  `detection_class_prob`. So:
+  - font and emphasis come from `pdfplumber` alone (decision 7, signal 4);
+  - a low-confidence `Title` cannot be demoted by the vendor's probability.
+- **`image_base64` is returned for `Image` and `Table` elements** (4 of 4
+  images on paper 38), so decision 10 can be built.
+- **`languages` and `links` are returned**, used as decision 8 already says.
+- **No model or version identifier is returned.** Decision 3 is unchanged:
+  record the request options, and rely on the stored raw result.
+
+**5. Client behaviour (IR-985).**
+
+- **No unbounded synchronous call.** One synchronous `hi_res` call ran past
+  900 s without answering; the same paper took 43 s on retry. So the client
+  uses a bounded timeout with a retry, or an on-demand job, and records which.
+- **Re-record the fixtures.** The fixture recordings committed by IR-984 are
+  Transform's. The client and shaping (IR-986) need a Platform `hi_res`
+  recording of the four fixtures.
+
+**6. Open conditions, restated for the Platform API:**
+
+1. **Retention:** unchanged, now asked of the Platform service.
+2. **Model provider:** does not arise for `hi_res`, which sends no page to a
+   model (no `enrichment_origins` in its output). It returns if `vlm` or
+   `auto` is ever adopted.
+3. **Account features:** answered. A self-serve Platform account returns
+   coordinates, `text_as_html` and `image_base64`.
+4. **Price:** Unstructured publishes $0.015 per page for every strategy, after
+   10,000 free pages (`unstructured.io/pricing`, read 2026-11-14). It is still
+   to be confirmed that the separate Platform account bills at that rate
+   (IR-983).
 
 ## Related Requirements
 

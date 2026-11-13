@@ -331,11 +331,11 @@ Transform.
 **For shaping (IR-986):**
 - Build against this report's `hi_res` output: `parent_id`, `Formula`,
   `text_as_html` and `image_base64`.
+- `hi_res` `Formula` text is OCR, not LaTeX (e.g. `N-1 |A) = >> 2(n)|n). n=0`),
+  so the quality gate's formula rule (IR-989) is at risk.
 - Do not build against Transform's flatter elements.
 
 **Still owed:**
-- An ADR-067 amendment recording this decision, that the gate was restated
-  on real pages, and these numbers.
 - The Platform API's billing and retention terms.
 - A Platform recording of the four fixtures for IR-985's tests. The recordings
   committed under `fixtures/unstructured/` are Transform's.
