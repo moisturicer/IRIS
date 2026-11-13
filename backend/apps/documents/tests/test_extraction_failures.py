@@ -170,9 +170,13 @@ def test_a_clean_extraction_has_no_warnings(extraction):
     assert extraction.warnings == []
 
 
-def test_each_attempt_is_limited_to_the_declared_timeout_plus_a_minute(extraction, monkeypatch):
+@pytest.mark.parametrize("evidence_wall, limit", [(None, 960), (120, 1080)])
+def test_each_attempt_is_limited_to_the_declared_timeout_plus_evidence_plus_a_minute(
+        extraction, monkeypatch, settings, evidence_wall, limit):
+    # IR-1053: the PDF evidence read runs inside the same attempt.
     from celery.app.task import Task
 
+    settings.PDF_EVIDENCE_WALL_SECONDS = evidence_wall
     sent = []
     monkeypatch.setattr(Task, "apply_async", lambda self, args=None, kwargs=None, **options: sent.append(options))
 
@@ -180,7 +184,7 @@ def test_each_attempt_is_limited_to_the_declared_timeout_plus_a_minute(extractio
         tasks.extract_manuscript_text.delay(extraction.record_id, None)
         tasks.extract_pdf_text.delay(1)
 
-    assert [options["time_limit"] for options in sent] == [960, 960]
+    assert [options["time_limit"] for options in sent] == [limit, limit]
     assert all(options["soft_time_limit"] < options["time_limit"] for options in sent)
 
 

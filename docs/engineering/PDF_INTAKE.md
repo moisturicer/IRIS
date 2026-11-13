@@ -24,7 +24,7 @@ All limits must be positive and finite; integer limits must be integers. Partial
 
 Apply the additive migrations before starting this release's web/worker processes. Drain or stop old unfenced extraction/chunk workers before admitting revisioned uploads; mixed old-worker/new-writer operation is unsupported. Restart workers on the same release. Existing legacy queue messages handled by the new worker cannot process a revisioned source without its pin. No rollout was performed for this ticket.
 
-## Review text: the one sandbox child that returns data (IR-871)
+## Review text: a sandbox child that returns data (IR-871)
 
 Each Version's review text (ADR-058 §1 as amended) is read by `apps/records/review_text/reader.py`, in a subprocess shaped like the one above: an isolated interpreter, an environment of only `PATH` and `LANG`, a private temporary directory as its working directory, standard output and error to the null device, and a hard address-space, page and wall limit of its own (`REVIEW_TEXT_WALL_SECONDS`, `_MEMORY_MIB`, `_MAX_PAGES`). It runs in a Celery worker, never in the web process.
 
@@ -39,6 +39,10 @@ The risk is a parser taken over by a crafted PDF copying something it can read i
 From then on every open, socket or pipe fails with `EMFILE`. That covers the worker's environment under `/proc` and every other paper's file. `test_review_text_sandbox.py` proves both on Linux.
 
 **What is left:** the child still runs as the worker's OS user, so a flaw that reached an already open descriptor, or a kernel interface that needs none, isn't covered. Running it as a separate unprivileged user would close that, and is a deployment change not made here. A CMap file pdfminer would load from disk, which a few non-Latin fonts need, now fails closed as *no text*.
+
+## PDF evidence: the second child that returns data (IR-1053)
+
+Each Manuscript's PDF evidence (ADR-067 decision 4) is read by `apps/documents/pdf_evidence/reader.py` in a child built the same way as the review text reader: isolated interpreter, `PATH` and `LANG` only, a private temporary directory, output to the null device, and confined by the same three steps before it parses. Its own limits are `PDF_EVIDENCE_WALL_SECONDS` and `PDF_EVIDENCE_MEMORY_MIB`; its page cap is `PDF_VALIDATION_MAX_PAGES`, and it is handed no file above the 50 MB upload cap. It runs in the extraction worker, after the vendor read. The parent reads the JSON only after a clean exit, caps it at 64 MiB and checks its exact shape. Any refusal stores an empty document naming the reason, and extraction still completes. With both `PDF_EVIDENCE_*` unset, `manage.py check` warns (`documents.W003`) and no evidence is read; with only one set, or a value that is not finite and positive, Django refuses to start. `apps/documents/pdf_evidence/tests/test_sandbox.py` proves the confinement on Linux. What is left is the same as for the review text reader.
 
 ## Persistent identity and handoff
 
