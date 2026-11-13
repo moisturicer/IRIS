@@ -288,6 +288,11 @@ def submit_new_version(record, actor):
     ResubmissionRequest.objects.filter(pk__in=[r.pk for r in requests]).update(
         state=ResubmissionRequestState.RESUBMITTED, resolved_by=actor, resolved_at=now,
     )
+    # Resolved is final (ADR-069, IR-1075): stamp every notification whose task
+    # has ended *before* the rows below reopen, or the reopening would undo it.
+    from apps.notifications.settling import settle_record
+
+    settle_record(record)
     # Recorded before the reset, so every reset row is dated after it and
     # never reads as preserved (`clearance_state.is_preserved`).
     record.resubmission_count = (record.resubmission_count or 0) + 1
@@ -340,8 +345,15 @@ def submit_new_version(record, actor):
     })
     from apps.notifications.services import notify_new_version
 
+    seat_ids = {}
+    for seat in requesting_seats.filter(
+        state__in=OPEN_SEAT_STATES, reviewer__isnull=False,
+    ).order_by("pk"):
+        seat_ids.setdefault(seat.reviewer_id, seat.pk)
+
     who = revisions.join_labels([_label(p) for p in parties])
     transaction.on_commit(lambda: notify_new_version(
         record, version, submitted_by=actor, reviewers=reviewers, asked_by=who,
+        seat_ids=seat_ids,
     ))
     return version

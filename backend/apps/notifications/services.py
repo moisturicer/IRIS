@@ -16,7 +16,7 @@ from django.db import transaction
 from django.utils import timezone
 from core.enums import Party, RecordTypeName, RoleName
 from core.utils import send_email_async
-from .models import Notification, NotificationType
+from .models import Notification, NotificationType, TaskKind
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,17 @@ def _record_notif_type(record) -> NotificationType:
 
 def _record_url(record) -> str:
     return f"{settings.FRONTEND_URL}/records/{record.pk}"
+
+
+def _task(kind, row) -> dict:
+    """
+    The binding a notification that asks for action carries (ADR-069): which
+    row its task lives on. Empty when there is no row, so the notification is
+    sent and simply never resolves.
+    """
+    if row is None:
+        return {}
+    return {"task_kind": kind, "task_id": row.pk}
 
 
 def _log_failure(event: str, *, record=None, request=None, user=None):
@@ -95,11 +106,18 @@ def notify_new_record(record, submitted_by):
         adviser = record.adviser
         if not adviser:
             return
+        from apps.reviews.models import RecordAssignment
+        from core.enums import AssignmentState
+
+        turn = RecordAssignment.objects.filter(
+            record=record, party=Party.ADVISER, state=AssignmentState.ACTIVE,
+        ).first()
         Notification.objects.create(
             sender=submitted_by,
             recipient=adviser,
             record=record,
             notif_type=_record_notif_type(record),
+            **_task(TaskKind.ASSIGNMENT, turn),
             message=(
                 f"{submitted_by.get_full_name()} submitted a new {rt_name} for your review: "
                 f'"{record.title}".'
@@ -120,6 +138,10 @@ def notify_new_record(record, submitted_by):
         _log_failure("notify_new_record", record=record)
 
 
+def _party_label(party: str) -> str:
+    return str(Party(party).label)
+
+
 def _role_for_party(party: str):
     """
     The role that staffs an office party (ADR-021 §1), read from the tracker's
@@ -136,7 +158,7 @@ def _role_for_party(party: str):
 
 def notify_routed(
     record, *, actor, from_label, target_labels, opened_parties, nominees, reason, accepted,
-    threads=0,
+    threads=0, pool_assignments=None, nominee_seats=None,
 ):
     """
     A record was routed to one or more offices (ADR-032 §4, IR-261).
@@ -150,7 +172,13 @@ def notify_routed(
     - Each nominee, personally: the work is theirs.
     - The owners, only when the Adviser **accepted** it. Onward routing between
       offices is review traffic, visible on the tracker.
+
+    `pool_assignments` maps each pool office to the assignment it opened, and
+    `nominee_seats` maps a nominee's user id to their seat: the tasks the pool
+    and nominee notifications ask for, so they settle when it ends (ADR-069).
     """
+    pool_assignments = pool_assignments or {}
+    nominee_seats = nominee_seats or {}
     try:
         notif_type = NotificationType.objects.get_or_create(name="Record Routed")[0]
         url = _record_url(record)
@@ -162,13 +190,17 @@ def notify_routed(
             role = _role_for_party(party)
             if role is None:
                 continue
+            office = _party_label(party)
+            # Two sentences, each a whole one (audit WF-01): the reason lives on
+            # the routing event, and goes in the email, not in this notice.
             message = (
-                f'{from_label} sent "{title}" to your office for review: {reason} '
-                f"It is in your office's pool until someone claims it."
+                f'{from_label} sent "{title}" to {office}. '
+                f"It waits in {office}'s pool until a reviewer claims it."
             )
             Notification.objects.create(
                 sender=actor, broadcast_to_role=role, record=record,
                 notif_type=notif_type, message=message,
+                **_task(TaskKind.ASSIGNMENT, pool_assignments.get(party)),
             )
             emails = list(
                 UserModel.objects.filter(role=role, is_active=True).values_list("email", flat=True)
@@ -176,15 +208,21 @@ def notify_routed(
             if emails:
                 send_email_async(
                     subject=f"[IRIS] For review: {title[:60]}",
-                    message=f"Hello,\n\n{message}\n\n{url}\n\n-- The IRIS Team",
+                    message=(
+                        f"Hello,\n\n{message}\n\n"
+                        + (f"{from_label} wrote: {reason}\n\n" if reason else "")
+                        + f"{url}\n\n-- The IRIS Team"
+                    ),
                     recipient_list=emails,
                 )
 
         for nominee, office_label in nominees:
             message = f'{from_label} nominated you to review "{title}" for {office_label}.'
+            seat = nominee_seats.get(nominee.pk)
             Notification.objects.create(
                 sender=actor, recipient=nominee, record=record,
                 notif_type=notif_type, message=message,
+                **({"task_kind": TaskKind.SEAT, "task_id": seat} if seat else {}),
             )
             send_email_async(
                 subject=f"[IRIS] You were nominated to review: {title[:60]}",
@@ -397,6 +435,7 @@ def notify_revision_requested(revision_request, *, party_label: str, threads: in
                 record=record,
                 notif_type=notif_type,
                 message=message,
+                **_task(TaskKind.REVISION, revision_request),
             )
         if owners:
             primary = next((o.user for o in owners if o.is_primary), owners[0].user)
@@ -433,12 +472,18 @@ def notify_revision_withdrawn(revision_request, *, party_label: str, withdrawn_b
         _log_failure("notify_revision_withdrawn", request=revision_request)
 
 
-def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: str):
+def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: str,
+                       seat_ids=None):
     """
     Tell the reviewers of the parties that asked for a revision that the owner
     answered with a new version, which they now review (ADR-032 §5, IR-273).
     Nobody else: every other party's work stands. In-app only.
+
+    `seat_ids` maps a reviewer's user id to their seat, the task each notice
+    asks for, so it settles when they review or lose the seat (ADR-069). It is
+    a *new* notification for the new request: the earlier round's stays settled.
     """
+    seat_ids = seat_ids or {}
     try:
         message = (
             f'The owner submitted v{version.number} of "{record.title}" in answer to '
@@ -452,6 +497,8 @@ def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: st
                 record=record,
                 notif_type=notif_type,
                 message=message,
+                **({"task_kind": TaskKind.SEAT, "task_id": seat_ids[reviewer.pk]}
+                   if reviewer.pk in seat_ids else {}),
             )
     except Exception:
         _log_failure("notify_new_version", record=record)
@@ -565,6 +612,7 @@ def notify_document_requested(document_request, *, party_label: str):
                 record=record,
                 notif_type=notif_type,
                 message=message,
+                **_task(TaskKind.DOCUMENT_REQUEST, document_request),
             )
         if owners:
             primary = next((o.user for o in owners if o.is_primary), owners[0].user)
@@ -655,6 +703,7 @@ def notify_document_rejected(document_request, item, *, rejected_by):
                 record=record,
                 notif_type=notif_type,
                 message=message,
+                **_task(TaskKind.DOCUMENT_REQUEST, document_request),
             )
         if owners:
             primary = next((o.user for o in owners if o.is_primary), owners[0].user)
@@ -672,7 +721,7 @@ def notify_document_rejected(document_request, item, *, rejected_by):
         _log_failure("notify_document_rejected", request=document_request)
 
 
-def _notify_in_app(record, recipient, *, type_name, message, label):
+def _notify_in_app(record, recipient, *, type_name, message, label, task=None):
     """
     One in-app notice from a scheduled batch, with no email. Returns whether it
     was written; the savepoint lets the batch carry on inside its transaction
@@ -685,6 +734,7 @@ def _notify_in_app(record, recipient, *, type_name, message, label):
                 record=record,
                 notif_type=NotificationType.objects.get_or_create(name=type_name)[0],
                 message=message,
+                **(task or {}),
             )
         return True
     except Exception:
@@ -692,10 +742,14 @@ def _notify_in_app(record, recipient, *, type_name, message, label):
         return False
 
 
-def notify_deadline(record, recipient, *, type_name, message):
-    """One in-app deadline reminder or escalation (ADR-043 §7 keeps deadlines in-app)."""
+def notify_deadline(record, recipient, *, type_name, message, assignment=None):
+    """
+    One in-app deadline reminder or escalation (ADR-043 §7 keeps deadlines in-app).
+    It asks for the office's turn to be finished, so it settles with `assignment`.
+    """
     return _notify_in_app(record, recipient, type_name=type_name, message=message,
-                          label="notify_deadline")
+                          label="notify_deadline",
+                          task=_task(TaskKind.ASSIGNMENT, assignment))
 
 
 def notify_embargo_review(record, recipient, *, type_name, message):
@@ -764,7 +818,7 @@ def notify_contact_person_changed(record, *, changed_by, previous, contact):
         _log_failure("notify_contact_person_changed", record=record)
 
 
-def notify_role_request(user, requested_role):
+def notify_role_request(user, requested_role, request=None):
     """
     Broadcast to RDCO when a new role request is submitted.
     Student and Adviser role requests are approved by RDCO staff;
@@ -783,12 +837,13 @@ def notify_role_request(user, requested_role):
                 broadcast_to_role=rdco_role,
                 notif_type=_get_type(notif_type_name),
                 message=f"{user.get_full_name()} requested the {requested_role.name} role.",
+                **_task(TaskKind.ROLE_REQUEST, request),
             )
     except Exception:
         _log_failure("notify_role_request", user=user)
 
 
-def notify_download_request(record, requested_by):
+def notify_download_request(record, requested_by, request=None):
     """Broadcast to RDCO, who alone decides, when a user requests a record's files."""
     try:
         notif_type = _get_type("Download Request Submitted")
@@ -803,6 +858,7 @@ def notify_download_request(record, requested_by):
                     f"{requested_by.get_full_name()} has requested to download "
                     f'files for record "{record.title}".'
                 ),
+                **_task(TaskKind.DOWNLOAD_REQUEST, request),
             )
     except Exception:
         _log_failure("notify_download_request", record=record)
@@ -1114,6 +1170,7 @@ def notify_delete_requested(delete_request, *, requested_by):
             Notification.objects.create(
                 sender=requested_by, broadcast_to_role=role, record=record,
                 notif_type=notif_type, message=message,
+                **_task(TaskKind.DELETE_REQUEST, delete_request),
             )
             _email_role_users(
                 role, subject=f"[IRIS] Delete requested: {title[:60]}", greeting="Hello",

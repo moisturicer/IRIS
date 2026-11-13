@@ -25,6 +25,8 @@ const unread: Notification = {
   broadcast_to_role: null,
   created_at: "2026-10-31T09:00:00Z",
   is_read: false,
+  resolved_at: null,
+  resolved_label: "",
 };
 
 function signedInWithUnread() {

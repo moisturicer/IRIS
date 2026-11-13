@@ -241,7 +241,7 @@ def _consume_verification(raw_token) -> bool:
         pending = (user.role_requests.filter(status=RequestStatus.PENDING)
                    .select_related("requested_role").order_by("-created_at").first())
         if pending:
-            notify_role_request(user, pending.requested_role)
+            notify_role_request(user, pending.requested_role, request=pending)
     return True
 
 

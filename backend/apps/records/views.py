@@ -1992,7 +1992,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
                 {"record": ["You can already download this record."]}
             )
         dr = serializer.save(requested_by=user)
-        notify_download_request(dr.record, requested_by=user)
+        notify_download_request(dr.record, requested_by=user, request=dr)
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()

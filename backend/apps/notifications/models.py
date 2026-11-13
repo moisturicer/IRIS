@@ -19,6 +19,22 @@ class NotificationType(models.Model):
     def __str__(self): return self.name
 
 
+class TaskKind(models.TextChoices):
+    """
+    What a notification that asks for action is bound to (ADR-069). The id
+    names one row of that kind, and `apps.notifications.settling` decides
+    when that row's task has ended.
+    """
+
+    ASSIGNMENT = "assignment", "An office's (or the Adviser's) turn at a record"
+    SEAT = "seat", "One reviewer's seat"
+    REVISION = "revision", "A revision request"
+    DOCUMENT_REQUEST = "document_request", "A document request"
+    DOWNLOAD_REQUEST = "download_request", "A download request"
+    DELETE_REQUEST = "delete_request", "A delete request"
+    ROLE_REQUEST = "role_request", "A role request"
+
+
 class NotificationQuerySet(models.QuerySet):
 
     def visible_to(self, user):
@@ -68,6 +84,19 @@ class Notification(models.Model):
     notif_type       = models.ForeignKey(NotificationType, on_delete=models.CASCADE)
     message          = models.TextField(blank=True)
     created_at       = models.DateTimeField(auto_now_add=True)
+
+    # --- The task this notification asked for (ADR-069, IR-1075) -------------
+    # Only a notification that asks its recipient to act is bound to a task.
+    # An informational one (a decision, a publication, a comment) leaves both
+    # blank and never resolves.
+    task_kind        = models.CharField(
+        max_length=20, choices=TaskKind.choices, blank=True, default=""
+    )
+    task_id          = models.PositiveBigIntegerField(null=True, blank=True)
+    # Set once, when the task ends, and never cleared: a clearance reset sends
+    # a NEW notification instead of reopening this one (ADR-069 decision 5).
+    resolved_at      = models.DateTimeField(null=True, blank=True)
+    resolved_label   = models.CharField(max_length=200, blank=True, default="")
 
     objects = NotificationQuerySet.as_manager()
 
