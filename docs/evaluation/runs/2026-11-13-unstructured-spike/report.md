@@ -1,14 +1,29 @@
-# Unstructured spike (IR-984): what Transform returns, and the go/no-go
+# Unstructured spike (IR-984): what Transform and Platform return, and the go/no-go
 
-> **Read the 2026-11-14 addendum on real two-column papers first.** The
-> `two_columns` fixture also fails LlamaParse and Docling. On real papers,
-> Unstructured's `hi_res` strategy reads in order and keeps every coordinate.
+**Result: GO, with Unstructured's Platform API on the `hi_res` strategy, not
+Transform.** Jive Tyler Revalde decided this on 2026-11-14, from the evidence
+below. The gate's reading-order rule is judged on real two-column papers,
+because the `two_columns` fixture also fails LlamaParse and Docling (see
+*Reading order on real two-column papers*).
 
-**Result: NO-GO, as the rule is written.** Under ADR-067 decision 2's spike gate, reading order fails the
-`two_columns` fixture. It fails under both profiles. Coordinates pass: 0 of 939
-text elements on the proxy papers lack one. A text element is one whose text is
-non-blank and whose type is not `Image`. Counting `Image` elements as well, all
-1,056 proxy elements have a box.
+| Gate rule (ADR-067 §2) | `hi_res`, Platform API | Transform (as first recorded) |
+|---|---|---|
+| Coordinates on >90% of text elements | ✅ 0 missing of 492 (papers 38, 58, 25) | ✅ 0 missing of 939 |
+| Reading order on real two-column pages | ✅ 0 back-jumps on 35 pages (LlamaParse: 1, Docling: 0) | ❌ 14 back-jumps on 40 pages |
+| Reading order on the `two_columns` fixture | ❌ but every vendor fails it | ❌ |
+
+**Not measured:**
+- `hi_res` on paper 40 (14 two-column pages): the synchronous call timed out
+  after 900 s. It is the paper where Transform made 8 of its 14 errors.
+- `hi_res` on the coordinate gate's other proxy papers (21, 40, 52).
+
+**Follow-ups:**
+- ADR-067 names Transform, so adopting `hi_res` needs an amendment.
+- The Platform API has a separate account and key. Its terms, billing and
+  retention are open conditions, like Transform's.
+
+The sections below keep the original Transform record; the first verdict, NO-GO
+under the rule as written, is kept for the record.
 
 Recorded 2026-11-13 against `POST https://transform.unstructured.io/api/v2/parse`
 with `output=elements`, `include=coordinates&include=table_html` and
@@ -288,10 +303,27 @@ What this means for the gate, for IR-980's owner and ADR-067 to decide:
   mapping rows (`category_depth`/`parent_id`, `Image` + `image_base64`,
   `Formula`) have nothing to map from this account.
 
-## What follows from the rule
+## What follows
 
-Per IR-984's go/no-go rule, the remaining Unstructured subtasks of IR-980 are
-closed as "won't do" with this report linked. IR-982 (registry) and IR-983
-(pricing) are unaffected, and LlamaParse stays (ADR-067 decision 2).
-Recording the numbers in ADR-067 is its own change. Closing the tickets and
-amending the ADR are for IR-980's owner.
+**GO**, on the Platform API's `hi_res` strategy (decided 2026-11-14, above).
+IR-980's Unstructured subtasks continue, aimed at the Platform API rather than
+Transform.
+
+**For the client (IR-985):**
+- Use a background job, or a client-side page split, instead of the
+  synchronous partition call: paper 40 timed out on it.
+- Send `coordinates=true`, `pdf_infer_table_structure=true` and
+  `extract_image_block_types`.
+
+**For shaping (IR-986):**
+- Build against this report's `hi_res` output: `parent_id`, `Formula`,
+  `text_as_html` and `image_base64`.
+- Do not build against Transform's flatter elements.
+
+**Still owed:**
+- An ADR-067 amendment recording this decision, that the gate was restated
+  on real pages, and these numbers.
+- The Platform API's billing and retention terms.
+- A `hi_res` read of paper 40.
+- A Platform recording of the four fixtures for IR-985's tests. The recordings
+  committed under `fixtures/unstructured/` are Transform's.
