@@ -5,6 +5,12 @@
     python manage.py eval_retrieval --questions ... --user staff@cit.edu --reranking on
     python manage.py eval_retrieval --questions ... --user staff@cit.edu --technique fusion=on
     python manage.py eval_retrieval --list-techniques
+    python manage.py eval_retrieval --questions ... --user staff@cit.edu --variant trail_off=::trail=off
+
+`--variant NAME=<extractor>:<strategy>:<options>` builds a trial chunk set per
+record from the stored extraction, embeds only text with no vector yet, and
+measures retrieval against it. Readers never see a trial set (IR-1051);
+`cleanup_trial_chunk_sets` removes them.
 
 ADR-033 §5's six techniques each ship off and are switched on only on a run of
 this harness, so every run records all six at the values it used --
@@ -34,7 +40,16 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from apps.ai.backfill import cost_per_million, default_ceiling
 from apps.ai.composition import composition_root
+from apps.ai.trials import (
+    VariantError,
+    build_trial,
+    chunking_provenance,
+    parse_variant,
+    plan_trial,
+    trial_variants,
+)
 from apps.ai.evaluation import (
     QuestionSetError,
     RunConfig,
@@ -142,6 +157,21 @@ class Command(BaseCommand):
             "is built in this deployment yet. Reads nothing and costs nothing.",
         )
         parser.add_argument(
+            "--variant",
+            metavar="NAME=EXTRACTOR:STRATEGY:OPTIONS",
+            help="Measure a trial chunk set instead of the active one, e.g. "
+            "trail_off=::trail=off or t400=:structural:target_tokens=400. Blank "
+            "extractor or strategy means what production uses. --dry-run prints "
+            "its chunks, new tokens and cost and stops.",
+        )
+        parser.add_argument(
+            "--token-ceiling",
+            type=int,
+            default=None,
+            help="Refuse a --variant whose new embedding tokens exceed this "
+            "(default: AI_EMBEDDING_TOKEN_CEILING; 0 disables).",
+        )
+        parser.add_argument(
             "--drop-incomplete",
             action="store_true",
             help="Skip questions still holding a TODO instead of refusing the "
@@ -176,6 +206,7 @@ class Command(BaseCommand):
             raise CommandError("--questions is required")
 
         techniques = self._techniques(options["techniques"])
+        variant = self._variant(options.get("variant"))
         try:
             question_set = load_question_set(
                 options["questions"], drop_incomplete=options["drop_incomplete"]
@@ -203,6 +234,12 @@ class Command(BaseCommand):
                 f"not (IR-454)."
             )
 
+        plan = None
+        if variant is not None:
+            plan = self._plan(variant, options)
+            if options["dry_run"]:
+                return
+
         if options["dry_run"]:
             checks = check_question_set(question_set)
             self.stdout.write("")
@@ -216,11 +253,16 @@ class Command(BaseCommand):
 
         configs = self._configs(options, techniques)
         root = composition_root()
+        if plan is not None:
+            self._build(plan, root)
+            root = root.for_trial(variant.name)
+        self._warn_about_trial_sets()
         provenance = {
             "git_commit": _git_commit(),
             "question_set_path": question_set.source,
             "question_set_sha256": _question_set_digest(question_set.source),
             "retrieved_as": user.email,
+            "chunking": chunking_provenance(variant),
         }
 
         reports = []
@@ -310,6 +352,71 @@ class Command(BaseCommand):
                 )
             )
         return resolved
+
+    def _variant(self, text):
+        if not text:
+            return None
+        try:
+            return parse_variant(text)
+        except VariantError as exc:
+            raise CommandError(str(exc))
+
+    def _plan(self, variant, options):
+        """Chunk the corpus under ``variant`` in memory and print what it owes."""
+        from apps.ai.models import get_active_embedding_space
+
+        try:
+            plan = plan_trial(variant, space_id=get_active_embedding_space().pk)
+        except VariantError as exc:
+            raise CommandError(str(exc))
+        self.stdout.write("")
+        self.stdout.write(f"Trial variant {variant.name} ({variant.spec})")
+        self.stdout.write(
+            f"  records built        {len(plan.built)}\n"
+            f"  records skipped      {len(plan.skipped)}\n"
+            f"  chunks               {plan.chunk_count:,}\n"
+            f"  chunks to embed      {plan.new_chunks:,}\n"
+            f"  new tokens (approx)  {plan.new_tokens:,}\n"
+            f"  approximate cost     ~{plan.estimated_cost(cost_per_million()):,.4f}"
+        )
+        for skipped in plan.skipped:
+            self.stdout.write(
+                self.style.WARNING(f"  skipped record {skipped.record_id}: {skipped.skipped}")
+            )
+        ceiling = (
+            options["token_ceiling"] if options.get("token_ceiling") is not None
+            else default_ceiling()
+        )
+        if plan.exceeds(ceiling):
+            raise CommandError(
+                f"Variant {variant.name} would embed ~{plan.new_tokens:,} new tokens, "
+                f"over the ceiling of {ceiling:,}. Nothing has been written or sent. "
+                f"Raise it deliberately with --token-ceiling."
+            )
+        return plan
+
+    def _build(self, plan, root):
+        outcome = build_trial(plan, provider=root.embedder())
+        self.stdout.write(
+            f"Trial sets: {outcome.written} written, {outcome.reused_sets} reused; "
+            f"{outcome.carried} vectors carried over, {outcome.embedded} embedded."
+        )
+        for record_id, reason in outcome.refused.items():
+            self.stdout.write(
+                self.style.WARNING(f"  record {record_id} not embedded: {reason}")
+            )
+
+    def _warn_about_trial_sets(self):
+        stored = trial_variants()
+        if stored:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Trial chunk sets are stored ({', '.join(stored)}). Their vectors "
+                    f"share the HNSW index with the live ones, so compare a variant "
+                    f"against a baseline run with the same trial sets present, and "
+                    f"remove them with cleanup_trial_chunk_sets when done."
+                )
+            )
 
     def _configs(self, options, techniques):
         choice = options["reranking"]
