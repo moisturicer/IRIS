@@ -203,7 +203,7 @@ Created 14 Nov 2026. All sit under IR-920 except IR-1075 (under IR-671), unassig
 | 2.4 | [IR-1085](https://citiris.atlassian.net/browse/IR-1085) | Navigation: reviews nesting, Help in the footer, addressable Settings tabs | §4.7 | Medium | `not-ready` (D5) | — |
 | 2.5 | [IR-1086](https://citiris.atlassian.net/browse/IR-1086) | Tablet: the sidebar becomes a labelled icon rail below 1024 px | §4.7 | Medium | `ready-to-pull` | — |
 | 2.6 | [IR-1087](https://citiris.atlassian.net/browse/IR-1087) | Sentence case and no uppercase eyebrows | §4.10 | Medium | `ready-to-pull` | IR-1039–1042 |
-| 2.7 | [IR-1088](https://citiris.atlassian.net/browse/IR-1088) | One button component, with a legible disabled state | §4.10 | Medium | `ready-to-pull` | IR-1043 |
+| 2.7 | [IR-1088](https://citiris.atlassian.net/browse/IR-1088) | One button component, with a legible disabled state | §4.10 | Medium | `ready-to-pull` | IR-1043, IR-1038 |
 | 2.8 | [IR-1089](https://citiris.atlassian.net/browse/IR-1089) | Record overview: one byline, one date line, a fixed heading ladder | §4.10 | Medium | `ready-to-pull` | — |
 | 2.9 | [IR-1090](https://citiris.atlassian.net/browse/IR-1090) | Ask IRIS: reading width, clean sources, starter questions | §4.11 | Medium | `not-ready` (owner review) | — |
 | 2.10 | [IR-1091](https://citiris.atlassian.net/browse/IR-1091) | Workflow analytics: method in a disclosure, aligned numbers | — | Medium | `ready-to-pull` | — |
