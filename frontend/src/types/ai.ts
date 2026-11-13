@@ -220,6 +220,8 @@ export interface AIStatus {
 export interface RecordOverviewResponse {
   state:    "ready" | "generating" | "not_indexed" | "unavailable";
   overview: RecordOverview | null;
+  /** Why `unavailable`, when the reader may be told. `no_consent`: the owner said No (IR-792). */
+  reason?:  "too_large" | "no_consent";
   /** Present only on `ready` — whether this read hit the cache. */
   cached?:  boolean;
 }

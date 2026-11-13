@@ -154,7 +154,13 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
         </div>
       )}
 
-      {!loading && !failed && state === "unavailable" && (
+      {!loading && !failed && state === "unavailable" && response?.reason === "no_consent" && (
+        <OverviewNote>
+          The owner did not consent to AI use of this paper, so nothing is available for AI.
+        </OverviewNote>
+      )}
+
+      {!loading && !failed && state === "unavailable" && response?.reason !== "no_consent" && (
         <div className="flex items-start gap-3">
           <i className="fas fa-microchip text-sm text-stone-300 mt-0.5" aria-hidden />
           <div className="min-w-0">
