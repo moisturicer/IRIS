@@ -10,7 +10,7 @@ from .disclosure import (
     Reason,
     may_disclose,
 )
-from .records import decision_for_record, inputs_for_record
+from .records import NO_CONSENT, decision_for_record, inputs_for_record, reader_refusal
 
 __all__ = [
     "Decision",
@@ -19,4 +19,6 @@ __all__ = [
     "may_disclose",
     "decision_for_record",
     "inputs_for_record",
+    "NO_CONSENT",
+    "reader_refusal",
 ]

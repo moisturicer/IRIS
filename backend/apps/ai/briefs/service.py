@@ -23,6 +23,7 @@ from apps.ai.inference import InferenceTask, profile_for
 from apps.ai.inference.providers import BRIEF_OUTPUT_TOKENS
 from apps.ai.models import ChunkSet, PaperBrief, ProviderReservation
 from apps.ai.overview.assembly import whole_paper
+from apps.ai.policy import NO_CONSENT, reader_refusal
 from apps.records.models import Record
 
 from .reading import PROMPT_VERSION, SYSTEM, combine, prompt, reading_sections, verify_fields
@@ -62,6 +63,14 @@ def _authorized(record_id, user_id):
     return record
 
 
+def _refused(record_id, user):
+    """Name a No only to a reader who can open the paper (IR-792)."""
+    readable = research_records(user).filter(pk=record_id).first()
+    if readable is not None and reader_refusal(readable):
+        return _unavailable(NO_CONSENT)
+    return _unavailable("disclosure_or_access")
+
+
 def _wire(stored):
     return {
         "id": stored.pk, "record_id": stored.record_id, "chunk_set_id": stored.chunk_set_id,
@@ -82,7 +91,7 @@ def brief_for(record, *, user, retry=False, dispatch=True):
     if not getattr(settings, "AI_PAPER_BRIEFS_ENABLED", False):
         return _unavailable("not_enabled")
     if _authorized(record.pk, user.pk) is None:
-        return _unavailable("disclosure_or_access")
+        return _refused(record.pk, user)
     profile = profile_for(InferenceTask.BRIEF)
     try:
         _window(profile)
@@ -92,7 +101,7 @@ def brief_for(record, *, user, retry=False, dispatch=True):
     with transaction.atomic():
         Record.objects.select_for_update().get(pk=record.pk)
         if _authorized(record.pk, user.pk) is None:
-            return _unavailable("disclosure_or_access")
+            return _refused(record.pk, user)
         chunk_set = ChunkSet.objects.filter(record=record, is_active=True).first()
         if chunk_set is None:
             return {"state": "not_indexed", "brief": None}
@@ -148,7 +157,7 @@ def cached_brief(record, *, user):
     if not getattr(settings, "AI_PAPER_BRIEFS_ENABLED", False):
         return _unavailable("not_enabled")
     if _authorized(record.pk, user.pk) is None:
-        return _unavailable("disclosure_or_access")
+        return _refused(record.pk, user)
     chunk_set = ChunkSet.objects.filter(record=record, is_active=True).first()
     if chunk_set is None:
         return {"state": "not_indexed", "brief": None}

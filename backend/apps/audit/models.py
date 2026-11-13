@@ -46,6 +46,7 @@ class AuditEvent(models.Model):
     PUBLISHED                  = "PUBLISHED"
     RESUBMISSION_REQUESTED     = "RESUBMISSION_REQUESTED"
     REVISION_REQUEST_WITHDRAWN = "REVISION_REQUEST_WITHDRAWN"
+    REVISION_DRAFT_DISCARDED   = "REVISION_DRAFT_DISCARDED"
     RESUBMITTED                = "RESUBMITTED"
     CLEARANCE_PRESERVED        = "CLEARANCE_PRESERVED"
     SEAT_CLAIMED               = "SEAT_CLAIMED"
@@ -159,6 +160,7 @@ class AuditEvent(models.Model):
         (PUBLISHED,                  "Published"),
         (RESUBMISSION_REQUESTED,     "Revision Requested"),
         (REVISION_REQUEST_WITHDRAWN, "Revision Request Withdrawn"),
+        (REVISION_DRAFT_DISCARDED,   "Revised Manuscript Discarded"),
         (RESUBMITTED,                "New Version Submitted"),
         (CLEARANCE_PRESERVED,        "Clearance Preserved"),
         (SEAT_CLAIMED,               "Seat Claimed"),
