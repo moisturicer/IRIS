@@ -325,6 +325,29 @@ describe("where the login screen sends you", () => {
     await expectHostileDestinationRefused();
   });
 
+  it("returns to the page a lost session was on, with the session-ended message shown (IR-1081)", async () => {
+    // What the route guard hands over after a reload whose stored session could
+    // not be restored: the reason, the lost-session code and the page asked for.
+    acceptAnyPassword();
+    renderLoginAt("/login", {
+      reason: "session_expired",
+      code: "session_lost",
+      from: "/review/12/evaluate?status=pending",
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Your session ended. Sign in to continue where you were.",
+    );
+
+    await signIn();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "landed on /review/12/evaluate?status=pending" }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("keeps the destination when the session-expired banner is dismissed first", async () => {
     // `dismissSessionAlert` navigates to clear the banner's reason out of
     // router state. Reading the destination at submit time instead of on mount
