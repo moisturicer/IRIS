@@ -220,7 +220,7 @@ that two switches moved — see ADR-023's IR-394 divergence note.
 `--user` is required and is part of what is measured: retrieval filters by
 `Record.objects.visible_to(user)`, so a run reports what *that* user can
 retrieve. An anonymous user can read nothing and would score zero on a working
-stack. `manage.py seed_demo` creates `<role>@cit.edu` logins.
+stack. `manage.py seed_demo` creates `<role>@iris.test` logins.
 
 Every run writes `docs/evaluation/runs/<timestamp>-<set>.json` holding its
 configuration, both measures, per-question outcomes and provenance (git commit,

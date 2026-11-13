@@ -17,7 +17,7 @@ from apps.accounts.models import User
 from apps.opportunities.models import Opportunity
 
 poster = (
-    User.objects.filter(email="rdco@cit.edu").first()
+    User.objects.filter(email="rdco@iris.test").first()
     or User.objects.filter(role__name="RDCO").first()
 )
 

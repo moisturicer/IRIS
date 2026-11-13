@@ -12,8 +12,10 @@ hand through `manage.py shell <`:
     accounts/.../seed_test_users.py  -> a second, `iris-*` account set at a
                                         different password; deleted outright
 
-The account convention here is the one that already existed -- `<role>@cit.edu`
-at `IrisDemo123!`. Nothing about the credentials people already use has changed.
+Logins are `<role>@iris.test` at `IrisDemo123!`. They were `<role>@cit.edu`
+until IR-1067, but those office addresses are CIT-U's real mailboxes, so a demo
+server's notifications reached the real offices. `.test` is reserved (RFC 6761)
+and never delivered; the `<role>@` part and the password are unchanged.
 
 **Everything goes through the real adviser-first services.**
 never an assignment to `pipeline_status`. That is the point rather than a
@@ -76,23 +78,23 @@ PASSWORD = "IrisDemo123!"
 
 #: email, first, last, role
 ROLE_ACCOUNTS = [
-    ("student@cit.edu", "Sam", "Student", RoleName.STUDENT),
-    ("adviser@cit.edu", "Ana", "Adviser", RoleName.ADVISER),
-    ("rdco@cit.edu", "Rita", "Cruz", RoleName.RDCO),
-    ("itso@cit.edu", "Ivan", "Santos", RoleName.ITSO),
-    ("ierc@cit.edu", "Elena", "Reyes", RoleName.IERC),
-    ("ktto@cit.edu", "Karl", "Tan", RoleName.KTTO),
+    ("student@iris.test", "Sam", "Student", RoleName.STUDENT),
+    ("adviser@iris.test", "Ana", "Adviser", RoleName.ADVISER),
+    ("rdco@iris.test", "Rita", "Cruz", RoleName.RDCO),
+    ("itso@iris.test", "Ivan", "Santos", RoleName.ITSO),
+    ("ierc@iris.test", "Elena", "Reyes", RoleName.IERC),
+    ("ktto@iris.test", "Karl", "Tan", RoleName.KTTO),
 ]
 
 #: One coordinator per office (IR-478, ADR-032 §4), beside the plain
-#: `<role>@cit.edu` member above, so the demo can show that a member claims
+#: `<role>@iris.test` member above, so the demo can show that a member claims
 #: from the pool and a coordinator assigns it. The plain accounts are seeded
 #: with the flag off. email, first, last, role
 COORDINATOR_ACCOUNTS = [
-    ("itso.coordinator@cit.edu", "Irene", "Villanueva", RoleName.ITSO),
-    ("ierc.coordinator@cit.edu", "Edgar", "Mendoza", RoleName.IERC),
-    ("ktto.coordinator@cit.edu", "Katrina", "Lopez", RoleName.KTTO),
-    ("rdco.coordinator@cit.edu", "Ramon", "Bautista", RoleName.RDCO),
+    ("itso.coordinator@iris.test", "Irene", "Villanueva", RoleName.ITSO),
+    ("ierc.coordinator@iris.test", "Edgar", "Mendoza", RoleName.IERC),
+    ("ktto.coordinator@iris.test", "Katrina", "Lopez", RoleName.KTTO),
+    ("rdco.coordinator@iris.test", "Ramon", "Bautista", RoleName.RDCO),
 ]
 
 #: The seventh account: **the System Admin, and a Django superuser too.**
@@ -103,7 +105,7 @@ COORDINATOR_ACCOUNTS = [
 #: `is_superuser` with no API standing, so the role is what this account does in
 #: IRIS. ADR-051 §6 lets only this demo login hold both; a real System Admin is a
 #: named person's account and not a superuser.
-ADMIN_EMAIL = "admin@cit.edu"
+ADMIN_EMAIL = "admin@iris.test"
 
 CLASSIFICATIONS = [
     "Artificial Intelligence",
@@ -299,7 +301,7 @@ class Command(BaseCommand):
         college = College.objects.filter(code=college_code).first()
         course = Course.objects.filter(department__college=college).first() if college else None
 
-        email = f"{first.lower()}.{last.lower()}@cit.edu"
+        email = f"{first.lower()}.{last.lower()}@iris.test"
         user, _ = User.objects.get_or_create(
             email=email, defaults={"first_name": first, "last_name": last}
         )
@@ -678,7 +680,7 @@ class Command(BaseCommand):
         A Thesis/Research on the adviser-first model, at its Adviser (IR-261).
 
         Entered through `routing.enter_at_adviser`, as every submission is.
-        This one is where *Accept & send to RDCO…* is demoed (as adviser@cit.edu).
+        This one is where *Accept & send to RDCO…* is demoed (as adviser@iris.test).
         """
         record = self._make(
             NEW_MODEL_TITLE, RecordTypeName.THESIS_RESEARCH, users[RoleName.STUDENT],
@@ -692,7 +694,7 @@ class Command(BaseCommand):
     def _scenario_new_model_proposal_at_adviser(self, users):
         """
         A Proposal on the adviser-first model, at its Adviser (IR-271). Entered
-        through `routing.enter_at_adviser`; adviser@cit.edu opens the review and
+        through `routing.enter_at_adviser`; adviser@iris.test opens the review and
         demos *Accept* and *Reject*, which a Proposal's Adviser alone decides.
         """
         student = users[RoleName.STUDENT]
@@ -748,7 +750,7 @@ class Command(BaseCommand):
         """
         RDCO's first step (ADR-047 §1): a Thesis/Research nobody at RDCO has
         claimed yet. The author flagged KTTO and the Adviser suggests ITSO and
-        IERC, so rdco@cit.edu claims it and picks the offices. A suggestion
+        IERC, so rdco@iris.test claims it and picks the offices. A suggestion
         requests nothing, so no office holds it yet.
         """
         from apps.reviews import seats
@@ -774,7 +776,7 @@ class Command(BaseCommand):
         """
         RDCO deciding with work still open (ADR-047 §3 and §5). RDCO asked one
         ITSO officer, IERC's whole office and two KTTO officers. ITSO recorded a
-        finding, and IERC and KTTO have not finished. rdco@cit.edu's Decision
+        finding, and IERC and KTTO have not finished. rdco@iris.test's Decision
         dialog names both offices and the finding before anything closes.
         """
         from apps.reviews import seats
@@ -800,7 +802,7 @@ class Command(BaseCommand):
         )
         rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
         seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
-        ktto_coordinator = User.objects.get(email="ktto.coordinator@cit.edu")
+        ktto_coordinator = User.objects.get(email="ktto.coordinator@iris.test")
         route(
             record, rdco,
             to=[
