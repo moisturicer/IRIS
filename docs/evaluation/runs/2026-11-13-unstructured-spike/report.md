@@ -1,6 +1,10 @@
 # Unstructured spike (IR-984): what Transform returns, and the go/no-go
 
-**Result: NO-GO.** Under ADR-067 decision 2's spike gate, reading order fails the
+> **Read the 2026-11-14 addendum on real two-column papers first.** The
+> `two_columns` fixture also fails LlamaParse and Docling. On real papers,
+> Unstructured's `hi_res` strategy reads in order and keeps every coordinate.
+
+**Result: NO-GO, as the rule is written.** Under ADR-067 decision 2's spike gate, reading order fails the
 `two_columns` fixture. It fails under both profiles. Coordinates pass: 0 of 939
 text elements on the proxy papers lack one. A text element is one whose text is
 non-blank and whose type is not `Image`. Counting `Image` elements as well, all
@@ -211,6 +215,67 @@ What the Platform strategies give that Transform does not:
 
 All of these sit on the side of the trade-off that fails the gate. VLM took
 71 s for 5 pages.
+
+## Addendum: reading order on real two-column papers (2026-11-14)
+
+**The `two_columns` fixture cannot decide this gate: every vendor fails it.**
+
+- **LlamaParse**, the running Extractor: its committed recording
+  (`fixtures/llamaparse/two_columns/`) reads across the rows, like
+  Unstructured `balanced`.
+- **Docling** (`iris-docling:cpu`, run locally): reads L1, L2, R1–R3, then
+  the formula, then L3.
+- **Why they all fail:** the fixture's columns are three short sentences whose
+  baselines line up across the page, so a layout reader sees rows. No test ever
+  ran the contract's reading-order clause against LlamaParse.
+
+So reading order was measured on real papers instead: the four two-column proxy
+papers, 40 two-column pages. Paper 52 is single-column, since about 40% of its
+lines cross the middle, and is excluded.
+
+**How it is scored.** `pdfplumber`'s character positions split each page into
+its true left and right column. Each extractor block of at least 100
+characters is matched back to a column by a 40-character window, and the
+scorer counts **back-jumps**: a right-column block followed by a left-column
+block on the same page. Correct order scores 0.
+
+**Two checks on the scorer:**
+- Putting each page's right column first scores 14 on paper 40's 14 pages, as
+  it should.
+- Transform's back-jumps were read by hand: they are real interleaving.
+
+Scorer and counts are in `real_order/`.
+
+| Extractor | 38 (5 pp) | 58 (5 pp) | 25 (16 pp) | 40 (14 pp) | Total back-jumps |
+|---|---|---|---|---|---|
+| LlamaParse (running Extractor) | 0 | 0 | 1 | 0 | **1** |
+| Docling (previous Extractor) | 0 | 0 | 0 | 0 | **0** |
+| Unstructured Transform `balanced` | 1 | 2 | 3 | 8 | **14** |
+| Unstructured Transform `best` | 1 | 2 | — | — | 3 on two papers |
+| Unstructured Platform `hi_res` | 0 | 0 | 0 | — (timed out) | **0** on three papers |
+| Unstructured Platform `vlm` (forced) | 0 | 0 | — | — | 0 on two papers, but no coordinates |
+
+On these pages, cross-column merges are 0 or 1 for every extractor.
+
+**`hi_res` meets both rules on real papers.** It reads them in order, and
+every text element on papers 38, 58 and 25 has a box: 0 missing of 492. It
+also returns `Formula` elements, table HTML, `parent_id` and, when asked,
+`image_base64`.
+
+**Transform**, the API ADR-067 names, is the weakest reader of the six.
+
+What this means for the gate, for IR-980's owner and ADR-067 to decide:
+
+1. **As written, the rule is NO-GO**, because it names the fixture. But the
+   fixture also fails the vendor IRIS runs today, so it is not evidence
+   against Unstructured.
+2. **On real two-column papers**, Unstructured's `hi_res` strategy (Platform
+   API) reads as well as LlamaParse and Docling and keeps coordinates.
+   Transform does not read as well.
+3. **If the gate is restated on real pages, `hi_res` would pass it.** But
+   ADR-067 names the Transform API, so adopting `hi_res` means amending that
+   choice. That would also bring in the Platform API's own terms and price.
+   ADR-067's open conditions apply to it as they do to Transform.
 
 ## Other findings for IR-980's owner
 

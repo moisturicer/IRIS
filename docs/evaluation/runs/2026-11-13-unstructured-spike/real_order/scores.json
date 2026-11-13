@@ -1,0 +1,142 @@
+{
+  "notes": "Proxy tier (ADR-023): never a finding about CIT-U research. Counts only. inversions = right-to-left column back-jumps within a page; merged_across_columns = blocks that start in one column and end in the other, excluding a paragraph flowing from the foot of the left column to the head of the right. Only two-column pages (<5% of lines cross the middle) and blocks of >=100 characters are scored.",
+  "papers": {
+    "38": "State-Space-Based FIR Filtering on a Quantum Computer",
+    "58": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+    "25": "Diverse Metallicities in Protoclusters at z~3.4 detected by Deep Learning",
+    "40": "Accelerating massive ensembles of ordinary differential equations"
+  },
+  "scores": {
+    "LlamaParse": {
+      "38": {
+        "two_column_pages": 5,
+        "blocks_scored": 70,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "58": {
+        "two_column_pages": 5,
+        "blocks_scored": 62,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "25": {
+        "two_column_pages": 16,
+        "blocks_scored": 89,
+        "inversions": 1,
+        "merged_across_columns": 1
+      },
+      "40": {
+        "two_column_pages": 14,
+        "blocks_scored": 158,
+        "inversions": 0,
+        "merged_across_columns": 0
+      }
+    },
+    "Docling": {
+      "38": {
+        "two_column_pages": 5,
+        "blocks_scored": 68,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "58": {
+        "two_column_pages": 5,
+        "blocks_scored": 61,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "25": {
+        "two_column_pages": 16,
+        "blocks_scored": 83,
+        "inversions": 0,
+        "merged_across_columns": 1
+      },
+      "40": {
+        "two_column_pages": 14,
+        "blocks_scored": 151,
+        "inversions": 0,
+        "merged_across_columns": 0
+      }
+    },
+    "Unstructured Transform balanced": {
+      "38": {
+        "two_column_pages": 5,
+        "blocks_scored": 48,
+        "inversions": 1,
+        "merged_across_columns": 0
+      },
+      "58": {
+        "two_column_pages": 5,
+        "blocks_scored": 47,
+        "inversions": 2,
+        "merged_across_columns": 0
+      },
+      "25": {
+        "two_column_pages": 16,
+        "blocks_scored": 86,
+        "inversions": 3,
+        "merged_across_columns": 1
+      },
+      "40": {
+        "two_column_pages": 14,
+        "blocks_scored": 111,
+        "inversions": 8,
+        "merged_across_columns": 0
+      }
+    },
+    "Unstructured Transform best": {
+      "38": {
+        "two_column_pages": 5,
+        "blocks_scored": 48,
+        "inversions": 1,
+        "merged_across_columns": 0
+      },
+      "58": {
+        "two_column_pages": 5,
+        "blocks_scored": 47,
+        "inversions": 2,
+        "merged_across_columns": 0
+      },
+      "25": null,
+      "40": null
+    },
+    "Unstructured hi_res": {
+      "38": {
+        "two_column_pages": 5,
+        "blocks_scored": 47,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "58": {
+        "two_column_pages": 5,
+        "blocks_scored": 64,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "25": {
+        "two_column_pages": 16,
+        "blocks_scored": 91,
+        "inversions": 0,
+        "merged_across_columns": 1
+      },
+      "40": null
+    },
+    "Unstructured vlm": {
+      "38": {
+        "two_column_pages": 5,
+        "blocks_scored": 44,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "58": {
+        "two_column_pages": 5,
+        "blocks_scored": 46,
+        "inversions": 0,
+        "merged_across_columns": 0
+      },
+      "25": null,
+      "40": null
+    }
+  }
+}
