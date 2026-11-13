@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from .disclosure import Decision, DisclosureInputs, may_disclose
+from .disclosure import Decision, DisclosureInputs, Reason, may_disclose
+
+#: The one refusal a reader is told (ADR-054 decision 8).
+NO_CONSENT = Reason.NO_CONSENT.value
 
 
 def inputs_for_record(record: Any) -> DisclosureInputs:
@@ -48,3 +51,11 @@ def decision_for_record(record: Any) -> Decision:
     that has one.
     """
     return may_disclose(inputs_for_record(record))
+
+
+def reader_refusal(record: Any) -> str | None:
+    """``NO_CONSENT`` for a stored No only; never another reason (ADR-052)."""
+    # The gate merges No with no answer; only a No is reported as one.
+    if record.ai_consent is not False:
+        return None
+    return NO_CONSENT if Reason.NO_CONSENT in decision_for_record(record).reasons else None
