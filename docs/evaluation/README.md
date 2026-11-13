@@ -147,6 +147,10 @@ is too vague to resolve, which is why its `expected_outcome` is `clarify`.
 A set that supplies no `resolved_question` at all still measures the raw lane;
 the Resolved lane simply reports that no question carries one.
 
+### `scope_record` (IR-1052)
+
+Names the one Record a question is asked inside, the way Paper Chat asks it, by title or id. Every label must name the same Record. `eval_retrieval` retrieves only inside it, and each run file reports a `slices` block giving `corpus` and `record_scoped` recall, each with its own denominator. The in-paper set is [`proxy_record_scoped.json`](proxy_record_scoped.json). The baseline is in [`2026-11-14-IR-1052-in-paper-retrieval.md`](2026-11-14-IR-1052-in-paper-retrieval.md).
+
 ## How to label — the procedure
 
 Extend [`proxy_starter.json`](proxy_starter.json). It already holds labelled
