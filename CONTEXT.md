@@ -151,7 +151,7 @@ _Avoid_: Duplicate detection (that is about two Proposals overlapping with each 
 ### Review workflow
 
 **Specialist office**:
-ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (technical review, ethics compliance, the commercial potential of IP). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
+ITSO, IERC or KTTO, and TBI once ADR-068 is built: an office a Record is routed to for a question only it can answer (technical review, ethics compliance, IP, commercial potential). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
 _Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
 
 **ITSO**:
@@ -162,7 +162,11 @@ _Avoid_: IP office.
 The Institutional Ethics Review Committee, responsible for ethics compliance review of research submissions.
 
 **KTTO**:
-The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions. Under ADR-066 it owns a paper's [[IP application]]s, and commercialization moves to TBI (IR-977).
+The Knowledge and Technology Transfer Office. In a paper's review it answers whether the paper holds intellectual property to protect, and whether it should be filed before publication. It owns a paper's [[IP application]]s (ADR-066). Commercial potential is [[TBI]]'s question (ADR-068).
+
+**TBI**:
+The Technology Business Incubator, a [[Specialist office]] that answers a paper's commercial potential in its review, and owns its [[Commercialization application]]. Accepted in ADR-068, not built yet.
+_Avoid_: KTTO / TBI (IPAMS's shared step), incubator office.
 
 **Specialist path**:
 A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
