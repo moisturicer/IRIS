@@ -75,7 +75,11 @@ export default function LoginPage() {
   const sessionExpiredFromState =
     (location.state as { reason?: string } | null)?.reason === "session_expired";
   // Why the server ended the session (IR-645); inactivity when it did not say.
-  const sessionEnd = sessionEndMessage(searchParams.get("code"));
+  // The address carries it across a full page load; router state carries it
+  // from the route guard (IR-1081).
+  const sessionEnd = sessionEndMessage(
+    searchParams.get("code") ?? (location.state as { code?: unknown } | null)?.code,
+  );
   const [sessionAlert, setSessionAlert] = useState(
     () => searchParams.get("reason") === "session_expired" || sessionExpiredFromState
   );

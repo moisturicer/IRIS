@@ -5,6 +5,7 @@ import type { User } from "@/types/auth";
 import { useAuthStore } from "@/store/auth.store";
 import { decodeJwtPayload, isJwtExpired } from "@/lib/jwt";
 import { wholePath } from "@/lib/redirectTarget";
+import { isSessionEndCode, SESSION_LOST_CODE } from "@/lib/authSession";
 import { ForbiddenScreen } from "./ForbiddenScreen";
 import { PendingApprovalPage } from "@/features/auth/PendingApprovalPage";
 import { Spinner } from "@/components/ui/Spinner";
@@ -38,6 +39,7 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const user        = useAuthStore((s) => s.user);
   const authReady     = useAuthStore((s) => s.authReady);
+  const sessionLost   = useAuthStore((s) => s.sessionLost);
   const noticeRequired = useNoticeStore((s) => s.required);
   const location      = useLocation();
   /**
@@ -110,6 +112,19 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     // destination too, so the banner and the return trip are independent.
     return (
       <Navigate to="/login" replace state={{ reason: "session_expired", from: attempted }} />
+    );
+  }
+
+  // A session that was stored in this tab but could not be restored on load
+  // (IR-1081). Not "never signed in", so it gets the reason and the code.
+  if (!accessToken && sessionLost) {
+    const code = isSessionEndCode(sessionLost.code) ? sessionLost.code : SESSION_LOST_CODE;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ reason: "session_expired", code, from: attempted }}
+      />
     );
   }
 

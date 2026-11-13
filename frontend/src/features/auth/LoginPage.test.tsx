@@ -325,6 +325,29 @@ describe("where the login screen sends you", () => {
     await expectHostileDestinationRefused();
   });
 
+  it("returns to the page a lost session was on, with the session-ended message shown (IR-1081)", async () => {
+    // What the route guard hands over after a reload whose stored session could
+    // not be restored: the reason, the lost-session code and the page asked for.
+    acceptAnyPassword();
+    renderLoginAt("/login", {
+      reason: "session_expired",
+      code: "session_lost",
+      from: "/review/12/evaluate?status=pending",
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Your session ended. Sign in to continue where you were.",
+    );
+
+    await signIn();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "landed on /review/12/evaluate?status=pending" }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("keeps the destination when the session-expired banner is dismissed first", async () => {
     // `dismissSessionAlert` navigates to clear the banner's reason out of
     // router state. Reading the destination at submit time instead of on mount
@@ -745,6 +768,26 @@ describe("why the session ended", () => {
     renderScreen(<LoginPage />, { route });
 
     expect(screen.getByRole("alert")).toHaveTextContent(/30 minutes of inactivity/);
+  });
+
+  it("says the session ended, and that sign-in returns to the page, for a session lost on load (IR-1081)", () => {
+    renderScreen(<LoginPage />, {
+      route: "/login",
+      state: { reason: "session_expired", code: "session_lost", from: "/review/12/evaluate" },
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Your session ended. Sign in to continue where you were.");
+    expect(alert).not.toHaveTextContent(/30 minutes/);
+  });
+
+  it("reads the reason from router state as well as the address (IR-1081)", () => {
+    renderScreen(<LoginPage />, {
+      route: "/login",
+      state: { reason: "session_expired", code: "session_ended_revoked" },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/An administrator ended this session/);
   });
 
   it("clears the reason from the address when dismissed", async () => {

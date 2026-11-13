@@ -79,6 +79,19 @@ export const SESSION_END_MESSAGES = {
   },
 } as const;
 
+/**
+ * The code the route guard passes when a session stored in this tab could not
+ * be restored on load and the server gave no reason the screen knows (IR-1081,
+ * audit FB-01). It is the interface's own, never one the server sends, so it
+ * is kept out of `SESSION_END_MESSAGES`, which is exactly the server's list.
+ */
+export const SESSION_LOST_CODE = "session_lost";
+
+const SESSION_LOST_MESSAGE = {
+  title: "Session Ended",
+  text: "Your session ended. Sign in to continue where you were.",
+} as const;
+
 export type SessionEndCode = keyof typeof SESSION_END_MESSAGES;
 
 export function isSessionEndCode(code: unknown): code is SessionEndCode {
@@ -86,6 +99,7 @@ export function isSessionEndCode(code: unknown): code is SessionEndCode {
 }
 
 export function sessionEndMessage(code: unknown) {
+  if (code === SESSION_LOST_CODE) return SESSION_LOST_MESSAGE;
   return SESSION_END_MESSAGES[isSessionEndCode(code) ? code : "session_idle"];
 }
 
