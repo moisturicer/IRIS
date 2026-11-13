@@ -122,7 +122,7 @@ IR-758 (spec, under IR-671), IR-759 (this ADR), IR-760, IR-761, IR-762, IR-763, 
 
 ## Amendment — 2026-11-12 (IR-758): Areas, the Audit Log and the Call Requests page
 
-**Status of this amendment: PROPOSED, for team review.** Drafted before any of IR-760 to IR-766 is built. It is not accepted until a reviewer records approval.
+**Status of this amendment: Accepted** — 2026-11-13: reviewed, accepted and merged by Ashlee Sean (PR #711), as relayed by Hermoine Zozobrado. Recorded before any of IR-760 to IR-766 is built.
 
 1. **A Call's Areas are Classifications only** (decisions 3 and the board's Area filter). CONTEXT.md defines an **Area** as a Classification or a PSCED category; for a Call it is always a Classification, the same topic names Discover filters by. PSCED fields are too broad to help a reader find a call for papers, and a second picker and filter would add work for no use. Decided by Hermoine Zozobrado, 2026-11-12.
 2. **Only the System Admin reads these events** (decision 15). RDCO no longer reads the Audit Log at all (ADR-051 decision 15). Read decision 15's last sentence as "The System Admin sees them in the Audit Log."

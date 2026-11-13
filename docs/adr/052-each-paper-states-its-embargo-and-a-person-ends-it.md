@@ -10,6 +10,8 @@
 
 **Amended again 2026-11-04 (Hermoine Zozobrado, IR-879 design session; Accepted): every paper is embargoed by default.** Decisions 2, 3, 5 and 16 and the IR-816 and IR-812 amendments change. See *Amendment — 2026-11-04 (IR-879): embargoed by default* at the end. Built by IR-882.
 
+**Amended 2026-11-13 by [ADR-066](066-ip-applications-beside-publishing.md) (IR-978; Accepted): starting an IP application sets the IP mark.** The mark still never clears, and filing doesn't release the paper: KTTO's IP release (decisions 11–13) stays a separate act.
+
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
 ## Context
