@@ -40,7 +40,7 @@ IRIS has two mechanisms a neighbouring product could not truthfully claim:
 - **Saved papers and their Reading status follow the reader's account** (IR-566, ADR-044), are private to them, and are the same on Discover, the Record page and My Library. **The reader's own folders and reading history are still kept in this browser only** (folders until IR-572; history until IR-756, and cleared on sign-out), and the interface says so where they are listed. Likes (the Star) are retired. Owned research is account-backed (`/records/mine/`).
 - **Status uses the server's wording** (`workflow_state_label`), never a client mapping.
 - **Honest copy:** never invent a metric, count, status or capability that the API cannot supply. Mockup-only fields do not enter the interface.
-- **Fixed vocabulary.** *Archived* is a rejected record. *Unlisted* is a Thesis or Project kept out of the catalogue. *Accepted* is a Proposal its Adviser accepted.
+- **Fixed vocabulary.** *Archived* is a rejected record. *Unlisted* is a Thesis or Project kept out of the catalogue. *Accepted* is a Proposal its Adviser accepted: as a record's state it belongs to a Proposal only. An Adviser's or RDCO's act of accepting any record reads *Accepted* on their own Done row (ADR-032 §9, clarified 2026-11-14).
 - **Proposal continuation is built (IR-417):** an accepted Proposal can be continued as a Thesis or Project, which creates an ordinary child draft linked to it (lineage) and opens it in Publish.
 
 ## Brand Commitments

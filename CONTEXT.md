@@ -216,6 +216,10 @@ _Avoid_: Reset (a new Version gives reopened parties a fresh due date, which is 
 Telling an office's coordinators that its [[Due date]] has passed. Only a notification: the Record, its [[Seat]]s and its [[Clearance]]s are unchanged. The Adviser stage has no Escalation.
 _Avoid_: Using it for the [[Hand-back]] to RDCO, auto-escalation (suggests the Record moves).
 
+**Resolved notification**:
+A notification that asked its recipient to act, once the task it asked for has ended, whoever ended it: cleared, claimed by a colleague, withdrawn, or closed by a [[Decision]]. It stays in the list as history but no longer counts as unread. It is final: if a resubmission asks the same office again, that is a new notification. A notification that only informs is never resolved.
+_Avoid_: Read (a person's own act, which a Resolved notification does not need), dismissed, archived.
+
 **Revision request**:
 One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and only RDCO can decide it; the party that asked cannot finish its own review either. Answered by the next Version, withdrawn by the party that asked, or withdrawn by RDCO's [[Decision]]. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
 _Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
@@ -225,7 +229,7 @@ An act that ends a Record's review: on a Thesis/Research or Project, accept & pu
 _Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which a Decision also records).
 
 **Accepted**:
-A Proposal its Adviser accepted: its resting state. It is not published, and nothing further is decided on it.
+A Proposal its Adviser accepted: its resting state. It is not published, and nothing further is decided on it. Only a Proposal is ever Accepted as a state. An Adviser or RDCO accepting a Thesis/Research or Project is an act, and it reads "Accepted" on that reviewer's own Done row while the Record itself reads by where it rests.
 _Avoid_: Approved (the stored name), ongoing, completed (the state of the retired *complete* act).
 
 **Continuation**:

@@ -16,6 +16,14 @@ colors:
   quiet-ink: "#57534e"
   body-ink: "#44403c"
   ink: "#1c1917"
+  # Decided 2026-11-14 (IR-1072), not built: values are the prototype's, iris-uiux-audit/prototype/styles.css.
+  field-stone: "#8f8884"
+  highlight-yellow: "#f7e08f"
+  highlight-yellow-now: "#f2c94c"
+  pen-rose: "#b4474b"
+  pen-wash: "#fbeaea"
+  pen-now: "#f5d5d6"
+  maroon-press: "#5a0c0f"
 typography:
   display:
     fontFamily: "EB Garamond, Georgia, Cambria, serif"
@@ -47,6 +55,11 @@ typography:
     fontFamily: "Inter Variable, Inter, ui-sans-serif, system-ui, sans-serif"
     fontSize: "13px"
     fontWeight: 600
+    lineHeight: "20px"
+  control:
+    # Decided 2026-11-14 (IR-1072), not built: form fields and page buttons only.
+    fontFamily: "Inter Variable, Inter, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "14px"
     lineHeight: "20px"
 rounded:
   thumb: "0.375rem"
@@ -157,6 +170,27 @@ components:
 # Design System: IRIS
 
 > **Authority.** `docs/adr/` and `docs/ui-ux/01-design-system.md` govern design decisions; `frontend/tailwind.config.js` defines the implemented tokens. This file is a derived summary, mostly of the record page (Paper and Overview, IR-569), plus the entry screens' Dossier frame (IR-704). Correct the design-system document and token source first, then update this summary and `.impeccable/design.json` when they disagree. A redesign refines this system; it does not replace its palette, type scale or webfont.
+
+## Decided changes, not built yet (IR-1072, 2026-11-14)
+
+Decided by **Lee Jasmin Adolfo** (project lead and frontend owner) on 2026-11-14, from the UI/UX audit ([`docs/frontend_ui_audit_spec.md`](docs/frontend_ui_audit_spec.md) §7.1). The authority is [`docs/ui-ux/01-design-system.md`](docs/ui-ux/01-design-system.md) §0, which says the same in full. **Nothing below is built: until the named ticket lands, the sections after this one describe what ships.** Where this section and a rule below disagree, this section wins once its ticket has landed.
+
+- **D1, fields and controls (IR-1074).** Every input, select, textarea and checkbox is outlined in **Field Stone** (#8f8884, 3.49:1 on white, WCAG 1.4.11). Rule Stone stays only on decorative chips and cards. Form fields and page buttons gain a **14/20 `control`** type step; the reader toolbar's reading controls stay 13 px. Placeholders and helper text are Quiet Ink (#57534e).
+- **D4, Discover layout (IR-1082).** The **1 / 2 / 3 column toggle stays**, at Jive's preference: one cycling icon button, hidden below `xl`, at the toolbar's one control height. The **96 px outline thumbnail** replaces the abstract-preview panel in 1 column only; the 2 and 3 column cards are text only.
+- **D5, navigation (IR-1085).** **Office console and Analytics nest under My Reviews**, only for the roles that already have them. Their current URLs keep working.
+- **D6, highlight roles (IR-1097).** Each kind of highlight has one look, and no look means two things. Values are the prototype's:
+
+  | Role | Look |
+  |---|---|
+  | Action | Maroon fill, one per row |
+  | Here (current page, tab or conversation) | Desk Stone fill, Ink text, maroon icon, no side stripe |
+  | Selected (an option you chose) | White raised segment or an Ink outline, never maroon |
+  | Reference (page citation, source number) | Maroon text on white with a Rule Stone hairline |
+  | Match (search, Find) | **Highlight Yellow** (#f7e08f); the current match **#f2c94c**; Ink text on it is 14:1 |
+  | Pen (a reviewer's mark) | **Pen Rose**: fill #fbeaea, 2 px underline #b4474b, a numbered pin; the open thread's passage #f5d5d6 |
+  | Status | White chip, tone in text and outline; only Attention is filled |
+
+  **Maroon Wash (#fdf2f2) is retired from the interface** and stops being the "on" tint. **Maroon Press** (#5a0c0f) is the pressed state of a filled button. Yellow is reserved for matches and rose for a reviewer's marks, and nothing else uses either. The **Four Inks Rule** becomes: white, black, stone and maroon, plus one yellow highlighter for matches and one rose pen for a reviewer's marks. `palette.test.ts` blocks Tailwind hue classes, so the tokens are added there and in `tailwind.config.js` in the same change as IR-1097, which is also the change that edits this file's rules below.
 
 ## Overview
 
