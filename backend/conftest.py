@@ -27,6 +27,8 @@ PDF_TEST_LIMITS = {
     "PDF_VALIDATION_MAX_DEPTH": 100,
     # IR-871: the review text reader's own sandbox.
     "REVIEW_TEXT_WALL_SECONDS": 60, "REVIEW_TEXT_MEMORY_MIB": 1024, "REVIEW_TEXT_MAX_PAGES": 1000,
+    # IR-1053: the PDF evidence reader's sandbox.
+    "PDF_EVIDENCE_WALL_SECONDS": 60, "PDF_EVIDENCE_MEMORY_MIB": 1024,
 }
 
 from testing import run_lock

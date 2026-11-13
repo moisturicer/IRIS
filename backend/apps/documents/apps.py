@@ -17,6 +17,23 @@ class DocumentsConfig(AppConfig):
                 validation_limits()
             except ValueError as exc:
                 raise ImproperlyConfigured(str(exc)) from exc
+        from .pdf_evidence import sandbox as evidence
+
+        own = [getattr(settings, name, None) for name in evidence.LIMIT_NAMES[:2]]
+        if any(value is not None for value in own):
+            try:
+                evidence.limits()
+            except ValueError as exc:
+                raise ImproperlyConfigured(str(exc)) from exc
+
+        @register()
+        def check_pdf_evidence_limits(app_configs, **kwargs):
+            try:
+                evidence.limits()
+            except ValueError:
+                return [Warning("PDF evidence is not read: configure every PDF_EVIDENCE_* limit "
+                                "and PDF_VALIDATION_MAX_PAGES.", id="documents.W003")]
+            return []
 
         @register()
         def check_pdf_limits(app_configs, **kwargs):
