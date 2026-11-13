@@ -12,9 +12,9 @@ from pathlib import Path
 import asyncpg
 from pypdf import PdfReader
 
-from apps.ai.chunking import build_context_path_chunker, normalize
 from apps.ai.extraction import document_to_json, extraction_hash
 from apps.ai.extraction.ports import IncompleteExtraction
+from apps.ai.ingestion.pipeline import build_chunk_set
 
 
 class IncompleteCoverage(Exception):
@@ -59,7 +59,7 @@ def build_output(source, load, extractor, options):
     if (not pages or set(document.page_sizes) != pages or not pages <= covered
             or any(e.page not in pages for e in document.elements)):
         raise IncompleteCoverage()
-    chunks = build_context_path_chunker(options).chunk(normalize(document, options), options)
+    chunks = build_chunk_set(document, options)
     if not chunks.chunks or any(c.source_page not in pages for c in chunks.chunks):
         raise IncompleteCoverage()
     return {
