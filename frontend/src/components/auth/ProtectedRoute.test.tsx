@@ -37,12 +37,13 @@ import { ProtectedRoute } from "./ProtectedRoute";
  */
 function LoginStub() {
   const location = useLocation();
-  const state = (location.state ?? {}) as { from?: string; reason?: string };
+  const state = (location.state ?? {}) as { from?: string; reason?: string; code?: string };
   return (
     <div>
       <h1>Sign in</h1>
       <h2>{`destination ${state.from ?? "none"}`}</h2>
       <h2>{`reason ${state.reason ?? "none"}`}</h2>
+      <h2>{`code ${state.code ?? "none"}`}</h2>
     </div>
   );
 }
@@ -68,6 +69,7 @@ beforeEach(() => {
     refreshToken: null,
     isAuthenticated: false,
     authReady: false,
+    sessionLost: null,
   });
 });
 
@@ -129,6 +131,43 @@ describe("the route guard", () => {
 
     expect(screen.getByRole("heading", { name: "reason session_expired" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "destination /review/12/evaluate" })).toBeInTheDocument();
+  });
+
+  // IR-1081 (audit FB-01): on a reload the session is restored from the stored
+  // refresh token, and when that fails the store has no token at all, which
+  // used to look exactly like "never signed in".
+  it("explains a session that could not be restored on load, and keeps the destination", () => {
+    useAuthStore.setState({ authReady: true, accessToken: null, sessionLost: { code: null } });
+
+    renderGuardAt("/review/12/evaluate");
+
+    expect(screen.getByRole("heading", { name: "reason session_expired" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "code session_lost" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "destination /review/12/evaluate" })).toBeInTheDocument();
+  });
+
+  it("passes on the reason the server gave for a lost session", () => {
+    useAuthStore.setState({
+      authReady: true,
+      accessToken: null,
+      sessionLost: { code: "session_ended_revoked" },
+    });
+
+    renderGuardAt("/review/12/evaluate");
+
+    expect(screen.getByRole("heading", { name: "code session_ended_revoked" })).toBeInTheDocument();
+  });
+
+  it("falls back to the generic message for a reason the login screen does not know", () => {
+    useAuthStore.setState({
+      authReady: true,
+      accessToken: null,
+      sessionLost: { code: "token_not_valid" },
+    });
+
+    renderGuardAt("/review/12/evaluate");
+
+    expect(screen.getByRole("heading", { name: "code session_lost" })).toBeInTheDocument();
   });
 
   it("says nothing about a reason when there was simply no session", () => {

@@ -67,6 +67,7 @@ beforeEach(() => {
     refreshToken: null,
     isAuthenticated: false,
     authReady: false,
+    sessionLost: null,
   });
 });
 
@@ -157,5 +158,55 @@ describe("hydrateAuth", () => {
     expect(state.authReady).toBe(true);
     expect(useNoticeStore.getState().required).toBe(true);
     useNoticeStore.setState({ required: false });
+  });
+
+  // IR-1081 (audit FB-01): a reload that ends on sign-in must say why.
+  describe("when a stored session cannot be restored", () => {
+    it("remembers that a session was lost, so the guard can say so", async () => {
+      sessionStorage.setItem(REFRESH_KEY, "refresh-0");
+      spent.add("refresh-0");
+
+      await useAuthStore.getState().hydrateAuth();
+
+      expect(useAuthStore.getState().sessionLost).toEqual({ code: null });
+    });
+
+    it("keeps the reason the server gave", async () => {
+      sessionStorage.setItem(REFRESH_KEY, "refresh-0");
+      refreshToken.mockRejectedValueOnce({
+        response: { status: 401, data: { code: "session_ended_revoked" } },
+      });
+
+      await useAuthStore.getState().hydrateAuth();
+
+      expect(useAuthStore.getState().sessionLost).toEqual({ code: "session_ended_revoked" });
+    });
+
+    it("also remembers it when the profile request fails after a good refresh", async () => {
+      sessionStorage.setItem(REFRESH_KEY, "refresh-0");
+      me.mockRejectedValueOnce(new Error("profile unavailable"));
+
+      await useAuthStore.getState().hydrateAuth();
+
+      expect(useAuthStore.getState().sessionLost).toEqual({ code: null });
+    });
+
+    it("stays silent when there was never a stored session", async () => {
+      await useAuthStore.getState().hydrateAuth();
+
+      expect(useAuthStore.getState().sessionLost).toBeNull();
+    });
+
+    it("clears the memory on the next sign-in", () => {
+      useAuthStore.setState({ sessionLost: { code: null } });
+
+      useAuthStore.getState().login(
+        { id: 7, email: "ktto@cit.edu", role_name: "KTTO" } as never,
+        "access",
+        "refresh",
+      );
+
+      expect(useAuthStore.getState().sessionLost).toBeNull();
+    });
   });
 });

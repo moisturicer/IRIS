@@ -747,6 +747,26 @@ describe("why the session ended", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/30 minutes of inactivity/);
   });
 
+  it("says the session ended, and that sign-in returns to the page, for a session lost on load (IR-1081)", () => {
+    renderScreen(<LoginPage />, {
+      route: "/login",
+      state: { reason: "session_expired", code: "session_lost", from: "/review/12/evaluate" },
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Your session ended. Sign in to continue where you were.");
+    expect(alert).not.toHaveTextContent(/30 minutes/);
+  });
+
+  it("reads the reason from router state as well as the address (IR-1081)", () => {
+    renderScreen(<LoginPage />, {
+      route: "/login",
+      state: { reason: "session_expired", code: "session_ended_revoked" },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/An administrator ended this session/);
+  });
+
   it("clears the reason from the address when dismissed", async () => {
     const user = userEvent.setup();
     renderScreen(<LoginPage />, { route: "/login?reason=session_expired&code=session_ended" });

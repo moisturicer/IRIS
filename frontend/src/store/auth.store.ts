@@ -29,6 +29,13 @@ interface AuthState {
    * request is already `await`ing.
    */
   sessionEpoch: number;
+  /**
+   * Set when a session stored in this tab could not be restored on load
+   * (IR-1081, audit FB-01), with the server's reason if it gave one. Without
+   * it the route guard cannot tell that from never having signed in, and a
+   * reload that ended on sign-in said nothing. Cleared by the next sign-in.
+   */
+  sessionLost: { code: string | null } | null;
 
   login:      (user: User, access: string, refresh: string) => void;
   logout:     () => void;
@@ -45,6 +52,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isAuthenticated: false,
   authReady:       false,
   sessionEpoch:    0,
+  sessionLost:     null,
 
   login: (user, access, refresh) => {
     setStoredRefreshToken(refresh);
@@ -61,6 +69,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       accessToken: access,
       refreshToken: refresh,
       isAuthenticated: true,
+      sessionLost: null,
       sessionEpoch: s.sessionEpoch + 1,
     }));
   },
@@ -160,6 +169,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         return;
       }
       get().logout();
+      // After `logout`, which would otherwise be read as an ordinary sign-out.
+      const code = (err as { response?: { data?: { code?: unknown } } })?.response?.data?.code;
+      set({ sessionLost: { code: typeof code === "string" ? code : null } });
     } finally {
       set({ authReady: true });
     }
