@@ -1,21 +1,12 @@
-"""The PDF evidence reader (IR-1053, ADR-067 decision 4).
+"""PDF evidence reader (IR-1053, ADR-067 decision 4).
 
-Reads what the uploaded PDF itself says about its layout, once at extraction,
-so shaping (IR-1057) stays a pure function over stored data:
+Reads the PDF's own layout once at extraction: lines with word boxes (page
+points, top-left origin), font size and bold, bookmarks, page labels and
+contents entries. pdfplumber, pypdf and the standard library only.
 
-- ``pages``: per page its size, whether it has a text layer, and its lines,
-  each with its words' boxes, font size and bold flag. Boxes are page points
-  with a top-left origin, as ``BoundingBox`` uses.
-- ``bookmarks``: the PDF outline as (title, level, page).
-- ``page_labels``: the PDF's printed page labels, or ``None`` when it has none.
-- ``contents``: table-of-contents lines as (number, title, indent, page label).
-
-**Pure.** pdfplumber, pypdf and the standard library only: no Django, no
-network. It runs as a sandbox child (``sandbox.py``) as ``python -I reader.py
-<pdf> <out.json> <memory MiB> <max pages>``; its exit code is the result: 0
-read, 2 unreadable, 3 encrypted, 5 over the limits. Tests call ``read()``.
-
-**Changing a rule is a new reader**: raise ``READER``, which is stored.
+Runs as the sandbox child: ``python -I reader.py <pdf> <out> <MiB> <pages>``,
+exit 0 read, 2 unreadable, 3 encrypted, 5 over limits. Raise ``READER`` on
+any rule change.
 """
 from __future__ import annotations
 
@@ -50,13 +41,17 @@ def _bold(fontname: str) -> bool:
     return any(part in name for part in BOLD_NAMES)
 
 
+def _same_row(top: float, other_top: float, size: float) -> bool:
+    return abs(top - other_top) <= max(2.0, size * 0.3)
+
+
 def _lines(words: list[dict]) -> list[dict]:
     """Words in pdfplumber's order (by line, then left to right) grouped into lines."""
     lines, current = [], []
     for word in words:
         if current:
             last = current[-1]
-            same_row = abs(word["top"] - last["top"]) <= max(2.0, last["size"] * 0.3)
+            same_row = _same_row(word["top"], last["top"], last["size"])
             near = word["x0"] - last["x1"] <= last["size"] * LINE_GAP
             if not (same_row and near):
                 lines.append(current)
@@ -120,7 +115,7 @@ def _rows(lines: list[dict]) -> list[dict]:
     spaces: a right-aligned page number is its own line until then."""
     rows = []
     for line in sorted(lines, key=lambda l: (l["box"][1], l["box"][0])):
-        if rows and abs(line["box"][1] - rows[-1]["box"][1]) <= max(2.0, line["size"] * 0.3):
+        if rows and _same_row(line["box"][1], rows[-1]["box"][1], line["size"]):
             rows[-1] = {"box": rows[-1]["box"], "text": rows[-1]["text"] + "  " + _text(line)}
         else:
             rows.append({"box": line["box"], "text": _text(line)})

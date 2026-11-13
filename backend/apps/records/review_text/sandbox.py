@@ -7,7 +7,7 @@ cap, the same way upload checks run (``apps/documents/validators.py``). Its
 exit code says what happened, and only a clean exit's JSON is read back, after
 a size cap and a shape check.
 
-**The one sandbox that returns data** (IR-871 review; PDF_INTAKE.md §Review
+**A sandbox that returns data** (IR-871 review; PDF_INTAKE.md §Review
 text). Upload checks return only an exit code; this child must return text. So
 it opens its input and output first and then confines itself (`reader.confine`):
 it can open no further file, socket or pipe, so a parser taken over by a crafted

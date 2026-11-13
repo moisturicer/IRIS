@@ -43,6 +43,8 @@ def test_output_of_the_wrong_shape_is_refused():
     assert not sandbox.valid({**good, "pages": [{"page": "1"}]})
     assert not sandbox.valid({**good, "bookmarks": [{"title": 1, "level": 1, "page": 1}]})
     assert not sandbox.valid({**good, "page_labels": "i"})
+    assert not sandbox.valid({**good, "page_labels": ["i", "ii"]})
+    assert not sandbox.valid({**good, "pages": [{**good["pages"][0], "page": 2}]})
     assert not sandbox.valid({**good, "extra": True})
 
 

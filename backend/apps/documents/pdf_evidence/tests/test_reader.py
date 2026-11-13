@@ -2,6 +2,8 @@
 
 from io import BytesIO
 
+import pytest
+
 from apps.ai.extraction.tests.fixtures import FIXTURES, pdf_bytes
 from apps.documents.pdf_evidence import reader
 from apps.documents.pdf_evidence.tests.thesis import thesis_pdf
@@ -88,7 +90,5 @@ def test_a_paper_with_no_contents_page_has_no_entries():
 
 
 def test_more_pages_than_the_limit_is_over_budget():
-    import pytest
-
     with pytest.raises(reader.OverBudget):
         read(thesis_pdf(), max_pages=4)

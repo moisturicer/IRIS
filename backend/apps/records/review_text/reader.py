@@ -1131,7 +1131,7 @@ def _preload():
 def confine():
     """Open no file from here on (IR-871 review, PDF_INTAKE.md §Review text).
 
-    The reader is the one sandbox child that sends data back, so a parser
+    The reader is a sandbox child that sends data back, so a parser
     taken over by a crafted PDF must not be able to read anything to send:
     not the worker's environment under /proc, not another paper. The child
     has already opened its input and output, so it caps RLIMIT_NOFILE at the
