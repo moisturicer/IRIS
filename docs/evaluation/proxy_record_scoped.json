@@ -2,7 +2,7 @@
   "name": "proxy-record-scoped",
   "tier": "proxy",
   "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
-  "labelled_by": "Claude (AI draft for IR-1052), not yet reviewed by a named person",
+  "labelled_by": "Jive Tyler I. Revalde (questions and quotes drafted by Claude for IR-1052)",
   "notes": "IR-1052: Paper Chat's case. Every question is asked inside one Record (scope_record) and retrieval is narrowed to it, as Paper Chat narrows. Questions are worded as a reader of that paper would ask, without naming it. ADR-023 tier 1: an engineering gate over the arXiv proxy corpus, NEVER a finding about CIT-U research. Quotes are copied from active chunk text, not the PDF. A separate file because proxy_starter.json is pinned by the IR-542 audit.",
   "questions": [
     {
