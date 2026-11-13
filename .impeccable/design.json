@@ -1,50 +1,197 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-06T01:35:09Z",
+  "generatedAt": "2026-11-13T11:39:45Z",
   "title": "Design System: IRIS",
   "extensions": {
     "colorMeta": {
-      "binding-maroon": { "role": "primary", "displayName": "Binding Maroon", "canonical": "#6B0F12", "tonalRamp": ["#2d0608", "#4A0A0C", "#6B0F12", "#8B1316", "#f9b8b9", "#fce4e4", "#fdf2f2"] },
-      "binding-maroon-light": { "role": "primary", "displayName": "Binding Maroon Light", "canonical": "#8B1316" },
-      "binding-maroon-dark": { "role": "primary", "displayName": "Binding Maroon Dark", "canonical": "#4A0A0C" },
-      "maroon-wash": { "role": "primary", "displayName": "Maroon Wash", "canonical": "#fdf2f2" },
-      "maroon-thread": { "role": "primary", "displayName": "Maroon Thread", "canonical": "#f9b8b9" },
-      "endpaper": { "role": "neutral", "displayName": "Endpaper", "canonical": "#fafaf9", "tonalRamp": ["#1c1917", "#292524", "#44403c", "#57534e", "#78716c", "#d6d3d1", "#e7e5e4", "#fafaf9"] },
-      "page-white": { "role": "neutral", "displayName": "Page White", "canonical": "#ffffff" },
-      "bar-stone": { "role": "neutral", "displayName": "Bar Stone", "canonical": "#f5f5f4" },
-      "desk-stone": { "role": "neutral", "displayName": "Desk Stone", "canonical": "#e7e5e4" },
-      "rule-stone": { "role": "neutral", "displayName": "Rule Stone", "canonical": "#d6d3d1" },
-      "faint-ink": { "role": "neutral", "displayName": "Faint Ink", "canonical": "#78716c" },
-      "quiet-ink": { "role": "neutral", "displayName": "Quiet Ink", "canonical": "#57534e" },
-      "body-ink": { "role": "neutral", "displayName": "Body Ink", "canonical": "#44403c" },
-      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1c1917" }
+      "binding-maroon": {
+        "role": "primary",
+        "displayName": "Binding Maroon",
+        "canonical": "#6B0F12",
+        "tonalRamp": [
+          "#2d0608",
+          "#4A0A0C",
+          "#6B0F12",
+          "#8B1316",
+          "#f9b8b9",
+          "#fce4e4",
+          "#fdf2f2"
+        ]
+      },
+      "binding-maroon-light": {
+        "role": "primary",
+        "displayName": "Binding Maroon Light",
+        "canonical": "#8B1316"
+      },
+      "binding-maroon-dark": {
+        "role": "primary",
+        "displayName": "Binding Maroon Dark",
+        "canonical": "#4A0A0C"
+      },
+      "maroon-wash": {
+        "role": "primary",
+        "displayName": "Maroon Wash",
+        "canonical": "#fdf2f2"
+      },
+      "maroon-thread": {
+        "role": "primary",
+        "displayName": "Maroon Thread",
+        "canonical": "#f9b8b9"
+      },
+      "endpaper": {
+        "role": "neutral",
+        "displayName": "Endpaper",
+        "canonical": "#fafaf9",
+        "tonalRamp": [
+          "#1c1917",
+          "#292524",
+          "#44403c",
+          "#57534e",
+          "#78716c",
+          "#d6d3d1",
+          "#e7e5e4",
+          "#fafaf9"
+        ]
+      },
+      "page-white": {
+        "role": "neutral",
+        "displayName": "Page White",
+        "canonical": "#ffffff"
+      },
+      "bar-stone": {
+        "role": "neutral",
+        "displayName": "Bar Stone",
+        "canonical": "#f5f5f4"
+      },
+      "desk-stone": {
+        "role": "neutral",
+        "displayName": "Desk Stone",
+        "canonical": "#e7e5e4"
+      },
+      "rule-stone": {
+        "role": "neutral",
+        "displayName": "Rule Stone",
+        "canonical": "#d6d3d1"
+      },
+      "faint-ink": {
+        "role": "neutral",
+        "displayName": "Faint Ink",
+        "canonical": "#78716c"
+      },
+      "quiet-ink": {
+        "role": "neutral",
+        "displayName": "Quiet Ink",
+        "canonical": "#57534e"
+      },
+      "body-ink": {
+        "role": "neutral",
+        "displayName": "Body Ink",
+        "canonical": "#44403c"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1c1917"
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "A record's title on the Overview; 36px on a phone, 48px from sm." },
-      "headline": { "displayName": "Headline", "purpose": "Overview section headings and the Ask IRIS heading. Ink, never maroon." },
-      "title": { "displayName": "Title", "purpose": "The paper's title in the record bar; dialog and card titles." },
-      "body": { "displayName": "Body", "purpose": "Interface text." },
-      "reading": { "displayName": "Reading", "purpose": "AI Overview prose; the first paragraph is a 17px lead." },
-      "label": { "displayName": "Label", "purpose": "Every control's text." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "A record's title on the Overview; 36px on a phone, 48px from sm."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Overview section headings and the Ask IRIS heading. Ink, never maroon."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "The paper's title in the record bar; dialog and card titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Interface text."
+      },
+      "reading": {
+        "displayName": "Reading",
+        "purpose": "AI Overview prose; the first paragraph is a 17px lead."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Every control's text."
+      }
     },
     "shadows": [
-      { "name": "card-lift", "value": "0 4px 12px 0 rgb(0 0 0 / 0.08)", "purpose": "The Ask IRIS icon, and a record card on hover." },
-      { "name": "drawer-edge", "value": "-12px 0 32px rgb(41 37 36 / 0.12)", "purpose": "Ask IRIS as a drawer over the paper." },
-      { "name": "recess", "value": "inset 0 1px 3px rgb(41 37 36 / 0.28), inset 0 0 0 1px rgb(41 37 36 / 0.07)", "purpose": "The section track pressed into the record bar." },
-      { "name": "thumb", "value": "0 1px 2px rgb(41 37 36 / 0.35), 0 2px 6px rgb(107 15 18 / 0.25)", "purpose": "The maroon section thumb sitting in its track." }
+      {
+        "name": "card-lift",
+        "value": "0 4px 12px 0 rgb(0 0 0 / 0.08)",
+        "purpose": "The Ask IRIS icon, and a record card on hover."
+      },
+      {
+        "name": "drawer-edge",
+        "value": "-12px 0 32px rgb(41 37 36 / 0.12)",
+        "purpose": "Ask IRIS as a drawer over the paper."
+      },
+      {
+        "name": "recess",
+        "value": "inset 0 1px 3px rgb(41 37 36 / 0.28), inset 0 0 0 1px rgb(41 37 36 / 0.07)",
+        "purpose": "The section track pressed into the record bar."
+      },
+      {
+        "name": "thumb",
+        "value": "0 1px 2px rgb(41 37 36 / 0.35), 0 2px 6px rgb(107 15 18 / 0.25)",
+        "purpose": "The maroon section thumb sitting in its track."
+      }
     ],
     "motion": [
-      { "name": "colour-fade", "value": "150-200ms ease-out", "purpose": "Hover and focus colour changes." },
-      { "name": "settle", "value": "300ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The section thumb sliding; Record details folding away beside Ask IRIS." },
-      { "name": "panel-in", "value": "320ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Ask IRIS arriving from the edge it is docked to (1.5rem, opacity)." },
-      { "name": "sheet-settle", "value": "280ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The entry folder settling once on load (0.5rem rise, opacity); motion-safe only." },
-      { "name": "step-fade", "value": "150ms ease-out", "purpose": "Register's step panel cross-fading on a step change; opacity only, motion-safe only." }
+      {
+        "name": "colour-fade",
+        "value": "150-200ms ease-out",
+        "purpose": "Hover and focus colour changes."
+      },
+      {
+        "name": "settle",
+        "value": "300ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "The section thumb sliding; Record details folding away beside Ask IRIS."
+      },
+      {
+        "name": "panel-in",
+        "value": "320ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Ask IRIS arriving from the edge it is docked to (1.5rem, opacity)."
+      },
+      {
+        "name": "sheet-settle",
+        "value": "280ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "The entry folder settling once on load (0.5rem rise, opacity); motion-safe only."
+      },
+      {
+        "name": "step-fade",
+        "value": "150ms ease-out",
+        "purpose": "Register's step panel cross-fading on a step change; opacity only, motion-safe only."
+      }
     ],
     "breakpoints": [
-      { "name": "reading-split", "value": "@container reading (min-width: 640px)" },
-      { "name": "reading-wide", "value": "@container reading (min-width: 1000px)" },
-      { "name": "overview-wide", "value": "@container overview (min-width: 64rem)" },
-      { "name": "narrow", "value": "(max-width: 389.98px)", "purpose": "Register's folder tabs other than the current one show only their mark (IR-711)." }
+      {
+        "name": "reading-split",
+        "value": "@container reading (min-width: 640px)"
+      },
+      {
+        "name": "reading-wide",
+        "value": "@container reading (min-width: 1000px)"
+      },
+      {
+        "name": "overview-wide",
+        "value": "@container overview (min-width: 64rem)"
+      },
+      {
+        "name": "narrow",
+        "value": "(max-width: 389.98px)",
+        "purpose": "Register's folder tabs other than the current one show only their mark (IR-711)."
+      },
+      {
+        "name": "profile-wide",
+        "value": "@container profile (min-width: 48rem)",
+        "purpose": "Another person's Profile: Collaborators move beside the sections behind a vertical hairline (IR-700)."
+      }
     ]
   },
   "components": [
@@ -108,8 +255,8 @@
       "name": "Ask IRIS icon",
       "kind": "button",
       "refersTo": "ask-iris-fab",
-      "description": "The one corner control: opens Ask IRIS, gone while the panel is open.",
-      "html": "<button class=\"ds-fab\" aria-label=\"Ask IRIS\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M12 12v9M8 21h8M5 5l2 2M19 5l-2 2\"/></svg></button>",
+      "description": "The one corner control: the Ask IRIS glyph (a speech bubble with the mark's serif I cut out) on maroon; gone while the panel is open.",
+      "html": "<button class=\"ds-fab\" aria-label=\"Ask IRIS\"><svg width=\"26\" height=\"26\" viewBox=\"1.60 1.70 20.80 20.80\" fill=\"currentColor\" fill-rule=\"evenodd\" aria-hidden=\"true\"><path d=\"M7.5 2.5H16.5A5.5 5.5 0 0 1 22 8V12A5.5 5.5 0 0 1 16.5 17.5H11.5L7.2 21.4C6.6 21.9 5.6 21.5 5.6 20.7V17.2A5.5 5.5 0 0 1 2 12V8A5.5 5.5 0 0 1 7.5 2.5Z M8.3 5.3H15.7V7H13V13H15.7V14.7H8.3V13H11V7H8.3Z\"/></svg></button>",
       "css": ".ds-fab { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 9999px; background: #6B0F12; color: #fff; box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08); transition: background-color 200ms, transform 200ms; cursor: pointer; } .ds-fab:hover { background: #8B1316; transform: translateY(-2px); } .ds-fab:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6B0F12; }"
     },
     {
@@ -120,9 +267,38 @@
       "html": "<div class=\"ds-composer\"><textarea class=\"ds-composer-field\" rows=\"1\" placeholder=\"Ask about methodology, findings, datasets...\"></textarea><div class=\"ds-composer-row\"><span class=\"ds-scope\"><span class=\"ds-scope-dot\"></span>This paper</span><button class=\"ds-send\" aria-label=\"Send\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"><path d=\"M12 19V5M5 12l7-7 7 7\"/></svg></button></div></div>",
       "css": ".ds-composer { border: 1px solid #d6d3d1; border-radius: 12px; background: #fff; transition: border-color 200ms, box-shadow 200ms; } .ds-composer:focus-within { border-color: rgb(107 15 18 / 0.6); box-shadow: 0 0 0 2px rgb(107 15 18 / 0.2); } .ds-composer-field { display: block; width: 100%; box-sizing: border-box; resize: none; border: none; background: transparent; padding: 10px 12px 0; color: #292524; font: 400 14px/21px Inter, system-ui, sans-serif; outline: none; } .ds-composer-field::placeholder { color: #78716c; } .ds-composer-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 8px; } .ds-scope { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid #f9b8b9; border-radius: 12px; background: #fdf2f2; color: #6B0F12; font: 600 13px/20px Inter, system-ui, sans-serif; } .ds-scope-dot { width: 6px; height: 6px; border-radius: 9999px; background: #6B0F12; } .ds-send { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #6B0F12; border-radius: 12px; background: #6B0F12; color: #fff; cursor: pointer; transition: background-color 200ms; } .ds-send:hover { background: #8B1316; } .ds-send:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"
     },
-    { "name": "Entry folder", "kind": "custom", "refersTo": "entry-sheet", "description": "The Dossier frame's folder (IR-704): index tabs on a white sheet with a stone sheet behind it. The tab joined to the sheet carries a 2px maroon top edge (a recorded exception); a completed register step has a check and a solid outline, one not started is dashed.", "html": "<div class=\"ds-folder\"><div class=\"ds-folder-tabs\"><span class=\"ds-ftab ds-ftab-done\"><span class=\"ds-fmark ds-fmark-done\">&#10003;</span>Identity</span><span class=\"ds-ftab ds-ftab-on\"><span class=\"ds-fmark ds-fmark-on\">2</span>Affiliation</span><span class=\"ds-ftab ds-ftab-todo\"><span class=\"ds-fmark ds-fmark-todo\">3</span>Security</span></div><div class=\"ds-folder-back\"></div><div class=\"ds-folder-sheet\"><h2 class=\"ds-folder-title\">Create an Account</h2><p class=\"ds-folder-step\">Step 2 of 3 &middot; Affiliation</p></div></div>", "css": ".ds-folder { position: relative; isolation: isolate; max-width: 36rem; } .ds-folder-tabs { position: relative; z-index: 10; display: flex; gap: 4px; padding-left: 20px; } .ds-ftab { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-bottom: -1px; padding: 10px 16px; border: 1px solid; border-bottom: 0; border-radius: 12px 12px 0 0; font: 600 13px/20px Inter, system-ui, sans-serif; } .ds-ftab-done { border-color: #d6d3d1; background: #f5f5f4; color: #292524; } .ds-ftab-on { border-color: #e7e5e4; border-top: 2px solid #6B0F12; background: #fff; color: #6B0F12; } .ds-ftab-todo { border-style: dashed; border-color: #a8a29e; color: #57534e; } .ds-fmark { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 9999px; font-size: 12px; } .ds-fmark-done { background: #1c1917; color: #fff; } .ds-fmark-on { background: #6B0F12; color: #fff; } .ds-fmark-todo { border: 1px dashed #78716c; color: #44403c; } .ds-folder-back { position: absolute; inset: 44px 0 0 0; z-index: -1; transform: translate(8px, 8px); border: 1px solid #e7e5e4; border-radius: 16px; background: #f5f5f4; } .ds-folder-sheet { padding: 40px 44px; border: 1px solid #e7e5e4; border-radius: 16px; background: #fff; box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08); } .ds-folder-title { margin: 0; font: 600 28px/34px 'EB Garamond', Georgia, serif; color: #1c1917; } .ds-folder-step { margin: 4px 0 0; font: 600 12px/16px Inter, system-ui, sans-serif; color: #6B0F12; }"},
-    {"name": "Profile note", "kind": "custom", "refersTo": "profile-note", "description": "Own-view strip on your Profile: says how others see you and holds the one filled action.", "html": "<p class=\"ds-profile-note\" role=\"note\">This is how other people signed in to IRIS see you.<a class=\"ds-profile-note-action\" href=\"#\">Edit profile</a></p>", "css": ".ds-profile-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 8px 8px 8px 16px; border: 1px solid #e7e5e4; border-radius: 1rem; background: #f5f5f4; color: #44403c; font: 400 13px/20px Inter, system-ui, sans-serif; } .ds-profile-note-action { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 9999px; background: #6B0F12; color: #fff; font: 600 14px/21px Inter, system-ui, sans-serif; text-decoration: none; transition: background-color 200ms; } .ds-profile-note-action:hover { background: #8B1316; } .ds-profile-note-action:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"},
-    {"name": "Profile avatar", "kind": "custom", "refersTo": "profile-avatar", "description": "A person's initials on Maroon Wash when there is no photo; the photo replaces it.", "html": "<span class=\"ds-profile-avatar\" aria-hidden=\"true\">AR</span>", "css": ".ds-profile-avatar { display: inline-grid; place-items: center; width: 112px; height: 112px; border-radius: 9999px; background: #fdf2f2; color: #6B0F12; font: 600 28px/34px 'EB Garamond', Georgia, Cambria, serif; }"}
+    {
+      "name": "Entry folder",
+      "kind": "custom",
+      "refersTo": "entry-sheet",
+      "description": "The Dossier frame's folder (IR-704): index tabs on a white sheet with a stone sheet behind it. The tab joined to the sheet carries a 2px maroon top edge (a recorded exception); a completed register step has a check and a solid outline, one not started is dashed.",
+      "html": "<div class=\"ds-folder\"><div class=\"ds-folder-tabs\"><span class=\"ds-ftab ds-ftab-done\"><span class=\"ds-fmark ds-fmark-done\">&#10003;</span>Identity</span><span class=\"ds-ftab ds-ftab-on\"><span class=\"ds-fmark ds-fmark-on\">2</span>Affiliation</span><span class=\"ds-ftab ds-ftab-todo\"><span class=\"ds-fmark ds-fmark-todo\">3</span>Security</span></div><div class=\"ds-folder-back\"></div><div class=\"ds-folder-sheet\"><h2 class=\"ds-folder-title\">Create an Account</h2><p class=\"ds-folder-step\">Step 2 of 3 &middot; Affiliation</p></div></div>",
+      "css": ".ds-folder { position: relative; isolation: isolate; max-width: 36rem; } .ds-folder-tabs { position: relative; z-index: 10; display: flex; gap: 4px; padding-left: 20px; } .ds-ftab { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-bottom: -1px; padding: 10px 16px; border: 1px solid; border-bottom: 0; border-radius: 12px 12px 0 0; font: 600 13px/20px Inter, system-ui, sans-serif; } .ds-ftab-done { border-color: #d6d3d1; background: #f5f5f4; color: #292524; } .ds-ftab-on { border-color: #e7e5e4; border-top: 2px solid #6B0F12; background: #fff; color: #6B0F12; } .ds-ftab-todo { border-style: dashed; border-color: #a8a29e; color: #57534e; } .ds-fmark { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 9999px; font-size: 12px; } .ds-fmark-done { background: #1c1917; color: #fff; } .ds-fmark-on { background: #6B0F12; color: #fff; } .ds-fmark-todo { border: 1px dashed #78716c; color: #44403c; } .ds-folder-back { position: absolute; inset: 44px 0 0 0; z-index: -1; transform: translate(8px, 8px); border: 1px solid #e7e5e4; border-radius: 16px; background: #f5f5f4; } .ds-folder-sheet { padding: 40px 44px; border: 1px solid #e7e5e4; border-radius: 16px; background: #fff; box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08); } .ds-folder-title { margin: 0; font: 600 28px/34px 'EB Garamond', Georgia, serif; color: #1c1917; } .ds-folder-step { margin: 4px 0 0; font: 600 12px/16px Inter, system-ui, sans-serif; color: #6B0F12; }"
+    },
+    {
+      "name": "Profile note",
+      "kind": "custom",
+      "refersTo": "profile-note",
+      "description": "Own-view strip on your Profile: says how others see you and holds the one filled action.",
+      "html": "<p class=\"ds-profile-note\" role=\"note\">This is how other people signed in to IRIS see you.<a class=\"ds-profile-note-action\" href=\"#\">Edit profile</a></p>",
+      "css": ".ds-profile-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 8px 8px 8px 16px; border: 1px solid #e7e5e4; border-radius: 1rem; background: #f5f5f4; color: #44403c; font: 400 13px/20px Inter, system-ui, sans-serif; } .ds-profile-note-action { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 9999px; background: #6B0F12; color: #fff; font: 600 14px/21px Inter, system-ui, sans-serif; text-decoration: none; transition: background-color 200ms; } .ds-profile-note-action:hover { background: #8B1316; } .ds-profile-note-action:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"
+    },
+    {
+      "name": "Profile avatar",
+      "kind": "custom",
+      "refersTo": "profile-avatar",
+      "description": "A person's initials on Maroon Wash when there is no photo; the photo replaces it.",
+      "html": "<span class=\"ds-profile-avatar\" aria-hidden=\"true\">AR</span>",
+      "css": ".ds-profile-avatar { display: inline-grid; place-items: center; width: 112px; height: 112px; border-radius: 9999px; background: #fdf2f2; color: #6B0F12; font: 600 28px/34px 'EB Garamond', Georgia, Cambria, serif; }"
+    },
+    {
+      "name": "Collaborator row",
+      "kind": "custom",
+      "refersTo": "profile-collaborators",
+      "description": "Another person's Profile (IR-700): a 40px avatar, a name link and its shared-paper count. The whole row is the link's target; no totals, no email.",
+      "html": "<aside class=\"ds-collab\"><h2 class=\"ds-collab-h\">Collaborators</h2><ul class=\"ds-collab-list\"><li class=\"ds-collab-row\"><span class=\"ds-collab-av\" aria-hidden=\"true\">HZ</span><div class=\"ds-collab-txt\"><a class=\"ds-collab-name\" href=\"#\">Hermoine Joyce Zozobrado</a><p class=\"ds-collab-n\">2 shared papers</p></div></li><li class=\"ds-collab-row\"><span class=\"ds-collab-av\" aria-hidden=\"true\">AA</span><div class=\"ds-collab-txt\"><a class=\"ds-collab-name\" href=\"#\">Ashlee Sean Abac</a><p class=\"ds-collab-n\">1 shared paper</p></div></li></ul></aside>",
+      "css": ".ds-collab { max-width: 16rem; padding-left: 32px; border-left: 1px solid #e7e5e4; } .ds-collab-h { margin: 0; font: 600 20px/28px 'EB Garamond', Georgia, Cambria, serif; color: #1c1917; } .ds-collab-list { margin: 12px -8px 0; padding: 0; list-style: none; } .ds-collab-row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 8px; border-radius: 12px; transition: background-color 150ms; } .ds-collab-row:hover, .ds-collab-row:focus-within { background: #f5f5f4; } .ds-collab-av { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 9999px; background: #fdf2f2; color: #6B0F12; font: 600 13px/20px Inter, system-ui, sans-serif; } .ds-collab-txt { min-width: 0; } .ds-collab-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 2px; color: #1c1917; font: 600 15px/24px Inter, system-ui, sans-serif; text-decoration: none; transition: color 150ms; } .ds-collab-name::after { content: ''; position: absolute; inset: 0; } .ds-collab-name:hover { color: #6B0F12; } .ds-collab-name:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; } .ds-collab-n { margin: 0; color: #57534e; font: 400 13px/20px Inter, system-ui, sans-serif; }"
+    }
   ],
   "narrative": {
     "northStar": "The Bound Volume",
@@ -136,19 +312,50 @@
       "Width read from the container (`reading`, `overview`), not the viewport."
     ],
     "rules": [
-      { "name": "The Binding Rule", "body": "Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong.", "section": "colors" },
-      { "name": "The Four Inks Rule", "body": "The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Gold is decorative only: never text or the sole status signal. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).", "section": "colors" },
-      { "name": "The Token Authority Rule", "body": "`docs/adr/` and `docs/ui-ux/01-design-system.md` govern design decisions; `frontend/tailwind.config.js` defines the implemented tokens. This sidecar follows DESIGN.md after those sources are corrected.", "section": "overview" },
-      { "name": "The One Bright Object Rule", "body": "On the reading surfaces, only the thing being read is white. Bars, toolbars and headers around it are stone.", "section": "colors" },
-      { "name": "The Typeset Title Rule", "body": "Garamond is for what you read the title of (a paper, a section, a dialog). It never sets a control, a chip or a number.", "section": "typography" },
-      { "name": "The Named Size Rule", "body": "A size is asked for by role (`text-title`, `text-small`), never by pixel (`text-[13px]`). Nothing goes below 11 px, and labels are sentence case, never small tracked capitals.", "section": "typography" },
-      { "name": "The Container Rule", "body": "Read the container, never the window. A `lg:` breakpoint on a reading surface is a bug: the sidebar and Ask IRIS change the room without changing the window.", "section": "layout" },
-      { "name": "The Flush Column Rule", "body": "Reading text fills its column and meets what is beside it; the column, not the text, sets the measure.", "section": "layout" },
-      { "name": "The Hairline Rule", "body": "Two regions are separated by one Desk Stone or Rule Stone line. Never a card, a gap and a shadow at once.", "section": "elevation" }
+      {
+        "name": "The Binding Rule",
+        "body": "Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Four Inks Rule",
+        "body": "The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).",
+        "section": "colors"
+      },
+      {
+        "name": "The One Bright Object Rule",
+        "body": "On the reading surfaces, only the thing being read is white. Bars, toolbars and headers around it are stone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Typeset Title Rule",
+        "body": "Garamond is for what you read the title of (a paper, a section, a dialog). It never sets a control, a chip or a number.",
+        "section": "typography"
+      },
+      {
+        "name": "The Named Size Rule",
+        "body": "A size is asked for by role (`text-title`, `text-small`), never by pixel (`text-[13px]`). Nothing goes below 11 px, and labels are sentence case, never small tracked capitals.",
+        "section": "typography"
+      },
+      {
+        "name": "The Container Rule",
+        "body": "Read the container, never the window. A `lg:` breakpoint on a reading surface is a bug: the sidebar and Ask IRIS change the room without changing the window.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flush Column Rule",
+        "body": "Reading text fills its column and meets what is beside it; the column, not the text, sets the measure.",
+        "section": "layout"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Two regions are separated by one Desk Stone or Rule Stone line. Never a card, a gap and a shadow at once.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "**Do** keep exactly one filled Binding Maroon action per row, and make it the viewer's next step.",
-      "**Do** separate reading regions with one Desk Stone (#e7e5e4) or Rule Stone (#d6d3d1) hairline; elsewhere use white cards with a one-pixel stone-200 border and no resting shadow.",
+      "**Do** separate regions with one Desk Stone (#e7e5e4) or Rule Stone (#d6d3d1) hairline.",
       "**Do** keep the paper the only white thing on the Paper view; bars and headers are Bar Stone (#f5f5f4).",
       "**Do** take control sizes from the reading scale (44 px touch, 36 px pointer) and read the `reading` or `overview` container for every layout change.",
       "**Do** set titles and section headings in EB Garamond 600 and everything operable in Inter.",
@@ -162,7 +369,7 @@
       "**Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.",
       "**Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.",
       "**Don't** add a label explaining how AI text was made, or an outlined button where a ghost one is enough.",
-      "**Don't** put a thick accent border on a rounded shape."
+      "**Don't** put a thick accent border on a rounded shape. The one recorded exception is the entry folder's tab joined to the sheet (`EntryTab`, and register's current step), whose 2 px maroon top edge is the approved Dossier direction (the `border-accent-on-rounded` exception in `.impeccable/config.json`)."
     ]
   }
 }
