@@ -304,6 +304,65 @@ What this means for the gate, for IR-980's owner and ADR-067 to decide:
    choice. That would also bring in the Platform API's own terms and price.
    ADR-067's open conditions apply to it as they do to Transform.
 
+## Addendum: exact LaTeX for formulas, and indexing them (2026-11-14)
+
+`hi_res` finds formulas but writes them as OCR text (e.g. `N-1 |A) = >> 2(n)|n). n=0`).
+IRIS needs **exact LaTeX**, and the formulas must be **searchable**. This
+addendum measures how to get both. Scripts and counts are in `formulas/`. Only
+counts are committed; no paper text.
+
+**Ground truth.** The authors' own LaTeX: the arXiv sources of the four proxy
+papers (2609.20331v1, 2609.19207v1, 2609.35471v1, 2609.35661v1).
+
+- `latex_truth.py` extracts every display equation and expands the authors'
+  macros.
+- It normalizes notation that typesets identically: `\ket{n}` and
+  `|n\rangle`, `\bm` and `\boldsymbol`, `\le` and `\leq`, spacing, labels.
+- Every remaining difference was read by hand and classified.
+
+**Finding formulas.** `hi_res` returned **36 `Formula` elements**, against
+**36 display equations** in the four sources. Every box, viewed as a 300 dpi
+crop, sits on its equation.
+
+| Route to LaTeX | Typesets like the source | Errors (read by hand) | Cost per formula |
+|---|---|---|---|
+| **Crop → Claude Sonnet 5.5** (OpenRouter) | **34 / 36** (31 exact after normalization) | **no mathematical error**; 2 cosmetic: one word set bold, one bracket pair sized larger | $0.0017 |
+| Crop → Claude Haiku 5.5 | 33 / 36 (30 exact) | **1 error**: three aligned equations run onto one line; 2 format slips (`$` delimiters left in) | $0.0001 |
+| Unstructured Generative OCR (hi_res + `anthropic_ocr`, Sonnet 5) | 0 / 7 changed | skips every formula: all 36 are `is_extracted: true` (text layer), and Generative OCR only rewrites OCR'd text, as its docs say | — |
+| Unstructured `vlm`, formulas only | 5 / 14 exact, 12 / 14 ≥ 0.95 | equation numbers written as text, two equations merged, no coordinates | second full-page read |
+| `hi_res` text | 0 | OCR, not LaTeX | — |
+| Gemini models (OpenRouter) | not run | refused by the account's data-policy guardrail | — |
+
+**Caveat.** The measured prompt lost two backslashes to shell quoting: the
+`\tag{n}` instruction reached the models as a tab plus `ag{n}`. The models
+still emitted `\tag` correctly. `formulas/latex_ocr.py` holds the corrected
+prompt and has not been re-run.
+
+**Result.** Unstructured cannot produce exact LaTeX for born-digital PDFs. The
+measured route is: **`hi_res` locates the formula, IRIS crops it from the PDF,
+and Claude Sonnet transcribes the crop.** That is about $0.17 for a thesis
+with 100 display equations.
+
+**Indexing (proposed, not built or measured).**
+
+1. **One call per formula returns two things:** the exact LaTeX, and a
+   one-line plain-language description of what the equation states.
+2. **Both are embedded with their surrounding chunk.**
+   - The LaTeX carries exact symbols and the description carries meaning.
+   - "The KV-cache size formula" can match by meaning, and `\Gamma(T)` or
+     "softmax" by keyword (Postgres full-text search).
+3. **Each formula is also stored as its own record:** LaTeX, description,
+   page, box, equation number and model. So Paper Chat can quote it exactly
+   and a citation can open the PDF at the formula.
+4. **Measured before it is switched on:**
+   - Add formula questions to the proxy question set.
+   - Run `eval_retrieval` with formulas in and out of the embedded text.
+
+This reverses ADR-067 decision 11 (formulas out of the embedded text), so it is
+recorded as an ADR-067 amendment. Crops of real Manuscripts would go to a model
+provider, so every call sits behind the consent and embargo gate and ADR-041
+admission. The provider's retention is an open condition.
+
 ## Other findings for IR-980's owner
 
 - **Uploads and jobs were deleted after every run.** `DELETE

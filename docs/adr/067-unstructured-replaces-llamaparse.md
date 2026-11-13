@@ -281,6 +281,59 @@ This amends decision 2.
    to be confirmed that the separate Platform account bills at that rate
    (IR-983).
 
+## Amendment — 2026-11-14 (IR-984): exact LaTeX for formulas, and formulas indexed
+
+Decided by Jive Tyler Revalde on 2026-11-14, from the IR-984 spike report's
+formula addendum (`docs/evaluation/runs/2026-11-13-unstructured-spike/report.md`,
+`formulas/`). Proxy-tier numbers (ADR-023).
+
+**1. Every formula is stored as exact LaTeX, transcribed from a crop.** This
+amends decision 11, and item 4 of the earlier 2026-11-14 amendment.
+
+- **Locating:** `hi_res` locates each `Formula`. It found 36 of the 36 display
+  equations in the four proxy papers' arXiv sources.
+- **Transcribing:** IRIS crops the box from the PDF at 300 dpi and sends the
+  crop to a vision model for LaTeX.
+- **Why not the text `hi_res` returns:** it is OCR, not LaTeX, and is never
+  used as the formula.
+- **Why not Unstructured:** its Generative OCR skips text-layer formulas (all
+  36 were), and its `vlm` reader was less exact (5 of 14) and returns no boxes.
+
+**2. The model is Claude Sonnet 5.5 for now**, reached as an Inference task
+under ADR-036 (a new `transcribe_formula` task beside the reserved
+`describe_figure`).
+
+| Model | Result (36 equations) | Cost per formula |
+|---|---|---|
+| Sonnet 5.5 | typesets like the source on 34; no mathematical error; 2 cosmetic differences | $0.0017 |
+| Haiku 5.5 | 1 structural error | $0.0001 |
+
+Changing the model is a measurement against the same scorer (`formulas/latex_truth.py`), not an amendment.
+
+**3. Formulas are indexed.** This reverses decision 11's "left out of embedded
+text".
+
+- **The same call returns a one-line plain-language description** with the
+  LaTeX.
+- **Both enter the chunk's embedded text** at the formula's place, and both
+  feed the keyword index.
+- **Each formula is also kept as its own record:** LaTeX, description, page,
+  box, equation number, model and request. Answers can then quote it exactly
+  and cite it to its box.
+
+**4. Ships off until measured** (ADR-033 §5). Formula questions join the proxy
+question set, and `eval_retrieval` compares formulas in and out of the embedded
+text before the default changes.
+
+**5. Gates.**
+
+- Every transcription call is a paid provider attempt. It goes through the
+  consent and embargo gate and ADR-041 admission like any other.
+- An unavailable or refused call leaves the formula as an image crop with no
+  LaTeX. The OCR text is never substituted.
+- **New open condition:** the transcription provider's retention and
+  no-training terms, recorded before real Manuscripts are sent.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
