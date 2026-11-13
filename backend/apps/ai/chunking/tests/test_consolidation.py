@@ -83,6 +83,32 @@ def test_property_prose_with_its_trail_stays_within_the_target(strategy, section
         assert chunk.token_count <= target, chunk.text
 
 
+_atom = st.one_of(
+    _paragraph.map(lambda t: DocumentElement(kind=PARAGRAPH, text=t)),
+    _paragraph.map(lambda t: DocumentElement(kind="image", text="Figure.", description=t)),
+    _paragraph.map(lambda t: DocumentElement(kind="list_item", text=t)),
+    _paragraph.map(lambda t: DocumentElement(kind="list", text=t)),
+    st.lists(_paragraph, min_size=1, max_size=4).map(
+        lambda rows: DocumentElement(
+            kind="table", text="\n".join(rows), rows=tuple((r,) for r in rows)
+        )
+    ),
+    _heading.map(lambda t: DocumentElement(kind="table_header", text=t)),
+    _paragraph.map(lambda t: DocumentElement(kind="table_row", text=t)),
+    _heading.map(lambda t: DocumentElement(kind=HEADING, text=t, level=1)),
+)
+
+
+@pytest.mark.parametrize("strategy", ALL_STRATEGIES)
+@settings(max_examples=60, deadline=None)
+@given(elements=st.lists(_atom, min_size=1, max_size=10), target=st.integers(6, 40), slack=st.integers(0, 200))
+def test_property_kept_whole_content_never_passes_the_ceiling(strategy, elements, target, slack):
+    document = NormalizedDocument(title="A Thesis", elements=tuple(elements))
+    result = _chunk(document, strategy=strategy, target_tokens=target, max_tokens=target + slack)
+    for chunk in result.chunks:
+        assert chunk.token_count <= target + slack
+
+
 def test_the_trail_is_counted_inside_the_target():
     paragraph = " ".join(f"word{i}" for i in range(400)) + "."
     document = _document([("3 Methodology", 1, [paragraph])])

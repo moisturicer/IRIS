@@ -40,7 +40,7 @@ from ..document import (
     DocumentElement,
     NormalizedDocument,
 )
-from ..outline import HeadingStack, bounded_trail, trail_cost
+from ..outline import HeadingStack, bounded_trail
 from ..packing import Piece, assembled_fits, pack_pieces, reader_content
 from ..regions import regions_for
 from ..registry import register_chunker
@@ -133,7 +133,7 @@ def _chunk_section(section: _Section, options: ChunkingOptions) -> list[Draft]:
     if _fits(" ".join(e.text for e in elements), budget):
         windows = [[(e.text, e) for e in elements]]
     else:
-        ceiling = max(1, options.max_tokens - trail_cost(section.trail))
+        ceiling = body_budget(section.trail, options, options.max_tokens)
         windows = _split_structurally(elements, budget, ceiling)
 
     drafts = [_window_to_draft(w, section) for w in windows if w]
@@ -238,7 +238,7 @@ def _pack_table(
         return _pack_atoms(headers, max_tokens) + _pack_atoms(rows, max_tokens)
 
     if not rows:
-        return [header_pieces] if header_pieces else []
+        return _pack_atoms(headers, max_tokens)
 
     windows: list[list[Piece]] = []
     current_rows: list[Piece] = []

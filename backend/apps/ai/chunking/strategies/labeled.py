@@ -11,11 +11,11 @@ from html import escape
 import hashlib
 import json
 
-from ..assembly import Draft, Joiners, finalize, fold_heading_only, merge_short_siblings
+from ..assembly import Draft, Joiners, body_budget, finalize, fold_heading_only, merge_short_siblings
 from ..document import FORMULA, HEADING, DocumentElement, NormalizedDocument
-from ..formulas import without_formulas
+from apps.ai.extraction.formulas import without_formulas
 from ..hashing import chunkset_hash
-from ..outline import HeadingStack, bounded_trail, embedded_text, trail_cost
+from ..outline import HeadingStack, bounded_trail, embedded_text
 from ..regions import dedupe_regions
 from ..registry import register_chunker
 from ..table_html import TableHTML
@@ -96,7 +96,7 @@ def _pack_section(elements, trail, key, options) -> list[Draft]:
             parts = _table_parts(element, trail, target) if element.kind == "table" else [element]
             drafts.extend(_draft([part], trail, key) for part in parts)
         else:
-            for part in _prose_parts(element, trail, target):
+            for part in _prose_parts(element, trail, options):
                 if window and not _fits(window + [part], trail, target):
                     drafts.append(_draft(window, trail, key))
                     window = []
@@ -106,11 +106,11 @@ def _pack_section(elements, trail, key, options) -> list[Draft]:
     return [split for d in drafts for split in _within_ceiling(d, options)]
 
 
-def _prose_parts(element, trail, target):
+def _prose_parts(element, trail, options):
+    target = options.effective_target_tokens
     if element.kind not in _PROSE or _fits([element], trail, target):
         return [element]
-    budget = max(1, target - trail_cost(trail))
-    pieces = split_to_fit(element.text, budget)
+    pieces = split_to_fit(element.text, body_budget(trail, options))
     parts: list[DocumentElement] = []
     current = ""
     for piece in pieces:
@@ -125,10 +125,12 @@ def _prose_parts(element, trail, target):
 
 
 def _within_ceiling(draft: Draft, options: ChunkingOptions) -> list[Draft]:
-    """A kept-whole atom past the safety ceiling is split as plain text."""
+    """A kept-whole atom past the safety ceiling is split as plain text.
+    Its display form (table HTML, formulas) is lost; only for pathological
+    atoms."""
     if count_tokens(embedded_text(draft.trail, draft.body)) <= options.max_tokens:
         return [draft]
-    budget = max(1, options.max_tokens - trail_cost(draft.trail))
+    budget = body_budget(draft.trail, options, options.max_tokens)
     return [
         replace(draft, body=piece, content=piece)
         for piece in split_to_fit(draft.body, budget)

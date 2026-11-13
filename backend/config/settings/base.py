@@ -993,16 +993,9 @@ AI_GATEWAY_URL         = config("AI_GATEWAY_URL", default="http://ai-gateway:800
 # from the registry, because a settings module must not import an app
 # package to check itself against it.
 AI_CHUNK_STRATEGY      = config("AI_CHUNK_STRATEGY", default="")
-# THE UNIT IS REAL voyage-context-4 TOKENS (IR-287). It used to be
-# whitespace-delimited words, and 512 of those measured ~700 real BPE tokens
-# (IR-243) -- so the ceiling moved to 700 in the same change that made the
-# counter honest, and chunk boundaries on ordinary prose did not move. The
-# size is still an open question for IR-133's recall@10 harness; what changed
-# is that the number now means what it says.
-# ADR-067 decision 14: two numbers. The target is what packing aims for (the
-# sweep in IR-1054 chooses it); the safety ceiling is what no embedded chunk,
-# heading trail included, may exceed. Changing the ceiling needs an ADR
-# amendment.
+# Real voyage-context-4 tokens (IR-287).
+# ADR-067 decision 14: packing aims for the target (IR-1054 sweeps it); no
+# chunk, trail included, passes the ceiling.
 # Blank means 700, or the ceiling if that is smaller.
 AI_CHUNK_TARGET_TOKENS = config(
     "AI_CHUNK_TARGET_TOKENS", default="", cast=lambda v: int(v) if str(v).strip() else None

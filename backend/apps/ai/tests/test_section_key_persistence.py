@@ -49,6 +49,19 @@ def test_an_unchanged_rechunk_fills_missing_keys_and_embeds_nothing():
     assert keys == [["T", "1 Intro"], ["T", "2 Methods"]]
 
 
+def test_an_unchanged_rechunk_corrects_a_stale_key():
+    record = Record.objects.create(title="Stale")
+    repository = DjangoChunkRepository()
+    chunk_set = _chunk_set()
+    repository.save(record_id=record.id, extraction_hash="h", chunk_set=chunk_set)
+    DocumentChunk.objects.filter(record_id=record.id).update(section_key=["T", "Old"])
+
+    repository.rechunk(record_id=record.id, extraction_hash="h", chunk_set=chunk_set)
+
+    keys = list(DocumentChunk.objects.filter(record_id=record.id).order_by("sequence").values_list("section_key", flat=True))
+    assert keys == [["T", "1 Intro"], ["T", "2 Methods"]]
+
+
 def test_options_stored_before_two_sizes_read_back_unchanged():
     options = _deserialize_options({"strategy": "structural-markdown-v1", "max_tokens": 900, "overlap_tokens": 0})
     assert (options.effective_target_tokens, options.max_tokens) == (900, 900)

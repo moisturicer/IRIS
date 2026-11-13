@@ -37,9 +37,11 @@ class Joiners:
     content: str = " "
 
 
-def body_budget(trail: tuple[str, ...], options: ChunkingOptions) -> int:
-    """Tokens left for the body once ``trail`` is in."""
-    return max(1, options.effective_target_tokens - trail_cost(trail))
+def body_budget(trail: tuple[str, ...], options: ChunkingOptions, limit: int | None = None) -> int:
+    """Tokens left for the body under ``limit`` (default: the target) once
+    ``trail`` is in."""
+    limit = options.effective_target_tokens if limit is None else limit
+    return max(1, limit - trail_cost(trail))
 
 
 def combine(drafts: list[Draft], joiners: Joiners) -> Draft:

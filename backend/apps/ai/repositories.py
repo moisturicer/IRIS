@@ -469,25 +469,26 @@ class DjangoChunkRepository:
         return carried_chunks
 
     @staticmethod
-    def _fill_section_keys(previous_row, chunk_set: ChunkSet) -> int:
-        """Give chunks stored before IR-1050 their section key.
+    def _fill_section_keys(previous_row, chunk_set: ChunkSet) -> None:
+        """Refresh stored section keys on an unchanged re-chunk.
 
-        The key is not hashed, so the same content re-chunks as unchanged and
-        would otherwise never get one. Writes only while keys are missing.
+        The key is not hashed, so a missing or stale one would never be
+        rewritten otherwise. Writes only rows whose key differs.
         """
         from apps.ai.models.chunk import DocumentChunk as DocumentChunkModel
 
-        rows = list(
-            DocumentChunkModel.objects.filter(
-                chunk_set=previous_row, deleted_at__isnull=True, section_key__isnull=True
-            )
-        )
         keys = {chunk.sequence: list(chunk.section_key) for chunk in chunk_set.chunks}
-        for row in rows:
+        stale = [
+            row
+            for row in DocumentChunkModel.objects.filter(
+                chunk_set=previous_row, deleted_at__isnull=True
+            ).only("pk", "sequence", "section_key")
+            if row.section_key != keys.get(row.sequence, [])
+        ]
+        for row in stale:
             row.section_key = keys.get(row.sequence, [])
-        if rows:
-            DocumentChunkModel.objects.bulk_update(rows, ["section_key"])
-        return len(rows)
+        if stale:
+            DocumentChunkModel.objects.bulk_update(stale, ["section_key"])
 
     @staticmethod
     def _tombstone_removed(*, previous_row, removed_hashes, chunk_model) -> int:
