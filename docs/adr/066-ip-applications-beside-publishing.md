@@ -6,7 +6,7 @@
 
 It amends [ADR-018](018-conditional-parallel-office-routing.md) (KTTO, not ITSO, owns IP), [ADR-063](063-rdco-sets-requirements-and-templates.md) (the IP and commercialization upload slots move into applications) and [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) (starting an application sets the IP mark). It sets the shape that IR-979's commercialization application follows.
 
-> **Amended by [ADR-068](068-tbi-is-a-specialist-office.md)** (Proposed 2026-11-14, IR-977): TBI is a
+> **Amended by [ADR-068](068-tbi-is-a-specialist-office.md)** (Accepted 2026-11-14, IR-977): TBI is a
 > specialist office, and decision 13's override notifies the office that owns the application, KTTO
 > for an IP application and TBI for a commercialization application, instead of always KTTO.
 
