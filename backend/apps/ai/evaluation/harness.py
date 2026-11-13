@@ -40,7 +40,7 @@ def _outcome(
     degraded: bool,
     mode: Optional[str],
     expects_refusal: bool = False,
-    scope_record=None,
+    scope_record: Optional[str | int] = None,
 ) -> QuestionOutcome:
     retrieved_hits = hits(question.expected, retrieved)
     final_hits = hits(question.expected, final)
@@ -82,25 +82,19 @@ def _outcome(
     )
 
 
-def _resolve_scopes(question_set: QuestionSet) -> dict:
+def _resolve_scopes(question_set: QuestionSet) -> dict[str | int, Any]:
     """Each scoped question's Record, resolved before anything is spent."""
-    from apps.records.models import Record
+    from .validation import resolve_record
 
-    resolved = {}
+    resolved: dict[str | int, Any] = {}
     for question in question_set.record_scoped:
         scope = question.scope_record
         if scope in resolved:
             continue
-        if isinstance(scope, int):
-            matches = list(Record.objects.filter(pk=scope)[:2])
-        else:
-            matches = list(Record.objects.filter(title__iexact=scope)[:2])
-        if len(matches) != 1:
-            raise QuestionSetError(
-                f"question {question.id}: scope_record {scope!r} names "
-                f"{'no' if not matches else 'more than one'} record"
-            )
-        resolved[scope] = matches[0]
+        record, problem = resolve_record(scope)
+        if record is None:
+            raise QuestionSetError(f"question {question.id}: scope_record {problem}")
+        resolved[scope] = record
     return resolved
 
 

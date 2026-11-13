@@ -80,6 +80,20 @@ def test_a_scope_naming_a_record_by_id_is_honoured(corpus, reader, embedder):
     assert report.retrieval_recall == 1.0
 
 
+def test_a_scope_title_with_stray_whitespace_still_resolves(corpus, reader, embedder):
+    loose = "  Tilapia   pond   sampling "
+    question = {
+        "id": "loose",
+        "question": FLOOD_QUESTION,
+        "scope_record": loose,
+        "expected": [{"record": loose, "quote": POND_QUOTE}],
+    }
+    report = run(
+        _root(embedder), _set(question), RunConfig(retrieval_limit=1), user=reader
+    )
+    assert report.retrieval_recall == 1.0
+
+
 def test_the_slice_reports_its_own_denominator_beside_the_corpus(
     corpus, reader, embedder
 ):

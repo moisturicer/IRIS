@@ -222,7 +222,7 @@ class EvalReport:
         corpus = _slice([o for o in self.outcomes if o.scope_record is None], k)
         scoped = _slice([o for o in self.outcomes if o.scope_record is not None], k)
         if corpus and scoped:
-            scoped["in_paper_minus_corpus_recall@" + str(k)] = round(
+            scoped[f"in_paper_minus_corpus_recall@{k}"] = round(
                 scoped[f"recall@{k}"] - corpus[f"recall@{k}"], 4
             )
         return {"corpus": corpus, "record_scoped": scoped}
