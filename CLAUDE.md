@@ -113,12 +113,13 @@ python -m pytest -n 4 -q                  # Full backend suite for ticket verifi
                                           # Reads only SECRET_KEY, RECOVERY_* and DB_*
                                           # from backend/.env, as CI supplies (IR-853)
 python manage.py seed_demo                # accounts + Discover catalogue + every workflow_state
-                                          # (IR-227). Logins are <role>@cit.edu / IrisDemo123!,
-                                          # plus admin@cit.edu (System Admin, and a Django superuser; IR-781).
+                                          # (IR-227). Logins are <role>@iris.test / IrisDemo123!
+                                          # (<role>@cit.edu until IR-1067: real office mailboxes),
+                                          # plus admin@iris.test (System Admin, and a Django superuser; IR-781).
                                           # Office coordinators (IR-478): itso.coordinator@,
                                           # ierc.coordinator@, ktto.coordinator@ and
-                                          # rdco.coordinator@cit.edu, same password. The plain
-                                          # <role>@cit.edu office logins are members, not
+                                          # rdco.coordinator@iris.test, same password. The plain
+                                          # <role>@iris.test office logins are members, not
                                           # coordinators; re-running restores both flags.
                                           # Replaced scripts/seed_demo_{users,records,clearances}.py
                                           # and seed_test_users, all deleted. Idempotent for records;
