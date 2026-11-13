@@ -27,7 +27,6 @@ from ..values import ChunkingOptions, ChunkSet
 STRATEGY_ID = "labeled-structure-v1"
 
 _PROSE = {HEADING, "text", "paragraph", "code", "link"}
-_ATOMS = frozenset({"table", "image"})
 _JOINERS = Joiners(body="\n", content="\n\n")
 
 
@@ -59,9 +58,9 @@ class LabeledStructureChunker:
         def fits(draft: Draft) -> bool:
             return count_tokens(embedded_text(draft.trail, draft.body)) <= options.effective_target_tokens
 
-        # A Figure or Table is its own retrievable unit (IR-852): never merged.
+        # A Figure is its own retrievable unit (IR-852): never merged.
         drafts = merge_short_siblings(
-            drafts, options, lambda d: fits(d) and not d.element_kinds & _ATOMS, _JOINERS
+            drafts, options, lambda d: fits(d) and "image" not in d.element_kinds, _JOINERS
         )
         drafts = fold_heading_only(drafts, options, fits, _JOINERS)
         return finalize(
@@ -74,7 +73,10 @@ class LabeledStructureChunker:
 
 
 def _has_content(element: DocumentElement) -> bool:
-    return bool(element.text.split() or element.description.split() or element.rows)
+    # An undescribed Figure is kept: its description is appended on a later pass.
+    return element.kind == "image" or bool(
+        element.text.split() or element.description.split() or element.rows
+    )
 
 
 def _body(elements) -> str:
