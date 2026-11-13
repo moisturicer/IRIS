@@ -37,6 +37,8 @@ expected order):
   comes after the whole right column.
 
 Both put left-column text after right-column text, so the rule fails. The
+Platform API's `fast`, `auto`, `hi_res` and `vlm` strategies were also tried
+(addendum below). None passes both rules. The
 proxy papers were not scored for reading order: the gate names only the
 fixture.
 
@@ -158,6 +160,57 @@ cannot miss it.
 
 A client should send `Prefer: wait=0` and poll, rather than hold a connection
 open for minutes.
+
+## Addendum: the Platform API's strategies (2026-11-14)
+
+Transform hides Unstructured's strategies behind its two profiles, so every
+strategy was also run through the separate **Platform** API, using its own key:
+
+- **`fast`, `auto` and `hi_res`** through the partition endpoint (`POST
+  https://api.unstructuredapp.io/general/v0/general`), with coordinates, table
+  structure and `extract_image_block_types` on.
+- **`vlm`** through an on-demand job (`POST
+  https://platform.unstructuredapp.io/api/v1/jobs/`). That endpoint rejects
+  `strategy=vlm` with a misleading "file may be corrupted" error.
+
+The requests and per-fixture counts are in `strategies.json`, and each
+strategy's raw `two_columns` output is in `strategies/`.
+
+| Strategy | `two_columns` order | Coordinates | Heading depth | Gate |
+|---|---|---|---|---|
+| `fast` | across the rows (L1, R1, L2, R2, …) | all | `parent_id` | fail (order) |
+| `auto` | L1, L2, formula, R1–R3, **then L3** | all | `parent_id` | fail (order) |
+| `hi_res` | same as `auto` | all | `parent_id` | fail (order) |
+| `vlm` (default auto routing) | **correct**: L1–L3, then R1–R3 | **none** | `category_depth` + `parent_id` | fail (coordinates) |
+| `vlm` (forced, JSON output) | **correct** | **none**: 0 of 81 on a 5-page proxy paper | `category_depth` + `parent_id` | fail (coordinates) |
+
+**Every strategy fails one rule or the other**, so the result stays NO-GO.
+The trade-off is structural, not a matter of settings:
+
+- **Layout strategies** (`fast`, `auto`, `hi_res`, and Transform) know where
+  every word sits but misread the column order.
+- **The VLM** reads like a person but returns no boxes at all, so a citation
+  could not highlight anything.
+
+`--measure` reports `vlm` `two_columns` as failing. That is an artefact: the
+model wrote `$$E = m c^2$$`. The raw output in `strategies/` shows the order is
+right.
+
+What the Platform strategies give that Transform does not:
+
+- **Heading structure.** `parent_id` on every strategy, and `category_depth`
+  on VLM.
+- **A real `Formula` element type** (`auto`, `hi_res`, `vlm`).
+- **Image bytes.** `image_base64` on `auto` and `hi_res` when
+  `extract_image_block_types` is set; they were seen on Tables here.
+- **Model provenance on VLM.** `metadata.enrichment_origins` names the provider
+  and model: `anthropic` / `claude-sonnet-4-6` (forced), `claude-opus-4-5-20251101`
+  (auto routing).
+- **Personal data detection.** VLM marked an `Address` element on the proxy
+  paper.
+
+All of these sit on the side of the trade-off that fails the gate. VLM took
+71 s for 5 pages.
 
 ## Other findings for IR-980's owner
 

@@ -1,0 +1,603 @@
+{
+  "notes": "Platform partition API (fast/auto/hi_res: POST https://api.unstructuredapp.io/general/v0/general; vlm: on-demand job POST https://platform.unstructuredapp.io/api/v1/jobs/). Synthetic fixtures plus one proxy paper (counts only).",
+  "strategies": {
+    "fast": {
+      "request": {
+        "strategy": "fast",
+        "coordinates": "true",
+        "pdf_infer_table_structure": "true",
+        "extract_image_block_types": "[\"Image\", \"Table\"]",
+        "include_page_breaks": "true"
+      },
+      "fixtures": {
+        "two_columns": {
+          "types": {
+            "Header": 1,
+            "Title": 3,
+            "NarrativeText": 5,
+            "Footer": 1,
+            "PageBreak": 1
+          },
+          "text_elements": 10,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0,
+          "text_in_order": [
+            "IRIS contract fixture",
+            "Two column study",
+            "Left column one opens.",
+            "Right column one resumes.",
+            "Left column two continues.",
+            "Right column two continues.",
+            "Right column three ends.",
+            "E = m c^2",
+            "Left column three ends.",
+            "Page 1"
+          ]
+        },
+        "figures": {
+          "types": {
+            "Header": 1,
+            "Title": 2,
+            "NarrativeText": 3,
+            "UncategorizedText": 1,
+            "Footer": 1,
+            "PageBreak": 1
+          },
+          "text_elements": 8,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0
+        },
+        "numbered_headings": {
+          "types": {
+            "Header": 2,
+            "Title": 4,
+            "NarrativeText": 4,
+            "Footer": 2,
+            "PageBreak": 2
+          },
+          "text_elements": 12,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0
+        },
+        "table_across_pages": {
+          "types": {
+            "Header": 2,
+            "Title": 3,
+            "NarrativeText": 1,
+            "UncategorizedText": 30,
+            "Footer": 2,
+            "PageBreak": 2
+          },
+          "text_elements": 38,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0
+        }
+      }
+    },
+    "auto": {
+      "request": {
+        "strategy": "auto",
+        "coordinates": "true",
+        "pdf_infer_table_structure": "true",
+        "extract_image_block_types": "[\"Image\", \"Table\"]",
+        "include_page_breaks": "true"
+      },
+      "fixtures": {
+        "two_columns": {
+          "types": {
+            "Header": 1,
+            "Title": 1,
+            "NarrativeText": 7,
+            "Footer": 1,
+            "PageBreak": 1
+          },
+          "text_elements": 10,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "is_extracted",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0,
+          "text_in_order": [
+            "IRIS contract fixture",
+            "Two column study",
+            "Left column one opens.",
+            "Left column two continues.",
+            "E = m c^2",
+            "Right column one resumes.",
+            "Right column two continues.",
+            "Right column three ends.",
+            "Left column three ends.",
+            "Page 1"
+          ]
+        },
+        "figures": {
+          "types": {
+            "Header": 1,
+            "Title": 1,
+            "NarrativeText": 4,
+            "Formula": 1,
+            "Footer": 1,
+            "PageBreak": 1
+          },
+          "text_elements": 8,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "is_extracted",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0
+        },
+        "numbered_headings": {
+          "types": {
+            "Header": 2,
+            "Title": 4,
+            "NarrativeText": 4,
+            "Footer": 2,
+            "PageBreak": 2
+          },
+          "text_elements": 12,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "is_extracted",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0
+        },
+        "table_across_pages": {
+          "types": {
+            "Header": 2,
+            "Title": 1,
+            "NarrativeText": 3,
+            "Table": 1,
+            "Footer": 2,
+            "PageBreak": 2
+          },
+          "text_elements": 9,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "image_base64",
+            "image_mime_type",
+            "is_extracted",
+            "languages",
+            "page_number",
+            "parent_id",
+            "table_extraction_method",
+            "text_as_html"
+          ],
+          "tables_with_html": 1
+        }
+      }
+    },
+    "hi_res": {
+      "request": {
+        "strategy": "hi_res",
+        "coordinates": "true",
+        "pdf_infer_table_structure": "true",
+        "extract_image_block_types": "[\"Image\", \"Table\"]",
+        "include_page_breaks": "true"
+      },
+      "fixtures": {
+        "two_columns": {
+          "types": {
+            "Header": 1,
+            "Title": 1,
+            "NarrativeText": 7,
+            "Footer": 1,
+            "PageBreak": 1
+          },
+          "text_elements": 10,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "is_extracted",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0,
+          "text_in_order": [
+            "IRIS contract fixture",
+            "Two column study",
+            "Left column one opens.",
+            "Left column two continues.",
+            "E = m c^2",
+            "Right column one resumes.",
+            "Right column two continues.",
+            "Right column three ends.",
+            "Left column three ends.",
+            "Page 1"
+          ]
+        },
+        "figures": {
+          "types": {
+            "Header": 1,
+            "Title": 1,
+            "NarrativeText": 4,
+            "Formula": 1,
+            "Footer": 1,
+            "PageBreak": 1
+          },
+          "text_elements": 8,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "is_extracted",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0
+        },
+        "numbered_headings": {
+          "types": {
+            "Header": 2,
+            "Title": 4,
+            "NarrativeText": 4,
+            "Footer": 2,
+            "PageBreak": 2
+          },
+          "text_elements": 12,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "is_extracted",
+            "languages",
+            "page_number",
+            "parent_id"
+          ],
+          "tables_with_html": 0
+        },
+        "table_across_pages": {
+          "types": {
+            "Header": 2,
+            "Title": 1,
+            "NarrativeText": 3,
+            "Table": 1,
+            "Footer": 2,
+            "PageBreak": 2
+          },
+          "text_elements": 9,
+          "text_elements_without_coordinates": 0,
+          "metadata_keys": [
+            "coordinates",
+            "filename",
+            "filetype",
+            "image_base64",
+            "image_mime_type",
+            "is_extracted",
+            "languages",
+            "page_number",
+            "parent_id",
+            "table_extraction_method",
+            "text_as_html"
+          ],
+          "tables_with_html": 1
+        }
+      }
+    },
+    "vlm (auto routing, default settings)": {
+      "request": {
+        "job_nodes": [
+          {
+            "type": "partition",
+            "subtype": "vlm",
+            "settings": {}
+          }
+        ]
+      },
+      "fixtures": {
+        "two_columns": {
+          "types": {
+            "UncategorizedText": 3,
+            "Header": 1,
+            "Title": 1,
+            "NarrativeText": 3,
+            "Formula": 1,
+            "Footer": 1
+          },
+          "text_elements": 7,
+          "text_elements_without_coordinates": 7,
+          "metadata_keys": [
+            "category_depth",
+            "data_source",
+            "enrichment_origins",
+            "filename",
+            "filetype",
+            "page_number",
+            "parent_id",
+            "partitioner_type",
+            "text_as_html"
+          ],
+          "tables_with_html": 0,
+          "text_in_order": [
+            "IRIS contract fixture",
+            "Two column study",
+            "Left column one opens. Left column two continues.",
+            "$$E = mc^2$$",
+            "Left column three ends.",
+            "Right column one resumes. Right column two continues. Right column three ends.",
+            "Page 1"
+          ]
+        },
+        "figures": {
+          "types": {
+            "UncategorizedText": 1,
+            "Header": 1,
+            "Title": 1,
+            "NarrativeText": 3,
+            "Image": 2,
+            "Formula": 1,
+            "Footer": 1
+          },
+          "text_elements": 7,
+          "text_elements_without_coordinates": 7,
+          "metadata_keys": [
+            "category_depth",
+            "data_source",
+            "enrichment_origins",
+            "filename",
+            "filetype",
+            "page_number",
+            "parent_id",
+            "partitioner_type",
+            "text_as_html"
+          ],
+          "tables_with_html": 0
+        },
+        "numbered_headings": {
+          "types": {
+            "UncategorizedText": 2,
+            "Header": 2,
+            "Title": 4,
+            "NarrativeText": 4,
+            "Footer": 2
+          },
+          "text_elements": 12,
+          "text_elements_without_coordinates": 12,
+          "metadata_keys": [
+            "category_depth",
+            "data_source",
+            "enrichment_origins",
+            "filename",
+            "filetype",
+            "page_number",
+            "parent_id",
+            "partitioner_type",
+            "text_as_html"
+          ],
+          "tables_with_html": 0
+        },
+        "table_across_pages": {
+          "types": {
+            "UncategorizedText": 2,
+            "Header": 2,
+            "Title": 1,
+            "NarrativeText": 2,
+            "Table": 2,
+            "Footer": 2
+          },
+          "text_elements": 9,
+          "text_elements_without_coordinates": 9,
+          "metadata_keys": [
+            "category_depth",
+            "data_source",
+            "enrichment_origins",
+            "filename",
+            "filetype",
+            "page_number",
+            "parent_id",
+            "partitioner_type",
+            "text_as_html"
+          ],
+          "tables_with_html": 2
+        }
+      }
+    },
+    "vlm (forced, json)": {
+      "request": {
+        "job_nodes": [
+          {
+            "type": "partition",
+            "subtype": "vlm",
+            "settings": {
+              "is_dynamic": false,
+              "allow_fast": false,
+              "output_format": "application/json"
+            }
+          }
+        ]
+      },
+      "fixtures": {
+        "two_columns": {
+          "types": {
+            "UncategorizedText": 3,
+            "Header": 1,
+            "Title": 1,
+            "NarrativeText": 3,
+            "Formula": 1,
+            "Footer": 1
+          },
+          "text_elements": 7,
+          "text_elements_without_coordinates": 7,
+          "metadata_keys": [
+            "category_depth",
+            "data_source",
+            "enrichment_origins",
+            "filename",
+            "filetype",
+            "page_number",
+            "parent_id",
+            "partitioner_type",
+            "text_as_html"
+          ],
+          "tables_with_html": 0,
+          "text_in_order": [
+            "IRIS contract fixture",
+            "Two column study",
+            "Left column one opens. Left column two continues.",
+            "$$E = m c^2$$",
+            "Left column three ends.",
+            "Right column one resumes. Right column two continues. Right column three ends.",
+            "Page 1"
+          ]
+        },
+        "figures": {
+          "types": {
+            "UncategorizedText": 1,
+            "Header": 1,
+            "Title": 1,
+            "NarrativeText": 3,
+            "Image": 2,
+            "Formula": 1,
+            "Footer": 1
+          },
+          "text_elements": 7,
+          "text_elements_without_coordinates": 7,
+          "metadata_keys": [
+            "category_depth",
+            "data_source",
+            "enrichment_origins",
+            "filename",
+            "filetype",
+            "page_number",
+            "parent_id",
+            "partitioner_type",
+            "text_as_html"
+          ],
+          "tables_with_html": 0
+        },
+        "numbered_headings": {
+          "types": {
+            "UncategorizedText": 2,
+            "Header": 2,
+            "Title": 4,
+            "NarrativeText": 4,
+            "Footer": 2
+          },
+          "text_elements": 12,
+          "text_elements_without_coordinates": 12,
+          "metadata_keys": [
+            "category_depth",
+            "data_source",
+            "enrichment_origins",
+            "filename",
+            "filetype",
+            "page_number",
+            "parent_id",
+            "partitioner_type",
+            "text_as_html"
+          ],
+          "tables_with_html": 0
+        },
+        "table_across_pages": {
+          "types": {
+            "UncategorizedText": 2,
+            "Header": 2,
+            "Title": 1,
+            "NarrativeText": 2,
+            "Table": 2,
+            "Footer": 2
+          },
+          "text_elements": 9,
+          "text_elements_without_coordinates": 9,
+          "metadata_keys": [
+            "category_depth",
+            "data_source",
+            "enrichment_origins",
+            "filename",
+            "filetype",
+            "page_number",
+            "parent_id",
+            "partitioner_type",
+            "text_as_html"
+          ],
+          "tables_with_html": 2
+        }
+      }
+    }
+  },
+  "vlm_forced_on_proxy_paper": {
+    "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+    "pages": 5,
+    "latency_seconds": 71.2,
+    "types": {
+      "UncategorizedText": 22,
+      "Title": 18,
+      "Address": 1,
+      "NarrativeText": 45,
+      "Formula": 7,
+      "Image": 5,
+      "FigureCaption": 4
+    },
+    "text_elements": 81,
+    "text_elements_without_coordinates": 81,
+    "metadata_keys": [
+      "category_depth",
+      "data_source",
+      "enrichment_origins",
+      "filename",
+      "filetype",
+      "page_number",
+      "parent_id",
+      "partitioner_type",
+      "text_as_html"
+    ]
+  }
+}

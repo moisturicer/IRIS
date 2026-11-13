@@ -1,0 +1,382 @@
+[
+  {
+    "type": "Header",
+    "element_id": "5399742f4a35a31687e115bca4197ecb",
+    "text": "IRIS contract fixture",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            72.0,
+            37.65599999999995
+          ],
+          [
+            72.0,
+            45.65599999999995
+          ],
+          [
+            142.24800000000002,
+            45.65599999999995
+          ],
+          [
+            142.24800000000002,
+            37.65599999999995
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "bda07f378363095a2db4309d927dfd24",
+    "text": "Two column study",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            72.0,
+            72.89800000000002
+          ],
+          [
+            72.0,
+            86.89800000000002
+          ],
+          [
+            194.906,
+            86.89800000000002
+          ],
+          [
+            194.906,
+            72.89800000000002
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf",
+      "parent_id": "5399742f4a35a31687e115bca4197ecb"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "0f8b0689b3498198fc4daa381ed8d7f8",
+    "text": "Left column one opens.",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            72.0,
+            112.07000000000005
+          ],
+          [
+            72.0,
+            122.07000000000005
+          ],
+          [
+            175.95000000000002,
+            122.07000000000005
+          ],
+          [
+            175.95000000000002,
+            112.07000000000005
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf",
+      "parent_id": "bda07f378363095a2db4309d927dfd24"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "bdedf1bbc34a12eb3c2c3738faef0692",
+    "text": "Right column one resumes.",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            324.0,
+            112.07000000000005
+          ],
+          [
+            324.0,
+            122.07000000000005
+          ],
+          [
+            445.71,
+            122.07000000000005
+          ],
+          [
+            445.71,
+            112.07000000000005
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf",
+      "parent_id": "bda07f378363095a2db4309d927dfd24"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "a4083d5973636a98bd69fcd1561e79e8",
+    "text": "Left column two continues.",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            72.0,
+            142.07000000000005
+          ],
+          [
+            72.0,
+            152.07000000000005
+          ],
+          [
+            190.39000000000001,
+            152.07000000000005
+          ],
+          [
+            190.39000000000001,
+            142.07000000000005
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf",
+      "parent_id": "bda07f378363095a2db4309d927dfd24"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "b8db04850d5b81dbebcb9378aebdca5a",
+    "text": "Right column two continues.",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            324.0,
+            142.07000000000005
+          ],
+          [
+            324.0,
+            152.07000000000005
+          ],
+          [
+            449.05,
+            152.07000000000005
+          ],
+          [
+            449.05,
+            142.07000000000005
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf",
+      "parent_id": "bda07f378363095a2db4309d927dfd24"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "ebc2c82060dd7b712d34712319cb8321",
+    "text": "Right column three ends.",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            324.0,
+            172.07000000000005
+          ],
+          [
+            324.0,
+            182.07000000000005
+          ],
+          [
+            435.15999999999997,
+            182.07000000000005
+          ],
+          [
+            435.15999999999997,
+            172.07000000000005
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf",
+      "parent_id": "5399742f4a35a31687e115bca4197ecb"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "67b97a58612e2117e9c9fcc1f4861967",
+    "text": "E = m c^2",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            112.0,
+            182.48400000000004
+          ],
+          [
+            112.0,
+            194.48400000000004
+          ],
+          [
+            165.316,
+            194.48400000000004
+          ],
+          [
+            165.316,
+            182.48400000000004
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf",
+      "parent_id": "ebc2c82060dd7b712d34712319cb8321"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "6e37c4097859ca9f4b38e182f18eb2ac",
+    "text": "Left column three ends.",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            72.0,
+            222.07000000000005
+          ],
+          [
+            72.0,
+            232.07000000000005
+          ],
+          [
+            176.50000000000003,
+            232.07000000000005
+          ],
+          [
+            176.50000000000003,
+            222.07000000000005
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf",
+      "parent_id": "5399742f4a35a31687e115bca4197ecb"
+    }
+  },
+  {
+    "type": "Footer",
+    "element_id": "36a523ebd8fd38d7f4ea4a5a95687096",
+    "text": "Page 1",
+    "metadata": {
+      "coordinates": {
+        "points": [
+          [
+            290.0,
+            751.656
+          ],
+          [
+            290.0,
+            759.656
+          ],
+          [
+            315.352,
+            759.656
+          ],
+          [
+            315.352,
+            751.656
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 612.0,
+        "layout_height": 792.0
+      },
+      "page_number": 1,
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "PageBreak",
+    "element_id": "57528ef9557095e3783a65ef7d8a47c3",
+    "text": "",
+    "metadata": {
+      "languages": [
+        "eng"
+      ],
+      "filename": "two_columns.pdf",
+      "filetype": "application/pdf"
+    }
+  }
+]
