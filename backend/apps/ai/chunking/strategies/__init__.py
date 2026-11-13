@@ -6,6 +6,7 @@ discover them all.
 """
 
 from . import fixed_window  # noqa: F401  (import registers the strategy)
+from . import labeled  # noqa: F401  (import registers the strategy)
 from . import structural  # noqa: F401  (import registers the strategy)
 
-__all__ = ["fixed_window", "structural"]
+__all__ = ["fixed_window", "labeled", "structural"]

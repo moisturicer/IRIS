@@ -60,7 +60,8 @@ def test_oversized_list_and_figure_are_atomic_and_description_is_retrieval_only(
     ]))
     figure = replace(document.elements[-1], description="Machine-only chart interpretation.")
     document = replace(document, elements=document.elements[:-1] + (figure,))
-    chunks = build_chunk_set(document, ChunkingOptions(max_tokens=30)).chunks
+    # Kept whole past the target, up to the safety ceiling (IR-1050).
+    chunks = build_chunk_set(document, ChunkingOptions(target_tokens=30, max_tokens=2000)).chunks
     listings = [c for c in chunks if "list" in c.element_kinds]
     assert len(listings) == 1
     assert "Complete item 0" in listings[0].content and "Complete item 19" in listings[0].content

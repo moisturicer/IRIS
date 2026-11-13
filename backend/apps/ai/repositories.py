@@ -129,11 +129,10 @@ def _serialize_options(options: ChunkingOptions) -> dict:
     return {
         "strategy": options.strategy,
         "max_tokens": options.max_tokens,
+        "target_tokens": options.target_tokens,
         "min_tokens": options.min_tokens,
-        "overlap_tokens": options.overlap_tokens,
         "context_path_max_tokens": options.context_path_max_tokens,
         "merge_short_siblings": options.merge_short_siblings,
-        "repeat_table_header": options.repeat_table_header,
         "exclude_sections": list(options.exclude_sections),
     }
 
@@ -142,11 +141,11 @@ def _deserialize_options(data: dict) -> ChunkingOptions:
     return ChunkingOptions(
         strategy=data["strategy"],
         max_tokens=data["max_tokens"],
+        # Rows before IR-1050 had one number, used as the packing size.
+        target_tokens=data["target_tokens"] if "target_tokens" in data else data["max_tokens"],
         min_tokens=data.get("min_tokens"),
-        overlap_tokens=data.get("overlap_tokens", 0),
-        context_path_max_tokens=data.get("context_path_max_tokens", 48),
+        context_path_max_tokens=data.get("context_path_max_tokens", 64),
         merge_short_siblings=data.get("merge_short_siblings", True),
-        repeat_table_header=data.get("repeat_table_header", True),
         exclude_sections=tuple(data.get("exclude_sections", ())),
     )
 
@@ -285,6 +284,7 @@ class DjangoChunkRepository:
         # would otherwise serialise on rows it never touches.
         previous_row, previous = self._load_active(record_id)
         if self._diff_against(previous, chunk_set).unchanged:
+            self._fill_section_keys(previous_row, chunk_set)
             return _unchanged_outcome(previous)
 
         with transaction.atomic():
@@ -333,6 +333,7 @@ class DjangoChunkRepository:
                     source_page=chunk.source_page,
                     element_kinds=sorted(chunk.element_kinds),
                     bboxes=serialize_regions(chunk.bboxes),
+                    section_key=list(chunk.section_key),
                 )
                 for chunk in chunk_set.chunks
             )
@@ -410,6 +411,7 @@ class DjangoChunkRepository:
                 source_page=row.source_page,
                 element_kinds=frozenset(row.element_kinds),
                 bboxes=deserialize_regions(row.bboxes),
+                section_key=tuple(row.section_key or ()),
             )
             for row in rows
         )
@@ -465,6 +467,27 @@ class DjangoChunkRepository:
         if carried_rows:
             embedding_model.objects.bulk_create(carried_rows)
         return carried_chunks
+
+    @staticmethod
+    def _fill_section_keys(previous_row, chunk_set: ChunkSet) -> int:
+        """Give chunks stored before IR-1050 their section key.
+
+        The key is not hashed, so the same content re-chunks as unchanged and
+        would otherwise never get one. Writes only while keys are missing.
+        """
+        from apps.ai.models.chunk import DocumentChunk as DocumentChunkModel
+
+        rows = list(
+            DocumentChunkModel.objects.filter(
+                chunk_set=previous_row, deleted_at__isnull=True, section_key__isnull=True
+            )
+        )
+        keys = {chunk.sequence: list(chunk.section_key) for chunk in chunk_set.chunks}
+        for row in rows:
+            row.section_key = keys.get(row.sequence, [])
+        if rows:
+            DocumentChunkModel.objects.bulk_update(rows, ["section_key"])
+        return len(rows)
 
     @staticmethod
     def _tombstone_removed(*, previous_row, removed_hashes, chunk_model) -> int:

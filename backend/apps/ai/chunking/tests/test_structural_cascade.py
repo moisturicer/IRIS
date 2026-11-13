@@ -29,6 +29,9 @@ def build(*elements: DocumentElement, title: str = "A Thesis") -> NormalizedDocu
 
 
 def options(**overrides) -> ChunkingOptions:
+    # No heading trail: these tests size the cascade's own cuts (IR-1050
+    # counts the trail inside the budget; test_consolidation covers that).
+    overrides.setdefault("context_path_max_tokens", 0)
     return ChunkingOptions(strategy=STRATEGY_ID, **overrides)
 
 
@@ -382,10 +385,13 @@ def test_registered_under_its_own_strategy_id():
 )
 def test_property_table_header_always_present_in_every_row_fragment(n_rows, max_tokens):
     document = _table_document(n_rows=n_rows)
+    # A repeated header may pass the target, never the safety ceiling.
     result = chunker().chunk(
-        document, options(max_tokens=max_tokens, merge_short_siblings=False)
+        document,
+        options(target_tokens=max_tokens, max_tokens=2000, merge_short_siblings=False),
     )
 
     for chunk in result.chunks:
+        assert chunk.token_count <= 2000
         if TABLE_ROW in chunk.element_kinds:
             assert "Col1" in chunk.content

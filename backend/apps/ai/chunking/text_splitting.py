@@ -17,6 +17,7 @@ import re
 import unicodedata
 
 from .packing import assembled, assembled_fits
+from .tokens import count_tokens
 
 # A sentence ends at `.`, `!` or `?` followed by whitespace (or end of
 # string). The terminator stays attached to the sentence it closes.
@@ -122,3 +123,35 @@ def grapheme_safe_split(text: str, max_chars: int) -> tuple[str, ...]:
         pieces.append(text[start:end])
         start = end
     return tuple(pieces)
+
+
+def split_to_fit(text: str, max_tokens: int, max_word_chars: int | None = None) -> list[str]:
+    """Split ``text`` until every piece fits, coarsest boundary first:
+    sentence, clause, word group, word, then grapheme clusters.
+
+    ``max_word_chars`` also treats any longer whitespace-free run as too big,
+    so a run-on with no spaces still reaches the grapheme stage.
+    """
+    text = text.strip()
+    if not text:
+        return []
+    if _fits(text, max_tokens, max_word_chars):
+        return [text]
+    for pieces in (split_into_sentences(text), split_into_clauses(text)):
+        if len(pieces) > 1:
+            return [p for piece in pieces for p in split_to_fit(piece, max_tokens, max_word_chars)]
+    groups = split_into_token_groups(text, max_tokens)
+    if len(groups) > 1:
+        return [p for g in groups for p in split_to_fit(g, max_tokens, max_word_chars)]
+    words = text.split()
+    if len(words) > 1:
+        return [p for w in words for p in split_to_fit(w, max_tokens, max_word_chars)]
+    # A token is never shorter than one character, so this always fits.
+    budget = max(1, min(max_word_chars or max_tokens, max_tokens))
+    return list(grapheme_safe_split(text, max_chars=budget))
+
+
+def _fits(text: str, max_tokens: int, max_word_chars: int | None) -> bool:
+    if max_word_chars is not None and max((len(w) for w in text.split()), default=0) > max_word_chars:
+        return False
+    return count_tokens(text) <= max_tokens

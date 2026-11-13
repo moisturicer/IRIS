@@ -85,6 +85,8 @@ class DocumentChunk(models.Model):
     source_page = models.PositiveIntegerField(null=True, blank=True)
     element_kinds = ArrayField(models.CharField(max_length=30), default=list, blank=True)
     bboxes = models.JSONField(default=list, blank=True)
+    # Full heading path of the chunk's section (IR-1050). Null until set.
+    section_key = models.JSONField(null=True, blank=True, default=None)
     created_at = models.DateTimeField(auto_now_add=True)
     # Set when a re-chunk finds this chunk's text no longer anywhere in the
     # document (IR-115). A tombstone, not a supersession marker: a chunk

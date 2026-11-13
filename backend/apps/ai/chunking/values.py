@@ -17,6 +17,11 @@ from .document import BoundingBox
 # value objects, and importing back would be circular.
 DEFAULT_STRATEGY = "structural-markdown-v1"
 
+# ADR-067 decision 14: the packer aims for the target; nothing may exceed the
+# safety ceiling.
+DEFAULT_TARGET_TOKENS = 700
+DEFAULT_MAX_TOKENS = 2000
+
 
 @dataclass(frozen=True)
 class Chunk:
@@ -37,56 +42,65 @@ class Chunk:
     source_page: int | None = None
     element_kinds: frozenset[str] = field(default_factory=frozenset)
     bboxes: tuple[BoundingBox, ...] = ()
+    # Full heading path of the chunk's section. Not hashed (IR-1050).
+    section_key: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class ChunkingOptions:
     """The strategy's parameters, as data.
 
-    Defaults are a starting prior, not a decision. The right ``max_tokens``
-    for this corpus is settled by reading real chunks and by the retrieval
-    eval set, not chosen here.
+    Two sizes (ADR-067 decision 14): ``target_tokens`` is what packing and
+    splitting aim for; ``max_tokens`` is the safety ceiling no embedded chunk
+    text, heading trail included, may exceed. Only content a strategy keeps
+    whole can land between them. Unset, the target is 700 or the ceiling,
+    whichever is smaller.
 
     Every ``*_tokens`` field is counted in real ``voyage-context-4`` tokens
-    (IR-287). The 700/64 defaults are the measured equivalents of the 512/48
-    *words* they replaced, so the unit changed and the chunk size did not.
+    (IR-287).
     """
 
     strategy: str = DEFAULT_STRATEGY
-    max_tokens: int = 700
+    max_tokens: int = DEFAULT_MAX_TOKENS
+    target_tokens: int | None = None
     min_tokens: int | None = None
-    overlap_tokens: int = 0
     context_path_max_tokens: int = 64
     merge_short_siblings: bool = True
-    repeat_table_header: bool = True
     exclude_sections: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.max_tokens < 1:
             raise ValueError("max_tokens must be at least 1")
+        if self.target_tokens is not None:
+            if self.target_tokens < 1:
+                raise ValueError("target_tokens must be at least 1")
+            if self.target_tokens > self.max_tokens:
+                raise ValueError("target_tokens must not exceed max_tokens")
         if self.min_tokens is not None:
             if self.min_tokens < 0:
                 raise ValueError("min_tokens must not be negative")
-            if self.min_tokens > self.max_tokens:
-                raise ValueError("min_tokens must not exceed max_tokens")
+            if self.min_tokens > self.effective_target_tokens:
+                raise ValueError("min_tokens must not exceed the target size")
+
+    @property
+    def effective_target_tokens(self) -> int:
+        if self.target_tokens is not None:
+            return self.target_tokens
+        return min(DEFAULT_TARGET_TOKENS, self.max_tokens)
 
     @property
     def effective_min_tokens(self) -> int:
         """The floor below which a chunk is merged with its next sibling.
 
-        Derived from ``max_tokens`` when not set explicitly, rather than
+        Derived from the target when not set explicitly, rather than
         defaulting to a constant. A fixed default is a footgun: it silently
         exceeds any small window a caller chooses, and the resulting error is
         about a value the caller never supplied.
         """
         if self.min_tokens is not None:
             return self.min_tokens
-        # The cap is 88 rather than 64 because it is now real tokens: 64
-        # words measured ~88 of them, and IR-287 moved the unit without
-        # moving where the floor actually falls. Note it no longer binds at
-        # the shipped ceiling -- 700 // 8 is 87 -- so it is there for small
-        # windows, which is the footgun this property exists to defuse.
-        return max(1, min(88, self.max_tokens // 8))
+        # 88 real tokens is the old 64-word cap (IR-287).
+        return max(1, min(88, self.effective_target_tokens // 8))
 
 
 @dataclass(frozen=True)

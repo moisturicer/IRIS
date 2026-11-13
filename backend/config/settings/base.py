@@ -999,8 +999,16 @@ AI_CHUNK_STRATEGY      = config("AI_CHUNK_STRATEGY", default="")
 # counter honest, and chunk boundaries on ordinary prose did not move. The
 # size is still an open question for IR-133's recall@10 harness; what changed
 # is that the number now means what it says.
-AI_CHUNK_MAX_TOKENS    = config("AI_CHUNK_MAX_TOKENS", default=700, cast=int)
-# Blank means "derive from max_tokens" — see ChunkingOptions.effective_min_tokens,
+# ADR-067 decision 14: two numbers. The target is what packing aims for (the
+# sweep in IR-1054 chooses it); the safety ceiling is what no embedded chunk,
+# heading trail included, may exceed. Changing the ceiling needs an ADR
+# amendment.
+# Blank means 700, or the ceiling if that is smaller.
+AI_CHUNK_TARGET_TOKENS = config(
+    "AI_CHUNK_TARGET_TOKENS", default="", cast=lambda v: int(v) if str(v).strip() else None
+)
+AI_CHUNK_MAX_TOKENS    = config("AI_CHUNK_MAX_TOKENS", default=2000, cast=int)
+# Blank means "derive from the target" — see ChunkingOptions.effective_min_tokens,
 # which explains why a fixed default would be a footgun.
 AI_CHUNK_MIN_TOKENS    = config(
     "AI_CHUNK_MIN_TOKENS", default="", cast=lambda v: int(v) if str(v).strip() else None

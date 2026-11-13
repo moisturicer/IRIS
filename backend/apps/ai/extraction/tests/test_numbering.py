@@ -4,7 +4,7 @@ Pure: a list of heading texts in, a list of depths out. No document, no
 Django, no network.
 """
 
-from apps.ai.chunking.numbering import outline_depths
+from apps.ai.extraction.numbering import outline_depths
 
 
 def depths(*headings: str) -> list:
