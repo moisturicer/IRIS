@@ -12,6 +12,16 @@
 > `for_commercialization`). The form never wrote `requested_itso/ierc/ktto`, so those fields had made the
 > hints empty for anyone using it. The fields stay, and no hint reads them.
 
+> **Amended by [ADR-066](066-ip-applications-beside-publishing.md)** (Accepted 2026-11-13, IR-978):
+> KTTO, not ITSO, owns a paper's IP: an IP application, from request to the IP office's decision,
+> beside the paper's review. ITSO's review may recommend one but owns none. KTTO's "commercial
+> potential" scope in the table below moves to TBI (IR-977, IR-979).
+
+> **Amended by [ADR-068](068-tbi-is-a-specialist-office.md)** (Accepted 2026-11-14, IR-977): TBI is a
+> fourth specialist office, and commercial potential is its review question. KTTO's row in the table
+> below now reads "IP: whether to protect, and whether to file before publication", and
+> `for_commercialization` hints at TBI, not KTTO.
+
 **Accepted** — 2026-09-07, by **Lee Jasmin Adolfo**. Proposed 2026-09-04 and implemented behind
 this ADR so the change had a paper trail before the team decided; the decision has now been
 taken, so the code and this document agree on their own status again.

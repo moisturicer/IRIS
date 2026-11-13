@@ -188,6 +188,10 @@ class PdfExtraction(models.Model):
     # The vendor's whole result, kept for shaping without a paid re-read (IR-841).
     # Admin only: it carries watermark text, which only staff see.
     raw_result     = models.JSONField(default=dict, blank=True)
+    # IRIS's own reading of the PDF, beside the vendor's (IR-1053, ADR-067 §4):
+    # word boxes, fonts, bookmarks, page labels, contents. Manuscripts only.
+    # Admin only, like raw_result.
+    pdf_evidence   = models.JSONField(default=dict, blank=True)
     pages_read     = models.PositiveIntegerField(null=True, blank=True)
     # Null when the vendor never reported a charge.
     credits        = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)

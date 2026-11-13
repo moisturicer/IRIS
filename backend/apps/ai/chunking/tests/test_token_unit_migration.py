@@ -44,8 +44,7 @@ Tuning the number against IR-133's recall@10 evidence remains open.
 
 import pytest
 
-from apps.ai.chunking import packing, tokens
-from apps.ai.chunking import context_path as context_path_module
+from apps.ai.chunking import assembly, outline, packing, text_splitting, tokens
 from apps.ai.chunking.strategies import fixed_window, structural
 from apps.ai.chunking.strategies.structural import STRATEGY_ID, StructuralCascadeChunker
 from apps.ai.chunking.tests.fixtures.prose_document import prose_document
@@ -63,9 +62,7 @@ EQUIVALENT_CEILING, BAND_TOP = 578, 673
 
 #: Every module that counts. Each imports ``count_tokens`` by name, so the
 #: old unit has to be injected into each of them rather than into one place.
-#: ``text_splitting`` is absent on purpose: it counts only through
-#: ``packing.assembled_fits``, which is the point of that helper existing.
-_COUNTING_MODULES = (packing, context_path_module, structural, fixed_window)
+_COUNTING_MODULES = (packing, outline, assembly, text_splitting, structural, fixed_window)
 
 
 def _count_words(text: str) -> int:

@@ -50,6 +50,13 @@ def build(*elements: DocumentElement, **page_sizes) -> NormalizedDocument:
     )
 
 
+def _skip_labeled(strategy_id):
+    # labeled-structure-v1's set hash covers display and evidence on purpose,
+    # so a moved box refreshes stored regions; text hashes still match (IR-840).
+    if strategy_id == "labeled-structure-v1":
+        pytest.skip("labeled hashes display and evidence by design")
+
+
 def chunk_document(document, strategy_id, **kwargs):
     options = ChunkingOptions(strategy=strategy_id, **kwargs)
     return build_chunker(options).chunk(document, options)
@@ -180,6 +187,7 @@ def test_the_content_hash_is_unchanged_when_only_coordinates_change(strategy_id)
     """An extractor upgrade that shifts a rect by a fraction of a point
     changes no meaning. If it changed the hash it would mark the whole corpus
     stale and trigger a full re-embed."""
+    _skip_labeled(strategy_id)
     text = "Ponds were sampled weekly across the dry season."
     original = build(para(text, 4, 110.0))
     shifted = build(
@@ -200,6 +208,7 @@ def test_the_content_hash_is_unchanged_when_only_coordinates_change(strategy_id)
 
 def test_the_content_hash_is_unchanged_when_only_page_numbers_change(strategy_id):
     """Repagination is the same class of change as a coordinate shift."""
+    _skip_labeled(strategy_id)
     text = "Dissolved oxygen was logged at dawn."
     first = chunk_document(build(para(text, 1, 100.0)), strategy_id, max_tokens=512)
     second = chunk_document(build(para(text, 12, 100.0)), strategy_id, max_tokens=512)

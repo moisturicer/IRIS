@@ -1,7 +1,7 @@
-"""Tests for the context-path decorator (IR-112).
+"""Tests for the heading trail (IR-112).
 
-Runs against every registered strategy, wrapped, plus decorator-specific
-truncation and no-heading behaviour.
+Every registered strategy attaches the trail itself, inside the target
+(IR-1050), so these run through ``build_chunker``.
 """
 
 from hypothesis import given, settings, strategies as st
@@ -11,10 +11,9 @@ from apps.ai.chunking import (
     DocumentElement,
     NormalizedDocument,
     build_chunker,
-    build_context_path_chunker,
     registered_strategies,
 )
-from apps.ai.chunking.context_path import ContextPathChunker, _truncate_middle
+from apps.ai.chunking.outline import truncate_middle as _truncate_middle
 from apps.ai.chunking.document import HEADING, PARAGRAPH, TABLE_HEADER, TABLE_ROW
 from apps.ai.chunking.tokens import count_tokens
 
@@ -37,22 +36,12 @@ def test_composes_with_every_registered_strategy():
     )
     for strategy_id in ALL_STRATEGIES:
         options = ChunkingOptions(strategy=strategy_id, max_tokens=50)
-        result = build_context_path_chunker(options).chunk(document, options)
+        result = build_chunker(options).chunk(document, options)
 
         assert result.chunks
         for chunk in result.chunks:
             assert chunk.text.startswith("A Thesis")
             assert chunk.context_path
-
-
-def test_wrapping_does_not_change_the_inner_strategys_id():
-    options = ChunkingOptions(strategy="fixed-window", max_tokens=50)
-    document = doc(DocumentElement(kind=PARAGRAPH, text="alpha beta gamma"))
-
-    plain = build_chunker(options).chunk(document, options)
-    wrapped = ContextPathChunker(build_chunker(options)).chunk(document, options)
-
-    assert wrapped.strategy_id == plain.strategy_id
 
 
 # --------------------------------------------------------------------------
@@ -71,9 +60,9 @@ def test_embedded_text_begins_with_the_context_path_but_content_does_not():
         title="Optimization of Tilapia Feed Conversion",
     )
     options = ChunkingOptions(
-        strategy="structural-markdown-v1", max_tokens=50, merge_short_siblings=False
+        strategy="structural-markdown-v1", max_tokens=200, merge_short_siblings=False
     )
-    result = build_context_path_chunker(options).chunk(document, options)
+    result = build_chunker(options).chunk(document, options)
 
     chunk = result.chunks[-1]
     assert chunk.context_path == (
@@ -105,9 +94,9 @@ def test_a_repeated_table_header_does_not_desync_the_cursor():
         DocumentElement(kind=PARAGRAPH, text="This is the discussion section text."),
     )
     options = ChunkingOptions(
-        strategy="structural-markdown-v1", max_tokens=15, merge_short_siblings=False
+        strategy="structural-markdown-v1", max_tokens=40, merge_short_siblings=False
     )
-    result = build_context_path_chunker(options).chunk(document, options)
+    result = build_chunker(options).chunk(document, options)
 
     table_chunks = [c for c in result.chunks if TABLE_ROW in c.element_kinds]
     assert table_chunks, "the table must have actually been split into fragments"
@@ -125,7 +114,7 @@ def test_a_repeated_table_header_does_not_desync_the_cursor():
 def test_a_chunk_with_no_enclosing_heading_still_gets_a_valid_path():
     document = doc(DocumentElement(kind=PARAGRAPH, text="no heading precedes this"))
     options = ChunkingOptions(strategy="fixed-window", max_tokens=50)
-    result = build_context_path_chunker(options).chunk(document, options)
+    result = build_chunker(options).chunk(document, options)
 
     assert result.chunks[0].context_path == ("A Thesis",)
 
@@ -140,7 +129,7 @@ def test_context_path_participates_in_the_content_hash():
         DocumentElement(kind=PARAGRAPH, text="same words here"),
     )
     options = ChunkingOptions(strategy="fixed-window", max_tokens=50)
-    chunker = build_context_path_chunker
+    chunker = build_chunker
 
     hash_a = chunker(options).chunk(doc_a, options).content_hash
     hash_b = chunker(options).chunk(doc_b, options).content_hash
@@ -187,7 +176,7 @@ def test_context_path_never_exceeds_its_token_budget():
     options = ChunkingOptions(
         strategy="fixed-window", max_tokens=50, context_path_max_tokens=5
     )
-    result = build_context_path_chunker(options).chunk(document, options)
+    result = build_chunker(options).chunk(document, options)
 
     for chunk in result.chunks:
         assert count_tokens(" > ".join(chunk.context_path)) <= 5
@@ -212,7 +201,7 @@ _document = st.lists(_paragraph, min_size=1, max_size=6).map(
 @given(document=_document)
 def test_property_no_content_is_lost_with_decorator_applied(document):
     options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=16)
-    result = build_context_path_chunker(options).chunk(document, options)
+    result = build_chunker(options).chunk(document, options)
 
     rejoined = " ".join(c.content for c in result.chunks).split()
     original = " ".join(e.text for e in document.elements).split()
@@ -224,8 +213,8 @@ def test_property_no_content_is_lost_with_decorator_applied(document):
 def test_property_decorated_chunking_is_deterministic(document):
     options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=16)
 
-    first = build_context_path_chunker(options).chunk(document, options)
-    second = build_context_path_chunker(options).chunk(document, options)
+    first = build_chunker(options).chunk(document, options)
+    second = build_chunker(options).chunk(document, options)
 
     assert first.chunks == second.chunks
     assert first.content_hash == second.content_hash
@@ -235,7 +224,7 @@ def test_empty_chunkset_is_passed_through_unchanged():
     options = ChunkingOptions(strategy="fixed-window", max_tokens=16)
     document = NormalizedDocument(title="Empty", elements=())
 
-    result = build_context_path_chunker(options).chunk(document, options)
+    result = build_chunker(options).chunk(document, options)
 
     assert result.chunks == ()
 
@@ -258,8 +247,8 @@ def test_a_folded_heading_keeps_the_path_of_the_section_it_folded_into():
         ),
         title="Optimization of Tilapia Feed Conversion",
     )
-    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=50)
-    result = build_context_path_chunker(options).chunk(document, options)
+    options = ChunkingOptions(strategy="structural-markdown-v1", max_tokens=200)
+    result = build_chunker(options).chunk(document, options)
 
     merged = [c for c in result.chunks if "Samples were collected" in c.content]
     assert len(merged) == 1
@@ -289,8 +278,9 @@ def test_a_fixed_window_chunk_ending_on_a_heading_keeps_its_own_sections_path():
         DocumentElement(kind=PARAGRAPH, text="zeta eta theta"),
         title="A Thesis",
     )
-    options = ChunkingOptions(strategy="fixed-window", max_tokens=9)
-    result = build_context_path_chunker(options).chunk(document, options)
+    # The trail is inside the budget (IR-1050): 18 closes the window on "2 Methods".
+    options = ChunkingOptions(strategy="fixed-window", max_tokens=18)
+    result = build_chunker(options).chunk(document, options)
 
     for chunk in result.chunks:
         if "alpha" in chunk.content:

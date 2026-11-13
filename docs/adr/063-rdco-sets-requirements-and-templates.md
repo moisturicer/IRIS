@@ -6,6 +6,8 @@
 
 It **amends [ADR-051](051-system-admin-account-deletion-and-consent.md)** decision 16, the System Admin's role description and its shared `/notices` page: only RDCO publishes a Notice (decision 9). It **reverses [`institution_configuration_boundary.md`](../institution_configuration_boundary.md) C7**, which kept upload slots per record type as deployment-time configuration with no configuration screen (decision 1). It **restores labels** that migration `documents/0005` removed, under a rule that keeps that migration's point: a label never blocks submitting (decision 3).
 
+**Amended 2026-11-13 by [ADR-066](066-ip-applications-beside-publishing.md) (IR-978; Accepted).** A slot can belong to an IP application of one kind, or to a commercialization application, instead of a record type, and Setup manages those lists too. The IP slots and the Commercialization Assessment leave the Thesis/Research and Project submissions, Intellectual Property Application Status is removed, and a Proposal keeps only Patent Search Report and Commercialization Initial Assessment (ADR-066 decisions 20–23).
+
 It leaves [ADR-018](018-conditional-parallel-office-routing.md) and [ADR-022](022-explicit-document-requests.md) standing, since offices still ask for what they need through document requests. It does not bring back IR-118's request presets, which stay deferred.
 
 ## Context

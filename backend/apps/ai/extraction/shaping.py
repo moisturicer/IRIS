@@ -15,8 +15,8 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
-from apps.ai.chunking.formulas import DISPLAY_FORMULA
-from apps.ai.chunking.numbering import outline_depths
+from apps.ai.extraction.formulas import DISPLAY_FORMULA
+from apps.ai.extraction.numbering import outline_depths
 from apps.ai.chunking.regions import dedupe_regions
 
 

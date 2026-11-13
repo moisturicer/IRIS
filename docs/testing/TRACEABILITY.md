@@ -84,6 +84,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1046** | An owner sends the revised manuscript from the Revision requested card, as they send a requested document from its row — follows IR-273; no FR- id | [details](traceability/IR-1046.md) | **PARTIAL** |
 | **IR-632** | Under `RESTART_ALL` every reset office that had completed reviews the new version again, with the same reviewer — ADR-004's control arm … | [details](traceability/IR-632.md) | **IMPLEMENTED** |
 | **IR-1047** | An owner can discard a revised manuscript they uploaded and have not yet submitted, putting the submitted manuscript back — follows IR-273; no FR- id | [details](traceability/IR-1047.md) | **PARTIAL** |
+| **IR-1050** | Chunker consolidation part A: `labeled-structure-v1` registered and under the contract suite, the heading trail counted inside the target size, a target size with a 2,000-token safety ceiling, small-chunk merging for labeled, and a stored section key per chunk — ADR-067 decision 14; no FR- id | [details](traceability/IR-1050.md) | **PARTIAL** |
 | **IR-268** | My Reviews: a reviewer's own seats plus their office's pool, as To review · In review · Done — touches FR-M5-01 (stable label only) | [details](traceability/IR-268.md) | **IMPLEMENTED** |
 | **IR-478** | RDCO grants and removes office coordinators on the Users page; demo coordinators — ADR-032 §4, after IR-415; touches FR-M5-01 (stable label … | [details](traceability/IR-478.md) | **IMPLEMENTED** |
 | **IR-797** | RDCO replaces a paper's Adviser, adds an owner and withdraws a paper in review — ADR-051 decision 10; touches FR-M5-01 (stable label only) | [details](traceability/IR-797.md) | **PARTIAL** |
@@ -261,6 +262,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-S5 | Audit immutability | [details](traceability/NFR-S5.md) | **VERIFIED** |
 | NFR-S6 | Account protection | [details](traceability/NFR-S6.md) | **PARTIAL** |
 | **IR-999** | Soft rate limits: each budget has a per-minute burst whose refusal clears in under a minute, and a daily backstop; extends NFR-S6 (IR-661) | [details](traceability/IR-999.md) | **IMPLEMENTED** |
+| **IR-1053** | PDF evidence: each Manuscript's word boxes, fonts, bookmarks, page labels and contents entries, read once at extraction in a sandbox and stored beside the raw result; a bad PDF stores its error and extraction still completes (ADR-067 decision 4) | [details](traceability/IR-1053.md) | **IMPLEMENTED** |
 | NFR-P1 | 100 concurrent sessions | [details](traceability/NFR-P1.md) | **NOT STARTED** |
 | NFR-P2…P5 | Performance and processing | [details](traceability/NFR-P2-P5.md) | **NOT STARTED** |
 | NFR-R1 | Uptime | [details](traceability/NFR-R1.md) | **NOT STARTED** |

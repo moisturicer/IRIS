@@ -1,93 +1,98 @@
 """The simplest strategy that satisfies the contract.
 
-This exists to prove the shape end to end — port, registry, value objects,
-hash — before the structure-aware cascade replaces it as the default. It is
-kept afterwards, not deleted: it is the baseline the cascade is measured
-against on the eval set, and if structural chunking does not beat it, that is
-a finding worth having.
+The evaluation baseline (ADR-067 decision 12), never the production strategy.
+It packs elements into windows under the target size and hard-splits any
+single element that will not fit. It knows nothing about tables or lists,
+and its windows may cross a heading.
 
-It packs elements into windows under the token ceiling and hard-splits any
-single element that will not fit. It knows nothing about headings, tables or
-lists; that is the whole point.
+A window is labelled with the trail of its first piece that is not a heading
+(what the chunk is about), or of its last heading when it holds only
+headings. The trail is counted inside the target (IR-1050).
 """
 
-from ..document import NormalizedDocument
-from ..hashing import chunkset_hash
-from ..packing import Piece, pack_pieces, reader_content
+from ..assembly import Draft, body_budget, finalize
+from ..document import DocumentElement, NormalizedDocument
+from ..outline import HeadingStack, bounded_trail, embedded_text
+from ..packing import JOIN, reader_content
 from ..regions import regions_for
 from ..registry import register_chunker
 from ..text_splitting import grapheme_safe_split, split_into_token_groups
 from ..tokens import count_tokens
-from ..values import Chunk, ChunkingOptions, ChunkSet
+from ..values import ChunkingOptions, ChunkSet
 
 STRATEGY_ID = "fixed-window"
+
+# (text, element, trail, section key)
+_Piece = tuple[str, DocumentElement, tuple[str, ...], tuple[str, ...]]
 
 
 @register_chunker(STRATEGY_ID)
 class FixedWindowChunker:
-    """Packs consecutive elements into windows under ``max_tokens``."""
+    """Packs consecutive elements into windows under the target size."""
 
     def chunk(
         self, document: NormalizedDocument, options: ChunkingOptions
     ) -> ChunkSet:
-        pieces = self._split_to_fitting_pieces(document, options.max_tokens)
-        windows = pack_pieces(pieces, options.max_tokens)
-        chunks = self._to_chunks(windows, document)
-
-        return ChunkSet(
-            chunks=chunks,
+        target = options.effective_target_tokens
+        windows: list[list[_Piece]] = []
+        current: list[_Piece] = []
+        for piece in _pieces(document, options):
+            if current and not _window_fits(current + [piece], target):
+                windows.append(current)
+                current = []
+            current.append(piece)
+        if current:
+            windows.append(current)
+        return finalize(
+            [_draft(window) for window in windows],
             strategy_id=STRATEGY_ID,
             options=options,
-            content_hash=chunkset_hash(chunks),
             page_sizes=document.page_sizes,
         )
 
-    # -- steps -------------------------------------------------------------
 
-    def _split_to_fitting_pieces(
-        self, document: NormalizedDocument, max_tokens: int
-    ) -> list[Piece]:
-        """Break every element down until each piece fits the ceiling.
+def _pieces(document: NormalizedDocument, options: ChunkingOptions) -> list[_Piece]:
+    """Every element broken down until each piece fits beside its own trail."""
+    stack = HeadingStack(document.title)
+    pieces: list[_Piece] = []
+    for element in document.elements:
+        stack.push(element)
+        key = stack.path
+        trail = bounded_trail(key, options)
+        budget = body_budget(trail, options)
+        for group in split_into_token_groups(element.text, budget):
+            if count_tokens(group) <= budget:
+                pieces.append((group, element, trail, key))
+                continue
+            # A token is never shorter than a character, so this fits.
+            for fragment in grapheme_safe_split(group, max_chars=budget):
+                pieces.append((fragment, element, trail, key))
+    return pieces
 
-        Returns (text, element) pairs so each piece still knows where it came
-        from — which is what lets page and region data travel with it later.
-        """
-        pieces: list[Piece] = []
-        for element in document.elements:
-            for group in split_into_token_groups(element.text, max_tokens):
-                if count_tokens(group) <= max_tokens:
-                    pieces.append((group, element))
-                    continue
-                # A single word costing more than the whole ceiling. Before
-                # IR-287 this could not happen -- a word was one "token"
-                # however long it was -- so the word-count split above was
-                # enough. A token is never shorter than one character, so a
-                # piece capped at ``max_tokens`` characters always fits.
-                for fragment in grapheme_safe_split(group, max_chars=max(1, max_tokens)):
-                    pieces.append((fragment, element))
-        return pieces
 
-    def _to_chunks(
-        self, windows: list[list[Piece]], document: NormalizedDocument
-    ) -> tuple[Chunk, ...]:
-        chunks: list[Chunk] = []
-        for sequence, window in enumerate(windows):
-            text = " ".join(text for text, _ in window)
-            elements = [element for _, element in window]
-            pages = [e.page for e in elements if getattr(e, "page", None) is not None]
-            bboxes = regions_for(elements)
-            chunks.append(
-                Chunk(
-                    # The context path is applied by a decorator, not here.
-                    # Content differs from text only by a formula's delimiters.
-                    text=text,
-                    content=reader_content(window),
-                    context_path=(),
-                    sequence=sequence,
-                    token_count=count_tokens(text),
-                    source_page=pages[0] if pages else None,
-                    element_kinds=frozenset(e.kind for e in elements),
-                    bboxes=bboxes,
-                )
-            )
-        return tuple(chunks)
+def _label(window: list[_Piece]) -> _Piece:
+    for piece in window:
+        if not piece[1].is_heading:
+            return piece
+    return window[-1]
+
+
+def _window_fits(window: list[_Piece], target: int) -> bool:
+    _, _, trail, _ = _label(window)
+    body = JOIN.join(text for text, *_ in window)
+    return count_tokens(embedded_text(trail, body)) <= target
+
+
+def _draft(window: list[_Piece]) -> Draft:
+    _, _, trail, key = _label(window)
+    elements = [element for _, element, *_ in window]
+    pages = [e.page for e in elements if e.page is not None]
+    return Draft(
+        body=JOIN.join(text for text, *_ in window),
+        content=reader_content([(text, element) for text, element, *_ in window]),
+        trail=trail,
+        section_key=key,
+        source_page=pages[0] if pages else None,
+        element_kinds=frozenset(e.kind for e in elements),
+        bboxes=regions_for(elements),
+    )

@@ -181,18 +181,19 @@ class SeedDemoAccountTests(TestCase):
             )
         self.assertTrue(User.objects.filter(email=ADMIN_EMAIL).exists())
 
-    def test_it_keeps_the_account_convention_that_already_existed(self):
-        """`<role>@cit.edu` at `IrisDemo123!`, from the deleted seed_demo_users.py.
+    def test_it_keeps_the_account_convention_on_a_domain_that_takes_no_mail(self):
+        """`<role>@iris.test` at `IrisDemo123!` (IR-1067).
 
-        This command absorbed four seeders. Had it imposed its own emails or
-        password, every existing demo note, screenshot and muscle memory would
-        have silently stopped working -- so the convention is pinned here rather
-        than left to whoever edits the constants next.
+        Changed deliberately by IR-1067: this pinned `<role>@cit.edu`, and the
+        office addresses among those are CIT-U's real mailboxes, so a demo
+        server's notifications reached the real offices. `.test` is reserved
+        (RFC 6761) and never delivered. The password and the `<role>@` part
+        are still pinned, so demo notes need only the domain changed.
         """
         seed(accounts_only=True)
         self.assertEqual(PASSWORD, "IrisDemo123!")
         for email, _first, _last, _role in ROLE_ACCOUNTS:
-            self.assertTrue(email.endswith("@cit.edu"))
+            self.assertTrue(email.endswith("@iris.test"))
             self.assertTrue(
                 User.objects.get(email=email).check_password(PASSWORD),
                 f"{email} does not accept the documented password",
@@ -220,8 +221,8 @@ class SeedDemoAccountTests(TestCase):
 class SeedDemoCoordinatorTests(TestCase):
     """One coordinator per office beside a plain member (IR-478).
 
-    The demo shows that `itso@cit.edu` can only claim from ITSO's pool while
-    `itso.coordinator@cit.edu` can assign it (ADR-032 §4). That needs both
+    The demo shows that `itso@iris.test` can only claim from ITSO's pool while
+    `itso.coordinator@iris.test` can assign it (ADR-032 §4). That needs both
     kinds of account, and needs the plain one to stay plain.
     """
 
@@ -229,8 +230,8 @@ class SeedDemoCoordinatorTests(TestCase):
         seed(accounts_only=True)
         self.assertEqual(
             {email for email, *_ in COORDINATOR_ACCOUNTS},
-            {"itso.coordinator@cit.edu", "ierc.coordinator@cit.edu",
-             "ktto.coordinator@cit.edu", "rdco.coordinator@cit.edu"},
+            {"itso.coordinator@iris.test", "ierc.coordinator@iris.test",
+             "ktto.coordinator@iris.test", "rdco.coordinator@iris.test"},
         )
         for email, _first, _last, role_name in COORDINATOR_ACCOUNTS:
             user = User.objects.get(email=email)
@@ -249,15 +250,15 @@ class SeedDemoCoordinatorTests(TestCase):
     def test_running_again_restores_both_kinds(self):
         """A rehearsal that granted or removed the flag on the Users page is undone, like a changed password."""
         seed(accounts_only=True)
-        User.objects.filter(email="itso@cit.edu").update(is_office_coordinator=True)
-        User.objects.filter(email="itso.coordinator@cit.edu").update(is_office_coordinator=False)
+        User.objects.filter(email="itso@iris.test").update(is_office_coordinator=True)
+        User.objects.filter(email="itso.coordinator@iris.test").update(is_office_coordinator=False)
         count = User.objects.count()
 
         seed(accounts_only=True)
 
         self.assertEqual(User.objects.count(), count)
-        self.assertFalse(User.objects.get(email="itso@cit.edu").is_office_coordinator)
-        self.assertTrue(User.objects.get(email="itso.coordinator@cit.edu").is_office_coordinator)
+        self.assertFalse(User.objects.get(email="itso@iris.test").is_office_coordinator)
+        self.assertTrue(User.objects.get(email="itso.coordinator@iris.test").is_office_coordinator)
 
 
 class SeedDemoRecordTests(TestCase):
@@ -276,6 +277,16 @@ class SeedDemoRecordTests(TestCase):
 
     def setUp(self):
         seed()
+
+    def test_no_seeded_account_can_receive_real_mail(self):
+        """Every account the seed makes, catalogue owners included, is on `iris.test` (IR-1067).
+
+        A `@cit.edu` address may belong to a real office or student, who would
+        then get the demo's notifications.
+        """
+        emails = list(User.objects.values_list("email", flat=True))
+        self.assertTrue(emails)
+        self.assertEqual([e for e in emails if not e.endswith("@iris.test")], [])
 
     def test_every_pipeline_state_has_a_record(self):
         present = set(Record.objects.values_list("pipeline_status", flat=True))
@@ -438,7 +449,7 @@ class SeedDemoRecordTests(TestCase):
         self.assertFalse(ierc.seats.exists())
         self.assertEqual(ktto.seats.count(), 2)
 
-        flags = decision_flags(record, User.objects.get(email="rdco@cit.edu"))
+        flags = decision_flags(record, User.objects.get(email="rdco@iris.test"))
         self.assertEqual(flags["party"], "rdco")
         self.assertIsNone(flags["blocked"])
         self.assertEqual({row["party"] for row in flags["closes"]["assignments"]}, {"ierc", "ktto"})

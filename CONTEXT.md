@@ -151,7 +151,7 @@ _Avoid_: Duplicate detection (that is about two Proposals overlapping with each 
 ### Review workflow
 
 **Specialist office**:
-ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (technical review, ethics compliance, the commercial potential of IP). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
+ITSO, IERC or KTTO, and TBI once ADR-068 is built: an office a Record is routed to for a question only it can answer (technical review, ethics compliance, IP, commercial potential). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
 _Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
 
 **ITSO**:
@@ -162,7 +162,11 @@ _Avoid_: IP office.
 The Institutional Ethics Review Committee, responsible for ethics compliance review of research submissions.
 
 **KTTO**:
-The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions.
+The Knowledge and Technology Transfer Office. In a paper's review it answers whether the paper holds intellectual property to protect, and whether it should be filed before publication. It owns a paper's [[IP application]]s (ADR-066). Commercial potential is [[TBI]]'s question (ADR-068).
+
+**TBI**:
+The Technology Business Incubator, a [[Specialist office]] that answers a paper's commercial potential in its review, and owns its [[Commercialization application]]. Accepted in ADR-068, not built yet.
+_Avoid_: KTTO / TBI (IPAMS's shared step), incubator office.
 
 **Specialist path**:
 A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
@@ -349,6 +353,26 @@ _Avoid_: Post request, pending post, submission (that is a Record's).
 **Saved Call**:
 A [[Call]] a reader has kept in their [[Library]]. A reader saves a Call at most once, and it stays saved after the Call is over, until the reader removes it or RDCO deletes the Call.
 _Avoid_: Bookmark, reminder.
+
+### IP and commercialization
+
+These terms come from ADR-066, accepted 2026-11-13. None is built yet.
+
+**IP application**:
+A request to protect one kind of intellectual property in a paper (Patent, Utility Model, Industrial Design, Trademark or Copyright), owned by KTTO and running beside the paper's publishing rather than inside its review. It moves forward through For Application, Reviewed, Filed, and then Approved or Disapproved by the IP office; KTTO can end it as Not filed, and the owners can withdraw it before filing. A Thesis/Research or Project can have several, at most one open per kind.
+_Avoid_: IP review (that is a [[Specialist office]]'s clearance in the paper's review), patent request, IP status.
+
+**Commercialization application**:
+A request for TBI to review a paper's commercial potential and record its recommendations, running beside the paper's publishing like an [[IP application]]. Designed in IR-979, once TBI is an office.
+_Avoid_: Commercialization flag (the paper's old Yes/No), KTTO review.
+
+**Inventor**:
+A person named on an [[IP application]] as having contributed to what it protects. Kept as a name, not an account. The list starts as the paper's byline and KTTO edits it, so it can differ from the paper's owners.
+_Avoid_: Author (a byline name on the paper), owner (an account that owns the paper), applicant.
+
+**Publishing gate**:
+The warning RDCO sees before publishing a paper whose [[IP application]] hasn't been filed yet, because making an invention public first can cost it its novelty. RDCO can publish anyway, with a reason that is recorded.
+_Avoid_: Publication block, IP hold (RDCO is warned, not stopped).
 
 ### Accounts
 

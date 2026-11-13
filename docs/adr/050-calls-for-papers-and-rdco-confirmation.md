@@ -8,6 +8,8 @@ This is the feature's first ADR. It replaces IR-121's decisions on types, postin
 
 [ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01, changes two things here: the System Admin rather than RDCO reads these events in the Audit Log (decision 15), and the Call Requests page sits at `/rdco/call-requests`, in a nav section named RDCO.
 
+An amendment of 2026-11-12 (IR-758, below) restates both in this ADR's own text and settles which list a Call's Areas come from.
+
 ## Context
 
 Observed on `main`, 2026-11-01:
@@ -117,3 +119,13 @@ None. IR-121 records that no requirement backs this feature. Implementation tick
 ## Related Tasks
 
 IR-758 (spec, under IR-671), IR-759 (this ADR), IR-760, IR-761, IR-762, IR-763, IR-649, IR-764, IR-765 and IR-766. Also IR-121, IR-530, IR-757, IR-566 and ADR-044.
+
+## Amendment — 2026-11-12 (IR-758): Areas, the Audit Log and the Call Requests page
+
+**Status of this amendment: Accepted** — 2026-11-13: reviewed, accepted and merged by Ashlee Sean (PR #711), as relayed by Hermoine Zozobrado. Recorded before any of IR-760 to IR-766 is built.
+
+1. **A Call's Areas are Classifications only** (decisions 3 and the board's Area filter). CONTEXT.md defines an **Area** as a Classification or a PSCED category; for a Call it is always a Classification, the same topic names Discover filters by. PSCED fields are too broad to help a reader find a call for papers, and a second picker and filter would add work for no use. Decided by Hermoine Zozobrado, 2026-11-12.
+2. **Only the System Admin reads these events** (decision 15). RDCO no longer reads the Audit Log at all (ADR-051 decision 15). Read decision 15's last sentence as "The System Admin sees them in the Audit Log."
+3. **The Call Requests page is at `/rdco/call-requests`, in the RDCO section of the navigation** (decision 8), not under Administration. This restates ADR-051, which already placed it there.
+4. **A saved Call is declared in both account-data registries** (decision 13): `apps/accounts/deletion/registry.py`, saying what deleting the account does to it, and `apps/accounts/personal_data/registry.py`, saying which section of the personal-data download carries it. Both registries came after this ADR (IR-794, IR-786); their guard tests fail until a new table that points at a person is declared. The likely rules, for IR-649 to confirm: deleting the account deletes the person's saved Calls, and the download lists them.
+5. **The posting form follows IR-585**: it marks optional fields, not required ones.

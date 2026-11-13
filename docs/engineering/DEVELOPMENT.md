@@ -183,15 +183,15 @@ python manage.py seed_demo --password hunter2
 
 **One command replaced four** (IR-227). `scripts/seed_demo_users.py`, `scripts/seed_demo_records.py` and `scripts/seed_demo_clearances.py` — each run by hand through `manage.py shell <`, in the right order — plus `seed_test_users`, which seeded a second `iris-*` account set at a different password. All four are deleted.
 
-**The credentials are unchanged**: `<role>@cit.edu` at `IrisDemo123!`, the convention that already existed.
+**The logins are `<role>@iris.test` at `IrisDemo123!`.** They were `<role>@cit.edu` until IR-1067, but the office addresses there are CIT-U's real mailboxes, so a demo server's notifications reached the real offices. `.test` is reserved (RFC 6761) and never receives mail. An older database is renamed in place by the commands in `docs/testing/traceability/IR-1067.md`.
 
 | Login | Role |
 |---|---|
-| `student@cit.edu` | Student — owns the demo records |
-| `adviser@cit.edu` | Adviser |
-| `rdco@cit.edu` | RDCO — administers people's accounts and the request queues, and gives Student and Adviser (`ADMIN_ROLES` is `{RDCO}`) |
-| `itso@cit.edu` · `ierc@cit.edu` · `ktto@cit.edu` | The three clearing offices |
-| `admin@cit.edu` | **System Admin**, and a Django superuser — the Audit Log, system settings and office roles in IRIS, and Django's admin site (ADR-051, IR-781). Only this demo login holds both |
+| `student@iris.test` | Student — owns the demo records |
+| `adviser@iris.test` | Adviser |
+| `rdco@iris.test` | RDCO — administers people's accounts and the request queues, and gives Student and Adviser (`ADMIN_ROLES` is `{RDCO}`) |
+| `itso@iris.test` · `ierc@iris.test` · `ktto@iris.test` | The three clearing offices |
+| `admin@iris.test` | **System Admin**, and a Django superuser — the Audit Log, system settings and office roles in IRIS, and Django's admin site (ADR-051, IR-781). Only this demo login holds both |
 
 Re-running is idempotent for records (keyed by title) but **resets all seven passwords** to the default, so say so before a rehearsal if someone has changed one.
 
@@ -202,7 +202,7 @@ Two records carry the thesis contribution:
 - **`[DEMO] Declined by IERC, ITSO and KTTO preserved`** — the one you *drive*. It sits in `declined`. Upload a document as the student (resubmission requires one since IR-139 — that refusal is part of the demo), resubmit, and watch IERC reset while ITSO and KTTO survive.
 - **`[DEMO] Resubmitted, ITSO and KTTO preserved`** — the one you *look at*. Already resubmitted, so the paper view's "Preserved" badges render on arrival.
 
-`scripts/seed_demo_opportunities.py` is still a shell script — it seeds the Calls & Conferences board (IR-121), a separate feature, and depends on `rdco@cit.edu` which `seed_demo` creates.
+`scripts/seed_demo_opportunities.py` is still a shell script — it seeds the Calls & Conferences board (IR-121), a separate feature, and depends on `rdco@iris.test` which `seed_demo` creates.
 
 ---
 

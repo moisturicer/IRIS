@@ -118,3 +118,5 @@ FR-M3-01 (extraction) · FR-M3-02 (FTS) · FR-M3-03 (embeddings) · FR-M4-01 (RA
 **IR-195** (2026-09-08): implements the manuscript-only retrieval scope this amendment adds — the manuscript currently doesn't reach the chunker at all, and supplementary uploads currently do.
 
 **IR-287** (2026-09-21): implements the token-unit amendment above — the vendored tokenizer, the 512 → 700 ceiling that keeps chunk boundaries where they were, and the alignment of the vendor batching estimator with the chunker's count.
+
+**IR-1050** (2026-11-13): implements ADR-067 decision 14 — `AI_CHUNK_TARGET_TOKENS` (700) is what packing aims for, `AI_CHUNK_MAX_TOKENS` (2,000) is the safety ceiling, and every strategy counts the heading trail inside the target. Only content kept whole (a figure, a list, a table row under its repeated header) can pass the target.

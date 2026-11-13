@@ -77,6 +77,8 @@ def _run_extraction(self, extraction_id, source_revision):
     )
     from apps.ai.extraction.gate import NotDisclosed, reading
     from .figures import replace_figures
+    from .models import DocumentKind
+    from .pdf_evidence import sandbox
 
     attempt = uuid.uuid4()
     with transaction.atomic():
@@ -94,12 +96,15 @@ def _run_extraction(self, extraction_id, source_revision):
         filename = extraction.source_file or field.name
         storage = field.storage
         record_id = extraction.resolved_record_id
+        manuscript = extraction.kind == DocumentKind.MANUSCRIPT
 
     try:
         with storage.open(filename, "rb") as source:
             pdf_bytes = source.read()
         with reading(record_id):
             extracted = current_extractor().extract(pdf_bytes, filename=os.path.basename(filename))
+        # Local and after the vendor read; a bad PDF stores its error, never fails (IR-1053).
+        evidence = sandbox.read_pdf_evidence(pdf_bytes) if manuscript else {}
         values = {
             "extracted_text": flatten_for_search(extracted.document),
             "structure": document_to_json(extracted.document),
@@ -109,6 +114,7 @@ def _run_extraction(self, extraction_id, source_revision):
             "extractor_options": dict(extracted.provenance.options),
             "warnings": [{"kind": "page_failed", "page": page} for page in extracted.failed_pages],
             "raw_result": dict(extracted.raw),
+            "pdf_evidence": evidence,
             "pages_read": extracted.usage.pages if extracted.usage else None,
             "credits": extracted.usage.credits if extracted.usage else None,
             "error": "", "status": "done",
@@ -173,7 +179,11 @@ class ExtractionTask(Task):
     def apply_async(self, args=None, kwargs=None, **options):
         from apps.ai.extraction import current_extractor
 
-        limit = current_extractor().timeout_seconds + TIME_LIMIT_MARGIN_SECONDS
+        from django.conf import settings
+
+        # The evidence read runs inside the same attempt (IR-1053).
+        evidence = settings.PDF_EVIDENCE_WALL_SECONDS or 0
+        limit = int(current_extractor().timeout_seconds + evidence) + TIME_LIMIT_MARGIN_SECONDS
         options.setdefault("time_limit", limit)
         options.setdefault("soft_time_limit", limit - SOFT_LIMIT_HEADROOM_SECONDS)
         return super().apply_async(args, kwargs, **options)

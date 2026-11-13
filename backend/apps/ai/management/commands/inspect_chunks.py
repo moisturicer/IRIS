@@ -8,7 +8,7 @@ distribution, the median region count per chunk, and what the front matter
 and bibliography actually chunk to.
 
 It only reads. Re-chunking with a different ceiling is a configuration
-change (``AI_CHUNK_MAX_TOKENS``) followed by re-running the ingestion task
+change (``AI_CHUNK_TARGET_TOKENS``) followed by re-running the ingestion task
 with ``force=True``, which is the same path production takes.
 
 The token counts printed below are real ``voyage-context-4`` tokens as of

@@ -141,7 +141,7 @@ class Command(BaseCommand):
             raise CommandError(
                 f"Estimated {plan.estimated_tokens:,} tokens, over the ceiling of "
                 f"{ceiling:,}. Nothing has been sent. Either narrow the run "
-                f"(--record, --limit), check AI_CHUNK_MAX_TOKENS, or raise the "
+                f"(--record, --limit), check AI_CHUNK_TARGET_TOKENS, or raise the "
                 f"ceiling deliberately with --token-ceiling."
             )
 
