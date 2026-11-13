@@ -1,0 +1,108 @@
+{
+  "figures": {
+    "page_count": 1,
+    "status": "completed",
+    "profile": "balanced",
+    "types": {
+      "NarrativeText": 8
+    },
+    "text_elements": 8,
+    "text_elements_without_coordinates": 0,
+    "coordinate_systems": {
+      "PixelSpace": 8
+    },
+    "tables_with_html": 0,
+    "metadata_keys": [
+      "coordinates",
+      "page_number",
+      "parse_confidence",
+      "text_as_html"
+    ],
+    "warnings": [],
+    "failed_pages": [],
+    "degraded_pages": [],
+    "reading_order_holds": true
+  },
+  "numbered_headings": {
+    "page_count": 2,
+    "status": "completed",
+    "profile": "balanced",
+    "types": {
+      "Header": 2,
+      "Title": 4,
+      "NarrativeText": 4,
+      "PageNumber": 2
+    },
+    "text_elements": 12,
+    "text_elements_without_coordinates": 0,
+    "coordinate_systems": {
+      "PixelSpace": 12
+    },
+    "tables_with_html": 0,
+    "metadata_keys": [
+      "coordinates",
+      "page_number",
+      "parse_confidence",
+      "text_as_html"
+    ],
+    "warnings": [],
+    "failed_pages": [],
+    "degraded_pages": [],
+    "reading_order_holds": true
+  },
+  "table_across_pages": {
+    "page_count": 2,
+    "status": "completed",
+    "profile": "balanced",
+    "types": {
+      "Header": 2,
+      "Title": 1,
+      "NarrativeText": 2,
+      "Table": 1,
+      "PageNumber": 2
+    },
+    "text_elements": 8,
+    "text_elements_without_coordinates": 0,
+    "coordinate_systems": {
+      "PixelSpace": 9
+    },
+    "tables_with_html": 1,
+    "metadata_keys": [
+      "coordinates",
+      "page_number",
+      "parse_confidence",
+      "text_as_html"
+    ],
+    "warnings": [],
+    "failed_pages": [],
+    "degraded_pages": [],
+    "reading_order_holds": false
+  },
+  "two_columns": {
+    "page_count": 1,
+    "status": "completed",
+    "profile": "balanced",
+    "types": {
+      "Header": 1,
+      "Title": 1,
+      "NarrativeText": 2,
+      "PageNumber": 1
+    },
+    "text_elements": 5,
+    "text_elements_without_coordinates": 0,
+    "coordinate_systems": {
+      "PixelSpace": 5
+    },
+    "tables_with_html": 0,
+    "metadata_keys": [
+      "coordinates",
+      "page_number",
+      "parse_confidence",
+      "text_as_html"
+    ],
+    "warnings": [],
+    "failed_pages": [],
+    "degraded_pages": [],
+    "reading_order_holds": false
+  }
+}

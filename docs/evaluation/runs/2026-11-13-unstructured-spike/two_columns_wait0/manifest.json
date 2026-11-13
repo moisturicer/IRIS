@@ -1,0 +1,39 @@
+{
+  "fixture": "two_columns.pdf",
+  "pdf_sha256": "43458e641b52d7f6b250bbd298846c2c2d049cc8a71ef3bd6217aa299db99fcf",
+  "endpoint": "POST https://transform.unstructured.io/api/v2/parse",
+  "options": {
+    "output": "elements",
+    "profile": "balanced",
+    "include": [
+      "coordinates",
+      "table_html"
+    ]
+  },
+  "prefer": "wait=0",
+  "http_status": 202,
+  "location": "/api/v2/jobs/1a5dc6d3-d639-423f-923b-3b0d86c199d9",
+  "polls": 3,
+  "job_id": "1a5dc6d3-d639-423f-923b-3b0d86c199d9",
+  "status": "completed",
+  "profile": "balanced",
+  "format_version": "2.0",
+  "latency_seconds": 8.3,
+  "response_headers": {
+    "date": "Fri, 13 Nov 2026 14:33:12 GMT",
+    "content-type": "application/json",
+    "content-length": "289",
+    "connection": "keep-alive",
+    "server": "uvicorn",
+    "preference-applied": "wait=0",
+    "location": "/api/v2/jobs/1a5dc6d3-d639-423f-923b-3b0d86c199d9"
+  },
+  "final_response_headers": {
+    "date": "Fri, 13 Nov 2026 14:33:19 GMT",
+    "content-type": "application/json",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive",
+    "server": "uvicorn"
+  },
+  "recorded_at": "2026-11-13T14:33:19+00:00"
+}

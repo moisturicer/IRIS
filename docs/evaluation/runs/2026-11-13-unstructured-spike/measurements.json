@@ -1,0 +1,281 @@
+{
+  "proxy_papers": {
+    "21": {
+      "page_count": 20,
+      "status": "completed",
+      "profile": "balanced",
+      "types": {
+        "NarrativeText": 156,
+        "Title": 34,
+        "Header": 19,
+        "ListItem": 9,
+        "Image": 44,
+        "Table": 1,
+        "FigureCaption": 13
+      },
+      "text_elements": 232,
+      "text_elements_without_coordinates": 0,
+      "coordinate_systems": {
+        "PixelSpace": 276
+      },
+      "tables_with_html": 1,
+      "metadata_keys": [
+        "coordinates",
+        "page_number",
+        "parse_confidence",
+        "text_as_html"
+      ],
+      "warnings": [],
+      "failed_pages": [],
+      "degraded_pages": [],
+      "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+      "http_status": 200,
+      "latency_seconds": 57.1,
+      "pdf_sha256": "c9d452ad566849e95bde7c94ab74ad4ff61e48e6f2a310f98e093e1fa7bb46e9"
+    },
+    "25": {
+      "page_count": 23,
+      "status": "completed",
+      "profile": "balanced",
+      "types": {
+        "Header": 24,
+        "Title": 27,
+        "NarrativeText": 92,
+        "Footer": 23,
+        "Image": 21,
+        "FigureCaption": 22,
+        "Table": 6
+      },
+      "text_elements": 194,
+      "text_elements_without_coordinates": 0,
+      "coordinate_systems": {
+        "PixelSpace": 216
+      },
+      "tables_with_html": 6,
+      "metadata_keys": [
+        "coordinates",
+        "page_number",
+        "parse_confidence",
+        "text_as_html"
+      ],
+      "warnings": [],
+      "failed_pages": [],
+      "degraded_pages": [],
+      "title": "Diverse Metallicities in Protoclusters at z~3.4 detected by Deep Learning",
+      "http_status": 200,
+      "latency_seconds": 95.0,
+      "pdf_sha256": "49bdf91fdfc3c32ddd0d78a61361351ef370980359325f1755e94783275c8f40"
+    },
+    "38": {
+      "page_count": 5,
+      "status": "completed",
+      "profile": "balanced",
+      "types": {
+        "Header": 1,
+        "Title": 18,
+        "NarrativeText": 59,
+        "Image": 13,
+        "FigureCaption": 5
+      },
+      "text_elements": 83,
+      "text_elements_without_coordinates": 0,
+      "coordinate_systems": {
+        "PixelSpace": 96
+      },
+      "tables_with_html": 0,
+      "metadata_keys": [
+        "coordinates",
+        "page_number",
+        "parse_confidence",
+        "text_as_html"
+      ],
+      "warnings": [],
+      "failed_pages": [],
+      "degraded_pages": [],
+      "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+      "http_status": 200,
+      "latency_seconds": 15.6,
+      "pdf_sha256": "a84f170003ea37dfaffc3b2f15cecbf6f732af6efb9cf588399fc346f0b8d8f0"
+    },
+    "40": {
+      "page_count": 17,
+      "status": "completed",
+      "profile": "balanced",
+      "types": {
+        "Header": 18,
+        "Title": 33,
+        "NarrativeText": 149,
+        "Image": 23,
+        "Footer": 17,
+        "FigureCaption": 16,
+        "Table": 6
+      },
+      "text_elements": 239,
+      "text_elements_without_coordinates": 0,
+      "coordinate_systems": {
+        "PixelSpace": 262
+      },
+      "tables_with_html": 6,
+      "metadata_keys": [
+        "coordinates",
+        "page_number",
+        "parse_confidence",
+        "text_as_html"
+      ],
+      "warnings": [],
+      "failed_pages": [],
+      "degraded_pages": [],
+      "title": "Accelerating massive ensembles of ordinary differential equations",
+      "http_status": 200,
+      "latency_seconds": 78.4,
+      "pdf_sha256": "b109f841f0acfdb0cbfa40419313a8c286e1012072acb44aabcde4aabfe19ccd"
+    },
+    "52": {
+      "page_count": 8,
+      "status": "completed",
+      "profile": "balanced",
+      "types": {
+        "Header": 1,
+        "Title": 8,
+        "NarrativeText": 63,
+        "Image": 11,
+        "FigureCaption": 4,
+        "Table": 3
+      },
+      "text_elements": 79,
+      "text_elements_without_coordinates": 0,
+      "coordinate_systems": {
+        "PixelSpace": 90
+      },
+      "tables_with_html": 3,
+      "metadata_keys": [
+        "coordinates",
+        "page_number",
+        "parse_confidence",
+        "text_as_html"
+      ],
+      "warnings": [],
+      "failed_pages": [],
+      "degraded_pages": [],
+      "title": "Noise-adjusted turnover in estimated networks",
+      "http_status": 200,
+      "latency_seconds": 18.8,
+      "pdf_sha256": "1bf325ba792393ceab627162f743d1b0a02508c33348ad980136136a1069b669"
+    },
+    "58": {
+      "page_count": 5,
+      "status": "completed",
+      "profile": "balanced",
+      "types": {
+        "NarrativeText": 71,
+        "Title": 20,
+        "Image": 5,
+        "Table": 10,
+        "FigureCaption": 11
+      },
+      "text_elements": 112,
+      "text_elements_without_coordinates": 0,
+      "coordinate_systems": {
+        "PixelSpace": 117
+      },
+      "tables_with_html": 10,
+      "metadata_keys": [
+        "coordinates",
+        "page_number",
+        "parse_confidence",
+        "text_as_html"
+      ],
+      "warnings": [],
+      "failed_pages": [],
+      "degraded_pages": [],
+      "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+      "http_status": 200,
+      "latency_seconds": 22.5,
+      "pdf_sha256": "3de679e8c29a24c28592df1192bcd4b8527f38a9c158ecfad032d92496c3e4e7"
+    }
+  },
+  "notes": "Proxy tier (ADR-023): never a finding about CIT-U research. Counts only; no paper text.",
+  "two_columns_best_profile": {
+    "page_count": 1,
+    "status": "completed",
+    "profile": "best",
+    "types": {
+      "Header": 1,
+      "Title": 1,
+      "NarrativeText": 2,
+      "PageNumber": 1
+    },
+    "text_elements": 5,
+    "text_elements_without_coordinates": 0,
+    "coordinate_systems": {
+      "PixelSpace": 5
+    },
+    "tables_with_html": 0,
+    "metadata_keys": [
+      "coordinates",
+      "page_number",
+      "parse_confidence",
+      "text_as_html"
+    ],
+    "warnings": [],
+    "failed_pages": [],
+    "degraded_pages": [],
+    "reading_order_holds": false,
+    "http_status": 200,
+    "location": null,
+    "polls": 0,
+    "latency_seconds": 7.5,
+    "prefer": null,
+    "options": {
+      "output": "elements",
+      "profile": "best",
+      "include": [
+        "coordinates",
+        "table_html"
+      ]
+    },
+    "raw": "two_columns_best/"
+  },
+  "two_columns_prefer_wait_0": {
+    "page_count": 1,
+    "status": "completed",
+    "profile": "balanced",
+    "types": {
+      "Header": 1,
+      "Title": 1,
+      "NarrativeText": 2,
+      "PageNumber": 1
+    },
+    "text_elements": 5,
+    "text_elements_without_coordinates": 0,
+    "coordinate_systems": {
+      "PixelSpace": 5
+    },
+    "tables_with_html": 0,
+    "metadata_keys": [
+      "coordinates",
+      "page_number",
+      "parse_confidence",
+      "text_as_html"
+    ],
+    "warnings": [],
+    "failed_pages": [],
+    "degraded_pages": [],
+    "reading_order_holds": false,
+    "http_status": 202,
+    "location": "/api/v2/jobs/1a5dc6d3-d639-423f-923b-3b0d86c199d9",
+    "polls": 3,
+    "latency_seconds": 8.3,
+    "prefer": "wait=0",
+    "options": {
+      "output": "elements",
+      "profile": "balanced",
+      "include": [
+        "coordinates",
+        "table_html"
+      ]
+    },
+    "raw": "two_columns_wait0/"
+  },
+  "text_element_definition": "an element whose text is non-blank and whose type is not Image"
+}
