@@ -1,0 +1,601 @@
+{
+  "name": "proxy-record-scoped",
+  "tier": "proxy",
+  "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+  "labelled_by": "Claude (AI draft for IR-1052), not yet reviewed by a named person",
+  "notes": "IR-1052: Paper Chat's case. Every question is asked inside one Record (scope_record) and retrieval is narrowed to it, as Paper Chat narrows. Questions are worded as a reader of that paper would ask, without naming it. ADR-023 tier 1: an engineering gate over the arXiv proxy corpus, NEVER a finding about CIT-U research. Quotes are copied from active chunk text, not the PDF. A separate file because proxy_starter.json is pinned by the IR-542 audit.",
+  "questions": [
+    {
+      "id": "s01",
+      "kind": "in-paper",
+      "question": "why isn't judging an algorithm by its average welfare enough here?",
+      "scope_record": "Stable Policy Learning",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Stable Policy Learning",
+          "page": 2,
+          "quote": "This criterion does not distinguish between two algorithms that perform equally well in expectation"
+        }
+      ]
+    },
+    {
+      "id": "s02",
+      "kind": "in-paper",
+      "question": "which existing model of uncertainty is mathematically closest to their objective?",
+      "scope_record": "Stable Policy Learning",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Stable Policy Learning",
+          "page": 8,
+          "quote": "The robust mean-variance analysis of Maccheroni et al. (2013) is especially close mathematically"
+        }
+      ]
+    },
+    {
+      "id": "s03",
+      "kind": "in-paper",
+      "question": "are the bounds they derive sharp?",
+      "scope_record": "Stable Policy Learning",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Stable Policy Learning",
+          "page": 20,
+          "quote": "we establish matching lower bounds over a high-level class of populations and base learners"
+        }
+      ]
+    },
+    {
+      "id": "s04",
+      "kind": "in-paper",
+      "question": "how is the example that shows the bounds are tight built?",
+      "scope_record": "Stable Policy Learning",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Stable Policy Learning",
+          "page": 53,
+          "quote": "One covariate stratum determines expected regret, while another generates welfare variation across samples"
+        }
+      ]
+    },
+    {
+      "id": "s05",
+      "kind": "in-paper",
+      "question": "why is the response divided by the zero-signal spectrum in the mock figure?",
+      "scope_record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+          "page": 3,
+          "quote": "This normalization removes the scale-dependence from the primordial power spectrum and isolates any 1/k2 enhancement"
+        }
+      ]
+    },
+    {
+      "id": "s06",
+      "kind": "in-paper",
+      "question": "did the fits find the primordial signal they were looking for?",
+      "scope_record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+          "page": 4,
+          "quote": "We find no statistically significant evidence for f s=2 NL"
+        }
+      ]
+    },
+    {
+      "id": "s07",
+      "kind": "in-paper",
+      "question": "how did they measure halo shapes when splitting the samples?",
+      "scope_record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+          "page": 6,
+          "quote": "We use rockstar's weighted shape tensor to calculate the shape"
+        }
+      ]
+    },
+    {
+      "id": "s08",
+      "kind": "in-paper",
+      "question": "which sampler and priors were used for the galaxy subsample fits?",
+      "scope_record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+          "page": 7,
+          "quote": "We use broad flat priors and sample the likelihood with emcee"
+        }
+      ]
+    },
+    {
+      "id": "s09",
+      "kind": "in-paper",
+      "question": "how does the excited state decay?",
+      "scope_record": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+          "page": 1,
+          "quote": "its dominant decay channel is the semivisible three-photon decay"
+        }
+      ]
+    },
+    {
+      "id": "s10",
+      "kind": "in-paper",
+      "question": "why was that reference mass splitting chosen?",
+      "scope_record": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+          "page": 5,
+          "quote": "It gives a cosmologically long-lived excited state for the reference couplings"
+        }
+      ]
+    },
+    {
+      "id": "s11",
+      "kind": "in-paper",
+      "question": "how did they check the analytic approximations?",
+      "scope_record": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+          "page": 8,
+          "quote": "To validate the analytical approximations, we compare them with a numerical benchmark containing photon exchange only"
+        }
+      ]
+    },
+    {
+      "id": "s12",
+      "kind": "in-paper",
+      "question": "what background limits the electron recoil search?",
+      "scope_record": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+          "page": 11,
+          "quote": "The dominant irreducible background to the electron channel is neutrino-electron scattering"
+        }
+      ]
+    },
+    {
+      "id": "s13",
+      "kind": "in-paper",
+      "question": "what kind of active learning problem do they consider?",
+      "scope_record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+          "page": 4,
+          "quote": "operating on a finite unlabelled dataset X, for which we seek to obtain continuous labels"
+        }
+      ]
+    },
+    {
+      "id": "s14",
+      "kind": "in-paper",
+      "question": "which single kernel did best on the function with sharp peaks?",
+      "scope_record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+          "page": 14,
+          "quote": "Matérn-1/2 is the strongest fixed kernel among this dictionary on Bukin-2D"
+        }
+      ]
+    },
+    {
+      "id": "s15",
+      "kind": "in-paper",
+      "question": "why isn't the Brier-style loss used for active learning?",
+      "scope_record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+          "page": 18,
+          "quote": "BAL does not naturally provide a binary task-specific event for defining a Brier-style loss"
+        }
+      ]
+    },
+    {
+      "id": "s16",
+      "kind": "in-paper",
+      "question": "how were the emission line fluxes measured?",
+      "scope_record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 3,
+          "quote": "Emission lines were simultaneously fitted with three Gaussian profiles"
+        }
+      ]
+    },
+    {
+      "id": "s17",
+      "kind": "in-paper",
+      "question": "what does the dashed line in the stellar mass versus star formation plot show?",
+      "scope_record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 7,
+          "quote": "The blue dashed line indicates the main sequence of SFG"
+        }
+      ]
+    },
+    {
+      "id": "s18",
+      "kind": "in-paper",
+      "question": "what has been found about metallicity in even earlier protoclusters?",
+      "scope_record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 12,
+          "quote": "potentially indicating early chemical enrichment in dense environments"
+        }
+      ]
+    },
+    {
+      "id": "s19",
+      "kind": "in-paper",
+      "question": "why can't the earlier post-starburst quasar samples give the overall AGN fraction?",
+      "scope_record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+          "page": 2,
+          "quote": "as they were all selected from quasar catalogs, they cannot be used to estimate the overall"
+        }
+      ]
+    },
+    {
+      "id": "s20",
+      "kind": "in-paper",
+      "question": "which ways of finding AGN are least affected by dust?",
+      "scope_record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+          "page": 6,
+          "quote": "Mid-infrared and narrow-line selections are less sensitive to obscuring material"
+        }
+      ]
+    },
+    {
+      "id": "s21",
+      "kind": "in-paper",
+      "question": "how did they test whether the radio emission came from star formation?",
+      "scope_record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+          "page": 10,
+          "quote": "we compute the predicted star formation rate from L1.4GHz"
+        }
+      ]
+    },
+    {
+      "id": "s22",
+      "kind": "in-paper",
+      "question": "what explanations have been offered for strong emission lines in quiescent galaxies?",
+      "scope_record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+          "page": 16,
+          "quote": "this is a more extreme example of the Baldwin effect"
+        }
+      ]
+    },
+    {
+      "id": "s23",
+      "kind": "in-paper",
+      "question": "why does the endothermic case depend on the fastest dark matter particles?",
+      "scope_record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+          "page": 2,
+          "quote": "endothermic scattering needs a large vmin, so it is fed only by the fastest particles"
+        }
+      ]
+    },
+    {
+      "id": "s24",
+      "kind": "in-paper",
+      "question": "is background included in the likelihood fit?",
+      "scope_record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+          "page": 4,
+          "quote": "We neglect the background in this analysis"
+        }
+      ]
+    },
+    {
+      "id": "s25",
+      "kind": "in-paper",
+      "question": "what is the main lesson for interpreting high-energy recoil events?",
+      "scope_record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+          "page": 5,
+          "quote": "an endothermic interpretation cannot be unentangled from a galactic dynamical model"
+        }
+      ]
+    },
+    {
+      "id": "s26",
+      "kind": "in-paper",
+      "question": "how is performance usually reported for classifiers that output probabilities?",
+      "scope_record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+          "page": 4,
+          "quote": "model performance is often reported using deterministic metrics-computed by assigning each observation to the alternative with the highest predicted probability"
+        }
+      ]
+    },
+    {
+      "id": "s27",
+      "kind": "in-paper",
+      "question": "who proposed a probabilistic version of the confusion matrix?",
+      "scope_record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+          "page": 9,
+          "quote": "developed a probabilistic confusion matrix for cross-entropy loss"
+        }
+      ]
+    },
+    {
+      "id": "s28",
+      "kind": "in-paper",
+      "question": "which travel mode is predicted worst?",
+      "scope_record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+          "page": 14,
+          "quote": "Train remains the weakest alternative for every specification"
+        }
+      ]
+    },
+    {
+      "id": "s29",
+      "kind": "in-paper",
+      "question": "what examples of multi-valued treatments do they give?",
+      "scope_record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+          "page": 2,
+          "quote": "Weisburst (2019) focuses on police racial bias in use of force"
+        }
+      ]
+    },
+    {
+      "id": "s30",
+      "kind": "in-paper",
+      "question": "what empirical settings were used to compare the estimators?",
+      "scope_record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+          "page": 9,
+          "quote": "we replicate articles from top Economics journals"
+        }
+      ]
+    },
+    {
+      "id": "s31",
+      "kind": "in-paper",
+      "question": "how many estimates were analysed across the replicated papers?",
+      "scope_record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+          "page": 13,
+          "quote": "a total of 18 standard regressions, 141 parametric estimates, and 141 semiparametric estimates"
+        }
+      ]
+    },
+    {
+      "id": "s32",
+      "kind": "in-paper",
+      "question": "what is the signal efficiency hypothesis?",
+      "scope_record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+          "page": 4,
+          "quote": "whether excessive compute is spent oversampling easy ones"
+        }
+      ]
+    },
+    {
+      "id": "s33",
+      "kind": "in-paper",
+      "question": "what happened when coding was trained with per-test rewards?",
+      "scope_record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+          "page": 8,
+          "quote": "it rarely learned to pass all tests for any given problem"
+        }
+      ]
+    },
+    {
+      "id": "s34",
+      "kind": "in-paper",
+      "question": "when would the method not help?",
+      "scope_record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+          "page": 16,
+          "quote": "If a task leans more heavily towards difficult problems, Never Give Up will likely not be effective"
+        }
+      ]
+    },
+    {
+      "id": "s35",
+      "kind": "in-paper",
+      "question": "what does the irrelevant history scenario simulate?",
+      "scope_record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+          "page": 4,
+          "quote": "The history and current query concern unrelated topics or domains"
+        }
+      ]
+    },
+    {
+      "id": "s36",
+      "kind": "in-paper",
+      "question": "how do the correction scenarios differ from the others?",
+      "scope_record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+          "page": 5,
+          "quote": "Correction and Repeated Error introduce a confusable entity form into the historical transcript"
+        }
+      ]
+    },
+    {
+      "id": "s37",
+      "kind": "in-paper",
+      "question": "how are the fine-tuned models trained across context setups?",
+      "scope_record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+          "page": 6,
+          "quote": "we train separate adapters for the four context configurations"
+        }
+      ]
+    }
+  ]
+}

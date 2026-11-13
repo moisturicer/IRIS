@@ -105,6 +105,8 @@ class QuestionOutcome:
     #: The corpus cannot answer this question, so the right result is an empty
     #: final set (IR-454). Such an outcome is scored by correct refusal only.
     expects_refusal: bool = False
+    #: The Record retrieval was narrowed to, as Paper Chat narrows (IR-1052).
+    scope_record: Optional[str | int] = None
 
     @property
     def given_nothing(self) -> bool:
@@ -131,6 +133,22 @@ class QuestionOutcome:
 
 def _mean(values: Sequence[float]) -> float:
     return sum(values) / len(values) if values else 0.0
+
+
+def _slice(outcomes: Sequence[QuestionOutcome], k: int) -> Optional[dict[str, Any]]:
+    """Recall over one slice, with its own denominator. None when empty."""
+    if not outcomes:
+        return None
+    expected = sum(o.expected for o in outcomes)
+    return {
+        "questions": len(outcomes),
+        f"recall@{k}": round(_mean([o.retrieval_recall for o in outcomes]), 4),
+        "final_set_recall": round(_mean([o.final_set_recall for o in outcomes]), 4),
+        f"micro_recall@{k}": round(
+            sum(o.retrieved_hits for o in outcomes) / expected, 4
+        ),
+        "false_refusals": [o.question_id for o in outcomes if o.given_nothing],
+    }
 
 
 @dataclass(frozen=True)
@@ -193,6 +211,22 @@ class EvalReport:
     def k(self) -> int:
         return self.config.retrieval_limit
 
+    @property
+    def slices(self) -> dict[str, Any]:
+        """Corpus-wide and in-paper recall apart (IR-1052).
+
+        The headline averages every answerable question; a slice averages only
+        its own, so the in-paper number is never diluted by the corpus one.
+        """
+        k = self.k
+        corpus = _slice([o for o in self.outcomes if o.scope_record is None], k)
+        scoped = _slice([o for o in self.outcomes if o.scope_record is not None], k)
+        if corpus and scoped:
+            scoped["in_paper_minus_corpus_recall@" + str(k)] = round(
+                scoped[f"recall@{k}"] - corpus[f"recall@{k}"], 4
+            )
+        return {"corpus": corpus, "record_scoped": scoped}
+
     # -- serialization ------------------------------------------------------
 
     def as_dict(self) -> dict[str, Any]:
@@ -213,6 +247,7 @@ class EvalReport:
                 "false_refusals": list(self.false_refusals),
                 "degraded_questions": self.degraded_questions,
             },
+            "slices": self.slices,
             "provenance": self.provenance,
             "questions": [o.as_dict() for o in self.outcomes],
             "refusals": [o.as_dict() for o in self.refusals],
@@ -251,6 +286,7 @@ class EvalReport:
             f"  final-set recall   {self.final_set_recall:.3f}"
             f"   (micro {self.micro_final_set_recall:.3f})",
             self._refusal_line(),
+            *self._slice_lines(),
             "",
         ]
         if self.false_refusals:
@@ -292,6 +328,25 @@ class EvalReport:
             lines.extend(f"    {qid}: {quote}" for qid, quote in mismatches[:10])
             lines.append("")
         return "\n".join(lines)
+
+    def _slice_lines(self) -> list[str]:
+        scoped = self.slices["record_scoped"]
+        if scoped is None:
+            return []
+        corpus = self.slices["corpus"]
+        k = self.k
+        lines = [
+            f"  record-scoped      {scoped[f'recall@{k}']:.3f}"
+            f"   final-set {scoped['final_set_recall']:.3f}"
+            f"   ({scoped['questions']} questions, each inside one paper)"
+        ]
+        if corpus is not None:
+            lines.append(
+                f"  corpus-wide        {corpus[f'recall@{k}']:.3f}"
+                f"   final-set {corpus['final_set_recall']:.3f}"
+                f"   ({corpus['questions']} questions)"
+            )
+        return lines
 
     def _refusal_line(self) -> str:
         if self.correct_refusal is None:
