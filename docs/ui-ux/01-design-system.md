@@ -104,6 +104,31 @@ The single Settings & Profile page is split. **Profile** is who you are to other
 | **Edit profile** | Sections on hairlines (Photo and name, About you), then a footer rule with Cancel (secondary) and Save (the one filled action). Save sends the name and the profile fields, returns to Profile, which says "Profile saved." in a `role="status"` line. The photo saves on crop | A Save inside each of two panels |
 | **Settings** | Account & security (with the read-only sign-in email), Data privacy & consent, Role & access. A secondary "Your profile" pill sits in the header | A Profile tab first |
 
+### IR-1072 amendment: the UI/UX audit's design decisions (D1, D4, D5, D6)
+
+Decided on 2026-11-14 by **Lee Jasmin Adolfo** (project lead and frontend owner), from the audit in [`frontend_ui_audit_spec.md`](../frontend_ui_audit_spec.md) §7.1 and the prototype it points to. **Decided, not built:** the tickets named below build each one, and `DESIGN.md` carries the same text under "Decided changes". D2 and D3 are server decisions and live in [ADR-069](../adr/069-notifications-know-when-their-task-closed.md) and [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md) §9.
+
+| Decision | Now | Replaces | Built by |
+|---|---|---|---|
+| **D1 Field outline and control type** | The outline of every input, select, textarea and checkbox is `#8f8884` (3.49:1 on white, 3.34:1 on `stone-50`, WCAG 1.4.11); Rule Stone `#d6d3d1` stays on decorative chips and cards. A **14/20 `control`** type step for form fields and page buttons; the reader toolbar's 13 px reading controls are unchanged. Placeholders and helper text use Quiet Ink `#57534e` | Fields outlined `stone-300`, which is Rule Stone (about 1.5:1), with placeholders in `stone-500`, Faint Ink (`Input.tsx`, `Select.tsx`) | IR-1074 |
+| **D4 Discover layout** | The **1 / 2 / 3 column toggle stays** (Jive's preference): one cycling icon button, hidden below `xl`, at the toolbar's one control height. A **96 px outline thumbnail** replaces the abstract-preview panel in 1 column only; the 2 and 3 column cards are text only | The audit's "one list layout" recommendation | IR-1082 |
+| **D5 Navigation** | **Office console and Analytics nest under My Reviews**, only for the roles that already have them (`SCREEN_ACCESS`). Their current URLs keep working | Both as top-level sidebar entries | IR-1085 |
+| **D6 Highlight roles** | One look per kind of highlight, as in the table below, with the prototype's values. Yellow is reserved for matches and rose for a reviewer's marks. **Maroon Wash is retired from the interface** and is no longer the "on" tint | Maroon Wash as the one tint for about fifteen jobs, so a search match (1.10:1 on white) looked like a selection | IR-1097 (also IR-1082 for the match highlight) |
+
+| Role | Look | Token (prototype) |
+|---|---|---|
+| Action | Maroon fill, white text, one per row | `--maroon` |
+| Here | Desk Stone fill, Ink text, maroon icon, no side stripe | `--here` = `--desk` |
+| Selected | White raised segment, or an Ink outline; never maroon | `--ink`, `--page` |
+| Reference | Maroon text on white with a Rule Stone hairline; maroon fill on hover | `--maroon` |
+| Match | Highlight Yellow `#f7e08f`, the current match `#f2c94c`; Ink text on it 14:1 | `--hl`, `--hl-now` |
+| Pen | Rose fill `#fbeaea`, 2 px underline `#b4474b` (5.3:1 on white), a numbered pin; the open thread's passage `#f5d5d6` | `--pen-wash`, `--pen`, `--pen-now` |
+| Status | White chip, tone in text and outline; only Attention is filled | — |
+
+Also added: `--maroon-press` `#5a0c0f` for a pressed filled button, and `--field` `#8f8884`. Gold and stray hexes are removed. The **Four Inks Rule** now reads: white, black, stone and maroon, plus one yellow highlighter for matches and one rose pen for a reviewer's marks. Where the prototype (`iris-uiux-audit/prototype/styles.css`) and the audit's prose differ, the prototype's values are the decision.
+
+`palette.test.ts` guards Tailwind hue classes (IR-358); it changes with IR-1097, in the same change as the tokens, with the reason in its PR.
+
 ## 1 · Tokens as defined
 
 `frontend/tailwind.config.js`:

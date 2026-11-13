@@ -61,6 +61,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Corrected 2026-11-06 (Hermoine Zozobrado, IR-874): §7's review threads.** Only the parties that asked hold a Version with their open *Must fix* threads, every Decision closes open threads with its comment as the reason, and the Adviser's *Accept* of a Proposal is blocked like *Accept & send to RDCO*. See the *Correction, 2026-11-06* note under §7.
 
+**Clarified 2026-11-14 (project lead, IR-1072; Accepted): §9's word "Accepted".** It names an act, not only a record state. A record is *Accepted* only when it is a Proposal; an Adviser's or RDCO's *accept* of a Thesis/Research or Project reads "Accepted" on that reviewer's own Done row, and the record itself reads by where it rests. No behaviour changes. See the *Clarification, 2026-11-14* note under §9.
+
 **Corrected 2026-11-04: the IR-767 paragraph below.** Its last sentence, "Proposals and the Adviser's direct publication path remain", is wrong about the second half. The Adviser has no publication path. `OUTCOMES_FOR` gives the Adviser `REJECT` only on a Thesis/Research or Project (`apps/reviews/decisions.py:115-118`), as ADR-047's amendment decided. Proposals remain.
 
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
@@ -579,6 +581,14 @@ EXT  Record  + proposal_visibility ∈ private | discoverable   (default private
     - Done is paged newest first, with *Show more*. To review and In review are not paged.
 - **The URL holds the view.** `?tab=` defaults to `to_review`, `?outcome=` to All, and `?office=` to Mine. The old `?status=pending|approved|declined` maps once to `to_review` / `done` / `done` and is then replaced.
 - **After *Claim* or *Assign*** the page refetches and announces where the row went. In Mine view an *Assign* to someone else removes the row; in the office view it stays, with the new holder. A failed act is reported on its row and announces nothing. There is no polling.
+
+**Clarification, 2026-11-14 (project lead, IR-1072; Accepted by Lee Jasmin Adolfo): "Accepted" is an act on a Done row and a state only for a Proposal.** The UI/UX audit (finding WF-05) saw every Thesis on an Adviser's Done tab read **Accepted** and took it for a vocabulary fault, because `PRODUCT.md` fixed *Accepted* as "a Proposal its Adviser accepted". Reading the code settled that there are two vocabularies, and only one of them is wrong:
+
+- **A record's state follows `PRODUCT.md`.** `record_state_label` (`apps/reviews/tracker.py`) reads *Accepted* only for a Proposal at `approved`. A Thesis/Research or Project resting at `completed` reads *Unlisted*, and a published one *Published*.
+- **A Done row's outcome is the reviewer's own act.** `_outcome` (`apps/reviews/my_reviews.py`) calls an Adviser's or RDCO's `approved` *accepted*, as the 2026-10-08 amendment above already says, and ADR-047 says the Adviser "accepts" a Thesis or Project and sends it on. That is the reviewer's verb, and it stays for every record type.
+- **`PRODUCT.md` is corrected, not the code.** Per the source-of-truth order, the ADR wins. `PRODUCT.md`'s fixed vocabulary now says *Accepted* is a record's **state** only for a Proposal, and an Adviser's or RDCO's **act** of accepting any record reads the same word on their own Done row.
+- **What this costs.** The same word does two jobs, and a Thesis row can read *Accepted* while the record waits at an office. The Adviser who did the accepting is the reader of that row, so the audit rated it Low.
+- **The later upgrade, if readers still stumble:** label the outcome by what happened (an Adviser's act on a Thesis or Project reads *Routed*, RDCO's reads *Unlisted*, only a Proposal reads *Accepted*). That adds values to `ReviewOutcome`, so the API, the Done filters, `_outcome` and `_outcome_q` all change. It is not done here.
 
 ### 10. One Paper View, driven by capabilities
 

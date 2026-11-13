@@ -1,6 +1,6 @@
 # UI/UX audit of live IRIS and the redesign it proposes — specification (IR-1071)
 
-**Status: PROPOSED (14 Nov 2026).** Nothing here is approved. The project lead, or the team in the Phase 0 meeting (§7.1), approves it. Tracked on [IR-1071](https://citiris.atlassian.net/browse/IR-1071) under the redesign epic [IR-920](https://citiris.atlassian.net/browse/IR-920).
+**Status: PROPOSED (14 Nov 2026), except §7.1, decided the same day (IR-1072).** Nothing else here is approved. The project lead, or the team in the Phase 0 meeting (§7.1), approves it. Tracked on [IR-1071](https://citiris.atlassian.net/browse/IR-1071) under the redesign epic [IR-920](https://citiris.atlassian.net/browse/IR-920).
 
 **What this spec is.** It turns the audit in [`iris-uiux-audit/`](../iris-uiux-audit/README.md) into decisions and tickets. That folder holds the evidence:
 - [`audit-report.md`](../iris-uiux-audit/audit-report.md): findings with ids, for example `WF-01`, `NAV-01` and `A11Y-01`;
@@ -12,7 +12,7 @@
 **How it relates to other documents.**
 - **[`frontend_redesign_spec.md`](frontend_redesign_spec.md) (IR-374) stays the redesign's authority.** This spec amends it only where §4 says *Amends IR-374*.
 - **ADR-032's workflow invariants** (IR-374 §0) bind every ticket here. The frontend renders what the server says; it decides no workflow state.
-- **Two decisions depart from `DESIGN.md`** (§4.9 and the field token in §4.10). Neither can ship until the team accepts it and `DESIGN.md` and `palette.test.ts` change first.
+- **Two decisions depart from `DESIGN.md`** (§4.9 and the field token in §4.10). **Both were accepted on 2026-11-14 (IR-1072, §7.1),** and `DESIGN.md` records them under "Decided changes". `palette.test.ts` changes with IR-1097, before any highlight code ships.
 
 Sections 1–6 follow the project's `to-spec` template. Appendix A lists the tickets.
 
@@ -90,7 +90,7 @@ A compact per-party strip extracted from `ReviewRoutingTracker` ("Cleared on v1 
 
 ### 4.6 Discover
 - **One toolbar:** one filled action (Publish), one control height, visible filter labels, Sort in the results header with a live count.
-- **List rows** with a 96 px outline thumbnail. People results appear only on the People tab.
+- **The 1 / 2 / 3 column toggle stays** (D4, decided 2026-11-14; it is the existing cycling icon button in `DiscoverPage.tsx`, hidden below `xl`, at the toolbar's one control height). A **96 px outline thumbnail** replaces the abstract-preview panel in 1 column only; the 2 and 3 column cards are text only. People results appear only on the People tab. *This replaces the audit's "one list layout".*
 - **The whole card opens the paper,** using a stretched link on the title. Other controls on the card stay clickable above it, and keyboard focus outlines the whole card.
 - **No permanent Ask IRIS hint.** When a search looks like a question (it ends in "?" or starts with a question word), one line suggests Ask IRIS and carries the question over.
 - **Search matches every word.** Words are matched separately, stopwords are dropped, and each match is highlighted (§4.9).
@@ -127,7 +127,7 @@ Each kind of highlight gets one look, and no look means two things:
 | Pen (a reviewer's passage mark) | Rose fill with a 2 px underline and a numbered pin; the open thread's passage is stronger |
 | Status | White chip, tone in text and outline; only Attention is filled |
 
-Gold and stray hexes are removed. The full table is in `design-system.md` §1. **`DESIGN.md`'s Four Inks Rule allows no yellow, and it makes Maroon Wash the "on" tint for all of the above. The team must accept the change, and `DESIGN.md` and `palette.test.ts` must change, before code does.**
+Gold and stray hexes are removed. The full table is in `design-system.md` §1. **`DESIGN.md`'s Four Inks Rule allows no yellow, and it makes Maroon Wash the "on" tint for all of the above. Accepted on 2026-11-14 (D6, IR-1072): `DESIGN.md` records it, and `palette.test.ts` changes with IR-1097, before highlight code does.**
 
 ### 4.10 Components and type
 - **Buttons:** one component with a pill radius and sentence case. The disabled state is Desk Stone with Faint Ink and a reason line. Prefer validation on press to a permanently disabled *Continue*.
@@ -157,14 +157,16 @@ The thread is capped at 68ch. Sources show title, section, page and a clean snip
 
 ### 7.1 Phase 0 decisions (one meeting, the team's, not this spec's)
 
-| # | Decision | Recommendation |
-|---|---|---|
-| D1 | Adopt the `field` outline token `#8f8884` and a 14/20 `control` type step | Yes; add both to `DESIGN.md` |
-| D2 | Should a notification carry a *resolved* state from the server? | Yes; the client cannot know reliably |
-| D3 | Thesis records reading "Accepted" | A server vocabulary call, recorded in the ADR that owns workflow labels |
-| D4 | Keep the Discover layout toggle and the uploaded-cover thumbnail? | One list layout, thumbnail as a 96 px outline |
-| D5 | Nest Office console and Analytics under My Reviews | Yes, for the roles that have them |
-| D6 | Adopt the highlight roles of §4.9, including yellow for matches | Yes; change `DESIGN.md` and `palette.test.ts` first |
+**Decided 2026-11-14 by Lee Jasmin Adolfo (project lead and frontend owner), IR-1072.** The "Recommendation" column is what the audit proposed; "Decided" is what was settled.
+
+| # | Decision | Recommendation | Decided |
+|---|---|---|---|
+| D1 | Adopt the `field` outline token `#8f8884` and a 14/20 `control` type step | Yes; add both to `DESIGN.md` | **Yes.** 14/20 applies to form fields and page buttons only; the reader toolbar's reading controls stay 13 px. In `DESIGN.md` and `docs/ui-ux/01-design-system.md` §0 |
+| D2 | Should a notification carry a *resolved* state from the server? | Yes; the client cannot know reliably | **Yes.** Only notifications that ask for action resolve, when the task leaves the recipient whoever closed it; resolved is final. [ADR-069](adr/069-notifications-know-when-their-task-closed.md) |
+| D3 | Thesis records reading "Accepted" | A server vocabulary call, recorded in the ADR that owns workflow labels | **"Accepted" stays as the reviewer's act** on any record type; as a record's state it is Proposal-only. `PRODUCT.md` is corrected, not the code. [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) §9, clarified |
+| D4 | Keep the Discover layout toggle and the uploaded-cover thumbnail? | One list layout, thumbnail as a 96 px outline | **Keep the 1 / 2 / 3 column toggle** (Jive's preference). The 96 px outline thumbnail shows in 1 column only |
+| D5 | Nest Office console and Analytics under My Reviews | Yes, for the roles that have them | **Yes**, with the existing URLs kept |
+| D6 | Adopt the highlight roles of §4.9, including yellow for matches | Yes; change `DESIGN.md` and `palette.test.ts` first | **Yes, with the prototype's values.** `DESIGN.md` changes in IR-1072; `palette.test.ts` and the tokens change with IR-1097 |
 
 ### 7.2 Existing tickets this overlaps
 Linked rather than duplicated:
