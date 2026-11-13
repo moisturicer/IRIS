@@ -83,6 +83,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1045** | A reviewer can discard an unsent Request Revision draft — follows IR-272, IR-143 and IR-931; no FR- id | [details](traceability/IR-1045.md) | **PARTIAL** |
 | **IR-1046** | An owner sends the revised manuscript from the Revision requested card, as they send a requested document from its row — follows IR-273; no FR- id | [details](traceability/IR-1046.md) | **PARTIAL** |
 | **IR-632** | Under `RESTART_ALL` every reset office that had completed reviews the new version again, with the same reviewer — ADR-004's control arm … | [details](traceability/IR-632.md) | **IMPLEMENTED** |
+| **IR-1047** | An owner can discard a revised manuscript they uploaded and have not yet submitted, putting the submitted manuscript back — follows IR-273; no FR- id | [details](traceability/IR-1047.md) | **PARTIAL** |
 | **IR-268** | My Reviews: a reviewer's own seats plus their office's pool, as To review · In review · Done — touches FR-M5-01 (stable label only) | [details](traceability/IR-268.md) | **IMPLEMENTED** |
 | **IR-478** | RDCO grants and removes office coordinators on the Users page; demo coordinators — ADR-032 §4, after IR-415; touches FR-M5-01 (stable label … | [details](traceability/IR-478.md) | **IMPLEMENTED** |
 | **IR-797** | RDCO replaces a paper's Adviser, adds an owner and withdraws a paper in review — ADR-051 decision 10; touches FR-M5-01 (stable label only) | [details](traceability/IR-797.md) | **PARTIAL** |

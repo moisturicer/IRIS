@@ -962,6 +962,13 @@ FR-M5-01 · FR-M5-03 · FR-M4 · NFR-R3 · NFR-S4. These are stable labels only.
 
 **Re-planned 2026-09-26.** Each ticket above has been rewritten in Jira to this column, relabelled `not-ready` until the tickets it now depends on exist, and has its frontend acceptance criteria held for the frontend redesign specification.
 
+**Amendment, 2026-11-12 (IR-1047; decided in a design grilling with Lee Jasmin Adolfo, proposed, awaiting the project lead's review): an owner discards a revised manuscript that no version carries yet.** §5's Amendment let an owner upload a revised manuscript while a revision is asked for, and kept it from every reader but the owner until the new version is submitted. Until now the only ways back to the submitted file were to upload another, or for the last open request to be withdrawn (`restore_submitted_manuscript`).
+
+- **One owner act, `POST /records/<id>/discard-revised-manuscript/`**, runs the same restore: the record's manuscript is the latest version's again and the dropped upload's pending extraction is deleted. It answers with the record detail. A caller who is not an owner is a 403 (404 for a record they cannot see); no open revision request, or nothing unsent, is a 400 that says which.
+- **Offered by a capability, `discard_revised_manuscript`**, to an owner while a revision is asked for and `manuscript_unsubmitted` is true, so a screen never decides who may discard.
+- **Only the manuscript.** Edited details and uploaded documents are saved as they are made and are not staged; documents already have a per-version remove in Files. The discarded file stays in storage, as every manuscript file does.
+- **Recorded, not announced.** One `REVISION_DRAFT_DISCARDED` audit event (`version`, `discarded_revision`). Nobody is notified: reviewers never read the upload and their chunks were never replaced.
+
 **New tickets, to be created after the frontend redesign specification is reconciled:**
 
 - seats, pool and coordinator

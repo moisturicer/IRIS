@@ -57,7 +57,12 @@ from django.utils import timezone
 from apps.audit import workflow as audit
 from apps.records import lifecycle
 from apps.records.services import queue_manuscript_extraction
-from apps.records.versions import latest_version, stored_manuscript_unsubmitted, write_version
+from apps.records.versions import (
+    latest_version,
+    restore_submitted_manuscript,
+    stored_manuscript_unsubmitted,
+    write_version,
+)
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
@@ -189,7 +194,40 @@ def new_version_hint(record, user) -> Optional[dict]:
     }
 
 
-# --- the act --------------------------------------------------------------------------
+# --- the acts -------------------------------------------------------------------------
+
+@transaction.atomic
+def discard_revised_manuscript(record, actor):
+    """
+    Throw away the revised manuscript an owner uploaded and has not yet
+    submitted (IR-1047), so the record's manuscript is the latest version's
+    again. The same restore a withdrawn last request runs
+    (`versions.restore_submitted_manuscript`), asked for by the owner instead.
+
+    Who comes first, then what, as in `submit_new_version`: a caller who is
+    not an owner is a 403 whatever the record's state. Only while a revision is
+    asked for, and only when the stored manuscript is not the latest
+    version's; otherwise a 400 that says which.
+
+    Nothing else moves. The file stays in storage, as every manuscript file
+    does. Reviewers never read the upload (`versions.served_manuscript`), so
+    nobody is notified, and their chunks were never replaced
+    (`versions.manuscript_awaits_submission`). Details the owner edited and
+    documents they uploaded are untouched: they are saved as they are made.
+    """
+    record = routing._locked(record)
+    if not is_record_owner(actor, record):
+        raise NewVersionRefused("Only an owner of this record may discard its revised manuscript.")
+    if not routing.is_in_review(record) or not revisions.open_requests(record).exists():
+        raise NewVersionError(
+            "No reviewer has asked for a revision, so there is no revised manuscript to discard."
+        )
+    if not stored_manuscript_unsubmitted(record):
+        raise NewVersionError("There is no unsent revised manuscript to discard.")
+    discarded = record.manuscript_revision
+    restore_submitted_manuscript(record)
+    audit.revision_draft_discarded(record, actor, discarded_revision=discarded)
+
 
 @transaction.atomic
 def submit_new_version(record, actor):
