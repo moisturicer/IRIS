@@ -48,6 +48,22 @@ _Avoid_: Extraction (the AI's text, not the reviewers'), Version text alone (amb
 The adapter that turns PDF bytes into an Extraction behind the `StructuredExtractor` port. `EXTRACTION_BACKEND` chooses which one runs; every non-legacy Extractor passes the contract suite.
 _Avoid_: Parser, Docling (one legacy Extractor, not the role)
 
+**PDF evidence**:
+What IRIS reads from a Manuscript's PDF itself at extraction time, with no vendor: word boxes, page labels, bookmarks, fonts and table-of-contents entries. Stored beside the Extractor's raw result, so shaping can recover exact highlights, printed page numbers and heading depth without opening the PDF again (ADR-067).
+_Avoid_: Review text (what reviewers read, a different thing), OCR, local extraction (it is not an Extraction).
+
+**Trial chunk set**:
+A chunk set built only for an evaluation run, with a named strategy and options, and never made active. It is how two chunking strategies or sizes are compared on the same papers without touching what readers see (ADR-067).
+_Avoid_: Test chunks, candidate index, shadow chunk set.
+
+**Target size**:
+The chunk length, in `voyage-context-4` tokens, the chunker aims for. Chosen by measurement (ADR-067); chunks may come out shorter or longer.
+_Avoid_: Max tokens, chunk limit, ceiling (that is the Safety ceiling).
+
+**Safety ceiling**:
+The length no chunk may exceed, about 2,000 `voyage-context-4` tokens, guaranteed by the chunker's tests whatever the Target size. It exists so a table or list too long to keep whole is split, not so chunks grow to it (ADR-067).
+_Avoid_: Target size, max tokens.
+
 **Transient failure** / **Permanent failure**:
 How an Extraction attempt failed (IR-839). Transient is an unavailable Extractor and is retried; permanent is everything else, an unexpected exception included, and fails once.
 _Avoid_: Retryable (that names the reader's retry action, offered after either kind)
