@@ -792,7 +792,7 @@ function PaperPdfReaderSource({
       >
         {status === "loading" && (
           <div className="mx-auto max-w-2xl bg-white shadow-card ring-1 ring-stone-200">
-            <Skeleton rows={8} label="Loading the paper…" />
+            <Skeleton rows={8} label="Loading the paper…" onRetry={() => setAttempt((n) => n + 1)} />
           </div>
         )}
 

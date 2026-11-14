@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button, Input, Select, Skeleton } from "@/components/ui";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { failureMessage } from "@/lib/readFailure";
 import { cn } from "@/lib/utils";
 import type { AnalyticsTimeInStage, WorkflowAnalytics } from "@/types/reviews";
 
@@ -142,8 +143,8 @@ export default function ReviewAnalyticsPage() {
         setData(next);
         if (!office) setOffices(next.parties);
       })
-      .catch(() => {
-        if (!cancelled) setLoadError("Workflow analytics could not be loaded.");
+      .catch((err: unknown) => {
+        if (!cancelled) setLoadError(failureMessage(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -191,11 +192,11 @@ export default function ReviewAnalyticsPage() {
       {invalidRange && <p role="alert" className="mb-4 text-sm text-brand">From must be on or before To.</p>}
 
       {loadError ? (
-        <EmptyState tone="error" icon="fa-triangle-exclamation" title={loadError}
-                    message="Please try loading the figures again."
+        <EmptyState tone="error" icon="fa-triangle-exclamation" title="Workflow analytics could not be loaded"
+                    message={loadError}
                     action={<Button type="button" onClick={() => setReload((n) => n + 1)}>Try again</Button>} />
       ) : loading && !data ? (
-        <div role="status" aria-label="Loading workflow analytics"><Skeleton className="h-64 w-full" /></div>
+        <div role="status" aria-label="Loading workflow analytics"><Skeleton className="h-64 w-full" onRetry={() => setReload((n) => n + 1)} /></div>
       ) : data && (
         <div aria-busy={loading}>
           {loading && <p role="status" className="mb-3 text-sm text-stone-600">Updating…</p>}

@@ -212,7 +212,7 @@ export function FilesSection({
       </div>
     );
   }
-  if (slots == null) return <Skeleton rows={6} label="Loading the files…" />;
+  if (slots == null) return <Skeleton rows={6} label="Loading the files…" onRetry={() => void load()} />;
 
   const { bySlot, other } = askedFor(requests);
   const shownSlots = slots.filter((s) => editable || s.uploads.length > 0 || bySlot.has(s.id));

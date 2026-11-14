@@ -17,6 +17,7 @@ import { Link } from "react-router-dom";
 import { differenceInCalendarDays, formatDistanceToNowStrict, parseISO } from "date-fns";
 
 import { notificationsApi } from "@/api/notifications";
+import { failureMessage } from "@/lib/readFailure";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -56,6 +57,7 @@ export default function NotificationsPage() {
   // A failed load is not an empty inbox (IR-745): saying "No notifications
   // yet" after an error would tell the reader something untrue.
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [filter, setFilter] = useState<Filter>("all");
 
   const load = () => {
@@ -66,7 +68,7 @@ export default function NotificationsPage() {
         setNotifications(data.results ?? data);
         setLoadFailed(false);
       })
-      .catch(() => setLoadFailed(true))
+      .catch((error: unknown) => { setLoadFailed(true); setLoadError(error); })
       .finally(() => setLoading(false));
   };
 
@@ -151,13 +153,13 @@ export default function NotificationsPage() {
 
       <div className="bg-surface rounded-2xl border border-stone-200 overflow-hidden">
         {loading ? (
-          <Skeleton />
+          <Skeleton onRetry={load} />
         ) : loadFailed ? (
           <EmptyState
             tone="error"
             icon="fa-circle-exclamation"
             title="Couldn't load your notifications"
-            message="Check your connection and try again."
+            message={failureMessage(loadError)}
             action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
           />
         ) : notifications.length === 0 ? (

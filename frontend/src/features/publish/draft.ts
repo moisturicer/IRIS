@@ -1,4 +1,5 @@
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 /**
  * The Publish dialog's pure rules (IR-408), kept out of the component so each
  * is stated once and tested as a table.
@@ -116,7 +117,6 @@ export interface ApiFailure {
   network:  boolean;
 }
 
-const NETWORK_MESSAGE = "We couldn't reach IRIS. Check your connection and try again.";
 const SERVER_MESSAGE = "IRIS isn't responding right now. Try again in a few minutes.";
 const TOO_LARGE_MESSAGE = "This is too large for the server to accept.";
 
@@ -132,7 +132,7 @@ function statusMessage(status: number | undefined, fallback: string): string {
 
 export function describeFailure(err: unknown, fallback: string): ApiFailure {
   const response = (err as { response?: { status?: number; data?: unknown } })?.response;
-  if (!response) return { message: NETWORK_MESSAGE, fields: {}, network: true };
+  if (!response) return { message: failureMessage(err), fields: {}, network: true };
 
   const data = response.data;
   const fields: Record<string, string> = {};

@@ -159,7 +159,9 @@ it("applies filters on the first page and exports all matching rows with the sam
 it("reports failed loads and empty metadata without inventing history", async () => {
   vi.mocked(auditApi.list).mockRejectedValue(new Error("Offline"));
   renderScreen(<AuditLogPage />);
-  expect(await screen.findByRole("alert")).toHaveTextContent("Could not load");
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("The audit log didn't load.");
+  expect(within(alert).getByRole("button", { name: "Try again" })).toBeVisible();
   expect(screen.getByText(/missing events do not prove/)).toBeInTheDocument();
 });
 

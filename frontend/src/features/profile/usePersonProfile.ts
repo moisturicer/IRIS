@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { peopleApi } from "@/api/people";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import type { Collaborator, ProfilePage, ProfilePaper, PublicProfile } from "@/types/people";
 
 /** One paged list on the Profile and what the reader has done with it. */
@@ -99,7 +100,7 @@ export function usePersonProfile(id: number) {
           : {
               kind: "failed",
               interrupted: isRequestTimeout(person.reason),
-              message: errorDetail(person.reason, "Check your connection, then try again."),
+              message: failureMessage(person.reason),
             });
         return;
       }
