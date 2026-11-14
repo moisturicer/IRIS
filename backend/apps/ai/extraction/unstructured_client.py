@@ -6,7 +6,6 @@ delete; what it retains is ADR-067 open condition 1.
 """
 
 import base64
-import json
 import logging
 import re
 import time
@@ -44,11 +43,6 @@ REQUEST_OPTIONS = {
     "include_page_breaks": "true",
     "extract_image_block_types": '["Image", "Table"]',
 }
-# IR-1126: the partition endpoint accepts this and ignores it; only the Jobs
-# API returns descriptions (ADR-067, 2026-11-15 amendment). Off by default.
-IMAGE_DESCRIPTION_OPTIONS = {
-    "advanced_options": json.dumps({"enrichments": {"image_description": {}}}),
-}
 
 DEFAULT_TIMEOUT_BASE_SECONDS = 120
 DEFAULT_TIMEOUT_PER_PAGE_SECONDS = 10
@@ -85,11 +79,8 @@ class UnstructuredExtractor:
         max_figure_pixels: int = DEFAULT_MAX_FIGURE_PIXELS,
         api: Optional[httpx.Client] = None,
         sleep: Callable[[float], None] = time.sleep,
-        describe_images: bool = False,
     ):
         self._shape = shape
-        self._describe_images = describe_images
-        self._request = {**REQUEST_OPTIONS, **(IMAGE_DESCRIPTION_OPTIONS if describe_images else {})}
         self._max_figures = max_figures
         self._max_figure_pixels = max_figure_pixels
         self._api_key = api_key
@@ -103,10 +94,6 @@ class UnstructuredExtractor:
     @property
     def model(self) -> str:
         return f"{EXTRACTOR_NAME}-{STRATEGY}"
-
-    @property
-    def describes_images(self) -> bool:
-        return self._describe_images
 
     @property
     def account(self) -> str:
@@ -141,9 +128,8 @@ class UnstructuredExtractor:
         document = self._shape(raw)
         if not document.elements:
             raise EmptyExtraction(f"no extractable content for {filename!r}")
-        figures = _figures(elements, document, self._max_figures, self._max_figure_pixels,
-                           self._describe_images)
-        options = {**self._request, "call": {
+        figures = _figures(elements, document, self._max_figures, self._max_figure_pixels)
+        options = {**REQUEST_OPTIONS, "call": {
             "mode": "synchronous", "attempts": ATTEMPTS, "attempts_made": made,
             "attempt_timeout_seconds": attempt_seconds,
         }}
@@ -161,7 +147,7 @@ class UnstructuredExtractor:
         for attempt in range(1, ATTEMPTS + 1):
             try:
                 response = api.post(
-                    PATH, timeout=timeout, data=self._request,
+                    PATH, timeout=timeout, data=REQUEST_OPTIONS,
                     files={"files": (filename, pdf_bytes, "application/pdf")},
                 )
             except httpx.TimeoutException as exc:
@@ -237,7 +223,7 @@ def _signed(value: Any) -> bool:
 
 
 def _figures(elements: list, document: NormalizedDocument, max_figures: int,
-             max_pixels: int, described: bool = False) -> tuple[FigureImage, ...]:
+             max_pixels: int) -> tuple[FigureImage, ...]:
     """Each shaped Image's ``image_base64`` as a Figure (IR-987, ADR-067 decision 10).
     Page and caption come from shaping, so a Figure joins its element by name."""
     shaped = {e.figure: e for e in document.elements if e.kind == "image" and e.figure}
@@ -258,19 +244,8 @@ def _figures(elements: list, document: NormalizedDocument, max_figures: int,
             page=element.page, bbox=_box(metadata, element.page),
             media_type=media_type, data=data,
             caption=element.text or None, name=element.figure,
-            description=_description(item.get("text")) if described else "",
         ))
     return tuple(figures)
-
-
-def _description(text: Any) -> str:
-    """The enrichment's ``description``, or ``""`` when its JSON has none."""
-    try:
-        enrichment = json.loads(text) if isinstance(text, str) else None
-    except ValueError:
-        return ""
-    description = enrichment.get("description") if isinstance(enrichment, dict) else None
-    return description.strip() if isinstance(description, str) else ""
 
 
 def _image_bytes(encoded: str, media_type: str, max_pixels: int, name: str) -> Optional[bytes]:

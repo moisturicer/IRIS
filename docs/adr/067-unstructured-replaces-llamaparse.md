@@ -408,10 +408,10 @@ stating its terms or by a customer key under IRIS's own agreement.
 - **Billed pages:** not shown by the Jobs API; they are read from Unstructured's
   dashboard.
 
-**4. What the code keeps.** `UNSTRUCTURED_IMAGE_DESCRIPTIONS` (default off)
-stores a description that arrives in an Image element's JSON `text`, and a
-Figure stored with one is not sent to `describe_figure`. On the partition
-endpoint the switch has no effect, because nothing arrives.
+**4. No code is kept.** A switch that stored the enrichment's description on
+each Figure was built and then removed, because the partition endpoint never
+returns one. Using the enrichment would need a Jobs-API reader first, and the
+measurement in item 3 gives no reason to build one.
 
 ## Related Requirements
 
@@ -436,4 +436,4 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-1055, IR-1056: section-mate expansion and section-aligned embedding windows
 - IR-982: vendor registry, closed as won't do
 - IR-1102: formulas as exact LaTeX, behind a flag
-- IR-1126: Unstructured's image-description enrichment, measured and left off
+- IR-1126: Unstructured's image-description enrichment, measured and not adopted

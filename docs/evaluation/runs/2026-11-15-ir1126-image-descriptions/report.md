@@ -3,9 +3,9 @@
 **Proxy tier (ADR-023).** Six openly licensed arXiv papers in `iris_ir1054`, the
 papers behind IR-1125's figure set. Nothing here is a finding about CIT-U research.
 
-**Verdict: the enrichment is worse on both checks, so the default stays off.**
-The ticket's rule was that the default changes only if the enrichment is no
-worse.
+**Verdict: the enrichment is worse on both checks, so IRIS does not adopt it.**
+The ticket's rule was to switch only if the enrichment is no worse. No code for
+it is kept: the partition endpoint IRIS uses never returns a description.
 
 | Check | IRIS's describer (Claude Sonnet 5.5) | Unstructured enrichment (Claude Sonnet 5, via Unstructured) |
 |---|---|---|
