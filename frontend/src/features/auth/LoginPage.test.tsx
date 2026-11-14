@@ -45,6 +45,26 @@ describe("the login screen", () => {
     expect(screen.getByRole("button", { name: "Show password" })).toBeInTheDocument();
   });
 
+  it("puts nothing in the password field that looks like a saved password, and names no institution in the email's (IR-1093)", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    expect(screen.getByLabelText("Password")).not.toHaveAttribute("placeholder");
+    const placeholder = screen.getByRole("textbox", { name: "Email Address" }).getAttribute("placeholder") ?? "";
+    expect(placeholder).not.toMatch(/cit|cebu|institute/i);
+  });
+
+  it("toggles the password's visibility and announces which state it is in (IR-1093)", async () => {
+    const user = userEvent.setup();
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+
+    expect(screen.getByLabelText("Password")).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Hide password" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show password" })).not.toBeInTheDocument();
+  });
+
   it("reaches a validation error as the field's accessible description", async () => {
     const user = userEvent.setup();
     renderScreen(<LoginPage />, { route: "/login" });
@@ -86,22 +106,30 @@ describe("the login screen", () => {
 /**
  * The Dossier frame (IR-706; IR-704 stories 1-5, 12, 58).
  *
- * The masthead is the page's one visible `<h1>`, and both logos are inside it,
- * so its accessible name says whose system this is.
+ * The visible headline is the page's one `<h1>` (IR-1093); the masthead above
+ * it carries both logos, so the page still says whose system this is.
  */
 describe("the frame sign in opens in", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("names IRIS and the pilot institution in the masthead, the page's only top-level heading", () => {
+  it("makes the visible headline the page's only top-level heading (IR-1093)", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
-    const [masthead, ...others] = screen.getAllByRole("heading", { level: 1 });
+    const [headline, ...others] = screen.getAllByRole("heading", { level: 1 });
     expect(others).toEqual([]);
-    expect(masthead).toHaveAccessibleName(/IRIS/);
-    expect(masthead).toHaveAccessibleName(/Cebu Institute of Technology/);
+    expect(headline).toHaveAccessibleName("Your research has a place.");
     expect(screen.getByRole("heading", { level: 2, name: "Welcome back" })).toBeInTheDocument();
+  });
+
+  it("still names IRIS and the pilot institution in the masthead (IR-211)", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const header = screen.getByRole("banner");
+    expect(within(header).getByText("IRIS")).toBeInTheDocument();
+    expect(within(header).getByRole("img", { name: /Cebu Institute of Technology/ })).toBeInTheDocument();
+    expect(within(header).queryByRole("heading")).not.toBeInTheDocument();
   });
 
   it("offers one Create an account link under the form and Help in the masthead", () => {

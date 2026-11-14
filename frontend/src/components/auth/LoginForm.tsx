@@ -80,7 +80,7 @@ export function LoginForm({
         size="lg"
         type={showPassword ? "text" : "password"}
         autoComplete="current-password"
-        placeholder="••••••••"
+        // No placeholder: dots in an empty field read as a saved password (IR-1093).
         disabled={disabled}
         error={errors.password?.message}
         aria-invalid={showCredentialsError || undefined}
