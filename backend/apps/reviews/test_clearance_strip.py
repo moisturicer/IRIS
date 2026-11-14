@@ -15,9 +15,10 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 
-from core.enums import Party
+from core.enums import AssignmentState, Party
 
 from .clearance_strip import clearance_strips
+from .models import RecordAssignment
 from .test_new_version import NewVersionTestBase
 
 MINE = "/api/v1/reviews/mine/"
@@ -77,6 +78,23 @@ class ClearanceStripTests(NewVersionTestBase):
 
         self.assertNotIn(Party.ITSO, strip)
         self.assertNotIn(Party.IERC, strip)
+
+    def test_an_office_whose_work_was_withdrawn_is_not_drawn_like_the_tracker(self):
+        """
+        A Decision can withdraw an office's assignment while its clearance is
+        still reset to pending. Nothing is left for that office to review, and
+        the tracker reads it as *Withdrawn*, so the strip draws nothing for it.
+        """
+        record = self.resubmitted()
+        RecordAssignment.objects.filter(record=record, party=Party.IERC).update(
+            state=AssignmentState.WITHDRAWN,
+        )
+
+        strip = self.strip(record)
+
+        self.assertNotIn(Party.IERC, strip)
+        self.assertEqual(words(strip[Party.ITSO]), "Cleared · Kept from v1")
+        self.assertEqual(self.rows(self.tracker(record))[Party.IERC]["state"], "withdrawn")
 
     def test_once_the_office_clears_the_new_version_it_is_no_longer_reset(self):
         record = self.resubmitted()

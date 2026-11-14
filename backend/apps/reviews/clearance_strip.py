@@ -93,6 +93,8 @@ def _office_entry(
         return _entry(office, "not_cleared", str(ClearanceStatus(clearance.status).label), note=note)
     if assignment.state != AssignmentState.ACTIVE:
         return None
+    # `held` is any live seat, so a Done seat beside a colleague's open one still
+    # reads Reviewing: the office has not finished (`seats.office_complete`).
     if assignment.pk in held:
         text = f"Reviewing v{current}" if current else "Reviewing"
         return _entry(office, "reviewing", text, note=note, version=current)
