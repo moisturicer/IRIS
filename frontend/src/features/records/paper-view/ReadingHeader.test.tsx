@@ -9,7 +9,9 @@
  * visual labels the phone drops. The 390 / 360 px look is the by-hand check on
  * the PR.
  *
- * Every query goes through the accessible tree, by role and accessible name.
+ * Elements are found by role and accessible name; the class assertions then
+ * read their markup (`parentElement`, the label `span`), because there is no
+ * accessible way to ask how big a control is drawn.
  */
 import { describe, expect, it, vi } from "vitest";
 

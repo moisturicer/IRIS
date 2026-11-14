@@ -66,6 +66,7 @@ export function ReadingHeader({
       <button
         type="button"
         onClick={onBack}
+        title="Back"
         className={cn(
           // Icon only on a phone, 44px square; the label stays for screen readers.
           "shrink-0 inline-flex items-center justify-center gap-1.5 -ml-1 min-w-11 px-2 text-small text-stone-600 hover:text-brand",
