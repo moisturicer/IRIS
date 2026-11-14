@@ -173,11 +173,11 @@ components:
 
 ## Decided changes, not built yet (IR-1072, 2026-11-14)
 
-Decided by **Lee Jasmin Adolfo** (project lead and frontend owner) on 2026-11-14, from the UI/UX audit ([`docs/frontend_ui_audit_spec.md`](docs/frontend_ui_audit_spec.md) §7.1). The authority is [`docs/ui-ux/01-design-system.md`](docs/ui-ux/01-design-system.md) §0, which says the same in full. **Nothing below is built: until the named ticket lands, the sections after this one describe what ships.** Where this section and a rule below disagree, this section wins once its ticket has landed.
+Decided by **Lee Jasmin Adolfo** (project lead and frontend owner) on 2026-11-14, from the UI/UX audit ([`docs/frontend_ui_audit_spec.md`](docs/frontend_ui_audit_spec.md) §7.1). The authority is [`docs/ui-ux/01-design-system.md`](docs/ui-ux/01-design-system.md) §0, which says the same in full. **Nothing below is built unless its line says so: until the named ticket lands, the sections after this one describe what ships.** Where this section and a rule below disagree, this section wins once its ticket has landed.
 
 - **D1, fields and controls (IR-1074).** Every input, select, textarea and checkbox is outlined in **Field Stone** (#8f8884, 3.49:1 on white, WCAG 1.4.11). Rule Stone stays only on decorative chips and cards. Form fields and page buttons gain a **14/20 `control`** type step; the reader toolbar's reading controls stay 13 px. Placeholders and helper text are Quiet Ink (#57534e).
 - **D4, Discover layout (IR-1082).** The **1 / 2 / 3 column toggle stays**, at Jive's preference: one cycling icon button, hidden below `xl`, at the toolbar's one control height. The **96 px outline thumbnail** replaces the abstract-preview panel in 1 column only; the 2 and 3 column cards are text only.
-- **D5, navigation (IR-1085).** **Office console and Analytics nest under My Reviews**, only for the roles that already have them. Their current URLs keep working.
+- **D5, navigation (IR-1085) — built.** **Office console and Analytics nest under My Reviews**, only for the roles that already have them. Their current URLs keep working. The sidebar lists them from `SCREEN_ACCESS` (`parent: "reviewQueue"`), the console for a coordinator only.
 - **D6, highlight roles (IR-1097).** Each kind of highlight has one look, and no look means two things. Values are the prototype's:
 
   | Role | Look |
