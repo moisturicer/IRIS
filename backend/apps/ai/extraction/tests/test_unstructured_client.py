@@ -15,6 +15,7 @@ from apps.ai.extraction import (
     Failure,
     classify,
 )
+from apps.ai.extraction.shaping_unstructured import shape_unstructured
 from apps.ai.extraction.unstructured_client import UnstructuredExtractor
 
 from .contract import ExtractorContract
@@ -166,15 +167,6 @@ def test_a_link_with_sig_in_its_path_is_kept():
     assert "design-sig=1" in json.dumps(extracted.raw)
 
 
-def test_unbuilt_shaping_fails_permanently(settings):
-    from apps.ai.extraction.selection import _shaping_pending
-
-    with pytest.raises(ExtractionError) as raised:
-        _shaping_pending({})
-
-    assert classify(raised.value) is Failure.PERMANENT
-
-
 def test_a_blank_pdf_is_an_empty_extraction():
     vendor = Vendor("blank")
 
@@ -236,9 +228,28 @@ FAILURES = {
 }
 
 
+_FORMULA = "hi_res Formula OCR is withheld until transcribed (ADR-067 formula amendment)"
+_TABLE = "hi_res reads one-column rows and leaves page 2's rows as text; IR-989 judges tables"
+# Strict: each flips to a failure when the gap closes.
+KNOWN_GAPS = {
+    ("two_columns", "check_reading_order"): "hi_res misorders this fixture (ADR-067 amendment §3)",
+    ("figures", "check_reading_order"): _FORMULA,
+    ("figures", "check_boxes"): _FORMULA,
+    ("table_across_pages", "check_reading_order"): _TABLE,
+    ("table_across_pages", "check_boxes"): _TABLE,
+}
+
+
 class TestUnstructuredContract(ExtractorContract):
+    @pytest.fixture(autouse=True)
+    def _known_gaps(self, request):
+        params = getattr(getattr(request.node, "callspec", None), "params", {})
+        reason = KNOWN_GAPS.get((params.get("name"), getattr(params.get("clause"), "__name__", "")))
+        if reason:
+            request.applymarker(pytest.mark.xfail(strict=True, reason=reason))
+
     def extractor_for(self, fixture):
-        pytest.xfail("the document clauses need IR-986's shaping of Unstructured's result")
+        return extractor(Vendor(fixture.name), shape=shape_unstructured)
 
     def extractor_for_blank(self):
         return extractor(Vendor("blank"))
@@ -276,9 +287,14 @@ class TestBuilder:
         settings.UNSTRUCTURED_BASE_URL = "https://api.unstructuredapp.io"
 
         adapter = unstructured_extractor()
+        vendor = Vendor("numbered_headings")
+        adapter._api = vendor.api()
+        fixture = FIXTURES["numbered_headings"]
+        extracted = adapter.extract(pdf_bytes(fixture), filename=fixture.filename)
 
         assert isinstance(adapter, UnstructuredExtractor)
         assert adapter.leaves_campus is True
+        assert extracted.document.elements[1].text == "1 Introduction"
 
     def test_it_is_not_a_selectable_backend_before_the_cutover(self, settings):
         from apps.ai.extraction.selection import verify_extraction_configuration

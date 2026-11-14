@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from .ports import ExtractionError, ExtractorUnavailable, StructuredExtractor
+from .ports import ExtractorUnavailable, StructuredExtractor
 
 
 def _llamaparse_shape():
@@ -80,20 +80,6 @@ def _verify_llamaextract() -> None:
         )
 
 
-def _unstructured_shape():
-    """IR-986's shaping of an Unstructured result, once it exists."""
-    if importlib.util.find_spec(f"{__package__}.shaping_unstructured") is None:
-        return None
-    from .shaping_unstructured import shape_unstructured
-
-    return shape_unstructured
-
-
-def _shaping_pending(raw):
-    # Permanent: retrying cannot build IR-986.
-    raise ExtractionError("Unstructured shaping (IR-986) is not built yet")
-
-
 def _verify_unstructured() -> None:
     from .unstructured_client import BASE_URL
 
@@ -106,11 +92,12 @@ def _verify_unstructured() -> None:
 def unstructured_extractor() -> StructuredExtractor:
     """The Unstructured adapter, unadmitted. Not a selectable backend until
     IR-988's cutover (ADR-067 decision 1); refuses a bad configuration."""
+    from .shaping_unstructured import shape_unstructured
     from .unstructured_client import UnstructuredExtractor
 
     _verify_unstructured()
     return UnstructuredExtractor(
-        shape=_unstructured_shape() or _shaping_pending,
+        shape=shape_unstructured,
         api_key=settings.UNSTRUCTURED_PLATFORM_API_KEY,
         base_url=settings.UNSTRUCTURED_BASE_URL,
         timeout_base_seconds=settings.UNSTRUCTURED_TIMEOUT_BASE_SECONDS,
