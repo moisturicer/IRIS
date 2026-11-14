@@ -10,20 +10,10 @@
 
 /** Sizes of 12 px or more, by file. */
 export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
-  "src/components/auth/AuthAlert.tsx": 3,
-  "src/components/auth/LoginForm.tsx": 1,
   "src/components/layout/Breadcrumbs.tsx": 1,
   "src/components/layout/NotificationBell.tsx": 7,
-  "src/components/records/DownloadRequestModal.tsx": 5,
   "src/components/shared/RequestStatusChip.tsx": 1,
   "src/components/shared/ResearchCard.tsx": 1,
-  "src/features/accounts/RoleRequestsPage.tsx": 5,
-  "src/features/accounts/UserListPage.tsx": 2,
-  "src/features/admin/AccountDeletionRequestsPage.tsx": 10,
-  "src/features/admin/DeleteRequestsPage.tsx": 7,
-  "src/features/admin/DownloadRequestsPage.tsx": 6,
-  "src/features/admin/RetentionPage.tsx": 4,
-  "src/features/admin/SessionsPage.tsx": 5,
   "src/features/ai/AIHubPage.tsx": 6,
   "src/features/ai/components/AskIrisNotice.tsx": 1,
   "src/features/ai/components/AssistantMessageSkeleton.tsx": 1,
@@ -38,8 +28,6 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
   "src/features/ai/components/SourceContextPanel.tsx": 4,
   "src/features/ai/components/StreamStatusRow.tsx": 2,
   "src/features/ai/components/TokenUsageMeter.tsx": 4,
-  "src/features/auth/EmailRequestForm.tsx": 7,
-  "src/features/auth/ResetPasswordPage.tsx": 7,
   "src/features/discover/DiscoverFilterBar.tsx": 2,
   "src/features/discover/DiscoverFilterDropdown.tsx": 1,
   "src/features/discover/DiscoverPage.tsx": 2,
@@ -49,7 +37,6 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
   "src/features/library/LibraryRecordTable.tsx": 7,
   "src/features/notifications/NotificationsPage.tsx": 2,
   "src/features/profile/PersonProfileView.tsx": 1,
-  "src/features/records/ImportRecordsPage.tsx": 7,
   "src/features/records/paper-view/AddReviewerDialog.tsx": 1,
   "src/features/records/paper-view/DecisionDialog.tsx": 4,
   "src/features/records/paper-view/NewVersionDialog.tsx": 4,
@@ -58,10 +45,6 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
   "src/features/records/paper-view/RouteDialog.tsx": 7,
   "src/features/records/paper-view/threads/FinishReviewDialog.tsx": 3,
   "src/features/review/AssignReviewerDialog.tsx": 1,
-  "src/features/settings/AiAnswerPanel.tsx": 5,
-  "src/features/settings/SettingsPage.tsx": 18,
-  "src/features/settings/YourDataPanels.tsx": 14,
-  "src/features/settings/settingsParts.tsx": 1,
 };
 
 /**
