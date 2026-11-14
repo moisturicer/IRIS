@@ -26,6 +26,7 @@ from typing import Iterable, Optional
 
 from django.db import transaction
 from django.db.models import Q, QuerySet
+from django.db.models.fields.files import FieldFile
 from django.utils import timezone
 
 from apps.audit.models import AuditEvent
@@ -137,12 +138,13 @@ def _drop_file_after_commit(field_file) -> None:
     Delete a replaced or removed Template's file once the change has committed,
     so the old file is never offered again (decision 8) and a rolled-back
     change keeps it. Reads the name now: saving a new file into the same field
-    renames this object.
+    renames this object. The copy hangs on a blank instance, so deleting it
+    never clears the field on the live row.
     """
     if not field_file:
         return
-    storage, name = field_file.storage, field_file.name
-    transaction.on_commit(lambda: storage.delete(name))
+    old = FieldFile(type(field_file.instance)(), field_file.field, field_file.name)
+    transaction.on_commit(lambda: old.delete(save=False))
 
 
 # -- Requirements ---------------------------------------------------------------

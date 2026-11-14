@@ -149,9 +149,9 @@ describe("the list RDCO keeps", () => {
     const reorder = vi.spyOn(setupApi, "reorder").mockResolvedValue({ data: thesis() } as never);
     const { user } = await openPage();
 
-    expect(screen.getByRole("button", { name: "Move Release Form up" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Move Ethics Clearance down" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "Move Ethics Clearance up" }));
+    expect(screen.getByRole("button", { name: "Move up Release Form" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move down Ethics Clearance" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Move up Ethics Clearance" }));
 
     expect(reorder).toHaveBeenCalledWith(2, [12, 11]);
   });

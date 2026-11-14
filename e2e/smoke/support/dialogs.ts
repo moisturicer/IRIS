@@ -178,6 +178,11 @@ export const DIALOGS: DialogCase[] = [
     open: press(/coordinator$/), dialog: anyDialog,
   },
   {
+    id: "remove a requirement", screen: "rdco-setup", sources: ["features/setup/SetupPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: async (page) => { await page.getByRole("button", { name: "Remove Publication / Conference Presentation / Both" }).click(); },
+    dialog: anyDialog,
+  },
+  {
     id: "lock or unlock an account", screen: "rdco-users", sources: ["features/accounts/UserListPage.tsx", "components/shared/ConfirmDialog.tsx"],
     open: press(/^(Lock|Unlock)$/), dialog: anyDialog,
   },

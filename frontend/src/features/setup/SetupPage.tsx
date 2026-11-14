@@ -377,13 +377,13 @@ function RequirementRow({
         </Button>
         <Button
           type="button" variant="ghost" size="sm" disabled={!onMoveUp} onClick={onMoveUp}
-          aria-label={`Move ${requirement.name} up`}
+          aria-label={`Move up ${requirement.name}`}
         >
           Move up
         </Button>
         <Button
           type="button" variant="ghost" size="sm" disabled={!onMoveDown} onClick={onMoveDown}
-          aria-label={`Move ${requirement.name} down`}
+          aria-label={`Move down ${requirement.name}`}
         >
           Move down
         </Button>
@@ -479,7 +479,7 @@ function TemplateControls({
         <Button
           type="button" variant="outline" size="sm" loading={working}
           onClick={() => input.current?.click()}
-          aria-label={`${templateName ? "Replace" : "Upload"} the Template for ${owner}`}
+          aria-label={templateName ? `Replace the Template for ${owner}` : `Upload Template for ${owner}`}
         >
           {templateName ? "Replace" : "Upload Template"}
         </Button>
