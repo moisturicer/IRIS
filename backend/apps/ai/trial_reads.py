@@ -61,7 +61,46 @@ def _evidence(pdf_bytes: bytes) -> dict:
     return sandbox.read_pdf_evidence(pdf_bytes)
 
 
-def _store(extraction, extracted, evidence: dict) -> None:
+def _crop(pdf_bytes: bytes, document) -> list:
+    from apps.documents import formulas
+
+    return formulas.crop(pdf_bytes, document)
+
+
+def _give_revision(extraction) -> None:
+    """A corpus-loaded paper has no manuscript revision, which Figures, Formulas
+    and their transcription are keyed on: give it one, as an accepted upload would."""
+    import uuid
+
+    from apps.documents.models import PdfExtraction
+    from apps.records.models import Record
+
+    revision = Record.objects.filter(pk=extraction.record_id).values_list(
+        "manuscript_revision", flat=True).first()
+    if revision is None:
+        revision = uuid.uuid4()
+        Record.objects.filter(pk=extraction.record_id).update(manuscript_revision=revision)
+    PdfExtraction.objects.filter(pk=extraction.pk).update(source_revision=revision)
+
+
+def _store_media(extraction, document, raw: dict, pdf_bytes: bytes, crop: Callable) -> tuple[int, int]:
+    """Figures and formula crops for the stored read, as extraction stores them (IR-987, IR-1102)."""
+    from django.conf import settings
+
+    from apps.ai.extraction.unstructured_client import _figures
+    from apps.documents import formulas
+    from apps.documents.figures import replace_figures
+
+    _give_revision(extraction)
+    extraction.refresh_from_db()
+    figures = _figures(raw.get("elements") or [], document,
+                       settings.UNSTRUCTURED_MAX_FIGURES, settings.UNSTRUCTURED_MAX_FIGURE_PIXELS)
+    replace_figures(extraction, figures)
+    formulas.replace_formulas(extraction, crop(pdf_bytes, document))
+    return extraction.figures.count(), extraction.formulas.count()
+
+
+def _store(extraction, extracted, evidence: dict, pdf_bytes: bytes, crop: Callable) -> None:
     from django.utils import timezone
 
     from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
@@ -83,6 +122,27 @@ def _store(extraction, extracted, evidence: dict) -> None:
         credits=extracted.usage.credits if extracted.usage else None,
         completed_at=timezone.now(),
     )
+    _store_media(extraction, document, dict(extracted.raw), pdf_bytes, crop)
+
+
+def store_media(
+    record_ids: Iterable[int],
+    *,
+    load: Callable = _manuscript_bytes,
+    crop: Callable = _crop,
+) -> dict[int, tuple[int, int]]:
+    """``(figures, formulas)`` stored for each paper already read by Unstructured,
+    from its stored read and PDF. Nothing is sent to Unstructured."""
+    from apps.ai.extraction import document_from_json
+    from apps.documents.models import DocumentKind, PdfExtraction
+
+    stored = {}
+    for extraction in PdfExtraction.objects.filter(
+            record_id__in=list(record_ids), kind=DocumentKind.MANUSCRIPT, extractor="unstructured"):
+        document = document_from_json(extraction.structure)
+        stored[extraction.record_id] = _store_media(
+            extraction, document, extraction.raw_result or {}, load(extraction), crop)
+    return stored
 
 
 def read_records(
@@ -92,6 +152,7 @@ def read_records(
     limit: Optional[int] = None,
     load: Callable = _manuscript_bytes,
     evidence: Callable[[bytes], dict] = _evidence,
+    crop: Callable = _crop,
     report: Callable[[str], None] = lambda line: None,
 ) -> ReadOutcome:
     """Read each paper with ``extractor``; at most ``limit`` paid reads."""
@@ -121,7 +182,7 @@ def read_records(
             outcome.failed[record_id] = f"{type(exc).__name__}: {exc}"
             report(f"  record {record_id}: failed ({type(exc).__name__})")
             continue
-        _store(extraction, extracted, evidence(pdf_bytes))
+        _store(extraction, extracted, evidence(pdf_bytes), pdf_bytes, crop)
         pages = extracted.usage.pages if extracted.usage else 0
         outcome.read.append(record_id)
         outcome.pages += pages

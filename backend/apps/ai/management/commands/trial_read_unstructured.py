@@ -25,6 +25,9 @@ class Command(BaseCommand):
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument("--replace-stored-read", action="store_true",
                             help="Required to send: each read replaces the stored extraction.")
+        parser.add_argument("--store-media", action="store_true",
+                            help="For papers already read: store Figures and formula crops "
+                                 "from the stored read. Sends nothing to Unstructured.")
 
     def handle(self, *args, **options):
         if not options["dry_run"] and not options["replace_stored_read"]:
@@ -33,6 +36,12 @@ class Command(BaseCommand):
         if not settings.DEBUG:
             raise CommandError("Refused with DEBUG off: this is a development measurement tool.")
         ids = self._records(options)
+        if options["store_media"]:
+            from apps.ai.trial_reads import store_media
+
+            for record_id, (figures, formulas) in store_media(ids).items():
+                self.stdout.write(f"  record {record_id}: {figures} figure(s), {formulas} formula crop(s)")
+            return
         if options["limit"] is not None:
             ids = ids[:options["limit"]] if options["dry_run"] else ids
         if options["dry_run"]:
