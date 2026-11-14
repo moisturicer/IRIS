@@ -59,7 +59,7 @@ export const ASK_PANELS_INLINE_PX = 900;
 export const CHAT_OPENING = "overflow-y-auto before:my-auto before:content-[''] after:my-auto after:content-['']";
 
 export const CHAT_COMPOSER_SURFACE =
-  "rounded-2xl border border-stone-300 bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 motion-reduce:transition-none";
+  "rounded-2xl border border-field bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 motion-reduce:transition-none";
 
 // Grows with the question up to a cap; browsers without field-sizing keep `rows`.
 export const CHAT_COMPOSER_FIELD =

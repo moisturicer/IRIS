@@ -17,6 +17,16 @@
     @apply bg-canvas text-stone-900;
   }
 
+  /* Preflight sets every placeholder to gray-400 (2.5:1 on white). Quiet Ink,
+     stone-600, is 7.7:1 (IR-1074, D1; WCAG 1.4.3), so a field that sets no
+     `placeholder:` class of its own is still readable. It sits in the same
+     layer after Preflight and has its specificity, so it wins by order, and
+     a `placeholder:text-*` utility still wins over it. */
+  input::placeholder,
+  textarea::placeholder {
+    color: theme('colors.stone.600');
+  }
+
   /* Replace default focus outline with brand ring */
   *:focus-visible {
     outline: 2px solid #6B0F12;

@@ -197,7 +197,7 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
           rows={16}
           aria-invalid={textError ? true : undefined}
           aria-describedby={textError ? errorId : undefined}
-          className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 font-mono text-small text-stone-900"
+          className="mt-2 w-full rounded-lg border border-field px-3 py-2 font-mono text-small text-stone-900"
         />
         {textError && <p id={errorId} className="mt-1.5 text-small text-brand">{textError}</p>}
       </div>

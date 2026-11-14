@@ -10,7 +10,7 @@ import { FieldLabel, type FieldMarker } from "./FieldLabel";
 type Size = "md" | "lg";
 
 const SIZE_CLASSES: Record<Size, string> = {
-  md: "px-3 py-2 text-body",
+  md: "px-3 py-2 text-control",
   lg: "min-h-11 px-4 py-3 text-base",
 };
 
@@ -93,7 +93,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={describedByIds || undefined}
             aria-required={required || undefined}
             className={`w-full border rounded-lg outline-none transition-colors
-              placeholder:text-stone-500 text-stone-900
+              placeholder:text-stone-600 text-stone-900
               ${SIZE_CLASSES[size]}
               ${leading ? "pl-9" : ""}
               ${trailing ? "pr-16" : ""}
@@ -102,7 +102,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 // keeps a maroon border at rest and takes a heavier ring on
                 // focus; the glyph on its message says the rest.
                 ? "border-brand focus:border-brand focus:ring-2 focus:ring-brand"
-                : "border-stone-300 focus:border-brand focus:ring-1 focus:ring-brand"
+                : "border-field focus:border-brand focus:ring-1 focus:ring-brand"
               }
               disabled:bg-stone-50 disabled:text-stone-500
               ${className}`}
@@ -123,7 +123,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {error}
           </p>
         )}
-        {hint && !error && <p id={hintId} className="text-small text-stone-500">{hint}</p>}
+        {hint && !error && <p id={hintId} className="text-small text-stone-600">{hint}</p>}
       </div>
     );
   }

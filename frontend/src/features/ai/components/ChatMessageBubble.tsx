@@ -134,7 +134,7 @@ export function ChatMessageBubble({
         className={cn(
           "rounded-full shrink-0 flex items-center justify-center",
           compact ? "w-7 h-7 text-2xs" : "w-8 h-8 text-xs",
-          isUser ? "bg-stone-100 text-stone-500" : "bg-stone-100 text-brand",
+          isUser ? "bg-stone-100 text-stone-600" : "bg-stone-100 text-brand",
         )}
         aria-hidden
       >

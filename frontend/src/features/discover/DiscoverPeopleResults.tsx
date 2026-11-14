@@ -191,21 +191,21 @@ export function DiscoverPeopleResults({ query, preview = false, onSeeAll }: Disc
       <div className="mb-4 flex flex-wrap gap-3">
         <label className="grid gap-1 text-small font-medium text-stone-700">
           College
-          <select value={college} onChange={(event) => { setCollege(event.target.value); setDepartment(""); }} className="h-10 min-w-44 rounded-lg border border-stone-300 bg-white px-3 text-body">
+          <select value={college} onChange={(event) => { setCollege(event.target.value); setDepartment(""); }} className="h-10 min-w-44 rounded-lg border border-field bg-white px-3 text-body">
             <option value="">All colleges</option>
             {colleges.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-small font-medium text-stone-700">
           Department
-          <select value={department} onChange={(event) => setDepartment(event.target.value)} disabled={!college} className="h-10 min-w-44 rounded-lg border border-stone-300 bg-white px-3 text-body disabled:bg-stone-100">
+          <select value={department} onChange={(event) => setDepartment(event.target.value)} disabled={!college} className="h-10 min-w-44 rounded-lg border border-field bg-white px-3 text-body disabled:bg-stone-100">
             <option value="">All departments</option>
             {departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-small font-medium text-stone-700">
           Role
-          <select value={role} onChange={(event) => setRole(event.target.value)} className="h-10 min-w-36 rounded-lg border border-stone-300 bg-white px-3 text-body">
+          <select value={role} onChange={(event) => setRole(event.target.value)} className="h-10 min-w-36 rounded-lg border border-field bg-white px-3 text-body">
             <option value="">All roles</option>
             {ROLE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>

@@ -73,9 +73,9 @@ const SIZE_CLASSES: Record<Size, string> = {
   // finger gets 44px at any window width and a mouse never does (IR-1092).
   // `page` and `full` are already `min-h-11` at every width.
   sm:   "rounded-full font-medium px-3 py-1.5 text-small touch:min-h-11",
-  md:   "rounded-full font-medium px-4 py-2 text-body touch:min-h-11",
-  lg:   "rounded-full font-medium px-5 py-2.5 text-body touch:min-h-11",
-  page: "rounded-full font-semibold justify-center min-h-11 px-5 text-sm",
+  md:   "rounded-full font-medium px-4 py-2 text-control touch:min-h-11",
+  lg:   "rounded-full font-medium px-5 py-2.5 text-control touch:min-h-11",
+  page: "rounded-full font-semibold justify-center min-h-11 px-5 text-control",
   full: "rounded-full font-medium w-full justify-center min-h-11 px-5 py-3.5 text-md",
   // 44px square on touch-sized screens (12-accessibility.md section 4), 36px
   // beside a desktop pointer: the height of every other control (IR-569). It
