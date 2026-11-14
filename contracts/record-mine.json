@@ -14,6 +14,7 @@
       "workflow_state_label": "Pending Deletion",
       "holders": [],
       "cleared_offices": [],
+      "clearance_strip": [],
       "submitter_status": {
         "line": "Pending Deletion",
         "waiting_on_you": []
@@ -33,6 +34,7 @@
       "workflow_state_label": "Published",
       "holders": [],
       "cleared_offices": [],
+      "clearance_strip": [],
       "submitter_status": {
         "line": "Published",
         "waiting_on_you": []
@@ -61,6 +63,16 @@
         }
       ],
       "cleared_offices": [],
+      "clearance_strip": [
+        {
+          "party": "itso",
+          "label": "ITSO",
+          "kind": "revision",
+          "text": "Asked for revision",
+          "note": null,
+          "version": null
+        }
+      ],
       "submitter_status": {
         "line": "Revision requested by ITSO: action needed",
         "waiting_on_you": [

@@ -48,7 +48,7 @@ export function ClearanceStrip({ entries, className }: ClearanceStripProps) {
       {entries.map((entry) => {
         const meta = KIND_META[entry.kind];
         return (
-          <li key={entry.party} className={cn("inline-flex items-center gap-1.5 font-semibold", meta.tone)}>
+          <li key={`${entry.party}:${entry.kind}`} className={cn("inline-flex items-center gap-1.5 font-semibold", meta.tone)}>
             <i className={cn("fas text-3xs", meta.icon)} aria-hidden />
             <span>
               {entry.label}

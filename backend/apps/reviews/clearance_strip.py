@@ -37,6 +37,11 @@ from .models import RecordAssignment, RecordClearance, ResubmissionRequest, Revi
 #: The offices a strip names, in the tracker's order.
 STRIP_OFFICES = tuple(str(o) for o in Office)
 
+#: Two kinds share a word with the clearance they report. They are spelled from
+#: the enum, not by hand (`test_enum_vocabulary`), so a rename cannot split them.
+KIND_CLEARED = str(ClearanceStatus.CLEARED.value)
+KIND_NOT_CLEARED = str(ClearanceStatus.NOT_CLEARED.value)
+
 #: A clearance an office finished with a negative outcome, shown in its own words.
 _NEGATIVE = frozenset({
     ClearanceStatus.DECLINED, ClearanceStatus.REJECTED, ClearanceStatus.NOT_CLEARED,
@@ -87,10 +92,10 @@ def _office_entry(
     if office in asking:
         return _entry(office, "revision", "Asked for revision", note=note, version=version)
     if clearance and clearance.status == ClearanceStatus.CLEARED:
-        kind = "kept" if carried and carried.state == PRESERVED else "cleared"
+        kind = "kept" if carried and carried.state == PRESERVED else KIND_CLEARED
         return _entry(office, kind, "Cleared", note=note, version=version)
     if clearance and clearance.status in _NEGATIVE:
-        return _entry(office, "not_cleared", str(ClearanceStatus(clearance.status).label), note=note)
+        return _entry(office, KIND_NOT_CLEARED, str(ClearanceStatus(clearance.status).label), note=note)
     if assignment.state != AssignmentState.ACTIVE:
         return None
     # `held` is any live seat, so a Done seat beside a colleague's open one still
