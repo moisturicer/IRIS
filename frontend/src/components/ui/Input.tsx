@@ -10,7 +10,7 @@ import { FieldLabel, type FieldMarker } from "./FieldLabel";
 type Size = "md" | "lg";
 
 const SIZE_CLASSES: Record<Size, string> = {
-  md: "px-3 py-2 text-[14px]",
+  md: "px-3 py-2 text-body",
   lg: "min-h-11 px-4 py-3 text-base",
 };
 
@@ -118,12 +118,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             is not carried by colour alone (IR-359). The glyph is aria-hidden,
             so the description the field announces is the sentence only. */}
         {error && (
-          <p id={errorId} className="flex items-start gap-1.5 text-[13px] text-brand">
+          <p id={errorId} className="flex items-start gap-1.5 text-small text-brand">
             <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
             {error}
           </p>
         )}
-        {hint && !error && <p id={hintId} className="text-[13px] text-stone-500">{hint}</p>}
+        {hint && !error && <p id={hintId} className="text-small text-stone-500">{hint}</p>}
       </div>
     );
   }
