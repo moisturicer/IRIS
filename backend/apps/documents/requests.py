@@ -345,6 +345,11 @@ def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequ
         item.decided_at = timezone.now()
         item.save(update_fields=["state", "upload", "rejection_reason", "decided_at"])
         if request.state != DocumentRequestState.OPEN:
+            # Resolved is final (ADR-069, IR-1075): the request's notification
+            # is stamped as it stood, before this reopens it.
+            from apps.notifications.settling import settle_record
+
+            settle_record(request.record)
             request.state = DocumentRequestState.OPEN
             request.closed_at = None
             request.save(update_fields=["state", "closed_at"])

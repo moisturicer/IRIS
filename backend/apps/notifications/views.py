@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import Notification, NotificationRead
 from .serializers import NotificationSerializer
+from .settling import settle_for
 
 
 class NotificationListView(generics.ListAPIView):
@@ -13,7 +14,9 @@ class NotificationListView(generics.ListAPIView):
     Returns notifications for the current user:
       - direct notifications where recipient = user
       - broadcast notifications where broadcast_to_role = user.role
-    Supports ?unread=true to filter unread only.
+    Supports ?unread=true to filter unread only. A resolved notification (its
+    task has ended, ADR-069) is never unread: it leaves the count and stays in
+    the full list as a settled line.
     """
     serializer_class   = NotificationSerializer
     permission_classes = [IsAuthenticated]
@@ -21,6 +24,8 @@ class NotificationListView(generics.ListAPIView):
     def get_queryset(self):
         from django.db.models import Exists, OuterRef
         user = self.request.user
+        # Stamp anything whose task has ended since this was last looked at.
+        settle_for(user)
         read_notifications = NotificationRead.objects.filter(
             notification=OuterRef("pk"),
             user=user
@@ -30,7 +35,7 @@ class NotificationListView(generics.ListAPIView):
         ).select_related("notif_type", "record", "sender").order_by("-created_at")
 
         if self.request.query_params.get("unread") == "true":
-            qs = qs.filter(is_read=False)
+            qs = qs.filter(is_read=False, resolved_at__isnull=True)
 
         return qs
 

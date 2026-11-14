@@ -415,6 +415,13 @@ def _notify(record, actor, plan, opened, *, accepted, threads=0):
     from apps.notifications.services import notify_routed
 
     targets = [t.party for t in plan.targets]
+    # The seat each nominee was given, so their notice settles with it (ADR-069).
+    nominee_seats = {
+        seat.reviewer_id: seat.pk
+        for t in plan.targets for seat in ReviewerSeat.objects.filter(
+            assignment=t.assignment, reviewer__in=t.nominees,
+        ).exclude(state=SeatState.WITHDRAWN)
+    }
     transaction.on_commit(lambda: notify_routed(
         record,
         actor=actor,
@@ -427,6 +434,8 @@ def _notify(record, actor, plan, opened, *, accepted, threads=0):
         reason=plan.reason,
         accepted=accepted,
         threads=threads,
+        pool_assignments={t.party: t.assignment for t in opened if not t.nominees},
+        nominee_seats=nominee_seats,
     ))
 
 

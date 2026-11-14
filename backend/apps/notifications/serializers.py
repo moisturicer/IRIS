@@ -14,4 +14,5 @@ class NotificationSerializer(serializers.ModelSerializer):
             "id", "notif_type", "notif_type_name", "message",
             "record", "record_title", "sender", "sender_name",
             "recipient", "broadcast_to_role", "created_at", "is_read",
+            "resolved_at", "resolved_label",
         ]

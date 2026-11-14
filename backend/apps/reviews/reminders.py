@@ -129,7 +129,8 @@ def _send(pk, record_id, due_at, kind, step, overdue=0):
 
         assignment_escalated(assignment, step=step, overdue=overdue, recipients=recipients)
     for user in recipients:
-        notify_deadline(record, user, type_name=type_name, message=message)
+        notify_deadline(record, user, type_name=type_name, message=message,
+                        assignment=assignment)
     return 1
 
 

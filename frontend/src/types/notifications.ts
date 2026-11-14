@@ -11,4 +11,8 @@ export interface Notification {
   broadcast_to_role: number | null;
   created_at:        string;
   is_read:           boolean;
+  /** Set by the server once the task this notification asked for has ended (ADR-069). Final. */
+  resolved_at:       string | null;
+  /** What happened, ready to show: "Reviewed by you on 20 Oct". Blank until resolved. */
+  resolved_label:    string;
 }

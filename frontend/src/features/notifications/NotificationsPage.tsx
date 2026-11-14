@@ -3,6 +3,10 @@
  * The bell in the sidebar answers "is there anything new?"; this page answers
  * "what has happened to my records?".
  *
+ * A notification whose task has ended (`resolved_at`, set by the server and
+ * never inferred here) is history: it shows a settled line instead of asking
+ * for anything, and it is never counted as unread.
+ *
  * A notification about a record is one link: the whole row opens the record
  * and marks the notification read, the way the bell's items already do. The
  * mark-read control is a sibling of that link, never nested inside it, so
@@ -21,8 +25,12 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
+import { notificationTypeLabel } from "./notificationLabels";
 
 type Filter = "all" | "unread";
+
+/** Waiting on the reader: unread, and its task has not ended. */
+const isUnread = (n: Notification) => !n.is_read && n.resolved_at == null;
 
 /** The day a notification belongs to, in plain words, newest group first. */
 function dayGroup(createdAt: string, now: Date): string {
@@ -88,11 +96,11 @@ export default function NotificationsPage() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   };
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const unreadCount = notifications.filter(isUnread).length;
 
   const groups = useMemo(() => {
     const now = new Date();
-    const shown = filter === "unread" ? notifications.filter((n) => !n.is_read) : notifications;
+    const shown = filter === "unread" ? notifications.filter(isUnread) : notifications;
     const byDay = new Map<string, Notification[]>();
     for (const n of shown) {
       const key = dayGroup(n.created_at, now);
@@ -158,7 +166,7 @@ export default function NotificationsPage() {
           <EmptyState
             icon="fa-check"
             title="You're all caught up."
-            message="Every notification has been read."
+            message="Nothing is waiting on you."
             action={<Button variant="outline" size="sm" onClick={() => setFilter("all")}>Show all</Button>}
           />
         ) : (
@@ -200,7 +208,8 @@ interface RowProps {
 }
 
 function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
-  const unread = !n.is_read;
+  const resolved = n.resolved_at != null;
+  const unread = isUnread(n);
   const opens = n.record != null;
 
   const body = (
@@ -214,12 +223,20 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
       >
         {n.message}
       </span>
+      {resolved && (
+        // The server's own words, never worked out here (ADR-069): it says what
+        // happened and when, so nothing on the row still asks the reader to act.
+        <span className="mt-1 flex items-center gap-1.5 text-small font-medium text-stone-700">
+          <i className="fas fa-check text-stone-500" aria-hidden />
+          {n.resolved_label}
+        </span>
+      )}
       <span className="mt-1 flex flex-wrap items-center gap-x-2 text-small text-stone-500">
         <time dateTime={n.created_at}>{time}</time>
         {n.notif_type_name && (
           <>
             <span aria-hidden>·</span>
-            <span>{n.notif_type_name}</span>
+            <span>{notificationTypeLabel(n.notif_type_name)}</span>
           </>
         )}
       </span>
