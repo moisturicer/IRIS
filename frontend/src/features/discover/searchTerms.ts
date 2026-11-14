@@ -1,5 +1,7 @@
 import React from "react";
 
+import { MATCH } from "@/components/ui/highlightRoles";
+
 import { escapeRegExp } from "./discoverUtils";
 
 /**
@@ -78,7 +80,7 @@ export function highlightTerms(text: string | null | undefined, query: string): 
       i % 2 === 1
         ? React.createElement(
             "mark",
-            { key: i, className: "bg-brand-50 text-stone-900 rounded-sm px-0.5 font-semibold" },
+            { key: i, className: `${MATCH} rounded-sm px-px` },
             part,
           )
         : part,
