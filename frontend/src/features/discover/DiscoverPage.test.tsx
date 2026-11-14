@@ -1374,3 +1374,162 @@ describe("saved custom feeds (IR-577)", () => {
     await expectNoBlockingA11yViolations(container);
   });
 });
+
+describe("the whole card opens the paper (IR-1095)", () => {
+  // Two columns: the one-column card repeats its footer for two layouts, and
+  // jsdom, which applies no CSS, would show both to a keyboard.
+  beforeEach(() => localStorage.setItem("iris.discover.columns", "2"));
+
+  it("gives each card one link, the title, and keeps Save and Cite as separate controls", async () => {
+    listed = [publishedThesis, listItem({ id: 5, title: "Rainfall and Dengue in Cebu" })];
+    renderDiscover();
+
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    expect(within(card).getAllByRole("link")).toHaveLength(1);
+    expect(within(card).getByRole("link", { name: publishedThesis.title })).toHaveAttribute("href", "/records/1");
+    expect(within(card).getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Cite this paper" })).toBeInTheDocument();
+  });
+
+  it("reaches the title once per card by keyboard, then that card's own controls", async () => {
+    listed = [publishedThesis, listItem({ id: 5, title: "Rainfall and Dengue in Cebu" })];
+    renderDiscover();
+    const first = await screen.findByRole("article", { name: publishedThesis.title });
+    const second = screen.getByRole("article", { name: "Rainfall and Dengue in Cebu" });
+
+    within(first).getByRole("link", { name: publishedThesis.title }).focus();
+    await userEvent.tab();
+    expect(within(first).getByRole("button", { name: "Save" })).toHaveFocus();
+    await userEvent.tab();
+    expect(within(first).getByRole("button", { name: "Cite this paper" })).toHaveFocus();
+    await userEvent.tab();
+    expect(within(second).getByRole("link", { name: "Rainfall and Dengue in Cebu" })).toHaveFocus();
+  });
+
+  it("saves from the card without opening the paper", async () => {
+    renderDiscover();
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+
+    await userEvent.click(within(card).getByRole("button", { name: "Save" }));
+
+    // The Save menu opens; the page did not navigate away from Discover.
+    expect(screen.getByRole("heading", { level: 1, name: "Discover" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Save", expanded: true })).toBeInTheDocument();
+  });
+});
+
+describe("a question is offered Ask IRIS (IR-1095)", () => {
+  const QUESTION = "Can weather data forecast dengue?";
+
+  function AskProbe() {
+    const { pathname, state } = useLocation();
+    return <output aria-label="Ask probe">{pathname === "/ai" ? `ask:${(state as { draft?: string } | null)?.draft ?? ""}` : pathname}</output>;
+  }
+
+  function renderWithAsk(route: string) {
+    return renderScreen(
+      <Routes>
+        <Route path="/" element={<DiscoverPage />} />
+        <Route path="/ai" element={<AskProbe />} />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it("shows one line above the results for a question, with a link that carries it over", async () => {
+    renderWithAsk(`/?q=${encodeURIComponent(QUESTION)}`);
+    await screen.findByText(publishedThesis.title);
+
+    const suggestion = screen.getByRole("link", { name: "Ask IRIS this question" });
+    expect(suggestion).toHaveAttribute("href", "/ai");
+    expect(screen.getAllByRole("link", { name: /Ask IRIS/ })).toHaveLength(1);
+
+    await userEvent.click(suggestion);
+    expect(screen.getByRole("status", { name: "Ask probe" })).toHaveTextContent(`ask:${QUESTION}`);
+  });
+
+  it("shows nothing for an ordinary search, and nothing when the box is empty", async () => {
+    const { unmount } = renderWithAsk("/?q=dengue+forecasting");
+    await screen.findByText(publishedThesis.title);
+    expect(screen.queryByRole("link", { name: /Ask IRIS/ })).not.toBeInTheDocument();
+    unmount();
+
+    renderWithAsk("/");
+    await screen.findByText(publishedThesis.title);
+    expect(screen.queryByRole("link", { name: /Ask IRIS/ })).not.toBeInTheDocument();
+  });
+
+  it("appears when the reader types a question, and goes when they change it back", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const box = screen.getByRole("textbox", { name: "Search records" });
+
+    await userEvent.type(box, QUESTION);
+    expect(await screen.findByRole("link", { name: "Ask IRIS this question" })).toBeInTheDocument();
+
+    await userEvent.clear(box);
+    await userEvent.type(box, "dengue forecasting");
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Ask IRIS this question" })).not.toBeInTheDocument());
+  });
+
+  it("asks the catalogue for the question's content words, not the whole sentence", async () => {
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+    await screen.findByText(publishedThesis.title);
+
+    expect(lastListParams()).toMatchObject({ search: "weather data forecast dengue" });
+  });
+
+  it("offers Ask IRIS instead when a search finds nothing", async () => {
+    listed = [];
+    renderWithAsk("/?q=flood");
+
+    await screen.findByRole("heading", { name: "No research matches these filters" });
+    await userEvent.click(screen.getByRole("link", { name: "Ask IRIS instead" }));
+    expect(screen.getByRole("status", { name: "Ask probe" })).toHaveTextContent("ask:flood");
+  });
+
+  it("offers one link, not two, when a question finds nothing", async () => {
+    listed = [];
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+
+    await screen.findByRole("heading", { name: "No research matches these filters" });
+    expect(screen.getAllByRole("link", { name: /Ask IRIS/ })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Ask IRIS this question" })).toBeInTheDocument();
+  });
+
+  it("does not offer it over the empty state of a filter-only view", async () => {
+    listed = [];
+    renderDiscover("/?type=2");
+
+    await screen.findByRole("heading", { name: "No research matches these filters" });
+    expect(screen.queryByRole("link", { name: /Ask IRIS/ })).not.toBeInTheDocument();
+  });
+
+  it("searches People by the same content words as papers", async () => {
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+    await screen.findByText(publishedThesis.title);
+
+    await waitFor(() => expect(peopleApi.search).toHaveBeenCalledWith(expect.objectContaining({ q: "weather data forecast dengue" })));
+  });
+
+  it("highlights matched words in the title too, without changing the card's name", async () => {
+    localStorage.setItem("iris.discover.columns", "2");
+    listed = [listItem({ id: 9, title: "Rainfall and Dengue in Cebu", abstract: "No overlap here." })];
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+
+    const card = await screen.findByRole("article", { name: "Rainfall and Dengue in Cebu" });
+    const link = within(card).getByRole("link", { name: "Rainfall and Dengue in Cebu" });
+    expect([...link.querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["Dengue"]);
+  });
+
+  it("highlights each matched word in a card, not only the whole phrase", async () => {
+    localStorage.setItem("iris.discover.columns", "2");
+    listed = [listItem({ id: 8, title: "Rainfall and Dengue", abstract: "Dengue cases follow weather patterns in Cebu." })];
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+
+    const card = await screen.findByRole("article", { name: "Rainfall and Dengue" });
+    const marked = [...card.querySelectorAll("mark")].map((m) => m.textContent);
+    // The title, then the abstract.
+    expect(marked).toEqual(["Dengue", "Dengue", "weather"]);
+  });
+});

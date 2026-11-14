@@ -34,7 +34,7 @@ export function formatAuthorList(
  * ──────────────────────────────────────────────────────────────────────────*/
 
 /** Escape a user-typed query so it can be embedded in a RegExp safely. */
-function escapeRegExp(value: string): string {
+export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
