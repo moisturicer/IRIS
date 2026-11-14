@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DEFAULT_QUERY, feedCriteria, feedQueryOf, feedSearchParams, parseDiscoverQuery, sameFeedQuery,
+  DEFAULT_QUERY, feedCriteria, feedQueryOf, feedSearchParams, listParams, parseDiscoverQuery, sameFeedQuery,
   writeDiscoverQuery,
 } from "./discoverQuery";
 
@@ -125,5 +125,26 @@ describe("saved feeds use Discover's own query (IR-577)", () => {
       "Intellectual property: any",
       "Sorted by: Most viewed",
     ]);
+  });
+});
+
+describe("listParams: the search is by word (IR-1095)", () => {
+  const search = (q: string) => listParams({ ...DEFAULT_QUERY, q }).search;
+
+  it("asks for the content words of a sentence, without its punctuation", () => {
+    expect(search("Can weather data forecast dengue?")).toBe("weather data forecast dengue");
+  });
+
+  it("leaves a plain word search as it was typed", () => {
+    expect(search("dengue forecasting")).toBe("dengue forecasting");
+  });
+
+  it("sends no search when nothing was typed", () => {
+    expect(listParams(DEFAULT_QUERY)).not.toHaveProperty("search");
+  });
+
+  it("keeps the URL's own text: the reader's sentence is not rewritten", () => {
+    const query = parse("q=Can+weather+data+forecast+dengue%3F");
+    expect(query.q).toBe("Can weather data forecast dengue?");
   });
 });

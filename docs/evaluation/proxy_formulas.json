@@ -1,0 +1,104 @@
+{
+  "name": "proxy_formulas",
+  "tier": "proxy",
+  "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+  "notes": "IR-1102: questions whose answer is a display formula in one of the four proxy papers the IR-984 spike read with Unstructured hi_res (records 25, 38, 40, 58). Each is asked in words, never in LaTeX, and labelled with a LaTeX snippet copied from the formula's transcription as the chunk content shows it, so a label resolves only once that paper's formulas are transcribed (ADR-067 amendment of 2026-11-14). Also appended to proxy_starter.json as kind `formula`. Proxy tier, ADR-023: an engineering gate, NEVER a finding about CIT-U research.",
+  "questions": [
+    {
+      "id": "f01", "kind": "formula",
+      "question": "how many bytes does caching keys and values take for a sequence of T tokens?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators", "page": 1, "quote": "\\Gamma(T) = 2 L H d_h T"}]
+    },
+    {
+      "id": "f02", "kind": "formula",
+      "question": "what is the size of one KV cache block in the network-on-chip fabric?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators", "page": 2, "quote": "|\\mathcal{B}(\\ell, s)| = 2 H d_h P"}]
+    },
+    {
+      "id": "f03", "kind": "formula",
+      "question": "which modular mapping places each layer's cache blocks on the tiles of the mesh?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators", "page": 2, "quote": "\\pi(\\ell, s) = \\left( \\ell \\bmod W"}]
+    },
+    {
+      "id": "f04", "kind": "formula",
+      "question": "how is the running maximum and normaliser updated block by block when softmax is computed online?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators", "page": 3, "quote": "m_s &= \\max(m_{s-1},\\, \\mathrm{rowmax}(z_s))"}]
+    },
+    {
+      "id": "f05", "kind": "formula",
+      "question": "what density threshold, built from the median and median absolute deviation of the field, marks an overdense region?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning", "page": 8, "quote": "\\rho_{\\mathrm{th}} = \\mathrm{Med}(\\boldsymbol{\\rho}_{\\mathrm{field}}) + 4\\mathrm{MAD}"}]
+    },
+    {
+      "id": "f06", "kind": "formula",
+      "question": "which colour cuts in g minus r and r minus i select the high-redshift galaxy candidates?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning", "page": 2, "quote": "& (g - r > 1.0) \\\\ \\wedge \\quad & (-1.0 < r - i < 1.0)"}]
+    },
+    {
+      "id": "f07", "kind": "formula",
+      "question": "what power law describes how the scatter grows with the number of galaxies?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning", "page": 4, "quote": "\\sigma_N = \\alpha N^{\\beta}"}]
+    },
+    {
+      "id": "f08", "kind": "formula",
+      "question": "how is the next step size chosen from the error estimates of the last three steps?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Accelerating massive ensembles of ordinary differential equations-with-annotations", "page": 4, "quote": "h_{n+1} = h_n \\, \\min\\Bigl(\\phi_{\\max}"}]
+    },
+    {
+      "id": "f09", "kind": "formula",
+      "question": "what linear system does each stage of the Rosenbrock method solve with the Jacobian?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Accelerating massive ensembles of ordinary differential equations-with-annotations", "page": 6, "quote": "$$ \\left(\\frac{1}{h\\gamma}I - J\\right)\\mathbf{k}_i"}]
+    },
+    {
+      "id": "f10", "kind": "formula",
+      "question": "what differential equation do the parameter sensitivities of the solution obey?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Accelerating massive ensembles of ordinary differential equations-with-annotations", "page": 7, "quote": "= J_y(t)\\, S(t) + J_p(t)"}]
+    },
+    {
+      "id": "f11", "kind": "formula",
+      "question": "what are the rate constants of the stiff Robertson chemical kinetics test problem?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Accelerating massive ensembles of ordinary differential equations-with-annotations", "page": 10, "quote": "-0.04\\, y_1 + 10^4\\, y_2\\, y_3"}]
+    },
+    {
+      "id": "f12", "kind": "formula",
+      "question": "how are the coupled van der Pol oscillators in the chain linked to their neighbours?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Accelerating massive ensembles of ordinary differential equations-with-annotations", "page": 11, "quote": "\\mu(1-x_i^2)\\,v_i - x_i + d\\,(x_{i-1}+x_{i+1}-2x_i)"}]
+    },
+    {
+      "id": "f13", "kind": "formula",
+      "question": "which rate equations track the neutron, proton, deuterium and helium abundances in the nucleosynthesis example?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "Accelerating massive ensembles of ordinary differential equations-with-annotations", "page": 13, "quote": "\\frac{\\Gamma_{p\\to n}\\,Y_p - \\Gamma_{n\\to p}\\,Y_n - R_{np}}{Hx}"}]
+    },
+    {
+      "id": "f14", "kind": "formula",
+      "question": "how is the input signal encoded as the amplitudes of a quantum state?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "State-Space-Based FIR Filtering on a Quantum Computer", "page": 2, "quote": "|A_x\\rangle = \\sum_{n=0}^{N-1} x(n)"}]
+    },
+    {
+      "id": "f15", "kind": "formula",
+      "question": "what state-space recursion gives the filter's output and next state from the input?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "State-Space-Based FIR Filtering on a Quantum Computer", "page": 2, "quote": "\\mathbf{y}(n) &= \\mathbf{A}\\,\\mathbf{x}(n) + \\mathbf{B}\\,\\mathbf{s}(n)"}]
+    },
+    {
+      "id": "f16", "kind": "formula",
+      "question": "how is the transfer matrix written as a product of rotations and delay matrices?",
+      "evidence_required": "corpus", "expected_outcome": "answer", "institutional": false,
+      "expected": [{"record": "State-Space-Based FIR Filtering on a Quantum Computer", "page": 3, "quote": "$$ \\mathbf{H}_{M}(z) = \\mathbf{R}_{M}\\mathbf{\\Lambda}(z)"}]
+    }
+  ]
+}

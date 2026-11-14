@@ -264,6 +264,13 @@ python manage.py check_vector_index                      # is vector search find
                                    # HNSW index, because that number says nothing about the index. A
                                    # stored-vector probe is an easier question than a real query vector,
                                    # which is why --titles exists as well
+python manage.py eval_formula_transcription --papers 25,38 --pdfs <dir> --results <dir> --sources <dir> --out <run.json>
+                                   # IR-1102: crop each hi_res Formula of stored results at 300 dpi,
+                                   # transcribe it with the formula model and score it against the
+                                   # arXiv source with the IR-984 spike's latex_truth.py. Spends credits,
+                                   # one call per formula. Writes counts and scores, never paper text;
+                                   # --replies writes the raw replies for reading by hand (never commit).
+                                   # Verified 2026-11-14: 36 of 36 proxy formulas, 32 exact
 python manage.py eval_evidence --questions <set.json>     # does the evidence detector
                                    # get a question's evidence requirement right? (IR-464).
                                    # The curated instrument of ADR-035 §10 — the one that

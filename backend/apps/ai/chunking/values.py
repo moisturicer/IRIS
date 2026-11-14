@@ -44,6 +44,8 @@ class Chunk:
     bboxes: tuple[BoundingBox, ...] = ()
     # Full heading path of the chunk's section. Not hashed (IR-1050).
     section_key: tuple[str, ...] = ()
+    # What the keyword index reads instead of ``content``; ``None`` reads it (IR-1102).
+    keyword_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,8 @@ class ChunkingOptions:
     context_path_max_tokens: int = 64
     merge_short_siblings: bool = True
     exclude_sections: tuple[str, ...] = ()
+    # Transcribed formulas in the embedded and keyword text (IR-1102).
+    index_formulas: bool = False
 
     def __post_init__(self) -> None:
         if self.max_tokens < 1:

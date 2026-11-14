@@ -145,6 +145,7 @@ EXCLUDED: dict[str, str] = {
     "ai.IngestionJob": _PAPER_DERIVED,
     "documents.PdfExtraction": _PAPER_DERIVED,
     "documents.ExtractionFigure": _PAPER_DERIVED,
+    "documents.ExtractionFormula": _PAPER_DERIVED,
     "documents.ManuscriptMetadata": _PAPER_DERIVED,
     "records.DiscoveryFeedSnapshot": (
         "A frozen ordering of the catalogue for one reader, rebuilt on demand. The reader's "

@@ -22,11 +22,16 @@ interface HandoffState {
   draft?: unknown;
 }
 
+/** The router state that carries `question` to Ask IRIS as a draft: for a `<Link state>`. */
+export function askHandoffState(question: string): HandoffState {
+  return { draft: question };
+}
+
 /** Navigates to Ask IRIS carrying `question` as a draft. */
 export function useAskIrisHandoff() {
   const navigate = useNavigate();
   return useCallback(
-    (question: string) => navigate(ASK_PATH, { state: { draft: question } satisfies HandoffState }),
+    (question: string) => navigate(ASK_PATH, { state: askHandoffState(question) }),
     [navigate],
   );
 }

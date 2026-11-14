@@ -334,6 +334,39 @@ text before the default changes.
 - **New open condition:** the transcription provider's retention and
   no-training terms, recorded before real Manuscripts are sent.
 
+### Implementation note (IR-1102)
+
+Built 2026-11-14. Decided by Jive Tyler Revalde on 2026-11-14, after the first
+build:
+
+- **Readers are shown the LaTeX, not a crop.** A transcribed formula is shown
+  as `$$…$$` in its chunk's content, flag on or off, and the answer model reads
+  it there, so it can quote the formula exactly. Its description is not shown.
+- **The flag decides only what is searchable.** `AI_FORMULA_TEXT_INDEXED`
+  becomes the chunking option `index_formulas`. On, a transcribed formula's
+  LaTeX and description enter the embedded text and the keyword index; off,
+  neither does. The keyword index reads a new column, `keyword_text`, which
+  is null (meaning `content`) except where a transcribed formula is, so no
+  other chunk's keyword index changes.
+- **Retention is accepted; training is not.** The task carries
+  `DataPolicy.NO_TRAINING`: every OpenRouter request sends
+  `provider.data_collection = "deny"`, so only endpoints that do not train on
+  or sell prompts are reached. This answers the open condition below.
+
+Also built:
+
+- **Cropping runs in the PDF evidence sandbox** (`pdf_evidence/crops.py`), on
+  Linux only, under the same limits; off Linux nothing is cropped.
+- **A Formula hi_res already returns as delimited LaTeX is cropped and
+  transcribed too**; until the model answers, its own LaTeX is shown.
+- **At most 500 formulas per Manuscript are cropped**; past that they are logged.
+- **The equation number is read from the model's `\tag{}`**, not the PDF.
+- **The run-file switch is `formula_text`.** It is read at indexing, so
+  `eval_retrieval` records it and refuses to move it: set it, re-chunk, then run.
+- **Measured** (`docs/evaluation/runs/2026-11-14-ir1102-formulas/`): see the
+  report there for transcription against `latex_truth.py` and the retrieval
+  comparison.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
@@ -356,3 +389,4 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-1054: strategy comparison and size sweep
 - IR-1055, IR-1056: section-mate expansion and section-aligned embedding windows
 - IR-982: vendor registry, closed as won't do
+- IR-1102: formulas as exact LaTeX, behind a flag

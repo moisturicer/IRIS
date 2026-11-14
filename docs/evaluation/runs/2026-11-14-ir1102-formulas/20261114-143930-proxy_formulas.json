@@ -1,0 +1,895 @@
+{
+  "runs": [
+    {
+      "question_set": {
+        "name": "proxy_formulas",
+        "source": "..\\docs\\evaluation\\proxy_formulas.json",
+        "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+        "tier": "proxy",
+        "questions": 16,
+        "without_passages": 0,
+        "unanswerable": 0,
+        "with_resolved_question": 0,
+        "record_scoped": 0,
+        "labels": 16,
+        "skipped_questions": []
+      },
+      "config": {
+        "reranking": false,
+        "retrieval_limit": 10,
+        "max_sources": 8,
+        "name": null,
+        "baseline": null,
+        "techniques": {
+          "fusion": {
+            "setting": "AI_RETRIEVAL_FUSION_ENABLED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-395"
+          },
+          "keyword_retrieval": {
+            "setting": "AI_KEYWORD_RETRIEVAL_ENABLED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-395"
+          },
+          "relevance_cut_off": {
+            "setting": "AI_RELEVANCE_MIN_SCORE",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-396"
+          },
+          "per_paper_cap": {
+            "setting": "AI_MAX_PASSAGES_PER_RECORD",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "neighbour_joining": {
+            "setting": "AI_JOIN_ADJACENT_PASSAGES",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "token_budget": {
+            "setting": "AI_PASSAGE_TOKEN_BUDGET",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "formula_text": {
+            "setting": "AI_FORMULA_TEXT_INDEXED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-1102"
+          }
+        },
+        "label": "no-reranking"
+      },
+      "measures": {
+        "recall@10": 0.8125,
+        "final_set_recall": 0.8125,
+        "micro_recall@10": 0.8125,
+        "micro_final_set_recall": 0.8125,
+        "correct_refusal": null,
+        "unanswerable_questions": 0,
+        "false_refusals": [],
+        "degraded_questions": 0
+      },
+      "slices": {
+        "corpus": {
+          "questions": 16,
+          "recall@10": 0.8125,
+          "final_set_recall": 0.8125,
+          "micro_recall@10": 0.8125,
+          "false_refusals": []
+        },
+        "record_scoped": null
+      },
+      "provenance": {
+        "ran_at": "2026-11-14T14:38:47+00:00",
+        "embedding_spaces": [
+          2
+        ],
+        "retrieval_modes": [
+          "vector"
+        ],
+        "embedder": "VoyageEmbeddingProvider",
+        "reranker": "NoOpReranker",
+        "retrieved_with_limit": 10,
+        "techniques_moved": [],
+        "git_commit": "v0.1.0-2660-g79628446-dirty",
+        "question_set_path": "..\\docs\\evaluation\\proxy_formulas.json",
+        "question_set_sha256": "9ac79f213efa9dfa8d1cd8fcb5c7773a34c0b2122684078f83d13643ad17efb4",
+        "retrieved_as": "sam.student@cit.edu",
+        "chunking": {
+          "variant": null,
+          "variant_spec": null,
+          "tokenizer": "voyage-context-4",
+          "chunk_sets": [
+            {
+              "extractor": "docling",
+              "strategy_id": "structural-markdown-v1",
+              "options": {
+                "context_path_max_tokens": 64,
+                "exclude_sections": [
+                  "References",
+                  "Bibliography",
+                  "Works Cited",
+                  "Literature Cited",
+                  "Table of Contents",
+                  "Contents",
+                  "List of Tables",
+                  "List of Figures"
+                ],
+                "max_tokens": 700,
+                "merge_short_siblings": true,
+                "min_tokens": null,
+                "overlap_tokens": 0,
+                "repeat_table_header": true,
+                "strategy": "structural-markdown-v1"
+              },
+              "records": 40
+            },
+            {
+              "extractor": "unstructured",
+              "strategy_id": "labeled-structure-v1",
+              "options": {
+                "context_path_max_tokens": 64,
+                "exclude_sections": [
+                  "References",
+                  "Bibliography",
+                  "Works Cited",
+                  "Literature Cited",
+                  "Table of Contents",
+                  "Contents",
+                  "List of Tables",
+                  "List of Figures"
+                ],
+                "index_formulas": false,
+                "max_tokens": 2000,
+                "merge_short_siblings": true,
+                "min_tokens": null,
+                "strategy": "labeled-structure-v1",
+                "target_tokens": null
+              },
+              "records": 4
+            }
+          ]
+        }
+      },
+      "questions": [
+        {
+          "question_id": "f01",
+          "question": "how many bytes does caching keys and values take for a sequence of T tokens?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f02",
+          "question": "what is the size of one KV cache block in the network-on-chip fabric?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f03",
+          "question": "which modular mapping places each layer's cache blocks on the tiles of the mesh?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f04",
+          "question": "how is the running maximum and normaliser updated block by block when softmax is computed online?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f05",
+          "question": "what density threshold, built from the median and median absolute deviation of the field, marks an overdense region?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "\\rho_{\\mathrm{th}} = \\mathrm{Med}(\\boldsymbol{\\rho}_{\\mathrm{field}}) + 4\\mathrm"
+          ],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "f06",
+          "question": "which colour cuts in g minus r and r minus i select the high-redshift galaxy candidates?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "& (g - r > 1.0) \\\\ \\wedge \\quad & (-1.0 < r - i < 1.0)"
+          ],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "f07",
+          "question": "what power law describes how the scatter grows with the number of galaxies?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "\\sigma_N = \\alpha N^{\\beta}"
+          ],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "f08",
+          "question": "how is the next step size chosen from the error estimates of the last three steps?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f09",
+          "question": "what linear system does each stage of the Rosenbrock method solve with the Jacobian?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f10",
+          "question": "what differential equation do the parameter sensitivities of the solution obey?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f11",
+          "question": "what are the rate constants of the stiff Robertson chemical kinetics test problem?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f12",
+          "question": "how are the coupled van der Pol oscillators in the chain linked to their neighbours?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f13",
+          "question": "which rate equations track the neutron, proton, deuterium and helium abundances in the nucleosynthesis example?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f14",
+          "question": "how is the input signal encoded as the amplitudes of a quantum state?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f15",
+          "question": "what state-space recursion gives the filter's output and next state from the input?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f16",
+          "question": "how is the transfer matrix written as a product of rotations and delay matrices?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        }
+      ],
+      "refusals": []
+    },
+    {
+      "question_set": {
+        "name": "proxy_formulas",
+        "source": "..\\docs\\evaluation\\proxy_formulas.json",
+        "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+        "tier": "proxy",
+        "questions": 16,
+        "without_passages": 0,
+        "unanswerable": 0,
+        "with_resolved_question": 0,
+        "record_scoped": 0,
+        "labels": 16,
+        "skipped_questions": []
+      },
+      "config": {
+        "reranking": true,
+        "retrieval_limit": 10,
+        "max_sources": 8,
+        "name": null,
+        "baseline": "no-reranking",
+        "techniques": {
+          "fusion": {
+            "setting": "AI_RETRIEVAL_FUSION_ENABLED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-395"
+          },
+          "keyword_retrieval": {
+            "setting": "AI_KEYWORD_RETRIEVAL_ENABLED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-395"
+          },
+          "relevance_cut_off": {
+            "setting": "AI_RELEVANCE_MIN_SCORE",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-396"
+          },
+          "per_paper_cap": {
+            "setting": "AI_MAX_PASSAGES_PER_RECORD",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "neighbour_joining": {
+            "setting": "AI_JOIN_ADJACENT_PASSAGES",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "token_budget": {
+            "setting": "AI_PASSAGE_TOKEN_BUDGET",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "formula_text": {
+            "setting": "AI_FORMULA_TEXT_INDEXED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-1102"
+          }
+        },
+        "label": "with-reranking"
+      },
+      "measures": {
+        "recall@10": 0.9375,
+        "final_set_recall": 0.9375,
+        "micro_recall@10": 0.9375,
+        "micro_final_set_recall": 0.9375,
+        "correct_refusal": null,
+        "unanswerable_questions": 0,
+        "false_refusals": [],
+        "degraded_questions": 0
+      },
+      "slices": {
+        "corpus": {
+          "questions": 16,
+          "recall@10": 0.9375,
+          "final_set_recall": 0.9375,
+          "micro_recall@10": 0.9375,
+          "false_refusals": []
+        },
+        "record_scoped": null
+      },
+      "provenance": {
+        "ran_at": "2026-11-14T14:39:30+00:00",
+        "embedding_spaces": [
+          2
+        ],
+        "retrieval_modes": [
+          "vector"
+        ],
+        "embedder": "VoyageEmbeddingProvider",
+        "reranker": "VoyageReranker",
+        "retrieved_with_limit": 10,
+        "techniques_moved": [],
+        "git_commit": "v0.1.0-2660-g79628446-dirty",
+        "question_set_path": "..\\docs\\evaluation\\proxy_formulas.json",
+        "question_set_sha256": "9ac79f213efa9dfa8d1cd8fcb5c7773a34c0b2122684078f83d13643ad17efb4",
+        "retrieved_as": "sam.student@cit.edu",
+        "chunking": {
+          "variant": null,
+          "variant_spec": null,
+          "tokenizer": "voyage-context-4",
+          "chunk_sets": [
+            {
+              "extractor": "docling",
+              "strategy_id": "structural-markdown-v1",
+              "options": {
+                "context_path_max_tokens": 64,
+                "exclude_sections": [
+                  "References",
+                  "Bibliography",
+                  "Works Cited",
+                  "Literature Cited",
+                  "Table of Contents",
+                  "Contents",
+                  "List of Tables",
+                  "List of Figures"
+                ],
+                "max_tokens": 700,
+                "merge_short_siblings": true,
+                "min_tokens": null,
+                "overlap_tokens": 0,
+                "repeat_table_header": true,
+                "strategy": "structural-markdown-v1"
+              },
+              "records": 40
+            },
+            {
+              "extractor": "unstructured",
+              "strategy_id": "labeled-structure-v1",
+              "options": {
+                "context_path_max_tokens": 64,
+                "exclude_sections": [
+                  "References",
+                  "Bibliography",
+                  "Works Cited",
+                  "Literature Cited",
+                  "Table of Contents",
+                  "Contents",
+                  "List of Tables",
+                  "List of Figures"
+                ],
+                "index_formulas": false,
+                "max_tokens": 2000,
+                "merge_short_siblings": true,
+                "min_tokens": null,
+                "strategy": "labeled-structure-v1",
+                "target_tokens": null
+              },
+              "records": 4
+            }
+          ]
+        }
+      },
+      "questions": [
+        {
+          "question_id": "f01",
+          "question": "how many bytes does caching keys and values take for a sequence of T tokens?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f02",
+          "question": "what is the size of one KV cache block in the network-on-chip fabric?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f03",
+          "question": "which modular mapping places each layer's cache blocks on the tiles of the mesh?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f04",
+          "question": "how is the running maximum and normaliser updated block by block when softmax is computed online?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f05",
+          "question": "what density threshold, built from the median and median absolute deviation of the field, marks an overdense region?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f06",
+          "question": "which colour cuts in g minus r and r minus i select the high-redshift galaxy candidates?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f07",
+          "question": "what power law describes how the scatter grows with the number of galaxies?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "\\sigma_N = \\alpha N^{\\beta}"
+          ],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "f08",
+          "question": "how is the next step size chosen from the error estimates of the last three steps?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f09",
+          "question": "what linear system does each stage of the Rosenbrock method solve with the Jacobian?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f10",
+          "question": "what differential equation do the parameter sensitivities of the solution obey?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f11",
+          "question": "what are the rate constants of the stiff Robertson chemical kinetics test problem?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f12",
+          "question": "how are the coupled van der Pol oscillators in the chain linked to their neighbours?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f13",
+          "question": "which rate equations track the neutron, proton, deuterium and helium abundances in the nucleosynthesis example?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f14",
+          "question": "how is the input signal encoded as the amplitudes of a quantum state?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f15",
+          "question": "what state-space recursion gives the filter's output and next state from the input?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "f16",
+          "question": "how is the transfer matrix written as a product of rotations and delay matrices?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "expects_refusal": false,
+          "scope_record": null,
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        }
+      ],
+      "refusals": []
+    }
+  ],
+  "baseline": "no-reranking"
+}

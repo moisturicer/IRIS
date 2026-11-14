@@ -16,13 +16,15 @@
 import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { COLOUR_TRANSITION, STRETCHED_FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 
 interface ResearchCardProps {
   /** Where the title leads: the record's Paper View. */
   href:      string;
   title:     string;
+  /** The title as shown, when it carries markup such as search highlights; `title` stays its name. */
+  titleContent?: ReactNode;
   /** `list` is a full-width row for feeds; `grid` a compact tile. */
   layout?:   "list" | "grid";
   /** The line above the title: category and record type. */
@@ -62,6 +64,7 @@ interface ResearchCardProps {
 export function ResearchCard({
   href,
   title,
+  titleContent,
   layout = "list",
   eyebrow,
   meta,
@@ -109,11 +112,11 @@ export function ResearchCard({
         className={cn(
           "rounded-sm hover:text-brand",
           COLOUR_TRANSITION,
-          FOCUS_RING,
+          STRETCHED_FOCUS_RING,
           "after:absolute after:inset-0 after:rounded-xl after:content-['']",
         )}
       >
-        {title}
+        {titleContent ?? title}
       </Link>
     </Heading>
 

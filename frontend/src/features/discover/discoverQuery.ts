@@ -3,6 +3,7 @@ import { IP_TYPE_LABELS } from "@/types/records";
 
 import { EMPTY_FILTERS, HAS_IP, SORT_OPTIONS, type DiscoverFilters, type DiscoverSort } from "./DiscoverFilterBar";
 import { ALL_VALUE, type FilterOption } from "./DiscoverFilterDropdown";
+import { searchTerms } from "./searchTerms";
 
 /**
  * Discover's query -- search text, filters and sort -- in one parsed shape
@@ -177,7 +178,8 @@ export function listParams(query: DiscoverQuery): Record<string, unknown> {
   // then all-time views, then newest (IR-369).
   const params: Record<string, unknown> = { ordering: feed === "trending" ? "trending" : ORDERING[sort] };
 
-  if (q) params.search = q;
+  // By word: the sentence's content words, not the phrase (IR-1095).
+  if (q) params.search = searchTerms(q).join(" ");
   if (filters.recordType !== ALL_VALUE) params.record_type = filters.recordType;
   if (filters.colleges.length > 0) params.college = filters.colleges.join(",");
   if (filters.classifications.length > 0) params.classification = filters.classifications.join(",");
