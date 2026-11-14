@@ -25,7 +25,7 @@ export function InterruptedState({ what, onRetry, framed }: InterruptedStateProp
       icon="fa-hourglass-half"
       title="This took too long"
       message={failureMessage(new RequestTimeoutError(0), { lead: `The ${what} did not finish loading.` })}
-      action={<Button type="button" variant="outline" size="sm" onClick={onRetry}>Try again</Button>}
+      action={<Button type="button" variant="outline" size="sm" onClick={onRetry}>Retry</Button>}
     />
   );
 }

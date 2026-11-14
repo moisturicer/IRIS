@@ -24,12 +24,12 @@ describe("LoadFailedAlert", () => {
 });
 
 describe("InterruptedState", () => {
-  it("blames IRIS for the wait and offers Try again", async () => {
+  it("blames IRIS for the wait and offers Retry, ADR-061's name for the reader's choice to read again", async () => {
     const onRetry = vi.fn();
     renderScreen(<InterruptedState what="console" onRetry={onRetry} />);
 
     expect(screen.getByRole("alert")).toHaveTextContent("The console did not finish loading. IRIS took too long to answer. Try again.");
-    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 });

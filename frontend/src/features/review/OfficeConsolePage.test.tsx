@@ -221,7 +221,7 @@ describe("OfficeConsolePage", () => {
 
     expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
     expect(screen.queryByText("Could not load the console")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByRole("list", { name: "Open reviews" })).toBeInTheDocument();
   });
 

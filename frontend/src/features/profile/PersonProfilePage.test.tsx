@@ -299,7 +299,7 @@ describe("loading and failing", () => {
     open(101);
 
     expect(await screen.findByText("This took too long")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
   });
 
   it("keeps a failed list in its place with its own retry, and still shows the rest", async () => {
