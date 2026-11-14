@@ -7,6 +7,9 @@
  *     approve action appears.
  *   - Decided asks for `status=decided` (approved and declined) and shows each
  *     outcome with the requester's reason and the date it was decided.
+ *   - The API pages at 20; "Load more" reads the next page and appends it.
+ *   - The reason column is the requester's ("Requested because"). RDCO's own
+ *     reason, and a Decline action, are IR-1099.
  *
  * Notes:
  *   - Only admins can approve deletions (backend: IsAdmin permission).
@@ -30,10 +33,23 @@ import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { formatDate }  from "@/lib/utils";
 import type { DeleteRequest } from "@/types/records";
 
+/** One page of the queue, and whether the server has another after it. */
+type QueuePage = { results: DeleteRequest[]; next: string | null };
+
+/**
+ * The pages read after the first, kept with the first page they follow. When a
+ * tab change or a reload brings a new first page, these no longer follow it and
+ * are ignored, so nothing stale is ever shown beside a fresh read.
+ */
+type LaterPages = { after: QueuePage; rows: DeleteRequest[]; page: number; next: string | null };
+
 export default function DeleteRequestsPage() {
   const [approving,    setApproving]    = useState<number | null>(null);
   const [error,        setError]        = useState<string | null>(null);
   const [tab, setTab] = useState<"pending" | "decided">("pending");
+  const [later,        setLater]        = useState<LaterPages | null>(null);
+  const [loadingMore,  setLoadingMore]  = useState(false);
+  const [moreError,    setMoreError]    = useState<string | null>(null);
 
   // Cancelled when the filter changes or the page closes, so a slow earlier
   // answer cannot replace the one the reader is waiting for (IR-914).
@@ -41,15 +57,41 @@ export default function DeleteRequestsPage() {
     (signal) =>
       recordsApi
         .listDeleteRequests({ status: tab }, { signal })
-        .then(({ data }) => data.results ?? []),
+        .then(({ data }): QueuePage => ({ results: data.results ?? [], next: data.next ?? null })),
     [tab],
   );
   const loading = read.status === "loading";
-  const requests = read.data ?? [];
+  const firstPage = read.data;
+  const following = later && later.after === firstPage ? later : null;
+  const requests = [...(firstPage?.results ?? []), ...(following?.rows ?? [])];
+  const hasMore = (following ? following.next : firstPage?.next) != null;
+
+  // Reads the page after the last one shown (the API pages at 20). A tab change
+  // or reload while it is in flight leaves its answer ignored, as above.
+  const loadMore = async () => {
+    if (!firstPage) return;
+    const page = (following?.page ?? 1) + 1;
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const { data } = await recordsApi.listDeleteRequests({ status: tab, page });
+      setLater({
+        after: firstPage,
+        rows: [...(following?.rows ?? []), ...(data.results ?? [])],
+        page,
+        next: data.next ?? null,
+      });
+    } catch {
+      setMoreError("Could not load more requests. Please try again.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Reading again also clears an earlier failed approval, as it always has.
   const reload = () => {
     setError(null);
+    setMoreError(null);
     read.retry();
   };
 
@@ -93,7 +135,7 @@ export default function DeleteRequestsPage() {
           <Button
             key={s}
             type="button"
-            onClick={() => setTab(s)}
+            onClick={() => { setTab(s); setMoreError(null); }}
             aria-pressed={tab === s}
             variant="ghost"
             size="sm"
@@ -135,7 +177,7 @@ export default function DeleteRequestsPage() {
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
             <span className="text-[13px] text-stone-500 font-medium">
-              {requests.length} request{requests.length !== 1 ? "s" : ""}
+              {requests.length} request{requests.length !== 1 ? "s" : ""}{hasMore ? " shown" : ""}
             </span>
           </div>
 
@@ -145,7 +187,7 @@ export default function DeleteRequestsPage() {
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Requested By</th>
-                  <th className="px-4 py-3 font-semibold text-stone-600">Reason</th>
+                  <th className="px-4 py-3 font-semibold text-stone-600">Requested because</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Date</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Status</th>
                   <th className="px-4 py-3 font-semibold text-stone-600 text-right">
@@ -204,6 +246,22 @@ export default function DeleteRequestsPage() {
               </tbody>
             </table>
           </div>
+          {(hasMore || moreError) && (
+            <div className="flex flex-col items-center gap-2 border-t border-stone-100 px-4 py-3">
+              {moreError && (
+                <p role="alert" className="text-small text-stone-700">{moreError}</p>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={loadMore}
+                loading={loadingMore}
+              >
+                Load more
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

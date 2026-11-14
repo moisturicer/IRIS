@@ -181,3 +181,84 @@ describe("DeleteRequestsPage tabs (IR-1076)", () => {
     expect(await screen.findByText("No requests have been decided yet.")).toBeInTheDocument();
   });
 });
+
+describe("DeleteRequestsPage paging (IR-1076)", () => {
+  const first = request({ id: 1, record_title: "First page paper", status: "declined", reviewed_at: "2026-11-02T08:00:00Z" });
+  const second = request({ id: 2, record_title: "Second page paper", status: "approved", reviewed_at: "2026-11-01T08:00:00Z" });
+
+  /** A server that has more than one page of decided requests. */
+  function twoPages() {
+    listDeleteRequests.mockImplementation((params: { status?: string; page?: number }) =>
+      Promise.resolve({
+        data: params.page === 2
+          ? { results: [second], next: null }
+          : { results: [first], next: "http://api/records/delete-requests/?page=2" },
+      }),
+    );
+  }
+
+  it("labels the requester's words as theirs, not as RDCO's decision", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [request({})], next: null } });
+
+    renderScreen(<DeleteRequestsPage />);
+
+    expect(await screen.findByRole("columnheader", { name: "Requested because" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Reason" })).not.toBeInTheDocument();
+  });
+
+  it("offers Load more only when the server has another page, and appends it", async () => {
+    twoPages();
+
+    renderScreen(<DeleteRequestsPage />);
+    await screen.findByRole("link", { name: "First page paper" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByRole("link", { name: "Second page paper" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "First page paper" })).toBeInTheDocument();
+    expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "pending", page: 2 });
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("shows no Load more when everything fits on one page", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [first], next: null } });
+
+    renderScreen(<DeleteRequestsPage />);
+    await screen.findByRole("link", { name: "First page paper" });
+
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("starts again from the first page when the tab changes", async () => {
+    twoPages();
+
+    renderScreen(<DeleteRequestsPage />);
+    await screen.findByRole("link", { name: "First page paper" });
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByRole("link", { name: "Second page paper" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+
+    await waitFor(() => expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "decided" }));
+    expect(await screen.findByRole("button", { name: "Load more" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Second page paper" })).not.toBeInTheDocument();
+  });
+
+  it("says so when the next page cannot be read, and keeps what is shown", async () => {
+    listDeleteRequests.mockImplementation((params: { page?: number }) =>
+      params.page === 2
+        ? Promise.reject(new Error("boom"))
+        : Promise.resolve({ data: { results: [first], next: "http://api/?page=2" } }),
+    );
+
+    renderScreen(<DeleteRequestsPage />);
+    await screen.findByRole("link", { name: "First page paper" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load more/i);
+    expect(screen.getByRole("link", { name: "First page paper" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
+  });
+});
+
