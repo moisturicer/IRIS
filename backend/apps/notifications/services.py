@@ -984,10 +984,15 @@ def notify_delete_approved(delete_request, reviewed_by):
 
 
 def notify_delete_declined(delete_request, reviewed_by):
-    """Notify the requester when their delete request is declined."""
+    """
+    Tell the requester their delete request was declined, and why, in-app and
+    by email (IR-1099). RDCO's note travels with it, as a download decline's
+    does (IR-688). The email links to the record, which was restored.
+    """
     try:
         requester = delete_request.requested_by
         record    = delete_request.record
+        note      = delete_request.rdco_note
 
         Notification.objects.create(
             sender=reviewed_by,
@@ -996,8 +1001,20 @@ def notify_delete_declined(delete_request, reviewed_by):
             notif_type=_get_type("Delete Request Declined"),
             message=(
                 f'Your deletion request for "{record.title}" has been declined. '
-                f"The record remains published."
+                f"The record remains published. RDCO's note: {note}"
             ),
+        )
+        send_email_async(
+            subject=f"[IRIS] Delete request declined: {record.title[:60]}",
+            message=(
+                f"Hello {requester.first_name},\n\n"
+                f'Your request to delete "{record.title}" has been declined. '
+                f"The record remains published.\n\n"
+                f"RDCO's note:\n{note}\n\n"
+                f"{_record_url(record)}\n\n"
+                f"-- The IRIS Team"
+            ),
+            recipient_list=[requester.email],
         )
     except Exception:
         _log_failure("notify_delete_declined", request=delete_request)

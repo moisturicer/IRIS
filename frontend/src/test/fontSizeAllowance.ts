@@ -32,7 +32,7 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
   "src/features/accounts/UserListPage.tsx": 2,
   "src/features/admin/AccountDeletionRequestsPage.tsx": 10,
   "src/features/admin/DeleteRequestsPage.tsx": 7,
-  "src/features/admin/DownloadRequestsPage.tsx": 9,
+  "src/features/admin/DownloadRequestsPage.tsx": 7,
   "src/features/admin/RetentionPage.tsx": 4,
   "src/features/admin/SessionsPage.tsx": 5,
   "src/features/ai/AIHubPage.tsx": 6,

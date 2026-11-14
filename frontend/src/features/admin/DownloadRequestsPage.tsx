@@ -11,25 +11,22 @@
  * Each row shows the reader's note and each grant's expiry. Declining and
  * revoking ask for a note the reader is sent (IR-688); approving takes none.
  */
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
-import { Button, Modal } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { failureMessage } from "@/lib/readFailure";
-import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
+import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
-import { errorDetail, fieldError } from "@/lib/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { formatDate }  from "@/lib/utils";
 import type { DownloadRequest } from "@/types/records";
 
-/** The longest note RDCO may leave (IR-688; the server enforces it too). */
-const NOTE_MAX_LENGTH = 500;
-/** Shown where a request made before notes existed has none (IR-688). */
-const NO_NOTE = "No note recorded";
+import { NO_NOTE, RdcoNoteDialog } from "./RdcoNoteDialog";
 
 type Filter = "" | "pending" | "approved" | "declined" | "revoked";
 const FILTERS: readonly Filter[] = ["pending", "approved", "declined", "revoked", ""];
@@ -52,84 +49,6 @@ const NOTE_ACTS = {
     send:   recordsApi.revokeDownloadRequest,
   },
 } as const;
-
-function NoteDialog({ act, onClose, onDone }: { act: NoteAct; onClose: () => void; onDone: () => void }) {
-  const ids = useId();
-  const copy = NOTE_ACTS[act.kind];
-  const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const ready = note.trim() !== "";
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!ready || sending) return;
-    setError(null);
-    setSending(true);
-    try {
-      await copy.send(act.request.id, note.trim());
-      onDone();
-    } catch (err) {
-      // The note stays in the box beside the server's reason.
-      setError(fieldError(err, "note") ?? errorDetail(err, "That did not go through. Please try again."));
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const formId = `${ids}-form`;
-  const noteId = `${ids}-note`;
-
-  return (
-    <Modal
-      open
-      onClose={sending ? () => {} : onClose}
-      title={copy.title}
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>
-            Cancel
-          </Button>
-          <Button type="submit" form={formId} variant="danger" disabled={!ready} loading={sending}>
-            {copy.submit}
-          </Button>
-        </div>
-      }
-    >
-      <form id={formId} onSubmit={submit} noValidate className="space-y-4">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
-          <span className="font-semibold text-stone-900">{act.request.requested_by_name ?? act.request.requested_by_email}</span>
-          {" · "}
-          {act.request.record_title}. {copy.intro}
-        </p>
-        <div>
-          <label htmlFor={noteId} className={LABEL}>
-            Note to the reader
-          </label>
-          <textarea
-            id={noteId}
-            required
-            rows={4}
-            maxLength={NOTE_MAX_LENGTH}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            aria-describedby={`${noteId}-help`}
-            className={fieldClasses(false)}
-          />
-          <p id={`${noteId}-help`} className="mt-1 text-[13px] text-stone-600">
-            The reader sees this as you write it. Up to {NOTE_MAX_LENGTH} characters.
-          </p>
-        </div>
-        {error && (
-          <p role="alert" className={LOAD_ERROR}>
-            <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-            {error}
-          </p>
-        )}
-      </form>
-    </Modal>
-  );
-}
 
 /** Under an approved request: until when, or since when it has expired. */
 function grantLine(req: DownloadRequest): string | null {
@@ -342,8 +261,21 @@ export default function DownloadRequestsPage() {
       )}
 
       {noteAct && (
-        <NoteDialog
-          act={noteAct}
+        <RdcoNoteDialog
+          title={NOTE_ACTS[noteAct.kind].title}
+          submitLabel={NOTE_ACTS[noteAct.kind].submit}
+          audience="reader"
+          subject={
+            <>
+              <span className="font-semibold text-stone-900">
+                {noteAct.request.requested_by_name ?? noteAct.request.requested_by_email}
+              </span>
+              {" · "}
+              {noteAct.request.record_title}.
+            </>
+          }
+          intro={NOTE_ACTS[noteAct.kind].intro}
+          send={(note) => NOTE_ACTS[noteAct.kind].send(noteAct.request.id, note)}
           onClose={() => setNoteAct(null)}
           onDone={() => { setNoteAct(null); load(); }}
         />
