@@ -183,8 +183,8 @@ def test_jev_decisions_are_admitted_and_a_refusal_routes_to_the_backup(settings)
 
 
 def test_each_inference_task_has_a_lane():
-    # Every task pinned. The reserved figure task is pinned without being
-    # named: `test_reserved_task.py` forbids naming it outside its package.
+    # Every task pinned. The reserved figure and formula tasks are pinned without
+    # being named: `test_reserved_task.py` forbids naming it outside its package.
     named = {
         "answer": "chat", "brief": "research", "resolve": "chat", "route": "chat",
         "plan": "research", "screen": "research", "summary": "overview",
@@ -192,7 +192,7 @@ def test_each_inference_task_has_a_lane():
     lanes = {task.value: task_lane(task) for task in InferenceTask}
     assert {name: lanes[name] for name in named} == named
     rest = {lane for name, lane in lanes.items() if name not in named}
-    assert len(lanes) == len(named) + 1 and rest == {"ingestion"}
+    assert len(lanes) == len(named) + 2 and rest == {"ingestion"}
 
 
 def test_a_bounded_stream_asks_for_its_usage_and_is_charged_it(settings):

@@ -200,7 +200,7 @@ export function RequestDocumentDialog({
               rows={3}
               aria-required
               placeholder="Why you need these, and anything they should check first."
-              className="w-full border border-stone-200 rounded-lg p-3 text-sm resize-y focus:outline-none focus:border-brand"
+              className="w-full border border-field rounded-lg p-3 text-sm resize-y focus:outline-none focus:border-brand"
             />
           </div>
 

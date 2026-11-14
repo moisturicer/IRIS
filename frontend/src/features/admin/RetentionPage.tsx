@@ -135,10 +135,10 @@ function RetentionItem({ type, saved, lastRun }: { type: RetentionType; saved: s
 
   return (
     <li aria-labelledby={headingId} className="bg-white rounded-xl border border-stone-200 p-4">
-      <h2 id={headingId} className="text-[15px] font-semibold text-stone-900">{type.label}</h2>
-      <p className="mt-1 text-[14px] text-stone-700 leading-relaxed">{type.description}</p>
+      <h2 id={headingId} className="text-body font-semibold text-stone-900">{type.label}</h2>
+      <p className="mt-1 text-body text-stone-700 leading-relaxed">{type.description}</p>
 
-      <dl className="mt-3 grid gap-x-6 gap-y-1 text-[14px] sm:grid-cols-[auto_1fr]">
+      <dl className="mt-3 grid gap-x-6 gap-y-1 text-body sm:grid-cols-[auto_1fr]">
         <dt className="font-medium text-stone-700">Period</dt>
         <dd className="text-stone-900">{periodText(current)}</dd>
         <dt className="font-medium text-stone-700">Last ran</dt>
@@ -169,7 +169,7 @@ function RetentionItem({ type, saved, lastRun }: { type: RetentionType; saved: s
           {error}
         </p>
       )}
-      {done && <p role="status" className="mt-3 text-[14px] text-stone-700">{done}</p>}
+      {done && <p role="status" className="mt-3 text-body text-stone-700">{done}</p>}
 
       <ConfirmDialog
         open={pending !== null}

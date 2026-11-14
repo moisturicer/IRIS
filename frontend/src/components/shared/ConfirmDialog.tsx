@@ -64,7 +64,7 @@ export function ConfirmDialog({
         </div>
       }
     >
-      <p className="text-[14px] text-stone-600">{message}</p>
+      <p className="text-body text-stone-600">{message}</p>
       {error && (
         <p role="alert" className="mt-3 text-small text-brand">
           {error}

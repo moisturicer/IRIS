@@ -65,7 +65,7 @@ export function Modal({
           <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
             <h2
               id={titleId}
-              className={displayTitle ? "font-display text-title text-stone-900" : "text-[16px] font-semibold text-stone-900"}
+              className={displayTitle ? "font-display text-title text-stone-900" : "text-heading font-semibold text-stone-900"}
             >
               {title}
             </h2>
@@ -75,7 +75,7 @@ export function Modal({
               className="inline-flex min-h-11 min-w-11 items-center justify-center p-1 rounded-md text-stone-500 hover:text-stone-700 hover:bg-stone-100"
               aria-label="Close"
             >
-              <i className="fa fa-times text-[15px]" aria-hidden />
+              <i className="fa fa-times text-body" aria-hidden />
             </button>
           </div>
         )}

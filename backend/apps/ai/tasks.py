@@ -167,6 +167,18 @@ def describe_extraction_figures(self, extraction_id: int, source_revision=None):
         raise self.retry(exc=exc, countdown=300 * (self.request.retries + 1))
 
 
+@shared_task(bind=True, max_retries=3, ignore_result=True)
+def transcribe_extraction_formulas(self, extraction_id: int, source_revision=None):
+    """Transcribe a read's Formula crops to LaTeX (IR-1102).
+    A retry resends only the formulas no reply was read for."""
+    from apps.ai.formula_transcriptions import TranscriptionsOwed, transcribe_formulas
+
+    try:
+        transcribe_formulas(extraction_id, source_revision)
+    except TranscriptionsOwed as exc:
+        raise self.retry(exc=exc, countdown=300 * (self.request.retries + 1))
+
+
 @shared_task(bind=True, max_retries=2)
 def generate_record_overview(
     self, record_id: int, chunk_set_id: int, content_hash: str, prompt_version: int

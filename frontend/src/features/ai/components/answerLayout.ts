@@ -27,6 +27,10 @@ export const ANSWER_MARKDOWN =
 export const OVERVIEW_MARKDOWN = [
   ANSWER_MARKDOWN,
   "prose-headings:text-stone-900 prose-h2:border-b-0 prose-h2:pb-0 prose-h2:mt-[2em] prose-h2:mb-[0.45em]",
+  // One ladder inside the Overview (IR-1089, audit VIS-06): its own heading is
+  // 22 px, so every heading the model writes is 17 px, whatever level it chose.
+  // The chat's 24 / 20 em steps put a section above the heading it sits under.
+  "prose-h1:text-lg prose-h2:text-lg prose-h3:text-lg prose-h4:text-lg",
   "prose-h3:mt-[1.5em] prose-h3:mb-[0.3em]",
   "prose-p:leading-[1.8] prose-li:leading-[1.75] prose-li:my-[0.35em] prose-li:marker:text-brand",
   "[&>p:first-child]:text-lg [&>p:first-child]:leading-[1.7] [&>p:first-child]:text-stone-800",
@@ -59,7 +63,7 @@ export const ASK_PANELS_INLINE_PX = 900;
 export const CHAT_OPENING = "overflow-y-auto before:my-auto before:content-[''] after:my-auto after:content-['']";
 
 export const CHAT_COMPOSER_SURFACE =
-  "rounded-2xl border border-stone-300 bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 motion-reduce:transition-none";
+  "rounded-2xl border border-field bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 motion-reduce:transition-none";
 
 // Grows with the question up to a cap; browsers without field-sizing keep `rows`.
 export const CHAT_COMPOSER_FIELD =

@@ -55,17 +55,42 @@ export default {
         surface: "#ffffff",
         overlay: "#ffffff",
 
-        // Primary brand color -- deep maroon
-        gold: {
-          DEFAULT: "#C59334",
-          dark:    "#A87B2A",
-          light:   "#D4A84A",
+        // Field Stone (IR-1074, D1; DESIGN.md "Decided changes"): the outline of
+        // every input, select, textarea and checkbox, 3.49:1 on white (WCAG
+        // 1.4.11). Rule Stone (`stone-300`) stays on decorative chips and cards,
+        // which carry no meaning an outline has to show. Placeholders and helper
+        // text are Quiet Ink, `stone-600` (#57534e).
+        field: "#8f8884",
+
+        // Highlight roles (IR-1097, D6; DESIGN.md "Decided changes"). One look
+        // per kind of highlight, and no look means two things. Values are the
+        // prototype's (iris-uiux-audit/prototype/styles.css).
+        //
+        // `hl` is the one yellow, for a word a search or Find matched, and
+        // `hl-now` the current Find match; ink on either is 14:1. `pen` is the
+        // one rose, for a reviewer's mark on a passage: its underline, fill
+        // and the open thread's stronger fill. Nothing else uses either hue,
+        // so a match can never be mistaken for a selection or a status.
+        hl: {
+          DEFAULT: "#F7E08F",
+          now:     "#F2C94C",
         },
-        cream: "#F5F0E8",
+        pen: {
+          DEFAULT: "#B4474B",
+          wash:    "#FBEAEA",
+          now:     "#F5D5D6",
+        },
+
+        // Primary brand color -- deep maroon. `brand-50`, `brand-100` and
+        // `brand-200` are retired as fills, outlines and text (palette.test.ts):
+        // Maroon Wash did fifteen jobs. The scale itself is unchanged; the
+        // guard keeps the three tints out of the source.
         brand: {
           DEFAULT: "#6B0F12",
           light:   "#8B1316",
           dark:    "#4A0A0C",
+          // The pressed state of a filled maroon button.
+          press:   "#5A0C0F",
           50:      "#fdf2f2",
           100:     "#fce4e4",
           200:     "#f9b8b9",
@@ -102,11 +127,17 @@ export default {
         // Named for what the text is, so a screen asks for `text-title` and the
         // size follows. `display` and `title` are set in `font-display`.
         display: ["28px", { lineHeight: "34px" }],
+        // A section heading in the reading column (IR-1089): the top of the
+        // fixed 22 / 17 ladder, with `lg` (17 px) for headings inside a section.
+        section: ["22px", { lineHeight: "28px" }],
         title:   ["20px", { lineHeight: "28px" }],
         heading: ["16px", { lineHeight: "24px" }],
         body:    ["15px", { lineHeight: "24px" }],
         small:   ["13px", { lineHeight: "20px" }],
         label:   ["12px", { lineHeight: "16px" }],
+        // Form fields and page buttons only (IR-1074, D1): 14/20, between
+        // `small` and `body`. The reader toolbar's reading controls stay 13 px.
+        control: ["14px", { lineHeight: "20px" }],
       },
 
       // On Tailwind's 4 px base (IR-405): the section rhythm and card padding,
@@ -230,7 +261,7 @@ export default {
                 fontStyle: "normal",
                 fontWeight: "400",
                 color: theme("colors.stone.600"),
-                borderLeftColor: theme("colors.gold.DEFAULT"),
+                borderLeftColor: theme("colors.stone.300"),
               },
               "blockquote p:first-of-type::before": { content: "none" },
               "blockquote p:last-of-type::after": { content: "none" },
@@ -275,12 +306,13 @@ export default {
           "0%":   { opacity: "0" },
           "100%": { opacity: "1" },
         },
-        // A citation's highlight briefly reads brighter on arrival, so a
+        // A citation's passage briefly reads stronger on arrival, so a
         // reader's eye finds it on the page rather than searching for a
-        // static box among the surrounding text (IR-335).
+        // static box among the surrounding text (IR-335). Maroon, the colour of
+        // a reference: yellow is for matches only (IR-1097).
         "citation-flash": {
-          "0%":   { backgroundColor: "rgb(252 211 77 / 0.75)" },
-          "100%": { backgroundColor: "rgb(252 211 77 / 0.35)" },
+          "0%":   { backgroundColor: "rgb(107 15 18 / 0.30)" },
+          "100%": { backgroundColor: "rgb(107 15 18 / 0.08)" },
         },
         // Ask IRIS arriving from the edge it is docked to (IR-569).
         "panel-in": {

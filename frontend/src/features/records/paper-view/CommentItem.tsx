@@ -120,13 +120,13 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
               <div
                 className={cn(
                   "min-w-0 max-w-full rounded-2xl px-3.5 py-2 transition-colors duration-300 motion-reduce:transition-none",
-                  ctx.highlightId === comment.id ? "bg-brand-100" : "bg-stone-100",
+                  ctx.highlightId === comment.id ? "bg-stone-200" : "bg-stone-100",
                 )}
               >
                 <header className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="text-xs font-semibold text-stone-900">{name}</span>
                   {comment.is_author && (
-                    <span className="rounded-full bg-brand/10 px-2 py-0.5 text-3xs font-semibold text-brand">Author</span>
+                    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-3xs font-semibold text-stone-700">Author</span>
                   )}
                 </header>
                 <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-stone-800">
@@ -287,7 +287,7 @@ function EditForm({ ctx }: { ctx: CommentContext }) {
         onKeyDown={keyDown}
         maxLength={ctx.maxLength}
         rows={2}
-        className="block max-h-64 w-full resize-none overflow-y-auto rounded-2xl border border-stone-300 bg-surface px-3.5 py-2.5 text-sm text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+        className="block max-h-64 w-full resize-none overflow-y-auto rounded-2xl border border-field bg-surface px-3.5 py-2.5 text-sm text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
       />
       {remaining <= 300 && <p className="mt-1 text-right text-2xs text-stone-600">{remaining} characters remaining</p>}
       <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 pl-1">

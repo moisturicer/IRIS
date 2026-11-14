@@ -107,8 +107,11 @@ class DocumentChunk(models.Model):
     # own set is no longer active. Hard-deleting instead would discard the
     # vector that makes the *next* re-chunk cheap.
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
-    # Keyword index over `content`, written by a database trigger and never
-    # by this model (IR-393, ADR-033 §2). See `apps.ai.keyword_index`.
+    # What the keyword index reads when it is not `content`: null reads
+    # `content`. Set where a transcribed formula is (IR-1102).
+    keyword_text = models.TextField(null=True, blank=True, default=None)
+    # Keyword index over `keyword_text`, else `content`, written by a database
+    # trigger and never by this model (IR-393, ADR-033 §2). See `apps.ai.keyword_index`.
     search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:

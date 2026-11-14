@@ -103,6 +103,8 @@ def unstructured_extractor() -> StructuredExtractor:
         timeout_base_seconds=settings.UNSTRUCTURED_TIMEOUT_BASE_SECONDS,
         timeout_per_page_seconds=settings.UNSTRUCTURED_TIMEOUT_PER_PAGE_SECONDS,
         max_pages=settings.PDF_VALIDATION_MAX_PAGES or settings.UNSTRUCTURED_MAX_PAGES,
+        max_figures=settings.UNSTRUCTURED_MAX_FIGURES,
+        max_figure_pixels=settings.UNSTRUCTURED_MAX_FIGURE_PIXELS,
     )
 
 

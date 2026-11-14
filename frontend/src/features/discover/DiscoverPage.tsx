@@ -1,7 +1,7 @@
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { recordsApi } from "@/api/records";
@@ -18,6 +18,7 @@ import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
 import type { SavedFeed } from "@/api/library";
 import { useRole } from "@/hooks/useRole";
 import { canAccess } from "@/lib/access";
+import { ASK_PATH, askHandoffState } from "@/lib/askHandoff";
 import { useFeedsStore } from "@/store/feeds.store";
 import { cn } from "@/lib/utils";
 import { IP_TYPE_LABELS } from "@/types/records";
@@ -48,6 +49,7 @@ import {
   writeDiscoverQuery,
   type DiscoverQuery,
 } from "./discoverQuery";
+import { looksLikeQuestion, searchTerms } from "./searchTerms";
 
 const PAGE_SIZE = 12;
 const COLUMNS_KEY = "iris.discover.columns";
@@ -621,20 +623,32 @@ export default function DiscoverPage() {
     }
   };
 
+  /** People are searched by the same content words as papers. */
+  const peopleQuery = useMemo(() => searchTerms(activeQuery).join(" "), [activeQuery]);
+
+  /** Ask IRIS is offered for a question once its results are in, not while they load or if they failed. */
+  const suggestAsk = !holdQuietly && !loading && !failed && looksLikeQuestion(activeQuery);
+
+  /* Papers / People sit in the page header, so on a phone the toolbar row below
+     search holds only what narrows the feed (IR-1080, audit RES-01). */
+  const resultsSwitch = (
+    <div role="group" aria-label="Discover results" className="inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 sm:h-10 sm:p-0.5">
+      {([ ["papers", "Papers"], ["people", "People"] ] as const).map(([value, label]) => (
+        <button key={value} type="button" aria-pressed={discoverView === value} onClick={() => setDiscoverView(value)}
+          className={cn("h-full min-h-11 rounded-md px-4 text-small font-semibold sm:min-h-0", COLOUR_TRANSITION, FOCUS_RING, discoverView === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-white")}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
   const research = (
     <>
-      <div role="group" aria-label="Discover results" className="mt-4 inline-flex h-10 items-center rounded-lg border border-stone-200 bg-stone-100 p-0.5">
-        {([ ["papers", "Papers"], ["people", "People"] ] as const).map(([value, label]) => (
-          <button key={value} type="button" aria-pressed={discoverView === value} onClick={() => setDiscoverView(value)}
-            className={cn("h-full rounded-md px-4 text-small font-semibold", COLOUR_TRANSITION, FOCUS_RING, discoverView === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-white")}>
-            {label}
-          </button>
-        ))}
-      </div>
-      {discoverView === "people" ? <DiscoverPeopleResults query={activeQuery} /> : (
+      {discoverView === "people" ? <DiscoverPeopleResults query={peopleQuery} /> : (
       <>
-      <div className="mt-4 flex flex-wrap items-center gap-1.5 sm:gap-2">
-        <div role="group" aria-label="Discover feed" className="inline-flex h-11 shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0.5 shadow-[inset_0_1px_2px_rgb(41_37_36/0.12)]">
+      <div role="group" aria-label="Discover controls"
+        className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+        <div role="group" aria-label="Discover feed" className="inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 shadow-[inset_0_1px_2px_rgb(41_37_36/0.12)] sm:h-11 sm:p-0.5">
           {([["for_you", "For you"], ["latest", "Latest"], ["trending", "Trending"]] as const).map(([value, label]) => (
             <button key={value} type="button" aria-pressed={feed === value}
               title={value === "trending" ? "Most viewed research" : undefined}
@@ -645,14 +659,14 @@ export default function DiscoverPage() {
                 updateQuery((current) => ({ ...current, feed: value, q: value === "for_you" ? "" : current.q }));
                 if (value === "for_you") setSearchInput("");
               }}
-               className={cn("h-full rounded-md px-1.5 text-[11px] sm:px-3 sm:text-small font-semibold", COLOUR_TRANSITION, FOCUS_RING, feed === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-surface")}>{label}</button>
+               className={cn("h-full min-h-11 rounded-md px-3 text-small font-semibold sm:min-h-0", COLOUR_TRANSITION, FOCUS_RING, feed === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-surface")}>{label}</button>
           ))}
         </div>
         <button type="button" onClick={() => setInterestOpen(true)}
           aria-label={interests.classifications.length || interests.psced.length ? "Edit Areas" : "Choose Areas"}
-          className={cn("inline-flex h-11 w-11 sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white sm:px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+          className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
           <i className="fas fa-compass text-[12px]" aria-hidden />
-          <span className="hidden sm:inline">Areas</span>
+          <span>Areas</span>
         </button>
         <MyFeeds
           query={query}
@@ -673,7 +687,7 @@ export default function DiscoverPage() {
           </svg>
         </button>
         <DiscoverFilterBar
-          className="max-xl:ml-auto"
+          className="shrink-0"
           filters={filters}
           onChange={setFilters}
           showSort={feed === "latest"}
@@ -685,9 +699,9 @@ export default function DiscoverPage() {
         />
         {canPublish && (
           <button type="button" onClick={openPublish} aria-label="Publish"
-            className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 w-11 !px-0 sm:w-auto sm:!px-5")}>
+            className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 shrink-0 !px-4 sm:!px-5")}>
             <i className="fas fa-plus text-[12px]" aria-hidden />
-            <span className="hidden sm:inline">Publish</span>
+            <span>Publish</span>
           </button>
         )}
       </div>
@@ -758,7 +772,19 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      <DiscoverPeopleResults query={activeQuery} preview onSeeAll={() => setDiscoverView("people")} />
+      {/* A question gets one line above the results, not a permanent one (IR-1095). */}
+      {suggestAsk && (
+        <p className="mt-4 text-small text-stone-700">
+          This looks like a question.{" "}
+          <Link to={ASK_PATH} state={askHandoffState(activeQuery)}
+            className={cn("font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
+            Ask IRIS this question
+          </Link>{" "}
+          to get an answer from the research you can read.
+        </p>
+      )}
+
+      <DiscoverPeopleResults query={peopleQuery} preview onSeeAll={() => setDiscoverView("people")} />
 
       <p aria-live="polite" className="sr-only">
         {/* No count over an empty state: its own message already says so. */}
@@ -800,9 +826,17 @@ export default function DiscoverPage() {
             title="No research matches these filters"
             message="Try removing a filter or searching for something else."
             action={
-              <button type="button" onClick={clearFilters} className={cn(PILL_SECONDARY, FOCUS_RING)}>
-                Clear filters
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button type="button" onClick={clearFilters} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+                  Clear filters
+                </button>
+                {/* A question already has its own line above; one offer is enough. */}
+                {activeQuery && !suggestAsk && (
+                  <Link to={ASK_PATH} state={askHandoffState(activeQuery)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+                    Ask IRIS instead
+                  </Link>
+                )}
+              </div>
             }
           />
         ) : (
@@ -866,9 +900,12 @@ export default function DiscoverPage() {
       <div className={cn(PAGE_WIDTH.standard, "px-4 sm:px-7 pt-4 sm:pt-7 pb-12 flex-1")}>
         <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
 
-        <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
-          <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
-          <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
+            <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
+            <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
+          </div>
+          {resultsSwitch}
         </div>
 
         <DiscoverTabs

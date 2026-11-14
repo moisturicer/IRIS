@@ -121,7 +121,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
       </button>
 
       {failure && !open && (
-        <p role="alert" className="absolute top-full mt-1.5 right-0 w-60 z-40 rounded-lg border border-brand-200 bg-white px-3 py-2 text-2xs text-brand shadow-card-md">
+        <p role="alert" className="absolute top-full mt-1.5 right-0 w-60 z-40 rounded-lg border border-stone-300 bg-white px-3 py-2 text-2xs text-brand shadow-card-md">
           {failure.message}
         </p>
       )}
@@ -133,7 +133,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
           className={cn("absolute top-full mt-1.5 w-64", variant === "pill" ? "left-0" : "right-0", "bg-white rounded-lg shadow-card-md border border-stone-200/90 py-1.5 z-40")}
         >
           {failure && (
-            <p role="alert" className="mx-3 mb-1.5 rounded-md bg-brand-50 px-2 py-1.5 text-2xs text-brand">
+            <p role="alert" className="mx-3 mb-1.5 rounded-md border border-stone-300 bg-surface px-2 py-1.5 text-2xs text-brand">
               {failure.message}
             </p>
           )}
@@ -224,7 +224,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                   }}
                   placeholder="New folder…"
                   aria-label="New folder name"
-                  className="flex-1 min-w-0 px-2 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs outline-none focus:border-brand"
+                  className="flex-1 min-w-0 px-2 py-1.5 bg-stone-50 border border-field rounded-lg text-xs outline-none focus:border-brand"
                 />
                 <button
                   type="button"

@@ -2862,14 +2862,87 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.getByRole("button", { name: "Save" })).toHaveClass("bg-brand");
   });
 
-  it("lists the authors as chips, and says what the record is", async () => {
+  it("lists the authors as chips, and leaves what the record is to Record details (IR-1089)", async () => {
     renderPaperView();
     await waitForRecord(record.title);
 
     const authors = screen.getByRole("list", { name: "Authors" });
     expect(within(authors).getByText("R. Dela Cruz")).toBeInTheDocument();
-    expect(screen.getAllByText("Thesis/Research").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Applied Research").length).toBeGreaterThan(0);
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    expect(within(header).queryByText("Thesis/Research")).not.toBeInTheDocument();
+    expect(within(header).queryByText("Applied Research")).not.toBeInTheDocument();
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Thesis/Research")).toBeInTheDocument();
+    expect(within(details).getByText("Applied Research")).toBeInTheDocument();
+  });
+
+  it("names the authors once and dates the work once, above the abstract (IR-1089)", async () => {
+    shownRecord = { ...record, publication_year: 2025, access_count: 3 };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(screen.getAllByText("R. Dela Cruz")).toHaveLength(1);
+    expect(screen.getAllByText(/^Completed /)).toHaveLength(1);
+    expect(screen.queryByText(/^Added /)).not.toBeInTheDocument();
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    expect(within(header).getByText("Completed 2026")).toBeInTheDocument();
+    // Neither the publication year nor the view count is a second date or a stat in the header.
+    expect(within(header).queryByText(/Published \d{4}/)).not.toBeInTheDocument();
+    expect(within(header).queryByText(/\d+ views?$/)).not.toBeInTheDocument();
+  });
+
+  it("keeps governance fields in Record details and out of the header (IR-1089)", async () => {
+    shownRecord = {
+      ...record, is_ip: true, ip_type: "patent", for_commercialization: true, community_extension: true,
+      psced: "0613", publication_year: 2025, access_count: 3,
+    };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    for (const label of [/Intellectual Property/, /Commercialization/, /Community Extension/, /Patent/]) {
+      expect(within(header).queryByText(label)).not.toBeInTheDocument();
+    }
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    const row = (label: string) => within(details).getByText(label).parentElement as HTMLElement;
+    expect(row("Published")).toHaveTextContent("2025");
+    expect(row("Views")).toHaveTextContent("3");
+    expect(row("PSCED")).toHaveTextContent("0613");
+    expect(row("Community Extension")).toHaveTextContent("Yes");
+    expect(row("IP Status")).toHaveTextContent("Patent");
+    expect(row("Commercialization")).toHaveTextContent("Eligible");
+  });
+
+  it("reads its headings in order, none above its parent's size, inside the AI Overview (IR-1089)", async () => {
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.overview).mockResolvedValueOnce({
+      data: {
+        state: "ready", cached: false,
+        overview: { text: "## Methodology\n\nA network.\n\n### Data\n\nGauge records.", citations: [], degraded: false, model: "fake", generated_at: "2026-09-23T00:00:00Z" },
+      },
+    } as never);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await screen.findByRole("heading", { name: "Methodology" });
+
+    const headings = screen.getAllByRole("heading").map((h) => ({
+      level: Number(h.tagName.slice(1)), name: h.textContent ?? "",
+    }));
+    expect(headings[0]).toMatchObject({ level: 1, name: record.title });
+    expect(headings.filter((h) => h.level === 1)).toHaveLength(1);
+    // Never a step down of more than one level (an h2 straight to an h4).
+    headings.slice(1).forEach((h, i) => expect(h.level, `"${h.name}" after "${headings[i].name}"`).toBeLessThanOrEqual(headings[i].level + 1));
+
+    const overviewAt = headings.findIndex((h) => h.name.trim() === "AI Overview");
+    const methodologyAt = headings.findIndex((h) => h.name === "Methodology");
+    const dataAt = headings.findIndex((h) => h.name === "Data");
+    expect(overviewAt).toBeGreaterThan(-1);
+    expect([methodologyAt, dataAt]).toEqual([overviewAt + 1, overviewAt + 2]);
+    // Inside the AI Overview no heading outranks the AI Overview's own.
+    for (const inside of [methodologyAt, dataAt]) {
+      expect(headings[inside].level).toBeGreaterThanOrEqual(headings[overviewAt].level);
+    }
+    expect(headings[dataAt].level).toBeGreaterThan(headings[methodologyAt].level);
   });
 
   it("never credits the submitting owner as an unrecorded author", async () => {
@@ -2890,7 +2963,9 @@ describe("the Overview's header (IR-569)", () => {
     const authors = screen.getByRole("list", { name: "Authors" });
     expect(within(authors).getAllByRole("listitem")).toHaveLength(8);
     expect(within(authors).getByText("Ashish Vaswani")).toBeInTheDocument();
-    expect(screen.getByText("Published 2017")).toBeInTheDocument();
+    // The publication year is a governance field now, in Record details (IR-1089).
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Published").parentElement).toHaveTextContent("2017");
     expect(screen.getByText("Completed 2020")).toBeInTheDocument();
     expect(screen.getByText("Imported reference")).toBeInTheDocument();
     expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();

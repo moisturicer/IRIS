@@ -125,7 +125,7 @@ export function LibraryRecordTable({
               key={record.id}
               className={cn(
                 "group relative flex flex-col rounded-2xl border bg-white p-card-compact transition-[border-color,box-shadow] duration-200 hover:shadow-card-md md:p-card",
-                selected.has(record.id) ? "border-brand-200" : "border-stone-200",
+                selected.has(record.id) ? "border-stone-900" : "border-stone-200",
               )}
             >
               <div className="flex items-center gap-2">
@@ -155,7 +155,7 @@ export function LibraryRecordTable({
               {viewed && <p className="mt-0.5 text-label text-stone-500">{viewed}</p>}
               <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">
                 {status && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-semibold text-brand ring-1 ring-brand-200">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-0.5 text-2xs font-semibold text-brand ring-1 ring-stone-300">
                     <i className={cn("fas", READING_STATUSES.find((s) => s.value === status)?.icon)} aria-hidden />
                     {readingStatusLabel(status)}
                   </span>
@@ -201,7 +201,7 @@ export function LibraryRecordTable({
             className={cn(
               "grid gap-x-3 gap-y-1.5 items-start md:items-center px-4 py-3 transition-colors",
               ROW_GRID,
-              selected.has(record.id) ? "bg-brand-50/40" : "hover:bg-stone-50",
+              selected.has(record.id) ? "bg-stone-100" : "hover:bg-stone-50",
             )}
           >
             <div className="flex items-center gap-2">

@@ -122,6 +122,20 @@ class RecallWideningTests:
 
         assert len(spy.seen[0]) > 3, "the reranker was handed only what was asked for"
 
+    def test_a_passage_with_no_content_is_never_sent_to_the_reranker(self, embedder, space, reader):
+        """IR-1102: an uncaptioned Figure's chunk shows nothing, and Voyage
+        refuses an empty document."""
+        record = make_record("Thesis", reader, embedder, space, ["a figure", "a passage"])
+        DocumentChunk.objects.filter(record=record, sequence=0).update(content="")
+        spy = _TransmittingReranker()
+
+        results = RerankingRetriever(
+            TwoStageRetriever(embedder), reranker=spy, policy_enabled=False,
+        ).retrieve("passage", reader)
+
+        assert spy.seen == [["a passage"]]
+        assert [p.content for p in results.passages] == ["a passage"]
+
     def test_the_callers_limit_still_bounds_the_result(self, embedder, space, reader):
         make_record("Thesis", reader, embedder, space,
                     [f"passage number {i}" for i in range(30)])

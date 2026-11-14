@@ -731,6 +731,21 @@ LLM_DESCRIBE_FIGURE_REASONING = config(
 LLM_DESCRIBE_FIGURE_PROVIDER_ONLY = config("LLM_DESCRIBE_FIGURE_PROVIDER_ONLY", default="")
 LLM_DESCRIBE_FIGURE_PROVIDER_PINS = config("LLM_DESCRIBE_FIGURE_PROVIDER_PINS", default="")
 
+# transcribe_formula (IR-1102, ADR-067 §Amendment): off until a model is set.
+# A vision model; requests deny training, and retention is accepted.
+LLM_TRANSCRIBE_FORMULA_VENDOR   = config("LLM_TRANSCRIBE_FORMULA_VENDOR", default="")
+LLM_TRANSCRIBE_FORMULA_BASE_URL = config("LLM_TRANSCRIBE_FORMULA_BASE_URL", default="")
+LLM_TRANSCRIBE_FORMULA_API_KEY  = config("LLM_TRANSCRIBE_FORMULA_API_KEY", default="")
+LLM_TRANSCRIBE_FORMULA_MODEL    = config("LLM_TRANSCRIBE_FORMULA_MODEL", default="")
+LLM_TRANSCRIBE_FORMULA_FALLBACK_MODELS = config(
+    "LLM_TRANSCRIBE_FORMULA_FALLBACK_MODELS", default=""
+)
+LLM_TRANSCRIBE_FORMULA_REASONING = config(
+    "LLM_TRANSCRIBE_FORMULA_REASONING", default=False, cast=bool
+)
+LLM_TRANSCRIBE_FORMULA_PROVIDER_ONLY = config("LLM_TRANSCRIBE_FORMULA_PROVIDER_ONLY", default="")
+LLM_TRANSCRIBE_FORMULA_PROVIDER_PINS = config("LLM_TRANSCRIBE_FORMULA_PROVIDER_PINS", default="")
+
 # ---- The verbatim history window (IR-449, ADR-026 §6) -------------------
 #
 # How much of a Conversation goes into the prompt verbatim. This was
@@ -820,6 +835,16 @@ AI_KEYWORD_RETRIEVAL_ENABLED = config(
 AI_RETRIEVAL_FUSION_ENABLED = config(
     "AI_RETRIEVAL_FUSION_ENABLED", default=False, cast=bool
 )
+
+# ---- Section-aligned embedding windows (IR-1056) ----------------------
+# Off until a trial run shows it helps; re-embed with `backfill_embeddings --force` after.
+AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False, cast=bool)
+
+# ---- Formulas in the indexed text (IR-1102, ADR-067 §Amendment) ----------
+# Readers always see a transcribed formula's LaTeX. On, it and its description
+# also enter the chunk's embedded and keyword-indexed text. Read at chunking,
+# so moving it needs a re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
+AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
 
 # ---- Vector scan depth (IR-440) ---------------------------------------
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.
@@ -961,6 +986,9 @@ UNSTRUCTURED_TIMEOUT_BASE_SECONDS = config("UNSTRUCTURED_TIMEOUT_BASE_SECONDS", 
 UNSTRUCTURED_TIMEOUT_PER_PAGE_SECONDS = config("UNSTRUCTURED_TIMEOUT_PER_PAGE_SECONDS", default=10, cast=int)
 # Sizes the declared timeout when PDF_VALIDATION_MAX_PAGES is unset.
 UNSTRUCTURED_MAX_PAGES = config("UNSTRUCTURED_MAX_PAGES", default=1000, cast=int)
+# Figures kept per read, and pixels per Figure image (IR-987).
+UNSTRUCTURED_MAX_FIGURES = config("UNSTRUCTURED_MAX_FIGURES", default=200, cast=int)
+UNSTRUCTURED_MAX_FIGURE_PIXELS = config("UNSTRUCTURED_MAX_FIGURE_PIXELS", default=16_000_000, cast=int)
 # LlamaExtract (IR-846, ADR-056 §15): Publish suggestions read from the parse
 # job above, with the same key and region. Unset version reads nothing and
 # Publish falls back to the shaped document; "latest" only with DEBUG on.

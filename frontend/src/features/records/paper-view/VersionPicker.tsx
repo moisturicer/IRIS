@@ -62,7 +62,7 @@ export function VersionPicker({
         value={viewing != null ? String(viewing) : currentValue}
         onChange={(e) => onChoose(e.target.value === currentValue ? null : Number(e.target.value))}
         className={cn(
-          "min-h-11 reading-split:min-h-9 rounded-lg border border-stone-300 px-2 text-sm text-stone-800",
+          "min-h-11 reading-split:min-h-9 rounded-lg border border-field px-2 text-sm text-stone-800",
           compact ? "w-32 bg-transparent" : "min-w-0 max-w-full bg-white",
           FOCUS_RING,
         )}
@@ -101,7 +101,7 @@ export function VersionBanner({
   onBack: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 flex items-start gap-3 flex-wrap">
+    <div className="rounded-xl border border-stone-300 bg-surface px-4 py-3 flex items-start gap-3 flex-wrap">
       <i className="fas fa-clock-rotate-left text-sm text-brand mt-0.5" aria-hidden />
       <div className="min-w-0 flex-1 text-sm">
         <p className="font-semibold text-stone-900">

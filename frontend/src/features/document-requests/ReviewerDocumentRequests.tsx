@@ -219,7 +219,7 @@ function ManagedItem({
                 aria-label={`Reject ${item.label}`}
                 aria-expanded={rejecting}
                 onClick={() => setRejecting((v) => !v)}
-                className="px-2 py-1 rounded-lg border border-brand-200 text-xs font-bold text-brand hover:bg-brand-50 disabled:opacity-60"
+                className="px-2 py-1 rounded-lg border border-stone-300 text-xs font-bold text-brand hover:bg-stone-100 disabled:opacity-60"
               >
                 Reject
               </button>
@@ -251,7 +251,7 @@ function ManagedItem({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-stone-200 p-2 text-sm focus:outline-none focus:border-brand"
+            className="w-full rounded-lg border border-field p-2 text-sm focus:outline-none focus:border-brand"
           />
           <div className="flex gap-2">
             <button

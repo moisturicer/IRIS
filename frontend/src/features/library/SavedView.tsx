@@ -17,6 +17,7 @@ import type { RecordListItem } from "@/types/records";
 import { LibraryRecordTable, type LibraryLayout } from "./LibraryRecordTable";
 import type { LibraryView } from "./ReadingPanel";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
+import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 
 type SortKey = "added" | "title" | "year";
 
@@ -206,7 +207,7 @@ export function SavedView({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by title or author"
-            className="w-full rounded-lg border border-stone-300 bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="w-full rounded-lg border border-field bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-600 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </label>
         {folderControl}
@@ -228,7 +229,7 @@ export function SavedView({
               aria-label={`${mode === "list" ? "List" : "Grid"} view`}
               aria-pressed={layout === mode}
               className={cn("rounded-md px-2.5 py-1.5", COLOUR_TRANSITION, FOCUS_RING,
-                layout === mode ? "bg-brand-50 text-brand" : "text-stone-500 hover:text-stone-800")}
+                layout === mode ? SELECTED_SEGMENT : "text-stone-500 hover:text-stone-800")}
             >
               <i className={cn("fas", mode === "list" ? "fa-list" : "fa-table-cells-large", "text-small")} aria-hidden />
             </button>
@@ -248,7 +249,7 @@ export function SavedView({
               if (e.key === "Enter") e.currentTarget.blur();
               if (e.key === "Escape") setRenaming(false);
             }}
-            className="rounded-lg border border-brand-200 px-3 py-1.5 font-display text-title font-semibold focus:border-brand focus:outline-none"
+            className="rounded-lg border border-field px-3 py-1.5 font-display text-title font-semibold focus:border-brand focus:outline-none"
           />
         ) : (
           <h2 className="font-display text-title font-semibold text-stone-900">{title}</h2>
@@ -268,7 +269,7 @@ export function SavedView({
 
 
       {selected.size > 0 && view.kind !== "history" && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-stone-300 bg-surface px-3 py-2">
           <span className="text-small font-semibold text-brand">Selected papers</span>
           <button type="button" onClick={() => remove([...selected])} className={cn(PILL_SECONDARY, "ml-auto min-h-9 px-3")}>
             {removeLabel}

@@ -134,6 +134,7 @@ def _serialize_options(options: ChunkingOptions) -> dict:
         "context_path_max_tokens": options.context_path_max_tokens,
         "merge_short_siblings": options.merge_short_siblings,
         "exclude_sections": list(options.exclude_sections),
+        "index_formulas": options.index_formulas,
     }
 
 
@@ -147,6 +148,7 @@ def _deserialize_options(data: dict) -> ChunkingOptions:
         context_path_max_tokens=data.get("context_path_max_tokens", 64),
         merge_short_siblings=data.get("merge_short_siblings", True),
         exclude_sections=tuple(data.get("exclude_sections", ())),
+        index_formulas=data.get("index_formulas", False),
     )
 
 
@@ -204,6 +206,7 @@ def chunk_rows(db_chunk_set, record_id: int, chunk_set: ChunkSet) -> list:
             max_sequence=max_sequence,
             text=chunk.text,
             content=chunk.content,
+            keyword_text=chunk.keyword_text,
             context_path=list(chunk.context_path),
             text_hash=chunk_text_hash(chunk),
             token_count=chunk.token_count,
@@ -414,6 +417,7 @@ class DjangoChunkRepository:
             Chunk(
                 text=row.text,
                 content=row.content,
+                keyword_text=row.keyword_text,
                 context_path=tuple(row.context_path),
                 sequence=row.sequence,
                 token_count=row.token_count,

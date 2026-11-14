@@ -99,7 +99,7 @@ export function NotesPanel({ record, note, highlights, onOpenHighlight, canOpenV
               <textarea id={editorId} value={note.text} onChange={(e) => note.setText(e.target.value)}
                 maxLength={MAX_NOTE_LENGTH} aria-describedby={hintId}
                 placeholder="What do you want to remember about this paper? A question, a page, a thought."
-                className="min-h-40 w-full flex-1 resize-none rounded-lg border border-stone-300 bg-white p-3 text-body leading-relaxed text-stone-900 placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" />
+                className="min-h-40 w-full flex-1 resize-none rounded-lg border border-field bg-white p-3 text-body leading-relaxed text-stone-900 placeholder:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" />
             </div>
             <SaveStatus note={note} />
           </>
@@ -223,7 +223,7 @@ function ConflictNotice({ note }: { note: ReadingNoteState }) {
   const conflict = note.conflict;
   if (!conflict) return null;
   return (
-    <section aria-label="Note changed on another device" className="shrink-0 border-b border-stone-200 bg-brand-50 px-4 py-3">
+    <section aria-label="Note changed on another device" className="shrink-0 border-b border-stone-200 bg-surface px-4 py-3">
       <p className="text-small font-semibold text-stone-900">This note changed on another device.</p>
       <p className="mt-1 text-2xs text-stone-700">Neither text has been lost. Choose what to keep; nothing is saved until you do.</p>
       <div className="mt-2 grid gap-2 reading-split:grid-cols-2">

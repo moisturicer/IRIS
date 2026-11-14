@@ -84,13 +84,13 @@ export function CommentComposer({
           rows={1}
           placeholder={placeholder}
           aria-describedby={remaining <= SHOW_COUNTER_AT ? counterId : undefined}
-          className="block max-h-64 min-h-11 w-full resize-none overflow-y-auto rounded-2xl border border-stone-300 bg-stone-100 py-2.5 pl-3.5 pr-12 text-sm text-stone-900 placeholder:text-stone-600 focus-visible:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-10"
+          className="block max-h-64 min-h-11 w-full resize-none overflow-y-auto rounded-2xl border border-field bg-stone-100 py-2.5 pl-3.5 pr-12 text-sm text-stone-900 placeholder:text-stone-600 focus-visible:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-10"
         />
         <button
           type="submit"
           disabled={!canPost}
           aria-label={submitLabel}
-          className="absolute bottom-0 right-0 inline-flex h-11 w-11 items-center justify-center rounded-full text-brand transition-colors duration-150 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:text-stone-500 disabled:hover:bg-transparent motion-reduce:transition-none reading-split:h-10 reading-split:w-10"
+          className="absolute bottom-0 right-0 inline-flex h-11 w-11 items-center justify-center rounded-full text-brand transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:text-stone-500 disabled:hover:bg-transparent motion-reduce:transition-none reading-split:h-10 reading-split:w-10"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
             <path d="M22 2 11 13" />

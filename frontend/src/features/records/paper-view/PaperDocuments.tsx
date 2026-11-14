@@ -35,7 +35,7 @@ export function PaperDocuments({ files, manageHref }: PaperDocumentsProps) {
           {files.map((file) => {
             const inner = (
               <>
-                <span className="w-8 h-8 rounded-lg bg-brand-50 text-brand flex items-center justify-center shrink-0">
+                <span className="w-8 h-8 rounded-lg bg-stone-100 text-brand flex items-center justify-center shrink-0">
                   <i className="fas fa-file-lines text-xs" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -63,7 +63,7 @@ export function PaperDocuments({ files, manageHref }: PaperDocumentsProps) {
                     href={file.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-2.5 py-2 hover:border-brand/30 hover:bg-stone-50 transition-colors"
+                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-2.5 py-2 hover:border-stone-300 hover:shadow-card-md transition-colors"
                   >
                     {inner}
                   </a>
