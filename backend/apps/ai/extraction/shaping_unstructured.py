@@ -1,8 +1,9 @@
 """Shape a stored Unstructured result without I/O (ADR-067 decision 8, IR-986).
 
-Heading depth comes from section numbering alone until IR-1057 adds the
-PDF-evidence cascade. ``Address`` and ``EmailAddress`` are never emitted;
-they stay only in the stored raw result.
+Heading depth, printed page numbers and line-level citation boxes read IRIS's
+own PDF evidence when it is given (IR-1057, ``evidence_rules``).
+``Address`` and ``EmailAddress`` are never emitted; they stay only in the
+stored raw result.
 """
 
 from collections import Counter
@@ -12,9 +13,9 @@ from typing import Any, Mapping, Optional
 
 from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
 from apps.ai.extraction.formulas import DISPLAY_FORMULA
-from apps.ai.extraction.numbering import outline_depths
+from apps.ai.extraction import evidence_rules
 from apps.ai.extraction.ports import ExtractionError
-from apps.ai.extraction.shaping import CAPTION, FRONT_MATTER, split_formulas
+from apps.ai.extraction.shaping import CAPTION, split_formulas
 
 # hi_res renders a US Letter page at 2125x2750 px (IR-984 spike), i.e. 250 dpi.
 RENDER_DPI = 250
@@ -22,7 +23,6 @@ RENDER_DPI = 250
 # return the field (ADR-067, 2026-11-14 amendment), so it applies only when present.
 TITLE_MIN_PROBABILITY = 0.5
 _SCALE = 72 / RENDER_DPI
-_SECTION_LEVEL = 2
 _KINDS = {
     "Title": "heading", "NarrativeText": "text", "UncategorizedText": "text",
     "FigureCaption": "text", "ListItem": "text", "Table": "table", "Image": "image",
@@ -33,10 +33,32 @@ _PERSONAL = {"Address", "EmailAddress"}
 _KNOWN = {*_KINDS, *_PERSONAL, "PageBreak", "CompositeElement"}
 
 
+# Element types whose box narrows to its text lines (ADR-067 decision 5).
+_LINED = {"Title", "NarrativeText", "UncategorizedText", "FigureCaption", "ListItem"}
+
+
 def shape_unstructured(raw: Any, pdf_evidence: Optional[Mapping] = None) -> NormalizedDocument:
-    """Turn one stored result into IRIS values. ``pdf_evidence`` waits for IR-1057."""
+    """Turn one stored result, and the PDF evidence beside it, into IRIS values."""
+    return _shape(raw, pdf_evidence)[0]
+
+
+def shaping_report(raw: Any, pdf_evidence: Optional[Mapping] = None) -> dict:
+    """Which signal decided each heading, and how often line boxes matched."""
+    document, outcomes = _shape(raw, pdf_evidence)
+    headings = [(e.text, e.level, e.level_source) for e in document.elements if e.kind == "heading"]
+    return {
+        "headings": headings,
+        "signals": dict(Counter(source for _, _, source in headings)),
+        "line_boxes": dict(Counter(outcomes)),
+        "printed_pages": sorted({e.page for e in document.elements if e.printed_page_number}),
+    }
+
+
+def _shape(raw, pdf_evidence):
     elements: list[DocumentElement] = []
     sizes: dict[int, tuple[float, float]] = {}
+    parents: dict[str, str] = {}
+    outcomes: list[str] = []
     breaks = 0
     for item in _items(raw):
         label = str(item.get("type") or "")
@@ -51,12 +73,23 @@ def shape_unstructured(raw: Any, pdf_evidence: Optional[Mapping] = None) -> Norm
             raise ExtractionError(f"element on page {page} follows {breaks} page breaks")
         if label in _PERSONAL:
             continue
-        elements.extend(_element(item, label, metadata, page, sizes))
-    elements = _headings(_captions(_lists(_continued_tables(elements))))
+        if metadata.get("parent_id"):
+            parents[str(item.get("element_id") or "")] = str(metadata["parent_id"])
+        elements.extend(_element(item, label, metadata, page, sizes, pdf_evidence, outcomes))
+    elements = evidence_rules.place_headings(_captions(_lists(_continued_tables(elements))), pdf_evidence, parents)
+    elements = _printed(elements, pdf_evidence, sizes)
     title = next((e.text for e in elements if e.kind == "heading" and e.level == 1), "")
-    return NormalizedDocument(
+    document = NormalizedDocument(
         title=title, elements=tuple(elements), page_sizes=sizes, structure_is_authoritative=True,
     )
+    return document, outcomes
+
+
+def _printed(elements, pdf_evidence, sizes):
+    pages = {*sizes, *(e.page for e in elements if e.page)}
+    count = (evidence_rules.usable(pdf_evidence) or {}).get("page_count") or 0
+    printed = evidence_rules.printed_pages(elements, pdf_evidence, pages | set(range(1, count + 1)))
+    return [replace(e, printed_page_number=printed[e.page]) if e.page in printed else e for e in elements]
 
 
 def unmapped_types(raw: Any) -> dict[str, int]:
@@ -70,12 +103,17 @@ def _items(raw):
     return raw if isinstance(raw, list) else (raw.get("elements") or [])
 
 
-def _element(item, label, metadata, page, sizes):
+def _element(item, label, metadata, page, sizes, pdf_evidence, outcomes):
     languages = metadata.get("languages") or []
     text = str(item.get("text") or "")
+    boxes = _boxes(metadata, page, sizes)
+    if label in _LINED:
+        boxes, outcome = evidence_rules.line_boxes(text, boxes, pdf_evidence)
+        if outcome:
+            outcomes.append(outcome)
     element = DocumentElement(
         kind=_KINDS.get(label, "paragraph"), text=text, page=page,
-        bboxes=_boxes(metadata, page, sizes), source_label=label,
+        bboxes=boxes, source_label=label,
         element_id=str(item.get("element_id") or ""), language=languages[0] if languages else "",
     )
     if label == "Title":
@@ -210,18 +248,9 @@ class _TableRows(HTMLParser):
             self._cell.append(data)
 
 
-def _headings(elements):
-    """Numbered headings nest under the paper's title; others claim no depth."""
-    headings = [i for i, e in enumerate(elements) if e.kind == "heading"]
-    depths = outline_depths([elements[i].text for i in headings])
-    for i, depth in zip(headings, depths):
-        if depth is not None:
-            elements[i] = replace(elements[i], level=_SECTION_LEVEL + depth - 1)
-    first = headings[0] if headings else None
-    if first is not None and depths[0] is None and elements[first].page == 1 \
-            and not FRONT_MATTER.match(elements[first].text.strip()):
-        elements[first] = replace(elements[first], level=1)
-    return elements
+def element_boxes(metadata: Mapping, page: int) -> tuple[BoundingBox, ...]:
+    """One raw element's boxes in top-left page points."""
+    return _boxes(metadata, page, {})
 
 
 def _boxes(metadata, page, sizes):
