@@ -1,10 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 
 import { reviewsApi } from "@/api/reviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button, Input, Select, Skeleton } from "@/components/ui";
-import { FOCUS_RING } from "@/components/ui/interaction";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { failureMessage } from "@/lib/readFailure";
 import { cn } from "@/lib/utils";
 import type { AnalyticsTimeInStage, WorkflowAnalytics } from "@/types/reviews";
@@ -19,9 +19,11 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("en-US", {
  * Every figure is the server's, computed from the workflow audit log
  * (`backend/apps/reviews/analytics.py`); this page only lays it out. An
  * office sees its own figures and RDCO every party's. Three things are said
- * on the page rather than left to be assumed: when the log starts, that time
- * in stage is elapsed time rather than effort, and which cells hold too few
- * records to show a median. Nothing here names or ranks a reviewer.
+ * on the page rather than left to be assumed: when the log starts (always
+ * visible) and, in the "How these numbers are counted" disclosure (IR-1091),
+ * that time in stage is elapsed time rather than effort and how many records a
+ * cell needs for a median; cells holding too few say so in place. Nothing
+ * here names or ranks a reviewer.
  */
 
 const POLICY_LABEL: Record<string, string> = {
@@ -39,14 +41,68 @@ function duration(hours: number): string {
 const TABLE = "w-full text-left text-sm";
 const HEAD = "border-b border-stone-200 py-2 pr-4 font-medium text-stone-600";
 const CELL = "border-b border-stone-100 py-2 pr-4 tabular-nums";
+// Numbers line up on their right edge, in figures of one width, so a column
+// reads down as a comparison (audit LAY-05).
+const NUM_HEAD = `${HEAD} text-right`;
+const NUM_CELL = `${CELL} text-right`;
 
-function Section({ id, title, note, children, scrollRegionLabel }: {
-  id: string; title: string; note?: ReactNode; children: ReactNode; scrollRegionLabel?: string;
+/**
+ * How the figures are counted, kept out of the way of the figures themselves.
+ * Closed by default and not rendered until opened, so the page opens on
+ * numbers. A button and a named region, as the reasoning summary is, so it is
+ * found by role and name.
+ */
+function MethodDisclosure({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
+  return (
+    <div className="mb-6">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={open ? bodyId : undefined}
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
+        className={cn(
+          "-ml-1.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1",
+          "text-sm font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900",
+          COLOUR_TRANSITION,
+          FOCUS_RING,
+        )}
+      >
+        <i
+          className={cn(
+            "fas fa-chevron-right text-2xs transition-transform duration-200 motion-reduce:transition-none",
+            open && "rotate-90",
+          )}
+          aria-hidden
+        />
+        How these numbers are counted
+      </button>
+      {open && (
+        <div id={bodyId} role="region" aria-label="How these numbers are counted"
+             className="mt-2 max-w-3xl space-y-3 rounded-md bg-stone-50 p-4 text-sm text-stone-700">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MethodNote({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="font-medium text-stone-900">{title}</p>
+      <p className="text-stone-600">{children}</p>
+    </div>
+  );
+}
+
+function Section({ id, title, children, scrollRegionLabel }: {
+  id: string; title: string; children: ReactNode; scrollRegionLabel?: string;
 }) {
   return (
     <section aria-labelledby={id} className="mb-8">
-      <h2 id={id} className="mb-1 text-lg font-semibold text-stone-900">{title}</h2>
-      {note && <p className="mb-3 max-w-3xl text-sm text-stone-600">{note}</p>}
+      <h2 id={id} className="mb-3 text-lg font-semibold text-stone-900">{title}</h2>
       <div
         className={cn("overflow-x-auto", scrollRegionLabel && FOCUS_RING)}
         {...(scrollRegionLabel
@@ -148,16 +204,32 @@ export default function ReviewAnalyticsPage() {
             {data.data_since
               ? <>Figures start on {formatDate(data.data_since)}, the first workflow event recorded for {data.parties.length > 1 ? "these offices" : "this office"}. Work before then was never logged, so it is absent from these figures, not counted as zero.</>
               : <>No workflow events have been recorded yet, so there is nothing to measure.</>}
-            {" "}Times are Asia/Manila; weeks start on Monday.
           </p>
 
-          <Section id="open-now" title="Open now" scrollRegionLabel="Open now table"
-                   note="Overdue counts only assignments with a due date whose clock is running. A clock waiting on the owner is paused. Older assignments and offices without a configured turnaround may have no due date; these are listed separately, never counted as on time.">
+          <MethodDisclosure>
+            <MethodNote title="Open now">
+              Overdue counts only assignments with a due date whose clock is running. A clock waiting on the owner is paused. Older assignments and offices without a configured turnaround may have no due date; these are listed separately, never counted as on time.
+            </MethodNote>
+            <MethodNote title="Time in stage">
+              Elapsed time from an office receiving a record to its turn closing, including nights, weekends and waits on the author. It is not hands-on effort. A cell needs {data.thresholds.median} records for a median and {data.thresholds.p90} for a 90th percentile. &ldquo;Still open&rdquo; means open now.
+            </MethodNote>
+            <MethodNote title="Records entering and leaving, by week">
+              Counts office visits. A record returning to the same office in one week counts again.
+            </MethodNote>
+            <MethodNote title="New versions and preserved clearances">
+              A new version answering a revision request, and how many offices&rsquo; clearances it kept. These counts describe the workflow in use; they do not measure how much time clearance preservation saved.
+            </MethodNote>
+            <MethodNote title="Dates and times">
+              Times are Asia/Manila; weeks start on Monday.
+            </MethodNote>
+          </MethodDisclosure>
+
+          <Section id="open-now" title="Open now" scrollRegionLabel="Open now table">
             <table className={TABLE} aria-labelledby="open-now">
               <thead>
                 <tr>
                   {["Office", "Open", "In pool", "Open seats", "Overdue", "Overdue seats", "Paused", "No due date"]
-                    .map((h) => <th key={h} scope="col" className={HEAD}>{h}</th>)}
+                    .map((h, i) => <th key={h} scope="col" className={i === 0 ? HEAD : NUM_HEAD}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -165,15 +237,14 @@ export default function ReviewAnalyticsPage() {
                   <tr key={row.party}>
                     <th scope="row" className={`${CELL} font-medium`}>{label(row.party)}</th>
                     {[row.open_count, row.unseated, row.open_seats, row.overdue, row.overdue_seats,
-                      row.paused, row.undated].map((n, i) => <td key={i} className={CELL}>{n}</td>)}
+                      row.paused, row.undated].map((n, i) => <td key={i} className={NUM_CELL}>{n}</td>)}
                   </tr>
                 ))}
               </tbody>
             </table>
           </Section>
 
-          <Section id="time-in-stage" title="Time in stage" scrollRegionLabel="Time in stage table"
-                   note={<>Elapsed time from an office receiving a record to its turn closing, including nights, weekends and waits on the author. It is not hands-on effort. A cell needs {data.thresholds.median} records for a median and {data.thresholds.p90} for a 90th percentile. &ldquo;Still open&rdquo; means open now.</>}>
+          <Section id="time-in-stage" title="Time in stage" scrollRegionLabel="Time in stage table">
             {data.time_in_stage.length === 0 ? (
               <p className="text-sm text-stone-600">No completed turns in this range.</p>
             ) : (
@@ -181,7 +252,7 @@ export default function ReviewAnalyticsPage() {
                 <thead>
                   <tr>
                     {["Office", "Record type", "Records", "Median", "90th percentile"]
-                      .map((h) => <th key={h} scope="col" className={HEAD}>{h}</th>)}
+                      .map((h, i) => <th key={h} scope="col" className={i < 2 ? HEAD : NUM_HEAD}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -189,9 +260,9 @@ export default function ReviewAnalyticsPage() {
                     <tr key={`${cell.party}:${cell.record_type ?? ""}`}>
                       <th scope="row" className={`${CELL} font-medium`}>{label(cell.party)}</th>
                       <td className={CELL}>{cell.record_type ?? "All record types"}</td>
-                      <td className={CELL}>{cell.records}</td>
-                      <td className={CELL}>{figure(cell, "median", data.thresholds)}</td>
-                      <td className={CELL}>{figure(cell, "p90", data.thresholds)}</td>
+                      <td className={NUM_CELL}>{cell.records}</td>
+                      <td className={NUM_CELL}>{figure(cell, "median", data.thresholds)}</td>
+                      <td className={NUM_CELL}>{figure(cell, "p90", data.thresholds)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -207,8 +278,7 @@ export default function ReviewAnalyticsPage() {
             </ul>
           </Section>
 
-          <Section id="throughput" title="Records entering and leaving, by week"
-                   note="Counts office visits. A record returning to the same office in one week counts again.">
+          <Section id="throughput" title="Records entering and leaving, by week">
             {data.throughput.length === 0 ? (
               <p className="text-sm text-stone-600">No records entered or left in this range.</p>
             ) : (
@@ -216,7 +286,7 @@ export default function ReviewAnalyticsPage() {
                 <thead>
                   <tr>
                     {["Week of", "Office", "Entered", "Left"]
-                      .map((h) => <th key={h} scope="col" className={HEAD}>{h}</th>)}
+                      .map((h, i) => <th key={h} scope="col" className={i < 2 ? HEAD : NUM_HEAD}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -224,8 +294,8 @@ export default function ReviewAnalyticsPage() {
                     <tr key={`${row.week_start}:${row.party}`}>
                       <th scope="row" className={`${CELL} font-medium`}>{formatDate(row.week_start)}</th>
                       <td className={CELL}>{label(row.party)}</td>
-                      <td className={CELL}>{row.entered}</td>
-                      <td className={CELL}>{row.left}</td>
+                      <td className={NUM_CELL}>{row.entered}</td>
+                      <td className={NUM_CELL}>{row.left}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -233,8 +303,7 @@ export default function ReviewAnalyticsPage() {
             )}
           </Section>
 
-          <Section id="revision-cycles" title="New versions and preserved clearances"
-                   note="A new version answering a revision request, and how many offices' clearances it kept. These counts describe the workflow in use; they do not measure how much time clearance preservation saved.">
+          <Section id="revision-cycles" title="New versions and preserved clearances">
             {data.revision_cycles.length === 0 ? (
               <p className="text-sm text-stone-600">No new versions in this range.</p>
             ) : (
@@ -242,16 +311,16 @@ export default function ReviewAnalyticsPage() {
                 <thead>
                   <tr>
                     {["Policy", "New versions", "Kept a clearance", "Clearances kept"]
-                      .map((h) => <th key={h} scope="col" className={HEAD}>{h}</th>)}
+                      .map((h, i) => <th key={h} scope="col" className={i === 0 ? HEAD : NUM_HEAD}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {data.revision_cycles.map((row) => (
                     <tr key={row.policy}>
                       <th scope="row" className={`${CELL} font-medium`}>{policyLabel(row.policy)}</th>
-                      <td className={CELL}>{row.cycles}</td>
-                      <td className={CELL}>{row.cycles_preserving}</td>
-                      <td className={CELL}>{row.preserved_clearances}</td>
+                      <td className={NUM_CELL}>{row.cycles}</td>
+                      <td className={NUM_CELL}>{row.cycles_preserving}</td>
+                      <td className={NUM_CELL}>{row.preserved_clearances}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -82,6 +82,9 @@ class DocumentElement:
     description: str = ""
     # The Extractor's image name, joining a Figure element to its stored image.
     figure: str = ""
+    # The Extractor's own element id and detected language (IR-986).
+    element_id: str = ""
+    language: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.bboxes, tuple):

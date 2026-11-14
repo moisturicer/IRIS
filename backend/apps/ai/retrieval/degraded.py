@@ -34,6 +34,7 @@ from apps.ai.resilience.rate_limit import RateLimited
 from apps.records.models import Record
 
 from .ports import FULL_TEXT, RetrievalResult, RetrievedChunk, Retriever
+from .scope import chunk_set_scope
 from apps.ai.grants.reads import research_records
 
 logger = logging.getLogger(__name__)
@@ -77,10 +78,13 @@ class FullTextRetriever(Retriever):
         self,
         record: Optional[Record] = None,
         records: Optional[AbstractSet[int]] = None,
+        trial_variant: Optional[str] = None,
     ) -> None:
         self._record = record
         # A set of Record ids (IR-500), intersected with `visible_to`.
         self._records = records
+        # Evaluation only (IR-1051): read a trial chunk set instead.
+        self._trial_variant = trial_variant
 
     def retrieve(self, question: str, user, limit: int = 20):
         if not question.strip():
@@ -96,8 +100,8 @@ class FullTextRetriever(Retriever):
 
         rows = (
             DocumentChunk.objects.filter(
+                chunk_set_scope("", self._trial_variant),
                 record__in=visible,
-                chunk_set__is_active=True,
                 deleted_at__isnull=True,
             )
             .annotate(rank=SearchRank(F("search_vector"), query))

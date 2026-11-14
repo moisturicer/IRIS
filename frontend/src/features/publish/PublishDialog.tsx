@@ -28,14 +28,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { recordsApi, type ManuscriptMatch } from "@/api/records";
 import { Modal } from "@/components/ui/Modal";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
-import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { rolesFor } from "@/lib/access";
 import { errorDetail } from "@/lib/errorDetail";
 import { tabbableWithin } from "@/lib/focusTrap";
@@ -197,6 +196,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [attempt, setAttempt] = useState(0);
 
   const [step, setStep] = useState<PublishStep>(1);
+  // Set when Continue was pressed on step 1, which is when the manuscript step
+  // starts naming what is missing. Cleared on leaving the step.
+  const [continueTried, setContinueTried] = useState(false);
   const [typeId, setTypeId] = useState<number | null>(null);
   const [isContinuation, setIsContinuation] = useState(false);
   // The type the server holds, so Continue saves only a change.
@@ -365,6 +367,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   function goTo(next: PublishStep) {
     setStep(next);
+    setContinueTried(false);
     setStepFailure(null);
     setAnnouncement(`Step ${next} of 3: ${STEPS[next - 1].title}`);
   }
@@ -439,6 +442,13 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   function handleFile(file: File) {
     fileRef.current = file;
     void startUpload();
+  }
+
+  /** Validation on press (IR-1088): name what is missing, or go on. */
+  function validateThenContinueFromManuscript() {
+    setContinueTried(true);
+    if (typeId == null || acceptedUpload == null) return;
+    void continueFromManuscript();
   }
 
   async function continueFromManuscript() {
@@ -544,6 +554,15 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   }
 
   const acceptedUpload = acceptedManuscript(upload);
+  // What step 1's Continue names as missing, once it has been pressed.
+  const manuscriptErrors = {
+    type: continueTried && typeId == null ? "Choose what you're publishing." : undefined,
+    file: !continueTried || acceptedUpload != null
+      ? undefined
+      : upload.status === "uploading"
+        ? "Your manuscript is still uploading. Continue when it finishes."
+        : "Upload your manuscript as a PDF to continue.",
+  };
   const prefill = usePrefill({
     recordId: draftId,
     active: phase.kind === "form" && step === 2 && acceptedUpload != null,
@@ -731,52 +750,39 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <p className="text-small text-stone-600">
           {draftId == null ? " " : step === 2 ? SAVE_STATUS[autosave.status] : "Saved as a draft. You can close this and finish later."}
           {step === 2 && autosave.status === "failed" && (
-            <button type="button" onClick={() => void autosave.saveNow()} className={cn("ml-2 rounded-full font-medium text-stone-800 underline underline-offset-2", FOCUS_RING)}>
+            <Button type="button" variant="ghost" size="sm" className="ml-2" onClick={() => void autosave.saveNow()}>
               Try again
-            </button>
+            </Button>
           )}
         </p>
         <div className="ml-auto flex gap-2">
           {step > 1 && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="page"
               onClick={() => goTo((step - 1) as PublishStep)}
               disabled={saving || submitting || upload.status === "uploading"}
-              className={cn(PILL_SECONDARY, FOCUS_RING)}
             >
               Back
-            </button>
+            </Button>
           )}
           {step === 1 && (
-            <button
-              type="button"
-              onClick={() => void continueFromManuscript()}
-              disabled={acceptedUpload == null || typeId == null || saving}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
+            // Never disabled for what is missing: pressing it says which field
+            // needs what (IR-1088), where a dead button left the author guessing.
+            <Button type="button" size="page" loading={saving} onClick={validateThenContinueFromManuscript}>
               Continue
-            </button>
+            </Button>
           )}
           {step === 2 && (
-            <button
-              type="button"
-              onClick={() => void continueFromDetails()}
-              disabled={saving}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
+            <Button type="button" size="page" loading={saving} onClick={() => void continueFromDetails()}>
               Continue
-            </button>
+            </Button>
           )}
           {step === 3 && (
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={submitting}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
-              {submitting && <i className="fas fa-spinner fa-spin" aria-hidden />}
+            <Button type="button" size="page" loading={submitting} onClick={() => void submit()}>
               Submit for review
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -809,17 +815,12 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
             Your draft is kept, but the file has not finished uploading. You can add it when you come back.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              ref={keepUploadingRef}
-              onClick={() => setConfirmingClose(false)}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
+            <Button type="button" size="page" ref={keepUploadingRef} onClick={() => setConfirmingClose(false)}>
               Keep uploading
-            </button>
-            <button type="button" onClick={stopAndClose} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+            </Button>
+            <Button type="button" variant="outline" size="page" onClick={stopAndClose}>
               Stop and close
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -834,9 +835,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <Notice
           message={phase.message}
           action={
-            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+            <Button type="button" variant="outline" size="page" onClick={() => setAttempt((n) => n + 1)}>
               Try again
-            </button>
+            </Button>
           }
         />
       )}
@@ -845,9 +846,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <Notice
           message="We couldn't find that draft. It may have been deleted, or it isn't yours."
           action={
-            <button type="button" onClick={onRestart} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+            <Button type="button" size="page" onClick={onRestart}>
               Start a new submission
-            </button>
+            </Button>
           }
         />
       )}
@@ -856,9 +857,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <Notice
           message="This record has already been submitted, so it can't be changed here."
           action={
-            <Link to={`/records/${phase.recordId}`} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+            <ButtonLink to={`/records/${phase.recordId}`} size="page">
               Open paper
-            </Link>
+            </ButtonLink>
           }
         />
       )}
@@ -882,13 +883,14 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
               <span className="flex-1">{stepFailure.message}</span>
               {stepFailure.network && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => void (step === 1 ? continueFromManuscript() : continueFromDetails())}
-                  className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}
                 >
                   Try again
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -903,6 +905,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               onFile={handleFile}
               onRetry={() => void startUpload()}
               exactMatches={exactMatches}
+              typeError={manuscriptErrors.type}
+              fileError={manuscriptErrors.file}
             />
           )}
 
@@ -913,9 +917,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
                   <div role="alert" className={cn(LOAD_ERROR, "mb-section flex-wrap")}>
                     <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
                     <span className="flex-1">{STALE_DRAFT}</span>
-                    <button type="button" onClick={reloadDraft} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}>
+                    <Button type="button" variant="outline" size="sm" onClick={reloadDraft}>
                       Reload draft
-                    </button>
+                    </Button>
                   </div>
                 )}
                 {/* One announcement for the prefill, where the visible lines sit
@@ -1032,9 +1036,9 @@ function prefillFieldNotes(
 /** The line above Details when reading has stopped, or found nothing. */
 function PrefillLine({ reading, retrying, onRetry }: { reading: Prefill; retrying: boolean; onRetry: () => void }) {
   const action = (label: string, onClick: () => void, disabled = false) => (
-    <button type="button" onClick={onClick} disabled={disabled} className={cn(PILL_SECONDARY, FOCUS_RING, "ml-2 min-h-9 px-4")}>
+    <Button type="button" variant="outline" size="sm" className="ml-2" onClick={onClick} disabled={disabled}>
       {label}
-    </button>
+    </Button>
   );
   if (reading.status === "stalled") {
     return (

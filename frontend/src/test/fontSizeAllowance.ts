@@ -60,7 +60,7 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
   "src/features/library/LibraryRecordTable.tsx": 7,
   "src/features/notifications/NotificationsPage.tsx": 2,
   "src/features/profile/PersonProfileView.tsx": 1,
-  "src/features/records/ImportRecordsPage.tsx": 8,
+  "src/features/records/ImportRecordsPage.tsx": 7,
   "src/features/records/paper-view/AddReviewerDialog.tsx": 1,
   "src/features/records/paper-view/DecisionDialog.tsx": 4,
   "src/features/records/paper-view/NewVersionDialog.tsx": 4,
@@ -70,7 +70,7 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
   "src/features/records/paper-view/threads/FinishReviewDialog.tsx": 3,
   "src/features/review/AssignReviewerDialog.tsx": 1,
   "src/features/settings/AiAnswerPanel.tsx": 5,
-  "src/features/settings/SettingsPage.tsx": 19,
+  "src/features/settings/SettingsPage.tsx": 18,
   "src/features/settings/YourDataPanels.tsx": 14,
   "src/features/settings/settingsParts.tsx": 1,
 };
