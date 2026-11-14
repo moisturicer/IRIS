@@ -233,7 +233,8 @@ export const SCREENS: Screen[] = [
     id: "notifications", path: "/notifications", route: "/notifications", role: "Student",
     mocks: wrap("Student"),
     heading: "Notifications",
-    primary: (p) => p.getByRole("link", { name: "Home" }).first(), primaryLabel: "Home (breadcrumb)",
+    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
+    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
   },
   {
     id: "ask-iris", path: "/ai", route: "/ai", role: "Student",
@@ -324,7 +325,8 @@ export const SCREENS: Screen[] = [
     mocks: wrap("RDCO", (api) =>
       api.on("GET", "/reviews/office/", { office: "rdco", office_label: "RDCO", rows: [], load: [] })),
     heading: /console$/,
-    primary: (p) => p.getByRole("link", { name: "Home" }).first(), primaryLabel: "Home (breadcrumb)",
+    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
+    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
   },
   {
     id: "workflow-analytics", path: "/review/analytics", route: "/review/analytics", role: "RDCO",
@@ -335,7 +337,8 @@ export const SCREENS: Screen[] = [
         open_now: [], time_in_stage: [], unmeasured: [], throughput: [], revision_cycles: [], preserved_by_office: [],
       })),
     heading: "Workflow Analytics",
-    primary: (p) => p.getByRole("link", { name: "Home" }).first(), primaryLabel: "Home (breadcrumb)",
+    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
+    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
   },
   {
     id: "import-records", path: "/records/import", route: "/records/import", role: "RDCO",

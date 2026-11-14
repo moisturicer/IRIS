@@ -5,7 +5,7 @@
  * password for several reasons at once. The form must say all of them.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
 import { noticeApi } from "@/api/notice";
@@ -114,6 +114,58 @@ it("shows the server's current notice beside the account's consent record (IR-80
   const notice = screen.getByRole("region", { name: "Current data notice" });
   expect(await within(notice).findByText(/^IRIS data notice/)).toHaveTextContent("AI companies may read your papers' text.");
   expect(notice).toHaveTextContent("Version 6 · published Nov 2, 2026");
+});
+
+// IR-1085 (audit NAV-08): a Settings tab has an address, so it can be linked to
+// and survives a reload.
+describe("addressable tabs", () => {
+  function Where() {
+    const { pathname, search } = useLocation();
+    return <p role="status" aria-label="Location">{pathname + search}</p>;
+  }
+  const renderAt = (route: string) =>
+    renderScreen(<><SettingsPage /><Where /></>, { route });
+  const where = () => screen.getByRole("status", { name: "Location" });
+  const tab = (name: string) =>
+    within(screen.getByRole("navigation", { name: "Settings sections" })).getByRole("button", { name });
+
+  it("opens the Privacy tab at /settings?tab=privacy", () => {
+    renderAt("/settings?tab=privacy");
+
+    expect(tab("Data privacy & consent")).toHaveAttribute("aria-current", "page");
+    expect(tab("Account & security")).not.toHaveAttribute("aria-current");
+    expect(screen.getByText("No consent recorded")).toBeVisible();
+  });
+
+  it("opens the Role tab at /settings?tab=role", () => {
+    renderAt("/settings?tab=role");
+
+    expect(tab("Role & access")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("What your role lets you do in IRIS.")).toBeVisible();
+  });
+
+  it("updates the address when you switch tabs", async () => {
+    const user = userEvent.setup();
+    renderAt("/settings");
+
+    await user.click(tab("Data privacy & consent"));
+    expect(where()).toHaveTextContent("/settings?tab=privacy");
+    expect(tab("Data privacy & consent")).toHaveAttribute("aria-current", "page");
+
+    await user.click(tab("Role & access"));
+    expect(where()).toHaveTextContent("/settings?tab=role");
+
+    await user.click(tab("Account & security"));
+    expect(where()).toHaveTextContent("/settings?tab=security");
+    expect(screen.getByLabelText("Current password")).toBeVisible();
+  });
+
+  it("opens on Account & security when the tab is missing or unknown", () => {
+    renderAt("/settings?tab=billing");
+
+    expect(tab("Account & security")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("Current password")).toBeVisible();
+  });
 });
 
 // IR-933: Profile is its own page; Settings keeps the account.

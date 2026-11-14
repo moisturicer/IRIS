@@ -33,7 +33,8 @@ interface ReadingHeaderProps {
 /**
  * The record bar (IR-569): Back, the paper in one line, its version and the
  * sections. One 56px row from `reading-split`; the tabs take a second row
- * below it. Ask IRIS is the round icon at the bottom right, not a tool here.
+ * below it. Notes and Ask IRIS are the two round icons at the bottom right,
+ * Notes above Ask IRIS, not tools here.
  */
 export function ReadingHeader({
   sections,
