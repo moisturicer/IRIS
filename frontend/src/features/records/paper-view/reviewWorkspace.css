@@ -1,32 +1,40 @@
 .review-workspace-container { container: review-workspace / inline-size; min-width: 0; min-height: 0; flex: 1; display: flex; }
-.review-workspace { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--mid-w, 30%) var(--side-w, 20%); position: relative; min-height: 0; color: theme('colors.stone.700'); background: theme('colors.stone.50'); }
+/*
+ * Two columns, the pane getting 520px (IR-1094, spec §4.8): the paper and the pane. A tab opened on the
+ * right makes it three. The one row is `minmax(0, 1fr)`, so a column's content scrolls inside the column
+ * and never stretches the row past the viewport -- the blank band under the columns (audit LAY-07).
+ */
+.review-workspace { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--mid-w, 520px); grid-template-rows: minmax(0, 1fr); position: relative; min-height: 0; color: theme('colors.stone.700'); background: theme('colors.stone.50'); }
+.review-workspace.review-has-side { grid-template-columns: minmax(0, 1fr) var(--mid-w, 520px) var(--side-w, 320px); }
+.review-workspace.review-without-paper { grid-template-columns: minmax(0, 1fr); }
+.review-workspace.review-without-paper.review-has-side { grid-template-columns: minmax(0, 1fr) var(--side-w, 320px); }
 .review-paper { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: theme('colors.stone.200'); }
 .review-paper[inert] { position: relative; }
 .review-paper[inert]::after { content: ''; position: absolute; inset: 0; z-index: 10; background: rgb(41 37 36 / .2); }
 .review-pane { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid theme('colors.stone.300'); }
-.review-pane-head { padding: 12px 16px 0; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); }
+.review-pane-head { flex: none; padding: 12px 16px 0; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); }
 .review-tab { position: relative; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 600; }
 .review-tab[aria-selected=true] { color: theme('colors.stone.900'); box-shadow: inset 0 -2px theme('colors.stone.900'); }
 .review-pane-body { flex: 1; min-height: 0; overflow-y: auto; }
-.review-pane-foot { flex: none; padding: 12px 16px; border-top: 1px solid theme('colors.stone.300'); background: white; }
-.review-pane-foot > p { margin-bottom: 8px; }
-.review-details { position: relative; min-width: 0; min-height: 0; padding: 16px 18px; border-left: 1px solid theme('colors.stone.300'); }
-.review-details > div:last-child { overflow-y: auto; max-height: calc(100% - 64px); }
+.review-pane-foot { flex: none; max-height: 50%; overflow-y: auto; padding: 12px 16px; border-top: 1px solid theme('colors.stone.300'); background: white; }
+/* A tab opened beside the pane: its own header, and only its body scrolls. */
+.review-side { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid theme('colors.stone.300'); background: theme('colors.stone.50'); }
+.review-side-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; padding: 0 16px; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); }
+.review-side-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
 .review-resize-edge { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; touch-action: none; }
 .review-resize-edge:hover, .review-resize-edge:focus-visible { background: theme('colors.brand.DEFAULT'); outline: 2px solid theme('colors.brand.DEFAULT'); outline-offset: 0; }
 .review-control { min-height: 44px; padding: 0 8px; border-radius: 8px; font-size: 13px; }
 .review-paper-foot { display: none; }
-.review-without-paper { grid-template-columns: minmax(320px, 1fr) var(--side-w, 20%); }
 /* The footer keeps its acts compact, so the conversation keeps its room: 36px for a pointer, 44px for touch. */
-.review-pane-foot [role=toolbar], .review-details [role=toolbar] { gap: 6px; }
-.review-pane-foot button, .review-details [role=toolbar] button { min-height: 44px; padding: 0 12px; font-size: 13px; }
-@media (pointer: fine) { .review-control, .review-pane-foot button, .review-details [role=toolbar] button { min-height: 36px; } }
-@container review-workspace (max-width: 1199px) {
-  .review-workspace { grid-template-columns: minmax(0, 1fr) var(--mid-w, 40%); }
-  .review-without-paper { grid-template-columns: minmax(0, 1fr); }
-}
+.review-pane-foot [role=toolbar], .review-pane-body [role=toolbar], .review-side [role=toolbar] { gap: 6px; }
+.review-pane-foot button, .review-pane-body [role=toolbar] button, .review-side [role=toolbar] button { min-height: 44px; padding: 0 12px; font-size: 13px; }
+@media (pointer: fine) { .review-control, .review-pane-foot button, .review-pane-body [role=toolbar] button, .review-side [role=toolbar] button { min-height: 36px; } }
+/*
+ * Narrower than 900px the pane is a drawer over the paper with *Back to paper*; from there up they sit side
+ * by side, so the open pane never lies over the paper at 1024px (audit RES-06).
+ */
 @container review-workspace (max-width: 899px) {
-  .review-workspace { grid-template-columns: minmax(0, 1fr); }
+  .review-workspace, .review-workspace.review-has-side { grid-template-columns: minmax(0, 1fr); }
   .review-workspace:not(.review-without-paper) > .review-pane { position: absolute; inset: 0 0 0 auto; width: min(440px, 100%); z-index: 20; visibility: hidden; transform: translateX(100%); background: theme('colors.stone.50'); }
   .review-workspace:not(.review-without-paper) > .review-pane-open { visibility: visible; transform: none; }
   .review-resize-edge { display: none; }

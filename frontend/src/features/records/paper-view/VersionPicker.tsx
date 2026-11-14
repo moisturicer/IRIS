@@ -35,7 +35,12 @@ export function VersionPicker({
    * newest version is a version like any other, so it can still be read.
    */
   unsubmitted?: boolean;
-  /** In the reading header (IR-569): the label for screen readers only, and narrow. */
+  /**
+   * In the reading header (IR-569): the label for screen readers only, and
+   * narrow. Each option is a short label -- "v2 (current)" -- so the closed
+   * picker is never cut off (IR-1094, audit US-18); the cause and date are in
+   * Details and Changes.
+   */
   compact?: boolean;
 }) {
   const id = useId();
@@ -58,7 +63,7 @@ export function VersionPicker({
         onChange={(e) => onChoose(e.target.value === currentValue ? null : Number(e.target.value))}
         className={cn(
           "min-h-11 reading-split:min-h-9 rounded-lg border border-stone-300 px-2 text-sm text-stone-800",
-          compact ? "w-24 bg-transparent" : "min-w-0 max-w-full bg-white",
+          compact ? "w-32 bg-transparent" : "min-w-0 max-w-full bg-white",
           FOCUS_RING,
         )}
       >
@@ -68,13 +73,13 @@ export function VersionPicker({
           const empty = !v.manuscript_url && !current;
           return (
             <option key={v.number} value={v.number} disabled={empty}>
-              {`v${v.number} · ${v.cause_label} · ${formatDate(v.created_at)}`}
+              {compact ? `v${v.number}` : `v${v.number} · ${v.cause_label} · ${formatDate(v.created_at)}`}
               {current ? " (current)" : ""}
               {empty ? " (no manuscript)" : ""}
             </option>
           );
         })}
-        {unsubmitted && <option value="">Your revision · not yet submitted (current)</option>}
+        {unsubmitted && <option value="">{compact ? "Your revision (current)" : "Your revision · not yet submitted (current)"}</option>}
       </select>
     </div>
   );
