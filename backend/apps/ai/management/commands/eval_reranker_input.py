@@ -13,6 +13,7 @@ person has reviewed the figure labels.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -52,6 +53,9 @@ class Command(BaseCommand):
         parser.add_argument("--max-cost-usd", type=float, default=COST_CEILING_USD)
         parser.add_argument("--labels-reviewed-by", default="",
                             help="The person who reviewed the figure labels. Required to pay.")
+        parser.add_argument("--skip-unresolved-text", action="store_true",
+                            help="Drop text questions whose labels name nothing in this "
+                                 "database; they are listed in the run file.")
         parser.add_argument("--out", default=str(DEFAULT_OUT))
         parser.add_argument("--no-write", action="store_true")
 
@@ -64,7 +68,7 @@ class Command(BaseCommand):
         except QuestionSetError as exc:
             raise CommandError(str(exc))
         trial = options["figure_trial"]
-        self._check_labels(sets, trial)
+        sets = self._check_labels(sets, trial, options["skip_unresolved_text"])
 
         user = get_user_model().objects.filter(email__iexact=options["user"]).first()
         if user is None:
@@ -101,12 +105,24 @@ class Command(BaseCommand):
         if spent is not None and spent > options["max_cost_usd"]:
             self.stderr.write(f"Spent ${spent:.4f}, over the ${options['max_cost_usd']} ceiling.")
 
-    def _check_labels(self, sets, trial):
+    def _check_labels(self, sets, trial, skip_text):
+        checked = {}
         for name, question_set in sets.items():
             checks = check_question_set(question_set, trial if name == FIGURE_SET else None)
             self.stdout.write(f"{name}: {render_checks(checks)}")
-            if any(not c.ok for c in checks):
+            # A label found on another page still scores: pages are reported, not scored.
+            unresolved = {c.question_id for c in checks if not c.ok and not c.found_on_pages}
+            if unresolved and name == TEXT_SET and skip_text:
+                kept = tuple(q for q in question_set.questions if q.id not in unresolved)
+                question_set = replace(
+                    question_set, questions=kept,
+                    skipped=question_set.skipped + tuple(sorted(unresolved)),
+                )
+                self.stdout.write(f"Dropped {len(unresolved)} unresolvable text question(s).")
+            elif unresolved:
                 raise CommandError(f"some {name} labels do not resolve")
+            checked[name] = question_set
+        return checked
 
     def _finish(self, result, sets, options, user, price):
         result.provenance.update({
