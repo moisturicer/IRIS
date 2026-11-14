@@ -138,8 +138,20 @@ export const routes: RouteObject[] = [{
                 element: <ReviewAccessRoute />,
                 children: [
                   { path: "review",          element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
-                  // A coordinator's console (IR-623). The server refuses anyone else.
-                  { path: "review/office",   element: <OfficeConsolePage />,   handle: { crumb: "Office console" } },
+                ],
+              },
+            ],
+          },
+          {
+            // A coordinator's console (IR-623). The server refuses anyone else.
+            // Gated by its own entry in the access map, the one the sidebar
+            // lists it from (IR-1085), and still only with review work.
+            element: <ProtectedRoute allowedRoles={rolesFor("reviewOffice")} />,
+            children: [
+              {
+                element: <ReviewAccessRoute />,
+                children: [
+                  { path: "review/office", element: <OfficeConsolePage />, handle: { crumb: "Office console" } },
                 ],
               },
             ],

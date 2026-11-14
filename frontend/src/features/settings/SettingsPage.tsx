@@ -1,6 +1,6 @@
 import { INSTITUTION } from "@/config/institution";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -44,9 +44,25 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: "role",     label: "Role & access",          icon: "fa-id-badge"     },
 ];
 
+/**
+ * The tab is the address's `?tab=` (IR-1085, NAV-08), so a section can be linked
+ * to and survives a reload. A missing or unknown value is the first tab.
+ */
+function readTab(raw: string | null): TabId {
+  return TABS.find((t) => t.id === raw)?.id ?? "security";
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<TabId>("security");
+  const [params, setParams] = useSearchParams();
+  const tab = readTab(params.get("tab"));
+  // Pushes an entry, so Back returns to the tab you came from. Only `tab` is
+  // set; any other parameter in the address stays.
+  const setTab = (next: TabId) => setParams((prev) => {
+    const merged = new URLSearchParams(prev);
+    merged.set("tab", next);
+    return merged;
+  });
 
   if (!user) return null;
 
