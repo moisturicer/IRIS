@@ -1,7 +1,8 @@
 """Chunk authoritative structure at its declared heading depth (IR-840).
 
-Headings open sections at their declared level. Formulas are shown to readers
-and never embedded. Tables split only between rows and repeat their header.
+Headings open sections at their declared level. Formulas are shown to readers;
+only a transcribed one, with its description, is embedded (IR-1102). Tables
+split only between rows and repeat their header.
 Prose packs to the target size with its trail counted in; a figure, a list or
 a table row is kept whole up to the safety ceiling (ADR-067 decision 14).
 """
@@ -80,10 +81,15 @@ def _has_content(element: DocumentElement) -> bool:
 
 
 def _body(elements) -> str:
-    return "\n".join(
-        without_formulas(e.text + ("\n" + e.description if e.kind == "image" and e.description else ""))
-        for e in elements if e.kind != FORMULA
-    ).strip()
+    return "\n".join(_embedded(e) for e in elements if e.kind != FORMULA or e.description).strip()
+
+
+def _embedded(element) -> str:
+    # A transcribed formula carries its description (IR-1102): both are embedded.
+    if element.kind == FORMULA:
+        return f"{element.text}\n{element.description}"
+    described = element.kind == "image" and element.description
+    return without_formulas(element.text + ("\n" + element.description if described else ""))
 
 
 def _fits(elements, trail, limit) -> bool:
@@ -175,7 +181,7 @@ def _table_fragment(table, start, stop, layout):
 
 def _draft(elements, trail, key) -> Draft:
     content = "\n\n".join(
-        f"$$\n{e.text.strip()}\n$$" if e.kind == FORMULA else (e.html or e.text) if e.kind == "table" else e.text
+        _display_formula(e) if e.kind == FORMULA else (e.html or e.text) if e.kind == "table" else e.text
         for e in elements
     ).strip()
     return Draft(
@@ -189,10 +195,16 @@ def _draft(elements, trail, key) -> Draft:
     )
 
 
+def _display_formula(element) -> str:
+    # The description follows its formula so the keyword index sees it too (IR-1102).
+    shown = f"$$\n{element.text.strip()}\n$$"
+    return f"{shown}\n{element.description.strip()}" if element.description.strip() else shown
+
+
 def _content_hash(chunks, page_sizes):
     """Refresh display/evidence edits while reusing unchanged text vectors.
 
-    Formulas, HTML and evidence do not enter embedding text, so the set hash
+    Display-only formulas, HTML and evidence stay out of embedding text, so the set hash
     also covers them. Per-chunk text hashes are unchanged.
     """
     payload = {

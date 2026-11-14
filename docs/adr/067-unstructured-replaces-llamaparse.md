@@ -334,6 +334,33 @@ text before the default changes.
 - **New open condition:** the transcription provider's retention and
   no-training terms, recorded before real Manuscripts are sent.
 
+### Implementation note (IR-1102), for review
+
+Built 2026-11-14. Where the build reads this amendment narrowly, it says so
+here rather than deciding it; each point is for a person to confirm.
+
+- **The flag also gates display.** With `AI_FORMULA_TEXT_INDEXED` off, chunks
+  are exactly as before: a formula stays its crop and its LaTeX is stored only
+  on its `ExtractionFormula` row. On, the LaTeX is shown as `$$…$$` with the
+  description on the line below. The keyword index reads a chunk's displayed
+  `content`, so this is how the description reaches it without a new column.
+- **Zero retention.** `transcribe_formula` carries `DataPolicy.ZERO_RETENTION`,
+  as `describe_figure` does: a crop is a picture of the Manuscript. The open
+  condition below is still owed.
+- **The crop is not served.** No endpoint returns a formula crop yet, so an
+  untranscribed formula shows nothing to a reader, as before.
+- **Cropping runs in the PDF evidence sandbox** (`pdf_evidence/crops.py`), on
+  Linux only, under the same limits; off Linux nothing is cropped.
+- **A Formula hi_res already delimits as LaTeX is not cropped.** Shaping keeps
+  such text as the formula, as before; it gets no record or description.
+- **At most 500 formulas per Manuscript are cropped**; past that they are logged.
+- **The equation number is read from the model's `\tag{}`**, not the PDF.
+- **The run-file switch is `formula_text`.** It is read at indexing, so
+  `eval_retrieval` records it and refuses to move it: set it, re-chunk, then run.
+- **Open condition, recorded 2026-11-14:** the transcription provider's
+  retention and no-training terms must be recorded before real Manuscripts
+  are sent. They are not yet.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
@@ -356,3 +383,4 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-1054: strategy comparison and size sweep
 - IR-1055, IR-1056: section-mate expansion and section-aligned embedding windows
 - IR-982: vendor registry, closed as won't do
+- IR-1102: formulas as exact LaTeX, behind a flag

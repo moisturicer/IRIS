@@ -83,6 +83,11 @@ class CompletionLoggingLLMProvider(LLMProvider, ToolCallingLLM, ImageDescribingL
     def dialect(self) -> VendorDialect:
         return getattr(self._provider, "dialect", DEFAULT_DIALECT)
 
+    @property
+    def last_model_used(self) -> str:
+        """The model that answered the last clean call (IR-1102)."""
+        return self._model_used()
+
     def _model_used(self) -> str:
         """Which model answered a clean call.
 

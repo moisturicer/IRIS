@@ -183,8 +183,10 @@ def ingest_extraction(
             ),
         )
     from apps.ai.figure_descriptions import with_descriptions
+    from apps.ai.formula_transcriptions import with_formulas
 
     document = with_descriptions(document, extraction)
+    document = with_formulas(document, extraction)
     options = _options_for_document(document, options)
     if not extraction.content_hash:
         raise _record_failure(

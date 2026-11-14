@@ -219,6 +219,7 @@ def plan_trial(variant: Variant, *, space_id: int,
     missing, unreadable, or from another extractor is skipped and named.
     """
     from apps.ai.figure_descriptions import with_descriptions
+    from apps.ai.formula_transcriptions import with_formulas
     from apps.ai.ingestion.pipeline import _options_for_document, default_chunking_options
     from apps.ai.chunking import build_chunker, normalize
     from apps.ai.models.chunk import ChunkSet as ChunkSetModel
@@ -245,6 +246,7 @@ def plan_trial(variant: Variant, *, space_id: int,
             )
             continue
         document = with_descriptions(document, extraction)
+        document = with_formulas(document, extraction)
         # A blank strategy behaves as production does; a named one wins.
         record_options = options if variant.strategy else _options_for_document(document, options)
         try:

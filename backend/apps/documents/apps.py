@@ -10,6 +10,7 @@ class DocumentsConfig(AppConfig):
         from django.core.exceptions import ImproperlyConfigured
         from .validators import LIMIT_NAMES, validation_limits
         from . import figures  # noqa: F401 -- connects the image clean-up (IR-845)
+        from . import formulas  # noqa: F401 -- and the crop clean-up (IR-1102)
 
         values = [getattr(settings, name, None) for name in LIMIT_NAMES]
         if any(value is not None for value in values):
