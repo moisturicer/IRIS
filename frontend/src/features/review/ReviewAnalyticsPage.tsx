@@ -4,7 +4,7 @@ import { reviewsApi } from "@/api/reviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button, Input, Select, Skeleton } from "@/components/ui";
-import { FOCUS_RING } from "@/components/ui/interaction";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import type { AnalyticsTimeInStage, WorkflowAnalytics } from "@/types/reviews";
 
@@ -21,7 +21,8 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("en-US", {
  * on the page rather than left to be assumed: when the log starts (always
  * visible) and, in the "How these numbers are counted" disclosure (IR-1091),
  * that time in stage is elapsed time rather than effort and how many records a
- * cell needs for a median; cells holding too few say so in place. Nothing here names or ranks a reviewer.
+ * cell needs for a median; cells holding too few say so in place. Nothing
+ * here names or ranks a reviewer.
  */
 
 const POLICY_LABEL: Record<string, string> = {
@@ -50,7 +51,7 @@ const NUM_CELL = `${CELL} text-right`;
  * numbers. A button and a named region, as the reasoning summary is, so it is
  * found by role and name.
  */
-function Method({ children }: { children: ReactNode }) {
+function MethodDisclosure({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   return (
@@ -63,6 +64,7 @@ function Method({ children }: { children: ReactNode }) {
         className={cn(
           "-ml-1.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1",
           "text-sm font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900",
+          COLOUR_TRANSITION,
           FOCUS_RING,
         )}
       >
@@ -203,7 +205,7 @@ export default function ReviewAnalyticsPage() {
               : <>No workflow events have been recorded yet, so there is nothing to measure.</>}
           </p>
 
-          <Method>
+          <MethodDisclosure>
             <MethodNote title="Open now">
               Overdue counts only assignments with a due date whose clock is running. A clock waiting on the owner is paused. Older assignments and offices without a configured turnaround may have no due date; these are listed separately, never counted as on time.
             </MethodNote>
@@ -219,7 +221,7 @@ export default function ReviewAnalyticsPage() {
             <MethodNote title="Dates and times">
               Times are Asia/Manila; weeks start on Monday.
             </MethodNote>
-          </Method>
+          </MethodDisclosure>
 
           <Section id="open-now" title="Open now" scrollRegionLabel="Open now table">
             <table className={TABLE} aria-labelledby="open-now">
