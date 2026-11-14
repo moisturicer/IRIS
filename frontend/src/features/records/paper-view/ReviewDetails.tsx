@@ -6,9 +6,11 @@ import { recordsApi } from "@/api/records";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, downloadBlob, formatDate, joinLabels } from "@/lib/utils";
-import type { PaperPerson, RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState, TrackerSeat } from "@/types/records";
+import type { PaperPerson, Readiness, ReadinessItem, RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState, TrackerSeat } from "@/types/records";
 
+import { ReadinessFacts } from "./ReadinessPanel";
 import { dueText } from "./ReviewStatus";
+import { readinessFacts } from "./yourPart";
 
 /** Parties never asked are not part of this review, as on the status strip. */
 const UNASKED: ReadonlySet<TrackerPartyState> = new Set(["not_requested", "not_required"]);
@@ -35,13 +37,14 @@ const SEAT_ICON: Record<TrackerSeat["state"], string> = {
   withdrawn: "fa-circle-minus",
 };
 
-/** Where a Readiness link lands: a party's reviewers, or Documents. */
+/** Where a Readiness link lands: a party's reviewers, Documents, or the facts themselves. */
 export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`;
 
 /**
- * The review workspace's details sidebar (ADR-032 §10 Amendment, IR-681):
- * Reviewers by party, then Researchers, Adviser, Classification, Flagged by
- * the authors, Keywords, Version, Due dates, Documents and Participants.
+ * The review workspace's Details tab (ADR-032 §10 Amendment, IR-681; the
+ * third column that repeated it is gone, IR-1094): Readiness's facts, then
+ * Reviewers by party, Researchers, Adviser, Classification, Flagged by the
+ * authors, Keywords, Version, Due dates, Documents and Participants.
  *
  * Built from record detail's permission-filtered paper_details and the tracker.
  * Who is reviewing, due dates and participants are review content: the
@@ -54,10 +57,16 @@ export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`
  * targets) and `addColleague` only when the viewer may take them; the two
  * stay separate controls.
  */
-export function ReviewDetails({ record, tracker, ids, requestReview, addColleague, onAllDocuments }: {
+export function ReviewDetails({ record, tracker, ids, readiness, onReadinessAction, requestReview, addColleague, onAllDocuments }: {
   record: RecordDetail;
   tracker: RecordTracker;
   ids: string;
+  /**
+   * What the footer's one line leaves out (IR-1094): the server's facts, less
+   * the ones that restate a party's status, which Reviewers says once.
+   */
+  readiness?: Readiness | null;
+  onReadinessAction?: (action: NonNullable<ReadinessItem["action"]>) => void;
   requestReview?: { targets: string[]; onOpen: () => void };
   addColleague?: ReactNode;
   /** Open the Documents drawer, which replaced the Files section (IR-879). */
@@ -73,9 +82,15 @@ export function ReviewDetails({ record, tracker, ids, requestReview, addColleagu
   const latest = versions[versions.length - 1];
   const openRequests = (tracker.document_requests ?? []).filter((r) => r.state === "open");
   const participants = readable ? details?.participants : null;
+  const facts = readinessFacts(readiness);
 
   return (
     <div className="space-y-5">
+      {facts.length > 0 && onReadinessAction && (
+        <Section id={detailsTarget(ids, "readiness")} title="Readiness">
+          <ReadinessFacts items={facts} onAction={onReadinessAction} />
+        </Section>
+      )}
       <Section id={detailsTarget(ids, "reviewers")} title="Reviewers" action={requestReview && (
         <button type="button" aria-label="Request review" title="Request review" aria-describedby={requestNoteId}
           onClick={requestReview.onOpen} className={cn("review-control text-stone-600 hover:text-brand", FOCUS_RING)}>
@@ -238,24 +253,33 @@ function affiliationText(values: string[] | null | undefined): string {
   return values == null ? "Not disclosed" : values.length ? values.join("; ") : "Not recorded";
 }
 
+/**
+ * One status per party (IR-1094, audit US-17). A party with people to show
+ * says where it stands through them, each person with their own state; a party
+ * with none (not asked, waiting, withheld, or an unclaimed Pool) says it once
+ * on its own row. The row is never both.
+ */
 function PartyReviewers({ row, ids, readable, people }: { row: TrackerPartyRow; ids: string; readable: boolean; people: PaperPerson[] }) {
   // The tracker sends only the withdrawn seats a Decision cut short, labelled so.
   const seats = row.seats ?? [];
   const outcome = row.outcome && row.outcome !== "pending" ? row.outcome_label : null;
   const unasked = UNASKED.has(row.state);
+  const showSeats = !row.in_pool && readable && seats.length > 0;
   return (
     <li id={detailsTarget(ids, row.party)} tabIndex={-1} className={cn("rounded", FOCUS_RING)}>
       <p className={cn("flex items-center gap-2 text-small font-semibold", unasked ? "text-stone-600" : "text-stone-900")}>
         <span>{row.label}</span>
-        <span className="text-2xs font-normal text-stone-600">
-          <i className={cn("fas mr-1", STATE_ICON[row.state] ?? "fa-circle")} aria-hidden />
-          {[row.state_label, outcome, row.changes_requested ? "Changes requested" : null].filter(Boolean).join(" · ")}
-        </span>
+        {!showSeats && !row.in_pool && (
+          <span className="text-2xs font-normal text-stone-600">
+            <i className={cn("fas mr-1", STATE_ICON[row.state] ?? "fa-circle")} aria-hidden />
+            {[row.state_label, outcome, row.changes_requested ? "Changes requested" : null].filter(Boolean).join(" · ")}
+          </span>
+        )}
       </p>
       {row.in_pool ? (
         // The office, not a person: nobody holds a seat to show.
         <p className="mt-1 text-small text-stone-600"><i className="fas fa-users mr-2" aria-hidden />Nobody has claimed this yet</p>
-      ) : readable && seats.length > 0 && (
+      ) : showSeats && (
         <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-1">
           {seats.map((seat, i) => (
             <li key={i} className="flex items-center justify-between gap-2">
