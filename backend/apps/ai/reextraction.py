@@ -195,7 +195,8 @@ def rollback(record_ids: Sequence[int]) -> int:
             if active is None:
                 continue
             previous = (
-                ChunkSet.objects.filter(record_id=record_id, is_active=False, created_at__lt=active.created_at)
+                ChunkSet.objects.filter(record_id=record_id, is_active=False, trial_variant__isnull=True,
+                                        created_at__lt=active.created_at)
                 .order_by("-created_at", "-pk").first()
             )
             if previous is None:

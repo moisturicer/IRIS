@@ -293,7 +293,7 @@ export function CommentsSection({
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-brand">
           <p role="alert">{loadError}</p>
           <button type="button" className="underline focus-visible:outline focus-visible:outline-2" onClick={() => void refresh()}>
-            Retry
+            Try again
           </button>
         </div>
       )}
@@ -317,7 +317,7 @@ export function CommentsSection({
       )}
 
       {loading ? (
-        <Skeleton rows={3} label="Loading comments…" />
+        <Skeleton rows={3} label="Loading comments…" onRetry={() => void refresh()} />
       ) : loadError ? null : threads.length === 0 ? (
         <p className="py-4 text-sm text-stone-600">No comments yet. Start the discussion.</p>
       ) : (

@@ -56,6 +56,24 @@ describe("controls in the reading surfaces", () => {
     expect(offenders(/\blg:(min-h-|h-|w-)/)).toEqual([]);
   });
 
+  it("are never shorter than 44px on touch (IR-1092, audit RES-02)", () => {
+    // A bare `min-h-9` applies on a phone too; the pointer size is written
+    // `reading-split:min-h-9` after the touch one. The `:` guard lets that
+    // through and catches the unprefixed ones.
+    const small = /(?<![:\w-])min-h-(?:8|9|10)\b/;
+    expect(offenders(small)).toEqual([]);
+    // The threads folder holds reading controls too (the glob above is flat).
+    const threads = import.meta.glob("./threads/*.tsx", { query: "?raw", import: "default", eager: true }) as Record<
+      string,
+      string
+    >;
+    expect(
+      Object.entries(threads)
+        .filter(([name, text]) => !name.endsWith(".test.tsx") && small.test(text))
+        .map(([name]) => name),
+    ).toEqual([]);
+  });
+
   it("are rounded-lg, not rounded-md", () => {
     // ReadingHeader's section thumb sits one radius step inside its track on
     // purpose, so the two are concentric. The others are older.

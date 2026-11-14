@@ -1,4 +1,5 @@
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 /**
  * The Publish dialog's pure rules (IR-408), kept out of the component so each
  * is stated once and tested as a table.
@@ -36,8 +37,18 @@ export const isProposal = (typeName: string): boolean => typeKey(typeName) === "
  */
 export function provisionalTitle(fileName: string): string {
   const stem = fileName.replace(/\.[^./\\]+$/, "");
-  const title = stem.replace(/[\s_-]+/g, " ").trim();
+  const title = withoutPdfExtension(stem.replace(/[\s_-]+/g, " ").trim());
   return title || "Untitled manuscript";
+}
+
+/**
+ * A title without a trailing ".pdf", however many (IR-1084). A file named
+ * "paper.pdf.pdf" loses one extension to the file-name rule above and an
+ * extractor that falls back to the file name hands back "paper.pdf"; neither
+ * is a title an author chose.
+ */
+export function withoutPdfExtension(title: string): string {
+  return title.replace(/(\s*\.pdf)+\s*$/i, "").trim();
 }
 
 export interface ReferenceLists {
@@ -106,7 +117,6 @@ export interface ApiFailure {
   network:  boolean;
 }
 
-const NETWORK_MESSAGE = "We couldn't reach IRIS. Check your connection and try again.";
 const SERVER_MESSAGE = "IRIS isn't responding right now. Try again in a few minutes.";
 const TOO_LARGE_MESSAGE = "This is too large for the server to accept.";
 
@@ -122,7 +132,7 @@ function statusMessage(status: number | undefined, fallback: string): string {
 
 export function describeFailure(err: unknown, fallback: string): ApiFailure {
   const response = (err as { response?: { status?: number; data?: unknown } })?.response;
-  if (!response) return { message: NETWORK_MESSAGE, fields: {}, network: true };
+  if (!response) return { message: failureMessage(err), fields: {}, network: true };
 
   const data = response.data;
   const fields: Record<string, string> = {};

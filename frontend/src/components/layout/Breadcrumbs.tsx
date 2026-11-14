@@ -1,5 +1,7 @@
 import { Link, useMatches } from "react-router-dom";
 
+import { pathFor } from "@/lib/access";
+
 import type { PageWidth } from "./PageContainer";
 
 export type RouteHandle = {
@@ -15,17 +17,30 @@ export type RouteHandle = {
 
 export function Breadcrumbs() {
   const matches = useMatches();
-  const crumbs = matches.filter((m) => (m.handle as RouteHandle | undefined)?.crumb);
+  const withCrumb = matches.filter((m) => (m.handle as RouteHandle | undefined)?.crumb);
 
-  if (crumbs.length === 0) return null;
+  if (withCrumb.length === 0) return null;
+
+  // The first step is Discover, the page "/" is, under the name the sidebar
+  // gives it (IR-1085, NAV-03). Discover's own crumb is that step, so it is
+  // not listed again after it.
+  const discoverPath = pathFor("discover");
+  const crumbs = withCrumb.filter((m) => m.pathname !== discoverPath);
+  const onDiscover = crumbs.length === 0;
 
   return (
     <nav aria-label="Breadcrumb" className="mb-4">
       <ol className="flex flex-wrap items-center gap-1.5 text-[13px] text-stone-500">
         <li>
-          <Link to="/" className="hover:text-brand transition-colors font-medium">
-            Home
-          </Link>
+          {onDiscover ? (
+            <span className="text-stone-800 font-semibold" aria-current="page">
+              Discover
+            </span>
+          ) : (
+            <Link to={discoverPath} className="hover:text-brand transition-colors font-medium">
+              Discover
+            </Link>
+          )}
         </li>
         {crumbs.map((match, index) => {
           const label = (match.handle as RouteHandle).crumb!;

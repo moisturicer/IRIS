@@ -6,6 +6,7 @@ import { AuthAlert } from "@/components/auth/AuthAlert";
 import { Button } from "@/components/ui";
 import { Spinner } from "@/components/ui/Spinner";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { useAuthStore } from "@/store/auth.store";
 import { useNoticeStore } from "@/store/notice.store";
 import type { DataNotice } from "@/types/notice";
@@ -42,6 +43,7 @@ export function NoticeAnswerScreen() {
   const clearNotice = useNoticeStore((s) => s.clear);
 
   const [phase, setPhase] = useState<Phase>("loading");
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [notice, setNotice] = useState<DataNotice | null>(null);
   // Their last answer on AI: a No there makes a Yes ask which papers (IR-791).
   const [previousAi, setPreviousAi] = useState<boolean | null>(null);
@@ -73,7 +75,8 @@ export function NoticeAnswerScreen() {
       setPreviousAi(data.answer?.ai_consent ?? null);
       showNotice(data);
       setPhase("ready");
-    } catch {
+    } catch (err) {
+      setLoadError(err);
       setPhase((p) => (p === "ready" ? p : "failed"));
     }
   }, [showNotice]);
@@ -168,7 +171,7 @@ export function NoticeAnswerScreen() {
         {phase === "failed" && (
           <div className="mt-6">
             <AuthAlert variant="error" title="The notice didn't load">
-              Check your connection, then try again.
+              {failureMessage(loadError)}
             </AuthAlert>
             <Button type="button" onClick={() => { setPhase("loading"); void load(); }}>
               Try again

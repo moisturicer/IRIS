@@ -20,6 +20,7 @@ import {
   type NoticeAnswers,
 } from "./notice/NoticeAnswerFields";
 import { NoticeText } from "./notice/NoticeText";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Role = "Student" | "Adviser";
@@ -631,7 +632,7 @@ export default function SignupPage() {
                       className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-4 py-2.5
                         text-sm font-semibold transition-colors
                         ${role === value
-                          ? "border-brand bg-brand-50 text-brand"
+                          ? SELECTED
                           : "border-stone-300 bg-surface text-stone-700 hover:border-stone-400"}`}
                     >
                       <input

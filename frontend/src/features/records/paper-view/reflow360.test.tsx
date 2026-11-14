@@ -45,7 +45,7 @@ describe("the version picker", () => {
   it("keeps the compact reading-header picker at its fixed width", () => {
     renderScreen(<VersionPicker compact versions={versions} viewing={null} onChoose={() => {}} />);
     const select = screen.getByRole("combobox", { name: "Version" });
-    expect(select.className).toMatch(/\bw-24\b/);
+    expect(select.className).toMatch(/\bw-32\b/);
     expect(select.parentElement!.className).toMatch(/\bshrink-0\b/);
   });
 });

@@ -10,6 +10,7 @@ import {
   type TextLayerHandle,
 } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
+import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
 import { CitationOverlay } from "./CitationOverlay";
 import { FIND_HIT_CURRENT_CLASS, paintFindHits } from "./findHighlights";
 import { HighlightMarks, type ReaderHighlight } from "./ReaderHighlights";
@@ -235,6 +236,18 @@ export interface PaperPdfReaderProps {
    */
   fill?: boolean;
   /**
+   * The caller floats Notes and Ask IRIS over this pane's bottom-right
+   * (IR-1079): the filled pane keeps room under its last page so it scrolls
+   * clear of both. Only a `fill` pane scrolls inside itself; otherwise the
+   * page's own bottom padding does this.
+   */
+  clearCorner?: boolean;
+  /**
+   * What starts the toolbar (IR-1092): the caller's, for what the one-row phone
+   * record bar has no room for -- the paper's version or its picker.
+   */
+  toolbarStart?: ReactNode;
+  /**
    * The toolbar's download control (IR-677): the caller's, because only the
    * record knows where the viewer's download stands. Absent, there is none --
    * the bytes this reader holds are never saved as a copy (ADR-048).
@@ -295,6 +308,8 @@ function PaperPdfReaderSource({
   navKey,
   contained = false,
   fill = false,
+  clearCorner = false,
+  toolbarStart,
   downloadControl,
   bottomInset = 0,
   highlights = NO_HIGHLIGHTS,
@@ -664,6 +679,7 @@ function PaperPdfReaderSource({
               ),
         )}
       >
+        {toolbarStart && <div className="order-first flex items-center">{toolbarStart}</div>}
         {fill && ready && (
           <span className="order-first px-2 text-small text-stone-600 tabular-nums">
             Page {currentPage} / {pageCount}
@@ -771,7 +787,10 @@ function PaperPdfReaderSource({
           // A stable gutter, so the scrollbar appearing once the pages load
           // does not narrow the pane and set off a second refit.
           fill
-            ? "flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] rounded-none bg-stone-200 px-3 py-4 reading-split:px-6 focus-visible:ring-inset"
+            ? cn(
+                "flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] rounded-none bg-stone-200 px-3 pt-4 reading-split:px-6 focus-visible:ring-inset",
+                clearCorner ? CORNER_CLEARANCE_CLASS : "pb-4",
+              )
             : cn(
                 "reading-wide:flex-1 reading-wide:min-h-0 reading-wide:overflow-y-auto reading-wide:[scrollbar-gutter:stable]",
                 "reading-wide:rounded-none reading-wide:p-4 reading-wide:focus-visible:ring-inset",
@@ -780,7 +799,7 @@ function PaperPdfReaderSource({
       >
         {status === "loading" && (
           <div className="mx-auto max-w-2xl bg-white shadow-card ring-1 ring-stone-200">
-            <Skeleton rows={8} label="Loading the paper…" />
+            <Skeleton rows={8} label="Loading the paper…" onRetry={() => setAttempt((n) => n + 1)} />
           </div>
         )}
 

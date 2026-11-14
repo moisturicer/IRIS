@@ -56,7 +56,7 @@ export function DownloadRequestModal({
   return (
     <Modal open={open} onClose={onClose} title="Request download access" size="max-w-md">
       <div className="space-y-4">
-        <p className="text-[14px] text-stone-600 leading-relaxed">
+        <p className="text-body text-stone-600 leading-relaxed">
           You are requesting permission to download documents for{" "}
           <span className="font-semibold text-stone-900">{recordTitle}</span>.
           RDCO will review your request. If they approve it, you can download the paper here
@@ -76,11 +76,11 @@ export function DownloadRequestModal({
             aria-describedby={`${noteId}-help`}
             className={fieldClasses(false)}
           />
-          <p id={`${noteId}-help`} className="mt-1 text-[13px] text-stone-600">
+          <p id={`${noteId}-help`} className="mt-1 text-small text-stone-600">
             RDCO reads this when deciding. Up to {NOTE_MAX_LENGTH} characters.
           </p>
         </div>
-        <p className="text-[13px] text-stone-500 bg-stone-50 border border-stone-100 rounded-lg px-3 py-2">
+        <p className="text-small text-stone-500 bg-stone-50 border border-stone-100 rounded-lg px-3 py-2">
           Every copy carries your name. Do not redistribute it without permission.
         </p>
         <div className="flex gap-2 justify-end pt-1">
@@ -88,7 +88,7 @@ export function DownloadRequestModal({
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg text-[14px] font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-body font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -96,7 +96,7 @@ export function DownloadRequestModal({
             type="button"
             onClick={handleSubmit}
             disabled={submitting || !ready}
-            className="px-4 py-2 rounded-lg text-[14px] font-semibold text-white bg-brand hover:bg-brand-light disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-body font-semibold text-white bg-brand hover:bg-brand-light disabled:opacity-50"
           >
             {submitting ? "Submitting…" : "Submit request"}
           </button>

@@ -1,6 +1,7 @@
 import { noticeApi } from "@/api/notice";
 import { Spinner } from "@/components/ui/Spinner";
 import { useApiRead } from "@/hooks/useApiRead";
+import { failureMessage } from "@/lib/readFailure";
 import { NoticeText } from "./notice/NoticeText";
 
 /**
@@ -25,7 +26,7 @@ export function DataNotice() {
   if (read.status !== "ready" || !notice || typeof notice.text !== "string") {
     return (
       <div className="space-y-2 text-small text-stone-700">
-        <p role="alert">The data notice didn&apos;t load. Check your connection, then try again.</p>
+        <p role="alert">{failureMessage(read.error, { lead: "The data notice didn't load." })}</p>
         <button type="button" onClick={read.retry} className="font-semibold text-brand underline underline-offset-4">
           Try again
         </button>

@@ -125,6 +125,22 @@ describe("RDCO publishes the next version", () => {
     expect(screen.getByRole("button", { name: "Publish version 3" })).toBeDisabled();
   });
 
+  it("says why Publish is unavailable, and stops saying it once the text can be published (IR-1088)", async () => {
+    versions();
+    const { user } = await openPage();
+    const publish = () => screen.getByRole("button", { name: "Publish version 3" });
+
+    expect(publish()).toHaveAccessibleDescription("Change the text to publish a new version.");
+    await user.clear(field());
+    expect(publish()).toHaveAccessibleDescription("Enter the notice text to publish.");
+
+    await user.click(field());
+    await user.paste("A new notice");
+    expect(publish()).toBeEnabled();
+    expect(publish()).not.toHaveAttribute("aria-describedby");
+    expect(publish()).toHaveClass("rounded-full");
+  });
+
   it("shows the server's refusal when a newer version was published meanwhile, and keeps the paste", async () => {
     versions();
     vi.spyOn(noticeApi, "impact").mockResolvedValue({ data: { current_version: 2, accounts_to_answer: 3 } } as never);

@@ -159,6 +159,34 @@ def test_a_reader_finds_a_paper_and_opens_its_passage_at_the_exact_revision(rese
                                   "revision": hit.source.revision, "regions": []}]
 
 
+def test_a_trial_chunk_set_is_never_searched_or_read(research):
+    """IR-1051: an evaluation trial set beside the active one never reaches a reader."""
+    reader = make_user("tools-trial@cit.edu")
+    flood = paper("Flood forecasting", {4: [("Methods", FLOOD)]})
+    probe = "zebracorn migration across the floodplain during the wet season"
+    trial = ChunkSet.objects.create(
+        record=flood, extraction_hash="t", strategy_id="s", options={}, content_hash="trial",
+        trial_variant="probe", trial_spec="::",
+    )
+    DocumentChunk.objects.create(
+        chunk_set=trial, record=flood, sequence=0, max_sequence=0, text=probe, content=probe,
+        context_path=[flood.title, "Methods"], token_count=len(probe.split()),
+        text_hash="trial", source_page=4, element_kinds=["paragraph"],
+    )
+
+    async def script(tools):
+        await tools.search("zebracorn migration floodplain")
+        found = await tools.search("neural network flooding catchment")
+        await tools.read_page(found.records[0].handle, 4)
+
+    response, seen, _ = ask(research, reader, script, key="tools-trial-1")
+    assert response.status_code == 201
+    (_, probed), (_, found), (_, page) = seen
+    assert probe not in [p.text for p in probed.passages]
+    assert [p.text for p in found.passages] == [FLOOD]
+    assert [p.text for p in page.passages] == [FLOOD]
+
+
 def test_tool_calls_are_journalled_as_names_and_codes(research):
     reader = make_user("tools-journal@cit.edu")
     paper("Flood forecasting", {4: [("Methods", FLOOD)]})

@@ -191,6 +191,31 @@ def deserialize_regions(rows: list[dict[str, Any]]) -> tuple[BoundingBox, ...]:
     )
 
 
+def chunk_rows(db_chunk_set, record_id: int, chunk_set: ChunkSet) -> list:
+    """Unsaved ``DocumentChunk`` rows for ``chunk_set``, one per chunk."""
+    from apps.ai.models.chunk import DocumentChunk as DocumentChunkModel
+
+    max_sequence = len(chunk_set.chunks) - 1 if chunk_set.chunks else 0
+    return [
+        DocumentChunkModel(
+            chunk_set=db_chunk_set,
+            record_id=record_id,
+            sequence=chunk.sequence,
+            max_sequence=max_sequence,
+            text=chunk.text,
+            content=chunk.content,
+            context_path=list(chunk.context_path),
+            text_hash=chunk_text_hash(chunk),
+            token_count=chunk.token_count,
+            source_page=chunk.source_page,
+            element_kinds=sorted(chunk.element_kinds),
+            bboxes=serialize_regions(chunk.bboxes),
+            section_key=list(chunk.section_key),
+        )
+        for chunk in chunk_set.chunks
+    ]
+
+
 def _serialize_page_sizes(page_sizes) -> dict:
     # JSON object keys are strings — mirrors apps.ai.extraction.serialization.
     return {str(page): list(size) for page, size in page_sizes.items()}
@@ -318,24 +343,8 @@ class DjangoChunkRepository:
                 is_active=True,
             )
 
-            max_sequence = len(chunk_set.chunks) - 1 if chunk_set.chunks else 0
             rows = DocumentChunkModel.objects.bulk_create(
-                DocumentChunkModel(
-                    chunk_set=db_chunk_set,
-                    record_id=record_id,
-                    sequence=chunk.sequence,
-                    max_sequence=max_sequence,
-                    text=chunk.text,
-                    content=chunk.content,
-                    context_path=list(chunk.context_path),
-                    text_hash=chunk_text_hash(chunk),
-                    token_count=chunk.token_count,
-                    source_page=chunk.source_page,
-                    element_kinds=sorted(chunk.element_kinds),
-                    bboxes=serialize_regions(chunk.bboxes),
-                    section_key=list(chunk.section_key),
-                )
-                for chunk in chunk_set.chunks
+                chunk_rows(db_chunk_set, record_id, chunk_set)
             )
 
             self._carry_vectors_over(

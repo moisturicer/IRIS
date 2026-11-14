@@ -89,6 +89,18 @@ interface ScreenDef {
      * this narrows it, so an Adviser with no advisees sees no My Reviews.
      */
     needsReviewAccess?: true;
+    /**
+     * Listed under another screen's row instead of in the list itself (IR-1085,
+     * D5). The row hangs from its parent: with no parent in the list there is
+     * nothing to hang from, so a child is left out too. A `ScreenKey`, typed as
+     * a string only because `ScreenKey` is derived from the map this describes.
+     */
+    parent?: string;
+    /**
+     * Shown only to an office coordinator (`review_access.is_coordinator`).
+     * Narrows the role like `needsReviewAccess`, never the route.
+     */
+    needsCoordinator?: true;
   };
 }
 
@@ -103,9 +115,10 @@ export const SCREEN_ACCESS = {
   // The bell at the top of the sidebar is the entry; its "View all" opens the
   // page, so a sidebar link would say the same thing twice (IR-519).
   notifications: { path: "/notifications", roles: EVERYONE },
-  // Profile, Settings and Help live in the account menu in the sidebar's user
-  // block (IR-413, spec §4.2), not in the nav list. Profile (who you are) and
-  // Settings (your account) are separate pages since IR-933.
+  // Profile and Settings live in the account menu in the sidebar's user block
+  // (IR-413, spec §4.2), not in the nav list. Profile (who you are) and
+  // Settings (your account) are separate pages since IR-933. Help is a link of
+  // its own in the sidebar's footer (IR-1085), also outside the nav list.
   profile:       { path: "/profile",       roles: EVERYONE },
   profileEdit:   { path: "/profile/edit",  roles: EVERYONE },
   // Another person's Profile (IR-700), opened by clicking their name. Who may be
@@ -139,9 +152,19 @@ export const SCREEN_ACCESS = {
                  nav: { label: "My Reviews", icon: "fa-list-check", section: "Main",
                         needsReviewAccess: true } },
 
+  // The coordinator's console (IR-623). The sidebar lists it only for a
+  // coordinator; the server refuses anyone else. Nested under My Reviews in the
+  // sidebar (IR-1085, D5), at the address it always had.
+  reviewOffice: { path: "/review/office", roles: OFFICES,
+                  nav: { label: "Office console", icon: "fa-users-gear", section: "Main",
+                         parent: "reviewQueue", needsCoordinator: true } },
+
   // Workflow analytics (IR-626): an office's own figures, every office's for
-  // RDCO. Reached from My Reviews, not the sidebar.
-  reviewAnalytics: { path: "/review/analytics", roles: OFFICES },
+  // RDCO. Nested under My Reviews in the sidebar (IR-1085, D5), still reached
+  // from the page's own header link too.
+  reviewAnalytics: { path: "/review/analytics", roles: OFFICES,
+                     nav: { label: "Workflow analytics", icon: "fa-chart-column", section: "Main",
+                            parent: "reviewQueue" } },
 
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.
@@ -220,6 +243,14 @@ export interface NavEntry {
   label: string;
   icon: string;
   section: NavSectionName;
+  /** The entry this one is listed under, when it is nested (IR-1085). */
+  parent?: ScreenKey;
+}
+
+/** The slice of `/users/me/`'s `review_access` the sidebar reads. */
+export interface NavReviewAccess {
+  my_reviews: boolean;
+  is_coordinator?: boolean;
 }
 
 /**
@@ -232,22 +263,29 @@ export interface NavEntry {
  * `reviewAccess` is the user's own `review_access` from `/users/me/`. An entry
  * marked `needsReviewAccess` is left out unless it says `my_reviews`; a
  * missing object counts as no review work, the same answer the route guard
- * gives, so the link and the page cannot disagree.
+ * gives, so the link and the page cannot disagree. `needsCoordinator` reads
+ * `is_coordinator` the same way.
+ *
+ * A nested entry (`parent`, IR-1085) comes right after its parent's entry and
+ * only while that parent is in the list. Callers group by `parent`.
  */
 export function navFor(
   role: RoleName | null | undefined,
-  reviewAccess?: { my_reviews: boolean } | null,
+  reviewAccess?: NavReviewAccess | null,
 ): NavEntry[] {
   if (!role) return [];
-  return ALL_SCREENS.flatMap((key) => {
+  const entries = ALL_SCREENS.flatMap((key) => {
     const def = SCREEN_ACCESS[key];
     if (!("nav" in def) || !def.nav) return [];
     if (!canAccess(role, key)) return [];
-    const { onlyFor, needsReviewAccess, ...item } = def.nav as NonNullable<ScreenDef["nav"]>;
+    const { onlyFor, needsReviewAccess, needsCoordinator, ...item } = def.nav as NonNullable<ScreenDef["nav"]>;
     if (onlyFor && !onlyFor.includes(role)) return [];
     if (needsReviewAccess && !hasReviewWork(reviewAccess)) return [];
-    return [{ key, to: def.path, ...item }];
+    if (needsCoordinator && !isCoordinator(reviewAccess)) return [];
+    return [{ key, to: def.path, ...item } as NavEntry];
   });
+  // A child with no parent in the list has nothing to hang from.
+  return entries.filter((entry) => !entry.parent || entries.some((other) => other.key === entry.parent));
 }
 
 /**
@@ -257,6 +295,15 @@ export function navFor(
  */
 export function hasReviewWork(reviewAccess?: { my_reviews: boolean } | null): boolean {
   return reviewAccess?.my_reviews === true;
+}
+
+/**
+ * Whether the server says this user coordinates an office (`is_coordinator`).
+ * The one reading of the flag, shared by the sidebar's Office console entry and
+ * My Reviews' own console link, so the two cannot disagree (IR-1085).
+ */
+export function isCoordinator(reviewAccess?: { is_coordinator?: boolean } | null): boolean {
+  return reviewAccess?.is_coordinator === true;
 }
 
 /** The sidebar's section order. */

@@ -10,6 +10,7 @@ import { accountsApi, type MyDeletionRequest } from "@/api/accounts";
 import { Button } from "@/components/ui";
 import { Spinner } from "@/components/ui/Spinner";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { formatDate } from "@/lib/utils";
 import { Message, Panel } from "./settingsParts";
 
@@ -43,7 +44,7 @@ export function DownloadMyDataPanel() {
       setFailure(
         status === 429
           ? "You've downloaded your data several times recently. Try again later."
-          : "Your file wasn't downloaded. Check your connection, then try again.",
+          : failureMessage(err, { lead: "Your file wasn't downloaded." }),
       );
       setState("failed");
     }
@@ -59,7 +60,7 @@ export function DownloadMyDataPanel() {
           Download my data
         </Button>
         {state === "preparing" && (
-          <p role="status" className="flex items-center gap-2 text-[13px] text-stone-600">
+          <p role="status" className="flex items-center gap-2 text-small text-stone-600">
             <Spinner size="sm" />
             Preparing your file…
           </p>
@@ -88,16 +89,16 @@ function WhatDeletionDoes() {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div>
-        <h3 className="text-[14px] font-semibold text-stone-900">What goes</h3>
-        <ul className="mt-2 space-y-1.5 text-[13px] text-stone-600 leading-relaxed list-disc pl-5">
+        <h3 className="text-body font-semibold text-stone-900">What goes</h3>
+        <ul className="mt-2 space-y-1.5 text-small text-stone-600 leading-relaxed list-disc pl-5">
           <li>Your profile and photo. You leave people search, the Adviser picker and reviewer pools.</li>
           <li>Your private data, including drafts nobody else is waiting on.</li>
           <li>Your sign-in. You can't sign in again, and your email can later register as a new account.</li>
         </ul>
       </div>
       <div>
-        <h3 className="text-[14px] font-semibold text-stone-900">What stays</h3>
-        <ul className="mt-2 space-y-1.5 text-[13px] text-stone-600 leading-relaxed list-disc pl-5">
+        <h3 className="text-body font-semibold text-stone-900">What stays</h3>
+        <ul className="mt-2 space-y-1.5 text-small text-stone-600 leading-relaxed list-disc pl-5">
           <li>Your name as an author on published papers.</li>
           <li>Your name as Adviser on a published paper, as plain text with no link.</li>
           <li>Comments and review history, shown as "Former user".</li>
@@ -116,14 +117,15 @@ export function DeleteAccountPanel() {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const { data } = await accountsApi.myDeletionRequest({ signal });
       setRequest(data.request);
       setPhase("ready");
-    } catch {
-      if (!signal?.aborted) setPhase("failed");
+    } catch (err) {
+      if (!signal?.aborted) { setLoadError(err); setPhase("failed"); }
     }
   }, []);
 
@@ -168,7 +170,7 @@ export function DeleteAccountPanel() {
       caption="Ask for your account to be deleted. The System Admin confirms it once nobody is waiting on you."
     >
       {phase === "loading" && (
-        <p role="status" className="flex items-center gap-2 text-[13px] text-stone-600">
+        <p role="status" className="flex items-center gap-2 text-small text-stone-600">
           <Spinner size="sm" />
           Checking for a deletion request…
         </p>
@@ -176,7 +178,7 @@ export function DeleteAccountPanel() {
 
       {phase === "failed" && (
         <div className="space-y-3">
-          <Message tone="error" role="alert">Your deletion request didn't load. Check your connection, then try again.</Message>
+          <Message tone="error" role="alert">{failureMessage(loadError, { lead: "Your deletion request didn't load." })}</Message>
           <Button type="button" variant="secondary" onClick={() => { setPhase("loading"); void load(); }}>
             Try again
           </Button>
@@ -187,20 +189,20 @@ export function DeleteAccountPanel() {
         <div className="space-y-5">
           {pending && request ? (
             <div className="rounded-lg border border-stone-200 p-4 space-y-3" role="group" aria-label="Your deletion request">
-              <p className="text-[14px] font-semibold text-stone-900">
+              <p className="text-body font-semibold text-stone-900">
                 Request sent on {formatDate(request.created_at)}, waiting for the System Admin
               </p>
               {request.blockers.length > 0 ? (
                 <div>
-                  <p className="text-[13px] text-stone-600">It can't be confirmed until this is cleared:</p>
-                  <ul className="mt-2 space-y-1.5 text-[13px] text-stone-700 leading-relaxed list-disc pl-5">
+                  <p className="text-small text-stone-600">It can't be confirmed until this is cleared:</p>
+                  <ul className="mt-2 space-y-1.5 text-small text-stone-700 leading-relaxed list-disc pl-5">
                     {request.blockers.map((b) => (
                       <li key={`${b.kind}-${b.record}`}>{b.message}</li>
                     ))}
                   </ul>
                 </div>
               ) : (
-                <p className="text-[13px] text-stone-600">Nothing is waiting on you, so it can be confirmed.</p>
+                <p className="text-small text-stone-600">Nothing is waiting on you, so it can be confirmed.</p>
               )}
               {request.can_cancel && (
                 <div className="flex flex-wrap gap-3">
@@ -214,14 +216,14 @@ export function DeleteAccountPanel() {
             <>
               {request?.status === "declined" && (
                 <div className="rounded-lg border border-stone-200 p-4" role="group" aria-label="Your last deletion request">
-                  <p className="text-[14px] font-semibold text-stone-900">
+                  <p className="text-body font-semibold text-stone-900">
                     Your last request was rejected{request.decided_at ? ` on ${formatDate(request.decided_at)}` : ""}
                   </p>
-                  <p className="text-[13px] text-stone-600 mt-1">Reason: {request.reason}</p>
+                  <p className="text-small text-stone-600 mt-1">Reason: {request.reason}</p>
                 </div>
               )}
               {request?.status === "cancelled" && (
-                <p role="status" className="text-[13px] text-stone-600">
+                <p role="status" className="text-small text-stone-600">
                   You cancelled your request. Your account stays as it is.
                 </p>
               )}
@@ -236,7 +238,7 @@ export function DeleteAccountPanel() {
                 </div>
               ) : (
                 <div className="rounded-lg border border-stone-200 p-4" role="group" aria-label="Delete my account">
-                  <p className="text-[13px] text-stone-700">
+                  <p className="text-small text-stone-700">
                     The System Admin deletes your account once they confirm it, and that can't be undone. Until
                     then you can cancel. Send the request?
                   </p>

@@ -10,10 +10,11 @@ import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { NotificationBell } from "./NotificationBell";
 import { AccountMenu } from "./AccountMenu";
-import { navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
+import { navFor, canAccess, pathFor, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
 import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { isRail, useSidebarMode } from "@/lib/layout";
+import { HERE } from "@/components/ui/highlightRoles";
 
 interface NavItem {
   to:     string;
@@ -26,7 +27,15 @@ interface NavItem {
    * screen reader hears in its place.
    */
   dot?: string;
+  /**
+   * Pages listed under this row (IR-1085, D5): My Reviews' Office console and
+   * Workflow analytics. A list inside the row, so it reads as part of it.
+   */
+  children?: NavItem[];
 }
+
+/** Help's own link in the sidebar's footer, outside the nav list (IR-1085). */
+const HELP_ITEM: NavItem = { to: pathFor("help"), label: "Help", icon: "fa-circle-question" };
 
 // There is no `comingSoon` flag. Nav items are derived from `lib/access.ts`,
 // which maps a role to screens that exist and are routed -- so a dead-end entry
@@ -48,12 +57,13 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
         onClick={onNavigate}
         className={({ isActive }) =>
           cn(
-            "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm",
+            // 44px on the phone drawer; compact from md, where a pointer is (IR-1092).
+            "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm",
             collapsed && "md:h-10 md:justify-center md:px-0",
-            // Active is the brand tint; hover is neutral stone, so a hovered
-            // row can never be mistaken for the page you are on.
+            // Active is "here" (a Desk Stone fill); hover is the lighter Bar Stone, so a
+            // hovered row can never be mistaken for the page you are on (IR-1097).
             isActive
-              ? "bg-brand-50 font-semibold text-brand"
+              ? HERE
               : "font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900",
             COLOUR_TRANSITION,
             FOCUS_RING,
@@ -100,6 +110,21 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
         )}
       </NavLink>
       </Tooltip>
+      {item.children && item.children.length > 0 && (
+        // Indented under its parent with a rule, and level with it on the rail,
+        // where each page is its own icon.
+        <ul
+          role="list"
+          className={cn(
+            "ml-5 mt-0.5 space-y-0.5 border-l border-stone-200 pl-2",
+            collapsed && "md:ml-0 md:border-l-0 md:pl-0",
+          )}
+        >
+          {item.children.map((child) => (
+            <NavItemLink key={child.to} item={child} collapsed={collapsed} onNavigate={onNavigate} />
+          ))}
+        </ul>
+      )}
     </li>
   );
 }
@@ -158,8 +183,9 @@ interface SidebarProps {
  * The app's navigation (IR-413, spec §4.1).
  *
  * Discover and research links, RDCO's coordination group, and the System
- * Admin's Administration group. The bell is at the top (IR-519) and the
- * account menu at the bottom. Below `md` it is a
+ * Admin's Administration group. My Reviews carries the Office console and
+ * Workflow analytics under it, for the roles that have them (IR-1085, D5). The
+ * bell is at the top (IR-519); Help and the account menu are at the bottom. Below `md` it is a
  * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
  * rail, and the IRIS mark opens the full sidebar over the page (IR-1086). From
  * 1024 px it is at full width, or as the rail if the user chooses (stored per
@@ -222,12 +248,22 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     library: needsAction ? "something needs your action" : undefined,
   };
 
+  const toItem = (entry: NavEntry): NavItem => {
+    const children = nav.filter((child) => child.parent === entry.key).map(toItem);
+    return {
+      to: entry.to, label: entry.label, icon: entry.icon,
+      badge: BADGES[entry.key], dot: DOTS[entry.key],
+      ...(children.length > 0 ? { children } : {}),
+    };
+  };
+
   const groups = NAV_SECTION_ORDER
     .map((section) => ({
       section,
+      // Nested entries are drawn inside their parent's row, not beside it.
       items: nav
-        .filter((entry) => entry.section === section)
-        .map((entry): NavItem => ({ to: entry.to, label: entry.label, icon: entry.icon, badge: BADGES[entry.key], dot: DOTS[entry.key] })),
+        .filter((entry) => entry.section === section && !entry.parent)
+        .map(toItem),
     }))
     // A group with nothing in it for this role is not rendered at all, which is
     // what keeps an empty "Administration" heading off a student's sidebar.
@@ -266,7 +302,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
               // and puts it back when that closes.
               data-sidebar-mark
               {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
-              className={cn("block h-9 w-9 rounded-lg", FOCUS_RING)}
+              className={cn("block h-9 w-9 touch:h-11 touch:w-11 rounded-lg", FOCUS_RING)}
             >
               <IrisMark className="h-9 w-9 text-brand" />
             </button>
@@ -295,7 +331,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             // Where AppShell puts focus when the phone drawer opens.
             {...(mode === "rail" ? {} : { "data-drawer-focus": "" })}
             className={cn(
-              "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 md:hidden",
+              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 md:hidden",
               COLOUR_TRANSITION,
               FOCUS_RING,
             )}
@@ -323,8 +359,11 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
         ))}
       </nav>
 
-      {/* ── Account menu ──────────────────────────────────────────────── */}
+      {/* ── Footer: Help, then the account menu ───────────────────────── */}
       <div className={cn("border-t border-stone-200 p-3", collapsed && "md:px-2")}>
+        <ul role="list" className="mb-2">
+          <NavItemLink item={HELP_ITEM} collapsed={collapsed} onNavigate={closeSidebar} />
+        </ul>
         <AccountMenu collapsed={collapsed} onNavigate={closeSidebar} />
       </div>
     </aside>

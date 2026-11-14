@@ -255,7 +255,7 @@
       "name": "Ask IRIS icon",
       "kind": "button",
       "refersTo": "ask-iris-fab",
-      "description": "The one corner control: the Ask IRIS glyph (a speech bubble with the mark's serif I cut out) on maroon; gone while the panel is open.",
+      "description": "The lower of the two corner controls (Notes sits above it): the Ask IRIS glyph (a speech bubble with the mark's serif I cut out) on maroon; gone while the panel is open.",
       "html": "<button class=\"ds-fab\" aria-label=\"Ask IRIS\"><svg width=\"26\" height=\"26\" viewBox=\"1.60 1.70 20.80 20.80\" fill=\"currentColor\" fill-rule=\"evenodd\" aria-hidden=\"true\"><path d=\"M7.5 2.5H16.5A5.5 5.5 0 0 1 22 8V12A5.5 5.5 0 0 1 16.5 17.5H11.5L7.2 21.4C6.6 21.9 5.6 21.5 5.6 20.7V17.2A5.5 5.5 0 0 1 2 12V8A5.5 5.5 0 0 1 7.5 2.5Z M8.3 5.3H15.7V7H13V13H15.7V14.7H8.3V13H11V7H8.3Z\"/></svg></button>",
       "css": ".ds-fab { width: 56px; height: 56px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 9999px; background: #6B0F12; color: #fff; box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08); transition: background-color 200ms, transform 200ms; cursor: pointer; } .ds-fab:hover { background: #8B1316; transform: translateY(-2px); } .ds-fab:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6B0F12; }"
     },
@@ -364,7 +364,7 @@
     ],
     "donts": [
       "**Don't** wrap reading content (the AI Overview, the Abstract, the reader, Ask IRIS) in a card.",
-      "**Don't** float controls over content. Controls live in a bar or toolbar, and Ask IRIS is the one corner icon.",
+      "**Don't** float controls over content. Controls live in a bar or toolbar. The two corner icons are Notes, above Ask IRIS, and both keep clear of the reading text: Overview and Paper reserve bottom padding so the last line scrolls past them.",
       "**Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.",
       "**Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.",
       "**Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.",

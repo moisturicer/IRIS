@@ -36,17 +36,22 @@ class LabelCheck:
         return self.problem is None
 
 
-def _resolve_record(label: Label) -> tuple[Optional[Record], Optional[str]]:
-    if isinstance(label.record, int):
-        record = Record.objects.filter(pk=label.record).first()
-        return record, None if record else f"no record with id {label.record}"
+def resolve_record(ref: str | int) -> tuple[Optional[Record], Optional[str]]:
+    """A Record named by id or title; titles compare with whitespace collapsed."""
+    if isinstance(ref, int):
+        record = Record.objects.filter(pk=ref).first()
+        return record, None if record else f"no record with id {ref}"
 
-    matches = list(Record.objects.filter(title__iexact=str(label.record).strip())[:2])
+    matches = list(Record.objects.filter(title__iexact=" ".join(str(ref).split()))[:2])
     if not matches:
-        return None, f"no record titled {str(label.record)[:60]!r}"
+        return None, f"no record titled {str(ref)[:60]!r}"
     if len(matches) > 1:
-        return None, f"{str(label.record)[:60]!r} matches more than one record"
+        return None, f"{str(ref)[:60]!r} matches more than one record"
     return matches[0], None
+
+
+def _resolve_record(label: Label) -> tuple[Optional[Record], Optional[str]]:
+    return resolve_record(label.record)
 
 
 def check_label(question_id: str, label: Label) -> LabelCheck:

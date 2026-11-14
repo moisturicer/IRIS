@@ -12,8 +12,8 @@ import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { errorDetail } from "@/lib/errorDetail";
-import { readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
-import { canAccess, pathFor } from "@/lib/access";
+import { failureMessage, readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
+import { canAccess, isCoordinator, pathFor } from "@/lib/access";
 import type { RoleName } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
@@ -34,6 +34,7 @@ import {
   waitLabel,
   type MyReviewsView,
 } from "./myReviews";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 /**
  * My Reviews (IR-268; ADR-032 §9 and its 2026-10-08 Amendment, ui-ux/16 §5).
@@ -56,7 +57,7 @@ export default function MyReviewsPage() {
   const { view, replace } = readView(params);
   const viewer = useAuthStore((s) => s.user);
   const access = viewer?.review_access;
-  const coordinatorOffice = access?.is_coordinator ? access.offices[0] ?? null : null;
+  const coordinatorOffice = isCoordinator(access) ? access?.offices[0] ?? null : null;
 
   const [page, setPage] = useState<Page | null>(null);
   // The tab carries the work waiting on the reader, so a count is seen without opening it (IR-1073).
@@ -93,7 +94,7 @@ export default function MyReviewsPage() {
     } catch (error) {
       // An empty tab and a failed request must not look alike.
       setLoadKind(readFailureKind(error));
-      setLoadError(errorDetail(error, "My Reviews could not be loaded."));
+      setLoadError(failureMessage(error, { lead: "My Reviews could not be loaded." }));
       return false;
     }
   }, [tab, outcome, office, sort, overdue]);
@@ -137,7 +138,7 @@ export default function MyReviewsPage() {
       const { data } = await reviewsApi.mine({ tab, outcome, office, cursor: page.next, sort, overdue });
       setPage({ ...data, rows: [...page.rows, ...data.rows] });
     } catch (error) {
-      setLoadError(errorDetail(error, "More of Done could not be loaded."));
+      setLoadError(failureMessage(error, { lead: "More of Done could not be loaded." }));
     } finally {
       setLoadingMore(false);
     }
@@ -191,7 +192,7 @@ export default function MyReviewsPage() {
               </Link>
             )}
             {coordinatorOffice && (
-              <Link to="/review/office"
+              <Link to={pathFor("reviewOffice")}
                 className={cn("inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
                 <i className="fas fa-users-gear" aria-hidden />
                 {officeLabel} console
@@ -318,7 +319,7 @@ export default function MyReviewsPage() {
         )}
 
         {loading ? (
-          <Skeleton rows={3} label="Loading My Reviews…" />
+          <Skeleton rows={3} label="Loading My Reviews…" onRetry={retry} />
         ) : loadError && !page ? (
           loadKind === "interrupted" ? (
             <InterruptedState what="My Reviews" onRetry={retry} />
@@ -387,13 +388,13 @@ export default function MyReviewsPage() {
   );
 }
 
-/** A filter or sort chip: pressed is brand-tinted, and its label says what it is. */
+/** A filter or sort chip: pressed is an Ink outline, and its label says what it is. */
 function chipClass(pressed: boolean) {
   return cn(
     "min-h-9 px-3 rounded-full border text-small font-medium",
     COLOUR_TRANSITION,
     FOCUS_RING,
-    pressed ? "border-brand bg-brand-50 text-brand" : "border-stone-200 text-stone-600 hover:border-stone-400",
+    pressed ? SELECTED : "border-stone-200 text-stone-600 hover:border-stone-400",
   );
 }
 

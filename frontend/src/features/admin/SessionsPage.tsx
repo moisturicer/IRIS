@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { accountsApi, type ActiveSession } from "@/api/accounts";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button }     from "@/components/ui/Button";
-import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Spinner }    from "@/components/ui/Spinner";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { failureMessage } from "@/lib/readFailure";
 import { formatDate } from "@/lib/utils";
 
 export default function SessionsPage() {
@@ -18,8 +19,8 @@ export default function SessionsPage() {
     try {
       const { data } = await accountsApi.sessions();
       setSessions(data);
-    } catch {
-      setError("Failed to load sessions. Please try again.");
+    } catch (err) {
+      setError(failureMessage(err, { lead: "The sessions didn't load." }));
     } finally {
       setLoading(false);
     }
@@ -55,23 +56,20 @@ export default function SessionsPage() {
           onClick={load}
           disabled={loading}
         >
-          <i className={`fas fa-sync-alt text-[13px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-small ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </Button>
       </div>
 
       {/* Error */}
       {error && (
-        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
-        </div>
+        <LoadFailedAlert message={error} onRetry={load} className="mb-4" />
       )}
 
       {/* Loading */}
       {loading && (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" label="Loading sessions" />
+          <Spinner size="lg" label="Loading sessions" onRetry={load} />
         </div>
       )}
 
@@ -79,8 +77,8 @@ export default function SessionsPage() {
       {!loading && !error && sessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-stone-500">
           <i className="fas fa-shield-alt text-4xl mb-3" aria-hidden />
-          <p className="text-[14px] font-medium">No active sessions</p>
-          <p className="text-[13px] mt-1">All users are currently logged out.</p>
+          <p className="text-body font-medium">No active sessions</p>
+          <p className="text-small mt-1">All users are currently logged out.</p>
         </div>
       )}
 
@@ -89,13 +87,13 @@ export default function SessionsPage() {
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           {/* Count badge */}
           <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-            <span className="text-[13px] text-stone-500 font-medium">
+            <span className="text-small text-stone-500 font-medium">
               {sessions.length} active session{sessions.length !== 1 ? "s" : ""}
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-[14px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">User</th>

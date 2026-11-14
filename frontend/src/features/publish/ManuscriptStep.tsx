@@ -8,14 +8,16 @@
 import { useEffect, useRef, useState } from "react";
 
 import { UploadDropzone, type UploadState } from "@/components/shared/UploadDropzone";
+import { Button } from "@/components/ui/Button";
+import { FieldError } from "@/components/ui/FieldError";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatBytes } from "@/lib/utils";
 import type { RecordType } from "@/types/records";
 import type { ManuscriptMatch } from "@/api/records";
 import { Link } from "react-router-dom";
 
 import { typeKey } from "./draft";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 /** The same limit `SubmitDocumentView` and the serializer enforce (50 MB). */
 export const MANUSCRIPT_MAX_BYTES = 50 * 1024 * 1024;
@@ -56,9 +58,13 @@ interface ManuscriptStepProps {
   onFile:      (file: File) => void;
   onRetry:     () => void;
   exactMatches?: ManuscriptMatch[];
+  /** Said when Continue was pressed with no type chosen (IR-1088). */
+  typeError?:  string;
+  /** Said when Continue was pressed with no accepted manuscript. */
+  fileError?:  string;
 }
 
-export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFile, onRetry, exactMatches = [] }: ManuscriptStepProps) {
+export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFile, onRetry, exactMatches = [], typeError, fileError }: ManuscriptStepProps) {
   const [replacing, setReplacing] = useState(false);
   const uploading = upload.status === "uploading";
 
@@ -85,7 +91,11 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
 
   return (
     <div className="flex flex-col gap-section-lg">
-      <fieldset>
+      <fieldset
+        role="radiogroup"
+        aria-invalid={typeError ? true : undefined}
+        aria-describedby={typeError ? "publish-type-error" : undefined}
+      >
         <legend className="text-heading font-semibold text-stone-900">What are you publishing?</legend>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {recordTypes.map((type) => {
@@ -97,7 +107,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
                 className={cn(
                   "flex cursor-pointer items-start gap-3 rounded-xl border p-card-compact transition-colors duration-150 motion-reduce:transition-none",
                   "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand has-[:focus-visible]:ring-offset-2",
-                  checked ? "border-brand bg-brand-50" : "border-stone-200 bg-white hover:border-stone-400",
+                  checked ? SELECTED : "border-stone-200 bg-white hover:border-stone-400",
                   uploading && "cursor-not-allowed opacity-60",
                 )}
               >
@@ -123,11 +133,16 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
             );
           })}
         </div>
+        {typeError && (
+          <div role="alert" className="mt-2">
+            <FieldError id="publish-type-error">{typeError}</FieldError>
+          </div>
+        )}
       </fieldset>
 
       <section aria-labelledby="publish-manuscript-heading">
         {exactMatches.length > 0 && (
-          <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+          <div role="alert" className="rounded-lg border border-stone-300 bg-surface p-4">
             <p className="font-semibold">This manuscript is already attached to a record you can read.</p>
             <ul className="mt-2 space-y-2">
               {exactMatches.map((match) => <li key={match.id}>
@@ -170,14 +185,9 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
               {accepted.size != null && <span className="text-stone-600"> · {formatBytes(accepted.size)}</span>}
             </p>
             {upload.status === "done" && !replacing && (
-              <button
-                ref={replaceRef}
-                type="button"
-                onClick={() => setReplacing(true)}
-                className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}
-              >
+              <Button ref={replaceRef} type="button" variant="outline" size="sm" onClick={() => setReplacing(true)}>
                 Replace file
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -197,6 +207,12 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
                 onFile(file);
               }}
             />
+          </div>
+        )}
+
+        {fileError && (
+          <div role="alert" className="mt-2">
+            <FieldError id="publish-file-error">{fileError}</FieldError>
           </div>
         )}
       </section>

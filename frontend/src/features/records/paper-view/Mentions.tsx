@@ -91,7 +91,7 @@ export function MentionPicker({ recordId, value, onChange }: {
               <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                 {loaded.people.map((p) => (
                   <li key={p.id}>
-                    <label className="inline-flex items-center gap-1.5 text-small text-stone-800 min-h-9">
+                    <label className="inline-flex items-center gap-1.5 text-small text-stone-800 min-h-11 reading-split:min-h-9">
                       <input type="checkbox" checked={picked.has(p.id)} onChange={() => flip(p)}
                         className="accent-brand" />
                       {p.name}

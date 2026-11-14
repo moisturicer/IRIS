@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { accountsApi }   from "@/api/accounts";
+import { failureMessage } from "@/lib/readFailure";
 import { useUIStore }    from "@/store/ui.store";
 import { PageHeader }    from "@/components/layout/PageHeader";
 import { Button }        from "@/components/ui/Button";
@@ -22,6 +23,7 @@ export default function RoleRequestsPage() {
   // A failed load is not an empty queue (IR-745): "All caught up!" after an
   // error would tell RDCO there is nothing to decide when there may be.
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
   const [_acting,   setActing]    = useState(false);
 
@@ -33,7 +35,7 @@ export default function RoleRequestsPage() {
         setRequests(data.results);
         setLoadFailed(false);
       })
-      .catch(() => setLoadFailed(true))
+      .catch((error: unknown) => { setLoadFailed(true); setLoadError(error); })
       .finally(() => setLoading(false));
   };
 
@@ -65,25 +67,25 @@ export default function RoleRequestsPage() {
       />
 
       {loading ? (
-        <Skeleton />
+        <Skeleton onRetry={load} />
       ) : loadFailed ? (
         <EmptyState
           framed
           tone="error"
           icon="fa-circle-exclamation"
           title="Couldn't load role requests"
-          message="Check your connection and try again."
+          message={failureMessage(loadError)}
           action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
         />
       ) : requests.length === 0 ? (
         <div className="bg-white rounded-xl border border-stone-200 py-16 text-center">
-          <i className="fas fa-check-circle text-[32px] text-stone-500 mb-3 block" aria-hidden />
-          <p className="text-[15px] font-medium text-stone-700">All caught up!</p>
-          <p className="text-[13px] text-stone-500 mt-1">No pending role requests.</p>
+          <i className="fas fa-check-circle text-display text-stone-500 mb-3 block" aria-hidden />
+          <p className="text-body font-medium text-stone-700">All caught up!</p>
+          <p className="text-small text-stone-500 mt-1">No pending role requests.</p>
         </div>
       ) : (
         <div className="relative bg-white rounded-xl border border-stone-200 overflow-x-auto">
-          <table className="w-full text-[14px]">
+          <table className="w-full text-body">
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50">
                 <th className="text-left px-5 py-3 font-semibold text-stone-600">User</th>
@@ -100,7 +102,7 @@ export default function RoleRequestsPage() {
                     <div className="font-medium text-stone-900">{req.user_name}</div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${TONES.active}`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label font-semibold ${TONES.active}`}>
                       {req.role_name}
                     </span>
                   </td>

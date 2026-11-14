@@ -36,6 +36,26 @@ const press = (name: string | RegExp) => async (page: Page) => {
   await page.getByRole("button", { name, exact: typeof name === "string" }).first().click();
 };
 
+/**
+ * Choose an item from a user row's "⋯" menu (IR-1077). Rows offer different
+ * items, so each menu is opened in turn until one has the item.
+ */
+const fromRowMenu = (name: string | RegExp) => async (page: Page) => {
+  const triggers = page.getByRole("button", { name: /^Actions for /, exact: false });
+  await triggers.first().waitFor();
+  const count = await triggers.count();
+  for (let i = 0; i < count; i++) {
+    await triggers.nth(i).click();
+    const item = page.getByRole("menuitem", { name, exact: typeof name === "string" }).first();
+    if (await item.isVisible()) {
+      await item.click();
+      return;
+    }
+    await page.keyboard.press("Escape");
+  }
+  throw new Error(`No row menu offers ${String(name)}`);
+};
+
 /** A Record under review that the signed-in reader may act on, with the given actions on offer. */
 const reviewing = (...capabilities: string[]) => (api: MockApi) =>
   api.on("GET", `/records/${PAPER.id}/`, {
@@ -171,15 +191,15 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "change a user's role", screen: "rdco-users", sources: ["features/accounts/UserListPage.tsx"],
-    open: press("Change role"), dialog: anyDialog,
+    open: fromRowMenu("Change role"), dialog: anyDialog,
   },
   {
     id: "make or remove a coordinator", screen: "admin-users", sources: ["features/accounts/UserListPage.tsx", "components/shared/ConfirmDialog.tsx"],
-    open: press(/coordinator$/), dialog: anyDialog,
+    open: fromRowMenu(/coordinator$/), dialog: anyDialog,
   },
   {
     id: "lock or unlock an account", screen: "rdco-users", sources: ["features/accounts/UserListPage.tsx", "components/shared/ConfirmDialog.tsx"],
-    open: press(/^(Lock|Unlock)$/), dialog: anyDialog,
+    open: fromRowMenu(/^(Lock|Unlock)/), dialog: anyDialog,
   },
   {
     id: "approve a role request", screen: "role-requests", sources: ["features/accounts/RoleRequestsPage.tsx"],
@@ -221,7 +241,12 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog", { name: "Publish version 2?" }),
   },
   {
-    id: "decline a download request", screen: "download-requests", sources: ["features/admin/DownloadRequestsPage.tsx"],
+    id: "decline a download request", screen: "download-requests", sources: ["features/admin/RdcoNoteDialog.tsx"],
+    open: press("Decline"), dialog: anyDialog,
+  },
+  {
+    // The same dialog, opened from the other queue (IR-1099); its copy differs.
+    id: "decline a delete request", screen: "delete-requests", sources: ["features/admin/RdcoNoteDialog.tsx"],
     open: press("Decline"), dialog: anyDialog,
   },
   {

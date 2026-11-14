@@ -37,9 +37,11 @@ interface EntryFrameProps {
  * IR-710. It is the only entry frame: IR-711 deleted the split frame
  * (`AuthLayout` and its brand panel).
  *
- * The masthead is the page's one `<h1>`, and it is visible at every width, so
- * no breakpoint can take it out of the accessibility tree as IR-211 found the
- * brand panel did. Its name is the logos' own: "IRIS" from the wordmark, the
+ * The page's one `<h1>` is visible at every width, so no breakpoint can take
+ * it out of the accessibility tree as IR-211 found the brand panel did. On a
+ * screen with a lede it is the headline (IR-1093) and the masthead is a plain
+ * container; on one without, it is the masthead, whose name is the logos' own.
+ * Either way the masthead names the system: "IRIS" from the wordmark, the
  * institution from its logo's alt text, read from `config/institution`
  * (IR-768). Both logos keep their natural proportions; on a phone they are only set smaller.
  *
@@ -65,6 +67,10 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
       {label}
     </a>
   );
+  // The page's one `<h1>` is its visible headline when it has one (IR-1093);
+  // a screen without a lede (verification, pending) keeps the masthead, whose
+  // name is the logos' own.
+  const Masthead = lede ? "div" : "h1";
   return (
     <div className="flex min-h-screen flex-col bg-canvas font-sans">
       {before}
@@ -95,7 +101,7 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
       </Modal>
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-page items-center justify-between gap-3 px-4 py-2 sm:px-8 lg:px-12">
-          <h1 className="flex min-w-0 items-center gap-2.5 sm:gap-4">
+          <Masthead className="flex min-w-0 items-center gap-2.5 sm:gap-4">
             <span className="flex shrink-0 items-center gap-2">
               <IrisMark className="size-7 text-brand sm:size-9" />
               <span className="text-brand">
@@ -109,16 +115,16 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
               alt={INSTITUTION.name}
               className="h-6 w-auto min-w-0 object-contain sm:h-9"
             />
-          </h1>
+          </Masthead>
           {help && <div className="shrink-0 text-small">{informationLink("Help", "entry-help")}</div>}
         </div>
       </header>
 
       <main className="flex flex-1 flex-col items-center px-4 pb-12 pt-section sm:px-8 sm:pt-10 lg:pt-12">
         {lede && (
-          <p className="order-1 max-w-4xl text-balance font-display text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl md:text-center lg:text-6xl">
+          <h1 className="order-1 max-w-4xl text-balance font-display text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl md:text-center lg:text-6xl">
             {lede.headline}
-          </p>
+          </h1>
         )}
         {lede && (
           <p className="order-3 mt-section max-w-2xl text-pretty text-body text-stone-700 md:order-2 md:text-center md:mt-4 md:text-lg">

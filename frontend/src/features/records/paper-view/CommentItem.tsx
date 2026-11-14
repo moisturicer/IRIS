@@ -120,13 +120,13 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
               <div
                 className={cn(
                   "min-w-0 max-w-full rounded-2xl px-3.5 py-2 transition-colors duration-300 motion-reduce:transition-none",
-                  ctx.highlightId === comment.id ? "bg-brand-100" : "bg-stone-100",
+                  ctx.highlightId === comment.id ? "bg-stone-200" : "bg-stone-100",
                 )}
               >
                 <header className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="text-xs font-semibold text-stone-900">{name}</span>
                   {comment.is_author && (
-                    <span className="rounded-full bg-brand/10 px-2 py-0.5 text-3xs font-semibold text-brand">Author</span>
+                    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-3xs font-semibold text-stone-700">Author</span>
                   )}
                 </header>
                 <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-stone-800">

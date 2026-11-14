@@ -80,7 +80,7 @@ export function LoginForm({
         size="lg"
         type={showPassword ? "text" : "password"}
         autoComplete="current-password"
-        placeholder="••••••••"
+        // No placeholder: dots in an empty field read as a saved password (IR-1093).
         disabled={disabled}
         error={errors.password?.message}
         aria-invalid={showCredentialsError || undefined}
@@ -94,7 +94,7 @@ export function LoginForm({
             // px/min-w give the 44px target 2.5.5 asks for; the text
             // alone would be about 34x18.
             className="flex items-center justify-center min-h-11 min-w-11 px-1
-              text-[14px] font-semibold text-brand hover:underline"
+              text-body font-semibold text-brand hover:underline"
           >
             {showPassword ? "Hide" : "Show"}
           </button>

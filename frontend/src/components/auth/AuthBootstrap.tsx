@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { Spinner } from "@/components/ui/Spinner";
+import { reloadPage } from "@/lib/readFailure";
 import { authApi } from "@/api/auth";
 import { startHeartbeat, startIdleWatch, trackActivity } from "@/lib/activity";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
@@ -42,7 +43,7 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
   if (!authReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-canvas">
-        <Spinner size="lg" label="Loading IRIS" />
+        <Spinner size="lg" label="Loading IRIS" onRetry={reloadPage} />
       </div>
     );
   }

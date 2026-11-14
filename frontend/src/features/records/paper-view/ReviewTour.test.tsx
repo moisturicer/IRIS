@@ -104,16 +104,16 @@ describe("walking through the tour (IR-997)", () => {
     openWorkspace();
     await user.click(screen.getByRole("button", { name: "Start tour" }));
 
-    expect(progress()).toBe("Step 1 of 4");
+    expect(progress()).toBe("Step 1 of 3");
     expect(stepTitle()).toBe("The paper");
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(progress()).toBe("Step 2 of 4");
+    expect(progress()).toBe("Step 2 of 3");
     expect(stepTitle()).toBe("Review pane sections");
 
     await user.click(screen.getByRole("button", { name: "Previous" }));
-    expect(progress()).toBe("Step 1 of 4");
+    expect(progress()).toBe("Step 1 of 3");
   });
 
   it("names only the tabs this workspace has", async () => {
@@ -139,8 +139,8 @@ describe("walking through the tour (IR-997)", () => {
     const user = userEvent.setup();
     openWorkspace();
     await user.click(screen.getByRole("button", { name: "Start tour" }));
-    for (let i = 0; i < 3; i += 1) await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(progress()).toBe("Step 4 of 4");
+    for (let i = 0; i < 2; i += 1) await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(progress()).toBe("Step 3 of 3");
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Done" }));
     expect(tourDialog()).toBeNull();
@@ -150,7 +150,7 @@ describe("walking through the tour (IR-997)", () => {
     const user = userEvent.setup();
     openWorkspace({ reader: false });
     await user.click(screen.getByRole("button", { name: "Start tour" }));
-    expect(progress()).toBe("Step 1 of 3");
+    expect(progress()).toBe("Step 1 of 2");
     expect(stepTitle()).toBe("Review pane sections");
   });
 
@@ -180,18 +180,33 @@ describe("walking through the tour (IR-997)", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(stepTitle()).toBe("The review pane");
 
+    // The paper sits behind the open drawer, so its step goes.
     await user.click(screen.getByRole("button", { name: "Open review pane" }));
-    expect(progress()).toBe("Step 1 of 3");
+    expect(progress()).toBe("Step 1 of 2");
     expect(stepTitle()).toBe("Review pane sections");
   });
 
-  it("points a folded workspace at the Details tab", async () => {
+  it("ends on Your part, and has no step for a People & details column that is gone (IR-1094)", async () => {
     widthOf(1000);
     const user = userEvent.setup();
     openWorkspace();
     await user.click(screen.getByRole("button", { name: "Start tour" }));
-    for (let i = 0; i < 3; i += 1) await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(stepTitle()).toBe("Details tab");
+    for (let i = 0; i < 2; i += 1) await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(stepTitle()).toBe("Your part");
+  });
+
+  it("mentions the columns button only where a tab may open on the right (IR-1094)", async () => {
+    const user = userEvent.setup();
+    for (const [width, offered] of [[1000, false], [1400, true]] as const) {
+      widthOf(width);
+      const { unmount } = openWorkspace();
+      await user.click(screen.getByRole("button", { name: "Take a tour" }));
+      await user.click(screen.getByRole("button", { name: "Next" }));
+      const step = within(screen.getByRole("dialog", { name: "Review workspace tour" }));
+      expect(step.getByText(/Details/)).toBeInTheDocument();
+      expect(step.queryByText(/Columns button/) !== null).toBe(offered);
+      unmount();
+    }
   });
 });
 
@@ -239,7 +254,7 @@ describe("leaving the tour (IR-997)", () => {
     await user.click(screen.getByRole("button", { name: "Start tour" }));
     await user.click(screen.getByRole("button", { name: "Skip tour" }));
     await user.click(screen.getByRole("button", { name: "Take a tour" }));
-    expect(progress()).toBe("Step 1 of 4");
+    expect(progress()).toBe("Step 1 of 3");
   });
 
   it("has no blocking accessibility violations while open", async () => {

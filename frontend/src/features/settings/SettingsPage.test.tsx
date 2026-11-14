@@ -5,7 +5,7 @@
  * password for several reasons at once. The form must say all of them.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
 import { noticeApi } from "@/api/notice";
@@ -41,6 +41,23 @@ async function changePassword(user: ReturnType<typeof userEvent.setup>, next: st
 }
 
 describe("changing your password", () => {
+  it("shows Change password as a pill that says what it is waiting for (IR-1088)", async () => {
+    const user = userEvent.setup();
+    renderScreen(<SettingsPage />, { route: "/settings" });
+    await user.click(screen.getByRole("button", { name: "Account & security" }));
+
+    const submit = screen.getByRole("button", { name: "Change password" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveClass("rounded-full");
+    expect(submit).not.toHaveClass("uppercase");
+    expect(submit).toHaveAccessibleDescription("Enter your current password and a new one.");
+
+    await user.type(screen.getByLabelText("Current password"), "old-Passw0rd");
+    await user.type(screen.getByLabelText(/^New password/), "new-Passw0rd");
+    expect(screen.getByRole("button", { name: "Change password" })).toBeEnabled();
+    expect(screen.queryByText("Enter your current password and a new one.")).not.toBeInTheDocument();
+  });
+
   it("shows every reason the server refused the new password, not just the first", async () => {
     const user = userEvent.setup();
     vi.spyOn(authApi, "changePassword").mockRejectedValue({
@@ -114,6 +131,58 @@ it("shows the server's current notice beside the account's consent record (IR-80
   const notice = screen.getByRole("region", { name: "Current data notice" });
   expect(await within(notice).findByText(/^IRIS data notice/)).toHaveTextContent("AI companies may read your papers' text.");
   expect(notice).toHaveTextContent("Version 6 · published Nov 2, 2026");
+});
+
+// IR-1085 (audit NAV-08): a Settings tab has an address, so it can be linked to
+// and survives a reload.
+describe("addressable tabs", () => {
+  function Where() {
+    const { pathname, search } = useLocation();
+    return <p role="status" aria-label="Location">{pathname + search}</p>;
+  }
+  const renderAt = (route: string) =>
+    renderScreen(<><SettingsPage /><Where /></>, { route });
+  const where = () => screen.getByRole("status", { name: "Location" });
+  const tab = (name: string) =>
+    within(screen.getByRole("navigation", { name: "Settings sections" })).getByRole("button", { name });
+
+  it("opens the Privacy tab at /settings?tab=privacy", () => {
+    renderAt("/settings?tab=privacy");
+
+    expect(tab("Data privacy & consent")).toHaveAttribute("aria-current", "page");
+    expect(tab("Account & security")).not.toHaveAttribute("aria-current");
+    expect(screen.getByText("No consent recorded")).toBeVisible();
+  });
+
+  it("opens the Role tab at /settings?tab=role", () => {
+    renderAt("/settings?tab=role");
+
+    expect(tab("Role & access")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("What your role lets you do in IRIS.")).toBeVisible();
+  });
+
+  it("updates the address when you switch tabs", async () => {
+    const user = userEvent.setup();
+    renderAt("/settings");
+
+    await user.click(tab("Data privacy & consent"));
+    expect(where()).toHaveTextContent("/settings?tab=privacy");
+    expect(tab("Data privacy & consent")).toHaveAttribute("aria-current", "page");
+
+    await user.click(tab("Role & access"));
+    expect(where()).toHaveTextContent("/settings?tab=role");
+
+    await user.click(tab("Account & security"));
+    expect(where()).toHaveTextContent("/settings?tab=security");
+    expect(screen.getByLabelText("Current password")).toBeVisible();
+  });
+
+  it("opens on Account & security when the tab is missing or unknown", () => {
+    renderAt("/settings?tab=billing");
+
+    expect(tab("Account & security")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("Current password")).toBeVisible();
+  });
 });
 
 // IR-933: Profile is its own page; Settings keeps the account.

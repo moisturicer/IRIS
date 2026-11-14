@@ -5,6 +5,14 @@ import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { cn } from "@/lib/utils";
 
 /**
+ * Bottom padding that lets the last line of a reading surface scroll clear of
+ * both corner buttons (IR-1079). Notes sits highest: its top edge is 140px up
+ * (`bottom-24` + `h-11`), so 11rem leaves 36px of air above it. Anything that
+ * floats a button here, or moves one, changes this number with it.
+ */
+export const CORNER_CLEARANCE_CLASS = "pb-44";
+
+/**
  * The reader's private Notes, closed (IR-580): a smaller round icon just above
  * Ask IRIS, in the same corner, so the two tools that share the reading
  * workspace's one panel sit together.
@@ -30,8 +38,8 @@ export function NotesFab({ onOpen, buttonRef }: { onOpen: () => void; buttonRef?
 }
 
 /**
- * Ask IRIS, closed (IR-569): one round icon at the bottom right, over every
- * section that has the assistant. Its tooltip is its name; the panel it opens
+ * Ask IRIS, closed (IR-569): a round icon at the bottom right, under Notes,
+ * over every section that has the assistant. Its tooltip is its name; the panel it opens
  * says what it is.
  */
 export function AskIrisFab({ onOpen, buttonRef }: { onOpen: () => void; buttonRef?: Ref<HTMLButtonElement> }) {

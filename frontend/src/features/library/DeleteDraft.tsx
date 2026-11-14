@@ -2,8 +2,7 @@ import { useState } from "react";
 
 import { recordsApi } from "@/api/records";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { describeFailure } from "@/features/publish/draft";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +42,13 @@ export function DeleteDraft({ recordId, title, onDeleted }: DeleteDraftProps) {
     <>
       <button
         type="button"
-        className={cn(PILL_SECONDARY, "min-h-9 px-4 hover:text-brand", FOCUS_RING)}
+        // A ghost (IR-1084): quieter than Continue draft, with no fill or outline at rest.
+        className={cn(
+          "inline-flex min-h-9 items-center justify-center gap-2 rounded-full px-4 text-small font-semibold text-stone-700",
+          "hover:bg-stone-100 hover:text-brand",
+          COLOUR_TRANSITION,
+          FOCUS_RING,
+        )}
         onClick={() => { setError(null); setOpen(true); }}
       >
         <i className="fas fa-trash-can text-label" aria-hidden />

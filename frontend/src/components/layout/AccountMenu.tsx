@@ -16,13 +16,15 @@ interface AccountMenuProps {
 }
 
 const ITEM =
-  `flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100 hover:text-stone-900 ${COLOUR_TRANSITION} ${FOCUS_RING}`;
+  `flex min-h-11 md:min-h-0 touch:min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100 hover:text-stone-900 ${COLOUR_TRANSITION} ${FOCUS_RING}`;
 
 /**
  * The account menu in the sidebar's user block (IR-413, spec §4.2).
  *
- * Profile, Settings, Help and Sign out live here rather than in the nav
- * list: they are about the person, not places in the research. A disclosure
+ * Profile, Settings and Sign out live here rather than in the nav
+ * list: they are about the person, not places in the research. Help left for
+ * the sidebar's footer in IR-1085, where every role finds it without opening
+ * a menu. A disclosure
  * (a button that shows and hides a list of links), not an ARIA `menu` --
  * every item is a plain link or button, so Tab and Enter behave exactly as
  * they do everywhere else on the page.
@@ -152,12 +154,6 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
               <Link to={pathFor("settings")} onClick={choose} className={ITEM}>
                 <i aria-hidden className="fas fa-gear w-4 text-center text-stone-500" />
                 Settings
-              </Link>
-            </li>
-            <li>
-              <Link to={pathFor("help")} onClick={choose} className={ITEM}>
-                <i aria-hidden className="fas fa-circle-question w-4 text-center text-stone-500" />
-                Help
               </Link>
             </li>
             <li className="mt-1.5 border-t border-stone-100 pt-1.5">

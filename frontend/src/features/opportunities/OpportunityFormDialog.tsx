@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
+import { failureMessage } from "@/lib/readFailure";
 import type { Opportunity } from "@/types/opportunities";
 
 import {
@@ -124,7 +125,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
         );
       } else {
         setFormError(
-          `Could not ${editing ? "save your changes" : "post the call"}. Check your connection and try again; nothing has been lost.`,
+          `${failureMessage(err, { lead: `Could not ${editing ? "save your changes" : "post the call"}.` })} Nothing has been lost.`,
         );
       }
     } finally {

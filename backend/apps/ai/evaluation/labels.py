@@ -115,6 +115,9 @@ class Question:
     #: evidence detector runs on raw and Resolved text and ORs the two, so a
     #: set that supplies neither still measures the raw lane.
     resolved_question: Optional[str] = None
+    #: The one Record this question is asked inside, as Paper Chat asks it
+    #: (IR-1052). A title or id, named the way its labels name it.
+    scope_record: Optional[str | int] = None
 
     @property
     def deliberately_empty(self) -> bool:
@@ -147,6 +150,7 @@ class Question:
             "expected_outcome": self.expected_outcome,
             "institutional": self.institutional,
             "resolved_question": self.resolved_question,
+            "scope_record": self.scope_record,
             "expected": [label.as_dict() for label in self.expected],
         }
 
@@ -183,6 +187,11 @@ class QuestionSet:
         return tuple(q for q in self.questions if q.expected)
 
     @property
+    def record_scoped(self) -> tuple[Question, ...]:
+        """The questions asked inside one Record (IR-1052)."""
+        return tuple(q for q in self.questions if q.scope_record is not None)
+
+    @property
     def unanswerable(self) -> tuple[Question, ...]:
         """The questions the correct-refusal measure scores (IR-454). Disjoint
         from `scored`, so neither measure can leak into the other."""
@@ -198,6 +207,7 @@ class QuestionSet:
             "without_passages": len(self.questions) - len(self.scored),
             "unanswerable": len(self.unanswerable),
             "with_resolved_question": len(self.resolved),
+            "record_scoped": len(self.record_scoped),
             "labels": self.label_count,
             "skipped_questions": list(self.skipped),
         }
@@ -271,6 +281,7 @@ def parse_question_set(
 
         kind, evidence, outcome, institutional = _read_evidence_fields(raw, where)
         resolved = _read_resolved_question(raw, where)
+        scope = _read_scope_record(raw, where)
 
         raw_expected = raw.get("expected")
         deliberate = (
@@ -314,6 +325,7 @@ def parse_question_set(
             )
 
         _check_declaration(where, evidence, outcome, has_passages=bool(labels))
+        _check_scope(where, scope, labels)
         questions.append(
             Question(
                 id=qid,
@@ -324,6 +336,7 @@ def parse_question_set(
                 expected_outcome=outcome,
                 institutional=institutional,
                 resolved_question=resolved,
+                scope_record=scope,
             )
         )
 
@@ -395,6 +408,37 @@ def _read_resolved_question(raw: dict, where: str) -> Optional[str]:
     if value.strip() == PLACEHOLDER:
         raise QuestionSetError(f"{where}: resolved_question is still a template slot")
     return value.strip()
+
+
+def _read_scope_record(raw: dict, where: str) -> Optional[str | int]:
+    """``scope_record``: the Record a Paper Chat question is asked inside."""
+    value = raw.get("scope_record")
+    if value is None:
+        return None
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip() and value.strip() != PLACEHOLDER:
+        return value.strip()
+    raise QuestionSetError(
+        f"{where}: scope_record must be a Record title or id, or absent"
+    )
+
+
+def _check_scope(where: str, scope, labels: Sequence[Label]) -> None:
+    """Every label of a scoped question must be inside its Record."""
+    if scope is None:
+        return
+    for label in labels:
+        same_kind = isinstance(label.record, int) == isinstance(scope, int)
+        if not same_kind or (
+            label.record != scope
+            if isinstance(scope, int)
+            else normalize(str(label.record)) != normalize(scope)
+        ):
+            raise QuestionSetError(
+                f"{where}: label record {label.record!r} is outside its scope "
+                f"{scope!r}"
+            )
 
 
 def _check_declaration(where, evidence, outcome, *, has_passages: bool) -> None:

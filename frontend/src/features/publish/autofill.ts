@@ -21,6 +21,7 @@
  * origin, embargo, the hints or the completion year.
  */
 import type { MetadataValues } from "@/features/records/metadata/metadataSchema";
+import { withoutPdfExtension } from "./draft";
 import type { FieldDecision, MetadataSources, MetadataSuggestions, SuggestionEntry, SuggestionFields } from "@/types/records";
 
 export const AUTOFILL_FIELDS = ["title", "abstract", "authors", "keywords", "publication_year"] as const;
@@ -38,10 +39,24 @@ export const NO_FIELDS: SuggestionFields = {
  * and abstract, which were always the auto-applicable two.
  */
 export function fieldsOf(data: MetadataSuggestions): SuggestionFields {
-  if (data.fields) return data.fields;
+  if (data.fields) return { ...data.fields, title: untitled(data.fields.title) };
   const legacy = (value: string | null): SuggestionEntry<string> | null =>
     value == null ? null : { value, basis: "document_title", page: null, region: null, auto_apply: true, exceeds_limit: false };
-  return { ...NO_FIELDS, title: legacy(data.suggestions.title), abstract: legacy(data.suggestions.abstract) };
+  return { ...NO_FIELDS, title: untitled(legacy(data.suggestions.title)), abstract: legacy(data.suggestions.abstract) };
+}
+
+/**
+ * A suggested title never ends in ".pdf" (IR-1084). The server declines a
+ * title that is only the manuscript's stored file name, but storage may
+ * rename a file ("My_Thesis_k3Jx.pdf"), so the extractor's file-name fallback
+ * can slip through; stripped, it reads as the placeholder it is. A title that
+ * was only an extension is not offered.
+ */
+function untitled(entry: SuggestionEntry<string> | null): SuggestionEntry<string> | null {
+  if (entry == null) return null;
+  const value = withoutPdfExtension(entry.value);
+  if (!value) return null;
+  return value === entry.value ? entry : { ...entry, value };
 }
 
 /** A suggestion's value as the form would hold it. */

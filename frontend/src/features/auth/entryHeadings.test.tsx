@@ -50,6 +50,8 @@ interface EntryScreen {
   render: () => void;
   /** The per-screen title, which sits one level below the layout's `<h1>`. */
   title: string;
+  /** The visible headline, on the screens that show one: it is the `<h1>` (IR-1093). */
+  headline?: string;
 }
 
 const SCREENS: EntryScreen[] = [
@@ -57,6 +59,7 @@ const SCREENS: EntryScreen[] = [
     name: "login",
     render: () => renderScreen(<LoginPage />, { route: "/login" }),
     title: "Welcome back",
+    headline: "Your research has a place.",
   },
   {
     name: "signup",
@@ -67,6 +70,7 @@ const SCREENS: EntryScreen[] = [
       renderScreen(<SignupPage />, { route: "/signup" });
     },
     title: "Create an Account",
+    headline: "Begin with your research identity.",
   },
   {
     name: "email verification",
@@ -128,12 +132,19 @@ afterEach(() => {
   useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
 });
 
-describe.each(SCREENS)("the $name screen", ({ render, title }) => {
+describe.each(SCREENS)("the $name screen", ({ render, title, headline }) => {
   it("has exactly one top-level heading", async () => {
     render();
     await screen.findByRole("heading", { name: title });
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it.runIf(headline)("makes its visible headline that heading (IR-1093)", async () => {
+    render();
+    await screen.findByRole("heading", { name: title });
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveAccessibleName(headline!);
   });
 
   it("puts its title one level below that heading, and never skips a level", async () => {

@@ -7,6 +7,7 @@ import { useCancelDownloadRequest } from "@/components/records/useCancelDownload
 import { useDownloadCopy } from "@/components/records/useDownloadCopy";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -23,7 +24,7 @@ function stateLabel(request: ReaderDownloadRequest): { text: string; tone: strin
     case "granted":
       return {
         text: request.grant_expires_at ? `Granted until ${formatDate(request.grant_expires_at, DATE)}` : "Granted",
-        tone: "border-brand-200 bg-brand-50 text-brand",
+        tone: "border-stone-300 bg-surface text-brand",
       };
     case "declined":
       return { text: "Declined", tone: "border-stone-300 bg-stone-100 text-stone-900" };
@@ -124,12 +125,11 @@ export function DownloadRequestsView() {
 
   if (loading && requests.length === 0) {
     return (
-      <div className="space-y-3" role="status">
-        <span className="sr-only">Loading your download requests…</span>
+      <LoadingRegion label="Loading your download requests…" onRetry={reload} className="space-y-3">
         {[0, 1].map((i) => (
-          <div key={i} className="h-24 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" aria-hidden />
+          <div key={i} className="h-24 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" />
         ))}
-      </div>
+      </LoadingRegion>
     );
   }
 
@@ -139,7 +139,7 @@ export function DownloadRequestsView() {
         interrupted={interrupted}
         what="download requests"
         title="Could not load your download requests"
-        message="Nothing was changed. Check your connection and try again."
+        lead="Nothing was changed."
         onRetry={reload}
       />
     );

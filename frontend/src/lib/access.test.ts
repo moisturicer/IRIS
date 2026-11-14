@@ -27,7 +27,7 @@ import {
   type ScreenKey,
 } from "./access";
 import { ROLES, type RoleName } from "./constants";
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 
 
 const EVERY_ROLE: RoleName[] = [
@@ -101,7 +101,8 @@ test("Notifications is the bell, not a sidebar link, and its page stays open (IR
 
 const REVIEW_WORK = { my_reviews: true };
 const NO_REVIEW_WORK = { my_reviews: false };
-const labels = (role: RoleName, access?: { my_reviews: boolean }) =>
+const COORDINATOR_WORK = { my_reviews: true, is_coordinator: true };
+const labels = (role: RoleName, access?: { my_reviews: boolean; is_coordinator?: boolean }) =>
   navFor(role, access).map((item) => `${item.section}: ${item.label}`);
 
 test("every role shares one short main list, in the spec's order", () => {
@@ -109,20 +110,72 @@ test("every role shares one short main list, in the spec's order", () => {
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Calls & Conferences",
   ]);
   // The Adviser included since IR-534: Discover is its home, so the Submit
-  // Disclosure shortcut it kept until then is gone.
-  for (const role of [ROLES.ADVISER, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
+  // Disclosure shortcut it kept until then is gone. No office, so nothing
+  // nests under My Reviews.
+  expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+  ]);
+  // An office member also has its Workflow analytics, nested under My Reviews
+  // (IR-1085, D5); the console is the coordinator's alone.
+  for (const role of [ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
     expect(labels(role, REVIEW_WORK)).toEqual([
-      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
+      "Main: Workflow analytics", "Main: Calls & Conferences",
     ]);
   }
 });
 
 test("RDCO's coordination screens, Import Records included, are one RDCO group", () => {
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
+    "Main: Workflow analytics", "Main: Calls & Conferences",
     "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
     "RDCO: Delete Requests", "RDCO: Notices",
   ]);
+});
+
+// IR-1085, D5: Office console and Workflow analytics nest under My Reviews, for
+// the roles that already have them, and keep the addresses they had.
+describe("the pages nested under My Reviews (IR-1085, D5)", () => {
+  const nested = (role: RoleName, access?: { my_reviews: boolean; is_coordinator?: boolean } | null) =>
+    navFor(role, access)
+      .filter((item) => item.parent === "reviewQueue")
+      .map(({ label, to }) => ({ label, to }));
+
+  test("a coordinator reaches the console and analytics at their existing addresses", () => {
+    expect(nested(ROLES.ITSO, COORDINATOR_WORK)).toEqual([
+      { label: "Office console", to: "/review/office" },
+      { label: "Workflow analytics", to: "/review/analytics" },
+    ]);
+  });
+
+  test("RDCO's coordinator gets them too, and a missing flag is not a coordinator", () => {
+    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label))
+      .toEqual(["Office console", "Workflow analytics"]);
+    expect(nested(ROLES.RDCO, { my_reviews: true, is_coordinator: undefined }).map((i) => i.label))
+      .toEqual(["Workflow analytics"]);
+  });
+
+  test("an office member who is not a coordinator sees analytics but not the console", () => {
+    expect(nested(ROLES.IERC, REVIEW_WORK).map((i) => i.label)).toEqual(["Workflow analytics"]);
+    expect(nested(ROLES.IERC, { my_reviews: true, is_coordinator: false }).map((i) => i.label))
+      .toEqual(["Workflow analytics"]);
+  });
+
+  test("roles without the screens see neither, even with the flags set", () => {
+    for (const role of [ROLES.STUDENT, ROLES.ADVISER, ROLES.SYSTEM_ADMIN]) {
+      expect(nested(role, COORDINATOR_WORK), role).toEqual([]);
+    }
+  });
+
+  test("they hang from My Reviews: no My Reviews, no nested pages", () => {
+    expect(nested(ROLES.ITSO, { my_reviews: false, is_coordinator: true })).toEqual([]);
+    expect(nested(ROLES.ITSO, null)).toEqual([]);
+  });
+
+  test("the office console is the offices', and its gate is the one the sidebar reads", () => {
+    only("reviewOffice", [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
+  });
 });
 
 test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Retention and Notices (IR-783, IR-788, IR-795, IR-800)", () => {
@@ -227,7 +280,7 @@ test("nav is derived from the same map, so a link cannot outrun its gate", () =>
   // The actual IR-160 defect, stated as a property: anything the nav offers a
   // role, that role can open.
   for (const role of EVERY_ROLE) {
-    for (const item of navFor(role, REVIEW_WORK)) {
+    for (const item of navFor(role, COORDINATOR_WORK)) {
       assertEqual(canAccess(role, item.key), true,
         `nav offered ${role} the ${item.key} screen it cannot open`);
     }

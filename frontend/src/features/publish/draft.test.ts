@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { emptyMetadata } from "@/features/records/metadata/metadataSchema";
 
-import { describeFailure, firstIncompleteStep, provisionalTitle } from "./draft";
+import { describeFailure, firstIncompleteStep, provisionalTitle, withoutPdfExtension } from "./draft";
 
 describe("provisionalTitle", () => {
   it.each([
@@ -13,8 +13,30 @@ describe("provisionalTitle", () => {
     ["thesis final.v2.PDF", "thesis final.v2"],
     ["  spaced__out--name .pdf", "spaced out name"],
     [".pdf", "Untitled manuscript"],
+    // IR-1084: never a title that ends in ".pdf", however the name was doubled.
+    ["paper.pdf.pdf", "paper"],
+    ["Thesis.PDF.pdf", "Thesis"],
+    ["My_Thesis.pdf .pdf", "My Thesis"],
+    ["pdf.pdf", "pdf"],
   ])("%s → %s", (fileName, title) => {
     expect(provisionalTitle(fileName)).toBe(title);
+    expect(title).not.toMatch(/\.pdf$/i);
+  });
+});
+
+describe("withoutPdfExtension (IR-1084)", () => {
+  it.each([
+    ["My Thesis.pdf", "My Thesis"],
+    ["My Thesis.PDF", "My Thesis"],
+    ["My Thesis .pdf  ", "My Thesis"],
+    ["paper.pdf.pdf", "paper"],
+    [".pdf", ""],
+    // Only a trailing extension: a title that mentions pdf is left whole.
+    ["Reading a .pdf file", "Reading a .pdf file"],
+    ["PDF parsing for theses", "PDF parsing for theses"],
+    ["A study of pdf.js", "A study of pdf.js"],
+  ])("%j → %j", (title, expected) => {
+    expect(withoutPdfExtension(title)).toBe(expected);
   });
 });
 

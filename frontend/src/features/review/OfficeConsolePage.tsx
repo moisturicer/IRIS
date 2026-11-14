@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { ClearanceStrip, hasStrip } from "@/components/shared/ClearanceStrip";
 import { ResearchCard } from "@/components/shared/ResearchCard";
-import { readFailureKind } from "@/lib/readFailure";
+import { failureMessage, readFailureKind } from "@/lib/readFailure";
 import { Badge, Button, Skeleton } from "@/components/ui";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
@@ -45,6 +45,7 @@ const BACK_LINK = cn(
 export default function OfficeConsolePage() {
   const [data, setData] = useState<OfficeConsole | null>(null);
   const [state, setState] = useState<Load>("loading");
+  const [failure, setFailure] = useState<unknown>(null);
   const [acting, setActing] = useState<Acting | null>(null);
   const [announcement, setAnnouncement] = useState("");
 
@@ -57,6 +58,7 @@ export default function OfficeConsolePage() {
       return true;
     } catch (err) {
       const kind = readFailureKind(err);
+      setFailure(err);
       setState(kind === "unavailable" ? "refused" : kind);
       return false;
     }
@@ -94,7 +96,7 @@ export default function OfficeConsolePage() {
       </p>
 
       {state === "loading" ? (
-        <Skeleton rows={3} label="Loading the console…" />
+        <Skeleton rows={3} label="Loading the console…" onRetry={retry} />
       ) : state === "refused" ? (
         <EmptyState
           icon="fa-lock"
@@ -109,7 +111,7 @@ export default function OfficeConsolePage() {
           icon="fa-triangle-exclamation"
           tone="error"
           title="Could not load the console"
-          message="Check your connection, then try again."
+          message={failureMessage(failure)}
           action={<Button type="button" variant="secondary" onClick={retry}>Try again</Button>}
         />
       ) : (

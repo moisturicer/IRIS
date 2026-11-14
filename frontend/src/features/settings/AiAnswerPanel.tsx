@@ -10,6 +10,7 @@
  * started with, and no screen offers a per-paper control.
  */
 import { useCallback, useEffect, useState } from "react";
+import { failureMessage } from "@/lib/readFailure";
 import { accountsApi } from "@/api/accounts";
 import { noticeApi } from "@/api/notice";
 import { Button } from "@/components/ui";
@@ -36,6 +37,7 @@ export function AiAnswerPanel() {
   const [papers, setPapers] = useState<PapersChoice | null>(null);
   const [papersError, setPapersError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
@@ -44,7 +46,8 @@ export function AiAnswerPanel() {
       const { data } = await noticeApi.current();
       setAnswer(data.answer ?? null);
       setPhase("ready");
-    } catch {
+    } catch (err) {
+      setLoadError(err);
       setPhase("failed");
     }
   }, []);
@@ -103,7 +106,7 @@ export function AiAnswerPanel() {
       caption="Your answer covers the papers you're Contact person of. Each paper keeps the answer it started with, and there is no setting per paper."
     >
       {phase === "loading" && (
-        <p role="status" className="flex items-center gap-2 text-[13px] text-stone-600">
+        <p role="status" className="flex items-center gap-2 text-small text-stone-600">
           <Spinner size="sm" />
           Loading your answer…
         </p>
@@ -111,7 +114,7 @@ export function AiAnswerPanel() {
 
       {phase === "failed" && (
         <div className="space-y-3">
-          <Message tone="error" role="alert">Your answer didn't load. Check your connection, then try again.</Message>
+          <Message tone="error" role="alert">{failureMessage(loadError, { lead: "Your answer didn't load." })}</Message>
           <div className="flex flex-wrap gap-3">
             <Button type="button" variant="secondary" onClick={() => { setPhase("loading"); void load(); }}>
               Try again
@@ -123,13 +126,13 @@ export function AiAnswerPanel() {
       {phase === "ready" && (
         <div className="space-y-4">
           <div className="rounded-lg border border-stone-200 p-4" role="group" aria-label="Your answer">
-            <p className="text-[14px] font-semibold text-stone-900">
+            <p className="text-body font-semibold text-stone-900">
               {current === true && "Yes, AI may use your papers"}
               {current === false && "No, AI doesn't use your papers"}
               {current === null && "You haven't answered yet"}
             </p>
             {answer?.version != null && (
-              <p className="text-[13px] text-stone-600 mt-0.5">
+              <p className="text-small text-stone-600 mt-0.5">
                 Given under notice version {answer.version}
                 {answer.answered_at ? ` on ${formatDate(answer.answered_at)}` : ""}.
               </p>
@@ -158,13 +161,13 @@ export function AiAnswerPanel() {
                     error={papersError}
                   />
                 ) : (
-                  <p className="text-[13px] text-stone-700">
+                  <p className="text-small text-stone-700">
                     IRIS may then send your papers&apos; text to AI companies, subject to the embargo and the IP
                     mark. Text already sent can&apos;t be recalled.
                   </p>
                 )
               ) : (
-                <p className="text-[13px] text-stone-700">
+                <p className="text-small text-stone-700">
                   This only affects papers from now on. Your earlier papers keep their Yes and stay in use by AI,
                   and what was already processed stays.
                 </p>

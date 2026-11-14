@@ -2,17 +2,10 @@ import { useId } from "react";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
-import type { Readiness, ReadinessItem, ReadinessVerdict } from "@/types/records";
+import type { Readiness, ReadinessItem } from "@/types/records";
 
 import { RailHeading } from "./headings";
-
-/** A glyph beside the server's verdict, never instead of it. */
-const VERDICT_ICON: Record<ReadinessVerdict, string> = {
-  ready: "fa-circle-check",
-  blocked: "fa-circle-xmark",
-  waiting_on_you: "fa-circle-exclamation",
-  none: "fa-circle-info",
-};
+import { VERDICT_ICON } from "./yourPart";
 
 /** The words on an item's link. The act behind it is the host's existing control. */
 const ACTION_WORDS: Record<string, string> = {
@@ -42,87 +35,71 @@ export function ReadinessPanel({ readiness, onAction, id }: {
   return (
     <section id={id} tabIndex={-1} aria-labelledby={headingId} className={cn("space-y-3 rounded", FOCUS_RING)}>
       <RailHeading id={headingId}>Readiness</RailHeading>
+      {/* No side stripe: the icon and the words carry the verdict (IR-1094, spec §4.9). */}
       <p
         role="status"
-        className={cn(
-          "flex items-center gap-2 rounded-lg border border-stone-300 border-l-[3px] border-l-brand bg-white px-3 py-2.5 text-small font-semibold text-stone-900",
-          readiness.verdict === "ready" && "border-l-stone-900",
-        )}
+        className="flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-small font-semibold text-stone-900"
       >
         <i className={cn("fas", VERDICT_ICON[readiness.verdict])} aria-hidden />
         {readiness.headline}
       </p>
-      {readiness.items.length > 0 && (
-        <ul aria-label="What readiness depends on" className="space-y-2">
-          {readiness.items.map((item, i) => (
-            <li
-              key={`${item.kind}-${i}`}
-              className={cn(
-                "rounded-lg px-3 py-2 text-small",
-                item.severity === "blocker"
-                  ? "border-l-[3px] border-brand bg-stone-100 text-stone-900"
-                  : "border border-stone-300 text-stone-700",
-              )}
-            >
-              <p>
-                {item.severity === "blocker" && (
-                  <span className="mr-1.5 font-semibold text-brand">
-                    <i className="fas fa-ban mr-1 text-2xs" aria-hidden />
-                    Blocker:
-                  </span>
-                )}
-                {item.severity === "blocker" ? " " : <i className="fas fa-circle-info mr-1.5 text-2xs text-stone-500" aria-hidden />}
-                {item.label}
-              </p>
-              {(item.actor_name || item.since || item.paused || item.action) && (
-                <p className="mt-0.5 text-2xs text-stone-600">
-                  {[
-                    item.actor_name,
-                    item.since && `since ${formatDate(item.since)}`,
-                    item.paused && "clock paused",
-                  ].filter(Boolean).join(" · ")}
-                  {item.action && ACTION_WORDS[item.action.kind] && (
-                    <button
-                      type="button"
-                      onClick={() => onAction(item.action!)}
-                      className={cn("ml-2 font-semibold text-brand hover:underline", FOCUS_RING)}
-                    >
-                      {ACTION_WORDS[item.action.kind]}
-                    </button>
-                  )}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <ReadinessFacts items={readiness.items} onAction={onAction} />
     </section>
   );
 }
 
 /**
- * The pane head's one-line summary (the prototype's "Your readiness"): the
- * server's headline, and a jump to the whole Readiness panel.
+ * Each fact behind a verdict, in the server's words: a blocker is marked
+ * "Blocker" in words and an icon; information has an outline. The offered
+ * action dispatches to a control the page already has. The review workspace
+ * lists these under Details (IR-1094); the author's pane lists them in its
+ * Readiness card.
  */
-export function ReadinessSummary({ readiness, onShow }: { readiness: Readiness; onShow: () => void }) {
+export function ReadinessFacts({ items, onAction }: {
+  items: readonly ReadinessItem[];
+  onAction: (action: NonNullable<ReadinessItem["action"]>) => void;
+}) {
+  if (items.length === 0) return null;
   return (
-    <button
-      type="button"
-      onClick={onShow}
-      aria-label={`${readiness.headline} Show Readiness`}
-      className={cn(
-        "mt-2 flex w-full items-center gap-3 rounded-lg border border-stone-300 border-l-[3px] border-l-brand bg-white px-3 py-2 text-left",
-        FOCUS_RING,
-      )}
-    >
-      <i className={cn("fas text-base text-stone-900", VERDICT_ICON[readiness.verdict])} aria-hidden />
-      <span className="min-w-0 flex-1">
-        <span className="block text-2xs font-semibold uppercase tracking-wider text-stone-500">Your readiness</span>
-        <span className="block truncate text-small font-semibold text-stone-900">{readiness.headline}</span>
-      </span>
-      <span className="text-2xs font-semibold text-brand whitespace-nowrap">
-        View why <i className="fas fa-arrow-right ml-0.5" aria-hidden />
-      </span>
-    </button>
+    <ul aria-label="What readiness depends on" className="space-y-2">
+      {items.map((item, i) => (
+        <li
+          key={`${item.kind}-${i}`}
+          className={cn(
+            "rounded-lg px-3 py-2 text-small",
+            item.severity === "blocker" ? "bg-stone-100 text-stone-900" : "border border-stone-300 text-stone-700",
+          )}
+        >
+          <p>
+            {item.severity === "blocker" && (
+              <span className="mr-1.5 font-semibold text-brand">
+                <i className="fas fa-ban mr-1 text-2xs" aria-hidden />
+                Blocker:
+              </span>
+            )}
+            {item.severity === "blocker" ? " " : <i className="fas fa-circle-info mr-1.5 text-2xs text-stone-500" aria-hidden />}
+            {item.label}
+          </p>
+          {(item.actor_name || item.since || item.paused || item.action) && (
+            <p className="mt-0.5 text-2xs text-stone-600">
+              {[
+                item.actor_name,
+                item.since && `since ${formatDate(item.since)}`,
+                item.paused && "clock paused",
+              ].filter(Boolean).join(" · ")}
+              {item.action && ACTION_WORDS[item.action.kind] && (
+                <button
+                  type="button"
+                  onClick={() => onAction(item.action!)}
+                  className={cn("ml-2 font-semibold text-brand hover:underline", FOCUS_RING)}
+                >
+                  {ACTION_WORDS[item.action.kind]}
+                </button>
+              )}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -26,6 +26,8 @@ import { LOAD_ERROR, WARNING_NOTICE } from "@/components/ui/fieldClasses";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { failureMessage } from "@/lib/readFailure";
 import { useApiRead } from "@/hooks/useApiRead";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
@@ -133,10 +135,10 @@ function RetentionItem({ type, saved, lastRun }: { type: RetentionType; saved: s
 
   return (
     <li aria-labelledby={headingId} className="bg-white rounded-xl border border-stone-200 p-4">
-      <h2 id={headingId} className="text-[15px] font-semibold text-stone-900">{type.label}</h2>
-      <p className="mt-1 text-[14px] text-stone-700 leading-relaxed">{type.description}</p>
+      <h2 id={headingId} className="text-body font-semibold text-stone-900">{type.label}</h2>
+      <p className="mt-1 text-body text-stone-700 leading-relaxed">{type.description}</p>
 
-      <dl className="mt-3 grid gap-x-6 gap-y-1 text-[14px] sm:grid-cols-[auto_1fr]">
+      <dl className="mt-3 grid gap-x-6 gap-y-1 text-body sm:grid-cols-[auto_1fr]">
         <dt className="font-medium text-stone-700">Period</dt>
         <dd className="text-stone-900">{periodText(current)}</dd>
         <dt className="font-medium text-stone-700">Last ran</dt>
@@ -167,7 +169,7 @@ function RetentionItem({ type, saved, lastRun }: { type: RetentionType; saved: s
           {error}
         </p>
       )}
-      {done && <p role="status" className="mt-3 text-[14px] text-stone-700">{done}</p>}
+      {done && <p role="status" className="mt-3 text-body text-stone-700">{done}</p>}
 
       <ConfirmDialog
         open={pending !== null}
@@ -229,13 +231,13 @@ export default function RetentionPage() {
         <InterruptedState what="retention periods" onRetry={read.retry} />
       ) : read.status === "loading" ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" label="Loading retention periods" />
+          <Spinner size="lg" label="Loading retention periods" onRetry={read.retry} />
         </div>
       ) : read.status === "failed" || !data ? (
-        <div role="alert" className={LOAD_ERROR}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          Failed to load retention periods.
-        </div>
+        <LoadFailedAlert
+          message={failureMessage(read.error, { lead: "The retention periods didn't load." })}
+          onRetry={read.retry}
+        />
       ) : (
         <ul aria-label="Retention periods" className="space-y-3">
           {RETENTION_TYPES.map((type, i) => (

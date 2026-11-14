@@ -37,6 +37,7 @@ from apps.records.models import Record
 
 from .ports import VECTOR, RetrievalResult, RetrievedChunk, Retriever
 from .scan_depth import scan_depth
+from .scope import chunk_set_scope
 from apps.ai.grants.reads import research_records
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ class TwoStageRetriever(Retriever):
         space: Optional[EmbeddingSpace] = None,
         record: Optional[Record] = None,
         records: Optional[AbstractSet[int]] = None,
+        trial_variant: Optional[str] = None,
     ) -> None:
         """``record`` narrows stage 1 to one Record, constructor-time (IR-298).
 
@@ -77,6 +79,8 @@ class TwoStageRetriever(Retriever):
         self._space = space
         self._record = record
         self._records = records
+        # Evaluation only (IR-1051): read a trial chunk set instead.
+        self._trial_variant = trial_variant
 
     def _active_space(self) -> Optional[EmbeddingSpace]:
         if self._space is not None:
@@ -136,11 +140,11 @@ class TwoStageRetriever(Retriever):
             distance = CosineDistance("embedding", query_vector)
             rows = list(
                 ChunkEmbedding.objects.filter(
+                    chunk_set_scope("chunk__", self._trial_variant),
                     space=space,
                     # `DocumentChunk` carries a denormalized `record` FK, so this
                     # narrows without joining through the chunk set.
                     chunk__record_id__in=candidate_ids,
-                    chunk__chunk_set__is_active=True,
                     chunk__deleted_at__isnull=True,
                 )
                 # `chunk_set` for its `page_sizes`, which is what turns a
