@@ -35,6 +35,14 @@ describe("Help", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("calls the in-paper assistant Ask IRIS, the name the screen uses (IR-1090)", () => {
+    renderAs({ role_name: ROLES.STUDENT });
+
+    const finding = section("Finding research")!;
+    expect(within(finding).getByText(/use Ask IRIS to ask questions about that one paper/)).toBeInTheDocument();
+    expect(screen.queryByText(/Paper Chat/)).not.toBeInTheDocument();
+  });
+
   it("shows a Student how to publish, and nothing about reviewing or administration", () => {
     renderAs({ role_name: ROLES.STUDENT });
 

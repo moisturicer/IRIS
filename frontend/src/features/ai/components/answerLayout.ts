@@ -37,10 +37,11 @@ export const OVERVIEW_MARKDOWN = [
  * two cannot drift apart (IR-451).
  *
  * Viewport-relative with a cap, never a fixed pixel width: `92vw` keeps a
- * narrow screen usable without a horizontal scrollbar, and the 60rem cap is
- * the old `max-w-3xl` (48rem) plus two inches at 96px/in.
+ * narrow screen usable without a horizontal scrollbar, and the cap is a
+ * reading measure of 68 characters (IR-1090; it was 60rem, about 110 characters
+ * a line at the answer's 16px, which the audit found too long to read).
  */
-export const CHAT_COLUMN = "w-full max-w-[min(92vw,60rem)] mx-auto";
+export const CHAT_COLUMN = "w-full max-w-[min(92vw,68ch)] mx-auto";
 
 /**
  * Ask IRIS's history and sources sit beside the answer from this page width,
@@ -61,8 +62,9 @@ export const CHAT_COMPOSER_SURFACE =
 export const CHAT_COMPOSER_FIELD =
   "resize-none caret-brand [field-sizing:content] max-h-40 overflow-y-auto scrollbar-thin";
 
-// The opening's text, starter questions and composer share this width.
-export const CHAT_OPENING_COLUMN = "mx-auto w-full max-w-3xl";
+// The opening's text, starter questions and composer share this width, which is
+// the thread's own (IR-1090), so the page does not widen when the first answer lands.
+export const CHAT_OPENING_COLUMN = "mx-auto w-full max-w-[min(92vw,68ch)]";
 
 // A round composer control: 44 px on touch, 36 px beside a pointer.
 export const CHAT_COMPOSER_ICON =
