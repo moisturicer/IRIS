@@ -351,6 +351,6 @@ export const recordsApi = {
     }),
   approveDeleteRequest:    (id: number) =>
     apiClient.post(`/records/delete-requests/${id}/approve/`),
-  declineDeleteRequest:    (id: number) =>
-    apiClient.post(`/records/delete-requests/${id}/decline/`),
+  declineDeleteRequest:    (id: number, note: string) =>
+    apiClient.post(`/records/delete-requests/${id}/decline/`, { note }),
 };

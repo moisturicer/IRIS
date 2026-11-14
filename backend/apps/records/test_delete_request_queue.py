@@ -76,7 +76,9 @@ class DeleteRequestFixtures:
 
     def decide(self, request, verdict):
         self.client.force_authenticate(self.rdco)
-        response = self.client.post(f"{DELETE_REQUESTS}{request.pk}/{verdict}/")
+        # A decline needs RDCO's note (IR-1099); an approval takes none.
+        data = {"note": "Kept for the archive."} if verdict == "decline" else {}
+        response = self.client.post(f"{DELETE_REQUESTS}{request.pk}/{verdict}/", data, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         request.refresh_from_db()
         return request

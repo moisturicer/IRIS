@@ -39,6 +39,7 @@ from .download_service import (
     NoteRequired,
     OwnDownloadRequest,
     cancel_download_request,
+    clean_note,
     decide_download_request,
     revoke_download_grant,
 )
@@ -2079,7 +2080,7 @@ class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
     GET    /delete-requests/                  -- RDCO: all requests
     GET    /delete-requests/<id>/             -- RDCO: one request
     POST   /delete-requests/<id>/approve/     -- RDCO: soft-delete record, notify owner
-    POST   /delete-requests/<id>/decline/     -- RDCO: restore record, notify owner
+    POST   /delete-requests/<id>/decline/     -- RDCO: restore record, notify owner (needs a `note`)
 
     Read and decided, never written to directly (IR-496). A request comes into
     existence only through `DELETE /records/<id>/` (`RecordViewSet.perform_destroy`),
@@ -2133,44 +2134,61 @@ class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
         """
         from django.utils import timezone
         dr = self.get_object()
-        if dr.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        dr.status      = RequestStatus.APPROVED
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        soft_delete_record(dr.record, deleted_by=request.user)
+        # The same row lock `decline` takes: a decision and a rival decision are
+        # one decision and one refusal, so an approval cannot soft-delete a
+        # record a decline has just restored (IR-1099).
+        with transaction.atomic():
+            dr = DeleteRequest.objects.select_for_update().get(pk=dr.pk)
+            if dr.status != RequestStatus.PENDING:
+                return Response(
+                    {"detail": f"Request is already '{dr.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            dr.status      = RequestStatus.APPROVED
+            dr.reviewed_by = request.user
+            dr.reviewed_at = timezone.now()
+            dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+            soft_delete_record(dr.record, deleted_by=request.user)
         notify_delete_approved(dr, reviewed_by=request.user)
         return Response({"detail": "Delete request approved. The record has been removed."})
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsRDCO])
     def decline(self, request, pk=None):
         """
-        POST /delete-requests/<id>/decline/
-        Marks the request declined, restores the record to published, and notifies the requester.
+        POST /delete-requests/<id>/decline/ {note}
+        Marks the request declined, restores the record to published, and notifies
+        the requester, in-app and by email, with RDCO's note. A decline needs a
+        note, as a download request's does; an approval takes none (IR-1099).
         """
         from django.utils import timezone
         dr = self.get_object()
-        if dr.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            note = clean_note(request.data.get("note"))
+        except NoteRequired as exc:
+            return Response({"note": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
+        # The row lock makes two simultaneous decisions one decision and one
+        # refusal, as `decide_download_request` does, and a restore that cannot
+        # happen leaves the request pending rather than declined (IR-1099).
+        with transaction.atomic():
+            dr = DeleteRequest.objects.select_for_update().get(pk=dr.pk)
+            if dr.status != RequestStatus.PENDING:
+                return Response(
+                    {"detail": f"Request is already '{dr.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            dr.status      = RequestStatus.DECLINED
+            dr.reviewed_by = request.user
+            dr.reviewed_at = timezone.now()
+            dr.rdco_note   = note
+            dr.save(update_fields=["status", "reviewed_by", "reviewed_at", "rdco_note"])
+            # Restore the record to its pre-deletion visible state. The fallback
+            # for a row predating `previous_pipeline_status` lives in the table's
+            # `restore_previous` resolver now, not here.
+            lifecycle.apply(
+                dr.record,
+                lifecycle.WorkflowEvent.RESTORE,
+                request.user,
+                restore_to=dr.previous_pipeline_status,
             )
-        dr.status      = RequestStatus.DECLINED
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        # Restore the record to its pre-deletion visible state. The fallback for
-        # a row predating `previous_pipeline_status` lives in the table's
-        # `restore_previous` resolver now, not here.
-        lifecycle.apply(
-            dr.record,
-            lifecycle.WorkflowEvent.RESTORE,
-            request.user,
-            restore_to=dr.previous_pipeline_status,
-        )
         notify_delete_declined(dr, reviewed_by=request.user)
         return Response({"detail": "Delete request declined. The record has been restored."})

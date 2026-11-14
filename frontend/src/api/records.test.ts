@@ -138,7 +138,8 @@ const rows: Row[] = [
   ["listDeleteRequests", () => recordsApi.listDeleteRequests({ page: 1 }),
     "get", "/records/delete-requests/", none, { page: 1 }],
   ["approveDeleteRequest", () => recordsApi.approveDeleteRequest(8), "post", "/records/delete-requests/8/approve/"],
-  ["declineDeleteRequest", () => recordsApi.declineDeleteRequest(8), "post", "/records/delete-requests/8/decline/"],
+  ["declineDeleteRequest", () => recordsApi.declineDeleteRequest(8, "kept"),
+    "post", "/records/delete-requests/8/decline/", { note: "kept" }],
 ];
 
 afterEach(() => useAuthStore.setState({ accessToken: null }));
