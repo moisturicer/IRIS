@@ -221,7 +221,12 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog", { name: "Publish version 2?" }),
   },
   {
-    id: "decline a download request", screen: "download-requests", sources: ["features/admin/DownloadRequestsPage.tsx"],
+    id: "decline a download request", screen: "download-requests", sources: ["features/admin/RdcoNoteDialog.tsx"],
+    open: press("Decline"), dialog: anyDialog,
+  },
+  {
+    // The same dialog, opened from the other queue (IR-1099); its copy differs.
+    id: "decline a delete request", screen: "delete-requests", sources: ["features/admin/RdcoNoteDialog.tsx"],
     open: press("Decline"), dialog: anyDialog,
   },
   {
