@@ -113,6 +113,7 @@ def default_chunking_options() -> ChunkingOptions:
         min_tokens=settings.AI_CHUNK_MIN_TOKENS,
         context_path_max_tokens=settings.AI_CHUNK_CONTEXT_PATH_MAX_TOKENS,
         exclude_sections=tuple(settings.AI_CHUNK_EXCLUDE_SECTIONS),
+        index_formulas=settings.AI_FORMULA_TEXT_INDEXED,
     )
 
 
@@ -183,8 +184,10 @@ def ingest_extraction(
             ),
         )
     from apps.ai.figure_descriptions import with_descriptions
+    from apps.ai.formula_transcriptions import with_formulas
 
     document = with_descriptions(document, extraction)
+    document = with_formulas(document, extraction)
     options = _options_for_document(document, options)
     if not extraction.content_hash:
         raise _record_failure(

@@ -27,6 +27,8 @@ class Draft:
     source_page: int | None = None
     element_kinds: frozenset[str] = field(default_factory=frozenset)
     bboxes: tuple[BoundingBox, ...] = ()
+    # What the keyword index reads instead of ``content``; ``None`` reads it (IR-1102).
+    keyword: str | None = None
 
 
 @dataclass(frozen=True)
@@ -54,12 +56,20 @@ def combine(drafts: list[Draft], joiners: Joiners) -> Draft:
     return Draft(
         body=joiners.body.join(d.body for d in drafts if d.body),
         content=joiners.content.join(d.content for d in drafts if d.content),
+        keyword=_keywords(drafts, joiners),
         trail=drafts[-1].trail,
         section_key=drafts[-1].section_key,
         source_page=pages[0] if pages else None,
         element_kinds=kinds,
         bboxes=dedupe_regions([box for d in drafts for box in d.bboxes]),
     )
+
+
+def _keywords(drafts: list[Draft], joiners: Joiners) -> str | None:
+    if all(d.keyword is None for d in drafts):
+        return None
+    parts = (d.content if d.keyword is None else d.keyword for d in drafts)
+    return joiners.content.join(part for part in parts if part)
 
 
 Fits = Callable[[Draft], bool]
@@ -132,6 +142,7 @@ def finalize(
         Chunk(
             text=(text := embedded_text(d.trail, d.body)),
             content=d.content,
+            keyword_text=d.keyword,
             context_path=d.trail,
             sequence=sequence,
             token_count=count_tokens(text),

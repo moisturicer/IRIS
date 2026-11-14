@@ -125,7 +125,9 @@ def _element(item, label, metadata, page, sizes, pdf_evidence, outcomes):
     elif label in {"Image", "Formula"}:
         latex = DISPLAY_FORMULA.fullmatch(text.strip()) if label == "Formula" else None
         if latex:
-            return [replace(element, kind="formula", text=latex.group("dollar") or latex.group("bracket") or "")]
+            # Typed as LaTeX already, and still cropped and transcribed (IR-1102).
+            return [replace(element, kind="formula", figure=element.element_id,
+                            text=latex.group("dollar") or latex.group("bracket") or "")]
         # Image OCR is not a caption; Formula OCR is never the formula (ADR-067),
         # so it stays an image crop until it is transcribed.
         element = replace(element, text="", figure=element.element_id)
