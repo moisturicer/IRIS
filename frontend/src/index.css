@@ -176,7 +176,7 @@
 
 /* Find's matches (IR-353), marked inside the spans so they follow the text
    at any zoom. The match highlighter (#f7e08f), then the stronger #f2c94c
-   for the current one (IR-1097, D6), apart from a citation's maroon-ringed
+   for the current one (IR-1097, D6; the prototype's `mark` and `mark.now`), apart from a citation's maroon-ringed
    passage, which draws above the text layer and stays visible over them. The
    text is drawn on the canvas beneath and this layer is transparent, so the
    fill multiplies into the page: the words stay Ink on yellow (14:1). */
@@ -190,8 +190,6 @@
 
 .textLayer mark.find-hit-current {
   background-color: #f2c94c;
-  outline: 2px solid #1c1917;
-  outline-offset: 1px;
 }
 
 /* Review threads' passages (IR-875, IR-1097): the reviewer's pen. A rose fill
@@ -207,6 +205,7 @@
 
 .thread-mark-open {
   background-color: #f5d5d6;
+  box-shadow: inset 0 -2px 0 #6b0f12;
 }
 
 .thread-mark-pending {
@@ -215,12 +214,13 @@
   mix-blend-mode: multiply;
 }
 
-/* The reader's own highlight (IR-583): a warm wash with an underline, so it is
-   told from a thread's maroon and from find's orange without relying on hue
-   alone. Over the text layer without taking its pointer. */
+/* The reader's own highlight (IR-583): a stone wash with an Ink underline. The
+   prototype has no such mark, and yellow is for matches only and rose for a
+   reviewer's pen (IR-1097, D6), so it takes neither hue. Over the text layer
+   without taking its pointer. */
 .reader-highlight {
-  background-color: rgb(250 204 21 / 0.28);
-  box-shadow: inset 0 -2px 0 rgb(161 98 7 / 0.7);
+  background-color: rgb(120 113 108 / 0.22);
+  box-shadow: inset 0 -2px 0 rgb(28 25 23 / 0.7);
   mix-blend-mode: multiply;
 }
 

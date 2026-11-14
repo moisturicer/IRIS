@@ -69,7 +69,7 @@ export function LibraryOverview({
         <section aria-labelledby="overview-waiting" className="rounded-2xl border border-stone-300 bg-surface p-card-compact md:p-card">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand ring-1 ring-stone-300" aria-hidden>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-white" aria-hidden>
                 <i className="fas fa-hourglass-half text-small" />
               </span>
               <div>

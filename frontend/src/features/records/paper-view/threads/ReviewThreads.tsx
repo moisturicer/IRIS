@@ -200,6 +200,8 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
     }
   };
   const id = props.recordId;
+  // The thread a pin opened: its passage on the paper and its quote here share one colour.
+  const now = props.focus?.id === root.id;
   const otherSeverity: ThreadSeverity = root.severity === "must_fix" ? "suggestion" : "must_fix";
 
   return (
@@ -215,7 +217,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
         </h4>
         <span aria-hidden className={cn(
           "inline-grid place-items-center min-w-5 h-5 px-1 rounded-full text-[11px] font-semibold",
-          root.is_draft ? "bg-white text-pen ring-1 ring-pen" : root.state === "open" ? "bg-pen text-white" : "bg-stone-900 text-white",
+          root.is_draft || root.state !== "open" ? "bg-white text-pen ring-1 ring-pen" : "bg-pen text-white",
         )}>{thread.pin}</span>
         {root.party_label && <span className="text-small font-semibold text-stone-900">{root.party_label}</span>}
         {root.anchor && (
@@ -234,7 +236,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           type="button"
           onClick={() => props.onShowInPaper(thread)}
           aria-label={`Show in paper: “${root.anchor.quote}”`}
-          className={cn("block w-full text-left border-l-2 border-brand/40 pl-2 text-small italic text-stone-700 hover:text-brand", FOCUS_RING)}
+          className={cn("block w-full text-left border-l-2 border-brand/40 pl-2 text-small italic text-stone-700 hover:text-brand", now && "bg-pen-now", FOCUS_RING)}
         >
           “{root.anchor.quote}”
         </button>
