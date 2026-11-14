@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -10,22 +10,26 @@ import { seatToOpen } from "@/features/records/capabilities";
 import { cn } from "@/lib/utils";
 import type { RecordTracker } from "@/types/records";
 
-import { ReadinessPanel, ReadinessSummary } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
 import { REVIEW_ACTIONS, VERDICT_CAPABILITIES, type DialogReviewAction } from "./reviewActions";
 import type { ShowPlace } from "./changes/ChangeItem";
 import { ChangesTab } from "./changes/ChangesTab";
+import { TabBesideMenu } from "./TabBesideMenu";
 import { ReviewThreads } from "./threads/ReviewThreads";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
+import { DRAWER_BELOW_PX, fitWidths, maxWidth, minWidth, SIDE_TAB_MIN_PX, type Widths } from "./reviewGeometry";
 import { GuidedTour } from "./tour/GuidedTour";
 import { markTourSeen, tourSeen } from "./tour/tourStorage";
 import { reviewTourSteps, tourTargets, type TourTab } from "./tour/tourSteps";
 import type { ReviewWorkspaceProps } from "./ReviewWorkspace";
+import { YourPartFooter } from "./YourPartFooter";
+import { readinessFacts, yourPartSummary } from "./yourPart";
 import "./reviewWorkspace.css";
 
 const WIDTHS_KEY = "iris-review-cols";
+const SIDE_TAB_KEY = "iris-review-side-tab";
 
 /**
  * Who reviews moves to the sidebar's Reviewers (ADR-032 §10 Amendment): the
@@ -47,8 +51,6 @@ type Tab = TourTab;
 const TAB_NAMES: Record<Tab, string> = {
   conversation: "Conversation", threads: "Threads", changes: "Changes", details: "Details",
 };
-type Widths = { mid: number | null; side: number | null };
-
 function readWidths(): Widths {
   try {
     const value = JSON.parse(localStorage.getItem(WIDTHS_KEY) ?? "null");
@@ -59,22 +61,22 @@ function readWidths(): Widths {
   }
 }
 
-/** One geometry for pointer, keyboard, restored widths and container changes. */
-function fitWidths(width: number, wanted: Widths) {
-  const w = width || 1600;
-  let mid = Math.max(320, Math.min(wanted.mid ?? w * .3, w / 2));
-  const side = Math.max(220, Math.min(wanted.side ?? w * .2, 420, mid - 40));
-  mid = Math.max(320, Math.min(mid, w - 480 - (w >= 1200 ? side : 0)));
-  // The paper's minimum can reduce the pane after the first sidebar clamp.
-  return { mid: Math.floor(mid), side: Math.floor(Math.min(side, mid - 40)) };
+/** The tab the reviewer last opened on the right, if it is still one this workspace has. */
+function readSideTab(): Tab | null {
+  try {
+    const value = localStorage.getItem(SIDE_TAB_KEY);
+    return value !== null && value in TAB_NAMES ? (value as Tab) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, onChanged, onDocuments, onOpenReview, onShowVersion }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
-  const sizes = fitWidths(width, wanted);
   const [statusTarget, setStatusTarget] = useState<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<Tab>("conversation");
+  const [sideChoice, setSideChoice] = useState(readSideTab);
   // Narrow, the workspace starts on the paper, its pins in view; the pane
   // opens from its launcher, a pin, Comment or Readiness (IR-875).
   const [open, setOpen] = useState(false);
@@ -112,8 +114,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
         .find((el) => el && !el.closest('[inert],[aria-hidden="true"]'))?.focus();
     });
   }, []);
-  const drawer = width > 0 && width < 900 && Boolean(reader);
-  const folded = width > 0 && width < 1200;
+  const drawer = width > 0 && width < DRAWER_BELOW_PX && Boolean(reader);
+  const roomy = width >= SIDE_TAB_MIN_PX;
   const drag = useRef<{ key: keyof Widths; x: number; mid: number; side: number } | null>(null);
 
   // Deferred, so the drawer's focus trap is gone before the launcher is focused.
@@ -127,13 +129,9 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     try { localStorage.setItem(WIDTHS_KEY, JSON.stringify(next)); } catch { /* Defaults still render. */ }
   };
 
-  useEffect(() => {
-    if (!folded) setTab((t) => (t === "details" ? "conversation" : t));
-  }, [folded]);
-
   const tw = useThreadsWorkspace({
     record, can, onChanged,
-    showThreads: () => { setTab("threads"); if (drawer) setOpen(true); },
+    showThreads: () => { reveal("threads"); if (drawer) setOpen(true); },
     showPaper: () => { if (drawer && open) closeDrawer(); },
     announce: setRouted,
   });
@@ -145,9 +143,31 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   // Changes needs two Versions to compare (ADR-058 §3, IR-873).
   const versions = record.versions ?? [];
   const comparable = versions.length >= 2;
-  const tabs: Tab[] = [
-    "conversation", "threads", ...(comparable ? ["changes" as const] : []), ...(folded ? ["details" as const] : []),
-  ];
+  // Details is a tab at every width: the third column that repeated it is gone
+  // (IR-1094). One tab may sit in a right column on a workspace wide enough;
+  // narrower, it returns to the row, and the choice is kept for next time.
+  const allTabs: Tab[] = ["conversation", "threads", ...(comparable ? ["changes" as const] : []), "details"];
+  const sideTab = roomy && sideChoice !== null && allTabs.includes(sideChoice) ? sideChoice : null;
+  const tabs = allTabs.filter((t) => t !== sideTab);
+  const shown: Tab = tabs.includes(tab) ? tab : tabs[0]!;
+  const sizes = fitWidths(width, wanted, sideTab !== null);
+  // Where focus goes once the control that was used is gone: the right column's
+  // close button when a tab arrives, the tab's own button when it returns.
+  const focusLater = (id: string) => requestAnimationFrame(() => document.getElementById(id)?.focus());
+  const chooseSide = (next: Tab | null) => {
+    // The tab that moves out of the row must not stay "selected" behind it, or
+    // closing the column would silently bring it back as the shown tab.
+    if (next !== null && next === shown) setTab(allTabs.find((t) => t !== next)!);
+    if (next !== null) focusLater(`${ids}-side-close`);
+    else if (sideTab) focusLater(`${ids}-tab-${sideTab}`);
+    setSideChoice(next);
+    try {
+      if (next === null) localStorage.removeItem(SIDE_TAB_KEY);
+      else localStorage.setItem(SIDE_TAB_KEY, next);
+    } catch { /* The choice still holds for this visit. */ }
+  };
+  // Shows a tab wherever it is: its own button, or already in the right column.
+  const reveal = (name: Tab) => { if (name !== sideTab) setTab(name); };
   const latest = versions[versions.length - 1]?.number ?? null;
   // A reviewer looking again at a new Version reads the response it was
   // submitted with first (ADR-032 §7, IR-876): once per letter, so a later
@@ -160,12 +180,14 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     ledWithLetter.current = letterVersion;
     setTab("threads");
   }, [reviewing, letterVersion, latest]);
-  // Fetched only once opened, then kept, so its choices survive a tab switch.
+  // Fetched only once opened, then kept, so its choices survive a tab switch
+  // (moving it to the right column mounts it again, and it starts afresh).
   const [changesOpened, setChangesOpened] = useState(false);
+  const changesVisible = shown === "changes" || sideTab === "changes";
   useEffect(() => {
-    if (tab === "changes") setChangesOpened(true);
+    if (changesVisible) setChangesOpened(true);
     if (tab === "changes" && !comparable) setTab("conversation");
-  }, [tab, comparable]);
+  }, [changesVisible, tab, comparable]);
   const showChange = ({ version, page, regions }: ShowPlace) => {
     onShowVersion?.(version === latest ? null : version);
     tw.showPlace(page, regions);
@@ -200,14 +222,14 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const edge = (key: keyof Widths, label: string) => (
     <div
       role="separator" tabIndex={0} aria-label={label} aria-orientation="vertical"
-      aria-controls={`${ids}-${key}`} aria-valuenow={sizes[key]} aria-valuemin={key === "mid" ? 320 : 220}
-      aria-valuemax={key === "mid" ? Math.max(320, Math.min(width / 2, width - 480 - (folded ? 0 : sizes.side))) : Math.min(420, sizes.mid - 40)}
+      aria-controls={`${ids}-${key}`} aria-valuenow={sizes[key]} aria-valuemin={minWidth(key)}
+      aria-valuemax={maxWidth(key, width, sizes, sideTab !== null)}
       className="review-resize-edge"
       onPointerDown={(e) => startDrag(key, e)}
       onPointerMove={(e) => {
         const from = drag.current;
         if (!from || from.key !== key) return;
-        update(fitWidths(width, { mid: from.mid, side: from.side, [key]: from[key] + from.x - e.clientX }));
+        update(fitWidths(width, { mid: from.mid, side: from.side, [key]: from[key] + from.x - e.clientX }, sideTab !== null));
       }}
       onPointerUp={() => { drag.current = null; }}
       onPointerCancel={() => { drag.current = null; }}
@@ -216,7 +238,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
       onKeyDown={(e) => {
         if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
         e.preventDefault();
-        update(fitWidths(width, { ...sizes, [key]: sizes[key] + (e.key === "ArrowLeft" ? 24 : -24) }));
+        update(fitWidths(width, { ...sizes, [key]: sizes[key] + (e.key === "ArrowLeft" ? 24 : -24) }, sideTab !== null));
       }}
     />
   );
@@ -235,11 +257,17 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     </div>
   );
   const footer = useRef<HTMLElement>(null);
-  // A Readiness link reuses a control the page already has; a sidebar target
-  // folded into Details opens that tab first, then takes focus.
+  // A Readiness link reuses a control the page already has; a target in
+  // Details opens that tab first (unless it is already on the right), then
+  // takes focus.
   const goTo = (to: string) => {
-    if (folded) setTab("details");
-    requestAnimationFrame(() => document.getElementById(detailsTarget(ids, to))?.focus());
+    reveal("details");
+    if (drawer) setOpen(true);
+    requestAnimationFrame(() => {
+      const el = document.getElementById(detailsTarget(ids, to));
+      el?.scrollIntoView?.({ block: "start" });
+      el?.focus({ preventScroll: true });
+    });
   };
   const onReadinessAction = (action: { kind: string; target: string | null }) => {
     if (action.kind === "open_review") void onOpenReview?.();
@@ -261,6 +289,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const mayRequest = can.has("route") && targets.length > 0 && ROUTE !== undefined;
   const renderDetails = (tracker: RecordTracker) => (
     <ReviewDetails record={record} tracker={tracker} ids={ids}
+      readiness={record.readiness} onReadinessAction={onReadinessAction}
       requestReview={mayRequest ? { targets: targets.map((t) => t.label), onOpen: () => { setRouted(""); setRequesting(true); } } : undefined}
       addColleague={<ReviewActionBar record={record} can={can} actions={ADD_COLLEAGUE} label="Reviewer actions"
         primary={false} onChanged={onChanged} className="pt-1" />}
@@ -281,9 +310,34 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
       setClaiming(false);
     }
   };
+  // What each tab holds. A tab is mounted wherever it is shown -- its place in
+  // the pane, or the right column -- so choosing it there moves it (IR-1094).
+  const body: Record<Tab, ReactNode> = {
+    conversation: (
+      <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
+        onCommented={tw.threads.reload} renderStatus={renderDetails} />
+    ),
+    threads: <ReviewThreads {...tw.panel} />,
+    changes: comparable && changesOpened ? (
+      <ChangesTab recordId={record.id} versions={versions} threads={tw.threads.sent}
+        onShowInPaper={showChange} onOpenThread={tw.openThread} />
+    ) : null,
+    details,
+  };
+  const panel = (name: Tab) => name === sideTab || (name === "changes" && !comparable) ? null : (
+    <div key={name} role="tabpanel" id={`${ids}-${name}`} aria-labelledby={`${ids}-tab-${name}`} hidden={shown !== name} className="p-4">
+      {body[name]}
+    </div>
+  );
+
+  // Your part: the server's words, and the controls the server grants.
+  const draftCount = finishing ? tw.threads.drafts.length : 0;
+  const part = yourPartSummary({ readiness: record.readiness, seat: ownSeat, draftCount });
+  const hasFacts = readinessFacts(record.readiness).length > 0;
+
   return (
     <div ref={observe} className="review-workspace-container">
-      <div className={cn("review-workspace", !reader && "review-without-paper")}
+      <div className={cn("review-workspace", !reader && "review-without-paper", sideTab && "review-has-side")}
         style={{ "--mid-w": `${sizes.mid}px`, "--side-w": `${sizes.side}px` } as CSSProperties}>
         {reader && <div id={target.paper} className={cn("review-paper", drawer && !open && offered && "review-paper-offered")} {...(drawer && open ? { inert: "" } : {})}>{tw.wrapReader(reader)}</div>}
         <section ref={pane} id={`${ids}-mid`} aria-label="Review pane" tabIndex={-1}
@@ -293,51 +347,44 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           {!drawer && reader && edge("mid", "Resize the review pane")}
           <header className="review-pane-head">
             <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-2xs font-semibold uppercase tracking-wider text-stone-600">Review workspace / current record</p>
+              <div className="min-w-0">
                 {record.current_holders.length > 0 && (
-                  <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-2 py-0.5 text-2xs font-semibold text-brand">
+                  <p className="inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-2 py-0.5 text-2xs font-semibold text-brand">
                     <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
                     With {record.current_holders.map((h) => h.label).join(", ")}
                   </p>
                 )}
                 <h2 className="font-display text-xl font-semibold text-stone-900 mt-1">Review</h2>
               </div>
-              <div className="flex items-center gap-1">
-                <button ref={tourButton} type="button" className={cn("review-control text-brand", FOCUS_RING)}
+              <div className="flex shrink-0 items-center gap-1">
+                <button ref={tourButton} type="button" className={cn("review-control whitespace-nowrap text-brand", FOCUS_RING)}
                   onClick={(e) => startTour(e.currentTarget)}>Take a tour</button>
-                {drawer && <button type="button" className={cn("review-control text-brand", FOCUS_RING)}
+                {drawer && <button type="button" className={cn("review-control whitespace-nowrap text-brand", FOCUS_RING)}
                   onClick={closeDrawer}>Back to paper</button>}
               </div>
             </div>
             {offered && <div className="mt-3">{offer}</div>}
-            {record.readiness && (
-              <ReadinessSummary readiness={record.readiness} onShow={() => {
-                setTab("conversation");
-                requestAnimationFrame(() => {
-                  const panel = document.getElementById(`${ids}-readiness`);
-                  panel?.scrollIntoView({ block: "start" });
-                  panel?.focus({ preventScroll: true });
-                });
-              }} />
-            )}
-            <div role="tablist" id={target.tabs} aria-label="Review pane sections" onKeyDown={(e) => {
-              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
-              e.preventDefault();
-              const at = tabs.indexOf(tab);
-              const next = e.key === "Home" ? tabs[0] : e.key === "End" ? tabs[tabs.length - 1]
-                : tabs[(at + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
-              setTab(next);
-              document.getElementById(`${ids}-tab-${next}`)?.focus();
-            }}>
-              {tabs.map((name) => (
-                <button key={name} type="button" role="tab" id={`${ids}-tab-${name}`}
-                  aria-selected={tab === name} aria-controls={`${ids}-${name}`} tabIndex={tab === name ? 0 : -1}
-                  onClick={() => setTab(name)} className={cn("review-tab", FOCUS_RING)}>
-                  {TAB_NAMES[name]}
-                  {name === "threads" && tw.count && <>{" "}<span className="ml-1 text-2xs font-normal text-stone-600">{tw.count}</span></>}
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2">
+              <div role="tablist" id={target.tabs} aria-label="Review pane sections" onKeyDown={(e) => {
+                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+                e.preventDefault();
+                const at = tabs.indexOf(shown);
+                const next = e.key === "Home" ? tabs[0]! : e.key === "End" ? tabs[tabs.length - 1]!
+                  : tabs[(at + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]!;
+                setTab(next);
+                document.getElementById(`${ids}-tab-${next}`)?.focus();
+              }}>
+                {tabs.map((name) => (
+                  <button key={name} type="button" role="tab" id={`${ids}-tab-${name}`}
+                    aria-selected={shown === name} aria-controls={`${ids}-${name}`} tabIndex={shown === name ? 0 : -1}
+                    onClick={() => setTab(name)} className={cn("review-tab", FOCUS_RING)}>
+                    {TAB_NAMES[name]}
+                    {name === "threads" && tw.count && <>{" "}<span className="ml-1 text-2xs font-normal text-stone-600">{tw.count}</span></>}
+                  </button>
+                ))}
+              </div>
+              {roomy && <TabBesideMenu choices={tabs.map((t) => ({ id: t, label: TAB_NAMES[t] }))}
+                onChoose={chooseSide} />}
             </div>
           </header>
           <div
@@ -346,51 +393,35 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             tabIndex={0}
             className={cn("review-pane-body", FOCUS_RING)}
           >
-            <div role="tabpanel" id={`${ids}-conversation`} aria-labelledby={`${ids}-tab-conversation`} hidden={tab !== "conversation"} className="p-4">
-              <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
-                onCommented={tw.threads.reload}
-                renderStatus={renderDetails}
-                beforeComment={record.readiness ? <ReadinessPanel id={`${ids}-readiness`} readiness={record.readiness} onAction={onReadinessAction} /> : null} />
-            </div>
-            <div role="tabpanel" id={`${ids}-threads`} aria-labelledby={`${ids}-tab-threads`} hidden={tab !== "threads"} className="p-4">
-              <ReviewThreads {...tw.panel} />
-            </div>
-            {comparable && (
-              <div role="tabpanel" id={`${ids}-changes`} aria-labelledby={`${ids}-tab-changes`} hidden={tab !== "changes"} className="p-4">
-                {changesOpened && (
-                  <ChangesTab recordId={record.id} versions={versions} threads={tw.threads.sent}
-                    onShowInPaper={showChange} onOpenThread={tw.openThread} />
-                )}
-              </div>
-            )}
-            {folded && <div role="tabpanel" id={`${ids}-details`} aria-labelledby={`${ids}-tab-details`} hidden={tab !== "details"} className="p-4">{details}</div>}
+            {allTabs.map(panel)}
           </div>
-          <footer ref={footer} id={target.foot} className="review-pane-foot" aria-label="Your review">
-            <p className="text-small font-semibold text-stone-900"><i className="fas fa-clipboard-check mr-2" aria-hidden />Your review: {ownSeat?.verdict_label ?? ownSeat?.state_label ?? "No verdict recorded"}</p>
-            {finishing && (
-              <p className="text-2xs text-stone-600">
-                {tw.threads.drafts.length
-                  ? `${tw.threads.drafts.length} draft comment${tw.threads.drafts.length === 1 ? "" : "s"}, not sent`
-                  : "No draft comments"}
-              </p>
-            )}
-            {record.review_claim
-              ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
-              : unopened && <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button>}
-            {finishing && !record.review_claim && !unopened && (
-              <button type="button" onClick={tw.finish} className={cn(PILL_PRIMARY, FOCUS_RING)}>Finish review…</button>
-            )}
-            {claimError && <p role="alert" className="text-small text-brand">{claimError}</p>}
-            <ReviewActionBar record={record} can={can} actions={finishing ? FINISH_FOOTER_ACTIONS : FOOTER_ACTIONS} onChanged={onChanged}
-              primary={!finishing && !unopened && !record.review_claim} />
-          </footer>
+          <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {record.review_claim
+                ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
+                : unopened && <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button>}
+              {finishing && !record.review_claim && !unopened && (
+                <button type="button" onClick={tw.finish} className={cn(PILL_PRIMARY, FOCUS_RING)}>Finish review…</button>
+              )}
+              <ReviewActionBar record={record} can={can} actions={finishing ? FINISH_FOOTER_ACTIONS : FOOTER_ACTIONS} onChanged={onChanged}
+                primary={!finishing && !unopened && !record.review_claim} className="contents" />
+            </div>
+            {claimError && <p role="alert" className="mt-2 text-small text-brand">{claimError}</p>}
+          </YourPartFooter>
         </section>
-        {!folded && <aside id={target.side} aria-label="Review details" className="review-details">
-          {edge("side", "Resize the details sidebar")}
-          <p className="text-2xs font-semibold uppercase tracking-wider text-brand">Record context</p>
-          <h2 className="font-display text-xl font-semibold text-stone-900 mb-4">People &amp; details</h2>
-          {details}
-        </aside>}
+        {sideTab && (
+          <aside aria-label={`${TAB_NAMES[sideTab]} on the right`} className="review-side">
+            {edge("side", "Resize the right column")}
+            <header className="review-side-head">
+              <h2 className="font-display text-xl font-semibold text-stone-900">{TAB_NAMES[sideTab]}</h2>
+              <button type="button" id={`${ids}-side-close`} aria-label={`Close ${TAB_NAMES[sideTab]} on the right`} title="Close"
+                onClick={() => chooseSide(null)} className={cn("review-control text-stone-600 hover:text-brand", FOCUS_RING)}>
+                <i className="fas fa-xmark" aria-hidden />
+              </button>
+            </header>
+            <div className="review-side-body">{body[sideTab]}</div>
+          </aside>
+        )}
         <p role="status" aria-live="polite" className="sr-only">{routed}</p>
         {tw.dialogs}
         {/* Into <body>, as the action bar mounts its dialogs, so no sticky
@@ -410,7 +441,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
         )}
         {tour && (
           <GuidedTour opener={tour.opener} onClose={closeTour}
-            steps={reviewTourSteps({ ids, hasPaper: Boolean(reader), drawer, paneOpen: open, folded, tabs })} />
+            steps={reviewTourSteps({ ids, hasPaper: Boolean(reader), drawer, paneOpen: open, tabs: allTabs, beside: roomy })} />
         )}
       </div>
     </div>

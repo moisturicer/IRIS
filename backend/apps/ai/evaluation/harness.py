@@ -27,7 +27,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional, Sequence
 
-from .labels import Question, QuestionSet, hits
+from .labels import Question, QuestionSet, QuestionSetError, hits
 from .report import EvalReport, QuestionOutcome, RunConfig
 from .techniques import ResolvedTechniques, resolve
 
@@ -40,6 +40,7 @@ def _outcome(
     degraded: bool,
     mode: Optional[str],
     expects_refusal: bool = False,
+    scope_record: Optional[str | int] = None,
 ) -> QuestionOutcome:
     retrieved_hits = hits(question.expected, retrieved)
     final_hits = hits(question.expected, final)
@@ -77,7 +78,24 @@ def _outcome(
         ),
         page_mismatches=tuple(page_mismatches),
         expects_refusal=expects_refusal,
+        scope_record=scope_record,
     )
+
+
+def _resolve_scopes(question_set: QuestionSet) -> dict[str | int, Any]:
+    """Each scoped question's Record, resolved before anything is spent."""
+    from .validation import resolve_record
+
+    resolved: dict[str | int, Any] = {}
+    for question in question_set.record_scoped:
+        scope = question.scope_record
+        if scope in resolved:
+            continue
+        record, problem = resolve_record(scope)
+        if record is None:
+            raise QuestionSetError(f"question {question.id}: scope_record {problem}")
+        resolved[scope] = record
+    return resolved
 
 
 def run(
@@ -96,6 +114,7 @@ def run(
     zero on a working stack.
     """
     limit = max(config.retrieval_limit, config.max_sources)
+    scopes = _resolve_scopes(question_set)
     outcomes: list[QuestionOutcome] = []
     refusals: list[QuestionOutcome] = []
     spaces: set[int] = set()
@@ -104,9 +123,12 @@ def run(
     with config.techniques.applied():
         active = root if config.reranking else root.without_reranking()
         retriever = active.retriever()
+        # Paper Chat's narrowing: one retriever per paper (IR-1052).
+        scoped = {key: active.retriever(record=r) for key, r in scopes.items()}
         selection = active.source_selection(config.max_sources)
         for question in (*question_set.scored, *question_set.unanswerable):
-            result = retriever.retrieve(question.question, user, limit=limit)
+            chosen = scoped.get(question.scope_record, retriever)
+            result = chosen.retrieve(question.question, user, limit=limit)
             passages = list(result.passages)
             final = selection.apply(passages)
             if result.embedding_space_id is not None:
@@ -120,6 +142,7 @@ def run(
                 degraded=result.degraded,
                 mode=result.mode,
                 expects_refusal=question.unanswerable,
+                scope_record=question.scope_record,
             )
             (refusals if question.unanswerable else outcomes).append(outcome)
 
