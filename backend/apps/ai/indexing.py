@@ -429,7 +429,7 @@ def embed_active_chunk_set(
 
     # A long paper cannot go as one document: voyage-context-4 rejects one over
     # its window and does not truncate (IR-423). Each window is its own document.
-    windows = window_for_embedding(chunk_texts(chunks))
+    windows = embedding_windows(chunks)
     versions = {
         Dependency.passage(record_id, version)
         for version in ChunkSet.objects.filter(
@@ -506,3 +506,18 @@ def chunk_texts(chunks: Sequence) -> list[str]:
     let the vector drift from the passage it indexes.
     """
     return [chunk.text for chunk in chunks]
+
+
+def windows_mode() -> str:
+    """How production cuts a long paper into embedding windows (IR-1056)."""
+    from django.conf import settings
+
+    return "section" if getattr(settings, "AI_SECTION_ALIGNED_WINDOWS", False) else "count"
+
+
+def embedding_windows(chunks: Sequence, mode: Optional[str] = None) -> list[list[str]]:
+    """``chunks``' texts cut into embedding windows, by count or at section breaks."""
+    texts = chunk_texts(chunks)
+    if (mode or windows_mode()) == "section":
+        return window_for_embedding(texts, section_keys=[c.section_key for c in chunks])
+    return window_for_embedding(texts)

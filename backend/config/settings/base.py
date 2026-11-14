@@ -821,6 +821,13 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
     "AI_RETRIEVAL_FUSION_ENABLED", default=False, cast=bool
 )
 
+# ---- Section-aligned embedding windows (IR-1056) ----------------------
+# A paper longer than one voyage-context-4 window is cut at top-level section
+# breaks instead of by token count alone. Off until a trial run shows it helps
+# (`eval_retrieval --variant name=::windows=section`). Turning it on changes no
+# stored vector: re-embed with `backfill_embeddings --force` after.
+AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False, cast=bool)
+
 # ---- Vector scan depth (IR-440) ---------------------------------------
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.
 AI_HNSW_EF_SEARCH = config("AI_HNSW_EF_SEARCH", default=200, cast=int)
