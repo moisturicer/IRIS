@@ -13,7 +13,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.notifications.models import Notification
-from apps.records.models import DOWNLOAD_NOTE_MAX_LENGTH, DeleteRequest
+from apps.records.models import DOWNLOAD_NOTE_MAX_LENGTH, DeleteRequest, Record
 from apps.records.test_delete_request_queue import DELETE_REQUESTS, DeleteRequestFixtures
 from core.enums import PipelineStatus, RequestStatus
 
@@ -96,6 +96,18 @@ class DeclineNoteTests(DeleteRequestFixtures, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         request.refresh_from_db()
         self.assertEqual(request.rdco_note, NOTE)
+
+    def test_an_approval_after_a_decline_is_refused_and_removes_nothing(self):
+        record = self.published_thesis("decided-first")
+        request = self.raise_by_deleting(record)
+        self.post(request, "decline", note=NOTE)
+
+        response = self.post(request, "approve")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        request.refresh_from_db()
+        self.assertEqual(request.status, RequestStatus.DECLINED)
+        self.assertFalse(Record.objects.with_deleted().get(pk=record.pk).is_deleted)
 
     def test_approving_takes_no_note(self):
         request = self.raise_by_deleting(self.published_thesis("approved"))

@@ -2134,16 +2134,21 @@ class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
         """
         from django.utils import timezone
         dr = self.get_object()
-        if dr.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        dr.status      = RequestStatus.APPROVED
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        soft_delete_record(dr.record, deleted_by=request.user)
+        # The same row lock `decline` takes: a decision and a rival decision are
+        # one decision and one refusal, so an approval cannot soft-delete a
+        # record a decline has just restored (IR-1099).
+        with transaction.atomic():
+            dr = DeleteRequest.objects.select_for_update().get(pk=dr.pk)
+            if dr.status != RequestStatus.PENDING:
+                return Response(
+                    {"detail": f"Request is already '{dr.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            dr.status      = RequestStatus.APPROVED
+            dr.reviewed_by = request.user
+            dr.reviewed_at = timezone.now()
+            dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+            soft_delete_record(dr.record, deleted_by=request.user)
         notify_delete_approved(dr, reviewed_by=request.user)
         return Response({"detail": "Delete request approved. The record has been removed."})
 
