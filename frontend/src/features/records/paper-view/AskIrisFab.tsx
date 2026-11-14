@@ -38,8 +38,8 @@ export function NotesFab({ onOpen, buttonRef }: { onOpen: () => void; buttonRef?
 }
 
 /**
- * Ask IRIS, closed (IR-569): one round icon at the bottom right, over every
- * section that has the assistant. Its tooltip is its name; the panel it opens
+ * Ask IRIS, closed (IR-569): a round icon at the bottom right, under Notes,
+ * over every section that has the assistant. Its tooltip is its name; the panel it opens
  * says what it is.
  */
 export function AskIrisFab({ onOpen, buttonRef }: { onOpen: () => void; buttonRef?: Ref<HTMLButtonElement> }) {

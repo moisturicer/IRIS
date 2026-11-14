@@ -1424,8 +1424,8 @@ export default function PaperViewPage() {
           className={chatPanelClass}
         />
       )}
-      {/* Closed: one round icon at the bottom right (IR-569). On the bar
-          while minimized, which is its way back. */}
+      {/* Closed: two round icons at the bottom right, Notes above Ask IRIS
+          (IR-569, IR-1079). On the bar while minimized, which is its way back. */}
       {!chat.open && !onReviewTab && (
         <>
           <NotesFab onOpen={openNotes} buttonRef={notesButtonRef} />
