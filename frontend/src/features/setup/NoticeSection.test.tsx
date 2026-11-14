@@ -1,7 +1,9 @@
 /**
- * The Notices page (ADR-051 decisions 16-17 as amended by ADR-063 decision 9,
- * IR-800): RDCO publishes the next version of the one data notice by pasting
- * it; RDCO and the System Admin read every version.
+ * Setup's Notice section (ADR-051 decisions 16-17 as amended by ADR-063
+ * decision 9; IR-800, on Setup since IR-972): RDCO publishes the next version
+ * of the one data notice by pasting it, and reads every version. The server
+ * refuses anyone else (`test_notice_publish.py`); the System Admin reads
+ * publications in the Audit Log (`redirects.test.tsx`).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { noticeApi, type NoticeVersion } from "@/api/notice";
@@ -10,7 +12,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
-import NoticesPage from "./NoticesPage";
+import NoticeSection from "./NoticeSection";
 
 const RDCO_PERSON = { id: 4, name: "Rita Dela Cruz", email: "rdco@cit.edu" };
 const V2: NoticeVersion = {
@@ -34,7 +36,7 @@ function versions(list: NoticeVersion[] = [V2, V1]) {
 
 async function openPage() {
   const user = userEvent.setup();
-  const view = renderScreen(<NoticesPage />, { route: "/notices" });
+  const view = renderScreen(<NoticeSection />, { route: "/rdco/setup?section=notice" });
   await screen.findByRole("heading", { level: 2, name: "Version history" });
   return { user, ...view };
 }
@@ -210,28 +212,12 @@ describe("version history", () => {
   });
 });
 
-describe("the System Admin", () => {
-  it("reads every version but has no form to publish one (ADR-063 decision 9)", async () => {
-    signInAs(ROLES.SYSTEM_ADMIN);
-    versions();
-    const impact = vi.spyOn(noticeApi, "impact");
-    const { container } = await openPage();
-
-    expect(screen.getByRole("group", { name: "Current version" })).toHaveTextContent("Version 2");
-    expect(screen.queryByRole("textbox", { name: "Notice text" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Publish/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Only RDCO publishes a new version.")).toBeInTheDocument();
-    expect(impact).not.toHaveBeenCalled();
-    await expectNoBlockingA11yViolations(container);
-  });
-});
-
 describe("when the history can't be read", () => {
   it("says so and offers to try again", async () => {
     const read = vi.spyOn(noticeApi, "versions").mockRejectedValueOnce({ response: { status: 500 } });
     read.mockResolvedValueOnce({ data: [V2, V1] } as never);
     const user = userEvent.setup();
-    renderScreen(<NoticesPage />, { route: "/notices" });
+    renderScreen(<NoticeSection />, { route: "/rdco/setup?section=notice" });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The notices didn't load.");
     await user.click(screen.getByRole("button", { name: "Try again" }));
@@ -240,7 +226,7 @@ describe("when the history can't be read", () => {
 
   it("treats a response that isn't a list as a failed read (CODING_STANDARDS F1)", async () => {
     vi.spyOn(noticeApi, "versions").mockResolvedValue({ data: { count: 0, results: [] } } as never);
-    renderScreen(<NoticesPage />, { route: "/notices" });
+    renderScreen(<NoticeSection />, { route: "/rdco/setup?section=notice" });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The notices didn't load.");
   });

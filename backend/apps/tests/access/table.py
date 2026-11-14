@@ -442,8 +442,41 @@ SLOT_UPLOAD = {"record": Ref("record"), "slot": Ref("slot"), "file": Upload("new
 UPLOAD = {"pk": Ref("upload")}
 RECORD_FILE = {"pk": Ref("record_file")}
 
+RECORD_TYPE = {"pk": Ref("record_type")}
+SLOT = {"pk": Ref("slot")}
+
 DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     "upload-slots": Entry({"GET": _case(SIGNED_IN)}),
+
+    # -- Templates, downloaded by anyone signed in (ADR-063 decisions 7-8) --
+    "upload-slot-template": Entry({"GET": _case(SIGNED_IN, kwargs=SLOT)}),
+    "record-type-manuscript-template": Entry({"GET": _case(SIGNED_IN, kwargs=RECORD_TYPE)}),
+
+    # -- RDCO's Setup (ADR-063 decision 9, IR-971): a role gate before lookup --
+    "setup-record-types": Entry({"GET": _case(RDCO_ONLY)}),
+    "setup-record-type": Entry({
+        "PATCH": _case(RDCO_ONLY, kwargs=RECORD_TYPE, data={"description": "Needs a Proposal first."}),
+    }),
+    "setup-manuscript-template": Entry({
+        "PUT": _case(RDCO_ONLY, kwargs=RECORD_TYPE, data={"file": Upload("format.pdf")},
+                     format="multipart"),
+        "DELETE": _case(RDCO_ONLY, kwargs=RECORD_TYPE),
+    }),
+    "setup-requirements": Entry({
+        "POST": _case(RDCO_ONLY, kwargs=RECORD_TYPE,
+                      data={"name": "Adviser's Endorsement", "is_required": False}),
+    }),
+    "setup-requirement-order": Entry({
+        "PUT": _case(RDCO_ONLY, kwargs=RECORD_TYPE, data={"order": Ref("record_type", "requirement_order")}),
+    }),
+    "setup-requirement": Entry({
+        "PATCH": _case(RDCO_ONLY, kwargs=SLOT, data={"is_required": True}),
+        "DELETE": _case(RDCO_ONLY, kwargs=SLOT),
+    }),
+    "setup-requirement-template": Entry({
+        "PUT": _case(RDCO_ONLY, kwargs=SLOT, data={"file": Upload("form.pdf")}, format="multipart"),
+        "DELETE": _case(RDCO_ONLY, kwargs=SLOT),
+    }),
 
     # -- a record's documents, named by the caller (the recorded exception) --
     "document-submit": Entry(
@@ -554,11 +587,12 @@ ACCOUNTS = {
     # An empty body is refused as invalid, which is not an access denial.
     "notice-current": Entry({"GET": _case(PUBLIC)}),
     "notice-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
-    # IR-799 (ADR-051 decisions 16-17, ADR-063 decision 9): RDCO and the System
-    # Admin read every version; only RDCO publishes, and only RDCO sees the
-    # impact count it publishes against. An empty body is invalid, not denied.
+    # IR-799, IR-972 (ADR-051 decisions 16-17, ADR-063 decision 9): only RDCO
+    # reads every version, publishes, and sees the impact count it publishes
+    # against; the System Admin reads publications in the Audit Log. An empty
+    # body is invalid, not denied.
     "notice-versions": Entry({
-        "GET": _case(ACCOUNT_ADMINS),
+        "GET": _case(RDCO_ONLY),
         "POST": _case(RDCO_ONLY, data={}),
     }),
     "notice-impact": Entry({"GET": _case(RDCO_ONLY)}),

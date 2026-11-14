@@ -1,30 +1,42 @@
-"""No seeded upload slot claims to be required (IR-118).
+"""The starting Requirement labels, and that a label never blocks (ADR-063 decision 3, IR-971).
 
-The seed in `0003` marked 37 of 41 slots `is_required=True`, including
-combinations no single work can satisfy (Patent Draft *and* Utility Model *and*
-Industrial Design *and* Trademark *and* Copyright) and documents that are
-outputs of an office's work rather than a submitter's (Patent Search Report).
-Nothing enforced any of it, so the only thing it did was put a red "Required"
-badge on forms a student cannot produce.
+**Rewritten on purpose in IR-971.** IR-118 asserted that no slot may be
+Required, because the `0003` seed marked 37 of 41 slots Required, nothing
+enforced it, and the red badges asked students for documents they couldn't
+produce. ADR-063 (accepted 2026-11-08) brings the label back under a rule that
+keeps IR-118's point: **a label informs and never blocks submitting**. So the
+property this file guards moves from "nothing is Required" to:
 
-This asserts the claim stays dropped. It is deliberately a property over the
-whole table rather than a check on named rows: the point is not that *these*
-slots are optional, it is that **the system does not assert a document
-requirement it cannot justify**. A future seed that adds a required slot should
-fail here and be argued for, not slip in.
+1. the labels are exactly ADR-063 decision 12's, as ADR-066 decisions 21-22
+   amend it (the IP slots and the Commercialization Assessment leave the
+   submission, so they stay Optional until IR-1062 removes them);
+2. a submission with an empty Required slot is accepted;
+3. no record type requires two alternative IP protections, and nothing
+   requires the Patent Draft, an office's output (IR-118's two tells, kept).
 
-Run:
-    docker compose exec -T backend python manage.py test apps.documents.test_upload_slot_requirements
+The Proposal's Patent Search Report is Required: ADR-066 decision 22 keeps it
+as the Proposal's own early check that the idea doesn't already exist, so it is
+no longer counted as an office's output on a Proposal.
 """
 
 from django.test import TestCase
+from rest_framework import status
 
 from apps.documents.models import UploadSlot
+from apps.records.test_embargo import DraftBase
+from core.enums import PipelineStatus
 
-#: Documents an office produces while processing a disclosure. A submitter
-#: cannot attach these at submission because they do not exist yet -- if one
-#: ever becomes required, the requirement is in the wrong place.
-OFFICE_OUTPUTS = {"Patent Search Report", "Patent Draft"}
+#: ADR-063 decision 12 as amended by ADR-066 decisions 21-22.
+EXPECTED_REQUIRED = {
+    ("Proposal", "Thesis Revision Form"),
+    ("Proposal", "Patent Search Report"),
+    ("Thesis / Research", "Community Extension"),
+    ("Thesis / Research", "Publication / Conference Presentation / Both"),
+    ("Thesis / Research", "Release Form"),
+    ("Project", "Community Extension"),
+    ("Project", "Publication / Conference Presentation / Both"),
+    ("Project", "Release Form"),
+}
 
 #: Alternative IP protections. Requiring more than one of these at once is the
 #: tell that a lifecycle checklist has been mistaken for a submission checklist.
@@ -37,50 +49,68 @@ MUTUALLY_EXCLUSIVE_IP = {
 }
 
 
-class UploadSlotRequirementTests(TestCase):
+def _seeded_required():
+    return set(
+        UploadSlot.objects.filter(is_required=True, record__isnull=True)
+        .values_list("record_type__name", "name")
+    )
+
+
+class StartingLabelTests(TestCase):
     def test_the_seed_produced_slots(self):
         """Guards the rest of this suite: every assertion below passes
         vacuously against an empty table, which is how a broken seed would
         look like a clean bill of health."""
         self.assertGreater(UploadSlot.objects.count(), 0)
 
-    def test_no_slot_claims_to_be_required(self):
-        required = list(
-            UploadSlot.objects.filter(is_required=True).values_list("name", flat=True)
-        )
-        self.assertEqual(
-            required,
-            [],
-            "A slot is marked required. Nothing in the codebase enforces "
-            "is_required, so this only puts a red badge on the form. If an "
-            "office has stated a real requirement, enforce it at submit and "
-            "update this test deliberately (IR-118).",
-        )
+    def test_the_labels_are_decision_12s_as_adr_066_amends_it(self):
+        self.assertEqual(_seeded_required(), EXPECTED_REQUIRED)
 
-    def test_no_office_output_is_demanded_from_a_submitter(self):
-        offenders = set(
-            UploadSlot.objects.filter(
-                is_required=True, name__in=OFFICE_OUTPUTS
-            ).values_list("name", flat=True)
+    def test_no_slot_leaving_the_submission_is_required(self):
+        """ADR-066 decision 21: IP Application Status, the IP slots and the
+        Commercialization Assessment leave Thesis / Research and Project."""
+        leaving = MUTUALLY_EXCLUSIVE_IP | {
+            "Intellectual Property Application Status", "Commercialization Assessment",
+        }
+        offenders = UploadSlot.objects.filter(
+            is_required=True, name__in=leaving,
+            record_type__name__in=["Thesis / Research", "Project"],
         )
-        self.assertEqual(
-            offenders,
-            set(),
-            "A document produced by an office while processing the disclosure "
-            "is being required from the person submitting it.",
-        )
+        self.assertFalse(offenders.exists(), list(offenders.values_list("name", flat=True)))
+
+    def test_the_patent_draft_is_never_demanded(self):
+        """An office's output while it processes the disclosure."""
+        self.assertFalse(UploadSlot.objects.filter(is_required=True, name="Patent Draft").exists())
 
     def test_no_record_type_requires_two_alternative_ip_protections(self):
-        """The clearest signal that the list describes a finished file rather
-        than a submission: a work has one IP protection, not five."""
-        for slot in UploadSlot.objects.filter(is_required=True).select_related(
-            "record_type"
-        ):
+        for slot in UploadSlot.objects.filter(is_required=True).select_related("record_type"):
             self.assertNotIn(slot.name, MUTUALLY_EXCLUSIVE_IP)
 
+    def test_each_record_types_slots_are_numbered_in_order(self):
+        """0025 keeps the order slots always showed in, numbered from 1."""
+        for type_name in ("Proposal", "Thesis / Research", "Project"):
+            positions = list(
+                UploadSlot.objects.filter(record_type__name=type_name, record__isnull=True)
+                .order_by("pk").values_list("position", flat=True)
+            )
+            self.assertEqual(positions, list(range(1, len(positions) + 1)), type_name)
+
     def test_the_slot_names_survive(self):
-        """Dropping the requirement must not drop the vocabulary -- these are
-        the upload targets an office will ask for later, under ADR-018."""
         names = set(UploadSlot.objects.values_list("name", flat=True))
         for expected in ("Ethics Clearance", "Patent Draft", "Release Form"):
             self.assertIn(expected, names)
+
+
+class RequiredNeverBlocksTests(DraftBase):
+    """ADR-063 decision 3: a Record with an empty Required slot is accepted."""
+
+    def test_a_submission_with_every_required_slot_empty_is_accepted(self):
+        required = UploadSlot.objects.filter(record_type=self.record_type, is_required=True)
+        self.assertTrue(required.exists(), "the Thesis / Research type has no Required slot to leave empty")
+        self.assertFalse(self.record.uploads.exists())
+
+        response = self._submit()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, PipelineStatus.IN_REVIEW)

@@ -2,7 +2,13 @@ export interface UploadSlot {
   id:          number;
   name:        string;
   record_type: number;
+  /** A label only: it never blocks submitting (ADR-063 decision 3). */
   is_required: boolean;
+  /** Plain text from RDCO's Setup; line breaks kept, links clickable (IR-971). */
+  description: string;
+  position:    number;
+  /** Empty when the slot has no Template. */
+  template_name: string;
 }
 
 export interface UploadReview {
@@ -35,6 +41,8 @@ export interface RecordUpload {
 
 /** UploadSlot with its uploads for a specific record -- returned by slotsForRecord() */
 export interface SlotWithUploads extends UploadSlot {
+  /** RDCO removed it after this paper used it; its files stay (ADR-063 decision 5). */
+  hidden:  boolean;
   uploads: RecordUpload[];
 }
 

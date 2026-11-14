@@ -602,6 +602,17 @@ class RecordTypeName(models.TextChoices):
     PROJECT = "Project", "Project"
 
 
+class RequirementRemoval(models.TextChoices):
+    """What removing a Requirement on Setup did (ADR-063 decision 5, IR-971).
+
+    `hidden`: some Record used it, so it left every list and its files stayed.
+    `deleted`: nobody had used it. Answered to RDCO and kept in the audit row.
+    """
+
+    HIDDEN = "hidden", "Hidden"
+    DELETED = "deleted", "Deleted"
+
+
 class RecoveryPurpose(models.TextChoices):
     """What a recovery token or email is for. Immutable once written.
 

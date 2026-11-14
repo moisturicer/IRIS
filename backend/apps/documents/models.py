@@ -15,16 +15,26 @@ def figure_path(instance, filename):
     return f"figures/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
 
 
+def template_path(instance, filename):
+    """A Template's stored name (ADR-063 decision 8): random, keeping only the extension."""
+    return f"templates/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
+
 class UploadSlot(models.Model):
     """
-    Defines what kind of document a record type requires.
-    E.g. "Proposal" record type might require "Ethical Clearance", "Concept Paper", etc.
-    Seed these via a data migration.
+    A Requirement: a document a record type asks for (ADR-063 decision 1).
+
+    RDCO edits the list on Setup (`apps.documents.setup`, IR-971). `is_required`
+    is a label and never blocks submitting (ADR-063 decision 3).
 
     `record` is set only on an **ad-hoc** slot: one made for a document request's
     free-text "Other" item (ADR-022 §3), so the file still belongs to a slot
     rather than being a loose `RecordFile`. An ad-hoc slot is that record's
     alone and is never on its type's list.
+
+    `hidden_at` is set when RDCO removes a requirement some Record has used
+    (ADR-063 decision 5): it leaves every list, and the files stay on their
+    papers under its name.
     """
     name        = models.CharField(max_length=200)
     record_type = models.ForeignKey(
@@ -35,6 +45,14 @@ class UploadSlot(models.Model):
         "records.Record", on_delete=models.CASCADE, null=True, blank=True,
         related_name="adhoc_slots",
     )
+    #: Plain text; line breaks kept, links made clickable by the screen (decision 10).
+    description = models.TextField(blank=True, default="")
+    #: Its place in the record type's list, after the Manuscript.
+    position    = models.PositiveIntegerField(default=0)
+    #: The one current Template (decision 8). Only the newest is ever offered.
+    template      = models.FileField(upload_to=template_path, blank=True, default="")
+    template_name = models.CharField(max_length=255, blank=True, default="")
+    hidden_at   = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.record_type.name} | {self.name}"

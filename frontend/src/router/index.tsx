@@ -45,11 +45,11 @@ const ImportRecordsPage = lazy(() => import("@/features/records/ImportRecordsPag
 const UserListPage = lazy(() => import("@/features/accounts/UserListPage"));
 const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage"));
 const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
+const SetupPage = lazy(() => import("@/features/setup/SetupPage"));
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
 const AccountDeletionRequestsPage = lazy(() => import("@/features/admin/AccountDeletionRequestsPage"));
 const RetentionPage = lazy(() => import("@/features/admin/RetentionPage"));
-const NoticesPage = lazy(() => import("@/features/admin/NoticesPage"));
 
 export const routes: RouteObject[] = [{
   // The last resort (IR-745): a crash outside the shell's own boundary below,
@@ -188,6 +188,11 @@ export const routes: RouteObject[] = [{
                 element: <DeferredPage name="Delete Requests"><DeleteRequestsPage /></DeferredPage>,
                 handle: { crumb: "Delete Requests", width: "full" },
               },
+              {
+                path: pathFor("setup"),
+                element: <DeferredPage name="Setup"><SetupPage /></DeferredPage>,
+                handle: { crumb: "Setup" },
+              },
             ],
           },
           {
@@ -236,15 +241,6 @@ export const routes: RouteObject[] = [{
               path: pathFor("retention"),
               element: <DeferredPage name="Retention"><RetentionPage /></DeferredPage>,
               handle: { crumb: "Retention" },
-            }],
-          },
-          {
-            // RDCO publishes, the System Admin reads (ADR-063 decision 9, IR-800).
-            element: <ProtectedRoute allowedRoles={[...rolesFor("notices"), ...rolesFor("adminNotices")]} />,
-            children: [{
-              path: pathFor("notices"),
-              element: <DeferredPage name="Notices"><NoticesPage /></DeferredPage>,
-              handle: { crumb: "Notices" },
             }],
           },
 

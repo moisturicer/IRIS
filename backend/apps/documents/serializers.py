@@ -5,7 +5,9 @@ from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, Record
 class UploadSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model  = UploadSlot
-        fields = ["id", "name", "record_type", "is_required"]
+        #: `template_name` is empty when the slot has no Template; the file
+        #: itself is fetched from `slots/<id>/template/`, always as a download.
+        fields = ["id", "name", "record_type", "is_required", "description", "position", "template_name"]
 
 
 class UploadStatusSerializer(serializers.ModelSerializer):
@@ -60,7 +62,16 @@ class SlotWithUploadsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = UploadSlot
-        fields = ["id", "name", "record_type", "is_required", "uploads"]
+        fields = [
+            "id", "name", "record_type", "is_required", "description", "position",
+            "template_name", "hidden", "uploads",
+        ]
+
+    #: A requirement RDCO removed after this paper used it (ADR-063 decision 5).
+    hidden = serializers.SerializerMethodField()
+
+    def get_hidden(self, slot):
+        return slot.hidden_at is not None
 
     def get_uploads(self, slot):
         record_id = self.context.get("record_id")

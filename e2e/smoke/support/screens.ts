@@ -54,6 +54,21 @@ const wrap = (role: SmokeRole, extra?: (api: MockApi) => void) => (api: MockApi)
   extra?.(api);
 };
 
+/** Setup's record types (IR-971): one requirement with a long name, a Template and a description holding a link. */
+const SETUP_RECORD_TYPES = [
+  {
+    id: 2, name: "Thesis / Research", description: "Needs an approved Proposal first.",
+    manuscript: { description: "Use the CIT-U manuscript format.", template_name: "CIT-U manuscript format.docx" },
+    requirements: [
+      { id: 11, name: "Publication / Conference Presentation / Both", is_required: true,
+        description: "Proof of acceptance. See https://cit.edu/research/forms.", position: 1,
+        template_name: "publication-proof-of-acceptance-form.pdf", in_use: true },
+      { id: 12, name: "Ethics Clearance", is_required: false, description: "", position: 2, template_name: "", in_use: false },
+    ],
+  },
+  { id: 1, name: "Proposal", description: "", manuscript: { description: "", template_name: "" }, requirements: [] },
+];
+
 const USERS = Array.from({ length: 6 }, (_, i) => ({
   id: 10 + i,
   email: `a.long.address.for.row.${i}@students.cit.edu`,
@@ -377,6 +392,12 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: "Refresh" }), primaryLabel: "Refresh",
     table: (p) => p.getByRole("table").first(),
   },
+  {
+    id: "rdco-setup", path: "/rdco/setup", route: "/rdco/setup", role: "RDCO",
+    mocks: wrap("RDCO", (api) => api.on("GET", "/documents/setup/record-types/", SETUP_RECORD_TYPES)),
+    heading: "Setup",
+    primary: (p) => p.getByRole("button", { name: "Add a requirement" }), primaryLabel: "Add a requirement",
+  },
 
   // --- System Admin --------------------------------------------------------
   {
@@ -403,15 +424,15 @@ export const SCREENS: Screen[] = [
     heading: "Retention",
     primary: (p) => p.getByRole("button", { name: "Save period" }), primaryLabel: "Save period",
   },
-  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): RDCO
-  // publishes the next version of the data notice here.
+  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800, IR-972):
+  // RDCO publishes the next version of the data notice in Setup's Notice section.
   {
-    id: "notices", path: "/notices", route: "/notices", role: "RDCO",
+    id: "rdco-setup-notice", path: "/rdco/setup?section=notice", route: "/rdco/setup", role: "RDCO",
     mocks: wrap("RDCO", (api) => api.on("GET", "/auth/notice/versions/", [{
       version: 1, text: "IRIS data notice\n\nWhat IRIS keeps\nYour name and CIT-U email.",
       published_at: when("11-01"), published_by: { id: 4, name: "Rita Dela Cruz", email: "rdco@cit.edu" },
     }])),
-    heading: "Notices",
+    heading: "Version history",
     primary: (p) => p.getByRole("button", { name: "Preview" }), primaryLabel: "Preview",
   },
   {

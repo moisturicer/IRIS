@@ -219,16 +219,16 @@ class NoticeVersionsView(APIView):
     GET  /auth/notice/versions/   every version, newest first, with who published it
     POST /auth/notice/versions/   {based_on_version, text}: publish the next version
 
-    ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-799). RDCO and
-    the System Admin read the history; **only RDCO publishes**. A publish takes
+    ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-799, IR-972).
+    **Only RDCO** reads the history and publishes, on Setup's Notice section;
+    the System Admin sees each publication in the Audit Log. A publish takes
     effect at once and is refused with 409 `notice_stale` when a newer version
     exists than the one it started from. Publishing is not answering: the
     publisher answers the new version like everyone else, so this route stays
     behind the sign-in block.
     """
 
-    def get_permissions(self):
-        return [IsAdmin()] if self.request.method == "POST" else [IsAccountAdmin()]
+    permission_classes = [IsAdmin]
 
     def get(self, request):
         notices = DataNotice.objects.select_related("published_by").order_by("-number")
