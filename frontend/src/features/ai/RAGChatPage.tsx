@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useConsumeHandoff } from "@/lib/askHandoff";
 import { runtimeReader, type ReaderConversationSummary } from "@/api/runtimeReader";
+import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { useUIStore } from "@/store/ui.store";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -69,6 +70,9 @@ function RuntimeAskPage() {
     drawerOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setDrawer(panel);
   };
+
+  // A conversation names the tab with its own title (IR-1073); a new chat keeps "Ask IRIS".
+  usePageTitle(conversations.find(c => c.id === conversationId)?.title);
 
   if (rawRecord !== null && (!recordId || !Number.isSafeInteger(recordId))) {
     return <p role="alert" className="p-6">This paper could not be opened.</p>;

@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
+import { RouteTitle } from "@/components/layout/RouteTitle";
 import { pathFor, rolesFor } from "@/lib/access";
 import { redirectRoutes } from "./redirects";
 
@@ -54,19 +55,22 @@ export const routes: RouteObject[] = [{
   // The last resort (IR-745): a crash outside the shell's own boundary below,
   // in a public page or in the shell itself, is drawn with no shell at all.
   errorElement: <RouteErrorScreen standalone />,
+  // Names the browser tab for every page below, public or not (IR-1073): from
+  // the deepest `handle.title`, else `handle.crumb`.
+  element: <RouteTitle />,
   children: [
-  { path: "/login",  element: <LoginPage /> },
-  { path: "/signup", element: <SignupPage /> },
+  { path: "/login",  element: <LoginPage />,  handle: { title: "Sign in" } },
+  { path: "/signup", element: <SignupPage />, handle: { title: "Create account" } },
   // ADR-045 (IR-643). Public: verifying never requires signing in.
-  { path: "/verify-email", element: <VerifyEmailPage /> },
-  { path: "/verify-email/resend", element: <ResendVerificationPage /> },
+  { path: "/verify-email", element: <VerifyEmailPage />, handle: { title: "Verify your email" } },
+  { path: "/verify-email/resend", element: <ResendVerificationPage />, handle: { title: "Send a new verification email" } },
   // Retired link shapes (IR-643, ADR-045 §8): the same page, which strips the
   // address and offers a new email. Nothing on them verifies.
-  { path: "/activate", element: <VerifyEmailPage /> },
-  { path: "/activate/:uidb64/:token", element: <VerifyEmailPage /> },
+  { path: "/activate", element: <VerifyEmailPage />, handle: { title: "Verify your email" } },
+  { path: "/activate/:uidb64/:token", element: <VerifyEmailPage />, handle: { title: "Verify your email" } },
   // ADR-045 (IR-642). Public: recovery must never require signing in.
-  { path: "/password/forgot", element: <ForgotPasswordPage /> },
-  { path: "/password/reset",  element: <ResetPasswordPage /> },
+  { path: "/password/forgot", element: <ForgotPasswordPage />, handle: { title: "Reset your password" } },
+  { path: "/password/reset",  element: <ResetPasswordPage />,  handle: { title: "Choose a new password" } },
 
   {
     // Every gate below comes from `lib/access.ts`, which the sidebar reads too.
@@ -88,10 +92,11 @@ export const routes: RouteObject[] = [{
           // moves the address, and the page it lands on applies its own.
           ...redirectRoutes,
           // No crumb: the reading header is this page's navigation (IR-569).
+          // The tab reads the paper's own title once it loads (IR-1073).
           {
             path: "records/:id",
             element: <DeferredPage name="Paper View"><PaperViewPage /></DeferredPage>,
-            handle: { width: "full" },
+            handle: { title: "Paper", width: "full" },
           },
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
           { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
@@ -142,7 +147,7 @@ export const routes: RouteObject[] = [{
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewAnalytics")} />,
             children: [
-              { path: "review/analytics", element: <ReviewAnalyticsPage />, handle: { crumb: "Workflow Analytics", width: "full" } },
+              { path: "review/analytics", element: <ReviewAnalyticsPage />, handle: { crumb: "Workflow analytics", width: "full" } },
             ],
           },
 
@@ -154,7 +159,7 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("importRecords"),
                 element: <DeferredPage name="Import Records"><ImportRecordsPage /></DeferredPage>,
-                handle: { crumb: "Import Records" },
+                handle: { crumb: "Import records" },
               },
               {
                 path: pathFor("roleRequests"),
@@ -234,7 +239,7 @@ export const routes: RouteObject[] = [{
           // Any other address (IR-745). Behind sign-in like every app
           // address, so a signed-out visitor learns nothing about which
           // paths exist, and inside the shell so the way out is in reach.
-          { path: "*", element: <NotFoundScreen /> },
+          { path: "*", element: <NotFoundScreen />, handle: { title: "Page not found" } },
         ],
         }],
       },
