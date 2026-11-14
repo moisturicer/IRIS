@@ -5,7 +5,7 @@
  * length is limited here and again by the server, and a refusal keeps what was
  * typed beside the server's reason.
  */
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
@@ -15,14 +15,27 @@ export const NOTE_MAX_LENGTH = 500;
 /** Shown where a decision made before notes existed has none (IR-688, IR-1099). */
 export const NO_NOTE = "No note recorded";
 
+/** RDCO's note under a decided row's status, or that there is none (older rows). */
+export function RdcoNoteLine({ note }: { note: string }) {
+  return (
+    <p className="mt-1 text-label max-w-xs break-words">
+      <span className="text-stone-500">RDCO's note: </span>
+      {note
+        ? <span className="text-stone-700">{note}</span>
+        : <span className="text-stone-500 italic">{NO_NOTE}</span>}
+    </p>
+  );
+}
+
 type Props = {
   title: string;
   /** The button that sends it, e.g. "Decline". */
   submitLabel: string;
   /** Who the note goes to, e.g. "reader": "Note to the reader". */
   audience: string;
-  /** Names the request being decided: who asked, and about what. */
-  subject: ReactNode;
+  /** The request being decided: who asked, and about what. */
+  requester: string;
+  recordTitle: string;
   /** What happens once it is sent. */
   intro: string;
   send: (note: string) => Promise<unknown>;
@@ -30,7 +43,7 @@ type Props = {
   onDone: () => void;
 };
 
-export function RdcoNoteDialog({ title, submitLabel, audience, subject, intro, send, onClose, onDone }: Props) {
+export function RdcoNoteDialog({ title, submitLabel, audience, requester, recordTitle, intro, send, onClose, onDone }: Props) {
   const ids = useId();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +87,9 @@ export function RdcoNoteDialog({ title, submitLabel, audience, subject, intro, s
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-4">
         <p className="text-sm text-stone-700 leading-relaxed">
-          {subject} {intro}
+          <span className="font-semibold text-stone-900">{requester}</span>
+          {" · "}
+          {recordTitle}. {intro}
         </p>
         <div>
           <label htmlFor={noteId} className={LABEL}>

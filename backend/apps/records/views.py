@@ -2157,28 +2157,33 @@ class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
         """
         from django.utils import timezone
         dr = self.get_object()
-        if dr.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         try:
             note = clean_note(request.data.get("note"))
         except NoteRequired as exc:
             return Response({"note": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
-        dr.status      = RequestStatus.DECLINED
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.rdco_note   = note
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at", "rdco_note"])
-        # Restore the record to its pre-deletion visible state. The fallback for
-        # a row predating `previous_pipeline_status` lives in the table's
-        # `restore_previous` resolver now, not here.
-        lifecycle.apply(
-            dr.record,
-            lifecycle.WorkflowEvent.RESTORE,
-            request.user,
-            restore_to=dr.previous_pipeline_status,
-        )
+        # The row lock makes two simultaneous decisions one decision and one
+        # refusal, as `decide_download_request` does, and a restore that cannot
+        # happen leaves the request pending rather than declined (IR-1099).
+        with transaction.atomic():
+            dr = DeleteRequest.objects.select_for_update().get(pk=dr.pk)
+            if dr.status != RequestStatus.PENDING:
+                return Response(
+                    {"detail": f"Request is already '{dr.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            dr.status      = RequestStatus.DECLINED
+            dr.reviewed_by = request.user
+            dr.reviewed_at = timezone.now()
+            dr.rdco_note   = note
+            dr.save(update_fields=["status", "reviewed_by", "reviewed_at", "rdco_note"])
+            # Restore the record to its pre-deletion visible state. The fallback
+            # for a row predating `previous_pipeline_status` lives in the table's
+            # `restore_previous` resolver now, not here.
+            lifecycle.apply(
+                dr.record,
+                lifecycle.WorkflowEvent.RESTORE,
+                request.user,
+                restore_to=dr.previous_pipeline_status,
+            )
         notify_delete_declined(dr, reviewed_by=request.user)
         return Response({"detail": "Delete request declined. The record has been restored."})

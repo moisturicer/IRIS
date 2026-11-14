@@ -45,7 +45,7 @@ def clean_note(note) -> str:
     # It arrives straight from the request body, so it may be any JSON value.
     note = note.strip() if isinstance(note, str) else ""
     if not note:
-        raise NoteRequired("Say why, in a note the reader will see.")
+        raise NoteRequired("Say why, in a note the requester will see.")
     if len(note) > NOTE_MAX_LENGTH:
         raise NoteRequired(f"Keep the note to {NOTE_MAX_LENGTH} characters.")
     return note

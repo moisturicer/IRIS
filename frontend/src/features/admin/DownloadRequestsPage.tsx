@@ -26,7 +26,7 @@ import { errorDetail } from "@/lib/errorDetail";
 import { formatDate }  from "@/lib/utils";
 import type { DownloadRequest } from "@/types/records";
 
-import { NO_NOTE, RdcoNoteDialog } from "./RdcoNoteDialog";
+import { NO_NOTE, RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
 
 type Filter = "" | "pending" | "approved" | "declined" | "revoked";
 const FILTERS: readonly Filter[] = ["pending", "approved", "declined", "revoked", ""];
@@ -201,14 +201,7 @@ export default function DownloadRequestsPage() {
                           expired={!req.grant_live && !!req.grant_expires_at}
                         />
                         {grant && <p className="mt-1 text-[12px] text-stone-600 whitespace-nowrap">{grant}</p>}
-                        {endedByRdco && (
-                          <p className="mt-1 text-[12px] max-w-xs break-words">
-                            <span className="text-stone-500">RDCO's note: </span>
-                            {req.rdco_note
-                              ? <span className="text-stone-700">{req.rdco_note}</span>
-                              : <span className="text-stone-500 italic">{NO_NOTE}</span>}
-                          </p>
-                        )}
+                        {endedByRdco && <RdcoNoteLine note={req.rdco_note} />}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {req.status === "pending" ? (
@@ -265,15 +258,8 @@ export default function DownloadRequestsPage() {
           title={NOTE_ACTS[noteAct.kind].title}
           submitLabel={NOTE_ACTS[noteAct.kind].submit}
           audience="reader"
-          subject={
-            <>
-              <span className="font-semibold text-stone-900">
-                {noteAct.request.requested_by_name ?? noteAct.request.requested_by_email}
-              </span>
-              {" · "}
-              {noteAct.request.record_title}.
-            </>
-          }
+          requester={noteAct.request.requested_by_name ?? noteAct.request.requested_by_email ?? "The reader"}
+          recordTitle={noteAct.request.record_title}
           intro={NOTE_ACTS[noteAct.kind].intro}
           send={(note) => NOTE_ACTS[noteAct.kind].send(noteAct.request.id, note)}
           onClose={() => setNoteAct(null)}

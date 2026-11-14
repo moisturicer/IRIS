@@ -40,7 +40,7 @@ import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { formatDate }  from "@/lib/utils";
 import type { DeleteRequest } from "@/types/records";
 
-import { NO_NOTE, RdcoNoteDialog } from "./RdcoNoteDialog";
+import { RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
 
 /** One page of the queue, and whether the server has another after it. */
 type QueuePage = { results: DeleteRequest[]; next: string | null };
@@ -240,14 +240,7 @@ export default function DeleteRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <RequestStatusChip state={req.status} />
-                      {req.status === "declined" && (
-                        <p className="mt-1 text-label max-w-xs break-words">
-                          <span className="text-stone-500">RDCO's note: </span>
-                          {req.rdco_note
-                            ? <span className="text-stone-700">{req.rdco_note}</span>
-                            : <span className="text-stone-500 italic">{NO_NOTE}</span>}
-                        </p>
-                      )}
+                      {req.status === "declined" && <RdcoNoteLine note={req.rdco_note} />}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {req.status === "pending" ? (
@@ -306,15 +299,8 @@ export default function DeleteRequestsPage() {
           title="Decline delete request"
           submitLabel="Decline"
           audience="requester"
-          subject={
-            <>
-              <span className="font-semibold text-stone-900">
-                {declining.requested_by_name ?? declining.requested_by_email}
-              </span>
-              {" · "}
-              {declining.record_title}.
-            </>
-          }
+          requester={declining.requested_by_name ?? declining.requested_by_email ?? "The requester"}
+          recordTitle={declining.record_title}
           intro="The record is restored. The requester is told in-app and by email, with your note."
           send={(note) => recordsApi.declineDeleteRequest(declining.id, note)}
           onClose={() => setDeclining(null)}
