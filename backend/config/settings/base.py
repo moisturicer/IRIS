@@ -952,6 +952,18 @@ LLAMAPARSE_TIMEOUT_BASE_SECONDS = config("LLAMAPARSE_TIMEOUT_BASE_SECONDS", defa
 LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS = config("LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS", default=30, cast=int)
 # Sizes the task's time limit when PDF_VALIDATION_MAX_PAGES is unset.
 LLAMAPARSE_MAX_PAGES = config("LLAMAPARSE_MAX_PAGES", default=1000, cast=int)
+# Unstructured's Platform API, hi_res (IR-985, ADR-067); read only in
+# apps.ai.extraction. Not selectable until IR-988's cutover.
+UNSTRUCTURED_PLATFORM_API_KEY = config("UNSTRUCTURED_PLATFORM_API_KEY", default="")
+UNSTRUCTURED_BASE_URL = config("UNSTRUCTURED_BASE_URL", default="https://api.unstructuredapp.io")
+# One attempt's timeout is base + per page x its page count; a timeout retries once.
+UNSTRUCTURED_TIMEOUT_BASE_SECONDS = config("UNSTRUCTURED_TIMEOUT_BASE_SECONDS", default=120, cast=int)
+UNSTRUCTURED_TIMEOUT_PER_PAGE_SECONDS = config("UNSTRUCTURED_TIMEOUT_PER_PAGE_SECONDS", default=10, cast=int)
+# Sizes the declared timeout when PDF_VALIDATION_MAX_PAGES is unset.
+UNSTRUCTURED_MAX_PAGES = config("UNSTRUCTURED_MAX_PAGES", default=1000, cast=int)
+# Figures kept per read, and pixels per Figure image (IR-987).
+UNSTRUCTURED_MAX_FIGURES = config("UNSTRUCTURED_MAX_FIGURES", default=200, cast=int)
+UNSTRUCTURED_MAX_FIGURE_PIXELS = config("UNSTRUCTURED_MAX_FIGURE_PIXELS", default=16_000_000, cast=int)
 # LlamaExtract (IR-846, ADR-056 §15): Publish suggestions read from the parse
 # job above, with the same key and region. Unset version reads nothing and
 # Publish falls back to the shaped document; "latest" only with DEBUG on.

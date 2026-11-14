@@ -29,8 +29,9 @@ from .fixtures import FIXTURES, Fixture, blank_pdf, pdf_bytes
 # Points of slack for an Extractor that rounds coordinates.
 TOLERANCE = 0.5
 FAILURES = ("connect", "timeout", "5xx")
-FURNITURE = {PAGE_HEADER, PAGE_FOOTER}
-TABLE = {TABLE_HEADER, TABLE_ROW}
+# Shapers on the labeled structure emit "header"/"footer"/"table" (IR-840, IR-986).
+FURNITURE = {PAGE_HEADER, PAGE_FOOTER, "header", "footer"}
+TABLE = {TABLE_HEADER, TABLE_ROW, "table"}
 
 
 def check_reading_order(document: NormalizedDocument, fixture: Fixture) -> None:
@@ -55,7 +56,8 @@ def check_boxes(document: NormalizedDocument, fixture: Fixture) -> None:
     # Top-left origin: of two passages in one column, the one read first sits higher.
     boxes = [next(e.bbox for e in document.elements if marker in e.text)
              for marker in fixture.reading_order]
-    pairs = [(a, b) for a, b in zip(boxes, boxes[1:]) if a.page == b.page and a.left == b.left]
+    pairs = [(a, b) for a, b in zip(boxes, boxes[1:])
+             if a.page == b.page and abs(a.left - b.left) <= TOLERANCE]
     assert pairs, f"{fixture.name} has no two markers in one column to compare"
     assert all(a.top < b.top for a, b in pairs), "boxes are not measured from the top of the page"
 

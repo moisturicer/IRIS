@@ -100,7 +100,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
         aria-expanded={open}
         aria-haspopup="true"
         title={showTitle ? "Notifications" : undefined}
-        className="relative w-[34px] h-[34px] rounded-lg border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
+        className="relative w-11 h-11 md:w-[34px] md:h-[34px] touch:w-11 touch:h-11 rounded-lg border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
       >
         <i className="fas fa-bell text-[15px]" aria-hidden />
         {unreadCount > 0 && (
@@ -127,7 +127,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
               <button
                 type="button"
                 onClick={handleMarkAllRead}
-                className="text-[12px] font-semibold text-brand hover:underline"
+                className="inline-flex items-center min-h-11 md:min-h-0 touch:min-h-11 text-[12px] font-semibold text-brand hover:underline"
               >
                 Mark all read
               </button>
@@ -183,7 +183,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
             to="/notifications"
             onClick={() => setOpen(false)}
             className={cn(
-              "block px-4 py-2.5 border-t border-stone-100 text-center text-[13px] font-semibold",
+              "flex items-center justify-center min-h-11 md:min-h-0 touch:min-h-11 px-4 py-2.5 border-t border-stone-100 text-center text-[13px] font-semibold",
               "text-brand hover:bg-stone-50 transition-colors",
             )}
           >

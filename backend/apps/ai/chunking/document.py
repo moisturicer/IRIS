@@ -85,6 +85,8 @@ class DocumentElement:
     # The Extractor's own element id and detected language (IR-986).
     element_id: str = ""
     language: str = ""
+    # Which signal decided a heading's level (IR-1057).
+    level_source: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.bboxes, tuple):

@@ -1,17 +1,41 @@
 import { lazy, type ComponentType } from "react";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RouteErrorScreen } from "@/features/errors/RouteErrorScreen";
+import { reloadPage } from "@/lib/readFailure";
 
 import { DeferredPage } from "./DeferredPage";
+
+vi.mock("@/lib/readFailure", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/readFailure")>()),
+  reloadPage: vi.fn(),
+}));
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe("DeferredPage", () => {
+  it("says it is still working after 2 s and offers Try again, which starts the page over, after 10 s (IR-1078)", () => {
+    vi.useFakeTimers();
+    try {
+      const PendingPage = lazy(() => new Promise<{ default: ComponentType }>(() => undefined));
+      render(<DeferredPage name="Paper View"><PendingPage /></DeferredPage>);
+
+      act(() => { vi.advanceTimersByTime(2_000); });
+      expect(screen.getByText("Still working…")).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+
+      act(() => { vi.advanceTimersByTime(8_000); });
+      act(() => screen.getByRole("button", { name: "Try again" }).click());
+      expect(reloadPage).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("announces an accessible loading state while a route bundle is pending", () => {
     const pendingImport = new Promise<{ default: ComponentType }>(() => undefined);
     const PendingPage = lazy(() => pendingImport);

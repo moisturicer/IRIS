@@ -185,3 +185,51 @@ def test_an_unknown_coordinate_system_is_refused():
     raw["metadata"]["coordinates"]["system"] = "PointSpace"
     with pytest.raises(ExtractionError, match="coordinate system"):
         shape_unstructured([raw])
+
+
+def platform(name):
+    """A Platform ``hi_res`` recording (IR-985, IR-1101)."""
+    from .unstructured_platform_vendor import recording as platform_recording
+
+    return platform_recording(name)
+
+
+def test_a_table_hi_res_splits_at_a_page_break_is_joined():
+    document = shape_unstructured(platform("ruled_table"))
+
+    tables = [e for e in document.elements if e.kind == "table"]
+    assert len(tables) == 1
+    table = tables[0]
+    assert table.rows[0] == ("Sample", "Mass")
+    # Cell values are the vendor's OCR ("401 g" reads "4019"); the labels are exact.
+    assert [row[0] for row in table.rows[1:]] == [f"Row {n:02d}" for n in range(1, 41)]
+    assert table.page == 1
+    assert {box.page for box in table.bboxes} == {1, 2}
+    body = [e.text for e in document.elements if e.kind not in {"header", "footer"}]
+    assert body[-1] == "The paragraph after the table."
+
+
+def _split(second_columns):
+    raw = platform("ruled_table")
+    for element in raw:
+        if element["type"] == "Table" and element["metadata"]["page_number"] == 2:
+            cells = "".join(f"<td>c{i}</td>" for i in range(second_columns))
+            element["metadata"]["text_as_html"] = f"<table><tr>{cells}</tr></table>"
+    return raw
+
+
+def test_a_next_page_table_with_other_columns_is_not_joined():
+    document = shape_unstructured(_split(3))
+
+    assert sum(e.kind == "table" for e in document.elements) == 2
+
+
+def test_a_table_after_body_text_on_the_next_page_is_not_joined():
+    raw = platform("ruled_table")
+    at = next(i for i, e in enumerate(raw) if e["type"] == "Table" and e["metadata"]["page_number"] == 2)
+    text = {**raw[at + 1], "text": "A paragraph opens page 2.", "element_id": "x"}
+    raw.insert(at, text)
+
+    document = shape_unstructured(raw)
+
+    assert sum(e.kind == "table" for e in document.elements) == 2

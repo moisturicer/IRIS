@@ -28,6 +28,8 @@ import { LOAD_ERROR, WARNING_NOTICE }  from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { failureMessage } from "@/lib/readFailure";
 import { useApiRead } from "@/hooks/useApiRead";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { formatDate }  from "@/lib/utils";
@@ -156,17 +158,24 @@ export default function DeleteRequestsPage() {
         </Button>
       </div>
 
-      {(error || read.status === "failed") && (
+      {error && (
         <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
           <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error ?? "Failed to load delete requests."}
+          {error}
         </div>
+      )}
+      {!error && read.status === "failed" && (
+        <LoadFailedAlert
+          message={failureMessage(read.error, { lead: "The delete requests didn't load." })}
+          onRetry={reload}
+          className="mb-4"
+        />
       )}
 
       {read.status === "interrupted" ? (
         <InterruptedState what="delete requests" onRetry={reload} />
       ) : loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" /></div>
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" onRetry={reload} /></div>
       ) : read.status === "failed" ? null : requests.length === 0 ? (
         <EmptyState
           icon="fa-trash-alt"

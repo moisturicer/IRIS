@@ -117,6 +117,42 @@ afterEach(() => {
 });
 
 
+// IR-1092 (audit RES-02): the bell was 34px square. jsdom has no layout, so the
+// size the markup asks for is what is checked; from `md` the compact size returns.
+describe("the bell's touch targets (IR-1092)", () => {
+  it("is a 44px square on a phone and compact from md", () => {
+    useNotificationsStore.setState({ items: [], unreadCount: 0 });
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "Notifications" })).toHaveClass(
+      "h-11",
+      "w-11",
+      "md:h-[34px]",
+      "md:w-[34px]",
+      "touch:h-11",
+      "touch:w-11",
+    );
+  });
+
+  it("makes Mark all read and View all notifications at least 44px tall on a phone", async () => {
+    useNotificationsStore.setState({ items: [notification(1, "A review was requested")], unreadCount: 1 });
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>,
+    );
+
+    const dialog = await openBell();
+
+    expect(within(dialog).getByRole("button", { name: "Mark all read" })).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
+    expect(within(dialog).getByRole("link", { name: "View all notifications" })).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
+  });
+});
+
 describe("the bell's visible count and accessible name (IR-777)", () => {
   it.each([
     [0, null, "Notifications"],

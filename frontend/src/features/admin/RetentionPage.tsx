@@ -26,6 +26,8 @@ import { LOAD_ERROR, WARNING_NOTICE } from "@/components/ui/fieldClasses";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { failureMessage } from "@/lib/readFailure";
 import { useApiRead } from "@/hooks/useApiRead";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
@@ -229,13 +231,13 @@ export default function RetentionPage() {
         <InterruptedState what="retention periods" onRetry={read.retry} />
       ) : read.status === "loading" ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" label="Loading retention periods" />
+          <Spinner size="lg" label="Loading retention periods" onRetry={read.retry} />
         </div>
       ) : read.status === "failed" || !data ? (
-        <div role="alert" className={LOAD_ERROR}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          Failed to load retention periods.
-        </div>
+        <LoadFailedAlert
+          message={failureMessage(read.error, { lead: "The retention periods didn't load." })}
+          onRetry={read.retry}
+        />
       ) : (
         <ul aria-label="Retention periods" className="space-y-3">
           {RETENTION_TYPES.map((type, i) => (

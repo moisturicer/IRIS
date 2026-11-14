@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { SlowLoadNotice, useLoadStage } from "./slowLoad";
+
 /**
  * The one loading placeholder (IR-158).
  *
@@ -18,9 +20,14 @@ interface SkeletonProps {
   label?: string;
   /** Applied to the wrapper, e.g. to change the padding. */
   className?: string;
+  /**
+   * Reads again. Given, the loader offers Try again once it has gone on for
+   * 10 s (IR-1078); a line saying it is still working appears after 2 s either way.
+   */
+  onRetry?: () => void;
 }
 
-export function Skeleton({ rows = 3, label = "Loading…", className = "" }: SkeletonProps) {
+export function Skeleton({ rows = 3, label = "Loading…", className = "", onRetry }: SkeletonProps) {
   // Every call site mounts this conditionally (`if (loading) return <Skeleton/>`),
   // so the live region arrives already carrying its text -- and a region that is
   // inserted already-populated is generally NOT announced by NVDA or JAWS; they
@@ -29,6 +36,7 @@ export function Skeleton({ rows = 3, label = "Loading…", className = "" }: Ske
   // for. Without this the role="status" is decorative.
   const [announce, setAnnounce] = useState(false);
   useEffect(() => setAnnounce(true), []);
+  const { stage, restart } = useLoadStage();
 
   return (
     <div
@@ -48,6 +56,7 @@ export function Skeleton({ rows = 3, label = "Loading…", className = "" }: Ske
           />
         ))}
       </div>
+      <SlowLoadNotice stage={stage} onRetry={onRetry} onRestart={restart} className="mt-4" />
     </div>
   );
 }

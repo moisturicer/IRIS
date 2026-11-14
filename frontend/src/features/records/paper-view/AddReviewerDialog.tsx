@@ -1,9 +1,11 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { seatsApi } from "@/api/reviews";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { Button, Modal, Skeleton } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import type { AddReviewerOptions } from "@/types/records";
 
 interface AddReviewerDialogProps {
@@ -27,24 +29,26 @@ export function AddReviewerDialog({ assignmentId, onClose, onAdded }: AddReviewe
   const ids = useId();
   const [options, setOptions] = useState<AddReviewerOptions | null>(null);
   const [loadFailed, setLoadFailed] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [chosen, setChosen] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadFailed(null);
     seatsApi
       .addReviewerOptions(assignmentId)
       .then(({ data }) => {
         if (!cancelled) setOptions(data);
       })
       .catch((err) => {
-        if (!cancelled) setLoadFailed(errorDetail(err, "Your office's members could not be loaded."));
+        if (!cancelled) setLoadFailed(failureMessage(err, { lead: "Your office's members could not be loaded." }));
       });
     return () => {
       cancelled = true;
     };
-  }, [assignmentId]);
+  }, [assignmentId, attempt]);
 
   const office = options?.party_label ?? "your office";
   const available = (options?.members ?? []).filter((m) => !m.seated);
@@ -92,12 +96,9 @@ export function AddReviewerDialog({ assignmentId, onClose, onAdded }: AddReviewe
         </p>
 
         {loadFailed ? (
-          <p role="alert" className={LOAD_ERROR}>
-            <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-            {loadFailed}
-          </p>
+          <LoadFailedAlert message={loadFailed} onRetry={() => setAttempt((n) => n + 1)} />
         ) : options == null ? (
-          <Skeleton rows={2} label="Loading your office's members…" />
+          <Skeleton rows={2} label="Loading your office's members…" onRetry={() => setAttempt((n) => n + 1)} />
         ) : (
           <div>
             <label htmlFor={pickId} className={LABEL}>

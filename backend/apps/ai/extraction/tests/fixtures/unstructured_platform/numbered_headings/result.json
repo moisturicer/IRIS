@@ -1,0 +1,478 @@
+[
+  {
+    "type": "Header",
+    "element_id": "d2b9189283050468a3227e401001cd12",
+    "text": "IRIS contract fixture",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.35311889648438,
+            126.4100570678711
+          ],
+          [
+            245.35311889648438,
+            158.5277777777776
+          ],
+          [
+            495.32757568359375,
+            158.5277777777776
+          ],
+          [
+            495.32757568359375,
+            126.4100570678711
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "numbered_headings.pdf"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "a730521016d0b73036cebe87b4e879da",
+    "text": "1 Introduction",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            246.94271850585938,
+            283.135009765625
+          ],
+          [
+            246.94271850585938,
+            336.45138888888897
+          ],
+          [
+            576.584716796875,
+            336.45138888888897
+          ],
+          [
+            576.584716796875,
+            283.135009765625
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "numbered_headings.pdf",
+      "parent_id": "d2b9189283050468a3227e401001cd12"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "8a70c286db4878b74579ccc731735d25",
+    "text": "The introduction states the question this fixture asks.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.7841796875,
+            362.8865661621094
+          ],
+          [
+            245.7841796875,
+            404.9226379394531
+          ],
+          [
+            1059.0343017578125,
+            404.9226379394531
+          ],
+          [
+            1059.0343017578125,
+            362.8865661621094
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "numbered_headings.pdf",
+      "parent_id": "a730521016d0b73036cebe87b4e879da"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "25402aba37b1b64a3b171d12e2833392",
+    "text": "1.1 Background",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.70761108398438,
+            490.1309814453125
+          ],
+          [
+            245.70761108398438,
+            540.2117309570312
+          ],
+          [
+            565.7734985351562,
+            540.2117309570312
+          ],
+          [
+            565.7734985351562,
+            490.1309814453125
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "numbered_headings.pdf",
+      "parent_id": "d2b9189283050468a3227e401001cd12"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "635c06b846e9c6305133d40837d0bb33",
+    "text": "Background material follows its numbered heading.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            246.0098876953125,
+            564.681396484375
+          ],
+          [
+            246.0098876953125,
+            607.6575927734375
+          ],
+          [
+            1037.5828857421875,
+            607.6575927734375
+          ],
+          [
+            1037.5828857421875,
+            564.681396484375
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "numbered_headings.pdf",
+      "parent_id": "25402aba37b1b64a3b171d12e2833392"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "565150d4f33941fd2dc233f4b205f5a4",
+    "text": "2 Methods",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            244.5933837890625,
+            700.4072875976562
+          ],
+          [
+            244.5933837890625,
+            753.1180555555557
+          ],
+          [
+            492.606689453125,
+            753.1180555555557
+          ],
+          [
+            492.606689453125,
+            700.4072875976562
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "numbered_headings.pdf",
+      "parent_id": "d2b9189283050468a3227e401001cd12"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "0941106f5ea723715429847e5b853bba",
+    "text": "Methods are described before any result is reported.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.51394653320312,
+            780.232421875
+          ],
+          [
+            245.51394653320312,
+            823.357177734375
+          ],
+          [
+            1055.8228759765625,
+            823.357177734375
+          ],
+          [
+            1055.8228759765625,
+            780.232421875
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "numbered_headings.pdf",
+      "parent_id": "565150d4f33941fd2dc233f4b205f5a4"
+    }
+  },
+  {
+    "type": "Footer",
+    "element_id": "4f9a19b8a1c60cf671fa2adfb931dfc3",
+    "text": "Page 1",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            1002.2463989257812,
+            2605.747314453125
+          ],
+          [
+            1002.2463989257812,
+            2639.7294921875
+          ],
+          [
+            1094.9722222222222,
+            2639.7294921875
+          ],
+          [
+            1094.9722222222222,
+            2605.747314453125
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "numbered_headings.pdf"
+    }
+  },
+  {
+    "type": "PageBreak",
+    "element_id": "d6d97d7988056f2b22ff49296d864dfc",
+    "text": "",
+    "metadata": {
+      "languages": [
+        "eng"
+      ],
+      "filename": "numbered_headings.pdf",
+      "filetype": "application/pdf"
+    }
+  },
+  {
+    "type": "Header",
+    "element_id": "ce9956b4bc6b8c581fac918766cb0fcb",
+    "text": "IRIS contract fixture",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.27023315429688,
+            126.4305419921875
+          ],
+          [
+            245.27023315429688,
+            158.5277777777776
+          ],
+          [
+            495.3308410644531,
+            158.5277777777776
+          ],
+          [
+            495.3308410644531,
+            126.4305419921875
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 2,
+      "filename": "numbered_headings.pdf"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "53eb6b29349f42cb84968cb7a9fb588b",
+    "text": "3 Results",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            244.77658081054688,
+            283.2928771972656
+          ],
+          [
+            244.77658081054688,
+            336.45138888888897
+          ],
+          [
+            467.7128601074219,
+            336.45138888888897
+          ],
+          [
+            467.7128601074219,
+            283.2928771972656
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 2,
+      "filename": "numbered_headings.pdf",
+      "parent_id": "ce9956b4bc6b8c581fac918766cb0fcb"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "4788486e8d3a61a3b6b46ce0ffa92d74",
+    "text": "Results close the document on its second page.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.2943115234375,
+            363.77587890625
+          ],
+          [
+            245.2943115234375,
+            406.1466064453125
+          ],
+          [
+            987.3169555664062,
+            406.1466064453125
+          ],
+          [
+            987.3169555664062,
+            363.77587890625
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 2,
+      "filename": "numbered_headings.pdf",
+      "parent_id": "53eb6b29349f42cb84968cb7a9fb588b"
+    }
+  },
+  {
+    "type": "Footer",
+    "element_id": "d5c2f4f4deb2a19b4ed022f38c75b912",
+    "text": "Page 2",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            1002.1494140625,
+            2605.60107421875
+          ],
+          [
+            1002.1494140625,
+            2639.65576171875
+          ],
+          [
+            1097.9217529296875,
+            2639.65576171875
+          ],
+          [
+            1097.9217529296875,
+            2605.60107421875
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 2,
+      "filename": "numbered_headings.pdf"
+    }
+  },
+  {
+    "type": "PageBreak",
+    "element_id": "cc3800bb9b4b72466f23fc2c03b3e043",
+    "text": "",
+    "metadata": {
+      "languages": [
+        "eng"
+      ],
+      "filename": "numbered_headings.pdf",
+      "filetype": "application/pdf"
+    }
+  }
+]

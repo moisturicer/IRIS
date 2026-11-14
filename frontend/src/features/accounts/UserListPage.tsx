@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { accountsApi }  from "@/api/accounts";
+import { failureMessage } from "@/lib/readFailure";
 import { PageHeader }   from "@/components/layout/PageHeader";
 import { DataTable }    from "@/components/shared/DataTable";
 import { EmptyState }   from "@/components/shared/EmptyState";
@@ -56,6 +57,7 @@ export default function UserListPage() {
   const [page, setPage]       = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [search, setSearch]   = useState("");
 
   // Lock/unlock confirm dialog
@@ -80,7 +82,7 @@ export default function UserListPage() {
         setLoadFailed(false);
       })
       // An empty table after an error would read as "no users" (IR-745).
-      .catch(() => setLoadFailed(true))
+      .catch((error: unknown) => { setLoadFailed(true); setLoadError(error); })
       .finally(() => setLoading(false));
   };
 
@@ -251,7 +253,7 @@ export default function UserListPage() {
           tone="error"
           icon="fa-circle-exclamation"
           title="Couldn't load users"
-          message="Check your connection and try again."
+          message={failureMessage(loadError)}
           action={<Button variant="outline" size="sm" onClick={() => load(page)}>Try again</Button>}
         />
       ) : (
@@ -261,6 +263,7 @@ export default function UserListPage() {
           data={users}
           columns={columns}
           loading={loading}
+          onRetry={() => load(page)}
           page={page}
           pageSize={20}
           totalCount={total}
