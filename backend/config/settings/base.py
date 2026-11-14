@@ -836,6 +836,10 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
     "AI_RETRIEVAL_FUSION_ENABLED", default=False, cast=bool
 )
 
+# ---- Section-aligned embedding windows (IR-1056) ----------------------
+# Off until a trial run shows it helps; re-embed with `backfill_embeddings --force` after.
+AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False, cast=bool)
+
 # ---- Formulas in the indexed text (IR-1102, ADR-067 §Amendment) ----------
 # Readers always see a transcribed formula's LaTeX. On, it and its description
 # also enter the chunk's embedded and keyword-indexed text. Read at chunking,
