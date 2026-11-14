@@ -104,7 +104,7 @@ def test_every_unrecorded_type_has_its_stated_use():
         element("Image", "axis label 0 10 20"),
         element("FigureCaption", "Figure 2: A plotted series."),
         element("Formula", "N-1 |A) = >> 2(n)|n). n=0"),
-        element("Image", "$$a^2 + b^2 = c^2$$"),
+        element("Formula", "$$a^2 + b^2 = c^2$$"),
         element("NarrativeText", "Energy is $$E = mc^2$$ here."),
         element("CodeSnippet", "x = 42"),
         element("Address", "1 Private Lane, Cebu"),
@@ -120,7 +120,7 @@ def test_every_unrecorded_type_has_its_stated_use():
         ("text", "Between lists.", "NarrativeText"),
         ("image", "Figure 2: A plotted series.", "Image"),
         ("image", "", "Formula"),
-        ("formula", "a^2 + b^2 = c^2", "Image"),
+        ("formula", "a^2 + b^2 = c^2", "Formula"),
         ("text", "Energy is ", "NarrativeText"),
         ("formula", "E = mc^2", "NarrativeText"),
         ("text", " here.", "NarrativeText"),
@@ -132,6 +132,8 @@ def test_every_unrecorded_type_has_its_stated_use():
     assert [child.text for child in listing.children] == ["First point", "Second point"]
     figure, crop = document.elements[4], document.elements[5]
     assert figure.figure == "id-Image-axis lab" and crop.figure == "id-Formula-N-1 |A) "
+    assert len(figure.bboxes) == 2
+
     assert all("Private Lane" not in e.text and "@" not in e.text for e in document.elements)
 
 
@@ -168,3 +170,18 @@ def test_a_shaped_document_stores_flattens_and_hashes_like_any_other():
     plain = NormalizedDocument(title="t", elements=(DocumentElement(kind="text", text="x"),))
     assert "element_id" not in document_to_json(plain)["elements"][0]
     assert "language" not in document_to_json(plain)["elements"][0]
+
+
+def test_a_caption_before_its_image_binds_and_keeps_its_box_first():
+    caption = element("FigureCaption", "Figure 1: Above.")
+    caption["metadata"]["coordinates"]["points"] = [[250, 100], [250, 140], [900, 140], [900, 100]]
+    (figure,) = shape_unstructured([caption, element("Image", "")]).elements
+    assert (figure.kind, figure.text) == ("image", "Figure 1: Above.")
+    assert figure.bboxes[0].top == pytest.approx(28.8)
+
+
+def test_an_unknown_coordinate_system_is_refused():
+    raw = element("NarrativeText", "x")
+    raw["metadata"]["coordinates"]["system"] = "PointSpace"
+    with pytest.raises(ExtractionError, match="coordinate system"):
+        shape_unstructured([raw])

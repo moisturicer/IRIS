@@ -85,7 +85,7 @@ def _element(item, label, metadata, page, sizes):
     elif label == "Table":
         element = _table(element, str(metadata.get("text_as_html") or ""))
     elif label in {"Image", "Formula"}:
-        latex = DISPLAY_FORMULA.fullmatch(text.strip())
+        latex = DISPLAY_FORMULA.fullmatch(text.strip()) if label == "Formula" else None
         if latex:
             return [replace(element, kind="formula", text=latex.group("dollar") or latex.group("bracket") or "")]
         # Image OCR is not a caption; Formula OCR is never the formula (ADR-067),
@@ -115,27 +115,26 @@ def _lists(elements):
 
 
 def _captions(elements):
-    """A FigureCaption next to an Image on its page becomes that Image's text."""
+    """A FigureCaption beside an Image on its page becomes that Image's text."""
     bound: list[DocumentElement] = []
-    skip = False
-    for index, element in enumerate(elements):
-        if skip:
-            skip = False
-            continue
-        if element.source_label != "FigureCaption":
-            following = elements[index + 1] if index + 1 < len(elements) else None
-            if _binds(element, following):
-                bound.append(replace(element, text=following.text))
-                skip = True
-            else:
-                bound.append(element)
-            continue
-        previous = bound[-1] if bound else None
-        if _binds(previous, element):
-            bound[-1] = replace(previous, text=element.text)
+    index = 0
+    while index < len(elements):
+        pair = elements[index:index + 2]
+        if len(pair) == 2 and _binds(*pair):
+            bound.append(_bound(*pair))
+            index += 2
+        elif len(pair) == 2 and _binds(*reversed(pair)):
+            bound.append(_bound(*reversed(pair)))
+            index += 2
         else:
-            bound.append(element)
+            bound.append(elements[index])
+            index += 1
     return bound
+
+
+def _bound(image, caption):
+    """The caption's box comes first, so a citation highlights the caption."""
+    return replace(image, text=caption.text, bboxes=caption.bboxes + image.bboxes)
 
 
 def _binds(image, caption):
@@ -209,6 +208,8 @@ def _boxes(metadata, page, sizes):
         coordinates = [dict(coordinates, page_number=page)]
     boxes = []
     for region in coordinates:
+        if region.get("system", "PixelSpace") != "PixelSpace":
+            raise ExtractionError(f"unsupported coordinate system {region.get('system')}")
         number = int(region.get("page_number") or page)
         width = float(region["layout_width"]) * _SCALE
         height = float(region["layout_height"]) * _SCALE
