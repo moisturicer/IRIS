@@ -52,6 +52,16 @@ class Figure:
 
 
 @dataclass(frozen=True)
+class Rule:
+    """A drawn line, top-left points; like a Figure it yields no element."""
+
+    left: float
+    top: float
+    right: float
+    bottom: float
+
+
+@dataclass(frozen=True)
 class Fixture:
     name: str
     title: str
@@ -155,8 +165,63 @@ def _figures() -> Fixture:
     )
 
 
+def _paper_columns() -> Fixture:
+    """Two dense prose columns, as a real paper sets them (IR-1101)."""
+    items = list(_furniture(1)) + [Item(HEADING, "Paper column study", 72, 70, 14, level=1)]
+    # Columns run the page and paragraph breaks fall at different heights.
+    for side, left, lengths in (("Left", 72, (17, 26)), ("Right", 324, (25, 18))):
+        top = 100
+        for number, lines in zip(("one", "two"), lengths):
+            items.append(Item(PARAGRAPH, f"{side} paragraph {number} opens its column.", left, top))
+            items += [Item(PARAGRAPH, f"{side} prose goes on along line {n:02d} here.", left, top + 14 * n)
+                      for n in range(1, lines)]
+            top += 14 * lines + 12
+    return Fixture(
+        name="paper_columns",
+        title="Paper column study",
+        pages=(tuple(items),),
+        reading_order=("Left paragraph one", "Left paragraph two",
+                       "Right paragraph one", "Right paragraph two"),
+    )
+
+
+def _ruled_table() -> Fixture:
+    """A gridded table whose rows run onto page 2, header once (IR-1101)."""
+    columns, row_height = (72, 216, 360), 18
+
+    def rows(cells, top, header):
+        drawn = []
+        for i, (first, second) in enumerate(cells):
+            kind = TABLE_HEADER if header and i == 0 else TABLE_ROW
+            y = top + row_height * i + 4
+            drawn += [Item(kind, first, columns[0] + 6, y), Item(kind, second, columns[1] + 6, y)]
+        bottom = top + row_height * len(cells)
+        drawn += [Rule(columns[0], top + row_height * i, columns[-1], top + row_height * i)
+                  for i in range(len(cells) + 1)]
+        drawn += [Rule(x, top, x, bottom) for x in columns]
+        return tuple(drawn), bottom
+
+    body = [(f"Row {n:02d}", f"{400 + n} g") for n in range(1, 41)]
+    first, _ = rows([("Sample", "Mass")] + body[:32], 120, header=True)
+    second, end = rows(body[32:], 70, header=False)
+    page1 = _furniture(1) + (
+        Item(HEADING, "Measurements table", 72, 70, 14, level=1),
+        Item(PARAGRAPH, "The ruled table below runs onto the next page.", 72, 94),
+    ) + first
+    page2 = _furniture(2) + second + (Item(PARAGRAPH, "The paragraph after the table.", 72, end + 20),)
+    return Fixture(
+        name="ruled_table",
+        title="Measurements table",
+        pages=(page1, page2),
+        reading_order=("Measurements table", "The ruled table below", "Row 40",
+                       "The paragraph after the table."),
+        has_table=True,
+    )
+
+
 FIXTURES: dict[str, Fixture] = {
-    f.name: f for f in (_numbered_headings(), _two_columns(), _table_across_pages(), _figures())
+    f.name: f for f in (_numbered_headings(), _two_columns(), _table_across_pages(), _figures(),
+                        _paper_columns(), _ruled_table())
 }
 
 
@@ -178,6 +243,9 @@ def render(fixture: Fixture) -> bytes:
         for item in page:
             if isinstance(item, Figure):
                 pdf.rect(item.left, HEIGHT - item.top - item.height, item.width, item.height)
+                continue
+            if isinstance(item, Rule):
+                pdf.line(item.left, HEIGHT - item.top, item.right, HEIGHT - item.bottom)
                 continue
             pdf.setFont(_font(item), item.size)
             pdf.drawString(item.left, HEIGHT - item.top - item.size, item.text)
