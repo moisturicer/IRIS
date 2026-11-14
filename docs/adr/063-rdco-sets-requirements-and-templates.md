@@ -8,6 +8,8 @@ It **amends [ADR-051](051-system-admin-account-deletion-and-consent.md)** decisi
 
 **Amended 2026-11-13 by [ADR-066](066-ip-applications-beside-publishing.md) (IR-978; Accepted).** A slot can belong to an IP application of one kind, or to a commercialization application, instead of a record type, and Setup manages those lists too. The IP slots and the Commercialization Assessment leave the Thesis/Research and Project submissions, Intellectual Property Application Status is removed, and a Proposal keeps only Patent Search Report and Commercialization Initial Assessment (ADR-066 decisions 20–23).
 
+**Amended 2026-11-14 (IR-972), see [Amendment](#amendment--2026-11-14-ir-972-setup-has-two-sections-and-only-rdco-reads-the-notices-history).** Setup has two sections, not three: each record type's description sits inside that type's Requirements & Templates tab. Only RDCO reads the Notice's past versions.
+
 It leaves [ADR-018](018-conditional-parallel-office-routing.md) and [ADR-022](022-explicit-document-requests.md) standing, since offices still ask for what they need through document requests. It does not bring back IR-118's request presets, which stay deferred.
 
 ## Context
@@ -117,3 +119,18 @@ FR-M2-01 (stable label only).
 ## Related Tasks
 
 IR-969 (spec), IR-970 to IR-975 (build), IR-118 (request presets, still deferred), IR-799 (Notice publishing), IR-976 to IR-979 (follow-ups).
+
+## Amendment — 2026-11-14 (IR-972): Setup has two sections, and only RDCO reads the Notice's history
+
+The decisions are Hermoine Zozobrado's, made on 2026-11-14 while building IR-971 and IR-972.
+
+**What this changes.** Decision 9 said Setup has three sections: Requirements & Templates, a description for each record type, and the Notice. Setup has **two**:
+
+- **Requirements & Templates.** One tab per record type. Each tab holds that type's description, shown at the top of its Guidelines section as decision 9 says, and then its requirements.
+- **The Notice.**
+
+A switch at the top of the page chooses the section, and the address keeps it (`?section=notice`). The description belongs beside the requirements it describes: both are about the same record type, so RDCO edits them in one place.
+
+**What this adds.** Decision 9 said the System Admin no longer publishes, and sees every publication in the Audit Log. It did not say whether the System Admin still reads past versions. **It does not.** Only RDCO reads the Notice's history, on Setup. The Audit Log records who published, when, and which version, but not the text. The current version stays readable by everyone. The System Admin's view of ADR-051's shared `/notices` page is removed. An old `/notices` link takes RDCO to Setup's Notice section and the System Admin to the Audit Log, filtered to Notice publications.
+
+**What stands.** Everything else in decision 9 is unchanged: only RDCO publishes, every publication is audited, and a published version never changes (ADR-051 decision 17).
