@@ -66,7 +66,7 @@ export function DataTable<T>({
       </p>
 
       <div className="relative overflow-x-auto">
-        <table className="w-full text-[14px]">
+        <table className="w-full text-body">
           <caption className="sr-only">{caption}</caption>
           <thead className="bg-stone-50 border-b border-stone-200">
             {table.getHeaderGroups().map((hg) => (
@@ -96,7 +96,7 @@ export function DataTable<T>({
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="py-12 text-center text-stone-500 text-[14px]">
+                <td colSpan={columns.length} className="py-12 text-center text-stone-500 text-body">
                   No records found.
                 </td>
               </tr>
@@ -117,7 +117,7 @@ export function DataTable<T>({
 
       {/* Pagination bar */}
       {totalCount > 0 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-stone-200 text-[13px] text-stone-500">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-stone-200 text-small text-stone-500">
           <span>{start}-{end} of {totalCount}</span>
           <div className="flex gap-1">
             <Button
@@ -127,7 +127,7 @@ export function DataTable<T>({
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
-              <i className="fa fa-chevron-left text-[12px]" aria-hidden />
+              <i className="fa fa-chevron-left text-label" aria-hidden />
             </Button>
             <span className="px-2 py-1 font-medium text-stone-700">{page} / {totalPages}</span>
             <Button
@@ -137,7 +137,7 @@ export function DataTable<T>({
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >
-              <i className="fa fa-chevron-right text-[12px]" aria-hidden />
+              <i className="fa fa-chevron-right text-label" aria-hidden />
             </Button>
           </div>
         </div>

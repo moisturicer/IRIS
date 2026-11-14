@@ -17,7 +17,7 @@ type Size = "sm" | "md" | "lg";
 // so a new step is added in one place.
 const SIZES: Record<Size, { control: string; chevron: string }> = {
   sm: { control: "min-h-9 pl-2 pr-8 py-1 text-small",  chevron: "pr-2.5" },
-  md: { control: "pl-3 pr-10 py-2 text-[14px]",        chevron: "pr-4" },
+  md: { control: "pl-3 pr-10 py-2 text-body",          chevron: "pr-4" },
   lg: { control: "min-h-11 pl-4 pr-10 py-3 text-base", chevron: "pr-4" },
 };
 
@@ -115,12 +115,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           </div>
         </div>
         {error && (
-          <p id={errorId} className="flex items-start gap-1.5 text-[13px] text-brand">
+          <p id={errorId} className="flex items-start gap-1.5 text-small text-brand">
             <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
             {error}
           </p>
         )}
-        {hint && !error && <p id={hintId} className="text-[13px] text-stone-500">{hint}</p>}
+        {hint && !error && <p id={hintId} className="text-small text-stone-500">{hint}</p>}
       </div>
     );
   }
