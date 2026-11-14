@@ -33,9 +33,14 @@ interface NotificationBellProps {
    * bell sits at the left of the screen, so it opens rightward with "start".
    */
   align?: "start" | "end";
+  /**
+   * The native hover title. A caller that wraps the bell in its own `Tooltip`
+   * (the sidebar's rail, IR-1086) turns it off so two tips do not stack.
+   */
+  showTitle?: boolean;
 }
 
-export function NotificationBell({ align = "end" }: NotificationBellProps) {
+export function NotificationBell({ align = "end", showTitle = true }: NotificationBellProps) {
   // AppShell owns the fetch (IR-370); the bell only reads the store.
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const items = useNotificationsStore((s) => s.items);
@@ -94,7 +99,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
         aria-label={unreadCount > 0 ? `Notifications, ${unreadBadge} unread` : "Notifications"}
         aria-expanded={open}
         aria-haspopup="true"
-        title="Notifications"
+        title={showTitle ? "Notifications" : undefined}
         className="relative w-[34px] h-[34px] rounded-lg border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
       >
         <i className="fas fa-bell text-[15px]" aria-hidden />

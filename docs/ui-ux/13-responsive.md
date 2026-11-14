@@ -49,9 +49,12 @@ At 768–1023 px the sidebar has already become a rail while content is still in
 | Range | Name | Sidebar | Content |
 |---|---|---|---|
 | **< 768 px** | Phone | Off-canvas drawer, `w-60` (240 px), backdrop | Single column, full-bleed |
-| **≥ 768 px** | Tablet and desktop | 240 px labelled (`w-60`), or the 64 px icon rail (`w-16`) the user chooses | `md:ml-60`, or `md:ml-16` beside the rail |
+| **768–1023 px** | Tablet | The 76 px icon rail (`w-rail`), always; the IRIS mark opens the 240 px sidebar over the page (IR-1086) | `md:ml-rail` |
+| **≥ 1024 px** | Desktop | 240 px labelled (`w-60`), or the 76 px icon rail the user chooses | `lg:ml-60`, or `md:ml-rail` beside the rail |
 
 *Amended 2026-10-12 (IR-413).* The table above used to name a 60 px rail at 768–1279 px that widened to 230 px at `xl`. The shipped shell never did that: from `md` up the width is the user's **Collapse / Expand** choice, stored per browser (`ui.store.ts`, `iris_sidebar_collapsed`). IR-413 moved the widths onto Tailwind's spacing scale (`w-60`, `w-16`) instead of `230px` and `60px`, and gave the drawer the keyboard behaviour [12](12-accessibility.md) asks for: while it is closed it is `inert`, so its links are out of the tab order; opening it moves focus to its **Close menu** button and makes the page behind it `inert`; Escape closes it and returns focus to **Open menu**.
+
+*Amended 2026-11-14 (IR-1086).* From 768 to 1023 px the sidebar is the 76 px icon rail whatever the reader saved, so the full sidebar no longer squeezes a single-column page; the mark opens it over the page, with the drawer's backdrop, inert page, focus move and Escape. The Collapse / Expand choice applies from 1024 px only.
 
 ---
 

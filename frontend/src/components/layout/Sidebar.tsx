@@ -12,6 +12,8 @@ import { NotificationBell } from "./NotificationBell";
 import { AccountMenu } from "./AccountMenu";
 import { navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
 import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { isRail, useSidebarMode } from "@/lib/layout";
 
 interface NavItem {
   to:     string;
@@ -36,14 +38,14 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
   const dot = badge == null ? item.dot : undefined;
   return (
     <li>
+      {/* A tooltip for the rail, on hover and focus. Not the accessible name:
+          the label inside stays in the tree as `sr-only` while hidden. */}
+      <Tooltip label={item.label} disabled={!collapsed} className="block">
       <NavLink
         to={item.to}
         // Ask IRIS stays current on its conversation addresses (IR-548).
         end={item.to !== ASK_PATH}
         onClick={onNavigate}
-        // A tooltip for the rail. Not the accessible name: the label below
-        // stays in the tree as `sr-only` while it is visually hidden.
-        title={collapsed ? item.label : undefined}
         className={({ isActive }) =>
           cn(
             "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm",
@@ -97,6 +99,7 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
           </>
         )}
       </NavLink>
+      </Tooltip>
     </li>
   );
 }
@@ -157,15 +160,25 @@ interface SidebarProps {
  * Discover and research links, RDCO's coordination group, and the System
  * Admin's Administration group. The bell is at the top (IR-519) and the
  * account menu at the bottom. Below `md` it is a
- * drawer `AppShell` opens and closes; from `md` up it is always on screen, at
- * full width or as an icon rail the user chooses (stored per browser).
+ * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
+ * rail, and the IRIS mark opens the full sidebar over the page (IR-1086). From
+ * 1024 px it is at full width, or as the rail if the user chooses (stored per
+ * browser; the choice is not read below 1024 px).
  */
 export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ className, inert, onDismiss }, ref) {
   const { user } = useAuth();
   const { roleName } = useRole();
   const closeSidebar = useUIStore((s) => s.closeSidebar);
-  const collapsed = useUIStore(selectSidebarCollapsed);
+  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const preferCollapsed = useUIStore(selectSidebarCollapsed);
   const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
+  const mode = useSidebarMode();
+  const collapsed = isRail(mode, sidebarOpen, preferCollapsed);
+  // The mark's job: on the desktop it saves a collapse preference; on a tablet
+  // it opens and closes the full sidebar over the page and saves nothing.
+  const dismiss = onDismiss ?? closeSidebar;
+  const onMark = mode !== "rail" ? toggleCollapsed : collapsed ? () => setSidebarOpen(true) : dismiss;
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
   const [needsAction, setNeedsAction] = useState(false);
   const { pathname, search } = useLocation();
@@ -228,28 +241,36 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       // React 18 has no `inert` prop; an empty string sets the attribute.
       {...(inert ? { inert: "" } : {})}
       className={cn(
-        // Below md: a 240px drawer over the page. From md: 240px, or a 64px
-        // rail when collapsed. AppShell's left margin follows the same widths.
+        // Below md: a 240px drawer over the page. From md: 240px, or the 76px
+        // rail when collapsed. AppShell's left margin follows the same widths,
+        // except that an opened tablet sidebar overlaps the page instead.
         "fixed left-0 top-0 z-50 flex h-screen w-60 flex-col border-r border-stone-200 bg-surface",
         // `shell` carries transform (the drawer's slide) and width (the rail)
         // together; AppShell sets the translate classes, not a transition.
         "transition-shell duration-200 ease-out motion-reduce:transition-none",
-        collapsed ? "md:w-16" : "md:w-60",
+        collapsed ? "md:w-rail" : "md:w-60",
+        mode === "rail" && !collapsed && "shadow-card-md",
         className,
       )}
     >
       {/* ── Brand ──────────────────────────────────────────────────────── */}
       <div className={cn("px-4 pb-4 pt-5", collapsed && "md:px-0 md:pb-3")}>
         <div className={cn("flex items-center gap-3", collapsed && "md:justify-center")}>
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Open sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Open sidebar" : "Collapse sidebar"}
-            className={cn("hidden h-9 w-9 flex-shrink-0 rounded-lg md:block", FOCUS_RING)}
-          >
-            <IrisMark className="h-9 w-9 text-brand" />
-          </button>
+          <Tooltip label="Open sidebar" disabled={!collapsed} className="hidden flex-shrink-0 md:block">
+            <button
+              type="button"
+              onClick={onMark}
+              aria-label={collapsed ? "Open sidebar" : "Collapse sidebar"}
+              title={collapsed ? undefined : "Collapse sidebar"}
+              // Where AppShell puts focus when a tablet's full sidebar opens,
+              // and puts it back when that closes.
+              data-sidebar-mark
+              {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
+              className={cn("block h-9 w-9 rounded-lg", FOCUS_RING)}
+            >
+              <IrisMark className="h-9 w-9 text-brand" />
+            </button>
+          </Tooltip>
           <IrisMark className="h-9 w-9 flex-shrink-0 text-brand md:hidden" />
           <p
             className={cn(
@@ -271,8 +292,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             type="button"
             onClick={onDismiss ?? closeSidebar}
             aria-label="Close menu"
-            // Where AppShell puts focus when the drawer opens.
-            data-drawer-focus
+            // Where AppShell puts focus when the phone drawer opens.
+            {...(mode === "rail" ? {} : { "data-drawer-focus": "" })}
             className={cn(
               "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 md:hidden",
               COLOUR_TRANSITION,
@@ -288,7 +309,9 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
         </p>
         {collapsed && (
           <div className="mt-3 hidden justify-center md:flex">
-            <NotificationBell align="start" />
+            <Tooltip label="Notifications">
+              <NotificationBell align="start" showTitle={false} />
+            </Tooltip>
           </div>
         )}
       </div>

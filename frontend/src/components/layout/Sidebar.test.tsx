@@ -9,7 +9,7 @@
  * Every query goes through the accessible tree, by role and accessible name.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
@@ -75,6 +75,32 @@ function atPhoneWidth() {
     addEventListener: () => {},
     removeEventListener: () => {},
   }));
+}
+
+/**
+ * Pretend the window is `px` wide: a media query matches when every
+ * min-width / max-width it names holds (IR-1086).
+ */
+function atWidth(initial: number) {
+  let px = initial;
+  const watchers = new Set<{ query: string; notify: (matches: boolean) => void }>();
+  const matchesAt = (query: string) => {
+    const min = /min-width:\s*([\d.]+)px/.exec(query);
+    const max = /max-width:\s*([\d.]+)px/.exec(query);
+    return (!min || px >= Number(min[1])) && (!max || px <= Number(max[1]));
+  };
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    get matches() { return matchesAt(query); },
+    media: query,
+    addEventListener: (_: string, notify: (event: { matches: boolean }) => void) =>
+      watchers.add({ query, notify: (matches) => notify({ matches }) }),
+    removeEventListener: () => {},
+  }));
+  /** Resize the window, telling every query that now matches or stops matching. */
+  return (next: number) => {
+    px = next;
+    act(() => watchers.forEach((w) => w.notify(matchesAt(w.query))));
+  };
 }
 
 const mainLinks = () =>
@@ -396,6 +422,178 @@ describe("the phone drawer and its account menu", () => {
     expect(await screen.findByRole("heading", { name: "Discover" })).toBeInTheDocument();
     expect(useUIStore.getState().sidebarOpen).toBe(false);
     expect(openMenu).not.toHaveFocus();
+  });
+});
+
+describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) => {
+  const LABELS = /^(Discover|Ask IRIS|My Library|Calls & Conferences)$/;
+
+  it("shows the rail whatever width the reader saved, with every control found by role and name", async () => {
+    atWidth(width);
+    useUIStore.setState({ sidebarCollapsed: false });
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
+    const nav = within(sidebar).getByRole("navigation", { name: "Main" });
+    for (const name of ["Discover", "Ask IRIS", "My Library", "Calls & Conferences"]) {
+      expect(within(nav).getByRole("link", { name })).toBeInTheDocument();
+    }
+    // The labels stay in the tree as screen-reader text, not display:none.
+    for (const label of within(nav).getAllByText(LABELS)) {
+      expect(label).toHaveClass("md:sr-only");
+    }
+    expect(within(sidebar).getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: /^Notifications/ })).toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: /account menu/ })).toBeInTheDocument();
+    expect(sidebar).toHaveClass("md:w-rail");
+    expect(sidebar).not.toHaveAttribute("inert");
+  });
+
+  it("leaves the page the rail's margin until the window reaches 1024 px", async () => {
+    atWidth(width);
+    useUIStore.setState({ sidebarCollapsed: false });
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    const content = screen.getByRole("main").parentElement!;
+    expect(content).toHaveClass("md:ml-rail");
+    // The full sidebar's margin starts at lg (1024 px), not at md.
+    expect(content).toHaveClass("lg:ml-60");
+    expect(content).not.toHaveClass("md:ml-60");
+  });
+
+  it("shows a tooltip naming each link on hover and on keyboard focus", async () => {
+    const user = userEvent.setup();
+    atWidth(width);
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    const navElement = await screen.findByRole("navigation", { name: "Main" });
+    const nav = within(navElement);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(nav.getByRole("link", { name: "Ask IRIS" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask IRIS");
+    await user.unhover(nav.getByRole("link", { name: "Ask IRIS" }));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    // Tab past the mark and the bell to the first link.
+    while (!navElement.contains(document.activeElement)) await user.tab();
+    const focused = document.activeElement as HTMLElement;
+    expect(focused).toHaveAccessibleName("Discover");
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Discover");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("gives the IRIS mark, the bell and the account button a tooltip too", async () => {
+    const user = userEvent.setup();
+    atWidth(width);
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    const sidebar = within(await screen.findByRole("complementary", { name: "Sidebar" }));
+    await user.hover(sidebar.getByRole("button", { name: "Open sidebar" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Open sidebar");
+    await user.hover(sidebar.getByRole("button", { name: /^Notifications/ }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Notifications");
+    await user.hover(sidebar.getByRole("button", { name: /account menu/ }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Ana Adviser");
+  });
+
+  it("opens the full sidebar over the page from the IRIS mark, without saving a preference", async () => {
+    const user = userEvent.setup();
+    atWidth(width);
+    useUIStore.setState({ sidebarCollapsed: false });
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    const page = await screen.findByRole("heading", { name: "My Library" });
+    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+
+    const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
+    expect(sidebar).toHaveClass("md:w-60");
+    const nav = within(sidebar).getByRole("navigation", { name: "Main" });
+    for (const label of within(nav).getAllByText(LABELS)) {
+      expect(label).not.toHaveClass("md:sr-only");
+    }
+    expect(within(sidebar).getByRole("button", { name: "Collapse sidebar" })).toHaveFocus();
+    expect(page.closest("[inert]")).not.toBeNull();
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+
+    await user.keyboard("{Escape}");
+    expect(useUIStore.getState().sidebarOpen).toBe(false);
+    expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveFocus();
+  });
+
+  it("closes the full sidebar when a link is chosen", async () => {
+    const user = userEvent.setup();
+    atWidth(width);
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await user.click(await screen.findByRole("button", { name: "Open sidebar" }));
+    await user.click(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Discover" }));
+
+    expect(await screen.findByRole("heading", { name: "Discover" })).toBeInTheDocument();
+    expect(useUIStore.getState().sidebarOpen).toBe(false);
+    expect(screen.getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
+  });
+
+  it("closes the opened sidebar when the window widens to the desktop, and keeps the rail when it narrows", async () => {
+    const user = userEvent.setup();
+    const resizeTo = atWidth(width);
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await user.click(await screen.findByRole("button", { name: "Open sidebar" }));
+    expect(useUIStore.getState().sidebarOpen).toBe(true);
+
+    resizeTo(1280);
+    expect(useUIStore.getState().sidebarOpen).toBe(false);
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
+
+    resizeTo(width);
+    expect(screen.getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+  });
+
+  it("has no serious or critical accessibility violations", async () => {
+    atWidth(width);
+    signIn(ROLES.RDCO, true);
+    const { container } = renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    await expectNoBlockingA11yViolations(container);
+  });
+});
+
+describe("the full sidebar from 1024 px (IR-1086)", () => {
+  it("shows labels and keeps the reader's saved collapse, with the margin to match", async () => {
+    atWidth(1024);
+    useUIStore.setState({ sidebarCollapsed: false });
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
+    expect(sidebar).toHaveClass("md:w-60");
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("main").parentElement).toHaveClass("lg:ml-60");
+  });
+
+  it("still collapses to the rail when the reader chose that", async () => {
+    atWidth(1280);
+    useUIStore.setState({ sidebarCollapsed: true });
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    expect(screen.getByRole("complementary", { name: "Sidebar" })).toHaveClass("md:w-rail");
+    expect(screen.getByRole("main").parentElement).not.toHaveClass("lg:ml-60");
   });
 });
 

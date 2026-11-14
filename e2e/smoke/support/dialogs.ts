@@ -384,7 +384,9 @@ export const DIALOGS: DialogCase[] = [
   {
     // Paper Chat on the AI runtime (IR-957): the modal form opens on the paper with no chat yet.
     id: "paper chat in its modal form", screen: "paper-view", path: `/records/${PAPER.id}`,
-    viewport: { width: 820, height: 900 }, sources: ["features/records/paper-view/PaperChatDock.tsx"],
+    // At tablet width the new icon rail leaves enough workspace for Ask IRIS
+    // to sit beside the page. Keep this modal case below the reading split.
+    viewport: { width: 600, height: 900 }, sources: ["features/records/paper-view/PaperChatDock.tsx"],
     override: (api) => {
       api.on("GET", "/ai/runtime/conversations", { protocol: "runs-reader-1", conversations: [] });
     },

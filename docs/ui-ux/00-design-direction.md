@@ -65,7 +65,7 @@ The frontend is further along than the backend. This is a **refinement** exercis
 | **Real design tokens** | `tailwind.config.js` defines a brand ramp (`#6B0F12` + 50–900), gold, cream, Inter, a 6-step font scale, radii, two card shadows |
 | **A primitive layer** | `ui/` — Button (5 variants × 3 sizes), Input (label/error/hint/leading), Card, Badge, Modal, Spinner, Toast |
 | **Shared components** | `DataTable` (wraps `@tanstack/react-table`, paginated), `EmptyState`, `StatusBadge`, `RoleBadge`, `ConfirmDialog`, `UploadDropzone` (was `FileUploadZone`; IR-405), `ResearchCard` (IR-405) |
-| **A responsive shell** | Sidebar as drawer < 768 px, icon rail 768–1279, full ≥ 1280; `AppShell` handles all three |
+| **A responsive shell** | Sidebar as drawer < 768 px, icon rail 768–1023, full ≥ 1024; `AppShell` handles all three |
 | **Global focus styling** | `index.css` sets a 2 px brand `:focus-visible` ring with offset — better than most projects this size |
 | **Modal semantics** | `role="dialog"`, `aria-modal`, `aria-labelledby`, Escape-to-close, `aria-hidden` backdrop, labelled close button |
 | **Feature coverage** | ~37 page components; the workflow path is complete end to end |
