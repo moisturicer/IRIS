@@ -1,0 +1,2096 @@
+{
+  "ticket": "IR-1125",
+  "decision_rule": "1. C is the default winner: it is the smallest change.\n2. A replaces C only if it wins on the text set by a paired exact (sign/McNemar) test at p < 0.05, and loses no figure question to C.\n3. B vs C: if their figure recall differs by one question or less, retrieval cannot separate them; the choice is a product decision about showing AI-written text to readers, recorded as such, with C chosen meanwhile.\n4. Any arm that is not identical to today on chunks with non-blank shown text, when it is meant to be, is a defect, not a result.",
+  "dry_run": false,
+  "arms": {
+    "today": "today",
+    "A": "embedded",
+    "B": "described",
+    "C": "fallback"
+  },
+  "sets": {
+    "text": {
+      "name": "proxy-starter",
+      "source": "..\\docs\\evaluation\\proxy_starter.json",
+      "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+      "tier": "proxy",
+      "questions": 107,
+      "without_passages": 40,
+      "unanswerable": 10,
+      "with_resolved_question": 20,
+      "record_scoped": 0,
+      "labels": 72,
+      "skipped_questions": [
+        "f01",
+        "f02",
+        "f03",
+        "f04",
+        "f05",
+        "f06",
+        "f07",
+        "f08",
+        "f09",
+        "f10",
+        "f11",
+        "f12",
+        "f13",
+        "f14",
+        "f15",
+        "f16",
+        "q40",
+        "q41",
+        "q44",
+        "q45",
+        "q48",
+        "q51"
+      ]
+    },
+    "figure": {
+      "name": "figure_reranker_ir1125",
+      "source": "..\\docs\\evaluation\\figure_reranker_ir1125.json",
+      "corpus": "IR-1054 six Unstructured papers, trial chunk set u2_labeled (iris_ir1054)",
+      "tier": "proxy",
+      "questions": 29,
+      "without_passages": 0,
+      "unanswerable": 0,
+      "with_resolved_question": 0,
+      "record_scoped": 0,
+      "labels": 29,
+      "skipped_questions": []
+    }
+  },
+  "recall": {
+    "text": {
+      "today": {
+        "recall_at_10": 0.7537,
+        "final_set_recall": 0.694,
+        "questions": 67,
+        "tokens": 2455380,
+        "paid_calls": 67,
+        "identical_to_today": true,
+        "by_kind": {
+          "cross-paper": {
+            "recall_at_10": 0.75,
+            "final_set_recall": 0.75,
+            "questions": 10
+          },
+          "exact-term": {
+            "recall_at_10": 0.8,
+            "final_set_recall": 0.8,
+            "questions": 10
+          },
+          "follow-up-after-grounded": {
+            "recall_at_10": 0.2,
+            "final_set_recall": 0.2,
+            "questions": 10
+          },
+          "mechanism": {
+            "recall_at_10": 0.8571,
+            "final_set_recall": 0.75,
+            "questions": 28
+          },
+          "near-duplicate": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 0.8889,
+            "questions": 9
+          }
+        }
+      },
+      "A": {
+        "recall_at_10": 0.7239,
+        "final_set_recall": 0.709,
+        "questions": 67,
+        "tokens": 2724795,
+        "paid_calls": 67,
+        "identical_to_today": false,
+        "by_kind": {
+          "cross-paper": {
+            "recall_at_10": 0.75,
+            "final_set_recall": 0.75,
+            "questions": 10
+          },
+          "exact-term": {
+            "recall_at_10": 0.8,
+            "final_set_recall": 0.8,
+            "questions": 10
+          },
+          "follow-up-after-grounded": {
+            "recall_at_10": 0.2,
+            "final_set_recall": 0.2,
+            "questions": 10
+          },
+          "mechanism": {
+            "recall_at_10": 0.7857,
+            "final_set_recall": 0.7857,
+            "questions": 28
+          },
+          "near-duplicate": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 0.8889,
+            "questions": 9
+          }
+        }
+      },
+      "B": {
+        "recall_at_10": 0.7537,
+        "final_set_recall": 0.694,
+        "questions": 67,
+        "tokens": 0,
+        "paid_calls": 0,
+        "identical_to_today": true,
+        "by_kind": {
+          "cross-paper": {
+            "recall_at_10": 0.75,
+            "final_set_recall": 0.75,
+            "questions": 10
+          },
+          "exact-term": {
+            "recall_at_10": 0.8,
+            "final_set_recall": 0.8,
+            "questions": 10
+          },
+          "follow-up-after-grounded": {
+            "recall_at_10": 0.2,
+            "final_set_recall": 0.2,
+            "questions": 10
+          },
+          "mechanism": {
+            "recall_at_10": 0.8571,
+            "final_set_recall": 0.75,
+            "questions": 28
+          },
+          "near-duplicate": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 0.8889,
+            "questions": 9
+          }
+        }
+      },
+      "C": {
+        "recall_at_10": 0.7537,
+        "final_set_recall": 0.694,
+        "questions": 67,
+        "tokens": 0,
+        "paid_calls": 0,
+        "identical_to_today": true,
+        "by_kind": {
+          "cross-paper": {
+            "recall_at_10": 0.75,
+            "final_set_recall": 0.75,
+            "questions": 10
+          },
+          "exact-term": {
+            "recall_at_10": 0.8,
+            "final_set_recall": 0.8,
+            "questions": 10
+          },
+          "follow-up-after-grounded": {
+            "recall_at_10": 0.2,
+            "final_set_recall": 0.2,
+            "questions": 10
+          },
+          "mechanism": {
+            "recall_at_10": 0.8571,
+            "final_set_recall": 0.75,
+            "questions": 28
+          },
+          "near-duplicate": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 0.8889,
+            "questions": 9
+          }
+        }
+      }
+    },
+    "figure": {
+      "today": {
+        "recall_at_10": 0.3103,
+        "final_set_recall": 0.3103,
+        "questions": 29,
+        "tokens": 944844,
+        "paid_calls": 29,
+        "identical_to_today": true,
+        "by_kind": {
+          "figure-captioned": {
+            "recall_at_10": 0.8182,
+            "final_set_recall": 0.8182,
+            "questions": 11
+          },
+          "figure-uncaptioned": {
+            "recall_at_10": 0.0,
+            "final_set_recall": 0.0,
+            "questions": 18
+          }
+        }
+      },
+      "A": {
+        "recall_at_10": 1.0,
+        "final_set_recall": 1.0,
+        "questions": 29,
+        "tokens": 1250739,
+        "paid_calls": 29,
+        "identical_to_today": false,
+        "by_kind": {
+          "figure-captioned": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 1.0,
+            "questions": 11
+          },
+          "figure-uncaptioned": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 1.0,
+            "questions": 18
+          }
+        }
+      },
+      "B": {
+        "recall_at_10": 1.0,
+        "final_set_recall": 1.0,
+        "questions": 29,
+        "tokens": 1207131,
+        "paid_calls": 29,
+        "identical_to_today": false,
+        "by_kind": {
+          "figure-captioned": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 1.0,
+            "questions": 11
+          },
+          "figure-uncaptioned": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 1.0,
+            "questions": 18
+          }
+        }
+      },
+      "C": {
+        "recall_at_10": 0.931,
+        "final_set_recall": 0.931,
+        "questions": 29,
+        "tokens": 1112713,
+        "paid_calls": 29,
+        "identical_to_today": false,
+        "by_kind": {
+          "figure-captioned": {
+            "recall_at_10": 0.8182,
+            "final_set_recall": 0.8182,
+            "questions": 11
+          },
+          "figure-uncaptioned": {
+            "recall_at_10": 1.0,
+            "final_set_recall": 1.0,
+            "questions": 18
+          }
+        }
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "first": "A",
+      "second": "today",
+      "wins": [],
+      "losses": [
+        "q03",
+        "q08"
+      ],
+      "ties": 65,
+      "p_value": 0.5,
+      "set": "text"
+    },
+    {
+      "first": "B",
+      "second": "today",
+      "wins": [],
+      "losses": [],
+      "ties": 67,
+      "p_value": 1.0,
+      "set": "text"
+    },
+    {
+      "first": "C",
+      "second": "today",
+      "wins": [],
+      "losses": [],
+      "ties": 67,
+      "p_value": 1.0,
+      "set": "text"
+    },
+    {
+      "first": "A",
+      "second": "C",
+      "wins": [],
+      "losses": [
+        "q03",
+        "q08"
+      ],
+      "ties": 65,
+      "p_value": 0.5,
+      "set": "text"
+    },
+    {
+      "first": "B",
+      "second": "C",
+      "wins": [],
+      "losses": [],
+      "ties": 67,
+      "p_value": 1.0,
+      "set": "text"
+    },
+    {
+      "first": "A",
+      "second": "today",
+      "wins": [
+        "fig29",
+        "fig23",
+        "fig25",
+        "fig27",
+        "fig19",
+        "fig20",
+        "fig04",
+        "fig05",
+        "fig06",
+        "fig09",
+        "fig10",
+        "fig11",
+        "fig12",
+        "fig13",
+        "fig15",
+        "fig16",
+        "fig18",
+        "fig03",
+        "fig01",
+        "fig02"
+      ],
+      "losses": [],
+      "ties": 9,
+      "p_value": 2e-06,
+      "set": "figure"
+    },
+    {
+      "first": "B",
+      "second": "today",
+      "wins": [
+        "fig29",
+        "fig23",
+        "fig25",
+        "fig27",
+        "fig19",
+        "fig20",
+        "fig04",
+        "fig05",
+        "fig06",
+        "fig09",
+        "fig10",
+        "fig11",
+        "fig12",
+        "fig13",
+        "fig15",
+        "fig16",
+        "fig18",
+        "fig03",
+        "fig01",
+        "fig02"
+      ],
+      "losses": [],
+      "ties": 9,
+      "p_value": 2e-06,
+      "set": "figure"
+    },
+    {
+      "first": "C",
+      "second": "today",
+      "wins": [
+        "fig29",
+        "fig23",
+        "fig25",
+        "fig27",
+        "fig19",
+        "fig20",
+        "fig04",
+        "fig05",
+        "fig06",
+        "fig09",
+        "fig11",
+        "fig12",
+        "fig15",
+        "fig16",
+        "fig18",
+        "fig03",
+        "fig01",
+        "fig02"
+      ],
+      "losses": [],
+      "ties": 11,
+      "p_value": 8e-06,
+      "set": "figure"
+    },
+    {
+      "first": "A",
+      "second": "C",
+      "wins": [
+        "fig10",
+        "fig13"
+      ],
+      "losses": [],
+      "ties": 27,
+      "p_value": 0.5,
+      "set": "figure"
+    },
+    {
+      "first": "B",
+      "second": "C",
+      "wins": [
+        "fig10",
+        "fig13"
+      ],
+      "losses": [],
+      "ties": 27,
+      "p_value": 0.5,
+      "set": "figure"
+    }
+  ],
+  "per_question": {
+    "text/today": {
+      "q01": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q02": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q03": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q04": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q05": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q06": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q07": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q08": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q09": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q10": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q11": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q12": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q13": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q14": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q15": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q16": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q17": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q18": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q19": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q20": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q21": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q22": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q23": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q24": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q25": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q26": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q27": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q28": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q29": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q30": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q31": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q32": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q33": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q34": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q35": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q36": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q37": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q38": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q39": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q42": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q43": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q46": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q47": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q49": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q50": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q52": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q61": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q62": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q75": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q76": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q77": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q98": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q99": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q100": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q101": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q102": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q103": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q104": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q105": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q106": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q107": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q108": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q109": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q110": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q111": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q112": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q113": {
+        "recall": 1.0,
+        "found": true
+      }
+    },
+    "text/A": {
+      "q01": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q02": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q03": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q04": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q05": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q06": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q07": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q08": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q09": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q10": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q11": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q12": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q13": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q14": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q15": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q16": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q17": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q18": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q19": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q20": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q21": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q22": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q23": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q24": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q25": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q26": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q27": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q28": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q29": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q30": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q31": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q32": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q33": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q34": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q35": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q36": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q37": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q38": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q39": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q42": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q43": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q46": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q47": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q49": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q50": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q52": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q61": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q62": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q75": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q76": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q77": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q98": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q99": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q100": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q101": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q102": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q103": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q104": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q105": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q106": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q107": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q108": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q109": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q110": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q111": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q112": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q113": {
+        "recall": 1.0,
+        "found": true
+      }
+    },
+    "text/B": {
+      "q01": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q02": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q03": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q04": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q05": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q06": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q07": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q08": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q09": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q10": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q11": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q12": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q13": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q14": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q15": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q16": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q17": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q18": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q19": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q20": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q21": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q22": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q23": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q24": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q25": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q26": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q27": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q28": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q29": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q30": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q31": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q32": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q33": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q34": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q35": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q36": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q37": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q38": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q39": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q42": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q43": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q46": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q47": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q49": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q50": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q52": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q61": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q62": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q75": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q76": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q77": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q98": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q99": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q100": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q101": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q102": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q103": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q104": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q105": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q106": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q107": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q108": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q109": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q110": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q111": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q112": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q113": {
+        "recall": 1.0,
+        "found": true
+      }
+    },
+    "text/C": {
+      "q01": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q02": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q03": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q04": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q05": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q06": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q07": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q08": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q09": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q10": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q11": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q12": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q13": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q14": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q15": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q16": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q17": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q18": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q19": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q20": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q21": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q22": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q23": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q24": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q25": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q26": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q27": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q28": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q29": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q30": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q31": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q32": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q33": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q34": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q35": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q36": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q37": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q38": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q39": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q42": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q43": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q46": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q47": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q49": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q50": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q52": {
+        "recall": 0.5,
+        "found": false
+      },
+      "q61": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q62": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q75": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q76": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q77": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q98": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q99": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q100": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q101": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q102": {
+        "recall": 0.0,
+        "found": false
+      },
+      "q103": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q104": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q105": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q106": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q107": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q108": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q109": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q110": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q111": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q112": {
+        "recall": 1.0,
+        "found": true
+      },
+      "q113": {
+        "recall": 1.0,
+        "found": true
+      }
+    },
+    "figure/today": {
+      "fig28": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig29": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig23": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig24": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig25": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig26": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig27": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig19": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig20": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig21": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig22": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig04": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig05": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig06": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig07": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig08": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig09": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig10": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig11": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig12": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig13": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig14": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig15": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig16": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig17": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig18": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig03": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig01": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig02": {
+        "recall": 0.0,
+        "found": false
+      }
+    },
+    "figure/A": {
+      "fig28": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig29": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig23": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig24": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig25": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig26": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig27": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig19": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig20": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig21": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig22": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig04": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig05": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig06": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig07": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig08": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig09": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig10": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig11": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig12": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig13": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig14": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig15": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig16": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig17": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig18": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig03": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig01": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig02": {
+        "recall": 1.0,
+        "found": true
+      }
+    },
+    "figure/B": {
+      "fig28": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig29": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig23": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig24": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig25": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig26": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig27": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig19": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig20": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig21": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig22": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig04": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig05": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig06": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig07": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig08": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig09": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig10": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig11": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig12": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig13": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig14": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig15": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig16": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig17": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig18": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig03": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig01": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig02": {
+        "recall": 1.0,
+        "found": true
+      }
+    },
+    "figure/C": {
+      "fig28": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig29": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig23": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig24": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig25": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig26": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig27": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig19": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig20": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig21": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig22": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig04": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig05": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig06": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig07": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig08": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig09": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig10": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig11": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig12": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig13": {
+        "recall": 0.0,
+        "found": false
+      },
+      "fig14": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig15": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig16": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig17": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig18": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig03": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig01": {
+        "recall": 1.0,
+        "found": true
+      },
+      "fig02": {
+        "recall": 1.0,
+        "found": true
+      }
+    }
+  },
+  "defects": [],
+  "tokens": 9695602,
+  "billed_tokens": 9613375,
+  "cost_per_million_usd": 0.05,
+  "cost_usd": 0.4807,
+  "recall_calls": 96,
+  "decision": [
+    "Rules 1-2: C stands (A vs C on text: 0 wins, 2 losses, p=0.5000; figure losses to C: 0).",
+    "Rule 3: B and C differ by 2 figure questions (B ahead). The rule does not choose here; a person does."
+  ],
+  "provenance": {
+    "ran_at": "2026-11-14T19:40:23+00:00",
+    "reranker": "VoyageReranker",
+    "retrieval_limit": 10,
+    "max_sources": 8,
+    "estimated_tokens": 9695602,
+    "labels_reviewed_by": "Jive Tyler Revalde",
+    "git_commit": "v0.1.0-2717-gc6f59f2c-dirty",
+    "retrieved_as": "student@cit.edu",
+    "figure_trial": "u2_labeled",
+    "techniques": {
+      "fusion": {
+        "setting": "AI_RETRIEVAL_FUSION_ENABLED",
+        "value": false,
+        "implemented": true,
+        "overridden": false,
+        "ticket": "IR-395"
+      },
+      "keyword_retrieval": {
+        "setting": "AI_KEYWORD_RETRIEVAL_ENABLED",
+        "value": false,
+        "implemented": true,
+        "overridden": false,
+        "ticket": "IR-395"
+      },
+      "relevance_cut_off": {
+        "setting": "AI_RELEVANCE_MIN_SCORE",
+        "value": null,
+        "implemented": false,
+        "overridden": false,
+        "ticket": "IR-396"
+      },
+      "per_paper_cap": {
+        "setting": "AI_MAX_PASSAGES_PER_RECORD",
+        "value": null,
+        "implemented": false,
+        "overridden": false,
+        "ticket": "IR-397"
+      },
+      "neighbour_joining": {
+        "setting": "AI_JOIN_ADJACENT_PASSAGES",
+        "value": null,
+        "implemented": false,
+        "overridden": false,
+        "ticket": "IR-397"
+      },
+      "token_budget": {
+        "setting": "AI_PASSAGE_TOKEN_BUDGET",
+        "value": null,
+        "implemented": false,
+        "overridden": false,
+        "ticket": "IR-397"
+      },
+      "formula_text": {
+        "setting": "AI_FORMULA_TEXT_INDEXED",
+        "value": false,
+        "implemented": true,
+        "overridden": false,
+        "ticket": "IR-1102"
+      },
+      "reranker_reads": {
+        "setting": "AI_RERANKER_READS",
+        "value": "today",
+        "implemented": true,
+        "overridden": false,
+        "ticket": "IR-1125"
+      }
+    },
+    "question_sets": {
+      "text": {
+        "path": "..\\docs\\evaluation\\proxy_starter.json",
+        "sha256": "742a8e5a0da085a1172f374d576cd6f8bec9443ac53c82f693e6ba5c185be417"
+      },
+      "figure": {
+        "path": "..\\docs\\evaluation\\figure_reranker_ir1125.json",
+        "sha256": "d12578b8e129918d90cb43b36b84f97b20bf5e971eb4650cd303a795bdddf4ab"
+      }
+    }
+  }
+}
