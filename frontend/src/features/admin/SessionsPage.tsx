@@ -56,7 +56,7 @@ export default function SessionsPage() {
           onClick={load}
           disabled={loading}
         >
-          <i className={`fas fa-sync-alt text-[13px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-small ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </Button>
       </div>
@@ -77,8 +77,8 @@ export default function SessionsPage() {
       {!loading && !error && sessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-stone-500">
           <i className="fas fa-shield-alt text-4xl mb-3" aria-hidden />
-          <p className="text-[14px] font-medium">No active sessions</p>
-          <p className="text-[13px] mt-1">All users are currently logged out.</p>
+          <p className="text-body font-medium">No active sessions</p>
+          <p className="text-small mt-1">All users are currently logged out.</p>
         </div>
       )}
 
@@ -87,13 +87,13 @@ export default function SessionsPage() {
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           {/* Count badge */}
           <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-            <span className="text-[13px] text-stone-500 font-medium">
+            <span className="text-small text-stone-500 font-medium">
               {sessions.length} active session{sessions.length !== 1 ? "s" : ""}
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-[14px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">User</th>

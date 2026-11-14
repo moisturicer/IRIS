@@ -40,7 +40,7 @@ function PasswordToggle({ shown, label, onToggle }: { shown: boolean; label: str
       onClick={onToggle}
       aria-label={`${shown ? "Hide" : "Show"} ${label}`}
       // 44px target, like the sign-in screen's toggle (2.5.5).
-      className="flex items-center justify-center min-h-11 min-w-11 px-1 text-[14px] font-semibold text-brand hover:underline"
+      className="flex items-center justify-center min-h-11 min-w-11 px-1 text-body font-semibold text-brand hover:underline"
     >
       {shown ? "Hide" : "Show"}
     </button>
@@ -132,12 +132,12 @@ export default function ResetPasswordPage() {
           className="text-balance font-display text-display font-semibold text-stone-900 outline-none">
           Password updated
         </h2>
-        <p className="mt-3 text-[15px] leading-relaxed text-stone-700">{done}</p>
-        <p className="mt-3 text-[14px] leading-relaxed text-stone-600">
+        <p className="mt-3 text-body leading-relaxed text-stone-700">{done}</p>
+        <p className="mt-3 text-body leading-relaxed text-stone-600">
           Every device that was signed in has been signed out. Email verification, role approval and
           any account restrictions still apply.
         </p>
-        <p className="mt-6 text-[15px]">
+        <p className="mt-6 text-body">
           <Link to="/login" className="font-semibold text-brand hover:underline">Return to sign in</Link>
         </p>
       </EntryFrame>
@@ -151,8 +151,8 @@ export default function ResetPasswordPage() {
           className="text-balance font-display text-display font-semibold text-stone-900 outline-none">
           This link can&apos;t be used
         </h2>
-        <p className="mt-3 text-[15px] leading-relaxed text-stone-700">{INVALID_LINK}</p>
-        <div className="mt-6 flex flex-col gap-3 text-[15px]">
+        <p className="mt-3 text-body leading-relaxed text-stone-700">{INVALID_LINK}</p>
+        <div className="mt-6 flex flex-col gap-3 text-body">
           <Link to="/password/forgot" className="font-semibold text-brand hover:underline">Request a new email</Link>
           <Link to="/login" className="font-semibold text-brand hover:underline">Back to sign in</Link>
         </div>
@@ -167,7 +167,7 @@ export default function ResetPasswordPage() {
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">
         Choose a new password
       </h2>
-      <p className="mt-2 mb-6 text-[15px] leading-relaxed text-stone-600">
+      <p className="mt-2 mb-6 text-body leading-relaxed text-stone-600">
         You will sign in with it from now on. Every device signed in to your account will be signed out.
       </p>
       {summary && (
