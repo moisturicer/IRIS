@@ -90,7 +90,6 @@ export const SUB_12PX_ALLOWANCE: Record<string, number> = {
   "src/features/ai/components/SourceContextPanel.tsx": 1,
   "src/features/ai/components/StreamStatusRow.tsx": 1,
   "src/features/discover/DiscoverFilterDropdown.tsx": 1,
-  "src/features/discover/DiscoverPage.tsx": 1,
   "src/features/discover/DiscoverResultCard.tsx": 1,
   "src/features/discover/ManuscriptCover.tsx": 1,
   "src/features/discover/MyFeeds.tsx": 2,

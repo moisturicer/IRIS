@@ -267,6 +267,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1073** | Every page has its own browser tab title: `<page> · IRIS` from the route, refined by a paper's, a conversation's or My Reviews' own name (audit NAV-01, WCAG 2.4.2) — epic IR-920; no FR- id | [details](traceability/IR-1073.md) | **IMPLEMENTED** |
 | **IR-1086** | Tablet: below 1024 px the sidebar is a 76 px icon rail, every control named and with a tooltip on hover and focus; the IRIS mark opens the full sidebar over the page (audit NAV-06, NAV-07) — epic IR-920; no FR- id | [details](traceability/IR-1086.md) | **IMPLEMENTED** |
 | **IR-1075** | Notifications show when their review task has closed: a notification that asked for action carries `resolved_at` and `resolved_label` from the server, leaves the unread count, and is final across a clearance reset — epic IR-671; ADR-069; no FR- id | [details](traceability/IR-1075.md) | **PARTIAL** |
+| **IR-1080** | Phone Discover: search first, then one scrolling row of named controls (feed, Areas, My feeds, Filters, Publish), each at least 44 px tall; Papers/People in the header (audit RES-01, RES-02, A11Y-09) — epic IR-920; no FR- id | [details](traceability/IR-1080.md) | **IMPLEMENTED** |
 | NFR-P1 | 100 concurrent sessions | [details](traceability/NFR-P1.md) | **NOT STARTED** |
 | NFR-P2…P5 | Performance and processing | [details](traceability/NFR-P2-P5.md) | **NOT STARTED** |
 | NFR-R1 | Uptime | [details](traceability/NFR-R1.md) | **NOT STARTED** |
