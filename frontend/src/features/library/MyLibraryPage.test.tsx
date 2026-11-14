@@ -7,7 +7,7 @@ import { useLibraryStore } from "@/store/library.store";
 import type { User } from "@/types/auth";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
-import type { MyResearchItem, ReaderDownloadRequest, RecordListItem } from "@/types/records";
+import type { ClearanceStripEntry, MyResearchItem, ReaderDownloadRequest, RecordListItem } from "@/types/records";
 import MyLibraryPage from "./MyLibraryPage";
 
 vi.mock("@/api/records", () => ({
@@ -57,6 +57,14 @@ function signIn(id: number, role = "Student") {
   useAuthStore.getState().login({ id, email: `reader${id}@cit.edu`, role_name: role } as unknown as User, "access", "refresh");
 }
 
+/** What a resubmission left on a record: ITSO's clearance kept, IERC's reset (IR-1083). */
+const KEPT: ClearanceStripEntry = {
+  party: "itso", label: "ITSO", kind: "kept", text: "Cleared", note: "Kept from v1", version: 1,
+};
+const RESET: ClearanceStripEntry = {
+  party: "ierc", label: "IERC", kind: "reviewing", text: "Reviewing v2", note: "Reset by v2", version: 2,
+};
+
 type MineResponse = Awaited<ReturnType<typeof recordsApi.mine>>;
 
 const ownRecord = (overrides: Partial<MyResearchItem>): MyResearchItem => ({
@@ -70,6 +78,7 @@ const ownRecord = (overrides: Partial<MyResearchItem>): MyResearchItem => ({
   workflow_state_label: "Draft",
   holders: [],
   cleared_offices: [],
+  clearance_strip: [],
   submitter_status: { line: "Draft: not yet submitted", waiting_on_you: [] },
   created_at: "2026-10-01T00:00:00Z",
   updated_at: "2026-10-02T00:00:00Z",
@@ -200,6 +209,7 @@ describe("My Library: an author's research", () => {
         id: 20, title: "Parallel review", pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
         holders: [{ party: "ierc", label: "IERC" }],
         cleared_offices: [{ office: "itso", label: "ITSO", preserved: true }],
+        clearance_strip: [KEPT, RESET],
       }),
       ownRecord({ id: 21, title: "First reading", pipeline_status: "in_review", workflow_state: "submitted", workflow_state_label: "Submitted", holders: [{ party: "adviser", label: "Adviser" }] }),
     ]);
@@ -207,8 +217,10 @@ describe("My Library: an author's research", () => {
 
     await screen.findByRole("link", { name: "Parallel review" });
     const review = section("In review");
-    expect(within(review).getByText("ITSO cleared")).toBeInTheDocument();
-    expect(within(review).getByText("· kept")).toBeInTheDocument();
+    // The strip is the server's words (IR-1083): kept says which version it was kept from.
+    const strip = within(review).getByRole("list", { name: "Clearances" });
+    expect(strip).toHaveTextContent("ITSO: Cleared · Kept from v1");
+    expect(strip).toHaveTextContent("IERC: Reviewing v2 · Reset by v2");
     expect(within(review).getByRole("link", { name: "First reading" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /With your Adviser|With the offices|With RDCO/ })).not.toBeInTheDocument();
   });

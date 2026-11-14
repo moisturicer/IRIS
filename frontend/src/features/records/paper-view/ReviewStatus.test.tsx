@@ -68,6 +68,7 @@ function afterRevision(): RecordTracker {
       row({ party: "ktto", label: "KTTO", state: "not_requested", state_label: "Not requested", at: null }),
       row({ party: "rdco", label: "RDCO", state: "awaiting", state_label: "Awaiting", at: null }),
     ],
+    clearance_strip: [],
     routing_history: [],
     routing_recorded_from: null,
     reviews: [],

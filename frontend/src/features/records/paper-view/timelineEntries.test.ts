@@ -19,6 +19,7 @@ function tracker(overrides: Partial<RecordTracker> = {}): RecordTracker {
     workflow_state_label: "In review",
     current_holders: [],
     parties: [],
+    clearance_strip: [],
     routing_history: [],
     routing_recorded_from: null,
     reviews: [],

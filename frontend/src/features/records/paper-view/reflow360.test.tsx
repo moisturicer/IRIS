@@ -84,7 +84,7 @@ describe("the routing tracker", () => {
     tracker.mockResolvedValue({
       data: {
         record_id: 15, record_type: "Thesis / Research", workflow_state: "submitted", workflow_state_label: "Submitted",
-        current_holders: [], parties: [party], routing_history: [], routing_recorded_from: null, reviews: [],
+        current_holders: [], parties: [party], clearance_strip: [], routing_history: [], routing_recorded_from: null, reviews: [],
         versions: [], review_comments: [], resubmissions: [], document_requests: [], clearances: [],
         resubmission: { count: 0, last_resubmitted_at: null, declining_office: null, offices_preserved: [] },
       } satisfies RecordTracker,

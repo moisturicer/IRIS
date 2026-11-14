@@ -1,3 +1,5 @@
+import type { ClearanceStripEntry } from "./records";
+
 /** The three tabs of My Reviews (ADR-032 §9). */
 export type MyReviewsTab = "to_review" | "in_review" | "done";
 
@@ -61,6 +63,8 @@ export interface MyReviewsRow {
   clock_paused:     boolean;
   /** Manila working days late, holidays excluded (IR-622); null unless overdue. */
   overdue_days:     number | null;
+  /** Which clearances this record holds, in the server's words (IR-1083). */
+  clearance_strip:  ClearanceStripEntry[];
 }
 
 /** The current tabs' orders (IR-622). Done is always newest first. */
@@ -109,6 +113,8 @@ export interface OfficeConsoleRow {
   /** Waiting on a requested document or on the author: the clock stands still. */
   clock_paused:     boolean;
   can_extend:       boolean;
+  /** Which clearances this record holds, in the server's words (IR-1083). */
+  clearance_strip:  ClearanceStripEntry[];
 }
 
 /** One member's load in the console: every member, idle ones too. */

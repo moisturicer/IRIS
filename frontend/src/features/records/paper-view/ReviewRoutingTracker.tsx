@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { recordsApi } from "@/api/records";
 import { isRequestTimeout } from "@/api/requestPolicy";
+import { ClearanceStrip } from "@/components/shared/ClearanceStrip";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
 import type {
@@ -148,6 +149,9 @@ function TrackerBody({ data }: { data: RecordTracker }) {
           </ul>
         </div>
       )}
+
+      {/* The same strip the lists draw (IR-1083), from the same server field. */}
+      <ClearanceStrip entries={data.clearance_strip} />
 
       <table className="w-full text-left border-collapse">
         <caption className="sr-only">Parties</caption>

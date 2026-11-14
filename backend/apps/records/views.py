@@ -1708,6 +1708,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         record here. Every row's workflow facts are worked out in one pass, so
         the query count does not grow with the number of records.
         """
+        from apps.reviews.clearance_strip import clearance_strips
         from apps.reviews.tracker import workflow_facts
 
         from django.db.models import Exists, OuterRef
@@ -1727,7 +1728,11 @@ class RecordViewSet(viewsets.ModelViewSet):
         records = list(qs)
         serializer = MyResearchSerializer(
             records, many=True,
-            context={"request": request, "workflow_facts": workflow_facts(records)},
+            context={
+                "request": request,
+                "workflow_facts": workflow_facts(records),
+                "clearance_strips": clearance_strips(r.pk for r in records),
+            },
         )
         return Response(serializer.data)
 

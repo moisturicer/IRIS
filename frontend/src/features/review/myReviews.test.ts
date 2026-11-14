@@ -19,6 +19,7 @@ function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
     outcome: null, outcome_label: null, decided_at: null,
     can_claim: false, can_assign: false,
     due_at: null, original_due_at: null, is_overdue: false, clock_paused: false, overdue_days: null,
+    clearance_strip: [],
     ...overrides,
   };
 }

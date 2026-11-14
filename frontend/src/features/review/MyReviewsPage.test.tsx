@@ -11,6 +11,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
 import type { User } from "@/types/auth";
+import type { ClearanceStripEntry } from "@/types/records";
 import type { MyReviewsPage as Page, MyReviewsRow } from "@/types/reviews";
 
 import MyReviewsPage from "./MyReviewsPage";
@@ -29,6 +30,14 @@ vi.mock("@/api/reviews", () => ({
   },
 }));
 
+/** What a resubmission left on a record: ITSO's clearance kept, IERC's reset (IR-1083). */
+const KEPT: ClearanceStripEntry = {
+  party: "itso", label: "ITSO", kind: "kept", text: "Cleared", note: "Kept from v1", version: 1,
+};
+const RESET: ClearanceStripEntry = {
+  party: "ierc", label: "IERC", kind: "reviewing", text: "Reviewing v2", note: "Reset by v2", version: 2,
+};
+
 function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
   return {
     key: "seat:1", kind: "seat", record: 7, title: "Smart Campus Energy Monitor",
@@ -39,6 +48,7 @@ function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
     waiting_on: null, outcome: null, outcome_label: null, decided_at: null,
     can_claim: false, can_assign: false,
     due_at: null, original_due_at: null, is_overdue: false, clock_paused: false, overdue_days: null,
+    clearance_strip: [],
     ...overrides,
   };
 }
@@ -95,6 +105,28 @@ beforeEach(() => {
 afterEach(() => useAuthStore.setState({ user: null }));
 
 describe("MyReviewsPage", () => {
+  it("shows a kept clearance and a reset one on each row, in the server's words (IR-1083)", async () => {
+    mine.mockResolvedValue(page([
+      row({ clearance_strip: [KEPT, RESET] }),
+      row({ key: "seat:2", record: 9, title: "Rainwater Harvesting Survey", clearance_strip: [RESET] }),
+      POOL,
+    ]));
+    show();
+
+    const kept = await screen.findByRole("article", { name: "Smart Campus Energy Monitor" });
+    const strip = within(kept).getByRole("list", { name: "Clearances" });
+    expect(strip).toHaveTextContent("ITSO: Cleared · Kept from v1");
+    expect(strip).toHaveTextContent("IERC: Reviewing v2 · Reset by v2");
+
+    const reset = screen.getByRole("article", { name: "Rainwater Harvesting Survey" });
+    expect(within(reset).getByRole("list", { name: "Clearances" })).toHaveTextContent("Reset by v2");
+    expect(within(reset).queryByText(/kept from/i)).not.toBeInTheDocument();
+
+    // A record no office holds a clearance on draws no strip.
+    const pool = screen.getByRole("article", { name: "AI-Based Medical Imaging" });
+    expect(within(pool).queryByRole("list", { name: "Clearances" })).not.toBeInTheDocument();
+  });
+
   it("shows three tabs with their counts and the rows of To review", async () => {
     const { container } = show();
 

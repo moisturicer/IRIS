@@ -69,6 +69,7 @@ function payload(overrides: Partial<RecordTracker>): RecordTracker {
     workflow_state_label: "Submitted",
     current_holders: [],
     parties: [],
+    clearance_strip: [],
     routing_history: [],
     routing_recorded_from: "2026-09-19T12:00:00Z",
     reviews: [],
@@ -192,6 +193,23 @@ describe("ReviewRoutingTracker", () => {
     expect(screen.queryByRole("list", { name: /currently with/i })).not.toBeInTheDocument();
 
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows the clearance strip the lists show, from the server's field (IR-1083)", async () => {
+    tracker.mockResolvedValue({
+      data: {
+        ...afterResubmission,
+        clearance_strip: [
+          { party: "itso", label: "ITSO", kind: "kept", text: "Cleared", note: "Kept from v1", version: 1 },
+          { party: "ierc", label: "IERC", kind: "reviewing", text: "Reviewing v2", note: "Reset by v2", version: 2 },
+        ],
+      },
+    });
+    renderTracker();
+
+    const strip = await screen.findByRole("list", { name: "Clearances" });
+    expect(strip).toHaveTextContent("ITSO: Cleared · Kept from v1");
+    expect(strip).toHaveTextContent("IERC: Reviewing v2 · Reset by v2");
   });
 
   it("keeps a retired Intake out of the party table once it has completed, but not out of the history", async () => {

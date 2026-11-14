@@ -101,6 +101,8 @@ class MyResearchSerializer(serializers.ModelSerializer):
     # `[{office, label, preserved}]`: each office that has cleared it, and
     # whether that clearance was kept through a resubmission (ADR-003).
     cleared_offices      = serializers.SerializerMethodField()
+    # The same facts as one line per office, in the server's words (IR-1083).
+    clearance_strip      = serializers.SerializerMethodField()
     # The owner's status line and what waits on them (IR-625). Every row
     # here is the caller's own record.
     submitter_status     = serializers.SerializerMethodField()
@@ -128,6 +130,9 @@ class MyResearchSerializer(serializers.ModelSerializer):
     def get_cleared_offices(self, obj):
         return self._facts(obj)["cleared_offices"]
 
+    def get_clearance_strip(self, obj):
+        return self.context["clearance_strips"][obj.pk]
+
     def get_submitter_status(self, obj):
         from apps.reviews.submitter_status import submitter_status
 
@@ -144,7 +149,7 @@ class MyResearchSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "record_type_name", "authors", "adviser_name",
             "pipeline_status", "workflow_state", "workflow_state_label",
-            "holders", "cleared_offices", "submitter_status", "created_at", "updated_at", "can_continue",
+            "holders", "cleared_offices", "clearance_strip", "submitter_status", "created_at", "updated_at", "can_continue",
         ]
         read_only_fields = fields
 
