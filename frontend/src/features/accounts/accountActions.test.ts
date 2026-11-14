@@ -29,4 +29,9 @@ describe("rowActions", () => {
     expect(rowActions("Student", 99, { id: 4, role_name: "Student" })).toEqual([]);
     expect(rowActions(undefined, undefined, { id: 4, role_name: "Student" })).toEqual([]);
   });
+
+  it("lists nothing while the viewer's own id is unknown, so a row can never be their own", () => {
+    expect(rowActions("RDCO", undefined, { id: 4, role_name: "Student" })).toEqual([]);
+    expect(rowActions("RDCO", null, { id: 4, role_name: "Student" })).toEqual([]);
+  });
 });

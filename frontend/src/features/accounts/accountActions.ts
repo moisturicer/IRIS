@@ -40,14 +40,16 @@ export type RowAction = "change-role" | "coordinator" | "lock";
 
 /**
  * What `viewer` is offered on one row, or nothing. The viewer's own row carries
- * no action at all, whatever the rules above would otherwise allow.
+ * no action at all, whatever the rules above would otherwise allow, and
+ * nothing is offered while the viewer's own id is unknown.
  */
 export function rowActions(
   viewer: string | null | undefined,
   viewerId: number | null | undefined,
   target: { id: number; role_name: string },
 ): RowAction[] {
-  if (viewerId !== null && viewerId !== undefined && target.id === viewerId) return [];
+  // Without an id the viewer's own row cannot be told apart, so nothing is offered.
+  if (viewerId === null || viewerId === undefined || target.id === viewerId) return [];
   const actions: RowAction[] = [];
   if (rolesToOffer(viewer, target.role_name).length > 0) actions.push("change-role");
   if (mayCoordinate(viewer, target.role_name)) actions.push("coordinator");

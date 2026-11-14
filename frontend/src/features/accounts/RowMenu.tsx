@@ -2,10 +2,12 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
+const ITEM_SELECTOR = '[role="menuitem"]';
+
 export interface RowMenuItem {
   key: string;
   label: string;
-  /** A destructive item: maroon text, never a filled button (audit CMP-01). */
+  /** A destructive item: Binding Maroon Dark text with a warning glyph, never a filled button (audit CMP-01, DESIGN.md). */
   danger?: boolean;
   onSelect: () => void;
 }
@@ -44,7 +46,7 @@ export function RowMenu({ label, items }: RowMenuProps) {
 
   // The first item takes focus once the list is drawn.
   useEffect(() => {
-    if (open && anchor) menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    if (open && anchor) menuRef.current?.querySelector<HTMLButtonElement>(ITEM_SELECTOR)?.focus();
   }, [open, anchor]);
 
   useEffect(() => {
@@ -73,7 +75,7 @@ export function RowMenu({ label, items }: RowMenuProps) {
   };
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>(ITEM_SELECTOR) ?? []);
     const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
     const move = (index: number) => {
       event.preventDefault();
@@ -104,7 +106,7 @@ export function RowMenu({ label, items }: RowMenuProps) {
         onClick={() => setOpen((value) => !value)}
         className="inline-flex h-11 w-11 items-center justify-center rounded-full text-stone-600 transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand aria-expanded:bg-stone-100 motion-reduce:transition-none"
       >
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-[18px] w-[18px]" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
           <circle cx="5" cy="12" r="1.8" />
           <circle cx="12" cy="12" r="1.8" />
           <circle cx="19" cy="12" r="1.8" />
@@ -130,10 +132,11 @@ export function RowMenu({ label, items }: RowMenuProps) {
                 item.onSelect();
               }}
               className={cn(
-                "block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-stone-100 focus-visible:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand",
-                item.danger ? "text-brand" : "text-stone-800",
+                "flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-stone-100 focus-visible:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand",
+                item.danger ? "text-brand-dark" : "text-stone-800",
               )}
             >
+              {item.danger && <i className="fas fa-triangle-exclamation shrink-0" aria-hidden />}
               {item.label}
             </button>
           ))}

@@ -35,6 +35,11 @@ function displayName(user: UserListItem): string {
   return `${user.first_name} ${user.last_name}`.trim() || user.email;
 }
 
+/** The lock verb for a row: an unlocked account is locked, a locked one unlocked. */
+function lockVerb(user: UserListItem): "Lock" | "Unlock" {
+  return user.is_locked ? "Unlock" : "Lock";
+}
+
 /** The four office roles: the only ones the server lets coordinate. */
 function isOfficeMember(user: UserListItem): boolean {
   return (STAFF_ROLES as readonly string[]).includes(user.role_name);
@@ -159,7 +164,7 @@ export default function UserListPage() {
       cell: ({ row }) => (
         <div className="min-w-0">
           <div className="font-medium text-stone-900">{displayName(row.original)}</div>
-          <div className="text-[13px] text-stone-600">{row.original.email}</div>
+          <div className="text-small text-stone-600">{row.original.email}</div>
         </div>
       ),
     },
@@ -206,7 +211,7 @@ export default function UserListPage() {
             case "lock":
               return {
                 key: action,
-                label: user.is_locked ? "Unlock" : "Lock",
+                label: lockVerb(user),
                 danger: !user.is_locked,
                 onSelect: () => setLockTarget(user),
               };
@@ -267,7 +272,7 @@ export default function UserListPage() {
       {/* Lock/unlock confirm: names the person, so a slip on the wrong row is seen. */}
       <ConfirmDialog
         open={!!lockTarget}
-        title={`${lockTarget?.is_locked ? "Unlock" : "Lock"} ${lockTarget ? displayName(lockTarget) : ""}'s account?`}
+        title={lockTarget ? `${lockVerb(lockTarget)} ${displayName(lockTarget)}'s account?` : ""}
         message={
           lockTarget
             ? lockTarget.is_locked
@@ -275,7 +280,7 @@ export default function UserListPage() {
               : `${displayName(lockTarget)} (${lockTarget.email}) will be prevented from logging in until the account is unlocked.`
             : ""
         }
-        confirmLabel={lockTarget?.is_locked ? "Unlock" : "Lock"}
+        confirmLabel={lockTarget ? lockVerb(lockTarget) : "Lock"}
         danger={!lockTarget?.is_locked}
         confirming={lockConfirming}
         onConfirm={handleToggleLock}
