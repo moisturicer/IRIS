@@ -443,6 +443,24 @@ describe("citation highlights", () => {
   });
 });
 
+describe("the toolbar's start slot (IR-1092)", () => {
+  it("holds what the caller puts there, among the paper tools", async () => {
+    render(
+      <PaperPdfReader
+        recordId={7}
+        scrollToPage={null}
+        highlightRegions={[]}
+        navKey="a"
+        contained
+        fill
+        toolbarStart={<span>Reading v2</span>}
+      />,
+    );
+
+    expect(within(await screen.findByRole("toolbar", { name: "Paper tools" })).getByText("Reading v2")).toBeInTheDocument();
+  });
+});
+
 describe("keeping clear of the corner buttons (IR-1079)", () => {
   it("leaves room under the last page for Notes and Ask IRIS when the caller asks", async () => {
     render(

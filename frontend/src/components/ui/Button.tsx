@@ -44,13 +44,16 @@ const SIZE_CLASSES: Record<Size, string> = {
   // token carries a line-height these don't set, so swapping them would resize
   // every existing button. That retrofit belongs with 01-design-system.md's own
   // "fix the five primitives" task, not with a login fix.
-  sm:   "px-3 py-1.5 text-[13px]",
-  md:   "px-4 py-2 text-[14px]",
-  lg:   "px-5 py-2.5 text-[15px]",
+  //
+  // `touch:` is the `(pointer: coarse)` media query (tailwind.config.js), so a
+  // finger gets 44px at any window width and a mouse never does (IR-1092).
+  sm:   "px-3 py-1.5 text-[13px] touch:min-h-11",
+  md:   "px-4 py-2 text-[14px] touch:min-h-11",
+  lg:   "px-5 py-2.5 text-[15px] touch:min-h-11",
   full: "w-full justify-center min-h-11 px-5 py-3.5 text-md",
   // 44px square on touch-sized screens (12-accessibility.md section 4), 36px
   // beside a desktop pointer: the height of every other control (IR-569).
-  icon: "w-11 h-11 lg:w-9 lg:h-9 justify-center text-xs",
+  icon: "w-11 h-11 lg:w-9 lg:h-9 touch:w-11 touch:h-11 justify-center text-xs",
 };
 
 /** The one place a button's look is assembled, for `Button` and `ButtonLink` alike. */

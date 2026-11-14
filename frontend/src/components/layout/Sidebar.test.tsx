@@ -566,7 +566,7 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
       within(sidebar).getByRole("link", { name: "Help" }),
     ];
     expect(links.length).toBeGreaterThan(2);
-    for (const link of links) expect(link).toHaveClass("min-h-11", "md:min-h-0");
+    for (const link of links) expect(link).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
   });
 
   it("makes the account menu's Profile, Settings and Sign out at least 44px tall", async () => {
@@ -579,7 +579,7 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
       screen.getByRole("link", { name: "Settings" }),
       screen.getByRole("button", { name: "Sign out" }),
     ]) {
-      expect(item).toHaveClass("min-h-11", "md:min-h-0");
+      expect(item).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
     }
   });
 });

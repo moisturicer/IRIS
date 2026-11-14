@@ -769,6 +769,9 @@ export default function PaperViewPage() {
           fill={onPaperTab || reviewerWorkspace}
           // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
           clearCorner={onPaperTab}
+          // On a phone's one-row bar there is no room for the version, so it
+          // sits at the start of the reader's toolbar (IR-1092).
+          toolbarStart={(onPaperTab || reviewerWorkspace) && tier === "single" ? paperVersion : undefined}
           bottomInset={onReviewTab ? reviewBarInset : 0}
           downloadControl={
             // An earlier version is not offered as a copy: the download route
@@ -924,7 +927,8 @@ export default function PaperViewPage() {
         onBack={() => navigate(-1)}
         onBackToAnswer={backToAnswer}
         title={!onPaperTab && !reviewerWorkspace ? undefined : arriving ? null : record.title}
-        version={onPaperTab || reviewerWorkspace ? paperVersion : undefined}
+        // Not in the bar below 640px, where the reader's toolbar holds it.
+        version={(onPaperTab || reviewerWorkspace) && tier !== "single" ? paperVersion : undefined}
       />
       <div
         className={cn(

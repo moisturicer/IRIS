@@ -2728,6 +2728,46 @@ describe("record versions (IR-416)", () => {
     expect(screen.getByRole("combobox", PICKER)).toHaveValue("2");
   });
 
+  // IR-1092: the one-row phone bar has no room for the picker, so below 640px
+  // of the workspace it sits in the reader's toolbar -- there once, in the
+  // tree, never drawn away -- and from 640px it stays in the bar.
+  describe("where the Paper tab keeps the picker (IR-1092)", () => {
+    const barOf = () => screen.getByRole("tablist", { name: "Paper view" }).parentElement as HTMLElement;
+    const readerOf = () => screen.getByText(/paper reader open/i).parentElement as HTMLElement;
+
+    it("is in the reader's toolbar, and not the bar, on a phone-width workspace", async () => {
+      shownRecord = { ...record, versions: twoVersions };
+      workspaceAt(360);
+      renderPaper(`/records/${RECORD_ID}?section=paper`);
+      await screen.findByText(/paper reader open/i);
+
+      const picker = screen.getByRole("combobox", PICKER);
+      expect(readerOf()).toContainElement(picker);
+      expect(barOf()).not.toContainElement(picker);
+    });
+
+    it("keeps a single version's label in the toolbar too, so a phone still says which it is reading", async () => {
+      shownRecord = { ...record, versions: [version(1, "submission")] };
+      workspaceAt(360);
+      renderPaper(`/records/${RECORD_ID}?section=paper`);
+      await screen.findByText(/paper reader open/i);
+
+      expect(readerOf()).toContainElement(screen.getByText("v1"));
+      expect(barOf()).not.toContainElement(screen.getByText("v1"));
+    });
+
+    it("stays in the bar from 640px", async () => {
+      shownRecord = { ...record, versions: twoVersions };
+      workspaceAt(1400);
+      renderPaper(`/records/${RECORD_ID}?section=paper`);
+      await screen.findByText(/paper reader open/i);
+
+      const picker = screen.getByRole("combobox", PICKER);
+      expect(barOf()).toContainElement(picker);
+      expect(readerOf()).not.toContainElement(picker);
+    });
+  });
+
   it("moves from Overview to the Paper tab when a version is chosen", async () => {
     shownRecord = { ...record, versions: twoVersions };
     renderPaperView();

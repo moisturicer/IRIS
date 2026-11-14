@@ -81,7 +81,7 @@ export function PaperDocuments({ files, manageHref }: PaperDocumentsProps) {
       {manageHref && (
         <Link
           to={manageHref}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+          className="mt-1 inline-flex min-h-11 reading-split:min-h-9 items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
         >
           Manage documents
           <i className="fas fa-arrow-right text-2xs" aria-hidden />

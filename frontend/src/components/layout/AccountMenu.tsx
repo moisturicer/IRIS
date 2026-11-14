@@ -16,7 +16,7 @@ interface AccountMenuProps {
 }
 
 const ITEM =
-  `flex min-h-11 md:min-h-0 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100 hover:text-stone-900 ${COLOUR_TRANSITION} ${FOCUS_RING}`;
+  `flex min-h-11 md:min-h-0 touch:min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100 hover:text-stone-900 ${COLOUR_TRANSITION} ${FOCUS_RING}`;
 
 /**
  * The account menu in the sidebar's user block (IR-413, spec §4.2).

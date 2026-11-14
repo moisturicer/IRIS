@@ -133,6 +133,8 @@ describe("the bell's touch targets (IR-1092)", () => {
       "w-11",
       "md:h-[34px]",
       "md:w-[34px]",
+      "touch:h-11",
+      "touch:w-11",
     );
   });
 
@@ -146,8 +148,8 @@ describe("the bell's touch targets (IR-1092)", () => {
 
     const dialog = await openBell();
 
-    expect(within(dialog).getByRole("button", { name: "Mark all read" })).toHaveClass("min-h-11", "md:min-h-0");
-    expect(within(dialog).getByRole("link", { name: "View all notifications" })).toHaveClass("min-h-11", "md:min-h-0");
+    expect(within(dialog).getByRole("button", { name: "Mark all read" })).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
+    expect(within(dialog).getByRole("link", { name: "View all notifications" })).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
   });
 });
 

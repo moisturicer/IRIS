@@ -33,9 +33,9 @@ interface ReadingHeaderProps {
 /**
  * The record bar (IR-569): Back, the paper in one line, its version and the
  * sections, in one 56px row. On a phone (below `reading-split`, IR-1092) Back
- * is its icon, the sections take the rest of the row and the title and version
- * are not drawn -- the title stays as the heading for screen readers, and the
- * version is chosen on Overview. Notes and Ask IRIS are the two round icons at the bottom right,
+ * is its icon, the sections take the rest of the row and the title is not
+ * drawn (it stays as the heading for screen readers). The page then leaves the
+ * version out of this bar and hands it to the reader's toolbar. Notes and Ask IRIS are the two round icons at the bottom right,
  * Notes above Ask IRIS, not tools here.
  */
 export function ReadingHeader({
