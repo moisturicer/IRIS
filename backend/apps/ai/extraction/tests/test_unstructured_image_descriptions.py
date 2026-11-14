@@ -1,10 +1,5 @@
 """Unstructured's image-description enrichment, behind a switch (IR-1126).
-
-The enrichment replaces an Image element's ``text`` with a JSON string carrying
-``type`` and ``description`` (Unstructured, ``concepts/enriching/image-descriptions``).
-Whether the partition endpoint accepts it is IR-1126's spike; these tests use
-the documented shape.
-"""
+Its JSON-in-``text`` shape is the vendor's documented one, not yet a recording."""
 
 import json
 import re
@@ -58,7 +53,6 @@ def test_off_by_default_the_request_and_the_figure_are_unchanged():
     assert form_fields(vendor) == set(REQUEST_OPTIONS) | {"files"}
     (figure,) = extracted.figures
     assert figure.description == ""
-    assert "call" in extracted.provenance.options
     assert set(extracted.provenance.options) == set(REQUEST_OPTIONS) | {"call"}
 
 
