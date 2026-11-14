@@ -161,7 +161,7 @@ export default function DeleteRequestsPage() {
           size="sm"
           className="ml-auto"
         >
-          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-label ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </Button>
       </div>
@@ -193,13 +193,13 @@ export default function DeleteRequestsPage() {
       ) : (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
-            <span className="text-[13px] text-stone-500 font-medium">
+            <span className="text-small text-stone-500 font-medium">
               {requests.length} request{requests.length !== 1 ? "s" : ""}{hasMore ? " shown" : ""}
             </span>
           </div>
 
           <div className="relative overflow-x-auto">
-            <table className="w-full text-[14px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
@@ -226,13 +226,13 @@ export default function DeleteRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
-                      <p className="text-[12px] text-stone-500">{req.requested_by_email}</p>
+                      <p className="text-label text-stone-500">{req.requested_by_email}</p>
                     </td>
                     <td className="px-4 py-3 max-w-[180px]">
                       {req.reason ? (
-                        <p className="text-stone-600 line-clamp-2 text-[13px]">{req.reason}</p>
+                        <p className="text-stone-600 line-clamp-2 text-small">{req.reason}</p>
                       ) : (
-                        <span className="text-stone-500 italic text-[13px]">No reason given</span>
+                        <span className="text-stone-500 italic text-small">No reason given</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-stone-500 whitespace-nowrap">
@@ -265,7 +265,7 @@ export default function DeleteRequestsPage() {
                           </Button>
                         </div>
                       ) : (
-                        <span className="text-[13px] text-stone-500 italic">
+                        <span className="text-small text-stone-500 italic">
                           {req.reviewed_at ? formatDate(req.reviewed_at) : "—"}
                         </span>
                       )}

@@ -118,8 +118,8 @@ export function EmailRequestForm({ id, copy, request, initialEmail = "" }: Email
         >
           Check your email
         </h2>
-        <p className="mt-3 text-[15px] leading-relaxed text-stone-700">{sent}</p>
-        <p className="mt-3 text-[14px] leading-relaxed text-stone-600">{copy.guidance}</p>
+        <p className="mt-3 text-body leading-relaxed text-stone-700">{sent}</p>
+        <p className="mt-3 text-body leading-relaxed text-stone-600">{copy.guidance}</p>
         {problem && (
           <div className="mt-6">
             <AuthAlert variant="error" title="Check your request" focusRef={problemRef}>{problem}</AuthAlert>
@@ -136,10 +136,10 @@ export function EmailRequestForm({ id, copy, request, initialEmail = "" }: Email
           >
             {left > 0 ? `Send another email in ${left} seconds` : "Send another email"}
           </Button>
-          <p role="status" className="text-[14px] text-stone-600">
+          <p role="status" className="text-body text-stone-600">
             {sending ? "Sending…" : counted && left === 0 ? "You can request another email now." : ""}
           </p>
-          <Link to="/login" className="text-[15px] font-semibold text-brand hover:underline">
+          <Link to="/login" className="text-body font-semibold text-brand hover:underline">
             Back to sign in
           </Link>
         </div>
@@ -152,7 +152,7 @@ export function EmailRequestForm({ id, copy, request, initialEmail = "" }: Email
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">
         {copy.heading}
       </h2>
-      <p className="mt-2 mb-6 text-[15px] leading-relaxed text-stone-600">{copy.intro}</p>
+      <p className="mt-2 mb-6 text-body leading-relaxed text-stone-600">{copy.intro}</p>
       {problem && <AuthAlert variant="error" title="Check your request" focusRef={problemRef}>{problem}</AuthAlert>}
       <form className="flex flex-col gap-5" noValidate onSubmit={submit}>
         <Input
@@ -170,9 +170,9 @@ export function EmailRequestForm({ id, copy, request, initialEmail = "" }: Email
         <Button type="submit" variant="primary" size="full" loading={sending} disabled={left > 0}>
           {left > 0 && problem ? `${copy.submit} (in ${left} seconds)` : copy.submit}
         </Button>
-        <p role="status" className="text-[14px] text-stone-600">{sending ? "Sending…" : ""}</p>
+        <p role="status" className="text-body text-stone-600">{sending ? "Sending…" : ""}</p>
       </form>
-      <p className="mt-6 text-[15px]">
+      <p className="mt-6 text-body">
         <Link to="/login" className="font-semibold text-brand hover:underline">Back to sign in</Link>
       </p>
     </EntryFrame>

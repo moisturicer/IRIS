@@ -27,7 +27,7 @@ export function Message({ tone, role, children }: { tone: "ok" | "error"; role: 
     <p
       role={role}
       className={cn(
-        "text-[13px] rounded-lg px-3 py-2 flex items-start gap-2",
+        "text-small rounded-lg px-3 py-2 flex items-start gap-2",
         tone === "ok" ? TONES.settled : TONES.active,
       )}
     >

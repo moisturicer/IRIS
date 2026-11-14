@@ -313,13 +313,13 @@ export default function UserListPage() {
         title="Change Role"
       >
         <div className="flex flex-col gap-4">
-          <p className="text-[14px] text-stone-600">
+          <p className="text-body text-stone-600">
             Changing role for <strong>{roleTarget?.email}</strong>.
           </p>
           {/* `User.assign_role` drops the grant on every role change, even to
               the same role, because it was for the office the old role staffed. */}
           {roleTarget?.is_office_coordinator && (
-            <p className="text-[14px] text-stone-700 border-l-2 border-brand pl-3">
+            <p className="text-body text-stone-700 border-l-2 border-brand pl-3">
               {roleTarget.email} coordinates {roleTarget.role_name}. Saving a role
               removes their coordinator status, even if you keep {roleTarget.role_name}.
             </p>

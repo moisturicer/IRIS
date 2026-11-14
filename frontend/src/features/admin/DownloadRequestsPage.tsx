@@ -127,7 +127,7 @@ export default function DownloadRequestsPage() {
           size="sm"
           className="w-full justify-center sm:ml-auto sm:w-auto"
         >
-          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-label ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </Button>
       </div>
@@ -152,13 +152,13 @@ export default function DownloadRequestsPage() {
       ) : (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
-            <span className="text-[13px] text-stone-500 font-medium">
+            <span className="text-small text-stone-500 font-medium">
               {requests.length} request{requests.length !== 1 ? "s" : ""}
             </span>
           </div>
 
           <div className="relative overflow-x-auto">
-            <table className="w-full text-[14px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
@@ -185,7 +185,7 @@ export default function DownloadRequestsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
-                        <p className="text-[12px] text-stone-500">{req.requested_by_email}</p>
+                        <p className="text-label text-stone-500">{req.requested_by_email}</p>
                       </td>
                       <td className="px-4 py-3 max-w-xs">
                         {req.note
@@ -200,7 +200,7 @@ export default function DownloadRequestsPage() {
                           state={req.status}
                           expired={!req.grant_live && !!req.grant_expires_at}
                         />
-                        {grant && <p className="mt-1 text-[12px] text-stone-600 whitespace-nowrap">{grant}</p>}
+                        {grant && <p className="mt-1 text-label text-stone-600 whitespace-nowrap">{grant}</p>}
                         {endedByRdco && <RdcoNoteLine note={req.rdco_note} />}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -237,7 +237,7 @@ export default function DownloadRequestsPage() {
                             Revoke
                           </Button>
                         ) : (
-                          <span className="text-[13px] text-stone-500 italic">
+                          <span className="text-small text-stone-500 italic">
                             {req.revoked_at ? formatDate(req.revoked_at)
                               : req.cancelled_at ? `Cancelled ${formatDate(req.cancelled_at)}`
                               : req.reviewed_at ? formatDate(req.reviewed_at) : "Reviewed"}
