@@ -22,20 +22,13 @@ from pathlib import Path
 
 import httpx
 
+from apps.ai.extraction.unstructured_client import BASE_URL, PATH
+from apps.ai.extraction.unstructured_client import REQUEST_OPTIONS as OPTIONS
+
 from . import DIRECTORY, FIXTURES, blank_pdf, pdf_bytes
 from .record_unstructured import safe_headers, scrub
 
 RECORDINGS = DIRECTORY / "unstructured_platform"
-BASE_URL = "https://api.unstructuredapp.io"
-PATH = "/general/v0/general"
-# ADR-067 amendment §1, as the spike sent it (strategies.json).
-OPTIONS = {
-    "strategy": "hi_res",
-    "coordinates": "true",
-    "pdf_infer_table_structure": "true",
-    "include_page_breaks": "true",
-    "extract_image_block_types": '["Image", "Table"]',
-}
 NOT_A_PDF = b"this is not a PDF\n"
 
 

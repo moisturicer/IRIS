@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from .ports import ExtractorUnavailable, StructuredExtractor
+from .ports import ExtractionError, ExtractorUnavailable, StructuredExtractor
 
 
 def _llamaparse_shape():
@@ -90,7 +90,8 @@ def _unstructured_shape():
 
 
 def _shaping_pending(raw):
-    raise ExtractorUnavailable("Unstructured shaping (IR-986) is not built yet")
+    # Permanent: retrying cannot build IR-986.
+    raise ExtractionError("Unstructured shaping (IR-986) is not built yet")
 
 
 def _verify_unstructured() -> None:
@@ -114,7 +115,7 @@ def unstructured_extractor() -> StructuredExtractor:
         base_url=settings.UNSTRUCTURED_BASE_URL,
         timeout_base_seconds=settings.UNSTRUCTURED_TIMEOUT_BASE_SECONDS,
         timeout_per_page_seconds=settings.UNSTRUCTURED_TIMEOUT_PER_PAGE_SECONDS,
-        max_pages=settings.PDF_VALIDATION_MAX_PAGES or settings.LLAMAPARSE_MAX_PAGES,
+        max_pages=settings.PDF_VALIDATION_MAX_PAGES or settings.UNSTRUCTURED_MAX_PAGES,
     )
 
 

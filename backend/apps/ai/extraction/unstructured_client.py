@@ -1,16 +1,11 @@
-"""Unstructured's Platform API as a ``StructuredExtractor`` (IR-985, ADR-067).
+"""Unstructured's Platform API, ``hi_res``, as a ``StructuredExtractor`` (IR-985, ADR-067).
 
-The one module that knows the partition endpoint's HTTP contract. ADR-067's
-2026-11-14 amendment pins ``strategy=hi_res`` on the Platform API, not
-Transform. The call is synchronous: each attempt has a timeout that grows
-with the page count, and a timed-out attempt is retried once (amendment §5).
-
-The endpoint keeps no upload and no job, so there is nothing to delete
-afterwards (ADR-056 decision 7). ``shape`` (IR-986) turns the raw result into
-IRIS's document. Whether a paper may be sent is decided around this adapter
-(IR-850), never here.
+Synchronous: each attempt's timeout grows with the page count and one timeout
+is retried. The endpoint returns no upload or job id, so there is nothing to
+delete; what it retains is ADR-067 open condition 1.
 """
 
+import re
 import time
 from io import BytesIO
 from typing import Any, Callable, Mapping, Optional
@@ -23,6 +18,7 @@ from .ports import (
     DocumentRejected,
     EmptyExtraction,
     ExtractedDocument,
+    ExtractionError,
     ExtractorUnavailable,
     Provenance,
     Usage,
@@ -54,6 +50,7 @@ TRANSFER_SLACK_SECONDS = 60
 # A key, quota or rate fault is the deployment's, never the document's.
 _NOT_THE_DOCUMENT = {401, 402, 403, 408, 429}
 _NOT_CONTENT = {"PageBreak"}
+_SIGNED = re.compile(r"[?&](X-Amz-[A-Za-z]+|Signature|sig)=")
 
 Shape = Callable[[Mapping[str, Any]], NormalizedDocument]
 
@@ -95,8 +92,8 @@ class UnstructuredExtractor:
 
     @property
     def timeout_seconds(self) -> float:
-        return (ATTEMPTS * self._attempt_seconds(self._max_pages)
-                + (ATTEMPTS - 1) * _RETRY_PAUSE_SECONDS + TRANSFER_SLACK_SECONDS)
+        return (ATTEMPTS * (self._attempt_seconds(self._max_pages) + TRANSFER_SLACK_SECONDS)
+                + (ATTEMPTS - 1) * _RETRY_PAUSE_SECONDS)
 
     def _attempt_seconds(self, pages: int) -> float:
         return float(self._base_seconds + self._per_page_seconds * pages)
@@ -105,11 +102,11 @@ class UnstructuredExtractor:
         pages = _page_count(pdf_bytes)
         attempt_seconds = self._attempt_seconds(pages)
         if self._api is not None:
-            response = self._partition(self._api, pdf_bytes, filename, attempt_seconds)
+            response, made = self._partition(self._api, pdf_bytes, filename, attempt_seconds)
         else:
             with httpx.Client(base_url=self._base_url,
                               headers={"unstructured-api-key": self._api_key}) as api:
-                response = self._partition(api, pdf_bytes, filename, attempt_seconds)
+                response, made = self._partition(api, pdf_bytes, filename, attempt_seconds)
 
         elements = _elements(response)
         if not any(e.get("type") not in _NOT_CONTENT and (e.get("text") or "").strip()
@@ -120,7 +117,8 @@ class UnstructuredExtractor:
         if not document.elements:
             raise EmptyExtraction(f"no extractable content for {filename!r}")
         options = {**REQUEST_OPTIONS, "call": {
-            "mode": "synchronous", "attempts": ATTEMPTS, "attempt_timeout_seconds": attempt_seconds,
+            "mode": "synchronous", "attempts": ATTEMPTS, "attempts_made": made,
+            "attempt_timeout_seconds": attempt_seconds,
         }}
         return ExtractedDocument(
             document=document,
@@ -130,7 +128,7 @@ class UnstructuredExtractor:
         )
 
     def _partition(self, api: httpx.Client, pdf_bytes: bytes, filename: str,
-                   attempt_seconds: float) -> httpx.Response:
+                   attempt_seconds: float) -> tuple[httpx.Response, int]:
         timeout = httpx.Timeout(attempt_seconds, connect=_CONNECT_SECONDS)
         for attempt in range(1, ATTEMPTS + 1):
             try:
@@ -149,7 +147,7 @@ class UnstructuredExtractor:
             except httpx.HTTPError as exc:
                 raise ExtractorUnavailable(f"Unstructured partition failed: {type(exc).__name__}") from exc
             _check(response)
-            return response
+            return response, attempt
         raise AssertionError("unreachable")
 
 
@@ -157,15 +155,23 @@ def _check(response: httpx.Response) -> None:
     status = response.status_code
     if status in _NOT_THE_DOCUMENT or status >= 500:
         raise ExtractorUnavailable(f"Unstructured partition returned {status}")
-    if status >= 400:
-        raise DocumentRejected(f"Unstructured partition returned {status}: {_detail(response)}")
+    if status < 400:
+        return
+    body = _body(response)
+    # FastAPI lists field errors: our request was wrong, not the document.
+    if isinstance(body, dict) and isinstance(body.get("detail"), list):
+        raise ExtractionError(f"Unstructured refused the request ({status}): {str(body['detail'])[:300]}")
+    raise DocumentRejected(f"Unstructured partition returned {status}: {_detail(body)}")
 
 
-def _detail(response: httpx.Response) -> str:
+def _body(response: httpx.Response) -> Any:
     try:
-        body = response.json()
+        return response.json()
     except ValueError:
-        return response.text[:300]
+        return response.text
+
+
+def _detail(body: Any) -> str:
     if isinstance(body, dict):
         return str(body.get("user_message") or body.get("detail") or body)[:300]
     return str(body)[:300]
@@ -199,9 +205,7 @@ def _without_signed_urls(value: Any) -> Any:
 
 
 def _signed(value: Any) -> bool:
-    return isinstance(value, str) and value.startswith("http") and (
-        "Signature=" in value or "X-Amz-" in value or "sig=" in value
-    )
+    return isinstance(value, str) and value.startswith("http") and bool(_SIGNED.search(value))
 
 
 def _page_count(pdf_bytes: bytes) -> int:

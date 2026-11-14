@@ -11,10 +11,11 @@ from typing import Union
 
 import httpx
 
+from apps.ai.extraction.unstructured_client import BASE_URL, PATH
+
 from .fixtures import DIRECTORY
 
 RECORDINGS = DIRECTORY / "unstructured_platform"
-BASE_URL = "https://api.unstructuredapp.io"
 API_KEY = "test-platform-key"
 
 Answer = Union[httpx.Response, Exception]
@@ -43,7 +44,7 @@ class Vendor:
 
     def _handle(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
-        if request.method != "POST" or request.url.path != "/general/v0/general":
+        if request.method != "POST" or request.url.path != PATH:
             return httpx.Response(404, json={"detail": "Not Found"})
         if self.answers:
             answer = self.answers.pop(0)

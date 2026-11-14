@@ -10,6 +10,7 @@ from apps.ai.chunking.document import PARAGRAPH, BoundingBox, DocumentElement, N
 from apps.ai.extraction import (
     DocumentRejected,
     EmptyExtraction,
+    ExtractionError,
     ExtractorUnavailable,
     Failure,
     classify,
@@ -55,7 +56,7 @@ def test_a_recorded_partition_returns_raw_usage_and_provenance():
     assert extracted.provenance.name == "unstructured"
     assert extracted.provenance.version == "general/v0:hi_res"
     assert extracted.provenance.options["strategy"] == "hi_res"
-    assert extracted.provenance.options["call"] == {"mode": "synchronous", "attempts": 2,
+    assert extracted.provenance.options["call"] == {"mode": "synchronous", "attempts": 2, "attempts_made": 1,
                                                      "attempt_timeout_seconds": 130.0}
 
 
@@ -98,6 +99,7 @@ def test_a_timed_out_call_is_retried_once():
 
     assert len(vendor.requests) == 2
     assert extracted.raw["elements"] == recording("two_columns")
+    assert extracted.provenance.options["call"]["attempts_made"] == 2
 
 
 def test_a_second_timeout_is_unavailable():
@@ -142,6 +144,35 @@ def test_a_document_fault_is_rejected(status):
 
     with pytest.raises(DocumentRejected):
         read(vendor)
+
+
+def test_a_refused_request_parameter_is_not_the_documents_fault():
+    detail = [{"loc": ["body", "strategy"], "msg": "bad value", "type": "value_error"}]
+    vendor = Vendor("two_columns", answers=(httpx.Response(422, json={"detail": detail}),))
+
+    with pytest.raises(ExtractionError) as raised:
+        read(vendor)
+
+    assert not isinstance(raised.value, (DocumentRejected, ExtractorUnavailable))
+    assert classify(raised.value) is Failure.PERMANENT
+
+
+def test_a_link_with_sig_in_its_path_is_kept():
+    elements = recording("two_columns")
+    elements[0]["metadata"]["links"] = [{"url": "https://example.org/design-sig=1", "text": "x"}]
+
+    extracted = read(Vendor("two_columns", result=elements))
+
+    assert "design-sig=1" in json.dumps(extracted.raw)
+
+
+def test_unbuilt_shaping_fails_permanently(settings):
+    from apps.ai.extraction.selection import _shaping_pending
+
+    with pytest.raises(ExtractionError) as raised:
+        _shaping_pending({})
+
+    assert classify(raised.value) is Failure.PERMANENT
 
 
 def test_a_blank_pdf_is_an_empty_extraction():
