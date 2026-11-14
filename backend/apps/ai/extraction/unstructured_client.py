@@ -5,6 +5,8 @@ is retried. The endpoint returns no upload or job id, so there is nothing to
 delete; what it retains is ADR-067 open condition 1.
 """
 
+import base64
+import logging
 import re
 import time
 from io import BytesIO
@@ -20,9 +22,12 @@ from .ports import (
     ExtractedDocument,
     ExtractionError,
     ExtractorUnavailable,
+    FigureImage,
     Provenance,
     Usage,
 )
+
+logger = logging.getLogger(__name__)
 
 EXTRACTOR_NAME = "unstructured"
 BASE_URL = "https://api.unstructuredapp.io"
@@ -41,6 +46,9 @@ REQUEST_OPTIONS = {
 
 DEFAULT_TIMEOUT_BASE_SECONDS = 120
 DEFAULT_TIMEOUT_PER_PAGE_SECONDS = 10
+DEFAULT_MAX_FIGURES = 200
+# A whole A3 page at hi_res's 250 dpi is about 12 Mpx.
+DEFAULT_MAX_FIGURE_PIXELS = 16_000_000
 ATTEMPTS = 2
 _RETRY_PAUSE_SECONDS = 5.0
 _CONNECT_SECONDS = 10.0
@@ -67,10 +75,14 @@ class UnstructuredExtractor:
         timeout_base_seconds: int = DEFAULT_TIMEOUT_BASE_SECONDS,
         timeout_per_page_seconds: int = DEFAULT_TIMEOUT_PER_PAGE_SECONDS,
         max_pages: int = 1000,
+        max_figures: int = DEFAULT_MAX_FIGURES,
+        max_figure_pixels: int = DEFAULT_MAX_FIGURE_PIXELS,
         api: Optional[httpx.Client] = None,
         sleep: Callable[[float], None] = time.sleep,
     ):
         self._shape = shape
+        self._max_figures = max_figures
+        self._max_figure_pixels = max_figure_pixels
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._base_seconds = timeout_base_seconds
@@ -116,6 +128,7 @@ class UnstructuredExtractor:
         document = self._shape(raw)
         if not document.elements:
             raise EmptyExtraction(f"no extractable content for {filename!r}")
+        figures = _figures(elements, document, self._max_figures, self._max_figure_pixels)
         options = {**REQUEST_OPTIONS, "call": {
             "mode": "synchronous", "attempts": ATTEMPTS, "attempts_made": made,
             "attempt_timeout_seconds": attempt_seconds,
@@ -124,6 +137,7 @@ class UnstructuredExtractor:
             document=document,
             provenance=Provenance(name=EXTRACTOR_NAME, version=VERSION, options=options),
             usage=Usage(pages=_billed_pages(response) or pages),
+            figures=figures,
             raw=raw,
         )
 
@@ -206,6 +220,61 @@ def _without_signed_urls(value: Any) -> Any:
 
 def _signed(value: Any) -> bool:
     return isinstance(value, str) and value.startswith("http") and bool(_SIGNED.search(value))
+
+
+def _figures(elements: list, document: NormalizedDocument, max_figures: int,
+             max_pixels: int) -> tuple[FigureImage, ...]:
+    """Each shaped Image's ``image_base64`` as a Figure (IR-987, ADR-067 decision 10).
+    Page and caption come from shaping, so a Figure joins its element by name."""
+    shaped = {e.figure: e for e in document.elements if e.kind == "image" and e.figure}
+    figures: list[FigureImage] = []
+    for item in elements:
+        metadata = item.get("metadata") or {}
+        element = shaped.get(str(item.get("element_id") or ""))
+        if item.get("type") != "Image" or element is None or not metadata.get("image_base64"):
+            continue
+        if len(figures) == max_figures:
+            logger.warning("more than %s figures; the rest are not kept", max_figures)
+            break
+        data = _image_bytes(metadata["image_base64"], max_pixels, element.figure)
+        if data is None:
+            continue
+        figures.append(FigureImage(
+            page=element.page, bbox=_box(metadata, element.page),
+            media_type=str(metadata.get("image_mime_type") or ""), data=data,
+            caption=element.text or None, name=element.figure,
+        ))
+    return tuple(figures)
+
+
+def _image_bytes(encoded: str, max_pixels: int, name: str) -> Optional[bytes]:
+    """Decoded bytes, or ``None`` for an unreadable or oversized image.
+    Only the header is read, so an oversized image is never decoded."""
+    from PIL import Image
+
+    try:
+        data = base64.b64decode(encoded, validate=True)
+        with Image.open(BytesIO(data)) as image:
+            width, height = image.size
+    except Exception:
+        logger.warning("figure %s is not a readable image; not kept", name)
+        return None
+    if width * height > max_pixels:
+        logger.warning("figure %s is %sx%s, over %s pixels; not kept", name, width, height, max_pixels)
+        return None
+    return data
+
+
+def _box(metadata: Mapping[str, Any], page: int) -> dict:
+    """The union of the element's boxes, in the ``x/y/w/h`` page points stored Figures use."""
+    from .shaping_unstructured import element_boxes
+
+    boxes = element_boxes(metadata, page)
+    if not boxes:
+        return {}
+    left, top = min(b.left for b in boxes), min(b.top for b in boxes)
+    return {"x": left, "y": top, "w": max(b.right for b in boxes) - left,
+            "h": max(b.bottom for b in boxes) - top}
 
 
 def _page_count(pdf_bytes: bytes) -> int:

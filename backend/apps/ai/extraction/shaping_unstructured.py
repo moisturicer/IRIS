@@ -224,6 +224,11 @@ def _headings(elements):
     return elements
 
 
+def element_boxes(metadata: Mapping, page: int) -> tuple[BoundingBox, ...]:
+    """One raw element's boxes in top-left page points."""
+    return _boxes(metadata, page, {})
+
+
 def _boxes(metadata, page, sizes):
     """Pixel corners to top-left page points, clamped to the page."""
     coordinates = metadata.get("coordinates")
