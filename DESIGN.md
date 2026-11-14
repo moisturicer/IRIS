@@ -364,7 +364,7 @@ The same typeset entry as your own, at `/people/:id`, with a second column. **Co
 
 ### Don't:
 - **Don't** wrap reading content (the AI Overview, the Abstract, the reader, Ask IRIS) in a card.
-- **Don't** float controls over content. Controls live in a bar or toolbar, and Ask IRIS is the one corner icon.
+- **Don't** float controls over content. Controls live in a bar or toolbar. The two corner icons are Notes, above Ask IRIS, and both keep clear of the reading text: Overview and Paper reserve bottom padding so the last line scrolls past them.
 - **Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.
 - **Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.
 - **Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.

@@ -147,6 +147,10 @@ is too vague to resolve, which is why its `expected_outcome` is `clarify`.
 A set that supplies no `resolved_question` at all still measures the raw lane;
 the Resolved lane simply reports that no question carries one.
 
+### `scope_record` (IR-1052)
+
+Names the one Record a question is asked inside, the way Paper Chat asks it, by title or id. Every label must name the same Record. `eval_retrieval` retrieves only inside it, and each run file reports a `slices` block giving `corpus` and `record_scoped` recall, each with its own denominator. The in-paper set is [`proxy_record_scoped.json`](proxy_record_scoped.json). The baseline is in [`2026-11-14-IR-1052-in-paper-retrieval.md`](2026-11-14-IR-1052-in-paper-retrieval.md).
+
 ## How to label — the procedure
 
 Extend [`proxy_starter.json`](proxy_starter.json). It already holds labelled
@@ -299,6 +303,52 @@ straight out of a run file back into a command.
 - **Read the delta against the question count.** With 20 questions, one question
   is 0.05 of the score. The comparison table prints that threshold; a delta
   below it moved nothing.
+
+## Measuring a chunking variant (IR-1051)
+
+`--variant` measures a different chunker setup without touching the live
+chunks. It builds a **trial chunk set** per record beside the active one, from
+the stored extraction (nothing is re-read from a vendor). Readers, Ask IRIS,
+the AI Overview and similarity never read a trial set: a database constraint
+keeps it inactive, and only this command retrieves from it.
+
+```bash
+# What it would cost, then stop. No writes, no vendor call:
+python manage.py eval_retrieval --questions ../docs/evaluation/proxy_starter.json --variant trail_off=::trail=off --dry-run
+
+# The heading-trail test: on (the live set), off, and shuffled as a placebo:
+python manage.py eval_retrieval --questions ../docs/evaluation/proxy_starter.json --user iris-student@cit.edu
+python manage.py eval_retrieval --questions ../docs/evaluation/proxy_starter.json --user iris-student@cit.edu --variant trail_off=::trail=off
+python manage.py eval_retrieval --questions ../docs/evaluation/proxy_starter.json --user iris-student@cit.edu --variant trail_shuffled=::trail=shuffled
+
+# A target-size candidate:
+python manage.py eval_retrieval --questions ... --user iris-student@cit.edu --variant t400=:structural:target_tokens=400
+
+# Done:
+python manage.py cleanup_trial_chunk_sets --all
+```
+
+A variant is `NAME=<extractor>:<strategy>:<options>`. A blank extractor or
+strategy means "what production uses"; a named strategy applies to every paper,
+including those production would chunk with `labeled-structure-v1`. Options are
+comma-separated: `max_tokens`, `target_tokens`, `min_tokens`,
+`context_path_max_tokens`, `merge_short_siblings`, `exclude_sections`
+(`|`-separated) and `trail=on|off|shuffled`. A paper whose stored extraction is
+from a different extractor is skipped and named; comparing extractors needs both
+extractions stored, which IRIS does not do yet.
+
+**Cost.** A trial chunk reuses any vector the same paper already has for the
+same text, so a variant identical to the live set embeds nothing. Only new text
+is sent, it goes through the same disclosure gate as indexing, and
+`AI_EMBEDDING_TOKEN_CEILING` (or `--token-ceiling`) refuses a variant over it
+before anything is written. A reused vector was computed with the live set's
+neighbours as context, which is the same limit an incremental re-chunk has.
+
+**Read the numbers with the trial sets present.** Trial vectors share the HNSW
+index with the live ones and take part of its scan, so run the baseline while
+the same trial sets are stored, and clean up afterwards. Every run file records
+`provenance.chunking`: the variant, its extractor, strategy and options per
+chunk set, and the tokenizer id. Runs without `--variant` record it too.
 
 ## Pointing the harness at the real eval set
 

@@ -132,9 +132,10 @@ describe("threads in the review workspace", () => {
     await waitFor(() => expect(screen.getByRole("article", { name: "Thread 1, ITSO" })).toHaveFocus());
   });
 
-  it("shows a party's open threads from Readiness", async () => {
+  it("shows a party's open threads from Readiness, which Details holds (IR-1094)", async () => {
     const user = userEvent.setup();
     openWorkspace();
+    await user.click(await screen.findByRole("tab", { name: "Details" }));
     await user.click(await screen.findByRole("button", { name: "Show threads" }));
     expect(screen.getByText(/Showing ITSO's threads/)).toBeInTheDocument();
     const panel = within(screen.getByRole("tabpanel", { name: /Threads/ }));
@@ -145,8 +146,8 @@ describe("threads in the review workspace", () => {
   it("finishes the review from the footer, and no longer offers each verdict apart", async () => {
     const user = userEvent.setup();
     openWorkspace();
-    const footer = within(screen.getByRole("contentinfo", { name: "Your review" }));
-    expect(await footer.findByText("1 draft comment, not sent")).toBeInTheDocument();
+    const footer = within(screen.getByRole("contentinfo", { name: "Your part" }));
+    expect(await footer.findByText(/1 draft comment, not sent/)).toBeInTheDocument();
     expect(footer.queryByRole("button", { name: "Clear…" })).toBeNull();
     expect(footer.queryByRole("button", { name: "Request Revision…" })).toBeNull();
     await user.click(footer.getByRole("button", { name: "Finish review…" }));
@@ -160,7 +161,7 @@ describe("threads in the review workspace", () => {
   // (core/permissions.py); found by hand on #595.
   it("offers Finish review to an opened seat even while open_review is offered", async () => {
     openWorkspace(["open_review", "comment_review", "finish_review", "office_review"]);
-    const footer = within(await screen.findByRole("contentinfo", { name: "Your review" }));
+    const footer = within(await screen.findByRole("contentinfo", { name: "Your part" }));
     expect(footer.getByRole("button", { name: "Finish review…" })).toBeInTheDocument();
     expect(footer.queryByRole("button", { name: "Open review" })).toBeNull();
   });
@@ -172,7 +173,7 @@ describe("threads in the review workspace", () => {
         reader={<StandInReader />} timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false}
         onDocuments={() => {}} />,
     );
-    const footer = within(await screen.findByRole("contentinfo", { name: "Your review" }));
+    const footer = within(await screen.findByRole("contentinfo", { name: "Your part" }));
     expect(footer.getByRole("button", { name: "Open review" })).toBeInTheDocument();
     expect(footer.queryByRole("button", { name: "Finish review…" })).toBeNull();
   });
