@@ -8,22 +8,36 @@ import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ContinueProposal } from "@/features/records/ContinueProposal";
 import { waitingHref } from "@/features/records/waitingOnYou";
 import { DeleteDraft } from "./DeleteDraft";
+import { waitingOn } from "./waitingOn";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
-function RowActions({ item, onDeleted }: { item: MyResearchItem; onDeleted?: (id: number) => void }) {
+/**
+ * A row's actions (IR-1084): one of Continue draft, the act that answers an
+ * open request, or Open review. The Overview's short list (`brief`) shows
+ * exactly one; the full list also offers Delete draft, quietly, on a draft.
+ */
+function RowActions({ item, brief, onDeleted }: { item: MyResearchItem; brief: boolean; onDeleted?: (id: number) => void }) {
   if (item.can_continue) return <ContinueProposal recordId={item.id} />;
   if (item.pipeline_status === "draft") {
     return (
       <>
-        <Link to={`/?publish=${item.id}`} className={cn(PILL_SECONDARY, "min-h-9 px-4", FOCUS_RING)}>Continue</Link>
-        {onDeleted && <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />}
+        <Link to={`/?publish=${item.id}`} className={cn(PILL_PRIMARY, "min-h-9 px-4", FOCUS_RING)}>
+          Continue draft <span className="sr-only">“{item.title}”</span>
+        </Link>
+        {!brief && onDeleted && <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />}
       </>
     );
   }
   // One link per open request, straight to the act on Paper View (IR-625).
-  const waiting = item.submitter_status.waiting_on_you;
-  if (waiting.length === 0) return null;
+  const waiting = brief ? item.submitter_status.waiting_on_you.slice(0, 1) : item.submitter_status.waiting_on_you;
+  if (waiting.length === 0) {
+    return (
+      <Link to={`/records/${item.id}`} className={cn(PILL_SECONDARY, "min-h-9 px-4", FOCUS_RING)}>
+        Open review <span className="sr-only">of “{item.title}”</span>
+      </Link>
+    );
+  }
   return (
     <>
       {waiting.map((request, i) => (
@@ -42,7 +56,7 @@ function RowActions({ item, onDeleted }: { item: MyResearchItem; onDeleted?: (id
 
 interface SubmissionRowProps {
   item: MyResearchItem;
-  /** The Overview's short list: no clearance strip and no actions. */
+  /** The Overview's short list: no clearance strip, one action, no Delete. */
   brief?: boolean;
   /** Offered on a draft: the row is gone once the server deleted it. */
   onDeleted?: (id: number) => void;
@@ -51,14 +65,15 @@ interface SubmissionRowProps {
 /**
  * One of the owner's records as a row in a ruled list (IR-410). The title is
  * the row's one link, stretched over the row; only the actions sit above it.
- * The status words are the server's (`submitter_status.line`).
+ * The status words are the server's (`submitter_status.line`); the sentence
+ * under the title says what the record waits on (`waitingOn`, IR-1084).
  */
 export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowProps) {
   const people = [
     item.authors.map((author) => author.name).join(", "),
     item.adviser_name && `Adviser: ${item.adviser_name}`,
   ].filter(Boolean).join(" · ");
-  const actions = brief ? null : <RowActions item={item} onDeleted={onDeleted} />;
+  const actions = <RowActions item={item} brief={brief} onDeleted={onDeleted} />;
 
   return (
     <li className={cn("group relative flex gap-4 px-4 py-4 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>
@@ -87,6 +102,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
               </Link>
             </h3>
             {people && <p className="mt-0.5 truncate text-small text-stone-600">{people}</p>}
+            <p className="mt-1 text-small text-stone-800">{waitingOn(item)}</p>
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-end">

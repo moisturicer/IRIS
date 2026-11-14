@@ -36,8 +36,18 @@ export const isProposal = (typeName: string): boolean => typeKey(typeName) === "
  */
 export function provisionalTitle(fileName: string): string {
   const stem = fileName.replace(/\.[^./\\]+$/, "");
-  const title = stem.replace(/[\s_-]+/g, " ").trim();
+  const title = withoutPdfExtension(stem.replace(/[\s_-]+/g, " ").trim());
   return title || "Untitled manuscript";
+}
+
+/**
+ * A title without a trailing ".pdf", however many (IR-1084). A file named
+ * "paper.pdf.pdf" loses one extension to the file-name rule above and an
+ * extractor that falls back to the file name hands back "paper.pdf"; neither
+ * is a title an author chose.
+ */
+export function withoutPdfExtension(title: string): string {
+  return title.replace(/(\s*\.pdf)+\s*$/i, "").trim();
 }
 
 export interface ReferenceLists {
