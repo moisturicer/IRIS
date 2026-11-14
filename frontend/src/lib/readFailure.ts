@@ -75,3 +75,11 @@ export function failureMessage(err?: unknown, options: FailureMessageOptions = {
         : errorDetail(err, options.rejected ?? REFUSED_MESSAGE);
   return options.lead ? `${options.lead} ${body}` : body;
 }
+
+/**
+ * Try again for a wait with no read of its own to repeat (the session check, a
+ * route's bundle): start the page over. Kept here so a test can stand in for it.
+ */
+export function reloadPage(): void {
+  window.location.reload();
+}

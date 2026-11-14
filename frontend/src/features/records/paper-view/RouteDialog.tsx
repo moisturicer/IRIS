@@ -1,9 +1,11 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { recordsApi } from "@/api/records";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { Button, Modal, Skeleton } from "@/components/ui";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { joinLabels } from "@/lib/utils";
 import type { Party, RouteOptions, RouteRequest } from "@/types/records";
 
@@ -49,6 +51,7 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
   const ids = useId();
   const [options, setOptions] = useState<RouteOptions | null>(null);
   const [loadFailed, setLoadFailed] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [choices, setChoices] = useState<Partial<Record<Party, Choice>>>({});
   const [suggested, setSuggested] = useState<string[]>([]);
   const [reason, setReason] = useState(initialReason);
@@ -57,6 +60,7 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
 
   useEffect(() => {
     let cancelled = false;
+    setLoadFailed(null);
     recordsApi
       .routeOptions(recordId)
       .then(({ data }) => {
@@ -68,12 +72,12 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
         }
       })
       .catch((err) => {
-        if (!cancelled) setLoadFailed(errorDetail(err, "The offices could not be loaded."));
+        if (!cancelled) setLoadFailed(failureMessage(err, { lead: "The offices could not be loaded." }));
       });
     return () => {
       cancelled = true;
     };
-  }, [recordId]);
+  }, [recordId, attempt]);
 
   const accepting = mode === "accept";
   const title = accepting ? "Accept & send to RDCO" : "Request review";
@@ -137,12 +141,9 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
         </p>
 
         {loadFailed ? (
-          <p role="alert" className={LOAD_ERROR}>
-            <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-            {loadFailed}
-          </p>
+          <LoadFailedAlert message={loadFailed} onRetry={() => setAttempt((n) => n + 1)} />
         ) : options == null ? (
-          <Skeleton rows={3} label="Loading the offices…" />
+          <Skeleton rows={3} label="Loading the offices…" onRetry={() => setAttempt((n) => n + 1)} />
         ) : (
           <fieldset>
             <legend className={LABEL}>Offices</legend>
