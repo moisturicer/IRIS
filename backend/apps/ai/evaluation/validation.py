@@ -20,7 +20,7 @@ from typing import Optional
 from apps.ai.models.chunk import DocumentChunk
 from apps.records.models import Record
 
-from .labels import Label, QuestionSet, normalize
+from .labels import MIN_REGION_OVERLAP, Label, QuestionSet, normalize
 
 
 @dataclass(frozen=True)
@@ -54,10 +54,12 @@ def _resolve_record(label: Label) -> tuple[Optional[Record], Optional[str]]:
     return resolve_record(label.record)
 
 
-def check_label(question_id: str, label: Label) -> LabelCheck:
+def check_label(question_id: str, label: Label, trial_variant: Optional[str] = None) -> LabelCheck:
     record, problem = _resolve_record(label)
     if record is None:
         return LabelCheck(question_id, label, problem=problem)
+    if label.is_figure:
+        return _check_region(question_id, label, record, trial_variant)
 
     chunks = DocumentChunk.objects.filter(
         record=record, chunk_set__is_active=True
@@ -104,9 +106,33 @@ def check_label(question_id: str, label: Label) -> LabelCheck:
     return LabelCheck(question_id, label, record_id=record.pk, found_on_pages=pages)
 
 
-def check_question_set(question_set: QuestionSet) -> list[LabelCheck]:
+def _check_region(
+    question_id: str, label: Label, record: Record, trial_variant: Optional[str] = None
+) -> LabelCheck:
+    """A figure label must overlap some chunk's box on its page (IR-1125)."""
+    from apps.ai.regions import normalized_regions
+    from apps.ai.retrieval.scope import chunk_set_scope
+
+    rows = DocumentChunk.objects.filter(
+        chunk_set_scope("", trial_variant), record=record, deleted_at__isnull=True,
+    ).values_list("bboxes", "chunk_set__page_sizes")
+    covered = any(
+        region.page == label.page and label.region.overlap(region) >= MIN_REGION_OVERLAP
+        for bboxes, sizes in rows
+        for region in normalized_regions(bboxes, sizes)
+    )
+    if not covered:
+        return LabelCheck(
+            question_id, label, record_id=record.pk,
+            problem=f"no chunk's box covers this region on page {label.page} — "
+            "check the page and the fractions against the figure",
+        )
+    return LabelCheck(question_id, label, record_id=record.pk, found_on_pages=(label.page,))
+
+
+def check_question_set(question_set: QuestionSet, trial_variant: Optional[str] = None) -> list[LabelCheck]:
     return [
-        check_label(question.id, label)
+        check_label(question.id, label, trial_variant)
         for question in question_set.questions
         for label in question.expected
     ]
@@ -118,7 +144,7 @@ def render_checks(checks: list[LabelCheck]) -> str:
     lines = [f"{len(good)}/{len(checks)} labels resolve against this database.", ""]
     for check in bad:
         lines.append(f"  x {check.question_id}: {check.problem}")
-        lines.append(f"      quote: {check.label.quote[:70]}")
+        lines.append(f"      label: {check.label.display[:70]}")
         lines.append(f"      record: {str(check.label.record)[:70]}")
     if bad:
         lines.append("")

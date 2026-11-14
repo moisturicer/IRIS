@@ -46,6 +46,10 @@ class RetrievedChunk:
     source_page: Optional[int]
     score: float
     regions: Sequence[Region] = ()
+    #: The text vector search read, and the chunk's element kinds, so the
+    #: reranker can be told to read it instead (IR-1125).
+    embedded: str = ""
+    element_kinds: Sequence[str] = ()
 
 
 @dataclass(frozen=True)
