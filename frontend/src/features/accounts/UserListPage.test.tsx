@@ -1,6 +1,7 @@
 /**
- * The Users page's coordinator controls (IR-478; ADR-032 §4). Every query goes
- * through the accessible tree.
+ * The Users page: coordinator controls (IR-478; ADR-032 §4) and row actions in a
+ * "⋯" menu with Lock behind a dialog that names the person (IR-1077). Every
+ * query goes through the accessible tree.
  */
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,13 +17,14 @@ import UserListPage from "./UserListPage";
 const userList = vi.fn();
 const setCoordinator = vi.fn();
 const setRole = vi.fn();
+const setLocked = vi.fn();
 
 vi.mock("@/api/accounts", () => ({
   accountsApi: {
     userList: (params: unknown) => userList(params),
     setCoordinator: (id: number, value: boolean) => setCoordinator(id, value),
     setRole: (id: number, role: string) => setRole(id, role),
-    setLocked: vi.fn(),
+    setLocked: (id: number, value: boolean) => setLocked(id, value),
   },
 }));
 
@@ -35,10 +37,10 @@ function user(overrides: Partial<UserListItem>): UserListItem {
   };
 }
 
-const MEMBER      = user({ id: 2, email: "itso@cit.edu", role_name: "ITSO" });
-const COORDINATOR = user({ id: 3, email: "ierc.coordinator@cit.edu", role_name: "IERC", is_office_coordinator: true });
-const STUDENT     = user({ id: 4, email: "student@cit.edu", role_name: "Student" });
-const ADVISER     = user({ id: 5, email: "adviser@cit.edu", role_name: "Adviser" });
+const MEMBER      = user({ id: 2, email: "itso@cit.edu", first_name: "Ida", last_name: "Tso", role_name: "ITSO" });
+const COORDINATOR = user({ id: 3, email: "ierc.coordinator@cit.edu", first_name: "Ian", last_name: "Ierc", role_name: "IERC", is_office_coordinator: true });
+const STUDENT     = user({ id: 4, email: "student@cit.edu", first_name: "Stu", last_name: "Dent", role_name: "Student" });
+const ADVISER     = user({ id: 5, email: "adviser@cit.edu", first_name: "Ada", last_name: "Viser", role_name: "Adviser" });
 
 function listing(rows: UserListItem[]) {
   return { data: { count: rows.length, results: rows } };
@@ -46,6 +48,28 @@ function listing(rows: UserListItem[]) {
 
 async function rowFor(email: string) {
   return (await screen.findByRole("row", { name: new RegExp(email) }));
+}
+
+const actionsTrigger = (row: HTMLElement) => within(row).getByRole("button", { name: /^Actions for / });
+
+/** Opens a row's "⋯" menu and returns it. */
+async function openMenu(email: string) {
+  await userEvent.click(actionsTrigger(await rowFor(email)));
+  return screen.getByRole("menu");
+}
+
+/** Opens a row's menu and chooses an item by its name. */
+async function choose(email: string, item: string) {
+  await userEvent.click(within(await openMenu(email)).getByRole("menuitem", { name: item }));
+}
+
+/** The names of a row's menu items, closing the menu again; none when the row has no menu. */
+async function offered(email: string): Promise<string[]> {
+  const row = await rowFor(email);
+  if (!within(row).queryByRole("button", { name: /^Actions for / })) return [];
+  const names = within(await openMenu(email)).getAllByRole("menuitem").map((i) => i.textContent ?? "");
+  await userEvent.keyboard("{Escape}");
+  return names;
 }
 
 /** The viewer the page is opened by. The System Admin gives office roles and the
@@ -69,9 +93,19 @@ describe("the users table", () => {
 
     const table = await screen.findByRole("table", { name: "User accounts" });
     const headers = within(table).getAllByRole("columnheader");
-    expect(headers).toHaveLength(5);
+    expect(headers).toHaveLength(4);
     for (const header of headers) expect(header).toHaveAttribute("scope", "col");
     expect(within(table).getByRole("columnheader", { name: "Actions" })).toBeInTheDocument();
+  });
+
+  it("shows the name first and the email under it, in one cell", async () => {
+    renderScreen(<UserListPage />);
+
+    const table = await screen.findByRole("table", { name: "User accounts" });
+    expect(within(table).getByRole("columnheader", { name: "User" })).toBeInTheDocument();
+    const cell = within(await rowFor("student@cit.edu")).getByRole("cell", { name: /Stu Dent/ });
+    expect(cell.textContent).toBe("Stu Dentstudent@cit.edu");
+    expect(within(table).queryByRole("columnheader", { name: "Email" })).not.toBeInTheDocument();
   });
 
   it("announces loading and the new page when pagination changes", async () => {
@@ -118,16 +152,15 @@ describe("who is offered the action", () => {
   it("offers it on office rows, by their current state", async () => {
     renderScreen(<UserListPage />);
 
-    expect(within(await rowFor("itso@cit.edu")).getByRole("button", { name: "Make coordinator" })).toBeInTheDocument();
-    expect(within(await rowFor("ierc.coordinator@cit.edu")).getByRole("button", { name: "Remove coordinator" })).toBeInTheDocument();
+    expect(await offered("itso@cit.edu")).toContain("Make coordinator");
+    expect(await offered("ierc.coordinator@cit.edu")).toContain("Remove coordinator");
   });
 
   it("never offers it on a Student or Adviser row", async () => {
     renderScreen(<UserListPage />);
 
     for (const email of ["student@cit.edu", "adviser@cit.edu"]) {
-      const row = await rowFor(email);
-      expect(within(row).queryByRole("button", { name: /coordinator/i })).not.toBeInTheDocument();
+      expect((await offered(email)).join()).not.toMatch(/coordinator/i);
     }
   });
 });
@@ -137,7 +170,7 @@ describe("granting", () => {
     setCoordinator.mockResolvedValue({ data: { ...MEMBER, is_office_coordinator: true } });
     renderScreen(<UserListPage />);
 
-    await userEvent.click(within(await rowFor("itso@cit.edu")).getByRole("button", { name: "Make coordinator" }));
+    await choose("itso@cit.edu", "Make coordinator");
     const dialog = screen.getByRole("dialog", { name: "Make coordinator?" });
     expect(dialog).toHaveTextContent("can assign, reassign and withdraw reviewers in ITSO");
 
@@ -147,13 +180,13 @@ describe("granting", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     const row = await rowFor("itso@cit.edu");
     expect(within(row).getByText("Coordinator")).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "Remove coordinator" })).toBeInTheDocument();
+    expect(await offered("itso@cit.edu")).toContain("Remove coordinator");
   });
 
   it("changes nothing when cancelled", async () => {
     renderScreen(<UserListPage />);
 
-    await userEvent.click(within(await rowFor("itso@cit.edu")).getByRole("button", { name: "Make coordinator" }));
+    await choose("itso@cit.edu", "Make coordinator");
     await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
 
     expect(setCoordinator).not.toHaveBeenCalled();
@@ -167,7 +200,7 @@ describe("granting", () => {
     });
     renderScreen(<UserListPage />);
 
-    await userEvent.click(within(await rowFor("itso@cit.edu")).getByRole("button", { name: "Make coordinator" }));
+    await choose("itso@cit.edu", "Make coordinator");
     const dialog = screen.getByRole("dialog", { name: "Make coordinator?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Make coordinator" }));
 
@@ -184,7 +217,7 @@ describe("removing", () => {
     setCoordinator.mockResolvedValue({ data: { ...COORDINATOR, is_office_coordinator: false } });
     renderScreen(<UserListPage />);
 
-    await userEvent.click(within(await rowFor("ierc.coordinator@cit.edu")).getByRole("button", { name: "Remove coordinator" }));
+    await choose("ierc.coordinator@cit.edu", "Remove coordinator");
     const dialog = screen.getByRole("dialog", { name: "Remove coordinator?" });
     expect(dialog).toHaveTextContent("their existing assignments stay");
 
@@ -194,14 +227,14 @@ describe("removing", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     const row = await rowFor("ierc.coordinator@cit.edu");
     expect(within(row).queryByText("Coordinator")).not.toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "Make coordinator" })).toBeInTheDocument();
+    expect(await offered("ierc.coordinator@cit.edu")).toContain("Make coordinator");
   });
 
   it("shows a refusal in the dialog and leaves the row as it was", async () => {
     setCoordinator.mockRejectedValue({ response: { status: 403, data: { detail: "You do not have permission to perform this action." } } });
     renderScreen(<UserListPage />);
 
-    await userEvent.click(within(await rowFor("ierc.coordinator@cit.edu")).getByRole("button", { name: "Remove coordinator" }));
+    await choose("ierc.coordinator@cit.edu", "Remove coordinator");
     const dialog = screen.getByRole("dialog", { name: "Remove coordinator?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Remove coordinator" }));
 
@@ -214,7 +247,7 @@ describe("the Change role dialog", () => {
   it("warns that a coordinator loses coordinator status", async () => {
     renderScreen(<UserListPage />);
 
-    await userEvent.click(within(await rowFor("ierc.coordinator@cit.edu")).getByRole("button", { name: "Change role" }));
+    await choose("ierc.coordinator@cit.edu", "Change role");
     const dialog = screen.getByRole("dialog", { name: "Change Role" });
 
     expect(within(dialog).getByRole("combobox", { name: "New role" })).toHaveValue("IERC");
@@ -224,7 +257,7 @@ describe("the Change role dialog", () => {
   it("gives no such warning for a member who does not coordinate", async () => {
     renderScreen(<UserListPage />);
 
-    await userEvent.click(within(await rowFor("itso@cit.edu")).getByRole("button", { name: "Change role" }));
+    await choose("itso@cit.edu", "Change role");
 
     expect(screen.getByRole("dialog", { name: "Change Role" })).not.toHaveTextContent(/coordinator/i);
   });
@@ -249,11 +282,11 @@ describe("accessibility", () => {
     await rowFor("itso@cit.edu");
     await expectNoBlockingA11yViolations(container);
 
-    await userEvent.click(within(await rowFor("itso@cit.edu")).getByRole("button", { name: "Make coordinator" }));
+    await choose("itso@cit.edu", "Make coordinator");
     await expectNoBlockingA11yViolations(document.body);
     await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
 
-    await userEvent.click(within(await rowFor("ierc.coordinator@cit.edu")).getByRole("button", { name: "Change role" }));
+    await choose("ierc.coordinator@cit.edu", "Change role");
     await expectNoBlockingA11yViolations(document.body);
   });
 });
@@ -275,8 +308,7 @@ describe("a list that fails to load (IR-745)", () => {
 // Who gives which role, and who locks, is the server's (ADR-051 §4-5, amended,
 // IR-781). The page offers each viewer only what the server will let them do.
 describe("what each viewer is offered (IR-781)", () => {
-  const ADMIN = user({ id: 6, email: "sysadmin@cit.edu", role_name: "System Admin" });
-  const buttons = (row: HTMLElement) => within(row).queryAllByRole("button").map((b) => b.textContent);
+  const ADMIN = user({ id: 6, email: "sysadmin@cit.edu", first_name: "Sys", last_name: "Admin", role_name: "System Admin" });
 
   beforeEach(() => {
     userList.mockResolvedValue(listing([MEMBER, STUDENT, ADMIN]));
@@ -286,9 +318,8 @@ describe("what each viewer is offered (IR-781)", () => {
     signInAs("RDCO");
     renderScreen(<UserListPage />);
 
-    const student = await rowFor("student@cit.edu");
-    expect(buttons(student)).toEqual(["Change role", "Lock"]);
-    await userEvent.click(within(student).getByRole("button", { name: "Change role" }));
+    expect(await offered("student@cit.edu")).toEqual(["Change role", "Lock"]);
+    await choose("student@cit.edu", "Change role");
     const options = within(screen.getByRole("dialog")).getAllByRole("option").map((o) => o.textContent);
     expect(options).toEqual(["Student", "Adviser"]);
   });
@@ -297,14 +328,14 @@ describe("what each viewer is offered (IR-781)", () => {
     signInAs("RDCO");
     renderScreen(<UserListPage />);
 
-    expect(buttons(await rowFor("itso@cit.edu"))).toEqual(["Lock"]);
+    expect(await offered("itso@cit.edu")).toEqual(["Lock"]);
   });
 
   it("offers nobody anything on a System Admin's row", async () => {
     for (const role of ["RDCO", "System Admin"]) {
       signInAs(role);
       const view = renderScreen(<UserListPage />);
-      expect(buttons(await rowFor("sysadmin@cit.edu"))).toEqual([]);
+      expect(await offered("sysadmin@cit.edu")).toEqual([]);
       view.unmount();
     }
   });
@@ -312,12 +343,101 @@ describe("what each viewer is offered (IR-781)", () => {
   it("offers the System Admin every role but its own, and the coordinator flag, and no Lock", async () => {
     renderScreen(<UserListPage />);
 
-    const member = await rowFor("itso@cit.edu");
-    expect(buttons(member)).toEqual(["Change role", "Make coordinator"]);
-    await userEvent.click(within(member).getByRole("button", { name: "Change role" }));
+    expect(await offered("itso@cit.edu")).toEqual(["Change role", "Make coordinator"]);
+    await choose("itso@cit.edu", "Change role");
     const options = within(screen.getByRole("dialog")).getAllByRole("option").map((o) => o.textContent);
     expect(options).toContain("ITSO");
     expect(options).toContain("RDCO");
     expect(options).not.toContain("System Admin");
+  });
+});
+
+// A filled, destructive Lock on every row, your own included, was audit CMP-01.
+describe("row actions in a menu (IR-1077)", () => {
+  beforeEach(() => {
+    signInAs("RDCO");
+    userList.mockResolvedValue(listing([MEMBER, STUDENT]));
+  });
+
+  it("gives each row a menu named for its person, and no row a loose Lock button", async () => {
+    renderScreen(<UserListPage />);
+
+    await rowFor("student@cit.edu");
+    expect(screen.getByRole("button", { name: "Actions for Stu Dent" })).toHaveAttribute("aria-haspopup", "menu");
+    expect(screen.getByRole("button", { name: "Actions for Ida Tso" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(Lock|Unlock|Change role)$/ })).not.toBeInTheDocument();
+  });
+
+  it("names the person in the Lock confirmation, and Lock is a menu item, not a button", async () => {
+    renderScreen(<UserListPage />);
+
+    await choose("student@cit.edu", "Lock");
+
+    const dialog = screen.getByRole("dialog", { name: "Lock Stu Dent's account?" });
+    expect(dialog).toHaveTextContent("Stu Dent (student@cit.edu) will be prevented from logging in");
+    expect(setLocked).not.toHaveBeenCalled();
+  });
+
+  it("changes nothing when the Lock confirmation is cancelled, and returns focus to the row's menu", async () => {
+    renderScreen(<UserListPage />);
+
+    await choose("student@cit.edu", "Lock");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+
+    expect(setLocked).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for Stu Dent" })).toHaveFocus();
+  });
+
+  it("locks once on confirm, says so, and reloads the list", async () => {
+    setLocked.mockResolvedValue({ data: {} });
+    renderScreen(<UserListPage />);
+
+    await choose("student@cit.edu", "Lock");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Lock" }));
+
+    await waitFor(() => expect(setLocked).toHaveBeenCalledTimes(1));
+    expect(setLocked).toHaveBeenCalledWith(4, true);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(userList).toHaveBeenCalledTimes(2));
+  });
+
+  it("names the person when unlocking too", async () => {
+    userList.mockResolvedValue(listing([user({ ...STUDENT, is_locked: true })]));
+    renderScreen(<UserListPage />);
+
+    expect(await offered("student@cit.edu")).toEqual(["Change role", "Unlock"]);
+    await choose("student@cit.edu", "Unlock");
+
+    const dialog = screen.getByRole("dialog", { name: "Unlock Stu Dent's account?" });
+    expect(dialog).toHaveTextContent("Stu Dent (student@cit.edu) will be able to log in again");
+  });
+
+  it("falls back to the email when a person has no name", async () => {
+    userList.mockResolvedValue(listing([user({ id: 8, email: "noname@cit.edu", first_name: "", last_name: "" })]));
+    renderScreen(<UserListPage />);
+
+    await choose("noname@cit.edu", "Lock");
+
+    expect(screen.getByRole("dialog", { name: "Lock noname@cit.edu's account?" })).toBeInTheDocument();
+  });
+
+  it("gives the viewer's own row no actions at all", async () => {
+    const own = user({ id: 99, email: "viewer@cit.edu", first_name: "Vi", last_name: "Ewer", role_name: "Student" });
+    userList.mockResolvedValue(listing([own, STUDENT]));
+    renderScreen(<UserListPage />);
+
+    const row = await rowFor("viewer@cit.edu");
+    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+    expect(await offered("student@cit.edu")).toEqual(["Change role", "Lock"]);
+  });
+
+  it("has no blocking axe violations with a menu open and on the Lock dialog", async () => {
+    renderScreen(<UserListPage />);
+
+    await openMenu("student@cit.edu");
+    await expectNoBlockingA11yViolations(document.body);
+    await userEvent.click(screen.getByRole("menuitem", { name: "Lock" }));
+    await expectNoBlockingA11yViolations(document.body);
   });
 });
