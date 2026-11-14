@@ -15,7 +15,7 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useUIStore } from "@/store/ui.store";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   answerReference,
   citedPage,
@@ -212,10 +212,6 @@ function LoadingSkeleton() {
     </div>
   );
 }
-
-/** An outlined fact about the record: its type, classification, programme flags. */
-const META_PILL = "inline-flex min-h-5 items-center rounded-full px-2.5 text-2xs font-semibold leading-4";
-const META_CHIP = cn(META_PILL, "ring-1 ring-inset ring-stone-300 text-stone-700");
 
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
@@ -990,35 +986,20 @@ export default function PaperViewPage() {
                 holds the paper in one line (IR-569). */}
             {!onPaperTab && !reviewerWorkspace && (
             <header className={cn("space-y-5", section === "overview" && "pb-1")}>
-              <p className="flex items-center gap-x-2 text-small text-stone-500">
-                <span>Added {formatDate(record.created_at)}</span>
-                <span aria-hidden className="text-stone-300">·</span>
-                <span>
-                  {record.access_count} view{record.access_count === 1 ? "" : "s"}
-                </span>
-              </p>
-
               <h1 className="font-display font-semibold text-4xl sm:text-5xl leading-[1.08] tracking-tight text-stone-900 text-balance">
                 {record.title}
               </h1>
 
+              {/* Where the record stands, once. What it is held under (type,
+                  Area, IP, commercialization) is in Record details (IR-1089). */}
               <div className="flex items-center gap-2 flex-wrap">
                 <StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />
-                {record.record_type_name && <span className={META_CHIP}>{record.record_type_name}</span>}
-                {record.classification_name && <span className={META_CHIP}>{record.classification_name}</span>}
-                {record.is_ip && (
-                  <span className={cn(META_PILL, "gap-1.5 bg-surface text-brand ring-1 ring-inset ring-stone-300")}>
-                    <i className="fas fa-shield-halved text-2xs" aria-hidden />
-                    Intellectual Property
-                  </span>
-                )}
-                {record.ip_type && <span className={META_CHIP}>{IP_TYPE_LABELS[record.ip_type]}</span>}
-                {record.for_commercialization && <span className={META_CHIP}>For Commercialization</span>}
-                {record.community_extension && <span className={META_CHIP}>Community Extension</span>}
               </div>
 
-              {/* Byline: authors, then adviser, college and year (spec §4.6).
-                  No adviser line when the record names none (IR-472). */}
+              {/* One byline and one date line (IR-1089, audit LAY-03): the
+                  authors, then the adviser when the record names one (IR-472),
+                  then the date the work was completed. Published and views are
+                  governance facts, in Record details. */}
               <div className="space-y-2">
                 {authorNames.length > 0 ? (
                   <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
@@ -1047,7 +1028,6 @@ export default function PaperViewPage() {
                 <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
                   {record.origin === "institutional" && <span>{INSTITUTION.name}</span>}
-                  {record.publication_year && <span>Published {record.publication_year}</span>}
                   {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
                 </div>
               </div>
@@ -1329,7 +1309,7 @@ export default function PaperViewPage() {
                 aria-labelledby={`${tabsId}-details`}
                 className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible"
               >
-                <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
+                <h2 id={`${tabsId}-details`} className="font-display text-section font-semibold text-stone-900">
                   Record details
                 </h2>
                 {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}

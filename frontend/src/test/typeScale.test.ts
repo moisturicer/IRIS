@@ -37,6 +37,9 @@ type FontSize = [string, { lineHeight: string }];
  */
 const ROLES: Record<string, [number, number]> = {
   display: [28, 34],
+  // A section heading in the reading column, above the 17 px `lg` inside it
+  // (IR-1089; spec §4.10: a fixed 22 / 17 heading ladder).
+  section: [22, 28],
   title:   [20, 28],
   heading: [16, 24],
   body:    [15, 24],
