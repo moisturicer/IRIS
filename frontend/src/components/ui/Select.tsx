@@ -17,7 +17,7 @@ type Size = "sm" | "md" | "lg";
 // so a new step is added in one place.
 const SIZES: Record<Size, { control: string; chevron: string }> = {
   sm: { control: "min-h-9 pl-2 pr-8 py-1 text-small",  chevron: "pr-2.5" },
-  md: { control: "pl-3 pr-10 py-2 text-body",        chevron: "pr-4" },
+  md: { control: "pl-3 pr-10 py-2 text-body",          chevron: "pr-4" },
   lg: { control: "min-h-11 pl-4 pr-10 py-3 text-base", chevron: "pr-4" },
 };
 
