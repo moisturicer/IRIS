@@ -176,7 +176,9 @@ class RerankingRetriever(Retriever):
         # was told -- that the vendor was out, which path ran, which space --
         # is not its to restate (IR-279).
         inner = self._inner.retrieve(question, user, limit=self._recall_limit)
-        candidates = self._permitted(inner.passages)
+        # A passage with nothing to show cannot be cited, and the vendor
+        # refuses an empty document (an uncaptioned Figure's chunk, IR-1102).
+        candidates = [c for c in self._permitted(inner.passages) if c.content.strip()]
         if not candidates:
             return inner.with_passages(
                 (),

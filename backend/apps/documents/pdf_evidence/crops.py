@@ -40,9 +40,12 @@ def render(data: bytes, boxes: list, *, max_pages: int) -> list:
         if "password" in str(error).lower():
             raise Encrypted from error
         raise
-    if len(pdf) > max_pages:
-        raise OverBudget
-    return [_crop(pdf, item) for item in boxes]
+    try:
+        if len(pdf) > max_pages:
+            raise OverBudget
+        return [_crop(pdf, item) for item in boxes]
+    finally:
+        pdf.close()
 
 
 def _crop(pdf, item):

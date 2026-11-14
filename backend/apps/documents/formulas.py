@@ -56,7 +56,8 @@ def targets(document) -> list[FormulaTarget]:
     """Each Formula the Extractor located and shaping left as a crop."""
     found = []
     for element in document.elements:
-        if element.source_label != "Formula" or element.kind != "image" or not element.figure:
+        if element.source_label != "Formula" or element.kind not in {"image", "formula"} \
+                or not element.figure:
             continue
         boxes = [b for b in element.bboxes if b.page == element.page]
         if not boxes or element.page not in document.page_sizes:

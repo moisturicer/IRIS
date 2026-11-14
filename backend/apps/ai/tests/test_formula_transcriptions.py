@@ -225,18 +225,21 @@ class TranscriptionTests:
 
         assert transcriber.images == []
 
-    def test_off_the_chunks_are_unchanged_by_a_transcription(self, settings):
+    def test_off_readers_see_the_latex_and_nothing_of_it_is_searchable(self, settings):
         settings.AI_FORMULA_TEXT_INDEXED = False
         record, extraction = manuscript()
-        before = [(c.text, c.content) for c in chunk(record)]
-        assert before
 
         with root(Transcriber()):
             run(record, extraction)
+        chunks = chunk(record)
 
-        assert [(c.text, c.content) for c in chunk(record)] == before
-        assert all(LATEX not in text and DESCRIPTION not in text for text, _ in before)
-        assert self.rechunks == []
+        (formula_chunk,) = [c for c in chunks if "formula" in c.element_kinds]
+        assert f"$$\n{LATEX}\n$$" in formula_chunk.content
+        assert DESCRIPTION not in formula_chunk.content
+        assert all(LATEX not in c.text and DESCRIPTION not in c.text for c in chunks)
+        assert LATEX not in formula_chunk.keyword_text and PROSE in formula_chunk.keyword_text
+        assert not DocumentChunk.objects.filter(pk=formula_chunk.pk, search_vector="overlaps").exists()
+        assert self.rechunks == [(extraction.pk, str(record.manuscript_revision))]
 
     def test_on_the_latex_and_description_are_embedded_and_indexed_at_the_formula(self, settings):
         settings.AI_FORMULA_TEXT_INDEXED = True
@@ -248,6 +251,13 @@ class TranscriptionTests:
 
         assert formula_chunk.text.index(PROSE) < formula_chunk.text.index(LATEX) \
             < formula_chunk.text.index(DESCRIPTION)
-        assert f"$$\n{LATEX}\n$$\n{DESCRIPTION}" in formula_chunk.content
-        hits = DocumentChunk.objects.filter(pk=formula_chunk.pk, search_vector="overlaps")
-        assert hits.exists()
+        assert f"$$\n{LATEX}\n$$" in formula_chunk.content
+        assert DESCRIPTION not in formula_chunk.content
+        assert DocumentChunk.objects.filter(pk=formula_chunk.pk, search_vector="overlaps").exists()
+
+    def test_a_chunk_with_no_transcribed_formula_is_indexed_by_its_content(self):
+        record, _ = manuscript(names=())
+        chunks = chunk(record)
+
+        assert chunks and all(c.keyword_text is None for c in chunks)
+        assert DocumentChunk.objects.filter(record=record, search_vector="weight").exists()

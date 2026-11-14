@@ -1,8 +1,9 @@
 """Chunk authoritative structure at its declared heading depth (IR-840).
 
 Headings open sections at their declared level. Formulas are shown to readers;
-only a transcribed one, with its description, is embedded (IR-1102). Tables
-split only between rows and repeat their header.
+a transcribed one is searchable, with its description, only when
+``index_formulas`` is on (IR-1102). Tables split only between rows and repeat
+their header.
 Prose packs to the target size with its trail counted in; a figure, a list or
 a table row is kept whole up to the safety ceiling (ADR-067 decision 14).
 """
@@ -80,41 +81,48 @@ def _has_content(element: DocumentElement) -> bool:
     )
 
 
-def _body(elements) -> str:
-    return "\n".join(_embedded(e) for e in elements if e.kind != FORMULA or e.description).strip()
+def _transcribed(element) -> bool:
+    """A formula read from its crop (IR-1102), not one the Extractor typed."""
+    return element.kind == FORMULA and element.source_label == "Formula"
+
+
+def _body(elements, index=False) -> str:
+    return "\n".join(
+        _embedded(e) for e in elements if e.kind != FORMULA or (index and _transcribed(e))
+    ).strip()
 
 
 def _embedded(element) -> str:
-    # A transcribed formula carries its description (IR-1102): both are embedded.
     if element.kind == FORMULA:
-        return f"{element.text}\n{element.description}"
+        return f"{element.text}\n{element.description}".strip()
     described = element.kind == "image" and element.description
     return without_formulas(element.text + ("\n" + element.description if described else ""))
 
 
-def _fits(elements, trail, limit) -> bool:
-    return count_tokens(embedded_text(trail, _body(elements))) <= limit
+def _fits(elements, trail, limit, index=False) -> bool:
+    return count_tokens(embedded_text(trail, _body(elements, index))) <= limit
 
 
 def _pack_section(elements, trail, key, options) -> list[Draft]:
     target = options.effective_target_tokens
+    index = options.index_formulas
     drafts: list[Draft] = []
     window: list[DocumentElement] = []
     for element in elements:
         if element.kind in {"table", "image"}:
             if window:
-                drafts.append(_draft(window, trail, key))
+                drafts.append(_draft(window, trail, key, index))
                 window = []
             parts = _table_parts(element, trail, target) if element.kind == "table" else [element]
-            drafts.extend(_draft([part], trail, key) for part in parts)
+            drafts.extend(_draft([part], trail, key, index) for part in parts)
         else:
             for part in _prose_parts(element, trail, options):
-                if window and not _fits(window + [part], trail, target):
-                    drafts.append(_draft(window, trail, key))
+                if window and not _fits(window + [part], trail, target, index):
+                    drafts.append(_draft(window, trail, key, index))
                     window = []
                 window.append(part)
     if window:
-        drafts.append(_draft(window, trail, key))
+        drafts.append(_draft(window, trail, key, index))
     return [split for d in drafts for split in _within_ceiling(d, options)]
 
 
@@ -144,7 +152,7 @@ def _within_ceiling(draft: Draft, options: ChunkingOptions) -> list[Draft]:
         return [draft]
     budget = body_budget(draft.trail, options, options.max_tokens)
     return [
-        replace(draft, body=piece, content=piece)
+        replace(draft, body=piece, content=piece, keyword=None)
         for piece in split_to_fit(draft.body, budget)
     ]
 
@@ -179,14 +187,11 @@ def _table_fragment(table, start, stop, layout):
                    text="\n".join(" | ".join(row) for row in (header, *rows)))
 
 
-def _draft(elements, trail, key) -> Draft:
-    content = "\n\n".join(
-        _display_formula(e) if e.kind == FORMULA else (e.html or e.text) if e.kind == "table" else e.text
-        for e in elements
-    ).strip()
+def _draft(elements, trail, key, index=False) -> Draft:
     return Draft(
-        body=_body(elements),
-        content=content,
+        body=_body(elements, index),
+        content="\n\n".join(_shown(e) for e in elements).strip(),
+        keyword=_keyword(elements, index),
         trail=trail,
         section_key=key,
         source_page=elements[0].page,
@@ -195,10 +200,24 @@ def _draft(elements, trail, key) -> Draft:
     )
 
 
-def _display_formula(element) -> str:
-    # The description follows its formula so the keyword index sees it too (IR-1102).
-    shown = f"$$\n{element.text.strip()}\n$$"
-    return f"{shown}\n{element.description.strip()}" if element.description.strip() else shown
+def _shown(element) -> str:
+    if element.kind == FORMULA:
+        return f"$$\n{element.text.strip()}\n$$"
+    return (element.html or element.text) if element.kind == "table" else element.text
+
+
+def _keyword(elements, index) -> str | None:
+    """What the keyword index reads instead of ``content`` (IR-1102): a
+    transcribed formula with its description when on, without it when off."""
+    if not any(_transcribed(e) for e in elements):
+        return None
+    pieces = []
+    for element in elements:
+        if not _transcribed(element):
+            pieces.append(_shown(element))
+        elif index:
+            pieces.append(f"{_shown(element)}\n{element.description}".strip())
+    return "\n\n".join(p for p in pieces if p).strip()
 
 
 def _content_hash(chunks, page_sizes):
@@ -210,7 +229,8 @@ def _content_hash(chunks, page_sizes):
     payload = {
         "semantic": chunkset_hash(chunks), "page_sizes": page_sizes,
         "display": [{
-            "content": chunk.content, "source_page": chunk.source_page,
+            "content": chunk.content, "keyword_text": chunk.keyword_text,
+            "source_page": chunk.source_page,
             "element_kinds": sorted(chunk.element_kinds),
             "boxes": [(b.page, b.left, b.top, b.right, b.bottom) for b in chunk.bboxes],
         } for chunk in chunks],

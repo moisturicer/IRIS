@@ -3,7 +3,8 @@
 Each stored Formula crop is read by the formula transcription model, which
 returns LaTeX and a one-line description. A refused, unreadable or unavailable
 call leaves the formula as its crop: the Extractor's OCR text is never used.
-With ``AI_FORMULA_TEXT_INDEXED`` on, chunking places both at the formula.
+Readers are shown the LaTeX; with ``AI_FORMULA_TEXT_INDEXED`` on, the LaTeX and
+description are also searchable.
 """
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ import logging
 import re
 from dataclasses import replace
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -114,7 +114,7 @@ def transcribe_formulas(extraction_id: int, source_revision) -> int:
             request=request, transcribed_at=timezone.now(),
         )
         written += updated if latex else 0
-    if written and settings.AI_FORMULA_TEXT_INDEXED:
+    if written:
         _queue_rechunk(extraction.pk, str(extraction.source_revision))
     if owed:
         raise TranscriptionsOwed(f"extraction {extraction.pk} has formulas left to transcribe")
@@ -134,13 +134,11 @@ def _queue_rechunk(extraction_id: int, source_revision: str) -> None:
 
 
 def with_formulas(document, extraction):
-    """``document`` with each transcribed Formula as LaTeX, when formulas are indexed.
-    Off, the document is returned unchanged, so chunks are exactly as before."""
+    """``document`` with each transcribed Formula as its LaTeX and description.
+    Whether they are searchable is the chunking option's to decide."""
     from apps.ai.chunking.document import FORMULA
     from apps.documents.models import ExtractionFormula
 
-    if not settings.AI_FORMULA_TEXT_INDEXED:
-        return document
     transcribed = {
         name: (latex, description)
         for name, latex, description in ExtractionFormula.objects.filter(
@@ -151,6 +149,6 @@ def with_formulas(document, extraction):
         return document
     return replace(document, elements=tuple(
         replace(e, kind=FORMULA, text=transcribed[e.figure][0], description=transcribed[e.figure][1], figure="")
-        if e.source_label == "Formula" and e.kind == "image" and e.figure in transcribed else e
+        if e.source_label == "Formula" and e.kind in {"image", FORMULA} and e.figure in transcribed else e
         for e in document.elements
     ))

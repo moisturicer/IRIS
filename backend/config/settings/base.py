@@ -732,8 +732,7 @@ LLM_DESCRIBE_FIGURE_PROVIDER_ONLY = config("LLM_DESCRIBE_FIGURE_PROVIDER_ONLY", 
 LLM_DESCRIBE_FIGURE_PROVIDER_PINS = config("LLM_DESCRIBE_FIGURE_PROVIDER_PINS", default="")
 
 # transcribe_formula (IR-1102, ADR-067 §Amendment): off until a model is set.
-# Its retention and no-training terms must be recorded before real Manuscripts
-# are sent (ADR-067's open condition).
+# A vision model; requests deny training, and retention is accepted.
 LLM_TRANSCRIBE_FORMULA_VENDOR   = config("LLM_TRANSCRIBE_FORMULA_VENDOR", default="")
 LLM_TRANSCRIBE_FORMULA_BASE_URL = config("LLM_TRANSCRIBE_FORMULA_BASE_URL", default="")
 LLM_TRANSCRIBE_FORMULA_API_KEY  = config("LLM_TRANSCRIBE_FORMULA_API_KEY", default="")
@@ -838,9 +837,9 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
 )
 
 # ---- Formulas in the indexed text (IR-1102, ADR-067 §Amendment) ----------
-# On, a transcribed formula's LaTeX and description enter its chunk's
-# embedded and keyword-indexed text. Read at chunking, so moving it needs a
-# re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
+# Readers always see a transcribed formula's LaTeX. On, it and its description
+# also enter the chunk's embedded and keyword-indexed text. Read at chunking,
+# so moving it needs a re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
 AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
 
 # ---- Vector scan depth (IR-440) ---------------------------------------

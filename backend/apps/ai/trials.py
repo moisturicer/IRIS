@@ -35,7 +35,8 @@ TRAIL_MODES = ("on", "off", "shuffled")
 
 _NAME = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 _INT_OPTIONS = ("max_tokens", "target_tokens", "min_tokens", "context_path_max_tokens")
-_OPTION_KEYS = (*_INT_OPTIONS, "merge_short_siblings", "exclude_sections", "trail")
+_BOOL_OPTIONS = ("merge_short_siblings", "index_formulas")
+_OPTION_KEYS = (*_INT_OPTIONS, *_BOOL_OPTIONS, "exclude_sections", "trail")
 
 
 class VariantError(ValueError):
@@ -66,7 +67,7 @@ class Variant:
         for key, value in self.options:
             if key in _INT_OPTIONS:
                 changes[key] = int(value)
-            elif key == "merge_short_siblings":
+            elif key in _BOOL_OPTIONS:
                 changes[key] = value == "true"
             elif key == "exclude_sections":
                 changes[key] = tuple(s for s in value.split("|") if s)
@@ -100,8 +101,8 @@ def parse_variant(text: str) -> Variant:
             raise VariantError(f"option {pair!r}: known keys are {', '.join(_OPTION_KEYS)}")
         if key in _INT_OPTIONS and not value.isdigit():
             raise VariantError(f"option {key} needs a whole number, not {value!r}")
-        if key == "merge_short_siblings" and value not in ("true", "false"):
-            raise VariantError("merge_short_siblings is true or false")
+        if key in _BOOL_OPTIONS and value not in ("true", "false"):
+            raise VariantError(f"{key} is true or false")
         if key == "trail" and value not in TRAIL_MODES:
             raise VariantError(f"trail is one of {', '.join(TRAIL_MODES)}")
         options.append((key, value))

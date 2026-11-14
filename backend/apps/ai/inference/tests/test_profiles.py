@@ -71,12 +71,12 @@ class ClosedTaskSetTests:
         settings.LLM_DESCRIBE_FIGURE_MODEL = ""
         assert profile_for(InferenceTask.DESCRIBE_FIGURE).is_configured is False
 
-    def test_transcribe_formula_is_off_and_zero_retention(self, settings):
-        """IR-1102: off until a model is set; a crop leaves IRIS only as a Figure does."""
+    def test_transcribe_formula_is_off_and_never_trained_on(self, settings):
+        """IR-1102: off until a model is set; retention is accepted, training is not."""
         settings.LLM_TRANSCRIBE_FORMULA_MODEL = ""
         profile = profile_for(InferenceTask.TRANSCRIBE_FORMULA)
         assert profile.is_configured is False
-        assert profile.data_policy is DataPolicy.ZERO_RETENTION
+        assert profile.data_policy is DataPolicy.NO_TRAINING
 
 
 class ProfileResolutionTests:

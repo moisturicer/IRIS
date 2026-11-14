@@ -3,13 +3,13 @@
   "ticket": "IR-542",
   "source": {
     "path": "docs/evaluation/proxy_starter.json",
-    "sha256": "222a3871520970699ece009f4aad8f949567505f303456480562dfe25d4a862b",
-    "last_changed_by_commit": "4418b1a",
+    "sha256": "2b4605b768d2adfe768f138839d4b554d582e5a8e8d7aaf1610a28a251f7b9d7",
+    "last_changed_by_commit": "IR-1102",
     "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
     "tier": "proxy"
   },
-  "question_count": 113,
-  "labelled_with_passages": 73,
+  "question_count": 129,
+  "labelled_with_passages": 89,
   "kinds": {
     "ambiguous": 10,
     "cross-paper": 10,
@@ -19,7 +19,8 @@
     "general-knowledge": 10,
     "mechanism": 33,
     "near-duplicate": 10,
-    "off-corpus-research": 10
+    "off-corpus-research": 10,
+    "formula": 16
   },
   "pilot_family_coverage": {
     "metadata_count": 0,
@@ -58,7 +59,7 @@
     }
   },
   "split": {
-    "rule": "Every existing question is development. All 113 have been read while tuning retrieval and the evidence decision (IR-133, IR-394, IR-463-467, IR-481-486), so none can serve as held-out evidence. Held-out membership is empty until new questions are written by someone who does not tune on them.",
+    "rule": "Every existing question is development. All 113 have been read while tuning retrieval and the evidence decision (IR-133, IR-394, IR-463-467, IR-481-486), so none can serve as held-out evidence. Held-out membership is empty until new questions are written by someone who does not tune on them. IR-1102 adds f01-f16 (kind formula) to development: they were written and run to measure the formula switch, so they are not held out.",
     "development": [
       "q01",
       "q02",
@@ -172,7 +173,23 @@
       "q110",
       "q111",
       "q112",
-      "q113"
+      "q113",
+      "f01",
+      "f02",
+      "f03",
+      "f04",
+      "f05",
+      "f06",
+      "f07",
+      "f08",
+      "f09",
+      "f10",
+      "f11",
+      "f12",
+      "f13",
+      "f14",
+      "f15",
+      "f16"
     ],
     "held_out": []
   }

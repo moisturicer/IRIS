@@ -138,7 +138,7 @@ TECHNIQUES: tuple[Technique, ...] = (
         adr="ADR-067 §Amendment 2026-11-14",
         ticket="IR-1102",
         note="transcribed formulas' LaTeX and description in the embedded and keyword-indexed "
-             "text; set at indexing, so re-chunk to move it",
+             "text (readers see the LaTeX either way); set at indexing, so re-chunk to move it",
         index_time=True,
     ),
 )

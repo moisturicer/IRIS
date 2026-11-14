@@ -61,6 +61,24 @@ def test_each_formula_is_a_target_with_its_page_and_box_in_points():
     assert target.bbox == pytest.approx({"x": 72.0, "y": 144.0, "w": 216.0, "h": 28.8})
 
 
+def test_a_formula_hi_res_typed_as_latex_is_still_cropped():
+    item = dict(formula_item(), text="$$x^2 + y^2$$")
+
+    (element,) = shaped(item).elements
+    (target,) = formulas.targets(shaped(item))
+
+    assert (element.kind, element.text, target.name) == ("formula", "x^2 + y^2", "eq-1")
+
+
+def test_a_trial_variant_can_index_formulas():
+    from apps.ai.chunking.values import ChunkingOptions
+    from apps.ai.trials import parse_variant
+
+    variant = parse_variant("formulas=unstructured::index_formulas=true")
+
+    assert variant.chunking_options(ChunkingOptions()).index_formulas is True
+
+
 def test_an_image_or_a_boxless_formula_is_not_a_target():
     document = shaped(
         {"type": "Image", "element_id": "img", "text": "", "metadata": {

@@ -74,13 +74,12 @@ class DataPolicy(Enum):
     """
 
     NO_TRAINING = "no_training"
-    #: Nothing retained either: a paper's Figures and Formula crops leave
-    #: IRIS only so (IR-852, IR-1102).
+    #: Nothing retained either: a paper's Figures leave IRIS only so (IR-852).
     ZERO_RETENTION = "zero_retention"
 
 
 #: Tasks whose vendor may keep nothing they are sent.
-_ZERO_RETENTION_TASKS = frozenset({InferenceTask.DESCRIBE_FIGURE, InferenceTask.TRANSCRIBE_FORMULA})
+_ZERO_RETENTION_TASKS = frozenset({InferenceTask.DESCRIBE_FIGURE})
 
 
 @dataclass(frozen=True)
