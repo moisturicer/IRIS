@@ -55,6 +55,13 @@ export default {
         surface: "#ffffff",
         overlay: "#ffffff",
 
+        // Field Stone (IR-1074, D1; DESIGN.md "Decided changes"): the outline of
+        // every input, select, textarea and checkbox, 3.49:1 on white (WCAG
+        // 1.4.11). Rule Stone (`stone-300`) stays on decorative chips and cards,
+        // which carry no meaning an outline has to show. Placeholders and helper
+        // text are Quiet Ink, `stone-600` (#57534e).
+        field: "#8f8884",
+
         // Highlight roles (IR-1097, D6; DESIGN.md "Decided changes"). One look
         // per kind of highlight, and no look means two things. Values are the
         // prototype's (iris-uiux-audit/prototype/styles.css).
@@ -128,6 +135,9 @@ export default {
         body:    ["15px", { lineHeight: "24px" }],
         small:   ["13px", { lineHeight: "20px" }],
         label:   ["12px", { lineHeight: "16px" }],
+        // Form fields and page buttons only (IR-1074, D1): 14/20, between
+        // `small` and `body`. The reader toolbar's reading controls stay 13 px.
+        control: ["14px", { lineHeight: "20px" }],
       },
 
       // On Tailwind's 4 px base (IR-405): the section rhythm and card padding,

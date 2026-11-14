@@ -131,7 +131,7 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by title or author"
-              className="w-full rounded-lg border border-stone-300 bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded-lg border border-field bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-600 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
           </label>
           <FilterChips label="Show" options={filters} value={filter} onChange={onFilterChange} />

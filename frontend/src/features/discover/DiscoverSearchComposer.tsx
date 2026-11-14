@@ -50,7 +50,7 @@ export function DiscoverSearchComposer({ value, onChange }: DiscoverSearchCompos
   }, [value]);
 
   return (
-    <div className={cn("flex min-h-14 items-center gap-3 rounded-2xl border border-stone-300 bg-surface px-4 py-2 focus-within:border-brand", COLOUR_TRANSITION)}>
+    <div className={cn("flex min-h-14 items-center gap-3 rounded-2xl border border-field bg-surface px-4 py-2 focus-within:border-brand", COLOUR_TRANSITION)}>
         <RepositorySearchIcon className="h-5 w-5 shrink-0 text-brand" />
         <div className="relative min-w-0 flex-1">
           {!value && <span aria-hidden="true" className={cn(

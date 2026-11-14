@@ -128,17 +128,17 @@ function Field({
         {label}
       </span>
       {children}
-      {hint && <span className="block text-label text-stone-500 mt-1.5">{hint}</span>}
+      {hint && <span className="block text-label text-stone-600 mt-1.5">{hint}</span>}
     </label>
   );
 }
 
 const inputClass =
-  "w-full px-3 py-2 rounded-lg border border-stone-200 text-body text-stone-900 " +
+  "w-full px-3 py-2 rounded-lg border border-field text-control text-stone-900 " +
   FOCUS_RING;
 
 const readOnlyClass =
-  "w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-body text-stone-500";
+  "w-full px-3 py-2 rounded-lg border border-field bg-stone-50 text-control text-stone-600";
 
 function Notice({ tone, children }: { tone: "ok" | "error"; children: React.ReactNode }) {
   return (

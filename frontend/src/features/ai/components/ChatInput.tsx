@@ -68,7 +68,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, beside, pl
           aria-label={label ?? placeholder ?? "Ask about the research corpus…"}
           placeholder={placeholder ?? "Ask about the research corpus…"}
           className={`col-span-2 min-h-9 min-w-0 bg-transparent px-2.5 py-1.5 text-[15px]
-            outline-none text-stone-900 placeholder:text-stone-500 disabled:opacity-50 ${CHAT_COMPOSER_FIELD}`}
+            outline-none text-stone-900 placeholder:text-stone-600 disabled:opacity-50 ${CHAT_COMPOSER_FIELD}`}
         />
         <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-1.5">
           {/* Visibly closed until uploads to a question exist. */}
