@@ -1,0 +1,314 @@
+[
+  {
+    "type": "Header",
+    "element_id": "f7f17df88fa45360823fcf5fd6912a38",
+    "text": "IRIS contract fixture",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.43460083007812,
+            126.00241088867188
+          ],
+          [
+            245.43460083007812,
+            158.7452392578125
+          ],
+          [
+            495.6324768066406,
+            158.7452392578125
+          ],
+          [
+            495.6324768066406,
+            126.00241088867188
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "figures.pdf"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "e6a5799218c8162a58536dc75dbcd333",
+    "text": "Figures and formulas",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            246.29556274414062,
+            248.9884796142578
+          ],
+          [
+            246.29556274414062,
+            304.56689453125
+          ],
+          [
+            745.8656005859375,
+            304.56689453125
+          ],
+          [
+            745.8656005859375,
+            248.9884796142578
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "figures.pdf",
+      "parent_id": "f7f17df88fa45360823fcf5fd6912a38"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "972da2c4b7553cbda77a667468e00d9e",
+    "text": "A captioned figure comes first.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            244.2227783203125,
+            328.44207763671875
+          ],
+          [
+            244.2227783203125,
+            369.9698791503906
+          ],
+          [
+            718.0653076171875,
+            369.9698791503906
+          ],
+          [
+            718.0653076171875,
+            328.44207763671875
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "figures.pdf",
+      "parent_id": "e6a5799218c8162a58536dc75dbcd333"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "98b595466b6b5047e6019e6b92a191d2",
+    "text": "Figure 1: A captioned rectangle.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.42784118652344,
+            834.5205688476562
+          ],
+          [
+            245.42784118652344,
+            875.0375366210938
+          ],
+          [
+            693.6386108398438,
+            875.0375366210938
+          ],
+          [
+            693.6386108398438,
+            834.5205688476562
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "figures.pdf",
+      "parent_id": "e6a5799218c8162a58536dc75dbcd333"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "da14c5f39afbf3e03501da7b2a6b98a7",
+    "text": "An uncaptioned figure follows.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            244.96142578125,
+            939.9312133789062
+          ],
+          [
+            244.96142578125,
+            982.5332641601562
+          ],
+          [
+            714.408203125,
+            982.5332641601562
+          ],
+          [
+            714.408203125,
+            939.9312133789062
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "figures.pdf",
+      "parent_id": "e6a5799218c8162a58536dc75dbcd333"
+    }
+  },
+  {
+    "type": "Formula",
+    "element_id": "88cc438785c425daf6435f2ebaf20200",
+    "text": "a^2 + b^2 = c^2",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            410.2548522949219,
+            1497.6368408203125
+          ],
+          [
+            410.2548522949219,
+            1543.3472222222222
+          ],
+          [
+            710.123046875,
+            1543.3472222222222
+          ],
+          [
+            710.123046875,
+            1497.6368408203125
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "figures.pdf"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "dc47d139f8e392dd499925bcaf0e652c",
+    "text": "The formula above closes the page.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            244.7293701171875,
+            1599.025634765625
+          ],
+          [
+            244.7293701171875,
+            1642.4683837890625
+          ],
+          [
+            801.9791666666667,
+            1642.4683837890625
+          ],
+          [
+            801.9791666666667,
+            1599.025634765625
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "figures.pdf"
+    }
+  },
+  {
+    "type": "Footer",
+    "element_id": "6b6ce19338a161b7f046fc61064cc1fb",
+    "text": "Page 1",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            1002.1915893554688,
+            2605.477783203125
+          ],
+          [
+            1002.1915893554688,
+            2639.999755859375
+          ],
+          [
+            1094.9722222222222,
+            2639.999755859375
+          ],
+          [
+            1094.9722222222222,
+            2605.477783203125
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "figures.pdf"
+    }
+  },
+  {
+    "type": "PageBreak",
+    "element_id": "32e4d6b29a1aee5387fe1ac7869a2da3",
+    "text": "",
+    "metadata": {
+      "languages": [
+        "eng"
+      ],
+      "filename": "figures.pdf",
+      "filetype": "application/pdf"
+    }
+  }
+]
