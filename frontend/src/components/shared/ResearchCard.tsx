@@ -16,7 +16,7 @@
 import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { COLOUR_TRANSITION } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 
 interface ResearchCardProps {
@@ -109,7 +109,9 @@ export function ResearchCard({
         className={cn(
           "rounded-sm hover:text-brand",
           COLOUR_TRANSITION,
-          FOCUS_RING,
+          // The ring goes on the stretched ::after, so keyboard focus on the
+          // title outlines the whole card it opens rather than the title text.
+          "focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand focus-visible:after:ring-offset-2",
           "after:absolute after:inset-0 after:rounded-xl after:content-['']",
         )}
       >

@@ -9,11 +9,11 @@ import { PaperSaveDropdown } from "./PaperSaveDropdown";
 import {
   cardHook,
   formatAuthorList,
-  highlightMatch,
   ipTypeLabel,
   indexedOnLabel,
   recordYearLabel,
 } from "./discoverUtils";
+import { highlightTerms } from "./searchTerms";
 
 interface DiscoverResultCardProps {
   record:          RecordListItem;
@@ -70,8 +70,8 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
       meta={record.publication_year ? `Published ${recordYearLabel(record)}` : indexedOnLabel(record)}
       byline={formatAuthorList(record.authors) === "Authors not recorded"
         ? <span className="italic text-stone-500">Authors not recorded</span>
-        : highlightMatch(formatAuthorList(record.authors), searchHighlight)}
-      summary={abstract ? highlightMatch(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
+        : highlightTerms(formatAuthorList(record.authors), searchHighlight)}
+      summary={abstract ? highlightTerms(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
       summaryClassName={expanded ? "xl:line-clamp-5" : undefined}
       splitFooter={expanded}
       previewLabel="Manuscript and abstract preview"
@@ -83,7 +83,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
             <span className="text-label font-semibold uppercase tracking-wide text-stone-700">{record.ai_hook?.trim() ? "At a glance" : "From the abstract"}</span>
           </div>
           <p className="mt-2 line-clamp-3 font-display text-[1.13rem] leading-snug text-stone-800">
-            {hook ? highlightMatch(hook, searchHighlight) : "No abstract has been added yet."}
+            {hook ? highlightTerms(hook, searchHighlight) : "No abstract has been added yet."}
           </p>
         </div>
       </>}

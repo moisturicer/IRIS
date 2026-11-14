@@ -1,7 +1,7 @@
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { recordsApi } from "@/api/records";
@@ -18,6 +18,7 @@ import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
 import type { SavedFeed } from "@/api/library";
 import { useRole } from "@/hooks/useRole";
 import { canAccess } from "@/lib/access";
+import { ASK_PATH, askHandoffState } from "@/lib/askHandoff";
 import { useFeedsStore } from "@/store/feeds.store";
 import { cn } from "@/lib/utils";
 import { IP_TYPE_LABELS } from "@/types/records";
@@ -48,6 +49,7 @@ import {
   writeDiscoverQuery,
   type DiscoverQuery,
 } from "./discoverQuery";
+import { looksLikeQuestion } from "./searchTerms";
 
 const PAGE_SIZE = 12;
 const COLUMNS_KEY = "iris.discover.columns";
@@ -765,6 +767,18 @@ export default function DiscoverPage() {
         {loading || !totalCount ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
       </p>
 
+      {/* A question gets one line, not a permanent one (IR-1095). */}
+      {!holdQuietly && looksLikeQuestion(activeQuery) && (
+        <p className="mt-4 text-small text-stone-700">
+          This looks like a question.{" "}
+          <Link to={ASK_PATH} state={askHandoffState(activeQuery)}
+            className={cn("font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
+            Ask IRIS this question
+          </Link>{" "}
+          to get an answer from the research you can read.
+        </p>
+      )}
+
       <div className="mt-4">
       {holdQuietly ? null : loading ? (
         <ResultsSkeleton columns={gridColumns} onRetry={() => setAttempt((n) => n + 1)} />
@@ -800,9 +814,16 @@ export default function DiscoverPage() {
             title="No research matches these filters"
             message="Try removing a filter or searching for something else."
             action={
-              <button type="button" onClick={clearFilters} className={cn(PILL_SECONDARY, FOCUS_RING)}>
-                Clear filters
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button type="button" onClick={clearFilters} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+                  Clear filters
+                </button>
+                {activeQuery && (
+                  <Link to={ASK_PATH} state={askHandoffState(activeQuery)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+                    Ask IRIS instead
+                  </Link>
+                )}
+              </div>
             }
           />
         ) : (
