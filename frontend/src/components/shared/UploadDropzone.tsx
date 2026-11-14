@@ -207,7 +207,7 @@ export function UploadDropzone({
             "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 select-none",
             COLOUR_TRANSITION,
             FOCUS_RING,
-            dragging ? "border-brand bg-brand-50" : "border-stone-300 bg-stone-50",
+            dragging ? "border-brand bg-stone-100" : "border-stone-300 bg-stone-50",
             disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-stone-500",
           )}
         >

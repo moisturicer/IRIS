@@ -141,7 +141,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
             {holders.map((h) => (
               <li
                 key={h.party}
-                className="px-2 py-0.5 rounded-md bg-brand-50 text-brand text-xs font-bold"
+                className="px-2 py-0.5 rounded-md bg-surface text-brand ring-1 ring-stone-300 text-xs font-bold"
               >
                 {h.label}
               </li>

@@ -14,6 +14,7 @@ import { Panel } from "./settingsParts";
 import { AiAnswerPanel } from "./AiAnswerPanel";
 import { CurrentNoticePanel } from "./CurrentNoticePanel";
 import { DeleteAccountPanel, DownloadMyDataPanel } from "./YourDataPanels";
+import { HERE } from "@/components/ui/highlightRoles";
 
 /**
  * Settings: the account. Who you are on IRIS (name, photo, bio, interests)
@@ -93,11 +94,11 @@ export default function SettingsPage() {
                   "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[14px] font-medium",
                   "whitespace-nowrap transition-colors text-left",
                   active
-                    ? "bg-brand-50 text-brand font-semibold"
+                    ? HERE
                     : "text-stone-600 hover:bg-stone-50",
                 )}
               >
-                <i className={cn("fas", t.icon, "text-[13px] w-4 shrink-0")} aria-hidden />
+                <i className={cn("fas", t.icon, "text-[13px] w-4 shrink-0", active && "text-brand")} aria-hidden />
                 {t.label}
               </button>
             );

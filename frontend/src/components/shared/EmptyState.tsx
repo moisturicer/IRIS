@@ -47,7 +47,7 @@ export function EmptyState({
       <div
         className={cn(
           "w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-lg",
-          error ? "bg-brand-50 text-brand" : "bg-stone-100 text-stone-500",
+          error ? "bg-stone-100 text-brand" : "bg-stone-100 text-stone-500",
         )}
       >
         <i className={cn("fas", icon)} aria-hidden="true" />

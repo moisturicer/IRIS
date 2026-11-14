@@ -27,6 +27,8 @@ export interface ReaderMark {
   label:      string;
   /** A draft: the quiet pin. */
   pending:    boolean;
+  /** The thread open in the Threads tab: its passage reads stronger (IR-1097). */
+  open:       boolean;
   onActivate: () => void;
 }
 
@@ -60,7 +62,11 @@ export function ThreadMarks({ marks, page }: { marks: ReaderMark[]; page: number
               <span
                 key={i}
                 aria-hidden
-                className={cn("absolute rounded-sm", mark.pending ? "thread-mark-pending" : "thread-mark")}
+                className={cn(
+                  "absolute rounded-sm",
+                  mark.pending ? "thread-mark-pending" : "thread-mark",
+                  mark.open && "thread-mark-open",
+                )}
                 style={{
                   left: `${r.left * 100}%`, top: `${r.top * 100}%`,
                   width: `${(r.right - r.left) * 100}%`, height: `${(r.bottom - r.top) * 100}%`,
@@ -73,7 +79,7 @@ export function ThreadMarks({ marks, page }: { marks: ReaderMark[]; page: number
               aria-label={mark.label}
               className={cn(
                 "thread-pin absolute pointer-events-auto -translate-y-1/2 inline-grid place-items-center rounded-full font-semibold leading-none",
-                mark.pending ? "bg-white text-brand ring-1 ring-brand/40" : "bg-brand text-white",
+                mark.pending ? "bg-white text-pen ring-1 ring-pen" : "bg-pen text-white",
                 FOCUS_RING,
               )}
               style={{

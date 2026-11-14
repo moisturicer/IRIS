@@ -219,7 +219,7 @@ function ManagedItem({
                 aria-label={`Reject ${item.label}`}
                 aria-expanded={rejecting}
                 onClick={() => setRejecting((v) => !v)}
-                className="px-2 py-1 rounded-lg border border-brand-200 text-xs font-bold text-brand hover:bg-brand-50 disabled:opacity-60"
+                className="px-2 py-1 rounded-lg border border-stone-300 text-xs font-bold text-brand hover:bg-stone-100 disabled:opacity-60"
               >
                 Reject
               </button>

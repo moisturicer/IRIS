@@ -52,6 +52,43 @@ export function offGreyClasses(source: string): string[] {
   return [...new Set(source.match(OFF_GREY) ?? [])];
 }
 
+/**
+ * The retired highlight tints (IR-1097, D6; DESIGN.md "Decided changes").
+ *
+ * One pale pink, Maroon Wash (`brand-50`), once did about fifteen jobs: the
+ * current page, a selected chip, the Active status, a citation, a search match,
+ * a badge and a warning all looked alike. Each kind of highlight now has its
+ * own look (`components/ui/highlightRoles.ts`), so the wash, the pinker
+ * `brand-100` and the thread rose `brand-200` are not used as a fill, outline
+ * or text colour anywhere, and neither is maroon at 5 or 10 percent, which is the
+ * same pink made by opacity. Gold and cream went with them: the gold thumbnail
+ * ring was off palette, and `cream` had one user.
+ */
+const RETIRED = [
+  "brand-(?:50|100|200)",
+  "brand/(?:5|10)",
+  "gold(?:-(?:light|dark))?",
+  "cream",
+].join("|");
+
+const RETIRED_TINT = new RegExp(
+  `(?<![\\w-])(?:${UTILITIES})-(?:${RETIRED})(?![\\w-])`,
+  "g",
+);
+
+/** Every retired wash, gold or cream colour class in `source`, once each, in order of appearance. */
+export function retiredTintClasses(source: string): string[] {
+  return [...new Set(source.match(RETIRED_TINT) ?? [])];
+}
+
+// The hexes the audit found loose in components, and the wash itself.
+const STRAY_HEX = /#(?:fbe4e4|fcfcfb|5a0c0f|fdf2f2)(?![0-9a-f])/gi;
+
+/** Every stray or retired hex in `source`, lower-cased, once each, in order of appearance. */
+export function strayHexes(source: string): string[] {
+  return [...new Set((source.match(STRAY_HEX) ?? []).map((h) => h.toLowerCase()))];
+}
+
 // White at any opacity below 100, in the `/60` or `/[0.6]` form; `/100` is opaque and passes.
 const SEE_THROUGH_WHITE = /(?<![\w-])bg-white\/(?!100(?![\w-]))(?:\d{1,3}|\[[^\]]+\])(?![\w-])/g;
 

@@ -223,7 +223,7 @@ function ConflictNotice({ note }: { note: ReadingNoteState }) {
   const conflict = note.conflict;
   if (!conflict) return null;
   return (
-    <section aria-label="Note changed on another device" className="shrink-0 border-b border-stone-200 bg-brand-50 px-4 py-3">
+    <section aria-label="Note changed on another device" className="shrink-0 border-b border-stone-200 bg-surface px-4 py-3">
       <p className="text-small font-semibold text-stone-900">This note changed on another device.</p>
       <p className="mt-1 text-2xs text-stone-700">Neither text has been lost. Choose what to keep; nothing is saved until you do.</p>
       <div className="mt-2 grid gap-2 reading-split:grid-cols-2">

@@ -18,7 +18,7 @@ interface AuthAlertProps {
 // warning is soft maroon (IR-359). The glyph and the title carry the meaning.
 function AlertIcon({ variant }: { variant: AuthAlertVariant }) {
   const bg =
-    variant === "warning" ? "bg-brand-100 text-brand" : "bg-brand text-white";
+    variant === "warning" ? "bg-stone-100 text-brand" : "bg-brand text-white";
 
   return (
     <span
@@ -35,7 +35,7 @@ export function AuthAlert({ variant, title, children, onDismiss, focusRef }: Aut
     <div
       ref={focusRef}
       tabIndex={focusRef ? -1 : undefined}
-      className="relative mb-6 rounded-lg border border-brand/25 bg-brand-50 px-4 py-3 text-brand"
+      className="relative mb-6 rounded-lg border border-stone-300 bg-surface px-4 py-3 text-brand"
       role="alert"
     >
       {onDismiss && (

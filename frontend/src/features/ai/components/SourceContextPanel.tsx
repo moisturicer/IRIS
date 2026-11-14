@@ -99,7 +99,7 @@ function PassageRow({ citation, title }: { citation: ChatCitation; title: string
     <Link to={to} state={state} title={snippet || undefined}
       aria-label={openCitationLabel(citation, title)}
       className="group/row grid grid-cols-[1.375rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-stone-100">
-      <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-md bg-brand-50 text-2xs font-semibold tabular-nums leading-none text-brand">
+      <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-md bg-surface text-2xs font-semibold tabular-nums leading-none text-brand ring-1 ring-stone-300">
         {citation.marker}
       </span>
       <span className="min-w-0">

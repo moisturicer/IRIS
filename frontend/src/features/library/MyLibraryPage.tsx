@@ -161,9 +161,9 @@ export default function MyLibraryPage() {
   const savedPanel = (
     <div>
       {failure && (
-        <p role="alert" className="mb-3 flex flex-wrap items-center gap-x-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-small text-brand">
+        <p role="alert" className="mb-3 flex flex-wrap items-center gap-x-2 rounded-xl border border-stone-300 bg-surface px-3 py-2 text-small text-brand">
           {failure.message}
-          <button type="button" onClick={dismissFailure} className={cn("ml-auto rounded-md px-2 py-1 font-semibold hover:bg-brand-100", FOCUS_RING)}>
+          <button type="button" onClick={dismissFailure} className={cn("ml-auto rounded-md px-2 py-1 font-semibold hover:bg-stone-100", FOCUS_RING)}>
             Dismiss
           </button>
         </p>
