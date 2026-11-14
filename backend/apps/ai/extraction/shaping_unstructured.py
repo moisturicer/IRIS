@@ -52,7 +52,7 @@ def shape_unstructured(raw: Any, pdf_evidence: Optional[Mapping] = None) -> Norm
         if label in _PERSONAL:
             continue
         elements.extend(_element(item, label, metadata, page, sizes))
-    elements = _headings(_captions(_lists(elements)))
+    elements = _headings(_captions(_lists(_continued_tables(elements))))
     title = next((e.text for e in elements if e.kind == "heading" and e.level == 1), "")
     return NormalizedDocument(
         title=title, elements=tuple(elements), page_sizes=sizes, structure_is_authoritative=True,
@@ -145,9 +145,34 @@ def _binds(image, caption):
     )
 
 
+def _continued_tables(elements):
+    """Join a table that opens a page onto the table that ended the page before
+    when their column counts match: hi_res splits tables at page breaks (IR-1101)."""
+    joined: list[DocumentElement] = []
+    last = None  # index in ``joined`` of the last body element
+    for element in elements:
+        previous = joined[last] if last is not None else None
+        if (element.kind == "table" and previous is not None and previous.kind == "table"
+                and element.page == (previous.page or 0) + 1 and _columns(element) == _columns(previous) > 0):
+            rows = previous.rows + element.rows
+            joined[last] = replace(
+                previous, rows=rows, bboxes=previous.bboxes + element.bboxes,
+                html=(previous.html or "") + (element.html or ""),
+                text="\n".join(" | ".join(row) for row in rows),
+            )
+            continue
+        joined.append(element)
+        if element.kind not in {"header", "footer"}:
+            last = len(joined) - 1
+    return joined
+
+
+def _columns(table):
+    return len(table.rows[0]) if table.rows and all(len(r) == len(table.rows[0]) for r in table.rows) else 0
+
+
 def _table(element, html):
-    """Rows from the table's HTML. Unstructured already joins a table split
-    across pages into one element (IR-984), so no merge is built here."""
+    """Rows from the table's HTML; split tables are joined by ``_continued_tables``."""
     if not html:
         return element
     parser = _TableRows()
