@@ -154,7 +154,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
             aria-pressed={selected === opt}
             onClick={() => setSelected(opt === selected ? "" : opt)}
             className={cn(
-              "px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors",
+              "min-h-11 reading-split:min-h-9 px-3 rounded-full text-xs font-semibold border transition-colors",
               selected === opt
                 ? "bg-brand text-white border-brand"
                 : "bg-white text-stone-600 border-stone-200 hover:border-brand/40",
@@ -170,7 +170,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
           type="button"
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className="px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
+          className="min-h-11 reading-split:min-h-9 px-3 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
         >
           {saving ? "Saving…" : "Save classification"}
         </button>

@@ -537,6 +537,53 @@ describe("the phone drawer", () => {
   });
 });
 
+// Every control a phone reader touches is at least 44px (IR-1092, audit RES-02).
+// jsdom has no layout, so what is checked is the size the markup asks for below
+// `md`, where the shell is a drawer; from `md` the pointer sizes come back. The
+// measured look at 390 and 360 px is the by-hand check on the PR.
+describe("touch targets in the phone drawer (IR-1092)", () => {
+  async function openDrawer() {
+    const user = userEvent.setup();
+    atPhoneWidth();
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+    await user.click(await screen.findByRole("button", { name: "Open menu" }));
+    return { user, sidebar: screen.getByRole("complementary", { name: "Sidebar" }) };
+  }
+
+  it("makes Close menu and Open menu 44px squares", async () => {
+    const { sidebar } = await openDrawer();
+
+    expect(within(sidebar).getByRole("button", { name: "Close menu" })).toHaveClass("h-11", "w-11", "md:hidden");
+    expect(screen.getByRole("button", { name: "Open menu", hidden: true })).toHaveClass("w-11", "h-11");
+  });
+
+  it("makes every navigation link and Help at least 44px tall, and compact again from md", async () => {
+    const { sidebar } = await openDrawer();
+
+    const links = [
+      ...within(within(sidebar).getByRole("navigation", { name: "Main" })).getAllByRole("link"),
+      within(sidebar).getByRole("link", { name: "Help" }),
+    ];
+    expect(links.length).toBeGreaterThan(2);
+    for (const link of links) expect(link).toHaveClass("min-h-11", "md:min-h-0");
+  });
+
+  it("makes the account menu's Profile, Settings and Sign out at least 44px tall", async () => {
+    const { user, sidebar } = await openDrawer();
+
+    await user.click(within(sidebar).getByRole("button", { name: /account menu/ }));
+
+    for (const item of [
+      screen.getByRole("link", { name: "Profile" }),
+      screen.getByRole("link", { name: "Settings" }),
+      screen.getByRole("button", { name: "Sign out" }),
+    ]) {
+      expect(item).toHaveClass("min-h-11", "md:min-h-0");
+    }
+  });
+});
+
 describe("the phone drawer and its account menu", () => {
   it("closes only the account menu on Escape, not the drawer around it", async () => {
     const user = userEvent.setup();

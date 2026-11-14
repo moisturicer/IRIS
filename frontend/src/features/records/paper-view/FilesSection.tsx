@@ -495,7 +495,7 @@ function DownloadButton({ name, onClick }: { name: string; onClick: () => void }
       type="button"
       onClick={onClick}
       aria-label={`Download ${name}`}
-      className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}
+      className={cn(PILL_SECONDARY, FOCUS_RING, "reading-split:min-h-9 px-3")}
     >
       <i className="fas fa-download text-2xs" aria-hidden />
       Download
@@ -509,7 +509,7 @@ function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) 
       type="button"
       onClick={onClick}
       aria-label={`Remove ${name}`}
-      className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}
+      className={cn(PILL_SECONDARY, FOCUS_RING, "reading-split:min-h-9 px-3")}
     >
       <i className="fas fa-trash-can text-2xs" aria-hidden />
       Remove
