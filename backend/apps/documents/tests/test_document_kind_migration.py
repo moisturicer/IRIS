@@ -18,7 +18,6 @@ from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-from apps.records.models import RecordType
 from apps.reviews.workflow_test_helpers import model_at_current_state
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
@@ -39,7 +38,7 @@ def test_the_backfill_marks_existing_rows_from_the_owner_they_hang_off():
 
         # Cross-app dependencies can also rewind records. Match the schema
         # actually left applied, rather than the live model or target closure.
-        record_type = RecordType.objects.create(name="Thesis")
+        record_type = model_at_current_state("records", "RecordType").objects.create(name="Thesis")
         record = model_at_current_state("records", "Record").objects.create(
             title="Pre-existing thesis", record_type_id=record_type.pk,
         )

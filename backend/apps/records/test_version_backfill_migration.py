@@ -22,7 +22,8 @@ from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
-from apps.records.models import RecordType, RecordVersion
+from apps.records.models import RecordVersion
+from apps.reviews.workflow_test_helpers import model_at_current_state
 from apps.reviews.models import Review
 from apps.reviews.workflow_test_helpers import purge_records_at_current_state
 
@@ -70,7 +71,7 @@ def test_the_backfill_records_one_knowable_version_per_submitted_record():
         adviser = _user("ir416-adviser@cit.edu", "Adviser")
         # get_or_create: a flushing TransactionTestCase earlier in the run
         # removes the rows records/0002 seeds.
-        thesis = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        thesis = model_at_current_state("records", "RecordType").objects.get_or_create(name="Thesis / Research")[0]
         OldRecord = _records_model("Record")
         OldRecordVersion = _records_model("RecordVersion")
 

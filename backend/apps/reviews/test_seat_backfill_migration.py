@@ -21,7 +21,6 @@ from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
-from apps.records.models import RecordType
 from apps.reviews.models import RecordClearance
 from apps.reviews.workflow_test_helpers import model_at_current_state, purge_records_at_current_state
 
@@ -86,8 +85,8 @@ def test_the_backfill_seats_each_active_assignment_it_can_map_and_no_other():
         rdco = _user("ir415-rdco@cit.edu", "RDCO")
         # get_or_create: a flushing TransactionTestCase earlier in the run
         # removes the rows records/0002 seeds.
-        thesis = RecordType.objects.get_or_create(name="Thesis / Research")[0]
-        proposal = RecordType.objects.get_or_create(name="Proposal")[0]
+        thesis = model_at_current_state("records", "RecordType").objects.get_or_create(name="Thesis / Research")[0]
+        proposal = model_at_current_state("records", "RecordType").objects.get_or_create(name="Proposal")[0]
 
         def record(title, status, record_type=thesis, **extra):
             if "adviser" in extra:

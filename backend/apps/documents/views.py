@@ -227,12 +227,13 @@ class UploadSlotListView(generics.ListAPIView):
 
     def get_queryset(self):
         # Ad-hoc slots belong to one record's document request (ADR-022 §3),
-        # never to a type's list.
-        qs = UploadSlot.objects.filter(record__isnull=True).order_by("pk")
+        # never to a type's list, and a removed requirement leaves it
+        # (ADR-063 decision 5). RDCO's order, from Setup (IR-971).
+        qs = UploadSlot.objects.filter(record__isnull=True, hidden_at__isnull=True)
         rt = self.request.query_params.get("record_type")
         if rt:
             qs = qs.filter(record_type_id=rt)
-        return qs
+        return qs.order_by("record_type_id", "position", "pk")
 
 
 class RecordSlotListView(APIView):
@@ -252,12 +253,12 @@ class RecordSlotListView(APIView):
         record, denied = authorize_record_documents(request, pk)
         if denied:
             return denied
-        from django.db.models import Q
+        from .setup import slots_for_record
 
-        # The type's slots, plus this record's own ad-hoc ones (ADR-022 §3).
-        slots = UploadSlot.objects.filter(
-            Q(record__isnull=True) | Q(record=record), record_type=record.record_type,
-        )
+        # The type's slots, this record's own ad-hoc ones (ADR-022 §3), and a
+        # removed requirement only while this paper has a file in it (ADR-063
+        # decision 5), in RDCO's order.
+        slots = slots_for_record(record)
         data  = SlotWithUploadsSerializer(slots, many=True, context={"record_id": pk, "request": request}).data
         return Response(data)
 

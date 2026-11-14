@@ -22,6 +22,7 @@
   "/rdco/delete-requests",
   "/rdco/download-requests",
   "/rdco/role-requests",
+  "/rdco/setup",
   "/rdco/users",
   "/records/:id",
   "/records/import",

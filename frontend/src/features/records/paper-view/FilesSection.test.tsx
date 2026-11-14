@@ -112,7 +112,10 @@ const revising = {
 } as RecordDetail;
 
 function slot(id: number, name: string): SlotWithUploads {
-  return { id, name, record_type: 1, is_required: false, uploads: [] };
+  return {
+    id, name, record_type: 1, is_required: false, description: "", position: id, template_name: "",
+    hidden: false, uploads: [],
+  };
 }
 
 beforeEach(() => {

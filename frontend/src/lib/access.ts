@@ -187,6 +187,10 @@ export const SCREEN_ACCESS = {
   // it from `adminNotices`, the same page, in its own sidebar section.
   notices:       { path: "/notices", roles: COORDINATOR,
                  nav: { label: "Notices", icon: "fa-file-signature", section: "RDCO" } },
+  // ADR-063 decision 9 (IR-971): RDCO's Setup, each record type's
+  // Requirements & Templates. Every RDCO account; the server refuses anyone else.
+  setup:         { path: "/rdco/setup", roles: COORDINATOR,
+                 nav: { label: "Setup", icon: "fa-sliders", section: "RDCO" } },
 
   // Both roles use the same Users page, with distinct addresses and server permissions.
   adminUsers:    { path: "/admin/users", roles: SYSTEM_ADMIN,

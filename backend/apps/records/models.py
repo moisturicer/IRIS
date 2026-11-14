@@ -76,9 +76,25 @@ class DiscoveryFeedSnapshot(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+def manuscript_template_path(instance, filename: str) -> str:
+    return f"templates/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
+
 class RecordType(models.Model):
-    """Proposal, Thesis/Research, Project."""
+    """
+    Proposal, Thesis/Research, Project.
+
+    RDCO writes the descriptions and the Manuscript's Template on Setup
+    (ADR-063 decisions 4 and 9, IR-971). The Manuscript is the paper itself,
+    not an upload slot, so its description and Template live here.
+    """
     name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, default="")
+    manuscript_description = models.TextField(blank=True, default="")
+    manuscript_template = models.FileField(
+        upload_to=manuscript_template_path, blank=True, default="",
+    )
+    manuscript_template_name = models.CharField(max_length=255, blank=True, default="")
     def __str__(self): return self.name
 
 

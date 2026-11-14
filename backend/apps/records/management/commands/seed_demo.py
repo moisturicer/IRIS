@@ -641,9 +641,14 @@ class Command(BaseCommand):
         # A new version requires a document uploaded since the request. The
         # lookup is for the type-level slot: another record's ad-hoc "Other"
         # slot can carry the same name and type (IR-348).
+        # Optional and last, as RDCO would add it on Setup (ADR-063, IR-971):
+        # the model's default would label it Required at the top of the list.
+        from apps.documents.setup import listed_slots
+
+        last = listed_slots(record.record_type_id).order_by("-position").values_list("position", flat=True).first()
         slot, _ = UploadSlot.objects.get_or_create(
             name="Revised ethics consent form", record_type=record.record_type,
-            record=None,
+            record=None, defaults={"is_required": False, "position": (last or 0) + 1},
         )
         RecordUpload.objects.create(
             record=record, slot=slot, file="documents/demo-revised-consent.pdf",
