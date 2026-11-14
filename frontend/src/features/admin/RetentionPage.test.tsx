@@ -172,6 +172,8 @@ describe("RetentionPage", () => {
     getSetting.mockRejectedValue(new Error("500"));
     renderScreen(<RetentionPage />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load retention periods.");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The retention periods didn't load.");
+    expect(within(alert).getByRole("button", { name: "Try again" })).toBeVisible();
   });
 });

@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { accountsApi, type ActiveSession } from "@/api/accounts";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button }     from "@/components/ui/Button";
-import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Spinner }    from "@/components/ui/Spinner";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { failureMessage } from "@/lib/readFailure";
 import { formatDate } from "@/lib/utils";
 
 export default function SessionsPage() {
@@ -18,8 +19,8 @@ export default function SessionsPage() {
     try {
       const { data } = await accountsApi.sessions();
       setSessions(data);
-    } catch {
-      setError("Failed to load sessions. Please try again.");
+    } catch (err) {
+      setError(failureMessage(err, { lead: "The sessions didn't load." }));
     } finally {
       setLoading(false);
     }
@@ -62,16 +63,13 @@ export default function SessionsPage() {
 
       {/* Error */}
       {error && (
-        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
-        </div>
+        <LoadFailedAlert message={error} onRetry={load} className="mb-4" />
       )}
 
       {/* Loading */}
       {loading && (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" label="Loading sessions" />
+          <Spinner size="lg" label="Loading sessions" onRetry={load} />
         </div>
       )}
 

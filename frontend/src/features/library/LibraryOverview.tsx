@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { formatAuthorList, recordYearLabel } from "@/features/discover/discoverUtils";
@@ -135,15 +136,15 @@ export function LibraryOverview({
           </div>
 
           {loading ? (
-            <div className="h-64 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" role="status">
-              <span className="sr-only">Loading your research…</span>
-            </div>
+            <LoadingRegion label="Loading your research…" onRetry={onRetry}>
+              <div className="h-64 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" />
+            </LoadingRegion>
           ) : failed ? (
             <ReadFailedState
               interrupted={interrupted}
               what="research list"
               title="Could not load your research"
-              message="Nothing was changed. Check your connection and try again."
+              lead="Nothing was changed."
               onRetry={onRetry}
             />
           ) : recent.length === 0 ? (

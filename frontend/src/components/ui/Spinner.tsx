@@ -1,10 +1,17 @@
 import { IrisLoader } from "@/components/brand/IrisBrand";
 
+import { SlowLoadNotice, useLoadStage } from "./slowLoad";
+
 interface SpinnerProps {
   size?: "sm" | "md" | "lg";
   className?: string;
   /** Says what is loading and makes the loader a polite status (`md`/`lg`). */
   label?: string;
+  /**
+   * Reads again. Given, a `md`/`lg` loader offers Try again once it has gone on
+   * for 10 s (IR-1078); a line saying it is still working appears after 2 s either way.
+   */
+  onRetry?: () => void;
 }
 
 const SIZE: Record<string, string> = {
@@ -21,9 +28,16 @@ const SIZE: Record<string, string> = {
  * caller already has its own `role="status"` text (ProtectedRoute,
  * the Publish dialog) or the ring sits beside a verb.
  */
-export function Spinner({ size = "md", className = "", label }: SpinnerProps) {
+export function Spinner({ size = "md", className = "", label, onRetry }: SpinnerProps) {
+  // Called before the early return: a hook cannot depend on `size`.
+  const { stage, restart } = useLoadStage();
   if (size !== "sm") {
-    return <IrisLoader className={`${SIZE[size]} text-brand ${className}`} label={label} />;
+    return (
+      <div aria-live="polite" className="flex flex-col items-center gap-3">
+        <IrisLoader className={`${SIZE[size]} text-brand ${className}`} label={label} />
+        <SlowLoadNotice stage={stage} onRetry={onRetry} onRestart={restart} />
+      </div>
+    );
   }
   return (
     <svg

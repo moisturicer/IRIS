@@ -12,7 +12,7 @@ import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { errorDetail } from "@/lib/errorDetail";
-import { readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
+import { failureMessage, readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
 import { canAccess, isCoordinator, pathFor } from "@/lib/access";
 import type { RoleName } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
@@ -94,7 +94,7 @@ export default function MyReviewsPage() {
     } catch (error) {
       // An empty tab and a failed request must not look alike.
       setLoadKind(readFailureKind(error));
-      setLoadError(errorDetail(error, "My Reviews could not be loaded."));
+      setLoadError(failureMessage(error, { lead: "My Reviews could not be loaded." }));
       return false;
     }
   }, [tab, outcome, office, sort, overdue]);
@@ -138,7 +138,7 @@ export default function MyReviewsPage() {
       const { data } = await reviewsApi.mine({ tab, outcome, office, cursor: page.next, sort, overdue });
       setPage({ ...data, rows: [...page.rows, ...data.rows] });
     } catch (error) {
-      setLoadError(errorDetail(error, "More of Done could not be loaded."));
+      setLoadError(failureMessage(error, { lead: "More of Done could not be loaded." }));
     } finally {
       setLoadingMore(false);
     }
@@ -319,7 +319,7 @@ export default function MyReviewsPage() {
         )}
 
         {loading ? (
-          <Skeleton rows={3} label="Loading My Reviews…" />
+          <Skeleton rows={3} label="Loading My Reviews…" onRetry={retry} />
         ) : loadError && !page ? (
           loadKind === "interrupted" ? (
             <InterruptedState what="My Reviews" onRetry={retry} />

@@ -2,7 +2,7 @@ import { INSTITUTION } from "@/config/institution";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
-import { readFailureKind } from "@/lib/readFailure";
+import { failureMessage, readFailureKind } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
@@ -59,7 +59,7 @@ import {
   PAPER_WORKSPACE_PANEL_CLASS,
   fitPanelWidth,
 } from "./PaperChatDock";
-import { AskIrisFab, NotesFab } from "./AskIrisFab";
+import { AskIrisFab, CORNER_CLEARANCE_CLASS, NotesFab } from "./AskIrisFab";
 import { NotesPanel } from "./NotesPanel";
 import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
 import { useReadingNote } from "./useReadingNote";
@@ -154,7 +154,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
             aria-pressed={selected === opt}
             onClick={() => setSelected(opt === selected ? "" : opt)}
             className={cn(
-              "px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors",
+              "min-h-11 reading-split:min-h-9 px-3 rounded-full text-xs font-semibold border transition-colors",
               selected === opt
                 ? "bg-brand text-white border-brand"
                 : "bg-white text-stone-600 border-stone-200 hover:border-brand/40",
@@ -170,7 +170,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
           type="button"
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className="px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
+          className="min-h-11 reading-split:min-h-9 px-3 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
         >
           {saving ? "Saving…" : "Save classification"}
         </button>
@@ -275,6 +275,7 @@ export default function PaperViewPage() {
    */
   const [loadFailed, setLoadFailed] = useState<"failed" | "interrupted" | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
@@ -533,6 +534,7 @@ export default function PaperViewPage() {
       // Any other failure is not "not found", and says so with a way to try again.
       .catch((err: unknown) => {
         const kind = readFailureKind(err);
+        setLoadError(err);
         setRecord(null);
         setLoadFailed(kind === "unavailable" ? null : kind);
       })
@@ -606,7 +608,7 @@ export default function PaperViewPage() {
         tone="error"
         icon="fa-circle-exclamation"
         title="We couldn't load this record"
-        message="Check your connection and try again."
+        message={failureMessage(loadError)}
         actions={
           <button
             type="button"
@@ -767,6 +769,11 @@ export default function PaperViewPage() {
           selectionActions={selectionActions}
           contained={onPaperTab || reviewerWorkspace || tier === "wide"}
           fill={onPaperTab || reviewerWorkspace}
+          // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
+          clearCorner={onPaperTab}
+          // On a phone's one-row bar there is no room for the version, so it
+          // sits at the start of the reader's toolbar (IR-1092).
+          toolbarStart={(onPaperTab || reviewerWorkspace) && tier === "single" ? paperVersion : undefined}
           bottomInset={onReviewTab ? reviewBarInset : 0}
           downloadControl={
             // An earlier version is not offered as a copy: the download route
@@ -922,7 +929,8 @@ export default function PaperViewPage() {
         onBack={() => navigate(-1)}
         onBackToAnswer={backToAnswer}
         title={!onPaperTab && !reviewerWorkspace ? undefined : arriving ? null : record.title}
-        version={onPaperTab || reviewerWorkspace ? paperVersion : undefined}
+        // Not in the bar below 640px, where the reader's toolbar holds it.
+        version={(onPaperTab || reviewerWorkspace) && tier !== "single" ? paperVersion : undefined}
       />
       <div
         className={cn(
@@ -947,7 +955,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
-              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8 pb-12", PAGE_WIDTH.standard),
+              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", CORNER_CLEARANCE_CLASS, PAGE_WIDTH.standard),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
@@ -1422,8 +1430,8 @@ export default function PaperViewPage() {
           className={chatPanelClass}
         />
       )}
-      {/* Closed: one round icon at the bottom right (IR-569). On the bar
-          while minimized, which is its way back. */}
+      {/* Closed: two round icons at the bottom right, Notes above Ask IRIS
+          (IR-569, IR-1079). On the bar while minimized, which is its way back. */}
       {!chat.open && !onReviewTab && (
         <>
           <NotesFab onOpen={openNotes} buttonRef={notesButtonRef} />

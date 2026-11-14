@@ -18,6 +18,7 @@ import { noticeApi, staleNoticeFrom, type NoticeVersion } from "@/api/notice";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { failureMessage } from "@/lib/readFailure";
 import { Button } from "@/components/ui/Button";
 import { WARNING_NOTICE } from "@/components/ui/fieldClasses";
 import { Spinner } from "@/components/ui/Spinner";
@@ -81,7 +82,7 @@ export default function NoticesPage() {
         </p>
       ) : !list || !current ? (
         <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-5">
-          <p role="alert" className="text-small text-stone-700">The notices didn&apos;t load. Check your connection, then try again.</p>
+          <p role="alert" className="text-small text-stone-700">{failureMessage(read.error, { lead: "The notices didn't load." })}</p>
           <div className="flex flex-wrap gap-3">
             <Button type="button" variant="outline" onClick={read.retry}>Try again</Button>
           </div>
@@ -130,6 +131,11 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
   const next = base + 1;
   const unchanged = text === current.text;
   const blank = text.trim() === "";
+  const publishBlockedReason = blank
+    ? "Enter the notice text to publish."
+    : unchanged
+      ? "Change the text to publish a new version."
+      : undefined;
 
   const ask = async () => {
     setCounting(true);
@@ -200,7 +206,13 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
         <Button type="button" variant="outline" aria-expanded={preview} onClick={() => setPreview((p) => !p)}>
           {preview ? "Hide preview" : "Preview"}
         </Button>
-        <Button type="button" loading={counting} disabled={unchanged || blank} onClick={() => void ask()}>
+        <Button
+          type="button"
+          loading={counting}
+          disabled={unchanged || blank}
+          disabledReason={publishBlockedReason}
+          onClick={() => void ask()}
+        >
           Publish version {next}
         </Button>
       </div>

@@ -269,6 +269,8 @@ Gold and cream are gone (IR-1097): the thumbnail ring and the other decoration w
 The record page is a container named `reading`, and the Overview column is its own container named `overview`, so the layout reads the width it is given.
 
 - **Paper tiers** (from the `reading` width): below 640 px Ask IRIS fills the workspace and offers Back to paper; from 640 px it is a drawer over the paper (a modal with a stone scrim); from 1000 px it is a column beside the paper, which keeps at least 640 px. The Paper view is full height: the record bar, then the reader beside Ask IRIS.
+- **Record bar on a phone** (below 640 px of the `reading` width, so a phone or any narrow workspace, not the window): one 56 px row, never two. Back is its icon, the Overview / Paper / Review control takes the rest of the row, and the title is not drawn (it stays as the page heading for screen readers). The version moves out of the bar to the start of the reader's toolbar, where it is drawn once.
+- **Touch size:** every control is 44 px on a touch pointer. The `touch:` variant is the `(pointer: coarse)` media query, not a width: the shared `Button` (`sm`, `md`, `lg`, `icon`) and the app shell's controls use it, so a touch tablet gets 44 px at any window width. The reading surfaces keep their own scale, 44 px below 640 px of the `reading` width and 36 px from it.
 - **Ask IRIS width:** 450 px by default, from 320 px to half the workspace, resizable from its left edge and remembered per browser. On the Overview it is a column the page makes room for; it never covers the page.
 - **Overview column:** one column up to 60 rem (960 px), set against whatever is beside it (Ask IRIS, or Record details) with the spare room on its left, a 56 px left gutter (16 px on a phone) and a 32 px right one. Record details sit beside the page in a 22 rem sticky column while the Overview container is 64 rem or wider, under it otherwise, and fold away while Ask IRIS is open.
 - **Rhythm:** sections inside the Overview are 32 px above and below a Desk Stone hairline. The gaps between a page's sections are 16 / 24 / 32 px; card padding is 20 px (16 compact).
@@ -299,7 +301,7 @@ Gently rounded and consistent. Controls and fields take one radius (0.75 rem); p
 ### Buttons
 Quiet and exact.
 - **Page actions** (View, Save, Cite, Share, Edit details): 44 px full pills, 20 px side padding, 14 px semibold. **One** Binding Maroon fill per row (View where there is a paper, otherwise Save; Continue or Open review when those are the viewer's job); the rest have no fill and a Rule Stone outline that turns maroon on hover.
-- The shared implementations are `PILL_PRIMARY` and `PILL_SECONDARY` in `frontend/src/components/ui/pillStyles.ts`; Danger uses `brand-dark` with a warning glyph.
+- The shared implementation is the `Button` component (`frontend/src/components/ui/Button.tsx`, IR-1088): a pill in every text size, with `size="page"` as the 44 px page action, and one disabled look for every variant, Desk Stone with Faint Ink, plus an optional `disabledReason` line beside it. Only the `icon` size keeps the 0.75 rem radius, so a `Button` is a pill wherever it is used, not only for page actions (audit VIS-04; this supersedes the 0.75 rem control radius in Shapes above for labelled buttons). A disabled ghost takes the same Desk Stone fill as the others. Screens not yet moved onto it still use `PILL_PRIMARY` and `PILL_SECONDARY` in `frontend/src/components/ui/pillStyles.ts`, which draw the same pill. Danger uses `brand-dark` with a warning glyph.
 - **Reading controls** (record bar, reader toolbar, Ask IRIS): 44 px on touch and 36 px beside a pointer, 0.75 rem radius, 13 px semibold. Three states: outlined at rest, an Ink outline on white when on, and the one filled control (Send).
 - **Ghost** (Copy on the AI Overview, Close): no outline, Faint Ink, a Bar Stone wash and Ink text on hover.
 - **Focus:** a 2 px Binding Maroon ring with an offset on every interactive element (`FOCUS_RING` in `frontend/src/components/ui/interaction.ts`). That file also defines `COLOUR_TRANSITION` for the 150 ms hover/focus fade.
@@ -366,7 +368,7 @@ The same typeset entry as your own, at `/people/:id`, with a second column. **Co
 
 ### Don't:
 - **Don't** wrap reading content (the AI Overview, the Abstract, the reader, Ask IRIS) in a card.
-- **Don't** float controls over content. Controls live in a bar or toolbar, and Ask IRIS is the one corner icon.
+- **Don't** float controls over content. Controls live in a bar or toolbar. The two corner icons are Notes, above Ask IRIS, and both keep clear of the reading text: Overview and Paper reserve bottom padding so the last line scrolls past them.
 - **Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.
 - **Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.
 - **Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.

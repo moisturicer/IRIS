@@ -16,6 +16,8 @@ interface DataTableProps<T> {
   data:          T[];
   columns:       ColumnDef<T, unknown>[];
   loading?:      boolean;
+  /** Reads again; a load that runs past 10 s offers it as Try again (IR-1078). */
+  onRetry?:      () => void;
   page:          number;
   pageSize:      number;
   totalCount:    number;
@@ -27,6 +29,7 @@ export function DataTable<T>({
   data,
   columns,
   loading,
+  onRetry,
   page,
   pageSize,
   totalCount,
@@ -87,7 +90,7 @@ export function DataTable<T>({
               <tr>
                 <td colSpan={columns.length} className="py-12 text-center">
                   <div className="flex justify-center">
-                    <Spinner />
+                    <Spinner onRetry={onRetry} />
                   </div>
                 </td>
               </tr>

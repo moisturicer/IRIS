@@ -132,6 +132,7 @@ class CompositionRoot:
         self._task_llms: dict["InferenceTask", LLMProvider] = {}
         self._permits = permits
         self._policy_enabled = policy_enabled
+        self._trial_variant: Optional[str] = None
 
     # -- the vendor seams ---------------------------------------------------
 
@@ -270,7 +271,9 @@ class CompositionRoot:
                 policy_enabled=self._policy_enabled,
                 permits=self._permits,
             ),
-            fallback=FullTextRetriever(record=record, records=records),
+            fallback=FullTextRetriever(
+                record=record, records=records, trial_variant=self._trial_variant
+            ),
             degrade_on=_vendor_failures(),
         )
 
@@ -304,7 +307,10 @@ class CompositionRoot:
         """
         from django.conf import settings
 
-        vector = TwoStageRetriever(self.embedder(), record=record, records=records)
+        vector = TwoStageRetriever(
+            self.embedder(), record=record, records=records,
+            trial_variant=self._trial_variant,
+        )
         if not (
             getattr(settings, "AI_KEYWORD_RETRIEVAL_ENABLED", False)
             and getattr(settings, "AI_RETRIEVAL_FUSION_ENABLED", False)
@@ -316,7 +322,10 @@ class CompositionRoot:
         # The same `FullTextRetriever` the outage path uses, scoped the same
         # way, so `visible_to(user)` is one predicate on both paths.
         return KeywordFusionRetriever(
-            vector, keyword=FullTextRetriever(record=record, records=records)
+            vector,
+            keyword=FullTextRetriever(
+                record=record, records=records, trial_variant=self._trial_variant
+            ),
         )
 
     def without_reranking(self) -> "CompositionRoot":
@@ -338,6 +347,18 @@ class CompositionRoot:
         variant = copy.copy(self)
         variant._reranker = NoOpReranker()
         return variant
+
+    def for_trial(self, variant: str) -> "CompositionRoot":
+        """The same root, retrieving from trial chunk set ``variant`` (IR-1051).
+
+        For `eval_retrieval` only. No reader path calls it, so readers always
+        retrieve from the active set.
+        """
+        import copy
+
+        trial = copy.copy(self)
+        trial._trial_variant = variant
+        return trial
 
     def source_selection(self, max_sources: int) -> SourceSelection:
         """What the model would be given, out of what retrieval returned.

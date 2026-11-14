@@ -10,6 +10,7 @@
  * started with, and no screen offers a per-paper control.
  */
 import { useCallback, useEffect, useState } from "react";
+import { failureMessage } from "@/lib/readFailure";
 import { accountsApi } from "@/api/accounts";
 import { noticeApi } from "@/api/notice";
 import { Button } from "@/components/ui";
@@ -36,6 +37,7 @@ export function AiAnswerPanel() {
   const [papers, setPapers] = useState<PapersChoice | null>(null);
   const [papersError, setPapersError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
@@ -44,7 +46,8 @@ export function AiAnswerPanel() {
       const { data } = await noticeApi.current();
       setAnswer(data.answer ?? null);
       setPhase("ready");
-    } catch {
+    } catch (err) {
+      setLoadError(err);
       setPhase("failed");
     }
   }, []);
@@ -111,7 +114,7 @@ export function AiAnswerPanel() {
 
       {phase === "failed" && (
         <div className="space-y-3">
-          <Message tone="error" role="alert">Your answer didn't load. Check your connection, then try again.</Message>
+          <Message tone="error" role="alert">{failureMessage(loadError, { lead: "Your answer didn't load." })}</Message>
           <div className="flex flex-wrap gap-3">
             <Button type="button" variant="secondary" onClick={() => { setPhase("loading"); void load(); }}>
               Try again

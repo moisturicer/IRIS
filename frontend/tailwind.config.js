@@ -33,6 +33,10 @@ export default {
       // the tabs other than the current one show only their mark there.
       screens: {
         narrow: { raw: "(max-width: 389.98px)" },
+        // A finger rather than a mouse (IR-1092): the pointer, not the width,
+        // decides whether a control needs 44px. Defined after the window
+        // breakpoints so it wins over a `md:` compact size on a touch tablet.
+        touch: { raw: "(pointer: coarse)" },
       },
 
       // The one cap for an app page (IR-519): PageContainer's "standard" width.

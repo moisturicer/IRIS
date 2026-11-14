@@ -19,7 +19,7 @@ from apps.ai.extraction.llamaparse_client import LlamaParseExtractor
 
 from .contract import ExtractorContract
 from .fixtures import FIXTURES, pdf_bytes
-from .llamaparse_vendor import Vendor, no_sleep, recording
+from .llamaparse_vendor import RECORDINGS, Vendor, no_sleep, recording
 
 VERSION = "2026-09-28"
 
@@ -66,7 +66,8 @@ def test_a_recorded_parse_returns_the_raw_result_its_usage_and_provenance():
     assert vendor.deleted == ["dfl-recorded"]
 
 
-@pytest.mark.parametrize("name", sorted(FIXTURES))
+# IR-1101's fixtures came after LlamaParse's recordings and are not recorded for it.
+@pytest.mark.parametrize("name", sorted(n for n in FIXTURES if (RECORDINGS / n).is_dir()))
 def test_every_recording_replays(name):
     extracted = read(Vendor(name), name)
 

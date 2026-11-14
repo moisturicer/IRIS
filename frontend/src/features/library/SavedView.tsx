@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { recordsApi } from "@/api/records";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -292,10 +293,9 @@ export function SavedView({
       )}
 
       {isLoading ? (
-        <div className="space-y-2" role="status">
-          <span className="sr-only">Loading saved papers…</span>
-          {[0, 1, 2].map((i) => <div key={i} className="h-16 rounded-xl border border-stone-200 bg-white motion-safe:animate-pulse" aria-hidden />)}
-        </div>
+        <LoadingRegion label="Loading saved papers…" onRetry={retry} className="space-y-2">
+          {[0, 1, 2].map((i) => <div key={i} className="h-16 rounded-xl border border-stone-200 bg-white motion-safe:animate-pulse" />)}
+        </LoadingRegion>
       ) : isFailed ? (
         <ReadFailedState
           interrupted={accountView ? libraryInterrupted : interrupted}

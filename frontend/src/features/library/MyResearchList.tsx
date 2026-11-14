@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
@@ -86,12 +87,11 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
 
   if (loading) {
     return (
-      <div className="space-y-3" role="status">
-        <span className="sr-only">Loading your research…</span>
+      <LoadingRegion label="Loading your research…" onRetry={onRetry} className="space-y-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-28 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" aria-hidden />
+          <div key={i} className="h-28 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" />
         ))}
-      </div>
+      </LoadingRegion>
     );
   }
 
@@ -101,7 +101,7 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
         interrupted={interrupted}
         what="research list"
         title="Could not load your research"
-        message="Nothing was changed. Check your connection and try again."
+        lead="Nothing was changed."
         onRetry={onRetry}
       />
     );

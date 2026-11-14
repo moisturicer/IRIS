@@ -182,7 +182,9 @@ it("opens a continuation in Publish, requires its manuscript, and keeps copied d
   const user = userEvent.setup();
   renderScreen(<PublishDialog />, { route: "/?publish=42" });
   await screen.findByRole("button", { name: /^Upload manuscript/ });
-  expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Upload your manuscript as a PDF to continue.");
+  expect(screen.queryByRole("textbox", { name: /^Title/ })).not.toBeInTheDocument();
   dropFile(pdf("full-thesis.pdf"));
   await screen.findByText(/uploaded/i, { selector: "p" });
   await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -399,20 +401,48 @@ describe("a failed upload", () => {
 });
 
 describe("Continue on step 1", () => {
-  it("stays disabled until the upload succeeds", async () => {
+  it("is never disabled for what is missing: pressing it names the missing field", async () => {
+    const user = userEvent.setup();
+    await openNew();
+
+    const next = screen.getByRole("button", { name: "Continue" });
+    expect(next).toBeEnabled();
+    await user.click(next);
+
+    expect(screen.getByText("Choose what you're publishing.")).toBeInTheDocument();
+    expect(screen.getByText("Upload your manuscript as a PDF to continue.")).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: /What are you publishing/ })).toBeInvalid();
+    expect(recordsApi.create).not.toHaveBeenCalled();
+  });
+
+  it("clears the type's error once a type is chosen, and keeps the manuscript's until it is uploaded", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    await chooseType(user, /Thesis \/ Research/);
+
+    expect(screen.queryByText("Choose what you're publishing.")).not.toBeInTheDocument();
+    expect(screen.getByText("Upload your manuscript as a PDF to continue.")).toBeInTheDocument();
+  });
+
+  it("says the upload is still running when pressed mid-upload, and goes on once it succeeds", async () => {
     const user = userEvent.setup();
     const upload = deferred<unknown>();
     vi.mocked(recordsApi.uploadManuscript).mockReturnValue(upload.promise as never);
     await openNew();
 
     await chooseType(user, /Thesis \/ Research/);
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
     dropFile(pdf());
     await screen.findByRole("progressbar");
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByText("Your manuscript is still uploading. Continue when it finishes.")).toBeInTheDocument();
 
     upload.resolve({ data: { id: 42 } });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+    await screen.findByText(/uploaded/i, { selector: "p" });
+    expect(screen.queryByText(/still uploading/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("textbox", { name: /^Title/ });
   });
 
   it("saves a changed type onto the draft", async () => {
@@ -806,7 +836,8 @@ describe("success", () => {
 
     // From nothing: back at the manuscript step, with no type chosen.
     expect(await screen.findByRole("radio", { name: /Proposal/ })).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+    expect(screen.queryByText("Choose what you're publishing.")).not.toBeInTheDocument();
   });
 });
 
@@ -831,8 +862,11 @@ describe("resuming a draft from /?publish=<id>", () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ abstract_file: null }) } as never);
     renderScreen(<PublishDialog />, { route: "/?publish=42" });
 
+    const user = userEvent.setup();
     expect(await screen.findByRole("radio", { name: /Thesis \/ Research/ })).toBeChecked();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByText("Upload your manuscript as a PDF to continue.")).toBeInTheDocument();
+    expect(screen.queryByText("Choose what you're publishing.")).not.toBeInTheDocument();
   });
 
   it("does not erase a saved field of research when that list failed to load", async () => {

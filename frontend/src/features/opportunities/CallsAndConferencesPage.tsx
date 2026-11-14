@@ -28,6 +28,7 @@ import {
 } from "./opportunityUtils";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 import { SELECTED } from "@/components/ui/highlightRoles";
+import { failureMessage } from "@/lib/readFailure";
 
 /** A filter chip, as My Reviews draws them: soft maroon when on. */
 function chipClass(on: boolean) {
@@ -196,7 +197,7 @@ export function CallsAndConferencesPage() {
       setDeleteError(
         status === 403 || status === 404
           ? "You can no longer delete this call. It may already be gone."
-          : "Could not delete the call. Check your connection and try again.",
+          : failureMessage(err, { lead: "Could not delete the call." }),
       );
     } finally {
       setDeleteBusy(false);

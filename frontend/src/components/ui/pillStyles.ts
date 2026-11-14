@@ -2,10 +2,10 @@
  * Page-action pills (IR-356; 01-design-system.md section 0): 44px, rounded,
  * one filled primary per action row and the rest outlined.
  *
- * Class strings rather than a `Button` size, because two of the actions are
- * router `Link`s and one is a dropdown trigger, and the `Button` primitive's
- * base `rounded-lg` would fight `rounded-full` with no tailwind-merge to
- * settle it.
+ * Class strings rather than a `Button` size, because two of the actions were
+ * router `Link`s and one a dropdown trigger. `Button` has since become the same
+ * pill (IR-1088: `size="page"`, and `ButtonLink` for a link), and the screens
+ * that moved onto it no longer use these; the rest keep them until they do.
  */
 import { SELECTED_RING } from "./highlightRoles";
 

@@ -1,10 +1,10 @@
 import { INSTITUTION } from "@/config/institution";
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { TONES } from "@/components/ui/statusTones";
 import { useAuth } from "@/hooks/useAuth";
 import { pathFor } from "@/lib/access";
@@ -73,7 +73,7 @@ export default function SettingsPage() {
       <PageHeader
         title="Settings"
         description="Your sign-in, your data and what your role lets you do."
-        actions={<Link to={pathFor("profile")} className={cn(PILL_SECONDARY, FOCUS_RING)}>Your profile</Link>}
+        actions={<ButtonLink to={pathFor("profile")} variant="outline" size="page">Your profile</ButtonLink>}
       />
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
@@ -235,14 +235,15 @@ function SecurityTab({ email, isVerified }: { email: string; isVerified: boolean
 
         <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-stone-100">
           {error && <Notice tone="error">{error}</Notice>}
-          <button
+          <Button
             type="submit"
-            disabled={saving || !oldPassword || !newPassword}
-            className="ml-auto px-4 py-2 rounded-lg text-[13px] font-bold uppercase tracking-wider
-              bg-brand text-white hover:bg-brand-light disabled:opacity-40"
+            className="ml-auto"
+            loading={saving}
+            disabled={!oldPassword || !newPassword}
+            disabledReason="Enter your current password and a new one."
           >
             {saving ? "Changing..." : "Change password"}
-          </button>
+          </Button>
         </div>
       </Panel>
     </form>

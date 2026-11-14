@@ -93,7 +93,7 @@ export function RevisionManuscriptUpload({ recordId, staged, onUploaded }: Revis
         <label
           htmlFor={inputId}
           className={cn(
-            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-stone-300 text-brand-dark text-xs font-bold cursor-pointer hover:bg-stone-100",
+            "inline-flex items-center gap-1.5 min-h-11 reading-split:min-h-9 px-3 rounded-lg bg-white border border-stone-300 text-brand-dark text-xs font-bold cursor-pointer hover:bg-stone-100",
             COLOUR_TRANSITION,
             "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand has-[:focus-visible]:ring-offset-2",
           )}

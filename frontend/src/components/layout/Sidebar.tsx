@@ -57,7 +57,8 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
         onClick={onNavigate}
         className={({ isActive }) =>
           cn(
-            "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm",
+            // 44px on the phone drawer; compact from md, where a pointer is (IR-1092).
+            "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm",
             collapsed && "md:h-10 md:justify-center md:px-0",
             // Active is "here" (a Desk Stone fill); hover is the lighter Bar Stone, so a
             // hovered row can never be mistaken for the page you are on (IR-1097).
@@ -301,7 +302,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
               // and puts it back when that closes.
               data-sidebar-mark
               {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
-              className={cn("block h-9 w-9 rounded-lg", FOCUS_RING)}
+              className={cn("block h-9 w-9 touch:h-11 touch:w-11 rounded-lg", FOCUS_RING)}
             >
               <IrisMark className="h-9 w-9 text-brand" />
             </button>
@@ -330,7 +331,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             // Where AppShell puts focus when the phone drawer opens.
             {...(mode === "rail" ? {} : { "data-drawer-focus": "" })}
             className={cn(
-              "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 md:hidden",
+              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 md:hidden",
               COLOUR_TRANSITION,
               FOCUS_RING,
             )}

@@ -37,6 +37,16 @@ beforeEach(() => {
 });
 
 describe("AddReviewerDialog", () => {
+  it("offers Try again when the members did not load, and reads them again (IR-1078)", async () => {
+    addReviewerOptions.mockRejectedValueOnce(Object.assign(new Error("503"), { response: { status: 503 } }));
+    renderScreen(<AddReviewerDialog assignmentId={31} onClose={() => {}} onAdded={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("IRIS took too long to answer. Try again.");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("combobox", { name: "Reviewer at IERC" })).toBeInTheDocument();
+    expect(addReviewerOptions).toHaveBeenCalledTimes(2);
+  });
+
   it("lists the office's members, someone already reviewing unchoosable, and adds the one picked", async () => {
     const onAdded = vi.fn();
     const { container } = renderScreen(

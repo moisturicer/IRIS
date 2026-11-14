@@ -45,8 +45,12 @@ def _user(email, role_name):
     )
 
 
-class DeleteRequestJourneyTests(APITestCase):
-    """Raised by deleting the record, then decided by RDCO."""
+class DeleteRequestFixtures:
+    """
+    A student who owns accepted work, an RDCO reviewer, and the two acts.
+
+    List it before `APITestCase`: its `setUpTestData` does not call `super()`.
+    """
 
     @classmethod
     def setUpTestData(cls):
@@ -76,6 +80,10 @@ class DeleteRequestJourneyTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         request.refresh_from_db()
         return request
+
+
+class DeleteRequestJourneyTests(DeleteRequestFixtures, APITestCase):
+    """Raised by deleting the record, then decided by RDCO."""
 
     def test_deleting_accepted_work_puts_it_on_hold_and_records_where_it_was(self):
         record = self.published_thesis("held")
@@ -109,3 +117,59 @@ class DeleteRequestJourneyTests(APITestCase):
         record.refresh_from_db()
         self.assertEqual(record.pipeline_status, PipelineStatus.PUBLISHED)
         self.assertFalse(record.is_deleted)
+
+
+class DeleteRequestQueueFilterTests(DeleteRequestFixtures, APITestCase):
+    """
+    IR-1076 (audit WF-02): the queue's `status` filter is honoured.
+
+    The viewset declared no filter, so `?status=pending` was ignored and RDCO's
+    Pending tab listed a request that had already been declined.
+    """
+
+    def queue(self, **params):
+        self.client.force_authenticate(self.rdco)
+        response = self.client.get(DELETE_REQUESTS, params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        return {row["record_title"]: row["status"] for row in response.data["results"]}
+
+    def three_decisions(self):
+        self.raise_by_deleting(self.published_thesis("waiting"))
+        self.decide(self.raise_by_deleting(self.published_thesis("turned-down")), "decline")
+        self.decide(self.raise_by_deleting(self.published_thesis("removed")), "approve")
+
+    def test_pending_lists_only_pending_requests(self):
+        self.three_decisions()
+
+        self.assertEqual(
+            self.queue(status="pending"), {"IR-496 waiting": RequestStatus.PENDING},
+        )
+
+    def test_decided_lists_every_request_that_is_not_pending(self):
+        self.three_decisions()
+
+        self.assertEqual(
+            self.queue(status="decided"),
+            {
+                "IR-496 turned-down": RequestStatus.DECLINED,
+                "IR-496 removed": RequestStatus.APPROVED,
+            },
+        )
+
+    def test_a_single_outcome_can_still_be_asked_for(self):
+        self.three_decisions()
+
+        self.assertEqual(
+            self.queue(status="declined"), {"IR-496 turned-down": RequestStatus.DECLINED},
+        )
+
+    def test_without_a_status_every_request_is_listed_newest_first(self):
+        self.three_decisions()
+
+        self.client.force_authenticate(self.rdco)
+        rows = self.client.get(DELETE_REQUESTS).data["results"]
+
+        self.assertEqual(
+            [row["record_title"] for row in rows],
+            ["IR-496 removed", "IR-496 turned-down", "IR-496 waiting"],
+        )

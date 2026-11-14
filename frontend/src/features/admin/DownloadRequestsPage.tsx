@@ -16,6 +16,8 @@ import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
 import { Button, Modal } from "@/components/ui";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { failureMessage } from "@/lib/readFailure";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
 import { EmptyState }  from "@/components/shared/EmptyState";
@@ -142,17 +144,23 @@ export default function DownloadRequestsPage() {
   const [approving, setApproving] = useState<number | null>(null);
   const [noteAct,  setNoteAct]  = useState<NoteAct | null>(null);
   const [error,    setError]    = useState<string | null>(null);
+  /** The list itself failed (not an action on a row), so the banner offers Try again. */
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState<Filter>("pending");
 
   const load = () => {
     setLoading(true);
     setError(null);
+    setLoadFailed(false);
     const params: Record<string, unknown> = {};
     if (filterStatus) params.status = filterStatus;
     recordsApi.listDownloadRequests(params)
       .then(({ data }) => setRequests(data.results ?? []))
-      .catch(() => setError("Failed to load requests."))
+      .catch((err: unknown) => {
+        setLoadFailed(true);
+        setError(failureMessage(err, { lead: "The download requests didn't load." }));
+      })
       .finally(() => setLoading(false));
   };
 
@@ -205,7 +213,9 @@ export default function DownloadRequestsPage() {
         </Button>
       </div>
 
-      {error && (
+      {error && loadFailed ? (
+        <LoadFailedAlert message={error} onRetry={load} className="mb-4" />
+      ) : error && (
         <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
           <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
           {error}
@@ -213,7 +223,7 @@ export default function DownloadRequestsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" /></div>
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" onRetry={load} /></div>
       ) : requests.length === 0 ? (
         <EmptyState
           icon="fa-download"
