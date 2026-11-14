@@ -77,7 +77,7 @@ export function FolderPicker({ collections, view, onViewChange, onCreate }: Fold
         }}
         aria-label="New folder name"
         placeholder="Folder name, then Enter"
-        className="min-h-9 w-48 rounded-lg border border-brand-200 bg-white px-3 text-small placeholder:text-stone-500 focus:border-brand focus:outline-none"
+        className="min-h-9 w-48 rounded-lg border border-stone-300 bg-white px-3 text-small placeholder:text-stone-500 focus:border-brand focus:outline-none"
       />
     );
   }

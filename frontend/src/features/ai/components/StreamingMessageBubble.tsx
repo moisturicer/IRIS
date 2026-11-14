@@ -24,7 +24,7 @@ export function StreamingMessageBubble({
     <div className={cn("flex animate-fade-in motion-reduce:animate-none", compact ? "gap-2.5" : "gap-3")}>
       <div
         className={cn(
-          "rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand",
+          "rounded-full shrink-0 flex items-center justify-center bg-stone-100 text-brand",
           compact ? "w-7 h-7" : "w-8 h-8",
         )}
       >

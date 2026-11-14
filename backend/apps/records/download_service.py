@@ -36,11 +36,16 @@ class NoteRequired(Exception):
     """A decline or a revocation says why (ADR-048, decision 4)."""
 
 
-def _clean_note(note) -> str:
+def clean_note(note) -> str:
+    """
+    RDCO's note, trimmed, or `NoteRequired` if it is blank or over the limit.
+    Download requests (IR-688) and delete requests (IR-1099) share it, so the
+    two queues refuse the same notes.
+    """
     # It arrives straight from the request body, so it may be any JSON value.
     note = note.strip() if isinstance(note, str) else ""
     if not note:
-        raise NoteRequired("Say why, in a note the reader will see.")
+        raise NoteRequired("Say why, in a note the requester will see.")
     if len(note) > NOTE_MAX_LENGTH:
         raise NoteRequired(f"Keep the note to {NOTE_MAX_LENGTH} characters.")
     return note
@@ -53,7 +58,7 @@ def decide_download_request(download_request, reviewer, *, approved: bool, note:
     row lock makes two simultaneous decisions one decision and one refusal.
     A decline needs a note and an approval takes none (IR-688).
     """
-    note = "" if approved else _clean_note(note)
+    note = "" if approved else clean_note(note)
     with transaction.atomic():
         current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
         if current.requested_by_id == reviewer.pk:
@@ -100,7 +105,7 @@ def revoke_download_grant(download_request, reviewer, *, note: str) -> None:
     RDCO ends a live grant early, saying why (IR-688). The reader can no longer
     download, is told in-app and by email, and may ask again.
     """
-    note = _clean_note(note)
+    note = clean_note(note)
     with transaction.atomic():
         current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
         if current.requested_by_id == reviewer.pk:

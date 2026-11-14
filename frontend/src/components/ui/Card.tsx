@@ -17,8 +17,8 @@ export function Card({ children, className = "", padding = true }: CardProps) {
 export function CardHeader({ title, description }: { title: string; description?: string }) {
   return (
     <div className="mb-4">
-      <h3 className="text-[16px] font-semibold text-stone-900">{title}</h3>
-      {description && <p className="text-[14px] text-stone-500 mt-0.5">{description}</p>}
+      <h3 className="text-heading font-semibold text-stone-900">{title}</h3>
+      {description && <p className="text-body text-stone-500 mt-0.5">{description}</p>}
     </div>
   );
 }

@@ -26,7 +26,7 @@ interface Props {
 // underline, never by colour alone (12-accessibility.md); the palette is grey
 // and maroon only (IR-358).
 const DELETED = "line-through decoration-stone-500 text-stone-600 bg-stone-200 rounded-sm px-0.5";
-const INSERTED = "underline decoration-brand decoration-2 underline-offset-2 text-stone-900 bg-brand-50 px-0.5";
+const INSERTED = "underline decoration-brand decoration-2 underline-offset-2 text-stone-900 px-0.5";
 
 function Deleted({ text }: { text: string }) {
   return <del className={DELETED}><span className="sr-only">Removed: </span>{text}</del>;

@@ -204,7 +204,7 @@ export function FilesSection({
 
   if (failed && slots == null) {
     return (
-      <div role="alert" className="rounded-2xl border border-brand-200 bg-brand-50 p-card text-small text-brand-dark">
+      <div role="alert" className="rounded-2xl border border-stone-300 bg-surface p-card text-small text-brand-dark">
         Could not load this record's files.{" "}
         <button type="button" onClick={() => void load()} className={cn("font-semibold underline", FOCUS_RING)}>
           Try again
@@ -228,7 +228,7 @@ export function FilesSection({
       <section>
         <SectionHeading>Manuscript</SectionHeading>
         {record.manuscript_unsubmitted && (
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-small font-semibold text-brand-dark">
+          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-small font-semibold text-brand-dark ring-1 ring-stone-300">
             <i className="fas fa-file-pen text-2xs" aria-hidden />
             Revised, not yet submitted
           </p>

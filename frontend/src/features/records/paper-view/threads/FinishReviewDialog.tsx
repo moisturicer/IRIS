@@ -10,6 +10,7 @@ import type { DecisionFlags, RecordDetail, ReviewComment, ReviewVerdict } from "
 
 import { closingLines } from "../DecisionDialog";
 import { plural, verdictOptions, type Thread } from "./threadModel";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 export interface FinishReviewDialogProps {
   record: RecordDetail;
@@ -148,7 +149,7 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, on
             return (
               <label key={o.verdict} className={cn(
                 "flex items-start gap-2.5 rounded-lg border px-3 py-2",
-                verdict === o.verdict ? "border-brand-200 bg-brand-50" : "border-stone-200",
+                verdict === o.verdict ? SELECTED : "border-stone-200",
                 o.unavailable && "opacity-70",
               )}>
                 <input type="radio" name={`${ids}-verdict`} value={o.verdict} checked={verdict === o.verdict}

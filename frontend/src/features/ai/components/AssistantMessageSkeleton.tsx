@@ -4,7 +4,7 @@ import { SynthesisIcon } from "./AskIrisIcons";
 export function AssistantMessageSkeleton() {
   return (
     <div className="flex gap-3" aria-busy="true" aria-label="IRIS is searching the repository">
-      <div className="w-8 h-8 rounded-full bg-brand/10 text-brand shrink-0 flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full bg-stone-100 text-brand shrink-0 flex items-center justify-center">
         <SynthesisIcon className="w-[18px] h-[18px]" spinning />
       </div>
       <div className="min-w-0 flex-1">

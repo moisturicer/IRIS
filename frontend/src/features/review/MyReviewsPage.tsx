@@ -34,6 +34,7 @@ import {
   waitLabel,
   type MyReviewsView,
 } from "./myReviews";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 /**
  * My Reviews (IR-268; ADR-032 §9 and its 2026-10-08 Amendment, ui-ux/16 §5).
@@ -387,13 +388,13 @@ export default function MyReviewsPage() {
   );
 }
 
-/** A filter or sort chip: pressed is brand-tinted, and its label says what it is. */
+/** A filter or sort chip: pressed is an Ink outline, and its label says what it is. */
 function chipClass(pressed: boolean) {
   return cn(
     "min-h-9 px-3 rounded-full border text-small font-medium",
     COLOUR_TRANSITION,
     FOCUS_RING,
-    pressed ? "border-brand bg-brand-50 text-brand" : "border-stone-200 text-stone-600 hover:border-stone-400",
+    pressed ? SELECTED : "border-stone-200 text-stone-600 hover:border-stone-400",
   );
 }
 

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { cn, formatDate } from "@/lib/utils";
 import type { ReaderConversationSummary } from "@/api/runtimeReader";
 import { EarlierConversationList } from "./EarlierConversations";
+import { HERE } from "@/components/ui/highlightRoles";
 
 interface ConversationSidebarProps {
   conversations:    ReaderConversationSummary[];
@@ -81,7 +82,7 @@ export function ConversationHistoryList({
                 aria-current={active ? "page" : undefined}
                 className={`block w-full text-left rounded-xl px-3 py-2.5 transition-all
                   ${active
-                    ? "bg-stone-200/70 text-stone-900"
+                    ? HERE
                     : "text-stone-700 hover:bg-stone-50"
                   }`}
               >
@@ -100,7 +101,7 @@ export function ConversationHistoryList({
                 className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center p-1.5 rounded-md
                   opacity-0 group-hover:opacity-100 focus-visible:opacity-100
                   [@media(hover:none)]:opacity-100 [@media(hover:none)]:w-11 [@media(hover:none)]:h-11
-                  text-stone-600 hover:text-brand-dark hover:bg-brand-50"
+                  text-stone-600 hover:text-brand-dark hover:bg-stone-100"
                 aria-label={`Delete ${c.title || "New conversation"}`}
               >
                 <i className="fas fa-trash text-[11px]" aria-hidden />

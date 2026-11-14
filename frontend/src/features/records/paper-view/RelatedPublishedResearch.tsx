@@ -88,7 +88,7 @@ export function RelatedPublishedResearch({ recordId }: { recordId: number }) {
               <li key={item.id}>
                 <Link
                   to={`/records/${item.id}`}
-                  className="group flex items-baseline justify-between gap-3 bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-brand/30 transition-colors duration-200"
+                  className="group flex items-baseline justify-between gap-3 bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-stone-300 hover:shadow-card-md transition-colors duration-200"
                 >
                   <span className="min-w-0">
                     <span className="block font-semibold text-stone-900 leading-snug group-hover:text-brand">

@@ -103,7 +103,7 @@ export function ModelPill<T extends string>({ name, value, options, onChange, no
                 }}
                 className={cn(
                   "flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left",
-                  selected ? "bg-brand-50 text-brand" : "text-stone-800 hover:bg-stone-100",
+                  selected ? "bg-surface text-stone-900 ring-1 ring-inset ring-stone-900" : "text-stone-800 hover:bg-stone-100",
                   COLOUR_TRANSITION,
                   FOCUS_RING,
                 )}

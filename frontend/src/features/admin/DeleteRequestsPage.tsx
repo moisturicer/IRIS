@@ -1,15 +1,19 @@
 /**
- * RDCO's delete-request queue: approve what is pending, read what is decided.
+ * RDCO's delete-request queue: approve or decline what is pending, read what is decided.
  * Accessible to staff roles only (gated by ProtectedRoute in router/index.tsx).
  *
  * Two tabs, never mixed (IR-1076, audit WF-02):
  *   - Pending asks the server for `status=pending` and is the only place the
- *     approve action appears.
+ *     approve and decline actions appear.
  *   - Decided asks for `status=decided` (approved and declined) and shows each
- *     outcome with the requester's reason and the date it was decided.
+ *     outcome with the requester's reason, RDCO's note on a decline, and the
+ *     date it was decided.
  *   - The API pages at 20; "Load more" reads the next page and appends it.
  *   - The reason column is the requester's ("Requested because"). RDCO's own
- *     reason, and a Decline action, are IR-1099.
+ *     reason is its note, shown under the status of a declined row (IR-1099).
+ *   - Declining asks for a note, as Download Requests does (IR-688): required,
+ *     limited here and by the server, and sent to the requester in-app and by
+ *     email. Approving takes none.
  *
  * Notes:
  *   - Only admins can approve deletions (backend: IsAdmin permission).
@@ -18,6 +22,7 @@
  * Backend endpoints:
  *   GET  /records/delete-requests/?status=pending|decided → the queue, narrowed
  *   POST /records/delete-requests/<id>/approve/           → approve (soft-deletes record)
+ *   POST /records/delete-requests/<id>/decline/           → decline, with a note (restores record)
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -35,6 +40,8 @@ import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { formatDate }  from "@/lib/utils";
 import type { DeleteRequest } from "@/types/records";
 
+import { RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
+
 /** One page of the queue, and whether the server has another after it. */
 type QueuePage = { results: DeleteRequest[]; next: string | null };
 
@@ -47,6 +54,7 @@ type LaterPages = { after: QueuePage; rows: DeleteRequest[]; page: number; next:
 
 export default function DeleteRequestsPage() {
   const [approving,    setApproving]    = useState<number | null>(null);
+  const [declining,    setDeclining]    = useState<DeleteRequest | null>(null);
   const [error,        setError]        = useState<string | null>(null);
   const [tab, setTab] = useState<"pending" | "decided">("pending");
   const [later,        setLater]        = useState<LaterPages | null>(null);
@@ -118,7 +126,7 @@ export default function DeleteRequestsPage() {
     <div>
       <PageHeader
         title="Delete Requests"
-        description="Review and approve requests to permanently remove records."
+        description="Review requests to permanently remove records: approve them, or decline with a note."
       />
 
       {/* Danger notice */}
@@ -153,7 +161,7 @@ export default function DeleteRequestsPage() {
           size="sm"
           className="ml-auto"
         >
-          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-label ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </Button>
       </div>
@@ -185,13 +193,13 @@ export default function DeleteRequestsPage() {
       ) : (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
-            <span className="text-[13px] text-stone-500 font-medium">
+            <span className="text-small text-stone-500 font-medium">
               {requests.length} request{requests.length !== 1 ? "s" : ""}{hasMore ? " shown" : ""}
             </span>
           </div>
 
           <div className="relative overflow-x-auto">
-            <table className="w-full text-[14px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
@@ -218,13 +226,13 @@ export default function DeleteRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
-                      <p className="text-[12px] text-stone-500">{req.requested_by_email}</p>
+                      <p className="text-label text-stone-500">{req.requested_by_email}</p>
                     </td>
                     <td className="px-4 py-3 max-w-[180px]">
                       {req.reason ? (
-                        <p className="text-stone-600 line-clamp-2 text-[13px]">{req.reason}</p>
+                        <p className="text-stone-600 line-clamp-2 text-small">{req.reason}</p>
                       ) : (
-                        <span className="text-stone-500 italic text-[13px]">No reason given</span>
+                        <span className="text-stone-500 italic text-small">No reason given</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-stone-500 whitespace-nowrap">
@@ -232,20 +240,32 @@ export default function DeleteRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <RequestStatusChip state={req.status} />
+                      {req.status === "declined" && <RdcoNoteLine note={req.rdco_note} />}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {req.status === "pending" ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleApprove(req)}
-                          loading={approving === req.id}
-                        >
-                          {approving === req.id ? "Deleting…" : "Approve Deletion"}
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleApprove(req)}
+                            loading={approving === req.id}
+                          >
+                            {approving === req.id ? "Deleting…" : "Approve Deletion"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDeclining(req)}
+                            disabled={approving === req.id}
+                          >
+                            Decline
+                          </Button>
+                        </div>
                       ) : (
-                        <span className="text-[13px] text-stone-500 italic">
+                        <span className="text-small text-stone-500 italic">
                           {req.reviewed_at ? formatDate(req.reviewed_at) : "—"}
                         </span>
                       )}
@@ -272,6 +292,20 @@ export default function DeleteRequestsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {declining && (
+        <RdcoNoteDialog
+          title="Decline delete request"
+          submitLabel="Decline"
+          audience="requester"
+          requester={declining.requested_by_name ?? declining.requested_by_email ?? "The requester"}
+          recordTitle={declining.record_title}
+          intro="The record is restored. The requester is told in-app and by email, with your note."
+          send={(note) => recordsApi.declineDeleteRequest(declining.id, note)}
+          onClose={() => setDeclining(null)}
+          onDone={() => { setDeclining(null); reload(); }}
+        />
       )}
     </div>
   );

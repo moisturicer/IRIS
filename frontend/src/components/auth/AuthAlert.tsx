@@ -18,11 +18,11 @@ interface AuthAlertProps {
 // warning is soft maroon (IR-359). The glyph and the title carry the meaning.
 function AlertIcon({ variant }: { variant: AuthAlertVariant }) {
   const bg =
-    variant === "warning" ? "bg-brand-100 text-brand" : "bg-brand text-white";
+    variant === "warning" ? "bg-stone-100 text-brand" : "bg-brand text-white";
 
   return (
     <span
-      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[16px] font-bold ${bg}`}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-heading font-bold ${bg}`}
       aria-hidden
     >
       !
@@ -35,7 +35,7 @@ export function AuthAlert({ variant, title, children, onDismiss, focusRef }: Aut
     <div
       ref={focusRef}
       tabIndex={focusRef ? -1 : undefined}
-      className="relative mb-6 rounded-lg border border-brand/25 bg-brand-50 px-4 py-3 text-brand"
+      className="relative mb-6 rounded-lg border border-stone-300 bg-surface px-4 py-3 text-brand"
       role="alert"
     >
       {onDismiss && (
@@ -51,8 +51,8 @@ export function AuthAlert({ variant, title, children, onDismiss, focusRef }: Aut
       <div className="flex gap-3 pr-6">
         <AlertIcon variant={variant} />
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-bold">{title}</p>
-          <div className="mt-1 text-[14px] leading-relaxed">{children}</div>
+          <p className="text-body font-bold">{title}</p>
+          <div className="mt-1 text-body leading-relaxed">{children}</div>
         </div>
       </div>
     </div>

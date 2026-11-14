@@ -10,17 +10,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RequestTimeoutError } from "@/api/requestPolicy";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { DeleteRequest } from "@/types/records";
 
 import DeleteRequestsPage from "./DeleteRequestsPage";
 
 const listDeleteRequests = vi.fn();
+const declineDeleteRequest = vi.fn();
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
     listDeleteRequests: (...args: unknown[]) => listDeleteRequests(...args),
     approveDeleteRequest: vi.fn(),
+    declineDeleteRequest: (...args: unknown[]) => declineDeleteRequest(...args),
   },
 }));
 
@@ -34,6 +37,7 @@ function request(overrides: Partial<DeleteRequest>): DeleteRequest {
     requested_by_email: "ana@cit.edu",
     reason: "Duplicate upload",
     status: "pending",
+    rdco_note: "",
     created_at: "2026-10-30T08:00:00Z",
     reviewed_by: null,
     reviewed_at: null,
@@ -49,6 +53,7 @@ function readSignal(options?: { signal?: AbortSignal }): AbortSignal {
 
 beforeEach(() => {
   listDeleteRequests.mockReset();
+  declineDeleteRequest.mockReset();
 });
 
 describe("DeleteRequestsPage reads", () => {
@@ -179,6 +184,108 @@ describe("DeleteRequestsPage tabs (IR-1076)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Decided" }));
 
     expect(await screen.findByText("No requests have been decided yet.")).toBeInTheDocument();
+  });
+});
+
+describe("DeleteRequestsPage decline with a note (IR-1099)", () => {
+  const waiting = request({ id: 4, record_title: "Still waiting", status: "pending" });
+
+  async function rowFor(title: string) {
+    return (await screen.findByRole("link", { name: title })).closest("tr") as HTMLElement;
+  }
+
+  it("offers Decline beside Approve on a pending row", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+
+    renderScreen(<DeleteRequestsPage />);
+
+    const row = await rowFor("Still waiting");
+    expect(within(row).getByRole("button", { name: "Approve Deletion" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Decline" })).toBeInTheDocument();
+  });
+
+  it("asks for a note before declining, sends it trimmed, and reads the queue again", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    declineDeleteRequest.mockResolvedValue({});
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    await expectNoBlockingA11yViolations(dialog);
+    const send = within(dialog).getByRole("button", { name: "Decline" });
+    expect(send).toBeDisabled();
+    const note = within(dialog).getByRole("textbox", { name: "Note to the requester" });
+    expect(note).toHaveAttribute("maxLength", "500");
+
+    await userEvent.type(note, "   ");
+    expect(send).toBeDisabled();
+    await userEvent.type(note, " Cited by a published paper. ");
+    await userEvent.click(send);
+
+    await waitFor(() => expect(declineDeleteRequest).toHaveBeenCalledWith(4, "Cited by a published paper."));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(listDeleteRequests).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps the note and shows the server's reason when the decline is refused", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    declineDeleteRequest.mockRejectedValue({
+      response: { data: { note: ["Keep the note to 500 characters."] } },
+    });
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    const note = within(dialog).getByRole("textbox", { name: "Note to the requester" });
+    await userEvent.type(note, "Cited by a published paper.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Decline" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Keep the note to 500 characters.");
+    expect(note).toHaveValue("Cited by a published paper.");
+    expect(listDeleteRequests).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends nothing when the dialog is cancelled", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(declineDeleteRequest).not.toHaveBeenCalled();
+  });
+
+  it("shows RDCO's note on a declined row, and says so when an older decline has none", async () => {
+    const declined = request({
+      id: 2, record_title: "Turned down", status: "declined",
+      rdco_note: "Cited by a published paper.", reviewed_at: "2026-11-02T08:00:00Z",
+    });
+    const older = request({
+      id: 3, record_title: "Turned down long ago", status: "declined",
+      rdco_note: "", reviewed_at: "2026-10-02T08:00:00Z",
+    });
+    const removed = request({
+      id: 5, record_title: "Removed thesis", status: "approved", reviewed_at: "2026-11-03T08:00:00Z",
+    });
+    listDeleteRequests.mockImplementation((params: { status?: string }) =>
+      Promise.resolve({
+        data: { results: params.status === "decided" ? [declined, older, removed] : [waiting] },
+      }),
+    );
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+
+    const noted = within(await rowFor("Turned down"));
+    expect(noted.getByText("RDCO's note:")).toBeInTheDocument();
+    expect(noted.getByText("Cited by a published paper.")).toBeInTheDocument();
+    expect(within(await rowFor("Turned down long ago")).getByText("No note recorded")).toBeInTheDocument();
+    // An approval takes no note, so none is shown or missing.
+    expect(within(await rowFor("Removed thesis")).queryByText(/RDCO's note/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
   });
 });
 
