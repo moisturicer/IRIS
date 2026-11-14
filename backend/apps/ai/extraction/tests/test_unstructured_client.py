@@ -229,10 +229,10 @@ FAILURES = {
 
 
 _FORMULA = "hi_res Formula OCR is withheld until transcribed (ADR-067 formula amendment)"
-_TABLE = "hi_res reads one-column rows and leaves page 2's rows as text; IR-989 judges tables"
+_TABLE = "unruled pipe text: hi_res sees a one-column table and loose rows; ruled_table checks tables"
 # Strict: each flips to a failure when the gap closes.
 KNOWN_GAPS = {
-    ("two_columns", "check_reading_order"): "hi_res misorders this fixture (ADR-067 amendment §3)",
+    ("two_columns", "check_reading_order"): "rows aligned across short columns read row by row for every Extractor tested; paper_columns checks columns",
     ("figures", "check_reading_order"): _FORMULA,
     ("figures", "check_boxes"): _FORMULA,
     ("table_across_pages", "check_reading_order"): _TABLE,
