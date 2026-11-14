@@ -34,7 +34,17 @@
         "clock_paused": false,
         "extensions": [],
         "can_extend": false,
-        "overdue_days": null
+        "overdue_days": null,
+        "clearance_strip": [
+          {
+            "party": "itso",
+            "label": "ITSO",
+            "kind": "reviewing",
+            "text": "Reviewing",
+            "note": null,
+            "version": null
+          }
+        ]
       },
       {
         "key": "seat:7",
@@ -66,7 +76,17 @@
         "clock_paused": true,
         "extensions": [],
         "can_extend": false,
-        "overdue_days": null
+        "overdue_days": null,
+        "clearance_strip": [
+          {
+            "party": "itso",
+            "label": "ITSO",
+            "kind": "revision",
+            "text": "Asked for revision",
+            "note": null,
+            "version": null
+          }
+        ]
       }
     ],
     "counts": {

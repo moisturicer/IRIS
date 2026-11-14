@@ -103,10 +103,38 @@ export interface MyResearchItem {
   /** Who has the record now, in tracker order; empty when nobody does. */
   holders:              { party: Party; label: string }[];
   /** Offices that have cleared it; `preserved` when kept through a resubmission (ADR-003). */
-  cleared_offices:      { office: "itso" | "ierc" | "ktto"; label: string; preserved: boolean }[];
+  cleared_offices:      { office: ClearanceOffice; label: string; preserved: boolean }[];
+  /** The same facts, one line per office in the server's words (IR-1083). */
+  clearance_strip:      ClearanceStripEntry[];
   submitter_status:     SubmitterStatus;
   created_at:           string;
   updated_at:           string;
+}
+
+/**
+ * What kind of line a clearance-strip entry is. A closed set: the client
+ * chooses tone and icon from it and nothing else (IR-1083).
+ */
+export type ClearanceStripKind =
+  "kept" | "cleared" | "reviewing" | "unclaimed" | "revision" | "not_cleared";
+
+/**
+ * One specialist office on a record, as a list row or the tracker states it:
+ * "ITSO · Cleared · Kept from v1". Every word is the server's (`text`, `note`,
+ * `label`), so no client works out which clearances a resubmission kept
+ * (IR-374 invariant 15). Carries no review content, so every list may show it.
+ */
+export type ClearanceOffice = "itso" | "ierc" | "ktto";
+
+export interface ClearanceStripEntry {
+  party:   ClearanceOffice;
+  label:   string;
+  kind:    ClearanceStripKind;
+  /** "Cleared", "Reviewing v2", "Unclaimed", "Asked for revision". */
+  text:    string;
+  /** What the latest version did to it: "Kept from v1", "Reset by v2". */
+  note:    string | null;
+  version: number | null;
 }
 
 /** One open request the owner must answer, worded by the server (IR-625). */
@@ -1288,6 +1316,8 @@ export interface RecordTracker {
   workflow_state_label:  string;
   current_holders:       TrackerHolder[];
   parties:               TrackerPartyRow[];
+  /** The compact per-office summary lists draw too (IR-1083). */
+  clearance_strip:       ClearanceStripEntry[];
   routing_history:       TrackerRoutingGroup[];
   /** Routing was not recorded before this date (IR-257's backfill wrote none). */
   routing_recorded_from: string | null;

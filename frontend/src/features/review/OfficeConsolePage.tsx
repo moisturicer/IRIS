@@ -5,6 +5,7 @@ import { reviewsApi } from "@/api/reviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { ClearanceStrip, hasStrip } from "@/components/shared/ClearanceStrip";
 import { ResearchCard } from "@/components/shared/ResearchCard";
 import { readFailureKind } from "@/lib/readFailure";
 import { Badge, Button, Skeleton } from "@/components/ui";
@@ -236,6 +237,7 @@ function ConsoleRow({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: Acting
       title={row.title}
       meta={<span>Received {formatDate(row.opened_at)}</span>}
       status={status}
+      footer={hasStrip(row.clearance_strip) ? <ClearanceStrip entries={row.clearance_strip} /> : undefined}
       actions={actions}
     />
   );

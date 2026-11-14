@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { ClearanceStrip } from "@/components/shared/ClearanceStrip";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -9,36 +10,6 @@ import { waitingHref } from "@/features/records/waitingOnYou";
 import { DeleteDraft } from "./DeleteDraft";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
-
-/**
- * Who has the record now and which offices have cleared it, as one quiet
- * line. A clearance kept through a resubmission says so: that is
- * clearance-aware resubmission (ADR-003), shown where the owner works. Only
- * parties the server named appear; an office that was never routed the record
- * is not drawn as a pending step.
- */
-function ReviewTrack({ item }: { item: MyResearchItem }) {
-  const cleared = new Set<string>(item.cleared_offices.map((o) => o.office));
-  const holding = item.holders.filter((h) => !cleared.has(h.party));
-  if (holding.length === 0 && item.cleared_offices.length === 0) return null;
-
-  return (
-    <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-label">
-      {holding.map((holder) => (
-        <span key={holder.party} className="inline-flex items-center gap-1.5 font-semibold text-brand">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
-          {holder.label} reviewing
-        </span>
-      ))}
-      {item.cleared_offices.map((office) => (
-        <span key={office.office} className="inline-flex items-center gap-1.5 font-semibold text-stone-800">
-          <i className="fas fa-check text-3xs" aria-hidden />
-          {office.label} cleared{office.preserved && <span className="font-normal text-stone-600"> · kept</span>}
-        </span>
-      ))}
-    </p>
-  );
-}
 
 function RowActions({ item, onDeleted }: { item: MyResearchItem; onDeleted?: (id: number) => void }) {
   if (item.can_continue) return <ContinueProposal recordId={item.id} />;
@@ -71,7 +42,7 @@ function RowActions({ item, onDeleted }: { item: MyResearchItem; onDeleted?: (id
 
 interface SubmissionRowProps {
   item: MyResearchItem;
-  /** The Overview's short list: no review track and no actions. */
+  /** The Overview's short list: no clearance strip and no actions. */
   brief?: boolean;
   /** Offered on a draft: the row is gone once the server deleted it. */
   onDeleted?: (id: number) => void;
@@ -124,7 +95,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
           </div>
         </div>
 
-        {!brief && <ReviewTrack item={item} />}
+        {!brief && <ClearanceStrip entries={item.clearance_strip} className="mt-2" />}
         {actions && <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
 

@@ -48,6 +48,7 @@ from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
 from .clearance_state import (
     carryover_fields, clearance_payload, is_preserved, record_versions, resubmission_payload,
 )
+from .clearance_strip import clearance_strips
 from .comments import comments_payload
 from .finish_review import rounds_payload
 from .decisions import withdrawn_by_label
@@ -797,6 +798,9 @@ def tracker_payload(record, user) -> dict[str, Any]:
             disclose_requests=disclose_requests,
             disclose_seats=readable, user=user, versions=versions,
         ),
+        # The compact per-office summary lists draw too (IR-1083): the same
+        # builder, so the record and its row in a list can never disagree.
+        "clearance_strip": clearance_strips([record.pk])[record.pk],
         "routing_history": _routing_history(record, staff=staff, readable=readable),
         "routing_recorded_from": _routing_recorded_from(),
         # `None`, not `[]`: there may be reviews this viewer is not told about.

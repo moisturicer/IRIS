@@ -58,6 +58,7 @@ const payload: RecordTracker = {
       can_extend: false, extensions: [],
     },
   ],
+  clearance_strip: [],
   routing_history: [
     {
       group_id: "g1", from: null, from_label: null, to: ["intake"], to_labels: ["Intake (retired)"],

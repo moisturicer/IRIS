@@ -23,6 +23,7 @@ from apps.records.models import Record
 from core.enums import OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus, SeatState
 from core.permissions import is_office_coordinator, office_parties_of
 
+from .clearance_strip import attach_clearance_strips
 from .deadlines import deadline_payload, with_deadlines
 from .models import RecordAssignment, ReviewerSeat
 from .seats import office_members
@@ -97,6 +98,7 @@ def office_console(user, *, office=None) -> dict:
         # done (waiting on its author, say) has no open work to show.
         rows.extend(_row(assignment, user, s) for s in seats if s.state in OPEN_SEAT_STATES)
     rows.sort(key=_order)
+    attach_clearance_strips(rows)  # which clearances each record holds (IR-1083)
 
     load = []
     for member in office_members(office):

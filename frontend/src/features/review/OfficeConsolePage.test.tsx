@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestTimeoutError } from "@/api/requestPolicy";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
+import type { ClearanceStripEntry } from "@/types/records";
 import type { OfficeConsole, OfficeConsoleRow } from "@/types/reviews";
 
 import OfficeConsolePage from "./OfficeConsolePage";
@@ -29,6 +30,14 @@ vi.mock("@/api/reviews", () => ({
   },
 }));
 
+/** What a resubmission left on a record: ITSO's clearance kept, IERC's reset (IR-1083). */
+const KEPT: ClearanceStripEntry = {
+  party: "itso", label: "ITSO", kind: "kept", text: "Cleared", note: "Kept from v1", version: 1,
+};
+const RESET: ClearanceStripEntry = {
+  party: "ierc", label: "IERC", kind: "reviewing", text: "Reviewing v2", note: "Reset by v2", version: 2,
+};
+
 function row(overrides: Partial<OfficeConsoleRow> = {}): OfficeConsoleRow {
   return {
     key: "seat:1", kind: "seat", record: 7, title: "Smart Campus Energy Monitor",
@@ -36,6 +45,7 @@ function row(overrides: Partial<OfficeConsoleRow> = {}): OfficeConsoleRow {
     seat_state: "in_review", seat_state_label: "In review",
     opened_at: "2026-10-01T02:00:00Z", due_at: "2026-10-06T15:59:00Z",
     original_due_at: "2026-10-06T15:59:00Z", is_overdue: true, clock_paused: false, can_extend: true,
+    clearance_strip: [],
     ...overrides,
   };
 }
@@ -84,6 +94,29 @@ beforeEach(() => {
 });
 
 describe("OfficeConsolePage", () => {
+  it("shows a kept clearance and a reset one on each row, in the server's words (IR-1083)", async () => {
+    office.mockResolvedValue(payload({
+      rows: [
+        row({ clearance_strip: [KEPT, RESET] }),
+        row({ key: "seat:2", record: 9, title: "Rainwater Harvesting Survey", clearance_strip: [RESET] }),
+        POOL,
+      ],
+    }));
+    show();
+
+    const kept = await screen.findByRole("article", { name: "Smart Campus Energy Monitor" });
+    const strip = within(kept).getByRole("list", { name: "Clearances" });
+    expect(strip).toHaveTextContent("ITSO: Cleared · Kept from v1");
+    expect(strip).toHaveTextContent("IERC: Reviewing v2 · Reset by v2");
+
+    const reset = screen.getByRole("article", { name: "Rainwater Harvesting Survey" });
+    expect(within(reset).getByRole("list", { name: "Clearances" })).toHaveTextContent("Reset by v2");
+    expect(within(reset).queryByText(/kept from/i)).not.toBeInTheDocument();
+
+    const pool = screen.getByRole("article", { name: "AI-Based Medical Imaging" });
+    expect(within(pool).queryByRole("list", { name: "Clearances" })).not.toBeInTheDocument();
+  });
+
   it("lists the office's open reviews and each reviewer's load", async () => {
     const { container } = show();
 

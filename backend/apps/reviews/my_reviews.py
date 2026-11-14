@@ -59,6 +59,7 @@ from core.permissions import (
     office_parties_of,
 )
 
+from .clearance_strip import attach_clearance_strips
 from .deadlines import deadline_payload, overdue_working_days, with_deadlines
 from .models import (
     Holiday,
@@ -597,4 +598,5 @@ def my_reviews(user, *, tab=None, outcome=None, office=None, cursor=None,
         if overdue_only:
             rows = [r for r in rows if r["is_overdue"]]
         _add_overdue_days(rows)
+    attach_clearance_strips(rows)  # which clearances each record holds (IR-1083)
     return {"rows": rows, "counts": _counts(scope), "next": next_cursor}

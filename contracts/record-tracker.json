@@ -186,6 +186,16 @@
         "carryover_label": null
       }
     ],
+    "clearance_strip": [
+      {
+        "party": "itso",
+        "label": "ITSO",
+        "kind": "reviewing",
+        "text": "Reviewing",
+        "note": null,
+        "version": null
+      }
+    ],
     "routing_history": [
       {
         "group_id": "83a0ea29-5896-46e8-87fc-82ea1407bda7",

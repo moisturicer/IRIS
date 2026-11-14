@@ -5,6 +5,7 @@ import { reviewsApi, seatsApi } from "@/api/reviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { ClearanceStrip, hasStrip } from "@/components/shared/ClearanceStrip";
 import { ResearchCard } from "@/components/shared/ResearchCard";
 import { Badge, Button, Skeleton } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
@@ -517,6 +518,7 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
         meta={meta || undefined}
         byline={routing ?? undefined}
         status={status}
+        footer={hasStrip(row.clearance_strip) ? <ClearanceStrip entries={row.clearance_strip} /> : undefined}
         actions={actions ?? undefined}
       />
       {error && (
