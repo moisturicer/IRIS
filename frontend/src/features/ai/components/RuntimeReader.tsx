@@ -355,7 +355,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
           {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
         {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}
-        {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" />}
+        {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" onRetry={() => setOpenAttempt(n => n + 1)} />}
         {opening === "unavailable" && <div className="py-10 text-center">
           <h2 className="font-display text-xl text-stone-900">This conversation is not available.</h2>
           <p className="mt-2 text-sm text-stone-600">It may have been deleted, or the link may be wrong.</p>

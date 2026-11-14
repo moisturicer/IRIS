@@ -391,7 +391,7 @@ describe("My Library: interrupted reads (IR-906)", () => {
 
     expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Could not load your research" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(recordsApi.mine).toHaveBeenCalledTimes(2);
   });
 
@@ -400,7 +400,7 @@ describe("My Library: interrupted reads (IR-906)", () => {
     renderScreen(<MyLibraryPage />, DOWNLOADS);
 
     expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(recordsApi.myDownloadRequests).toHaveBeenCalledTimes(2);
   });
 
@@ -409,7 +409,7 @@ describe("My Library: interrupted reads (IR-906)", () => {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
 
     expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(libraryApi.saves).toHaveBeenCalledTimes(2));
   });
 });

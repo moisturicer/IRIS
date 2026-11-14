@@ -1,4 +1,5 @@
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -8,6 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { Spinner } from "@/components/ui/Spinner";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -428,7 +430,7 @@ export default function DiscoverPage() {
         setRecords([]);
         setTotalCount(null);
         setInterrupted(isRequestTimeout(error));
-        setFailed(errorDetail(error, "Check your connection, then try again."));
+        setFailed(failureMessage(error));
       })
       .finally(() => {
         if (current === generation.current) setLoading(false);
@@ -765,7 +767,7 @@ export default function DiscoverPage() {
 
       <div className="mt-4">
       {holdQuietly ? null : loading ? (
-        <ResultsSkeleton columns={gridColumns} />
+        <ResultsSkeleton columns={gridColumns} onRetry={() => setAttempt((n) => n + 1)} />
       ) : failed && interrupted ? (
         <InterruptedState framed what="research" onRetry={() => setAttempt((n) => n + 1)} />
       ) : failed ? (
@@ -939,21 +941,18 @@ function InterestChoices({ title, options, selected, onChange }: {
 }
 
 /** Placeholder cards in the grid's own shape, announced once as loading. */
-function ResultsSkeleton({ columns }: { columns: string }) {
+function ResultsSkeleton({ columns, onRetry }: { columns: string; onRetry: () => void }) {
   return (
-    <div role="status">
-      <span className="sr-only">Loading research…</span>
-      <div className={cn("grid gap-4", columns)} aria-hidden="true">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-stone-200 p-card-compact md:p-card">
-            <div className="h-3 w-1/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-            <div className="mt-3 h-5 w-5/6 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-            <div className="mt-2 h-5 w-2/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-            <div className="mt-4 h-3 w-full rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-            <div className="mt-2 h-3 w-11/12 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          </div>
-        ))}
-      </div>
-    </div>
+    <LoadingRegion label="Loading research…" onRetry={onRetry} className={cn("grid gap-4", columns)}>
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className="bg-white rounded-xl border border-stone-200 p-card-compact md:p-card">
+          <div className="h-3 w-1/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+          <div className="mt-3 h-5 w-5/6 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+          <div className="mt-2 h-5 w-2/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+          <div className="mt-4 h-3 w-full rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+          <div className="mt-2 h-3 w-11/12 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+        </div>
+      ))}
+    </LoadingRegion>
   );
 }

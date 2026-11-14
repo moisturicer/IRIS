@@ -58,7 +58,7 @@ describe("DeleteRequestsPage reads", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/did not finish|took too long/i);
     expect(listDeleteRequests).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByRole("link", { name: "A withdrawn thesis" })).toBeInTheDocument();
     expect(listDeleteRequests).toHaveBeenCalledTimes(2);

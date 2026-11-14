@@ -2,7 +2,7 @@ import { INSTITUTION } from "@/config/institution";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
-import { readFailureKind } from "@/lib/readFailure";
+import { failureMessage, readFailureKind } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
@@ -275,6 +275,7 @@ export default function PaperViewPage() {
    */
   const [loadFailed, setLoadFailed] = useState<"failed" | "interrupted" | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
@@ -533,6 +534,7 @@ export default function PaperViewPage() {
       // Any other failure is not "not found", and says so with a way to try again.
       .catch((err: unknown) => {
         const kind = readFailureKind(err);
+        setLoadError(err);
         setRecord(null);
         setLoadFailed(kind === "unavailable" ? null : kind);
       })
@@ -606,7 +608,7 @@ export default function PaperViewPage() {
         tone="error"
         icon="fa-circle-exclamation"
         title="We couldn't load this record"
-        message="Check your connection and try again."
+        message={failureMessage(loadError)}
         actions={
           <button
             type="button"

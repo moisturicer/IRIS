@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { accountsApi }   from "@/api/accounts";
+import { failureMessage } from "@/lib/readFailure";
 import { useUIStore }    from "@/store/ui.store";
 import { PageHeader }    from "@/components/layout/PageHeader";
 import { Button }        from "@/components/ui/Button";
@@ -22,6 +23,7 @@ export default function RoleRequestsPage() {
   // A failed load is not an empty queue (IR-745): "All caught up!" after an
   // error would tell RDCO there is nothing to decide when there may be.
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
   const [_acting,   setActing]    = useState(false);
 
@@ -33,7 +35,7 @@ export default function RoleRequestsPage() {
         setRequests(data.results);
         setLoadFailed(false);
       })
-      .catch(() => setLoadFailed(true))
+      .catch((error: unknown) => { setLoadFailed(true); setLoadError(error); })
       .finally(() => setLoading(false));
   };
 
@@ -65,14 +67,14 @@ export default function RoleRequestsPage() {
       />
 
       {loading ? (
-        <Skeleton />
+        <Skeleton onRetry={load} />
       ) : loadFailed ? (
         <EmptyState
           framed
           tone="error"
           icon="fa-circle-exclamation"
           title="Couldn't load role requests"
-          message="Check your connection and try again."
+          message={failureMessage(loadError)}
           action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
         />
       ) : requests.length === 0 ? (

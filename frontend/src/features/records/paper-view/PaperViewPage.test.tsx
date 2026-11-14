@@ -2424,7 +2424,7 @@ describe("a record the viewer cannot read (IR-411)", () => {
     expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Record not available" })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitForRecord(record.title);
   });
 

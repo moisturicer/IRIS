@@ -11,7 +11,8 @@ import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { conversationPath } from "@/lib/askHandoff";
 import { CitationConversationContext } from "@/lib/citedPage";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
-import { readFailureKind } from "@/lib/readFailure";
+import { failureMessage, readFailureKind } from "@/lib/readFailure";
+import { Button } from "@/components/ui/Button";
 import type { ChatMessage } from "@/types/chat";
 import type { ConversationDetail, ConversationSummary } from "@/types/ai";
 import { ChatMessageList } from "./ChatMessageList";
@@ -33,6 +34,8 @@ export function earlierTranscript(conversation: ConversationDetail): ChatMessage
 export function EarlierConversation({ id }: { id: number }) {
   const [conversation, setConversation] = useState<ConversationDetail>();
   const [failure, setFailure] = useState<"unavailable" | "failed">();
+  const [failedWith, setFailedWith] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   usePageTitle(conversation?.title);
 
   useEffect(() => {
@@ -40,10 +43,14 @@ export function EarlierConversation({ id }: { id: number }) {
     setConversation(undefined); setFailure(undefined);
     aiApi.conversations.get(id).then(
       ({ data }) => { if (current) setConversation(data); },
-      (error) => { if (current) setFailure(readFailureKind(error) === "unavailable" ? "unavailable" : "failed"); },
+      (error) => {
+        if (!current) return;
+        setFailedWith(error);
+        setFailure(readFailureKind(error) === "unavailable" ? "unavailable" : "failed");
+      },
     );
     return () => { current = false; };
-  }, [id]);
+  }, [id, attempt]);
 
   return <div className="flex h-full min-h-0 flex-col">
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 px-6 py-4">
@@ -54,7 +61,10 @@ export function EarlierConversation({ id }: { id: number }) {
       <Link to="/ai" className="inline-flex min-h-11 items-center text-sm text-brand underline">New conversation</Link>
     </header>
     {failure === "unavailable" && <p role="alert" className="p-6">This conversation is not available. It may have been deleted, or the link may be wrong.</p>}
-    {failure === "failed" && <p role="alert" className="p-6">This conversation could not be loaded. Reload the page to try again.</p>}
+    {failure === "failed" && <div role="alert" className="space-y-3 p-6">
+      <p>{failureMessage(failedWith, { lead: "This conversation could not be loaded." })}</p>
+      <Button type="button" variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>Try again</Button>
+    </div>}
     {!conversation && !failure && <p role="status" className="p-6 text-sm text-stone-600">Opening conversation…</p>}
     {conversation && <CitationConversationContext.Provider value={conversation.id}>
       <div className="min-h-0 flex-1 overflow-y-auto">

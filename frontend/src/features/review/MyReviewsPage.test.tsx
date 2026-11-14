@@ -227,7 +227,7 @@ describe("MyReviewsPage", () => {
 
     expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Could not load My Reviews" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("link", { name: "Smart Campus Energy Monitor" })).toBeInTheDocument();
   });
 
@@ -237,7 +237,7 @@ describe("MyReviewsPage", () => {
 
     expect(await screen.findByRole("heading", { name: "My Reviews isn't available to you" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
   });
 
   it("announces nothing when the refetch after a claim fails", async () => {

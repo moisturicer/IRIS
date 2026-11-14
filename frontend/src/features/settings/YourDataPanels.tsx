@@ -10,6 +10,7 @@ import { accountsApi, type MyDeletionRequest } from "@/api/accounts";
 import { Button } from "@/components/ui";
 import { Spinner } from "@/components/ui/Spinner";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { formatDate } from "@/lib/utils";
 import { Message, Panel } from "./settingsParts";
 
@@ -43,7 +44,7 @@ export function DownloadMyDataPanel() {
       setFailure(
         status === 429
           ? "You've downloaded your data several times recently. Try again later."
-          : "Your file wasn't downloaded. Check your connection, then try again.",
+          : failureMessage(err, { lead: "Your file wasn't downloaded." }),
       );
       setState("failed");
     }
@@ -116,14 +117,15 @@ export function DeleteAccountPanel() {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const { data } = await accountsApi.myDeletionRequest({ signal });
       setRequest(data.request);
       setPhase("ready");
-    } catch {
-      if (!signal?.aborted) setPhase("failed");
+    } catch (err) {
+      if (!signal?.aborted) { setLoadError(err); setPhase("failed"); }
     }
   }, []);
 
@@ -176,7 +178,7 @@ export function DeleteAccountPanel() {
 
       {phase === "failed" && (
         <div className="space-y-3">
-          <Message tone="error" role="alert">Your deletion request didn't load. Check your connection, then try again.</Message>
+          <Message tone="error" role="alert">{failureMessage(loadError, { lead: "Your deletion request didn't load." })}</Message>
           <Button type="button" variant="secondary" onClick={() => { setPhase("loading"); void load(); }}>
             Try again
           </Button>

@@ -851,7 +851,7 @@ describe("states", () => {
     expect(alert).toHaveTextContent("This took too long");
     expect(alert).not.toHaveTextContent("We couldn't load research");
 
-    await userEvent.click(within(alert).getByRole("button", { name: "Retry" }));
+    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
     expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
   });
 

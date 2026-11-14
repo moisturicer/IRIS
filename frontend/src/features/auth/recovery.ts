@@ -9,6 +9,8 @@
  */
 import { useEffect, useState } from "react";
 
+import { failureMessage } from "@/lib/readFailure";
+
 export type RecoveryFailure =
   | { kind: "validation"; errors: Record<string, string[]> }
   | { kind: "invalid_link" }
@@ -47,7 +49,7 @@ export function retryMessage(failure: RecoveryFailure): string {
       return `IRIS could not take this request right now. Try again in ${failure.retryAfter} seconds.`;
     default:
       // Unknown outcome: it may have been accepted. Retrying is safe.
-      return "Your request may not have reached IRIS. Check your connection and try again.";
+      return failureMessage(undefined, { unreached: "Your request may not have reached IRIS. Try again." });
   }
 }
 

@@ -24,6 +24,8 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { failureMessage } from "@/lib/readFailure";
 import { useApiRead } from "@/hooks/useApiRead";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
@@ -222,13 +224,13 @@ export default function AccountDeletionRequestsPage() {
         <InterruptedState what="account deletion requests" onRetry={read.retry} />
       ) : loading && requests.length === 0 ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" label="Loading account deletion requests" />
+          <Spinner size="lg" label="Loading account deletion requests" onRetry={read.retry} />
         </div>
       ) : read.status === "failed" ? (
-        <div role="alert" className={LOAD_ERROR}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          Failed to load account deletion requests.
-        </div>
+        <LoadFailedAlert
+          message={failureMessage(read.error, { lead: "The account deletion requests didn't load." })}
+          onRetry={read.retry}
+        />
       ) : requests.length === 0 ? (
         <EmptyState icon="fa-user-slash" title="No deletion requests" message="Nobody is waiting on a decision." />
       ) : (
