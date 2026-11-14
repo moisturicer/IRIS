@@ -124,6 +124,21 @@ class AuditEvent(models.Model):
     REGISTRATION_REPLACED            = "REGISTRATION_REPLACED"
     UNVERIFIED_REGISTRATIONS_EXPIRED = "UNVERIFIED_REGISTRATIONS_EXPIRED"
 
+    # RDCO's Setup (ADR-063 decision 11, IR-971). `user` is the RDCO account.
+    # Metadata: `record_type` (id) and `record_type_name`; a requirement's
+    # `slot` (id) and `name`; CHANGED's `changes` ({field: [before, after]},
+    # descriptions as character counts, never their text); REORDERED's
+    # `order` (slot ids); REMOVED's `outcome` (`hidden` or `deleted`); a
+    # Template's `target` (`requirement` or `manuscript`), `filename` and
+    # `bytes`. Downloads are not logged (decision 11).
+    REQUIREMENT_ADDED     = "REQUIREMENT_ADDED"
+    REQUIREMENT_CHANGED   = "REQUIREMENT_CHANGED"
+    REQUIREMENTS_REORDERED = "REQUIREMENTS_REORDERED"
+    REQUIREMENT_REMOVED   = "REQUIREMENT_REMOVED"
+    TEMPLATE_REPLACED     = "TEMPLATE_REPLACED"
+    TEMPLATE_REMOVED      = "TEMPLATE_REMOVED"
+    RECORD_TYPE_DESCRIBED = "RECORD_TYPE_DESCRIBED"
+
     # Account deletion (ADR-051 §8-§12, IR-785)
     ACCOUNT_DELETION_REQUESTED = "ACCOUNT_DELETION_REQUESTED"
     ACCOUNT_DELETION_CANCELLED = "ACCOUNT_DELETION_CANCELLED"
@@ -208,6 +223,13 @@ class AuditEvent(models.Model):
         (NOTICE_PUBLISHED,             "Data Notice Published"),
         (AI_ANSWER_CHANGED,            "AI Answer Changed"),
         (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
+        (REQUIREMENT_ADDED,            "Requirement Added"),
+        (REQUIREMENT_CHANGED,          "Requirement Changed"),
+        (REQUIREMENTS_REORDERED,       "Requirements Reordered"),
+        (REQUIREMENT_REMOVED,          "Requirement Removed"),
+        (TEMPLATE_REPLACED,            "Template Replaced"),
+        (TEMPLATE_REMOVED,             "Template Removed"),
+        (RECORD_TYPE_DESCRIBED,        "Record Type Description Changed"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

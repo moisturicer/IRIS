@@ -45,6 +45,7 @@ const ImportRecordsPage = lazy(() => import("@/features/records/ImportRecordsPag
 const UserListPage = lazy(() => import("@/features/accounts/UserListPage"));
 const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage"));
 const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
+const SetupPage = lazy(() => import("@/features/setup/SetupPage"));
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
 const AccountDeletionRequestsPage = lazy(() => import("@/features/admin/AccountDeletionRequestsPage"));
@@ -187,6 +188,11 @@ export const routes: RouteObject[] = [{
                 path: pathFor("deleteRequests"),
                 element: <DeferredPage name="Delete Requests"><DeleteRequestsPage /></DeferredPage>,
                 handle: { crumb: "Delete Requests", width: "full" },
+              },
+              {
+                path: pathFor("setup"),
+                element: <DeferredPage name="Setup"><SetupPage /></DeferredPage>,
+                handle: { crumb: "Setup" },
               },
             ],
           },

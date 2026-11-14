@@ -442,8 +442,41 @@ SLOT_UPLOAD = {"record": Ref("record"), "slot": Ref("slot"), "file": Upload("new
 UPLOAD = {"pk": Ref("upload")}
 RECORD_FILE = {"pk": Ref("record_file")}
 
+RECORD_TYPE = {"pk": Ref("record_type")}
+SLOT = {"pk": Ref("slot")}
+
 DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     "upload-slots": Entry({"GET": _case(SIGNED_IN)}),
+
+    # -- Templates, downloaded by anyone signed in (ADR-063 decisions 7-8) --
+    "upload-slot-template": Entry({"GET": _case(SIGNED_IN, kwargs=SLOT)}),
+    "record-type-manuscript-template": Entry({"GET": _case(SIGNED_IN, kwargs=RECORD_TYPE)}),
+
+    # -- RDCO's Setup (ADR-063 decision 9, IR-971): a role gate before lookup --
+    "setup-record-types": Entry({"GET": _case(RDCO_ONLY)}),
+    "setup-record-type": Entry({
+        "PATCH": _case(RDCO_ONLY, kwargs=RECORD_TYPE, data={"description": "Needs a Proposal first."}),
+    }),
+    "setup-manuscript-template": Entry({
+        "PUT": _case(RDCO_ONLY, kwargs=RECORD_TYPE, data={"file": Upload("format.pdf")},
+                     format="multipart"),
+        "DELETE": _case(RDCO_ONLY, kwargs=RECORD_TYPE),
+    }),
+    "setup-requirements": Entry({
+        "POST": _case(RDCO_ONLY, kwargs=RECORD_TYPE,
+                      data={"name": "Adviser's Endorsement", "is_required": False}),
+    }),
+    "setup-requirement-order": Entry({
+        "PUT": _case(RDCO_ONLY, kwargs=RECORD_TYPE, data={"order": Ref("record_type", "requirement_order")}),
+    }),
+    "setup-requirement": Entry({
+        "PATCH": _case(RDCO_ONLY, kwargs=SLOT, data={"is_required": True}),
+        "DELETE": _case(RDCO_ONLY, kwargs=SLOT),
+    }),
+    "setup-requirement-template": Entry({
+        "PUT": _case(RDCO_ONLY, kwargs=SLOT, data={"file": Upload("form.pdf")}, format="multipart"),
+        "DELETE": _case(RDCO_ONLY, kwargs=SLOT),
+    }),
 
     # -- a record's documents, named by the caller (the recorded exception) --
     "document-submit": Entry(

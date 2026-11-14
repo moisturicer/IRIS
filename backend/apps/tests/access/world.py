@@ -127,6 +127,10 @@ class World:
             return user is not None
         if isinstance(obj, (SavedFeed, SavedReply)):
             return user is not None and obj.owner_id == user.pk
+        # A record type and its listed Requirements are on Guidelines for
+        # anyone signed in (ADR-063 decision 7, IR-971).
+        if isinstance(obj, RecordType) or (isinstance(obj, UploadSlot) and obj.record_id is None):
+            return user is not None
         return Record.objects.visible_to(user).filter(pk=self.record_of(name).pk).exists()
 
 
@@ -235,7 +239,19 @@ def build_world() -> World:
 
     # -- the record under review, and everything hanging off it ----------
     o["record"] = record = _at_itso("Matrix: a Thesis at ITSO", users)
-    o["slot"] = slot = UploadSlot.objects.create(name="Endorsement", record_type=record.record_type)
+    o["slot"] = slot = UploadSlot.objects.create(
+        name="Endorsement", record_type=record.record_type,
+        template=pdf("endorsement-form.pdf"), template_name="endorsement-form.pdf",
+    )
+    # A Manuscript Template to download (ADR-063 decision 4, IR-971).
+    record_type = record.record_type
+    record_type.manuscript_template.save("manuscript-format.pdf", pdf("manuscript-format.pdf"), save=False)
+    record_type.manuscript_template_name = "manuscript-format.pdf"
+    record_type.save(update_fields=["manuscript_template", "manuscript_template_name"])
+    # Setup's reorder must name every listed requirement once: the cell sends this.
+    from apps.documents.setup import listed_slots
+    record_type.requirement_order = list(listed_slots(record_type.pk).values_list("pk", flat=True))[::-1]
+    o["record_type"] = record_type
     o["upload"] = RecordUpload.objects.create(
         record=record, slot=slot, file=pdf("endorsement.pdf"), uploaded_by=owner,
     )

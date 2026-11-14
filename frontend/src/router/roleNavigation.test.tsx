@@ -38,6 +38,7 @@ describe("role-owned addresses (IR-783)", () => {
     ["/rdco/role-requests", "Role Requests"],
     ["/rdco/download-requests", "Download Requests"],
     ["/rdco/delete-requests", "Delete Requests"],
+    ["/rdco/setup", "Setup"],
   ])("opens %s for RDCO", async (path, title) => {
     visit(path, ROLES.RDCO);
     expect(await screen.findByRole("heading", { level: 1, name: title })).toBeInTheDocument();
@@ -65,6 +66,9 @@ describe("role-owned addresses (IR-783)", () => {
     [ROLES.SYSTEM_ADMIN, "/rdco/role-requests", false],
     [ROLES.SYSTEM_ADMIN, "/rdco/download-requests", false],
     [ROLES.SYSTEM_ADMIN, "/rdco/delete-requests", false],
+    [ROLES.SYSTEM_ADMIN, "/rdco/setup", false],
+    [ROLES.ADVISER, "/rdco/setup", false],
+    [ROLES.KTTO, "/rdco/setup", false],
     [ROLES.SYSTEM_ADMIN, "/review", false],
     [ROLES.SYSTEM_ADMIN, "/review/analytics", false],
     [ROLES.SYSTEM_ADMIN, "/review", true],
