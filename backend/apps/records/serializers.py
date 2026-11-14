@@ -907,7 +907,7 @@ class DeleteRequestSerializer(serializers.ModelSerializer):
         fields = [
             "id", "record", "record_title",
             "requested_by", "requested_by_name", "requested_by_email",
-            "reason", "status", "reviewed_by", "reviewed_at", "created_at",
+            "reason", "status", "rdco_note", "reviewed_by", "reviewed_at", "created_at",
         ]
         read_only_fields = fields
 

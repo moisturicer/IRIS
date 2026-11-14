@@ -89,7 +89,7 @@ const DOWNLOAD_REQUEST = {
 const DELETE_REQUEST = {
   id: 1, record: 101, record_title: LONG_TITLE, requested_by: 11,
   requested_by_name: "Maria Cristina Dela Cruz-Santos", requested_by_email: "maria.cristina@students.cit.edu",
-  reason: "Submitted by mistake.", status: "pending", reviewed_by: null, reviewed_at: null, created_at: when("11-04"),
+  reason: "Submitted by mistake.", status: "pending", rdco_note: "", reviewed_by: null, reviewed_at: null, created_at: when("11-04"),
 };
 
 const DELETION_REQUEST = {
