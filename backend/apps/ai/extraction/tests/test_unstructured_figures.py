@@ -133,3 +133,9 @@ def test_the_builder_passes_both_bounds(settings):
     figures = adapter.extract(pdf_bytes(fixture), filename=fixture.filename).figures
 
     assert [f.name for f in figures] == ["a"]
+
+
+def test_an_image_that_is_not_its_stated_type_takes_no_slot_under_the_bound():
+    extra = [image("mislabelled", png(), mime="image/jpeg"), image("ok", png())]
+
+    assert [f.name for f in read(extra, max_figures=1).figures] == ["ok"]

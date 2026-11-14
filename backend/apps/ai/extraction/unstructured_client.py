@@ -236,19 +236,20 @@ def _figures(elements: list, document: NormalizedDocument, max_figures: int,
         if len(figures) == max_figures:
             logger.warning("more than %s figures; the rest are not kept", max_figures)
             break
-        data = _image_bytes(metadata["image_base64"], max_pixels, element.figure)
+        media_type = str(metadata.get("image_mime_type") or "")
+        data = _image_bytes(metadata["image_base64"], media_type, max_pixels, element.figure)
         if data is None:
             continue
         figures.append(FigureImage(
             page=element.page, bbox=_box(metadata, element.page),
-            media_type=str(metadata.get("image_mime_type") or ""), data=data,
+            media_type=media_type, data=data,
             caption=element.text or None, name=element.figure,
         ))
     return tuple(figures)
 
 
-def _image_bytes(encoded: str, max_pixels: int, name: str) -> Optional[bytes]:
-    """Decoded bytes, or ``None`` for an unreadable or oversized image.
+def _image_bytes(encoded: str, media_type: str, max_pixels: int, name: str) -> Optional[bytes]:
+    """Decoded bytes, or ``None`` for an unreadable, mislabelled or oversized image.
     Only the header is read, so an oversized image is never decoded."""
     from PIL import Image
 
@@ -256,8 +257,12 @@ def _image_bytes(encoded: str, max_pixels: int, name: str) -> Optional[bytes]:
         data = base64.b64decode(encoded, validate=True)
         with Image.open(BytesIO(data)) as image:
             width, height = image.size
+            actual = Image.MIME.get(image.format or "")
     except Exception:
         logger.warning("figure %s is not a readable image; not kept", name)
+        return None
+    if actual != media_type:
+        logger.warning("figure %s is %s, not the %s it claims; not kept", name, actual, media_type)
         return None
     if width * height > max_pixels:
         logger.warning("figure %s is %sx%s, over %s pixels; not kept", name, width, height, max_pixels)
