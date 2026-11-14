@@ -3,7 +3,7 @@
  * ProtectedRoute in router/index.tsx; the server refuses everyone else anyway.
  *
  * Backend endpoints:
- *   GET  /records/download-requests/                → list all requests
+ *   GET  /records/download-requests/                → the queue, 20 a page (?status=, ?page=)
  *   POST /records/download-requests/<id>/approve/   → approve (a time-limited grant)
  *   POST /records/download-requests/<id>/decline/   → decline, with a note
  *   POST /records/download-requests/<id>/revoke/    → end a live grant, with a note
@@ -11,13 +11,16 @@
  * Each row shows the reader's note and each grant's expiry. Declining and
  * revoking ask for a note the reader is sent (IR-688); approving takes none.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui";
+import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { LoadMore } from "@/components/shared/LoadMore";
 import { failureMessage } from "@/lib/readFailure";
+import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
 import { EmptyState }  from "@/components/shared/EmptyState";
@@ -58,32 +61,29 @@ function grantLine(req: DownloadRequest): string | null {
 }
 
 export default function DownloadRequestsPage() {
-  const [requests, setRequests] = useState<DownloadRequest[]>([]);
-  const [loading,  setLoading]  = useState(true);
   const [approving, setApproving] = useState<number | null>(null);
   const [noteAct,  setNoteAct]  = useState<NoteAct | null>(null);
   const [error,    setError]    = useState<string | null>(null);
-  /** The list itself failed (not an action on a row), so the banner offers Try again. */
-  const [loadFailed, setLoadFailed] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState<Filter>("pending");
 
-  const load = () => {
-    setLoading(true);
-    setError(null);
-    setLoadFailed(false);
-    const params: Record<string, unknown> = {};
-    if (filterStatus) params.status = filterStatus;
-    recordsApi.listDownloadRequests(params)
-      .then(({ data }) => setRequests(data.results ?? []))
-      .catch((err: unknown) => {
-        setLoadFailed(true);
-        setError(failureMessage(err, { lead: "The download requests didn't load." }));
-      })
-      .finally(() => setLoading(false));
-  };
+  // The API pages at 20; "Load more" reads the next page. Changing the filter
+  // cancels the read in flight and starts again from the first page (IR-914).
+  const read = usePagedRead(
+    (page, signal) =>
+      recordsApi
+        .listDownloadRequests({ ...(filterStatus ? { status: filterStatus } : {}), ...pageParam(page) }, { signal })
+        .then(({ data }) => toPage(data)),
+    [filterStatus],
+  );
+  const requests = read.rows;
+  const loading = read.status === "loading";
 
-  useEffect(load, [filterStatus]);
+  // Reading again also clears an earlier failed action, as it always has.
+  const load = () => {
+    setError(null);
+    read.retry();
+  };
 
   const handleApprove = async (id: number) => {
     if (!confirm("Approve this download request? The requester is told in-app and by email.")) return;
@@ -132,18 +132,25 @@ export default function DownloadRequestsPage() {
         </Button>
       </div>
 
-      {error && loadFailed ? (
-        <LoadFailedAlert message={error} onRetry={load} className="mb-4" />
-      ) : error && (
+      {error && (
         <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
           <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
           {error}
         </div>
       )}
+      {read.status === "failed" && (
+        <LoadFailedAlert
+          message={failureMessage(read.error, { lead: "The download requests didn't load." })}
+          onRetry={load}
+          className="mb-4"
+        />
+      )}
 
-      {loading ? (
+      {read.status === "interrupted" ? (
+        <InterruptedState what="download requests" onRetry={load} />
+      ) : loading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" onRetry={load} /></div>
-      ) : requests.length === 0 ? (
+      ) : read.status === "failed" ? null : requests.length === 0 ? (
         <EmptyState
           icon="fa-download"
           title="No download requests"
@@ -153,7 +160,7 @@ export default function DownloadRequestsPage() {
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
             <span className="text-small text-stone-500 font-medium">
-              {requests.length} request{requests.length !== 1 ? "s" : ""}
+              {requests.length} request{requests.length !== 1 ? "s" : ""}{read.hasMore ? " shown" : ""}
             </span>
           </div>
 
@@ -250,6 +257,13 @@ export default function DownloadRequestsPage() {
               </tbody>
             </table>
           </div>
+          <LoadMore
+            hasMore={read.hasMore}
+            error={read.moreError}
+            loading={read.loadingMore}
+            onLoadMore={read.loadMore}
+            className="border-t border-stone-100 px-4 py-3"
+          />
         </div>
       )}
 

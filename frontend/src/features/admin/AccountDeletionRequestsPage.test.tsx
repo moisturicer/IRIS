@@ -53,6 +53,82 @@ beforeEach(() => {
   rejectDeletion.mockReset();
 });
 
+describe("AccountDeletionRequestsPage paging (IR-1100)", () => {
+  const first = request({ id: 1, user: { id: 1, name: "First Page Person", email: "one@cit.edu", role: "Student" } });
+  const second = request({ id: 2, user: { id: 2, name: "Second Page Person", email: "two@cit.edu", role: "Student" } });
+
+  /** A server with more than one page of requests. */
+  function twoPages() {
+    deletionRequests.mockImplementation((opts?: { page?: number }) =>
+      Promise.resolve({
+        data: opts?.page === 2
+          ? { results: [second], next: null }
+          : { results: [first], next: "http://api/users/deletion-requests/?page=2" },
+      }),
+    );
+  }
+
+  it("offers Load more when the server has another page, and appends it", async () => {
+    twoPages();
+    renderScreen(<AccountDeletionRequestsPage />);
+    await screen.findByRole("listitem", { name: "First Page Person" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByRole("listitem", { name: "Second Page Person" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "First Page Person" })).toBeInTheDocument();
+    expect(deletionRequests.mock.calls.at(-1)?.[0]).toMatchObject({ page: 2 });
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("shows no Load more when everything fits on one page", async () => {
+    deletionRequests.mockResolvedValue({ data: { results: [first], next: null } });
+    renderScreen(<AccountDeletionRequestsPage />);
+    await screen.findByRole("listitem", { name: "First Page Person" });
+
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("starts again from the first page after a decision refreshes the list", async () => {
+    deletionRequests.mockImplementation((opts?: { page?: number }) =>
+      Promise.resolve({
+        data: opts?.page === 2
+          ? { results: [second], next: null }
+          : { results: [first], next: "http://api/users/deletion-requests/?page=2" },
+      }),
+    );
+    confirmDeletion.mockResolvedValue({ data: first });
+    renderScreen(<AccountDeletionRequestsPage />);
+    await screen.findByRole("listitem", { name: "First Page Person" });
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByRole("listitem", { name: "Second Page Person" });
+
+    await userEvent.click(within(screen.getByRole("listitem", { name: "First Page Person" }))
+      .getByRole("button", { name: "Confirm deletion" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete account" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("First Page Person's account was deleted.");
+    await waitFor(() => expect(screen.queryByRole("listitem", { name: "Second Page Person" })).not.toBeInTheDocument());
+    expect(await screen.findByRole("button", { name: "Load more" })).toBeInTheDocument();
+  });
+
+  it("says so when the next page cannot be read, and keeps what is shown", async () => {
+    deletionRequests.mockImplementation((opts?: { page?: number }) =>
+      opts?.page === 2
+        ? Promise.reject(new Error("boom"))
+        : Promise.resolve({ data: { results: [first], next: "http://api/?page=2" } }),
+    );
+    renderScreen(<AccountDeletionRequestsPage />);
+    await screen.findByRole("listitem", { name: "First Page Person" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load more/i);
+    expect(screen.getByRole("listitem", { name: "First Page Person" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
+  });
+});
+
 describe("AccountDeletionRequestsPage", () => {
   it("lists who asked and when, with nothing blocking, and passes axe", async () => {
     deletionRequests.mockResolvedValue({ data: { results: [request()] } });

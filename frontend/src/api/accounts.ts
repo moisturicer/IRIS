@@ -5,7 +5,7 @@ import type { NoticeAnswer } from "@/types/notice";
 interface College    { id: number; name: string; code: string; }
 interface Department { id: number; name: string; code: string; college: number; college_name: string; }
 interface Course     { id: number; name: string; department: number; }
-interface PaginatedResponse<T> { count: number; results: T[]; }
+interface PaginatedResponse<T> { count: number; next?: string | null; results: T[]; }
 
 export interface ActiveSession {
   jti:        string;
@@ -101,8 +101,11 @@ export const accountsApi = {
   unlockUser:  (id: number) => apiClient.post(`/users/${id}/unlock/`),
 
   // Account deletion (ADR-051 §8-§9). The System Admin alone.
-  deletionRequests: (opts?: { signal?: AbortSignal }) =>
-    apiClient.get<PaginatedResponse<AccountDeletionRequest>>("/users/deletion-requests/", { signal: opts?.signal }),
+  deletionRequests: (opts?: { signal?: AbortSignal; page?: number }) =>
+    apiClient.get<PaginatedResponse<AccountDeletionRequest>>("/users/deletion-requests/", {
+      params: opts?.page ? { page: opts.page } : undefined,
+      signal: opts?.signal,
+    }),
   confirmDeletion: (id: number) =>
     apiClient.post<AccountDeletionRequest>(`/users/deletion-requests/${id}/confirm/`, {}),
   rejectDeletion: (id: number, reason: string) =>
@@ -128,7 +131,11 @@ export const accountsApi = {
   downloadMyData: () => apiClient.get<Blob>("/users/me/data/", { responseType: "blob" }),
 
   // Role requests
-  roleRequests:  () => apiClient.get<PaginatedResponse<RoleRequest>>("/users/role-requests/"),
+  roleRequests:  (opts?: { signal?: AbortSignal; page?: number }) =>
+    apiClient.get<PaginatedResponse<RoleRequest>>("/users/role-requests/", {
+      params: opts?.page ? { page: opts.page } : undefined,
+      signal: opts?.signal,
+    }),
   decideRequest: (id: number, action: "approve" | "decline") =>
     apiClient.patch<RoleRequest>(`/users/role-requests/${id}/`, { action }),
 

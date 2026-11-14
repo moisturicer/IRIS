@@ -10,7 +10,7 @@
  * compares no role names. A decision the server refuses (someone else got
  * there first, or a blocker appeared) shows the server's own reason.
  *
- *   GET  /users/deletion-requests/
+ *   GET  /users/deletion-requests/               (paged; ?page=N)
  *   POST /users/deletion-requests/<id>/confirm/
  *   POST /users/deletion-requests/<id>/reject/   {reason}
  */
@@ -25,8 +25,9 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { LoadMore } from "@/components/shared/LoadMore";
 import { failureMessage } from "@/lib/readFailure";
-import { useApiRead } from "@/hooks/useApiRead";
+import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
 
@@ -168,11 +169,12 @@ function RequestCard({
 }
 
 export default function AccountDeletionRequestsPage() {
-  const read = useApiRead(
-    (signal) => accountsApi.deletionRequests({ signal }).then(({ data }) => data.results ?? []),
+  // The API pages; "Load more" reads the next page and appends it (IR-1100).
+  const read = usePagedRead(
+    (page, signal) => accountsApi.deletionRequests({ signal, ...pageParam(page) }).then(({ data }) => toPage(data)),
     [],
   );
-  const requests = read.data ?? [];
+  const requests = read.rows;
   const loading = read.status === "loading";
 
   const [confirming, setConfirming] = useState<AccountDeletionRequest | null>(null);
@@ -244,6 +246,15 @@ export default function AccountDeletionRequestsPage() {
             />
           ))}
         </ul>
+      )}
+      {requests.length > 0 && (
+        <LoadMore
+          hasMore={read.hasMore}
+          error={read.moreError}
+          loading={read.loadingMore}
+          onLoadMore={read.loadMore}
+          className="mt-4"
+        />
       )}
 
       <ConfirmDialog
