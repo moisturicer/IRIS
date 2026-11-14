@@ -1,5 +1,7 @@
 import React from "react";
 
+import { escapeRegExp } from "./discoverUtils";
+
 /**
  * Discover searches by word (IR-1095, spec §4.6). The catalogue endpoint
  * already requires every word it is given, in the title, abstract or authors;
@@ -8,12 +10,15 @@ import React from "react";
  * and the same words are what each card highlights.
  */
 
-/** Function words that say nothing about a paper's subject. */
+/**
+ * Function words that say nothing about a paper's subject. Words that can be
+ * a subject ("IT", "may", "will") are left out of the list.
+ */
 const STOPWORDS = new Set([
   "a", "an", "and", "are", "as", "at", "be", "been", "but", "by", "can", "could", "did", "do", "does",
-  "for", "from", "has", "have", "how", "if", "in", "into", "is", "it", "its", "may", "might", "of", "on",
+  "for", "from", "has", "have", "how", "if", "in", "into", "is", "its", "of", "on",
   "or", "should", "so", "that", "the", "their", "there", "these", "this", "those", "to", "was", "were",
-  "what", "when", "where", "which", "who", "whom", "whose", "why", "will", "with", "would",
+  "what", "when", "where", "which", "who", "whom", "whose", "why", "with", "would",
 ]);
 
 /** Words that open a question in a sentence typed into the search box. */
@@ -46,15 +51,11 @@ export function searchTerms(text: string): string[] {
  * a catalogue search such as "can opener" from being offered a chat.
  */
 export function looksLikeQuestion(text: string): boolean {
-  const typed = text.trim();
-  const list = words(typed);
-  if (list.length === 0) return false;
-  if (typed.endsWith("?")) return true;
-  return list.length >= 3 && QUESTION_WORDS.has(list[0].toLowerCase());
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const trimmed = text.trim();
+  const typedWords = words(trimmed);
+  if (typedWords.length === 0) return false;
+  if (trimmed.endsWith("?")) return true;
+  return typedWords.length >= 3 && QUESTION_WORDS.has(typedWords[0].toLowerCase());
 }
 
 /**

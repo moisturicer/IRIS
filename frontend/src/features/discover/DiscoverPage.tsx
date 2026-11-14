@@ -623,6 +623,9 @@ export default function DiscoverPage() {
     }
   };
 
+  /** Ask IRIS is offered for a question once its results are in, not while they load or if they failed. */
+  const suggestAsk = !holdQuietly && !loading && !failed && looksLikeQuestion(activeQuery);
+
   const research = (
     <>
       <div role="group" aria-label="Discover results" className="mt-4 inline-flex h-10 items-center rounded-lg border border-stone-200 bg-stone-100 p-0.5">
@@ -760,15 +763,8 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      <DiscoverPeopleResults query={activeQuery} preview onSeeAll={() => setDiscoverView("people")} />
-
-      <p aria-live="polite" className="sr-only">
-        {/* No count over an empty state: its own message already says so. */}
-        {loading || !totalCount ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
-      </p>
-
-      {/* A question gets one line, not a permanent one (IR-1095). */}
-      {!holdQuietly && looksLikeQuestion(activeQuery) && (
+      {/* A question gets one line above the results, not a permanent one (IR-1095). */}
+      {suggestAsk && (
         <p className="mt-4 text-small text-stone-700">
           This looks like a question.{" "}
           <Link to={ASK_PATH} state={askHandoffState(activeQuery)}
@@ -778,6 +774,13 @@ export default function DiscoverPage() {
           to get an answer from the research you can read.
         </p>
       )}
+
+      <DiscoverPeopleResults query={activeQuery} preview onSeeAll={() => setDiscoverView("people")} />
+
+      <p aria-live="polite" className="sr-only">
+        {/* No count over an empty state: its own message already says so. */}
+        {loading || !totalCount ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
+      </p>
 
       <div className="mt-4">
       {holdQuietly ? null : loading ? (
@@ -818,7 +821,8 @@ export default function DiscoverPage() {
                 <button type="button" onClick={clearFilters} className={cn(PILL_SECONDARY, FOCUS_RING)}>
                   Clear filters
                 </button>
-                {activeQuery && (
+                {/* A question already has its own line above; one offer is enough. */}
+                {activeQuery && !suggestAsk && (
                   <Link to={ASK_PATH} state={askHandoffState(activeQuery)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
                     Ask IRIS instead
                   </Link>

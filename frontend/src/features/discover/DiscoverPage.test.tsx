@@ -1410,6 +1410,15 @@ describe("a question is offered Ask IRIS (IR-1095)", () => {
     expect(screen.getByRole("status", { name: "Ask probe" })).toHaveTextContent("ask:flood");
   });
 
+  it("offers one link, not two, when a question finds nothing", async () => {
+    listed = [];
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+
+    await screen.findByRole("heading", { name: "No research matches these filters" });
+    expect(screen.getAllByRole("link", { name: /Ask IRIS/ })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Ask IRIS this question" })).toBeInTheDocument();
+  });
+
   it("does not offer it over the empty state of a filter-only view", async () => {
     listed = [];
     renderDiscover("/?type=2");

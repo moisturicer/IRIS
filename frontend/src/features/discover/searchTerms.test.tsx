@@ -23,6 +23,10 @@ describe("searchTerms", () => {
     expect(searchTerms("how to be")).toEqual(["how", "to", "be"]);
   });
 
+  it("keeps a word that is also a subject, such as IT", () => {
+    expect(searchTerms("IT governance")).toEqual(["it", "governance"]);
+  });
+
   it("is empty for blank text", () => {
     expect(searchTerms("  ")).toEqual([]);
   });
