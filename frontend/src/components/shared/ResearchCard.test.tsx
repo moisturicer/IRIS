@@ -98,6 +98,14 @@ describe("ResearchCard", () => {
     expect(title.className).not.toMatch(/(^|\s)focus-visible:ring-2/);
   });
 
+  it("shows a caller's marked-up title in the link and keeps the plain title as its name", () => {
+    renderScreen(<ResearchCard href="/records/7" title="Rainfall and Dengue" titleContent={<>Rainfall and <mark>Dengue</mark></>} />);
+
+    const link = screen.getByRole("link", { name: "Rainfall and Dengue" });
+    expect(link.querySelector("mark")).toHaveTextContent("Dengue");
+    expect(screen.getByRole("article", { name: "Rainfall and Dengue" })).toBeInTheDocument();
+  });
+
   it("renders a bare record, title only, without empty slots", async () => {
     const { container } = renderScreen(<ResearchCard href="/records/7" title="Untitled draft" />);
 

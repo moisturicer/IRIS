@@ -55,6 +55,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
       layout="grid"
       href={`/records/${record.id}`}
       title={record.title}
+      titleContent={highlightTerms(record.title, searchHighlight)}
       eyebrow={
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           {record.classification_name && <span className="text-brand">{record.classification_name}</span>}

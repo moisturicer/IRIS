@@ -38,6 +38,9 @@ describe("looksLikeQuestion", () => {
     "dengue forecasting?",
     "How does rainfall affect flooding in Cebu",
     "what research explores flood resilience",
+    // Any search that opens with a question word, as the ticket words it.
+    "can opener",
+    "why dengue",
   ])("is true for %s", (text) => {
     expect(looksLikeQuestion(text)).toBe(true);
   });
@@ -48,9 +51,9 @@ describe("looksLikeQuestion", () => {
     "",
     "?",
     "  ",
-    // One question word on its own, or a stray two-word search, is a catalogue search.
+    // A question word on its own is not a question.
     "how",
-    "can opener",
+    "Which",
   ])("is false for %j", (text) => {
     expect(looksLikeQuestion(text)).toBe(false);
   });

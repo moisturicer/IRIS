@@ -49,7 +49,7 @@ import {
   writeDiscoverQuery,
   type DiscoverQuery,
 } from "./discoverQuery";
-import { looksLikeQuestion } from "./searchTerms";
+import { looksLikeQuestion, searchTerms } from "./searchTerms";
 
 const PAGE_SIZE = 12;
 const COLUMNS_KEY = "iris.discover.columns";
@@ -623,6 +623,9 @@ export default function DiscoverPage() {
     }
   };
 
+  /** People are searched by the same content words as papers. */
+  const peopleQuery = useMemo(() => searchTerms(activeQuery).join(" "), [activeQuery]);
+
   /** Ask IRIS is offered for a question once its results are in, not while they load or if they failed. */
   const suggestAsk = !holdQuietly && !loading && !failed && looksLikeQuestion(activeQuery);
 
@@ -636,7 +639,7 @@ export default function DiscoverPage() {
           </button>
         ))}
       </div>
-      {discoverView === "people" ? <DiscoverPeopleResults query={activeQuery} /> : (
+      {discoverView === "people" ? <DiscoverPeopleResults query={peopleQuery} /> : (
       <>
       <div className="mt-4 flex flex-wrap items-center gap-1.5 sm:gap-2">
         <div role="group" aria-label="Discover feed" className="inline-flex h-11 shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0.5 shadow-[inset_0_1px_2px_rgb(41_37_36/0.12)]">
@@ -775,7 +778,7 @@ export default function DiscoverPage() {
         </p>
       )}
 
-      <DiscoverPeopleResults query={activeQuery} preview onSeeAll={() => setDiscoverView("people")} />
+      <DiscoverPeopleResults query={peopleQuery} preview onSeeAll={() => setDiscoverView("people")} />
 
       <p aria-live="polite" className="sr-only">
         {/* No count over an empty state: its own message already says so. */}

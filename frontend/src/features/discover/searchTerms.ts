@@ -49,15 +49,15 @@ export function searchTerms(text: string): string[] {
 
 /**
  * Whether a search reads as a question for Ask IRIS: it ends in "?", or opens
- * with a question word and runs to at least three words. The length rule keeps
- * a catalogue search such as "can opener" from being offered a chat.
+ * with a question word and has at least one more word after it (a question word
+ * alone is not a question).
  */
 export function looksLikeQuestion(text: string): boolean {
   const trimmed = text.trim();
   const typedWords = words(trimmed);
   if (typedWords.length === 0) return false;
   if (trimmed.endsWith("?")) return true;
-  return typedWords.length >= 3 && QUESTION_WORDS.has(typedWords[0].toLowerCase());
+  return typedWords.length >= 2 && QUESTION_WORDS.has(typedWords[0].toLowerCase());
 }
 
 /**

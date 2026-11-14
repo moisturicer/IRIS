@@ -1427,6 +1427,23 @@ describe("a question is offered Ask IRIS (IR-1095)", () => {
     expect(screen.queryByRole("link", { name: /Ask IRIS/ })).not.toBeInTheDocument();
   });
 
+  it("searches People by the same content words as papers", async () => {
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+    await screen.findByText(publishedThesis.title);
+
+    await waitFor(() => expect(peopleApi.search).toHaveBeenCalledWith(expect.objectContaining({ q: "weather data forecast dengue" })));
+  });
+
+  it("highlights matched words in the title too, without changing the card's name", async () => {
+    localStorage.setItem("iris.discover.columns", "2");
+    listed = [listItem({ id: 9, title: "Rainfall and Dengue in Cebu", abstract: "No overlap here." })];
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+
+    const card = await screen.findByRole("article", { name: "Rainfall and Dengue in Cebu" });
+    const link = within(card).getByRole("link", { name: "Rainfall and Dengue in Cebu" });
+    expect([...link.querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["Dengue"]);
+  });
+
   it("highlights each matched word in a card, not only the whole phrase", async () => {
     localStorage.setItem("iris.discover.columns", "2");
     listed = [listItem({ id: 8, title: "Rainfall and Dengue", abstract: "Dengue cases follow weather patterns in Cebu." })];
@@ -1434,6 +1451,7 @@ describe("a question is offered Ask IRIS (IR-1095)", () => {
 
     const card = await screen.findByRole("article", { name: "Rainfall and Dengue" });
     const marked = [...card.querySelectorAll("mark")].map((m) => m.textContent);
-    expect(marked).toEqual(["Dengue", "weather"]);
+    // The title, then the abstract.
+    expect(marked).toEqual(["Dengue", "Dengue", "weather"]);
   });
 });
