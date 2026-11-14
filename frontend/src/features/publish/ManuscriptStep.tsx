@@ -16,6 +16,7 @@ import type { ManuscriptMatch } from "@/api/records";
 import { Link } from "react-router-dom";
 
 import { typeKey } from "./draft";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 /** The same limit `SubmitDocumentView` and the serializer enforce (50 MB). */
 export const MANUSCRIPT_MAX_BYTES = 50 * 1024 * 1024;
@@ -97,7 +98,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
                 className={cn(
                   "flex cursor-pointer items-start gap-3 rounded-xl border p-card-compact transition-colors duration-150 motion-reduce:transition-none",
                   "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand has-[:focus-visible]:ring-offset-2",
-                  checked ? "border-brand bg-brand-50" : "border-stone-200 bg-white hover:border-stone-400",
+                  checked ? SELECTED : "border-stone-200 bg-white hover:border-stone-400",
                   uploading && "cursor-not-allowed opacity-60",
                 )}
               >
@@ -127,7 +128,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
 
       <section aria-labelledby="publish-manuscript-heading">
         {exactMatches.length > 0 && (
-          <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+          <div role="alert" className="rounded-lg border border-stone-300 bg-surface p-4">
             <p className="font-semibold">This manuscript is already attached to a record you can read.</p>
             <ul className="mt-2 space-y-2">
               {exactMatches.map((match) => <li key={match.id}>

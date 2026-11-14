@@ -175,35 +175,43 @@
 }
 
 /* Find's matches (IR-353), marked inside the spans so they follow the text
-   at any zoom. Yellow, then orange for the current one, as a browser's find
-   marks them -- apart from a citation's maroon-ringed passage, which draws
-   above the text layer and stays visible over them. */
+   at any zoom. The match highlighter (#f7e08f), then the stronger #f2c94c
+   for the current one (IR-1097, D6), apart from a citation's maroon-ringed
+   passage, which draws above the text layer and stays visible over them. The
+   text is drawn on the canvas beneath and this layer is transparent, so the
+   fill multiplies into the page: the words stay Ink on yellow (14:1). */
 .textLayer mark.find-hit {
   position: static;
   color: transparent;
-  background-color: rgb(250 204 21 / 0.4);
+  background-color: #f7e08f;
+  mix-blend-mode: multiply;
   border-radius: 2px;
 }
 
 .textLayer mark.find-hit-current {
-  background-color: rgb(234 88 12 / 0.45);
-  outline: 2px solid rgb(234 88 12 / 0.85);
+  background-color: #f2c94c;
+  outline: 2px solid #1c1917;
   outline-offset: 1px;
 }
 
-/* Review threads' passages (IR-875): the prototype's wash with a thread
-   underline; a draft is the wash alone, dashed. Drawn over the text layer
-   without taking its pointer, so the words stay selectable. */
+/* Review threads' passages (IR-875, IR-1097): the reviewer's pen. A rose fill
+   (#fbeaea) with a 2 px pen underline (#b4474b, 5.3:1 on white); the open
+   thread's passage is stronger (#f5d5d6); a draft is the fill alone, dashed.
+   Drawn over the text layer without taking its pointer, so the words stay
+   selectable. */
 .thread-mark {
-  background-color: rgb(253 242 242 / 0.55);
-  box-shadow: inset 0 -2px 0 #f9b8b9;
+  background-color: #fbeaea;
+  box-shadow: inset 0 -2px 0 #b4474b;
   mix-blend-mode: multiply;
 }
 
+.thread-mark-open {
+  background-color: #f5d5d6;
+}
+
 .thread-mark-pending {
-  background-color: rgb(253 242 242 / 0.45);
-  box-shadow: inset 0 -2px 0 rgb(249 184 185 / 0.7);
-  border-bottom: 1px dashed #8b1d22;
+  background-color: #fbeaea;
+  border-bottom: 2px dashed #b4474b;
   mix-blend-mode: multiply;
 }
 

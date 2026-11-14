@@ -5,7 +5,6 @@ colors:
   binding-maroon: "#6B0F12"
   binding-maroon-light: "#8B1316"
   binding-maroon-dark: "#4A0A0C"
-  maroon-wash: "#fdf2f2"
   maroon-thread: "#f9b8b9"
   endpaper: "#fafaf9"
   page-white: "#ffffff"
@@ -16,7 +15,8 @@ colors:
   quiet-ink: "#57534e"
   body-ink: "#44403c"
   ink: "#1c1917"
-  # Decided 2026-11-14 (IR-1072), not built: values are the prototype's, iris-uiux-audit/prototype/styles.css.
+  # Decided 2026-11-14 (IR-1072); fields and the control step are not built yet, the highlight tokens are (IR-1097).
+  # Values are the prototype's, iris-uiux-audit/prototype/styles.css. Maroon Wash (#fdf2f2) is retired.
   field-stone: "#8f8884"
   highlight-yellow: "#f7e08f"
   highlight-yellow-now: "#f2c94c"
@@ -95,8 +95,8 @@ components:
     rounded: "{rounded.control}"
     height: "36px"
   control-on:
-    backgroundColor: "{colors.maroon-wash}"
-    textColor: "{colors.binding-maroon}"
+    backgroundColor: "{colors.page-white}"
+    textColor: "{colors.ink}"
     typography: "{typography.label}"
     rounded: "{rounded.control}"
     height: "36px"
@@ -128,7 +128,7 @@ components:
     rounded: "{rounded.pill}"
     padding: "4px 10px"
   citation-page:
-    backgroundColor: "{colors.maroon-wash}"
+    backgroundColor: "{colors.page-white}"
     textColor: "{colors.binding-maroon}"
     rounded: "{rounded.thumb}"
     padding: "0 6px"
@@ -144,8 +144,8 @@ components:
     rounded: "{rounded.sheet}"
     padding: "8px 8px 8px 16px"
   profile-avatar:
-    backgroundColor: "{colors.maroon-wash}"
-    textColor: "{colors.binding-maroon}"
+    backgroundColor: "{colors.binding-maroon}"
+    textColor: "{colors.page-white}"
     rounded: "{rounded.pill}"
     size: "112px"
   entry-masthead:
@@ -178,7 +178,7 @@ Decided by **Lee Jasmin Adolfo** (project lead and frontend owner) on 2026-11-14
 - **D1, fields and controls (IR-1074).** Every input, select, textarea and checkbox is outlined in **Field Stone** (#8f8884, 3.49:1 on white, WCAG 1.4.11). Rule Stone stays only on decorative chips and cards. Form fields and page buttons gain a **14/20 `control`** type step; the reader toolbar's reading controls stay 13 px. Placeholders and helper text are Quiet Ink (#57534e).
 - **D4, Discover layout (IR-1082).** The **1 / 2 / 3 column toggle stays**, at Jive's preference: one cycling icon button, hidden below `xl`, at the toolbar's one control height. The **96 px outline thumbnail** replaces the abstract-preview panel in 1 column only; the 2 and 3 column cards are text only.
 - **D5, navigation (IR-1085) — built.** **Office console and Analytics nest under My Reviews**, only for the roles that already have them. Their current URLs keep working. The sidebar lists them from `SCREEN_ACCESS` (`parent: "reviewQueue"`), the console for a coordinator only.
-- **D6, highlight roles (IR-1097).** Each kind of highlight has one look, and no look means two things. Values are the prototype's:
+- **D6, highlight roles (IR-1097) — built.** Each kind of highlight has one look, and no look means two things. Values are the prototype's:
 
   | Role | Look |
   |---|---|
@@ -190,7 +190,7 @@ Decided by **Lee Jasmin Adolfo** (project lead and frontend owner) on 2026-11-14
   | Pen (a reviewer's mark) | **Pen Rose**: fill #fbeaea, 2 px underline #b4474b, a numbered pin; the open thread's passage #f5d5d6 |
   | Status | White chip, tone in text and outline; only Attention is filled |
 
-  **Maroon Wash (#fdf2f2) is retired from the interface** and stops being the "on" tint. **Maroon Press** (#5a0c0f) is the pressed state of a filled button. Yellow is reserved for matches and rose for a reviewer's marks, and nothing else uses either. The **Four Inks Rule** becomes: white, black, stone and maroon, plus one yellow highlighter for matches and one rose pen for a reviewer's marks. `palette.test.ts` blocks Tailwind hue classes, so the tokens are added there and in `tailwind.config.js` in the same change as IR-1097, which is also the change that edits this file's rules below.
+  **Maroon Wash (#fdf2f2) is retired from the interface** and stops being the "on" tint. **Maroon Press** (#5a0c0f) is the pressed state of a filled button. Yellow is reserved for matches and rose for a reviewer's marks, and nothing else uses either. The **Four Inks Rule** becomes: white, black, stone and maroon, plus one yellow highlighter for matches and one rose pen for a reviewer's marks. The tokens are `hl`, `hl-now`, `pen`, `pen-wash`, `pen-now` and `brand-press` in `tailwind.config.js`, and the roles are class strings in `frontend/src/components/ui/highlightRoles.ts`. `palette.test.ts` keeps `brand-50`, `brand-100`, `brand-200`, gold, cream and the loose hexes out of the source. IR-1097 also edited this file's rules below.
 
 ## Overview
 
@@ -218,8 +218,10 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 - **Binding Maroon** (#6B0F12): the institution's identity. The one filled action in a row (View, Continue, Send), the selected section thumb, the Ask IRIS icon, error and rejection states, and the focus ring. 12.3:1 on white.
 - **Binding Maroon Light** (#8B1316): hover on maroon fills only.
 - **Binding Maroon Dark** (#4A0A0C): destructive actions (with a warning glyph) and dark accents.
-- **Maroon Wash** (#fdf2f2): the "on" tint. A switched-on control, the scope chip, a page citation, an *active* status chip, a search highlight.
-- **Maroon Thread** (#f9b8b9): the outline drawn around a Maroon Wash fill.
+- **Maroon Thread** (#f9b8b9): the browser's text selection. **Maroon Wash (#fdf2f2) is retired** (IR-1097): the "on" tint did about fifteen jobs, and each now has its own look (see Decided changes, D6).
+- **Maroon Press** (#5a0c0f): the pressed state of a filled maroon button.
+- **Highlight Yellow** (#f7e08f, current match #f2c94c): a word a search or Find matched, and nothing else. Ink on it is 14:1.
+- **Pen Rose** (underline #b4474b, fill #fbeaea, open thread #f5d5d6): a reviewer's mark on a passage, and nothing else.
 
 ### Neutral
 - **Endpaper** (#fafaf9): the ground under every screen (`canvas`), and the ground the Overview and the Ask IRIS panel sit on.
@@ -235,9 +237,9 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 ### Named Rules
 **The Binding Rule.** Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong.
 
-**The Four Inks Rule.** The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).
+**The Four Inks Rule.** The palette is white, black, stone and maroon (light, dark and press), plus one yellow highlighter for matches and one rose pen for a reviewer's marks. `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).
 
-Gold (`gold.DEFAULT`, about 2.8:1 on white) stays decorative. It is never text or the only status signal, and the Folio Ribbon logo does not use it.
+Gold and cream are gone (IR-1097): the thumbnail ring and the other decoration were off palette, and the Folio Ribbon logo never used them.
 
 **The One Bright Object Rule.** On the reading surfaces, only the thing being read is white. Bars, toolbars and headers around it are stone.
 
@@ -298,7 +300,7 @@ Gently rounded and consistent. Controls and fields take one radius (0.75 rem); p
 Quiet and exact.
 - **Page actions** (View, Save, Cite, Share, Edit details): 44 px full pills, 20 px side padding, 14 px semibold. **One** Binding Maroon fill per row (View where there is a paper, otherwise Save; Continue or Open review when those are the viewer's job); the rest have no fill and a Rule Stone outline that turns maroon on hover.
 - The shared implementations are `PILL_PRIMARY` and `PILL_SECONDARY` in `frontend/src/components/ui/pillStyles.ts`; Danger uses `brand-dark` with a warning glyph.
-- **Reading controls** (record bar, reader toolbar, Ask IRIS): 44 px on touch and 36 px beside a pointer, 0.75 rem radius, 13 px semibold. Three states: outlined at rest, Maroon Wash when on, and the one filled control (Send).
+- **Reading controls** (record bar, reader toolbar, Ask IRIS): 44 px on touch and 36 px beside a pointer, 0.75 rem radius, 13 px semibold. Three states: outlined at rest, an Ink outline on white when on, and the one filled control (Send).
 - **Ghost** (Copy on the AI Overview, Close): no outline, Faint Ink, a Bar Stone wash and Ink text on hover.
 - **Focus:** a 2 px Binding Maroon ring with an offset on every interactive element (`FOCUS_RING` in `frontend/src/components/ui/interaction.ts`). That file also defines `COLOUR_TRANSITION` for the 150 ms hover/focus fade.
 
@@ -312,11 +314,11 @@ The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone
 ### Chips
 - **Meta chips** (record type, classification, flags): full pills, no fill, Rule Stone outline, 13 px semibold Body Ink.
 - **Author chips:** white pills with a Desk Stone outline and a 24 px maroon initials disc.
-- **Status:** `TONES` in `frontend/src/components/ui/statusTones.ts` defines four tones only. *Quiet* is unfilled with a stone outline, *active* uses Maroon Wash, *attention* is solid maroon, and *settled* is solid Ink. Each carries its word, and stopping states also carry an icon.
-- **Scope chip** ("This paper" / "All papers") in the composer: Maroon Wash with a maroon dot; filled maroon when widened to all papers.
+- **Status:** `TONES` in `frontend/src/components/ui/statusTones.ts` defines four tones only. *Quiet* is unfilled with a stone outline, *active* is white with maroon text and a Rule Stone outline, *attention* is solid maroon (the only filled tone), and *settled* is an Ink outline on white. Each carries its word, and stopping states also carry an icon.
+- **Scope chip** ("This paper" / "All papers") in the composer: white with a Rule Stone outline and a maroon dot; filled maroon when widened to all papers.
 
 ### Citations
-In the AI Overview a citation is the page it cites: "p8", 12 px semibold maroon on a Maroon Wash, at the baseline of the text, linking to that page. Chat citations stay small numbered markers: 12 px semibold maroon on a Maroon Wash square, and the same numbers appear on the answer's sources button.
+In the AI Overview a citation is the page it cites: "p8", 12 px semibold maroon on white with a Rule Stone hairline, at the baseline of the text, linking to that page. Chat citations stay small numbered markers: 12 px semibold maroon on a white square with a Rule Stone hairline, and the same numbers appear on the answer's sources button.
 
 ### Inputs / Fields
 A white field with a Rule Stone outline and the control radius. Focus darkens the outline to maroon with a soft maroon ring. A disabled field sits on Endpaper with a not-allowed cursor and says why beside it. Paper Chat's composer holds the scope chip and Send inside its field. The Ask IRIS page's composer is one line that grows with the question up to a cap, over a row of round icon controls (attach, closed until uploads exist; compare) and a Bar Stone settings pill whose menu offers only what the server supports. Send is Bar Stone until there is something to send.
@@ -343,7 +345,7 @@ Sign in, register, email verification and the pending and declined screens share
 Replaced the split screen with its "shelf of bound work" brand panel (IR-535, IR-586), deleted in IR-711.
 
 ### Profile and Settings (IR-933)
-Two pages. **Profile** reads like a short typeset entry: an initials avatar (112 px, Maroon Wash with maroon Garamond initials) or the person's photo beside a Garamond name, the role and the affiliation, then About and Research interests, each under one hairline. A field left empty is left out. On your own profile a Bar Stone **note** strip says this is how others see you and holds the page's one filled pill, Edit profile. **Edit profile** is the same sections as fields, closed by Cancel and Save, and returns to Profile with a "Profile saved." line. **Settings** holds the account only: sign-in and password, consent, and role.
+Two pages. **Profile** reads like a short typeset entry: an initials avatar (112 px, maroon with white Garamond initials) or the person's photo beside a Garamond name, the role and the affiliation, then About and Research interests, each under one hairline. A field left empty is left out. On your own profile a Bar Stone **note** strip says this is how others see you and holds the page's one filled pill, Edit profile. **Edit profile** is the same sections as fields, closed by Cancel and Save, and returns to Profile with a "Profile saved." line. **Settings** holds the account only: sign-in and password, consent, and role.
 
 ### Another person's Profile (IR-700)
 The same typeset entry as your own, at `/people/:id`, with a second column. **Collaborators** (a 40 px avatar, a name link and "N shared papers") sit beside the sections once the page's own width reaches 48rem, behind one vertical hairline, and fall under them behind the same hairline laid flat; the layout reads the `profile` container, never the window. Research and Advised are compact `ResearchCard`s with only their own views, ten at a time with Show more, and Collaborators load twelve at a time. There are no totals, no citation counts and no email; a section with nothing in it is left out. A name with no visible Profile is plain text, and a hidden person is the standard not-found screen.

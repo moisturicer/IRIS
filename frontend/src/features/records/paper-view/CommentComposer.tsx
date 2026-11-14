@@ -90,7 +90,7 @@ export function CommentComposer({
           type="submit"
           disabled={!canPost}
           aria-label={submitLabel}
-          className="absolute bottom-0 right-0 inline-flex h-11 w-11 items-center justify-center rounded-full text-brand transition-colors duration-150 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:text-stone-500 disabled:hover:bg-transparent motion-reduce:transition-none reading-split:h-10 reading-split:w-10"
+          className="absolute bottom-0 right-0 inline-flex h-11 w-11 items-center justify-center rounded-full text-brand transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:text-stone-500 disabled:hover:bg-transparent motion-reduce:transition-none reading-split:h-10 reading-split:w-10"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
             <path d="M22 2 11 13" />

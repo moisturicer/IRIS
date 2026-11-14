@@ -62,7 +62,7 @@ export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) =
       ) : (
         <span
           aria-hidden
-          className="w-20 h-20 rounded-full grid place-items-center bg-brand-50 text-brand text-title font-semibold"
+          className="w-20 h-20 rounded-full grid place-items-center bg-brand text-white text-title font-semibold"
         >
           {initials}
         </span>

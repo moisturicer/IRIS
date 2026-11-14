@@ -77,7 +77,7 @@ export function ReadingHeader({
           type="button"
           onClick={onBackToAnswer}
           className={cn(
-            "shrink-0 inline-flex items-center gap-1.5 px-2 text-small font-semibold text-brand hover:bg-brand-50",
+            "shrink-0 inline-flex items-center gap-1.5 px-2 text-small font-semibold text-brand hover:bg-stone-100",
             CONTROL_SIZE,
             CONTROL_SHAPE,
             FOCUS_RING,

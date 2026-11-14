@@ -1,5 +1,6 @@
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
+import { SELECTED_RING } from "@/components/ui/highlightRoles";
 
 interface FilterChipsProps<T extends string> {
   label:    string;
@@ -10,7 +11,7 @@ interface FilterChipsProps<T extends string> {
 
 /**
  * A row of filter controls (DESIGN.md control-outline / control-on): 36 px,
- * the control radius, Maroon Wash when on. A plain group of toggle buttons,
+ * the control radius, an Ink outline when on (IR-1097). A plain group of toggle buttons,
  * so a screen reader hears which one is pressed.
  */
 export function FilterChips<T extends string>({ label, options, value, onChange }: FilterChipsProps<T>) {
@@ -28,7 +29,7 @@ export function FilterChips<T extends string>({ label, options, value, onChange 
               "min-h-9 rounded-lg px-3 text-small font-semibold",
               COLOUR_TRANSITION,
               FOCUS_RING,
-              on ? "bg-brand-50 text-brand ring-1 ring-brand-200" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
+              on ? SELECTED_RING : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
             )}
           >
             {option.label}

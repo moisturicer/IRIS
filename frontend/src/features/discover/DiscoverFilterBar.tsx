@@ -4,6 +4,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
 import { ALL_VALUE, DiscoverFilterDropdown, type FilterOption } from "./DiscoverFilterDropdown";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 /**
  * What Discover is narrowed by (spec §4.3). Each field maps to a query param
@@ -178,7 +179,7 @@ export function DiscoverFilterBar({
             "relative inline-flex h-11 w-11 sm:w-auto sm:px-3 items-center justify-center gap-2 rounded-lg border text-small font-medium",
             COLOUR_TRANSITION,
             FOCUS_RING,
-            count > 0 ? "bg-brand-50 border-brand text-brand" : "bg-white border-stone-300 text-stone-700",
+            count > 0 ? SELECTED : "bg-white border-stone-300 text-stone-700",
           )}
         >
           <i className="fas fa-sliders text-[12px]" aria-hidden />

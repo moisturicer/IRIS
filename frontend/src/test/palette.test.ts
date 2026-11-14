@@ -8,9 +8,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { offGreyClasses, offPaletteClasses, seeThroughWhiteClasses } from "./palette";
+import { offGreyClasses, offPaletteClasses, retiredTintClasses, seeThroughWhiteClasses, strayHexes } from "./palette";
 
 const THIS_FILE = "src/test/palette.test.ts";
+
+/**
+ * The retired-tint and stray-hex guards read shipped source only: a test names
+ * a retired class or hex on purpose, as a fixture or to assert it is gone.
+ */
+const TEST_FILE = /\.test\.tsx?$/;
 
 /** Every source file, keyed `src/...`, read as text. */
 const SOURCES: Record<string, string> = Object.fromEntries(
@@ -78,6 +84,41 @@ describe("what counts as a second grey or a see-through white (IR-558)", () => {
   });
 });
 
+describe("what counts as a retired highlight tint (IR-1097, D6)", () => {
+  it("catches Maroon Wash, its pinker neighbours, gold and cream on any colour utility", () => {
+    expect(
+      retiredTintClasses(
+        'className="bg-brand-50 hover:bg-brand-100 ring-brand-200 md:border-t-gold bg-brand-50/40 text-gold-dark bg-cream"',
+      ),
+    ).toEqual(["bg-brand-50", "bg-brand-100", "ring-brand-200", "border-t-gold", "text-gold-dark", "bg-cream"]);
+  });
+
+  it("catches maroon at 5 or 10 percent, the wash made by opacity, and lets stronger focus rings through", () => {
+    expect(retiredTintClasses("bg-brand/5 bg-brand/10 border-brand/10 ring-brand/40 bg-brand/15 hover:bg-brand/30")).toEqual([
+      "bg-brand/5", "bg-brand/10", "border-brand/10",
+    ]);
+  });
+
+  it("lets maroon, its darker shades, the new highlight tokens and a word containing a tint through", () => {
+    expect(
+      retiredTintClasses(
+        "bg-brand text-brand-light bg-brand-dark bg-brand-press ring-brand/40 bg-brand-700 " +
+        "bg-hl bg-hl-now bg-pen-wash bg-pen-now decoration-pen bg-stone-200 goldfish-100 bg-brand-500x",
+      ),
+    ).toEqual([]);
+  });
+
+  it("catches the loose hexes the audit found, and the wash, in any case", () => {
+    expect(strayHexes("a { color: #FBE4E4; } b { fill: #fcfcfb } c { x: #5a0c0f; y: #fdf2f2 }")).toEqual([
+      "#fbe4e4", "#fcfcfb", "#5a0c0f", "#fdf2f2",
+    ]);
+  });
+
+  it("lets the thread rose, the highlights and a longer hex through", () => {
+    expect(strayHexes("#f9b8b9 #f7e08f #f2c94c #b4474b #fbeaea #f5d5d6 #fdf2f2a0")).toEqual([]);
+  });
+});
+
 describe("the palette guard", () => {
   it("reads the whole source tree, not an empty one", () => {
     // A broken glob would make the guards below pass by reading nothing.
@@ -112,6 +153,37 @@ describe("the palette guard", () => {
     expect(
       offenders,
       "gray and slate are a second grey beside stone (01-design-system.md section 0). Write stone.",
+    ).toEqual({});
+  });
+
+  it("finds no retired highlight tint anywhere in frontend source", () => {
+    const offenders = Object.fromEntries(
+      Object.entries(SOURCES)
+        .filter(([path]) => path !== THIS_FILE && !TEST_FILE.test(path))
+        .map(([path, source]) => [path, retiredTintClasses(source)])
+        .filter(([, classes]) => classes.length > 0),
+    );
+
+    expect(
+      offenders,
+      "Maroon Wash, brand-100, brand-200, gold and cream are retired (DESIGN.md, D6). Pick the role: " +
+      "here, selected, reference, notice or status from components/ui/highlightRoles.ts, or the " +
+      "match and pen tokens (hl, hl-now, pen, pen-wash, pen-now).",
+    ).toEqual({});
+  });
+
+  it("finds no stray or retired hex anywhere in frontend source", () => {
+    const offenders = Object.fromEntries(
+      Object.entries(SOURCES)
+        .filter(([path]) => path !== THIS_FILE && !TEST_FILE.test(path))
+        .map(([path, source]) => [path, strayHexes(source)])
+        .filter(([, hexes]) => hexes.length > 0),
+    );
+
+    expect(
+      offenders,
+      "#fbe4e4, #fcfcfb, #5a0c0f and the wash #fdf2f2 are loose or retired. Use a token from " +
+      "tailwind.config.js (brand-press for a pressed filled button).",
     ).toEqual({});
   });
 

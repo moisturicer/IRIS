@@ -66,7 +66,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
         t.root.severity ? SEVERITY_WORDS[t.root.severity] : null]
         .filter(Boolean).join(", ");
       return { key: `t${t.root.id}`, pin: t.pin, version: a.version, regions: a.regions, label, pending,
-        onActivate: () => openThread(t) };
+        open: focus?.id === t.root.id, onActivate: () => openThread(t) };
     };
     return {
       currentVersion,
@@ -84,7 +84,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     };
     // `openThread` and `showThreads` only set state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threads.sent, threads.drafts, can, currentVersion, landing]);
+  }, [threads.sent, threads.drafts, can, currentVersion, landing, focus]);
 
   const panel: ReviewThreadsProps = {
     recordId: record.id, can, threads,

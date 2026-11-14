@@ -381,7 +381,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
               if (!activeRun(current) && !showDraft) return null;
               const active = activeRun(current);
               return <div className={cn("flex", dense ? "gap-2.5" : "gap-3")}>
-                <div className={cn("rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand", dense ? "w-7 h-7" : "w-8 h-8")}>
+                <div className={cn("rounded-full shrink-0 flex items-center justify-center bg-stone-100 text-brand", dense ? "w-7 h-7" : "w-8 h-8")}>
                   <AskIrisMark className={dense ? "w-4 h-4" : "w-[18px] h-[18px]"} />
                 </div>
                 <div className="min-w-0 flex-1">

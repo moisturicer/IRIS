@@ -3,6 +3,7 @@ import React from "react";
 import { parseISO, isValid, format } from "date-fns";
 import type { Author, RecordListItem } from "@/types/records";
 import { IP_TYPE_LABELS, type IpType } from "@/types/records";
+import { MATCH } from "@/components/ui/highlightRoles";
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Author formatting
@@ -60,7 +61,7 @@ export function highlightMatch(
             "mark",
             {
               key: i,
-              className: "bg-brand-50 text-stone-900 rounded-sm px-0.5 font-semibold",
+              className: `${MATCH} rounded-sm px-0.5 font-semibold`,
             },
             part,
           )
@@ -114,9 +115,9 @@ export const BADGE_TONE_CLASS: Record<BadgeTone, string> = {
   // Kind of work (Thesis / Project / Proposal) — solid dark, high contrast
   type:       "bg-stone-900 text-white",
   // On the palette since IR-407 (IR-357): protection is the one flag that
-  // takes the brand tint; the programme flags are told apart by icon and
+  // takes maroon text; the programme flags are told apart by icon and
   // word, never by a hue of their own.
-  ip:         "bg-brand-50 text-brand border border-brand-100",
+  ip:         "bg-surface text-brand border border-stone-300",
   commercial: "bg-stone-100 text-stone-800 border border-stone-200",
   extension:  "bg-stone-100 text-stone-800 border border-stone-200",
   ongoing:    "bg-stone-100 text-stone-800 border border-stone-200",

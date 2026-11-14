@@ -22,7 +22,7 @@ const RECENT_SHOWN = 4;
 const SHELF_SHOWN = 2;
 
 const LINK_TEXT = cn(
-  "inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-small font-semibold text-brand hover:bg-brand-50",
+  "inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-small font-semibold text-brand hover:bg-stone-100",
   COLOUR_TRANSITION,
   FOCUS_RING,
 );
@@ -65,10 +65,10 @@ export function LibraryOverview({
   return (
     <div className="space-y-section-lg">
       {waiting.length > 0 && (
-        <section aria-labelledby="overview-waiting" className="rounded-2xl border border-brand-200 bg-brand-50 p-card-compact md:p-card">
+        <section aria-labelledby="overview-waiting" className="rounded-2xl border border-stone-300 bg-surface p-card-compact md:p-card">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand ring-1 ring-brand-200" aria-hidden>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand ring-1 ring-stone-300" aria-hidden>
                 <i className="fas fa-hourglass-half text-small" />
               </span>
               <div>
@@ -89,7 +89,7 @@ export function LibraryOverview({
             )}
           </div>
 
-          <ul className="mt-4 divide-y divide-brand-100 border-t border-brand-100">
+          <ul className="mt-4 divide-y divide-stone-200 border-t border-stone-200">
             {waiting.slice(0, WAITING_SHOWN).map((item) => (
               <li key={item.id} className="flex flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">

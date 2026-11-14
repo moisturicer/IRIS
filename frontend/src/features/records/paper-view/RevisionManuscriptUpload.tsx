@@ -83,7 +83,7 @@ export function RevisionManuscriptUpload({ recordId, staged, onUploaded }: Revis
           <ProgressBar
             label={`Uploading ${fileName}`}
             progress={progress}
-            className="h-1.5 w-28 bg-brand-100"
+            className="h-1.5 w-28 bg-stone-200"
           />
           <span className="text-2xs font-semibold text-stone-600 tabular-nums" aria-hidden>
             {toPercent(progress)}%
@@ -93,7 +93,7 @@ export function RevisionManuscriptUpload({ recordId, staged, onUploaded }: Revis
         <label
           htmlFor={inputId}
           className={cn(
-            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-brand-200 text-brand-dark text-xs font-bold cursor-pointer hover:bg-brand-100",
+            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-stone-300 text-brand-dark text-xs font-bold cursor-pointer hover:bg-stone-100",
             COLOUR_TRANSITION,
             "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand has-[:focus-visible]:ring-offset-2",
           )}

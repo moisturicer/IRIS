@@ -14,6 +14,7 @@ import { navFor, canAccess, pathFor, NAV_SECTION_ORDER, type NavEntry, type NavS
 import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { isRail, useSidebarMode } from "@/lib/layout";
+import { HERE } from "@/components/ui/highlightRoles";
 
 interface NavItem {
   to:     string;
@@ -58,10 +59,10 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
           cn(
             "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm",
             collapsed && "md:h-10 md:justify-center md:px-0",
-            // Active is the brand tint; hover is neutral stone, so a hovered
-            // row can never be mistaken for the page you are on.
+            // Active is "here" (a Desk Stone fill); hover is the lighter Bar Stone, so a
+            // hovered row can never be mistaken for the page you are on (IR-1097).
             isActive
-              ? "bg-brand-50 font-semibold text-brand"
+              ? HERE
               : "font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900",
             COLOUR_TRANSITION,
             FOCUS_RING,

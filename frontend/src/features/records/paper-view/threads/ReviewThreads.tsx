@@ -15,6 +15,7 @@ import type { Passage } from "./passage";
 import { ResponseLetterPanel } from "./ResponseLetter";
 import { SEVERITY_WORDS, filterThreads, isOpen, threadStatus, type Thread, type ThreadFilter, type ThreadViewer } from "./threadModel";
 import type { ReviewThreadsState } from "./useReviewThreads";
+import { SELECTED_RING } from "@/components/ui/highlightRoles";
 
 /** What the composer comments on: a passage of a Version, or the whole record. */
 export type CommentTarget = { kind: "general" } | { kind: "passage"; version: number; passage: Passage };
@@ -106,7 +107,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
             onClick={() => setFilter(f)}
             className={cn(
               "min-h-9 rounded-full px-3 text-small font-semibold ring-1",
-              filter === f ? "bg-brand-50 text-brand ring-brand-200" : "text-stone-700 ring-stone-300 hover:text-brand",
+              filter === f ? SELECTED_RING : "text-stone-700 ring-stone-300 hover:text-brand",
               FOCUS_RING,
             )}
           >
@@ -163,7 +164,7 @@ function Chip({ children, tone = "quiet" }: { children: ReactNode; tone?: "quiet
   return (
     <span className={cn(
       "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold",
-      tone === "brand" && "bg-brand-50 text-brand ring-1 ring-brand-200",
+      tone === "brand" && "bg-surface text-brand ring-1 ring-stone-300",
       tone === "ink" && "bg-stone-900 text-white",
       tone === "quiet" && "text-stone-700 ring-1 ring-stone-300",
     )}>
@@ -214,7 +215,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
         </h4>
         <span aria-hidden className={cn(
           "inline-grid place-items-center min-w-5 h-5 px-1 rounded-full text-[11px] font-semibold",
-          root.is_draft ? "bg-white text-brand ring-1 ring-brand/40" : root.state === "open" ? "bg-brand text-white" : "bg-stone-900 text-white",
+          root.is_draft ? "bg-white text-pen ring-1 ring-pen" : root.state === "open" ? "bg-pen text-white" : "bg-stone-900 text-white",
         )}>{thread.pin}</span>
         {root.party_label && <span className="text-small font-semibold text-stone-900">{root.party_label}</span>}
         {root.anchor && (

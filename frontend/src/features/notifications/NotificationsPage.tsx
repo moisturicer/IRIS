@@ -26,6 +26,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
 import { notificationTypeLabel } from "./notificationLabels";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 type Filter = "all" | "unread";
 
@@ -119,7 +120,7 @@ export default function NotificationsPage() {
         COLOUR_TRANSITION,
         FOCUS_RING,
         filter === value
-          ? "bg-brand-50 border-brand-200 text-brand"
+          ? SELECTED
           : "border-stone-300 text-stone-700 hover:border-brand hover:text-brand",
       )}
     >

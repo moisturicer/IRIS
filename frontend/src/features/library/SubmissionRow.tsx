@@ -129,7 +129,7 @@ export function SubmissionPanel({ children, tone = "plain" }: { children: ReactN
     <ul
       className={cn(
         "divide-y overflow-hidden rounded-2xl border bg-white",
-        tone === "waiting" ? "divide-brand-100 border-brand-200" : "divide-stone-100 border-stone-200",
+        tone === "waiting" ? "divide-stone-200 border-stone-300" : "divide-stone-100 border-stone-200",
       )}
     >
       {children}

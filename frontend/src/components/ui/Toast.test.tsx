@@ -37,7 +37,8 @@ describe("ToastContainer", () => {
 
       const toast = screen.getByText("Record saved").parentElement!;
       expect(toast.className).not.toMatch(/bg-transparent|bg-white\//);
-      expect(toast.className).toMatch(/\bbg-(overlay|brand|stone-900)\b/);
+      // Success is an Ink outline on opaque white since IR-1097 (only Attention is filled).
+      expect(toast.className).toMatch(/\bbg-(overlay|surface|brand|stone-900)\b/);
     },
   );
 

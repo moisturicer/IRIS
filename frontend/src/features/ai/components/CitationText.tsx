@@ -10,6 +10,7 @@ import type { ChatCitation } from "@/types/ai";
 import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
 import { remarkLimitMath } from "./mathLimit";
 import { breakLongRuns } from "./runLimit";
+import { REFERENCE } from "@/components/ui/highlightRoles";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -95,11 +96,10 @@ function CitationChip({ citation, page = false }: { citation: ChatCitation; page
       className={
         page
           ? "inline-flex items-center px-1 mx-0.5 rounded-md text-2xs font-semibold tabular-nums " +
-            "text-brand leading-5 align-baseline no-underline hover:bg-brand-50 hover:underline transition-colors duration-150"
+            "text-brand leading-5 align-baseline no-underline hover:bg-stone-100 hover:underline transition-colors duration-150"
           : // min-w: a marker can run to three digits.
             "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mx-0.5 rounded-md " +
-            "bg-brand-50 text-2xs font-semibold tabular-nums text-brand align-text-bottom leading-none " +
-            "no-underline hover:bg-brand-100 transition-colors duration-150 motion-reduce:transition-none"
+            `${REFERENCE} text-2xs font-semibold tabular-nums align-text-bottom leading-none no-underline`
       }
     >
       {page ? `p${citation.marker}` : citation.marker}

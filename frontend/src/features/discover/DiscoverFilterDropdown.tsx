@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 /**
  * An option always carries the stable value the API expects (`value`) plus the
@@ -109,7 +110,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
           FOCUS_RING,
           block ? "w-full justify-between" : "max-w-[18rem]",
           isActive
-            ? "bg-brand-50 border-brand text-brand"
+            ? SELECTED
             : "bg-white text-stone-700 border-stone-300 hover:border-stone-500",
         )}
       >

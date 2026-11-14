@@ -23,7 +23,7 @@ function stateLabel(request: ReaderDownloadRequest): { text: string; tone: strin
     case "granted":
       return {
         text: request.grant_expires_at ? `Granted until ${formatDate(request.grant_expires_at, DATE)}` : "Granted",
-        tone: "border-brand-200 bg-brand-50 text-brand",
+        tone: "border-stone-300 bg-surface text-brand",
       };
     case "declined":
       return { text: "Declined", tone: "border-stone-300 bg-stone-100 text-stone-900" };
