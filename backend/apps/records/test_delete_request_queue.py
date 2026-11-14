@@ -46,7 +46,11 @@ def _user(email, role_name):
 
 
 class DeleteRequestFixtures:
-    """A student who owns accepted work, an RDCO reviewer, and the two acts."""
+    """
+    A student who owns accepted work, an RDCO reviewer, and the two acts.
+
+    List it before `APITestCase`: its `setUpTestData` does not call `super()`.
+    """
 
     @classmethod
     def setUpTestData(cls):
@@ -130,10 +134,9 @@ class DeleteRequestQueueFilterTests(DeleteRequestFixtures, APITestCase):
         return {row["record_title"]: row["status"] for row in response.data["results"]}
 
     def three_decisions(self):
-        waiting = self.raise_by_deleting(self.published_thesis("waiting"))
-        declined = self.decide(self.raise_by_deleting(self.published_thesis("turned-down")), "decline")
-        approved = self.decide(self.raise_by_deleting(self.published_thesis("removed")), "approve")
-        return waiting, declined, approved
+        self.raise_by_deleting(self.published_thesis("waiting"))
+        self.decide(self.raise_by_deleting(self.published_thesis("turned-down")), "decline")
+        self.decide(self.raise_by_deleting(self.published_thesis("removed")), "approve")
 
     def test_pending_lists_only_pending_requests(self):
         self.three_decisions()
