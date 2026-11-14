@@ -6,10 +6,14 @@ import { cn } from "@/lib/utils";
  * section reads the same.
  */
 
-/** A section of the reading column: serif, like a printed paper's. */
+/**
+ * A section of the reading column: serif, like a printed paper's. 22 px, the
+ * top of the page's fixed 22 / 17 px ladder (IR-1089); a heading inside a
+ * section, such as the AI Overview's, is 17 px.
+ */
 export function SectionHeading({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <h2 id={id} className="font-display text-xl font-semibold text-stone-900 mb-2">
+    <h2 id={id} className="font-display text-section font-semibold text-stone-900 mb-2">
       {children}
     </h2>
   );

@@ -115,6 +115,12 @@ describe("the AI overview on a paper", () => {
     }
   });
 
+  it("heads itself at the section size, above the 17 px headings inside it (IR-1089)", async () => {
+    renderScreen(<PaperAiOverview record={record} />);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "AI Overview" })).toHaveClass("text-section");
+  });
+
   it("carries no label about how it was made (IR-569)", async () => {
     renderScreen(<PaperAiOverview record={record} />);
     await screen.findByRole("heading", { level: 2, name: "Methodology" });

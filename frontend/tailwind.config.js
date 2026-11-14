@@ -120,6 +120,9 @@ export default {
         // Named for what the text is, so a screen asks for `text-title` and the
         // size follows. `display` and `title` are set in `font-display`.
         display: ["28px", { lineHeight: "34px" }],
+        // A section heading in the reading column (IR-1089): the top of the
+        // fixed 22 / 17 ladder, with `lg` (17 px) for headings inside a section.
+        section: ["22px", { lineHeight: "28px" }],
         title:   ["20px", { lineHeight: "28px" }],
         heading: ["16px", { lineHeight: "24px" }],
         body:    ["15px", { lineHeight: "24px" }],
