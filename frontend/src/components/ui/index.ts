@@ -5,5 +5,6 @@ export { Badge }          from "./Badge";
 export { Spinner }        from "./Spinner";
 export { Skeleton }       from "./Skeleton";
 export { Modal }          from "./Modal";
+export { Tooltip }        from "./Tooltip";
 export { Card, CardHeader } from "./Card";
 export { ToastContainer } from "./Toast";

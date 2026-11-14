@@ -200,6 +200,7 @@ no-restricted-syntax on /\[#6B0F12\]/ → "use bg-brand / text-brand"
 | `Select` | **New (IR-539).** A native `<select>` with `Input`'s contract: label, hint, error, derived `id`, `aria-invalid`, `aria-describedby`, `required`/`optional` as on `Input`, and the same `md`/`lg` steps plus `sm` (the 36 px toolbar step, matching the library toolbar's other controls; **below the 44 px target of `12-accessibility.md` §4**, an inherited gap the toolbar has still to close) and `inline` (label beside the control), both IR-585, with a drawn chevron. Native rather than a custom listbox, so the keyboard, the phone picker and `<optgroup>` behave as each platform expects | Adopt wherever a select is hand-rolled with `fieldClasses`. **Adopted (IR-585)** in the user list, audit log, document request, library toolbar, call form, metadata form and assign-reviewer dialog. Not yet: Paper View's Add reviewer, Route and Version pickers and `ReassignDialog`, which move when next touched. `AdviserCombobox` is a combobox and stays |
 | `Card` + `CardHeader` | Border, not shadow | Adopt `shadow-card`; keep the border option |
 | `Badge` | 6 variants, 11px, rounded-full | Keep |
+| `Tooltip` | **New (IR-1086).** A label beside a control whose text is hidden, shown on hover and keyboard focus (not on a mouse press), dismissed by Escape, leave or blur (WCAG 1.4.13). Drawn in a portal, so a scrolling parent cannot clip it. Not an `aria-describedby`: the control keeps its own accessible name. Use it instead of a native `title`, which touch and keyboard users never see | — |
 | `Modal` | `role="dialog"`, `aria-modal`, `aria-labelledby`, Escape, labelled close | **Add focus trap + focus restore** — the only substantive gap |
 | `Spinner` | 3 sizes, brand colour | Keep; wrap in the new `LoadingState` |
 | `Toast` | Exists | Verify `role="status"` / `aria-live` |
@@ -257,8 +258,9 @@ Font Awesome 6 via CDN, `<i className="fas fa-…" />`, 95 usages.
   - **Hover** is neutral, `bg-stone-100`, so it is never mistaken for the active row.
   - Every row carries `FOCUS_RING`.
 - **The account menu** in the user block holds Profile, Settings, Help and Sign out (`AccountMenu.tsx`). Profile and Settings are separate pages (IR-933): Profile is what other signed-in people see, with an own-view note and one filled **Edit profile** action; Settings is the account. It is a disclosure: a button that shows and hides a list of plain links and buttons, not an ARIA `menu`. It opens upward, or to the right of the rail, and uses `shadow-card-md`.
-- **Collapse / Expand** is one always-visible control at the bottom. It replaced a toggle that only appeared when you hovered the logo, which a touch tablet could not reach.
-- **Widths:** `w-60` / `w-16` instead of `230px` / `60px`.
+- **Collapse / Expand** is the IRIS mark at the top (a button named "Collapse sidebar" or "Open sidebar"). From 1024 px it saves the reader's choice. From 768 to 1023 px the sidebar is the icon rail and the mark opens the full sidebar over the page without saving anything (IR-1086).
+- **Widths:** `w-60` (240 px) and `w-rail` (76 px, a spacing token) instead of `230px` / `60px`. The content's margin is `md:ml-rail`, and `lg:ml-60` from 1024 px unless the reader chose the rail.
+- **Rail controls** each have a `Tooltip` on hover and keyboard focus (IR-1086).
 - **One new token:** `transition-shell` (`transitionProperty.shell`: transform, width, margin) in `tailwind.config.js`. The drawer slides, the rail narrows and the content margin follows. Two separate `transition-*` classes on one element silently override each other, because `cn` does not merge Tailwind classes.
 - **The app background is the `canvas` role** (`stone-50`, IR-558), previously `stone-100` and before that `gray-100`; the sidebar and mobile bar are `surface`. The drawer backdrop is `stone-900/40`, previously `black/40`, following the palette rule at the top of this file.
 

@@ -8,7 +8,7 @@ import { PageContainer } from "./PageContainer";
 import { Button } from "@/components/ui/Button";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useSidebarMode } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
 
@@ -74,9 +74,13 @@ export function AppShell() {
   // closed it is only slid off screen, so it is made inert to keep its links
   // out of the tab order; while it is open the page behind it is inert
   // instead, Escape closes it, and focus moves in and back out again.
-  // `max-width` so jsdom, which has no matchMedia, renders the desktop shell.
-  const isPhone = useMediaQuery("(max-width: 767.98px)");
-  const drawerOpen = isPhone && sidebarOpen;
+  // From 768 to 1023 px it is the icon rail, and the IRIS mark opens the full
+  // sidebar over the page the same way (IR-1086): the rail itself is never
+  // inert, but an opened sidebar behaves like the drawer.
+  // jsdom, which has no matchMedia, renders the desktop shell.
+  const mode = useSidebarMode();
+  const isPhone = mode === "drawer";
+  const drawerOpen = mode !== "desktop" && sidebarOpen;
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   // Set only when the reader dismissed the drawer (Escape, Close menu, the
@@ -99,15 +103,21 @@ export function AppShell() {
     }
     if (returnFocus.current) {
       returnFocus.current = false;
-      menuButtonRef.current?.focus();
+      // The rail's mark, which opened a tablet's sidebar, is on screen; Open
+      // menu is not (it is the phone's).
+      const returnTo = mode === "rail"
+        ? sidebarRef.current?.querySelector<HTMLElement>("[data-sidebar-mark]")
+        : menuButtonRef.current;
+      returnTo?.focus();
     }
-  }, [drawerOpen, dismiss]);
+  }, [drawerOpen, dismiss, mode]);
 
-  // Widening past md leaves no drawer to be open. Closing it means it cannot
-  // reopen, and take focus, if the window narrows again.
+  // Widening to the desktop leaves no drawer or opened rail to be open.
+  // Closing it means it cannot reopen, and take focus, if the window narrows
+  // again.
   useEffect(() => {
-    if (!isPhone && sidebarOpen) closeSidebar();
-  }, [isPhone, sidebarOpen, closeSidebar]);
+    if (mode === "desktop" && sidebarOpen) closeSidebar();
+  }, [mode, sidebarOpen, closeSidebar]);
 
   // A signed-in user with no role never reaches this shell: the route guard
   // shows them the pending screen instead (IR-537).
@@ -120,7 +130,7 @@ export function AppShell() {
         // tree rather than announced as a second "Close menu".
         <div
           aria-hidden
-          className="fixed inset-0 bg-stone-900/40 z-40 md:hidden"
+          className="fixed inset-0 bg-stone-900/40 z-40"
           onClick={dismiss}
         />
       )}
@@ -141,8 +151,11 @@ export function AppShell() {
           "flex flex-col flex-1 min-w-0 transition-shell duration-200 ease-out motion-reduce:transition-none",
           // Ask IRIS fills the window; its own panes scroll, so the page never does.
           isAskIris && "min-h-0",
-          // The sidebar's own widths: w-60, or the w-16 rail.
-          collapsed ? "md:ml-16" : "md:ml-60",
+          // The sidebar's own widths: the 76 px rail from md, or w-60 from lg
+          // unless the reader chose the rail. Between md and lg the rail is all
+          // that takes room; an opened sidebar overlaps the page (IR-1086).
+          "md:ml-rail",
+          !collapsed && "lg:ml-60",
         )}
       >
         {showPhoneBar && <PhoneBar ref={menuButtonRef} />}

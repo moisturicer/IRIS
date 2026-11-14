@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { pathFor } from "@/lib/access";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
 
 interface AccountMenuProps {
@@ -79,6 +80,9 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         if (open && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
       }}
     >
+      {/* The rail's tooltip (IR-1086), on hover and focus; not while the menu is
+          open, which opens to the same side. */}
+      <Tooltip label={fullName} disabled={!collapsed || open} className="block">
       <button
         ref={triggerRef}
         type="button"
@@ -87,7 +91,6 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         // No aria-label: the name is computed from the text below -- the
         // visible name and role, in order, then a hidden "account menu" -- so
         // it always begins with what a speech-input user sees (WCAG 2.5.3).
-        title={collapsed ? fullName : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn(
           "flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-stone-100",
@@ -124,6 +127,7 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
           )}
         />
       </button>
+      </Tooltip>
 
       {open && (
         <div

@@ -113,6 +113,8 @@ export default {
         "section-lg":   "2rem",
         card:           "1.25rem",
         "card-compact": "1rem",
+        // The sidebar's icon rail (IR-1086): `w-rail`, `md:ml-rail`.
+        rail:           "76px",
       },
 
       borderRadius: {
