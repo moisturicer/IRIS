@@ -50,7 +50,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         </p>
         <p>
           From a record you can <strong>Save</strong> it to your Library, <strong>Share</strong> its
-          link, cite it, or use Paper Chat to ask questions about that one paper.
+          link, cite it, or use Ask IRIS to ask questions about that one paper.
         </p>
       </>
     ),

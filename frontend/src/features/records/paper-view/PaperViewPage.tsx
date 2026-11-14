@@ -34,6 +34,7 @@ import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
 import { RelatedWorks } from "./RelatedWorks";
+import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { ContinueProposal } from "../ContinueProposal";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
@@ -264,6 +265,9 @@ export default function PaperViewPage() {
     key: number; page: number; regions: Region[]; version: number | null; arrival: string;
   } | null>(null);
   const [record, setRecord] = useState<RecordDetail | null>(null);
+  // The tab names the paper (IR-1073); until it loads, the route's own "Paper".
+  // The previous paper stays in state while the next one loads, so it must match the address.
+  usePageTitle(record && String(record.id) === id ? record.title : null);
   const [loading, setLoading] = useState(true);
   /**
    * The last load failed for a reason other than "no such record": `failed`
