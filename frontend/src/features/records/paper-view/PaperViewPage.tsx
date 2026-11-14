@@ -59,7 +59,7 @@ import {
   PAPER_WORKSPACE_PANEL_CLASS,
   fitPanelWidth,
 } from "./PaperChatDock";
-import { AskIrisFab, NotesFab } from "./AskIrisFab";
+import { AskIrisFab, CORNER_CLEARANCE_CLASS, NotesFab } from "./AskIrisFab";
 import { NotesPanel } from "./NotesPanel";
 import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
 import { useReadingNote } from "./useReadingNote";
@@ -769,6 +769,8 @@ export default function PaperViewPage() {
           selectionActions={selectionActions}
           contained={onPaperTab || reviewerWorkspace || tier === "wide"}
           fill={onPaperTab || reviewerWorkspace}
+          // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
+          clearCorner={onPaperTab}
           bottomInset={onReviewTab ? reviewBarInset : 0}
           downloadControl={
             // An earlier version is not offered as a copy: the download route
@@ -949,7 +951,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
-              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8 pb-12", PAGE_WIDTH.standard),
+              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", CORNER_CLEARANCE_CLASS, PAGE_WIDTH.standard),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
@@ -1424,8 +1426,8 @@ export default function PaperViewPage() {
           className={chatPanelClass}
         />
       )}
-      {/* Closed: one round icon at the bottom right (IR-569). On the bar
-          while minimized, which is its way back. */}
+      {/* Closed: two round icons at the bottom right, Notes above Ask IRIS
+          (IR-569, IR-1079). On the bar while minimized, which is its way back. */}
       {!chat.open && !onReviewTab && (
         <>
           <NotesFab onOpen={openNotes} buttonRef={notesButtonRef} />
