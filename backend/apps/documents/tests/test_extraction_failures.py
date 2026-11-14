@@ -170,10 +170,11 @@ def test_a_clean_extraction_has_no_warnings(extraction):
     assert extraction.warnings == []
 
 
-@pytest.mark.parametrize("evidence_wall, limit", [(None, 960), (120, 1080)])
+@pytest.mark.parametrize("evidence_wall, limit", [(None, 960), (120, 1200)])
 def test_each_attempt_is_limited_to_the_declared_timeout_plus_evidence_plus_a_minute(
         extraction, monkeypatch, settings, evidence_wall, limit):
-    # IR-1053: the PDF evidence read runs inside the same attempt.
+    # IR-1053: the PDF evidence read runs inside the same attempt, and so do
+    # the formula crops (IR-1102), each under the evidence wall limit.
     from celery.app.task import Task
 
     settings.PDF_EVIDENCE_WALL_SECONDS = evidence_wall

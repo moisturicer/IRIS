@@ -54,6 +54,7 @@ def reset_manuscript(record, *, defer=False, retry=False):
         from .figures import remove_superseded
         ChunkSet.objects.filter(record=record, is_active=True).exclude(source_revision=revision).update(is_active=False)
         remove_superseded(extraction)
+        extraction.formulas.exclude(source_revision=revision).delete()
     if not defer and not held:
         pinned = str(revision) if revision else None
         transaction.on_commit(lambda: extract_manuscript_text.delay(record.pk, pinned))

@@ -77,6 +77,7 @@ def _run_extraction(self, extraction_id, source_revision):
     )
     from apps.ai.extraction.gate import NotDisclosed, reading
     from .figures import replace_figures
+    from . import formulas
     from .models import DocumentKind
     from .pdf_evidence import sandbox
 
@@ -105,6 +106,8 @@ def _run_extraction(self, extraction_id, source_revision):
             extracted = current_extractor().extract(pdf_bytes, filename=os.path.basename(filename))
         # Local and after the vendor read; a bad PDF stores its error, never fails (IR-1053).
         evidence = sandbox.read_pdf_evidence(pdf_bytes) if manuscript else {}
+        # Each located Formula, cropped from this PDF; never its OCR text (IR-1102).
+        cropped = formulas.crop(pdf_bytes, extracted.document) if manuscript else []
         values = {
             "extracted_text": flatten_for_search(extracted.document),
             "structure": document_to_json(extracted.document),
@@ -169,6 +172,7 @@ def _run_extraction(self, extraction_id, source_revision):
             setattr(extraction, key, value)
         extraction.save(update_fields=list(values))
         replace_figures(extraction, extracted.figures)
+        formulas.replace_formulas(extraction, cropped)
         _queue_chunking_if_manuscript(extraction)
         _queue_metadata_if_llamaparse(extraction)
 
@@ -181,8 +185,9 @@ class ExtractionTask(Task):
 
         from django.conf import settings
 
-        # The evidence read runs inside the same attempt (IR-1053).
-        evidence = settings.PDF_EVIDENCE_WALL_SECONDS or 0
+        # The evidence read and the formula crops run inside the same attempt
+        # (IR-1053, IR-1102), each under the evidence wall limit.
+        evidence = 2 * (settings.PDF_EVIDENCE_WALL_SECONDS or 0)
         limit = int(current_extractor().timeout_seconds + evidence) + TIME_LIMIT_MARGIN_SECONDS
         options.setdefault("time_limit", limit)
         options.setdefault("soft_time_limit", limit - SOFT_LIMIT_HEADROOM_SECONDS)
@@ -219,6 +224,11 @@ def _queue_chunking_if_manuscript(extraction: "PdfExtraction") -> None:
             from apps.ai.tasks import describe_extraction_figures
 
             transaction.on_commit(lambda: describe_extraction_figures.delay(extraction.pk, pinned))
+        if extraction.formulas.exists():
+            from django.db import transaction
+            from apps.ai.tasks import transcribe_extraction_formulas
+
+            transaction.on_commit(lambda: transcribe_extraction_formulas.delay(extraction.pk, pinned))
 
 
 def _queue_chunk_extraction(extraction_id: int, source_revision=None) -> None:

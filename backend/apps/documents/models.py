@@ -15,6 +15,10 @@ def figure_path(instance, filename):
     return f"figures/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
 
 
+def formula_path(instance, filename):
+    return f"formulas/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
+
 class UploadSlot(models.Model):
     """
     Defines what kind of document a record type requires.
@@ -275,6 +279,43 @@ class ExtractionFigure(models.Model):
 
     def __str__(self):
         return f"Figure {self.pk} extraction={self.extraction_id} page={self.page}"
+
+
+class ExtractionFormula(models.Model):
+    """One display formula of a Manuscript (IR-1102, ADR-067 §Amendment).
+
+    ``image`` is the box cropped from the stored PDF at ``CROP_DPI``; the
+    Extractor's OCR text is never kept as the formula. ``latex`` and
+    ``description`` stay empty until the formula transcription model answers,
+    and an empty ``latex`` means the formula is shown as its crop. ``request``
+    is what was asked, ``model`` who answered. Stored like a Figure: nothing
+    serves the image directly.
+    """
+
+    CROP_DPI = 300
+
+    extraction = models.ForeignKey(PdfExtraction, on_delete=models.CASCADE, related_name="formulas")
+    source_revision = models.UUIDField(editable=False)
+    # The Extractor's element id, which the shaped Formula element names.
+    name = models.CharField(max_length=255)
+    page = models.PositiveIntegerField()
+    bbox = models.JSONField(default=dict, blank=True)
+    media_type = models.CharField(max_length=32, default="image/png")
+    image = models.FileField(upload_to=formula_path, max_length=255)
+    latex = models.TextField(blank=True)
+    description = models.TextField(blank=True)
+    equation_number = models.CharField(max_length=32, blank=True)
+    model = models.CharField(max_length=255, blank=True)
+    request = models.JSONField(default=dict, blank=True)
+    # Set once a reply was read; a refused or unreadable one leaves ``latex`` empty.
+    transcribed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["page", "pk"]
+
+    def __str__(self):
+        return f"Formula {self.pk} extraction={self.extraction_id} page={self.page}"
 
 
 class ManuscriptMetadata(models.Model):

@@ -211,6 +211,23 @@ class CompositionRoot:
             return None
         return require_image_describing(self.llm_for(InferenceTask.DESCRIBE_FIGURE))
 
+    def formula_transcriber(self) -> Optional["ImageDescribingLLM"]:
+        """The ``transcribe_formula`` model, or ``None`` while its Profile is unset (IR-1102)."""
+        from apps.ai.inference import InferenceTask, profile_for
+        from apps.ai.providers.vision import require_image_describing
+
+        if self._llm is None and not profile_for(InferenceTask.TRANSCRIBE_FORMULA).is_configured:
+            return None
+        return require_image_describing(self.llm_for(InferenceTask.TRANSCRIBE_FORMULA))
+
+    def formula_transcriber_models(self) -> tuple[str, ...]:
+        """The models ``formula_transcriber`` tries, in order, for the stored request."""
+        from apps.ai.inference import InferenceTask, profile_for
+
+        if self._llm is not None:
+            return (type(self._llm).__name__,)
+        return profile_for(InferenceTask.TRANSCRIBE_FORMULA).models
+
     def generation_configured(self) -> bool:
         """Whether a model would actually answer, without calling one.
 

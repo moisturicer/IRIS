@@ -731,6 +731,22 @@ LLM_DESCRIBE_FIGURE_REASONING = config(
 LLM_DESCRIBE_FIGURE_PROVIDER_ONLY = config("LLM_DESCRIBE_FIGURE_PROVIDER_ONLY", default="")
 LLM_DESCRIBE_FIGURE_PROVIDER_PINS = config("LLM_DESCRIBE_FIGURE_PROVIDER_PINS", default="")
 
+# transcribe_formula (IR-1102, ADR-067 §Amendment): off until a model is set.
+# Its retention and no-training terms must be recorded before real Manuscripts
+# are sent (ADR-067's open condition).
+LLM_TRANSCRIBE_FORMULA_VENDOR   = config("LLM_TRANSCRIBE_FORMULA_VENDOR", default="")
+LLM_TRANSCRIBE_FORMULA_BASE_URL = config("LLM_TRANSCRIBE_FORMULA_BASE_URL", default="")
+LLM_TRANSCRIBE_FORMULA_API_KEY  = config("LLM_TRANSCRIBE_FORMULA_API_KEY", default="")
+LLM_TRANSCRIBE_FORMULA_MODEL    = config("LLM_TRANSCRIBE_FORMULA_MODEL", default="")
+LLM_TRANSCRIBE_FORMULA_FALLBACK_MODELS = config(
+    "LLM_TRANSCRIBE_FORMULA_FALLBACK_MODELS", default=""
+)
+LLM_TRANSCRIBE_FORMULA_REASONING = config(
+    "LLM_TRANSCRIBE_FORMULA_REASONING", default=False, cast=bool
+)
+LLM_TRANSCRIBE_FORMULA_PROVIDER_ONLY = config("LLM_TRANSCRIBE_FORMULA_PROVIDER_ONLY", default="")
+LLM_TRANSCRIBE_FORMULA_PROVIDER_PINS = config("LLM_TRANSCRIBE_FORMULA_PROVIDER_PINS", default="")
+
 # ---- The verbatim history window (IR-449, ADR-026 §6) -------------------
 #
 # How much of a Conversation goes into the prompt verbatim. This was
@@ -820,6 +836,12 @@ AI_KEYWORD_RETRIEVAL_ENABLED = config(
 AI_RETRIEVAL_FUSION_ENABLED = config(
     "AI_RETRIEVAL_FUSION_ENABLED", default=False, cast=bool
 )
+
+# ---- Formulas in the indexed text (IR-1102, ADR-067 §Amendment) ----------
+# On, a transcribed formula's LaTeX and description enter its chunk's
+# embedded and keyword-indexed text. Read at chunking, so moving it needs a
+# re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
+AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
 
 # ---- Vector scan depth (IR-440) ---------------------------------------
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.

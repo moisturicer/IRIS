@@ -55,6 +55,7 @@ _TASK_LANES = {
     InferenceTask.SCREEN: "research",
     InferenceTask.SUMMARY: "overview",
     InferenceTask.DESCRIBE_FIGURE: "ingestion",
+    InferenceTask.TRANSCRIBE_FORMULA: "ingestion",
 }
 
 
