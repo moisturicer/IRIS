@@ -847,8 +847,8 @@ AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False,
 AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
 
 # ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
-# Modes in apps/ai/retrieval/reranker_input.py. Today until a run moves it.
-AI_RERANKER_READS = config("AI_RERANKER_READS", default="today")
+# Modes in apps/ai/retrieval/reranker_input.py. fallback since IR-1125 (ADR-033).
+AI_RERANKER_READS = config("AI_RERANKER_READS", default="fallback")
 if AI_RERANKER_READS not in ("today", "embedded", "described", "fallback"):
     raise ImproperlyConfigured(
         "AI_RERANKER_READS must be today, embedded, described or fallback, "

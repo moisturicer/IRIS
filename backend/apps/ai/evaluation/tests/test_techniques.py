@@ -78,9 +78,9 @@ def test_an_index_time_switch_is_recorded_but_cannot_be_moved_by_a_run():
     assert resolve()["formula_text"]["setting"] == "AI_FORMULA_TEXT_INDEXED"
 
 
-def test_what_the_reranker_reads_is_a_run_time_choice_defaulting_to_today():
-    """IR-1125: production is unchanged until a decision moves the default."""
-    assert resolve()["reranker_reads"]["value"] == "today"
+def test_what_the_reranker_reads_is_a_run_time_choice_defaulting_to_fallback():
+    """IR-1125's run moved the default to fallback (ADR-033 amendment)."""
+    assert resolve()["reranker_reads"]["value"] == "fallback"
     assert parse_override("reranker_reads=fallback") == ("reranker_reads", "fallback")
     with pytest.raises(TechniqueError):
         parse_override("reranker_reads=caption")

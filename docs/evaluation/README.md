@@ -310,7 +310,7 @@ A Figure printed with no caption has no quote to match, so a label can name it b
 
 ## What the reranker reads (IR-1125)
 
-`reranker_reads` (`AI_RERANKER_READS`, default `today`) decides the text the reranker scores: `today` (shown text, blank passages dropped), `embedded` (arm A), `described` (arm B: shown text plus a Figure's description, labelled as AI-written) or `fallback` (arm C: embedded text only where shown text is blank). Readers see the shown text whichever it is.
+`reranker_reads` (`AI_RERANKER_READS`, default `fallback` since IR-1125's run; see the ADR-033 amendment) decides the text the reranker scores: `today` (shown text, blank passages dropped), `embedded` (arm A), `described` (arm B: shown text plus a Figure's description, labelled as AI-written) or `fallback` (arm C: embedded text only where shown text is blank). Readers see the shown text whichever it is.
 
 `manage.py eval_reranker_input --help` lists its options: a text set, a figure set, the trial chunk set the figure papers live in, and a user.
 
