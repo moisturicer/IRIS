@@ -286,10 +286,9 @@ class ExtractionFormula(models.Model):
 
     ``image`` is the box cropped from the stored PDF at ``CROP_DPI``; the
     Extractor's OCR text is never kept as the formula. ``latex`` and
-    ``description`` stay empty until the formula transcription model answers,
-    and an empty ``latex`` means the formula is shown as its crop. ``request``
-    is what was asked, ``model`` who answered. Stored like a Figure: nothing
-    serves the image directly.
+    ``description`` stay empty until the transcription model answers; empty
+    ``latex`` means the formula stays its crop. ``model`` is the model that
+    replied. Stored like a Figure: nothing serves the image directly.
     """
 
     CROP_DPI = 300

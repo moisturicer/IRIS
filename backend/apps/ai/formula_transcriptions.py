@@ -12,7 +12,6 @@ import json
 import logging
 import re
 from dataclasses import replace
-from typing import Optional
 
 from django.conf import settings
 from django.db import transaction
@@ -111,7 +110,7 @@ def transcribe_formulas(extraction_id: int, source_revision) -> int:
             pk=formula.pk, source_revision=formula.source_revision, transcribed_at__isnull=True,
         ).update(
             latex=latex, description=description if latex else "",
-            equation_number=equation_number(latex), model=request["models"][0] if request["models"] else "",
+            equation_number=equation_number(latex), model=_answered_by(transcriber, request),
             request=request, transcribed_at=timezone.now(),
         )
         written += updated if latex else 0
@@ -122,19 +121,25 @@ def transcribe_formulas(extraction_id: int, source_revision) -> int:
     return written
 
 
+def _answered_by(transcriber, request) -> str:
+    """The model that replied, a fallback included; else the first one asked."""
+    used = getattr(transcriber, "last_model_used", None)
+    return used if isinstance(used, str) and used else next(iter(request["models"]), "")
+
+
 def _queue_rechunk(extraction_id: int, source_revision: str) -> None:
     from apps.ai.tasks import chunk_extraction
 
     transaction.on_commit(lambda: chunk_extraction.delay(extraction_id, source_revision, force=True))
 
 
-def with_formulas(document, extraction, *, indexed: Optional[bool] = None):
+def with_formulas(document, extraction):
     """``document`` with each transcribed Formula as LaTeX, when formulas are indexed.
     Off, the document is returned unchanged, so chunks are exactly as before."""
     from apps.ai.chunking.document import FORMULA
     from apps.documents.models import ExtractionFormula
 
-    if not (settings.AI_FORMULA_TEXT_INDEXED if indexed is None else indexed):
+    if not settings.AI_FORMULA_TEXT_INDEXED:
         return document
     transcribed = {
         name: (latex, description)

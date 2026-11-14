@@ -137,6 +137,17 @@ class TranscriptionTests:
         assert stored.request == {"prompt_version": 1, "dpi": 300, "models": ["Transcriber"]}
         assert self.rechunks == [(extraction.pk, str(record.manuscript_revision))]
 
+    def test_the_stored_model_is_the_fallback_that_replied(self):
+        record, extraction = manuscript()
+
+        class FellBack(Transcriber):
+            last_model_used = "anthropic/claude-haiku-5.5"
+
+        with root(FellBack()):
+            run(record, extraction)
+
+        assert ExtractionFormula.objects.get().model == "anthropic/claude-haiku-5.5"
+
     def test_an_unavailable_call_leaves_the_crop_and_is_owed(self):
         from apps.ai.providers.openai_compatible import LLMUnavailable
 

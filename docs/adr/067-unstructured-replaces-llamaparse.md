@@ -351,6 +351,10 @@ here rather than deciding it; each point is for a person to confirm.
   untranscribed formula shows nothing to a reader, as before.
 - **Cropping runs in the PDF evidence sandbox** (`pdf_evidence/crops.py`), on
   Linux only, under the same limits; off Linux nothing is cropped.
+- **A Formula hi_res already delimits as LaTeX is not cropped.** Shaping keeps
+  such text as the formula, as before; it gets no record or description.
+- **At most 500 formulas per Manuscript are cropped**; past that they are logged.
+- **The equation number is read from the model's `\tag{}`**, not the PDF.
 - **The run-file switch is `formula_text`.** It is read at indexing, so
   `eval_retrieval` records it and refuses to move it: set it, re-chunk, then run.
 - **Open condition, recorded 2026-11-14:** the transcription provider's

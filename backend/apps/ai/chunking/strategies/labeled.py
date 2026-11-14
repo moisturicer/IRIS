@@ -1,7 +1,8 @@
 """Chunk authoritative structure at its declared heading depth (IR-840).
 
 Headings open sections at their declared level. Formulas are shown to readers;
-only a transcribed one, with its description, is embedded (IR-1102). Tables split only between rows and repeat their header.
+only a transcribed one, with its description, is embedded (IR-1102). Tables
+split only between rows and repeat their header.
 Prose packs to the target size with its trail counted in; a figure, a list or
 a table row is kept whole up to the safety ceiling (ADR-067 decision 14).
 """
