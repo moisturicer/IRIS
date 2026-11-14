@@ -154,7 +154,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
             aria-pressed={selected === opt}
             onClick={() => setSelected(opt === selected ? "" : opt)}
             className={cn(
-              "px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors",
+              "min-h-11 reading-split:min-h-9 px-3 rounded-full text-xs font-semibold border transition-colors",
               selected === opt
                 ? "bg-brand text-white border-brand"
                 : "bg-white text-stone-600 border-stone-200 hover:border-brand/40",
@@ -170,7 +170,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
           type="button"
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className="px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
+          className="min-h-11 reading-split:min-h-9 px-3 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
         >
           {saving ? "Saving…" : "Save classification"}
         </button>
@@ -771,6 +771,9 @@ export default function PaperViewPage() {
           fill={onPaperTab || reviewerWorkspace}
           // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
           clearCorner={onPaperTab}
+          // On a phone's one-row bar there is no room for the version, so it
+          // sits at the start of the reader's toolbar (IR-1092).
+          toolbarStart={(onPaperTab || reviewerWorkspace) && tier === "single" ? paperVersion : undefined}
           bottomInset={onReviewTab ? reviewBarInset : 0}
           downloadControl={
             // An earlier version is not offered as a copy: the download route
@@ -926,7 +929,8 @@ export default function PaperViewPage() {
         onBack={() => navigate(-1)}
         onBackToAnswer={backToAnswer}
         title={!onPaperTab && !reviewerWorkspace ? undefined : arriving ? null : record.title}
-        version={onPaperTab || reviewerWorkspace ? paperVersion : undefined}
+        // Not in the bar below 640px, where the reader's toolbar holds it.
+        version={(onPaperTab || reviewerWorkspace) && tier !== "single" ? paperVersion : undefined}
       />
       <div
         className={cn(

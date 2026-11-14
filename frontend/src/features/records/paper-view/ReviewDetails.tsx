@@ -190,7 +190,7 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
           </p>
         )}
         {onAllDocuments && (
-          <button type="button" onClick={onAllDocuments} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}>
+          <button type="button" onClick={onAllDocuments} className={cn(PILL_SECONDARY, FOCUS_RING, "reading-split:min-h-9 px-3")}>
             <i className="fas fa-folder-open text-2xs" aria-hidden />
             All documents
           </button>
