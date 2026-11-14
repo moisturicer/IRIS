@@ -123,6 +123,16 @@ class TestTrialVariant:
         build_trial(plan, provider=recording)
         assert recording.chunks_sent == 0
 
+    def test_a_rebuild_after_the_setting_flips_rewrites_the_set(
+        self, paper, space, recording, settings
+    ):
+        build_trial(plan_trial(parse_variant("x=::"), space_id=space.pk), provider=recording)
+        settings.AI_SECTION_ALIGNED_WINDOWS = True
+        outcome = build_trial(plan_trial(parse_variant("x=::"), space_id=space.pk),
+                              provider=recording)
+        assert outcome.written == 1
+        assert chunking_provenance(parse_variant("x=::"))["chunk_sets"][0]["options"]["windows"] == "section"
+
     def test_provenance_records_the_windowing(self, paper, space, recording):
         variant = parse_variant("sw=::windows=section")
         build_trial(plan_trial(variant, space_id=space.pk), provider=recording)

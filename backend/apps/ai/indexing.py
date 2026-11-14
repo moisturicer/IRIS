@@ -512,7 +512,7 @@ def windows_mode() -> str:
     """How production cuts a long paper into embedding windows (IR-1056)."""
     from django.conf import settings
 
-    return "section" if getattr(settings, "AI_SECTION_ALIGNED_WINDOWS", False) else "count"
+    return "section" if settings.AI_SECTION_ALIGNED_WINDOWS else "count"
 
 
 def embedding_windows(chunks: Sequence, mode: Optional[str] = None) -> list[list[str]]:

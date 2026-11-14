@@ -32,7 +32,6 @@ from apps.ai.chunking.outline import PATH_SEPARATOR, TRAIL_JOIN, embedded_text
 from apps.ai.chunking.registry import registered_strategies
 from apps.ai.chunking.tokens import TOKENIZER_ID, count_tokens
 from apps.ai.providers import batching
-from apps.ai.providers.batching import WINDOW_MODES
 
 TRAIL_MODES = ("on", "off", "shuffled")
 
@@ -114,8 +113,8 @@ def parse_variant(text: str) -> Variant:
             raise VariantError("merge_short_siblings is true or false")
         if key == "trail" and value not in TRAIL_MODES:
             raise VariantError(f"trail is one of {', '.join(TRAIL_MODES)}")
-        if key == "windows" and value not in WINDOW_MODES:
-            raise VariantError(f"windows is one of {', '.join(WINDOW_MODES)}")
+        if key == "windows" and value not in batching.WINDOW_MODES:
+            raise VariantError(f"windows is one of {', '.join(batching.WINDOW_MODES)}")
         options.append((key, value))
     return Variant(name, extractor, strategy, tuple(sorted(options)))
 
@@ -207,14 +206,8 @@ def _is_long(texts) -> bool:
     return sum(batching.estimate_tokens(t) for t in texts) > batching.EMBED_WINDOW_TOKENS
 
 
-def _reusable(record_id: int, space_id: int, *, windows: str, long: bool):
-    """This record's vectors a trial may reuse by text (IR-1056).
-
-    In a long paper the same text gets a different vector under another
-    windowing, so only sets embedded the same way count. Active sets were
-    embedded the way production cuts; a trial set records its own mode, and
-    one from before IR-1056 was cut by count.
-    """
+def _reusable_embeddings(record_id: int, space_id: int, *, windows: str, long: bool):
+    """Vectors a trial may reuse by text; a long paper only from the same windowing."""
     from django.db.models import Q
 
     from apps.ai.indexing import windows_mode
@@ -234,7 +227,7 @@ def _reusable(record_id: int, space_id: int, *, windows: str, long: bool):
 
 def _vectored_hashes(record_id: int, space_id: int, hashes, *, windows: str,
                      long: bool) -> set[str]:
-    return set(_reusable(record_id, space_id, windows=windows, long=long).filter(
+    return set(_reusable_embeddings(record_id, space_id, windows=windows, long=long).filter(
         chunk__text_hash__in=list(hashes),
     ).values_list("chunk__text_hash", flat=True))
 
@@ -339,7 +332,8 @@ def _write_set(record_plan: RecordPlan, variant: Variant):
         existing = ChunkSetModel.objects.select_for_update().filter(
             record_id=record_plan.record_id, trial_variant=variant.name
         ).first()
-        if existing is not None and existing.content_hash == built.content_hash:
+        if (existing is not None and existing.content_hash == built.content_hash
+                and existing.options.get("windows", "count") == variant.windows):
             return existing, False
         if existing is not None:
             existing.delete()
@@ -368,7 +362,7 @@ def _carry_over(row, space_id: int, windows: str) -> int:
         return 0
     long = _is_long(DocumentChunk.objects.filter(chunk_set=row).values_list("text", flat=True))
     vectors: dict[str, object] = {}
-    for text_hash, vector in _reusable(
+    for text_hash, vector in _reusable_embeddings(
         row.record_id, space_id, windows=windows, long=long,
     ).filter(
         chunk__text_hash__in={c.text_hash for c in missing},

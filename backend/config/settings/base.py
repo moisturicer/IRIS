@@ -822,10 +822,7 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
 )
 
 # ---- Section-aligned embedding windows (IR-1056) ----------------------
-# A paper longer than one voyage-context-4 window is cut at top-level section
-# breaks instead of by token count alone. Off until a trial run shows it helps
-# (`eval_retrieval --variant name=::windows=section`). Turning it on changes no
-# stored vector: re-embed with `backfill_embeddings --force` after.
+# Off until a trial run shows it helps; re-embed with `backfill_embeddings --force` after.
 AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False, cast=bool)
 
 # ---- Vector scan depth (IR-440) ---------------------------------------
