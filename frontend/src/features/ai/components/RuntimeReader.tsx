@@ -17,6 +17,8 @@ import { ModelPill, type ModelPillOption } from "./ModelPill";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AskIrisMark } from "./AskIrisIcons";
 import { ReasoningBar } from "./ReasoningBar";
+import { StarterQuestions } from "./StarterQuestions";
+import { ASK_STARTERS, PAPER_STARTERS } from "./askStarters";
 import { TokenUsageMeter } from "./TokenUsageMeter";
 import { conversationTotals, toMessages, useCitedRecords } from "../runtime/messages";
 import { useDraft } from "../runtime/useDraft";
@@ -352,6 +354,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       <div ref={column} className={cn(dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
         {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
           {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
+        {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}
         {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" />}
         {opening === "unavailable" && <div className="py-10 text-center">
           <h2 className="font-display text-xl text-stone-900">This conversation is not available.</h2>

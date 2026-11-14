@@ -1,5 +1,6 @@
 import type { ChatCitation, SemanticSearchResult } from "@/types/ai";
 import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
+import { plainSnippet } from "@/lib/plainSnippet";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { withMathRendered } from "./PassageQuote";
@@ -76,21 +77,38 @@ export function SourceContextPanel({ open, question = null, citations, sources, 
   );
 }
 
-/** One cited passage: its marker, a two-line quote, and its page; the whole row opens the paper there. */
+/**
+ * The section a passage sits in: the innermost heading of its trail, as plain
+ * words. The paper's own title is not a section, so it is never repeated here.
+ */
+function sectionOf(citation: ChatCitation, title: string): string {
+  if (!hasCitationQuote(citation)) return "";
+  const heading = plainSnippet([...(citation.context_path ?? [])].reverse().find((part) => part.trim()) ?? "");
+  return heading.toLowerCase() === title.trim().toLowerCase() ? "" : heading;
+}
+
+/**
+ * One cited passage (IR-1090): its marker, the section, a two-line snippet with
+ * no Markdown in it, and its page; the whole row opens the paper there.
+ */
 function PassageRow({ citation, title }: { citation: ChatCitation; title: string }) {
   const { to, state } = useCitationLink(citation);
-  const quote = hasCitationQuote(citation) ? citation.text.replace(/\s+/g, " ").trim() : "";
+  const snippet = hasCitationQuote(citation) ? plainSnippet(citation.text) : "";
+  const section = sectionOf(citation, title);
   return (
-    <Link to={to} state={state} title={quote || undefined}
+    <Link to={to} state={state} title={snippet || undefined}
       aria-label={openCitationLabel(citation, title)}
       className="group/row grid grid-cols-[1.375rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-stone-100">
       <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-md bg-brand-50 text-2xs font-semibold tabular-nums leading-none text-brand">
         {citation.marker}
       </span>
-      <span className="line-clamp-2 min-w-0 text-[13px] leading-[1.45] text-stone-700">
-        {quote ? withMathRendered(quote) : <span className="italic text-stone-500">Open the passage</span>}
+      <span className="min-w-0">
+        {section && <span className="block truncate text-label font-medium text-stone-600">{section}</span>}
+        <span className="line-clamp-2 block text-small text-stone-700">
+          {snippet ? withMathRendered(snippet) : <span className="italic text-stone-500">Open the passage</span>}
+        </span>
       </span>
-      <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-stone-500">
+      <span className="mt-0.5 flex items-center gap-1.5 text-label font-medium tabular-nums text-stone-500">
         {citation.page != null && <>p. {citation.page}</>}
         <i aria-hidden className="fas fa-arrow-right text-[9px] opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-visible/row:opacity-100" />
       </span>
@@ -131,12 +149,12 @@ export function SourcePassages({
         return (
           <section key={recordId} aria-label={title} className="py-2 first:pt-0 last:pb-0">
             <div className="flex items-baseline gap-2 px-2">
-              <Link to={`/records/${recordId}`} className="min-w-0 truncate text-[13px] font-semibold text-stone-900 hover:text-brand hover:underline">
+              <Link to={`/records/${recordId}`} className="min-w-0 truncate text-small font-semibold text-stone-900 hover:text-brand hover:underline">
                 {title}
               </Link>
               <ResearchOriginBadge origin={card?.origin} />
             </div>
-            {byline && <p className="truncate px-2 text-[12px] text-stone-500">{byline}</p>}
+            {byline && <p className="truncate px-2 text-label text-stone-500">{byline}</p>}
             <div className="mt-1">
               {passages.map((citation) => <PassageRow key={`${citation.chunk_id}-${citation.marker}`} citation={citation} title={title} />)}
             </div>
