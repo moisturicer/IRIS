@@ -382,6 +382,7 @@ class TestEvalRetrievalVariant:
         run = json.loads(next(Path(out).glob("*.json")).read_text(encoding="utf-8"))["runs"][0]
         chunking = run["provenance"]["chunking"]
         assert chunking["variant"] == "off" and chunking["tokenizer"] == TOKENIZER_ID
+        assert run["provenance"]["trial"] == {"skipped": {}, "not_embedded": {}}
         assert run["measures"]["recall@10"] == 1.0
 
     def test_an_active_run_records_its_chunking_too(self, corpus, questions, embedder, tmp_path):

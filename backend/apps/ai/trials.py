@@ -222,6 +222,7 @@ def plan_trial(variant: Variant, *, space_id: int,
     from apps.ai.ingestion.pipeline import _options_for_document, default_chunking_options
     from apps.ai.chunking import build_chunker, normalize
     from apps.ai.models.chunk import ChunkSet as ChunkSetModel
+    from apps.ai.providers.batching import estimate_tokens
     from apps.documents.models import PdfExtraction
 
     _check_spec(variant)
@@ -259,8 +260,6 @@ def plan_trial(variant: Variant, *, space_id: int,
         hashes = [chunk_text_hash(c) for c in built.chunks]
         have = _vectored_hashes(active["record_id"], space_id, hashes)
         owed = [c for c, h in zip(built.chunks, hashes) if h not in have]
-        from apps.ai.providers.batching import estimate_tokens
-
         record_plan.new_chunks = len(owed)
         record_plan.new_tokens = sum(estimate_tokens(c.text) for c in owed)
     return plan
@@ -290,7 +289,7 @@ def _write_set(record_plan: RecordPlan, variant: Variant):
 
     from apps.ai.models.chunk import ChunkSet as ChunkSetModel
     from apps.ai.models.chunk import DocumentChunk
-    from apps.ai.repositories import _serialize_page_sizes, serialize_regions
+    from apps.ai.repositories import _serialize_page_sizes, chunk_rows
 
     built = record_plan.chunk_set
     with transaction.atomic():
@@ -312,18 +311,7 @@ def _write_set(record_plan: RecordPlan, variant: Variant):
             trial_variant=variant.name,
             trial_spec=variant.spec,
         )
-        last = len(built.chunks) - 1 if built.chunks else 0
-        DocumentChunk.objects.bulk_create(
-            DocumentChunk(
-                chunk_set=row, record_id=record_plan.record_id, sequence=c.sequence,
-                max_sequence=last, text=c.text, content=c.content,
-                context_path=list(c.context_path), text_hash=chunk_text_hash(c),
-                token_count=c.token_count, source_page=c.source_page,
-                element_kinds=sorted(c.element_kinds), bboxes=serialize_regions(c.bboxes),
-                section_key=list(c.section_key),
-            )
-            for c in built.chunks
-        )
+        DocumentChunk.objects.bulk_create(chunk_rows(row, record_plan.record_id, built))
     return row, True
 
 
@@ -349,8 +337,12 @@ def _carry_over(row, space_id: int) -> int:
 
 def _embed_rest(row, space, provider, active_hash: str) -> tuple[int, str]:
     """Embed the trial chunks still without a vector. Returns (count, refusal)."""
+    from django.db import transaction
+
     from apps.ai.indexing import (
+        SPACE_RETIRED,
         EmbeddingRefused,
+        _hold_space,
         _require_disclosure,
         chunk_texts,
         default_permits,
@@ -385,10 +377,16 @@ def _embed_rest(row, space, provider, active_hash: str) -> tuple[int, str]:
         raise ValueError(
             f"provider returned {len(vectors)} vectors for {len(chunks)} chunks"
         )
-    ChunkEmbedding.objects.bulk_create(
-        (ChunkEmbedding(chunk=c, space=space, embedding=v) for c, v in zip(chunks, vectors)),
-        ignore_conflicts=True,
-    )
+    with transaction.atomic():
+        # Same write fence as indexing: no vectors into a space retired mid-run.
+        Record.objects.select_for_update().get(pk=row.record_id)
+        if not _hold_space(space):
+            return 0, SPACE_RETIRED
+        ChunkEmbedding.objects.bulk_create(
+            (ChunkEmbedding(chunk=c, space=space, embedding=v)
+             for c, v in zip(chunks, vectors)),
+            ignore_conflicts=True,
+        )
     return len(chunks), ""
 
 

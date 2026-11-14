@@ -234,11 +234,7 @@ class Command(BaseCommand):
                 f"not (IR-454)."
             )
 
-        plan = None
-        if variant is not None:
-            plan = self._plan(variant, options)
-            if options["dry_run"]:
-                return
+        plan = self._plan(variant, options) if variant is not None else None
 
         if options["dry_run"]:
             checks = check_question_set(question_set)
@@ -253,8 +249,9 @@ class Command(BaseCommand):
 
         configs = self._configs(options, techniques)
         root = composition_root()
+        trial = None
         if plan is not None:
-            self._build(plan, root)
+            trial = self._build(plan, root)
             root = root.for_trial(variant.name)
         self._warn_about_trial_sets()
         provenance = {
@@ -263,6 +260,7 @@ class Command(BaseCommand):
             "question_set_sha256": _question_set_digest(question_set.source),
             "retrieved_as": user.email,
             "chunking": chunking_provenance(variant),
+            **({"trial": trial} if trial is not None else {}),
         }
 
         reports = []
@@ -405,6 +403,11 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.WARNING(f"  record {record_id} not embedded: {reason}")
             )
+        # Papers missing from the trial corpus, so a score is read against it.
+        return {
+            "skipped": {str(r.record_id): r.skipped for r in plan.skipped},
+            "not_embedded": {str(k): v for k, v in outcome.refused.items()},
+        }
 
     def _warn_about_trial_sets(self):
         stored = trial_variants()
