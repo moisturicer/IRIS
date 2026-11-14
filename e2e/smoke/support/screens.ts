@@ -424,15 +424,15 @@ export const SCREENS: Screen[] = [
     heading: "Retention",
     primary: (p) => p.getByRole("button", { name: "Save period" }), primaryLabel: "Save period",
   },
-  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): RDCO
-  // publishes the next version of the data notice here.
+  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800, IR-972):
+  // RDCO publishes the next version of the data notice in Setup's Notice section.
   {
-    id: "notices", path: "/notices", route: "/notices", role: "RDCO",
+    id: "rdco-setup-notice", path: "/rdco/setup?section=notice", route: "/rdco/setup", role: "RDCO",
     mocks: wrap("RDCO", (api) => api.on("GET", "/auth/notice/versions/", [{
       version: 1, text: "IRIS data notice\n\nWhat IRIS keeps\nYour name and CIT-U email.",
       published_at: when("11-01"), published_by: { id: 4, name: "Rita Dela Cruz", email: "rdco@cit.edu" },
     }])),
-    heading: "Notices",
+    heading: "Version history",
     primary: (p) => p.getByRole("button", { name: "Preview" }), primaryLabel: "Preview",
   },
   {

@@ -1,7 +1,9 @@
 /**
- * The Notices page (ADR-051 decisions 16-17 as amended by ADR-063 decision 9,
- * IR-800). IRIS has one data notice. RDCO publishes its next version by
- * pasting the whole text; RDCO and the System Admin read every version.
+ * Setup's Notice section (ADR-051 decisions 16-17 as amended by ADR-063
+ * decision 9; IR-800, moved onto Setup by IR-972). IRIS has one data notice.
+ * RDCO publishes its next version by pasting the whole text and reads every
+ * version. The System Admin no longer has this page: it reads each publication
+ * in the Audit Log, and an old `/notices` link takes it there.
  *
  * Publishing first shows how many people must answer the new version, and
  * says plainly that the data protection officer approves the text first and
@@ -9,22 +11,19 @@
  * refused by the server (409 `notice_stale`); the paste is kept and the page
  * shows the version that is current now.
  *
- *   GET  /auth/notice/versions/          RDCO and the System Admin
+ *   GET  /auth/notice/versions/          RDCO
  *   GET  /auth/notice/versions/impact/   RDCO
  *   POST /auth/notice/versions/          RDCO   {based_on_version, text}
  */
 import { useEffect, useId, useState } from "react";
 import { noticeApi, staleNoticeFrom, type NoticeVersion } from "@/api/notice";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { Button } from "@/components/ui/Button";
 import { WARNING_NOTICE } from "@/components/ui/fieldClasses";
 import { Spinner } from "@/components/ui/Spinner";
 import { NoticeText } from "@/features/auth/notice/NoticeText";
-import { useAuth } from "@/hooks/useAuth";
 import { useApiRead } from "@/hooks/useApiRead";
-import { canAccess } from "@/lib/access";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
 
@@ -42,10 +41,7 @@ function isVersionList(data: unknown): data is NoticeVersion[] {
   return Array.isArray(data) && data.every((v) => v && typeof v.version === "number" && typeof v.text === "string");
 }
 
-export default function NoticesPage() {
-  const { user } = useAuth();
-  // ADR-063 decision 9: RDCO alone publishes; the server refuses anyone else.
-  const canPublish = canAccess(user?.role_name as never, "notices");
+export default function NoticeSection() {
   const read = useApiRead((signal) => noticeApi.versions({ signal }).then((r) => r.data), []);
   // A reread after publishing puts the read back to loading. The last history
   // stays on screen meanwhile, so the form, its paste and its outcome stay too.
@@ -59,10 +55,9 @@ export default function NoticesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Notices"
-        description="The data notice everyone answers before using IRIS, and every version published so far."
-      />
+      <p className="text-small text-stone-600">
+        The data notice everyone answers before using IRIS, and every version published so far.
+      </p>
 
       <div role="note" className={WARNING_NOTICE}>
         <i className="fas fa-exclamation-triangle mt-0.5 flex-shrink-0" aria-hidden />
@@ -92,10 +87,9 @@ export default function NoticesPage() {
             <p className="text-small font-semibold text-stone-900">
               Version {current.version}, {published(current)}
             </p>
-            {!canPublish && <p className="mt-1 text-small text-stone-600">Only RDCO publishes a new version.</p>}
           </div>
 
-          {canPublish && <PublishForm current={current} onPublished={read.retry} />}
+          <PublishForm current={current} onPublished={read.retry} />
 
           <VersionHistory versions={list} />
         </>

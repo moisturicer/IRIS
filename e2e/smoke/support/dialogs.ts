@@ -216,8 +216,8 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog", { name: "Erase existing data?" }),
   },
   {
-    id: "publish a new notice version", screen: "notices",
-    sources: ["features/admin/NoticesPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    id: "publish a new notice version", screen: "rdco-setup-notice",
+    sources: ["features/setup/NoticeSection.tsx", "components/shared/ConfirmDialog.tsx"],
     override: (api) => api.on("GET", "/auth/notice/versions/impact/", { current_version: 1, accounts_to_answer: 41 }),
     open: async (page) => {
       await page.getByRole("textbox", { name: "Notice text" }).fill("IRIS data notice, version two");

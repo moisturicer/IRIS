@@ -3,6 +3,8 @@
  * enforces who may call each route; these pin what RDCO sees and sends.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useLocation } from "react-router-dom";
+import { noticeApi } from "@/api/notice";
 import { setupApi, type SetupRecordType } from "@/api/setup";
 import { linkParts } from "@/components/shared/PlainTextWithLinks";
 import { ROLES } from "@/lib/constants";
@@ -295,5 +297,71 @@ describe("linkParts", () => {
       { text: "</b>" },
     ]);
     expect(linkParts("javascript:alert(1) ftp://a")).toEqual([{ text: "javascript:alert(1) ftp://a" }]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Setup's two sections (ADR-063 decision 9, IR-972)                          */
+/* -------------------------------------------------------------------------- */
+
+function Address() {
+  const { pathname, search } = useLocation();
+  return <p>Address: {`${pathname}${search}`}</p>;
+}
+
+const address = () => screen.getByText(/^Address: /).textContent?.replace("Address: ", "");
+const sections = () => screen.getByRole("tablist", { name: "Setup sections" });
+
+function notices() {
+  return vi.spyOn(noticeApi, "versions").mockResolvedValue({
+    data: [{ version: 1, text: "IRIS data notice", published_at: "2026-11-01T02:00:00Z", published_by: null }],
+  } as never);
+}
+
+describe("Setup's sections", () => {
+  it("opens on Requirements & Templates, and choosing Notice opens it and says so in the address", async () => {
+    load();
+    const versions = notices();
+    const user = userEvent.setup();
+    const { container } = renderScreen(<><SetupPage /><Address /></>, { route: "/rdco/setup" });
+    await screen.findByRole("heading", { level: 2, name: "Requirements & Templates" });
+
+    expect(within(sections()).getByRole("tab", { name: "Requirements & Templates" })).toHaveAttribute("aria-selected", "true");
+    expect(versions).not.toHaveBeenCalled();
+
+    await user.click(within(sections()).getByRole("tab", { name: "Notice" }));
+
+    expect(within(sections()).getByRole("tab", { name: "Notice" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("heading", { level: 2, name: "Version history" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "Requirements & Templates" })).not.toBeInTheDocument();
+    expect(address()).toBe("/rdco/setup?section=notice");
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("opens on the Notice when the address says so, which is where an old /notices link lands", async () => {
+    notices();
+    const records = load();
+    renderScreen(<SetupPage />, { route: "/rdco/setup?section=notice" });
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Version history" })).toBeInTheDocument();
+    expect(within(sections()).getByRole("tab", { name: "Notice" })).toHaveAttribute("aria-selected", "true");
+    expect(records).not.toHaveBeenCalled();
+  });
+
+  it("moves between sections with the arrow keys, and back to Requirements & Templates clears the address", async () => {
+    load();
+    notices();
+    const user = userEvent.setup();
+    renderScreen(<><SetupPage /><Address /></>, { route: "/rdco/setup?section=notice" });
+    await screen.findByRole("heading", { level: 2, name: "Version history" });
+
+    within(sections()).getByRole("tab", { name: "Notice" }).focus();
+    await user.keyboard("{ArrowLeft}");
+
+    const requirements = within(sections()).getByRole("tab", { name: "Requirements & Templates" });
+    expect(requirements).toHaveAttribute("aria-selected", "true");
+    expect(requirements).toHaveFocus();
+    expect(await screen.findByRole("heading", { level: 2, name: "Requirements & Templates" })).toBeInTheDocument();
+    expect(address()).toBe("/rdco/setup");
   });
 });

@@ -2,8 +2,8 @@
 RDCO publishes a new data notice version by pasting it (IR-799).
 
 ADR-051 decisions 16-17, as amended by ADR-063 decision 9: only RDCO
-publishes; RDCO and the System Admin read every version; anyone reads the
-current one. A version never changes. Tested at the HTTP boundary with real
+publishes and only RDCO reads every version, on Setup (IR-972); the System
+Admin sees each publication in the Audit Log; anyone reads the current one. A version never changes. Tested at the HTTP boundary with real
 tokens, because the sign-in block a publish triggers is enforced in
 authentication, which `force_authenticate` would skip.
 """
@@ -195,23 +195,22 @@ class ReadVersionsTests(APITestCase):
         notice.answer_notice(user, notice_version=self.base + 1, ai_consent=True)
         return client_for(user)
 
-    def test_rdco_and_the_system_admin_list_every_version_with_who_and_when(self):
-        sysadmin = self.answered("sysadmin-reader@cit.edu", RoleName.SYSTEM_ADMIN)
-        for client in (client_for(self.rdco), sysadmin):
-            with self.subTest():
-                response = client.get(VERSIONS)
-                self.assertEqual(response.status_code, 200)
-                rows = response.json()
-                self.assertEqual([r["version"] for r in rows], list(range(self.base + 1, 0, -1)))
-                self.assertEqual(rows[0]["published_by"]["email"], self.rdco.email)
-                self.assertEqual(rows[0]["text"], "Pasted.")
-                self.assertTrue(rows[0]["published_at"])
-                # Version 1 came from a migration, published by nobody, readable as text.
-                self.assertIsNone(rows[-1]["published_by"])
-                self.assertTrue(rows[-1]["text"])
+    def test_rdco_lists_every_version_with_who_and_when(self):
+        response = client_for(self.rdco).get(VERSIONS)
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()
+        self.assertEqual([r["version"] for r in rows], list(range(self.base + 1, 0, -1)))
+        self.assertEqual(rows[0]["published_by"]["email"], self.rdco.email)
+        self.assertEqual(rows[0]["text"], "Pasted.")
+        self.assertTrue(rows[0]["published_at"])
+        # Version 1 came from a migration, published by nobody, readable as text.
+        self.assertIsNone(rows[-1]["published_by"])
+        self.assertTrue(rows[-1]["text"])
 
     def test_no_other_role_lists_the_versions(self):
-        for role in [RoleName.STUDENT, RoleName.ADVISER, RoleName.KTTO, RoleName.ITSO, RoleName.IERC, None]:
+        # The System Admin included (ADR-063 decision 9, IR-972): it reads each
+        # publication in the Audit Log, which records who, when and which version.
+        for role in NOT_PUBLISHERS:
             with self.subTest(role=role):
                 client = self.answered(f"list-{role or 'none'}@cit.edu".lower(), role)
                 self.assertEqual(client.get(VERSIONS).status_code, 403)

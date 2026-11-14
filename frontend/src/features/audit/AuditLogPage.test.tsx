@@ -65,6 +65,27 @@ it("does not offer a type the server no longer lists, even though the frontend s
   expect(screen.queryByRole("option", { name: "PIN Generated" })).not.toBeInTheDocument();
 });
 
+// IR-972: an old link to the Notices page brings the System Admin here,
+// filtered to Notice publications, so the address carries the filter.
+it("opens filtered to the event type the address names, and never reads the unfiltered log first", async () => {
+  renderScreen(<AuditLogPage />, { route: "/admin/audit?event_type=NOTICE_PUBLISHED" });
+
+  await waitFor(() => expect(screen.getByRole("combobox", { name: "Event type" })).toHaveValue("NOTICE_PUBLISHED"));
+  expect(auditApi.list).toHaveBeenCalledTimes(1);
+  expect(auditApi.list).toHaveBeenCalledWith(expect.objectContaining({ event_type: "NOTICE_PUBLISHED" }));
+});
+
+it("still names the filter the address applied when the event types can't be loaded", async () => {
+  vi.mocked(auditApi.eventTypes).mockRejectedValue(new Error("offline"));
+  renderScreen(<AuditLogPage />, { route: "/admin/audit?event_type=NOTICE_PUBLISHED" });
+
+  await screen.findByText(/Event types could not be loaded/);
+  const select = screen.getByRole("combobox", { name: "Event type" });
+  expect(select).toHaveValue("NOTICE_PUBLISHED");
+  expect(within(select).getByRole("option", { selected: true })).toHaveTextContent("Data Notice Published");
+  expect(auditApi.list).toHaveBeenCalledWith(expect.objectContaining({ event_type: "NOTICE_PUBLISHED" }));
+});
+
 it("filters by an event type it learned only from the server", async () => {
   respondWithTypes([...serverTypes, { type: "A_BRAND_NEW_EVENT", label: "A Brand New Event" }]);
   const person = userEvent.setup();

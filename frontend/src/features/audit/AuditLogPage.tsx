@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { auditApi, type AuditListParams } from "@/api/audit";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable } from "@/components/shared/DataTable";
@@ -51,7 +51,11 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [eventType, setEventType] = useState("");
+  // `?event_type=` opens the log already filtered: an old link to the Notices
+  // page lands here on Notice publications (IR-972). Read once, on arrival.
+  const [searchParams] = useSearchParams();
+  const [initialEventType] = useState(() => searchParams.get("event_type") ?? "");
+  const [eventType, setEventType] = useState(initialEventType);
   // The filter's options come from the server (IR-913), so a new backend event
   // type is filterable with no frontend change. Until they arrive, or if they
   // never do, the select offers only "All events" and the log still works.
@@ -61,7 +65,7 @@ export default function AuditLogPage() {
   const [user, setUser] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [filters, setFilters] = useState<AuditListParams>({});
+  const [filters, setFilters] = useState<AuditListParams>(initialEventType ? { event_type: initialEventType } : {});
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
 
@@ -123,6 +127,10 @@ export default function AuditLogPage() {
     }}>
       <Select label="Event type" value={eventType} onChange={(e) => setEventType(e.target.value)} aria-describedby={typesFailed ? "audit-event-types-note" : undefined}>
         <option value="">All events</option>
+        {/* A type the address chose but the server didn't list (or the list failed): still named, so the filter shown is the one applied. */}
+        {eventType && !typeOptions.some((option) => option.type === eventType) && (
+          <option value={eventType}>{eventName(eventType, new Map())}</option>
+        )}
         {typeGroups.map(({ group, types }) => <optgroup key={group} label={group}>{types.map(({ type, label: text }) => <option key={type} value={type}>{text}</option>)}</optgroup>)}
       </Select>
       <Input label="Record ID" type="number" min="1" step="1" value={record} onChange={(e) => setRecord(e.target.value)} />
