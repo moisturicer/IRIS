@@ -43,6 +43,10 @@ class ChunkSet(models.Model):
     content_hash = models.CharField(max_length=64)
     page_sizes = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=False)
+    # Set only on an evaluation trial set (IR-1051): never active, never read
+    # by a reader path, removed by `cleanup_trial_chunk_sets`.
+    trial_variant = models.CharField(max_length=100, null=True, blank=True, default=None)
+    trial_spec = models.CharField(max_length=300, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -51,6 +55,15 @@ class ChunkSet(models.Model):
                 fields=["record"],
                 condition=models.Q(is_active=True),
                 name="one_active_chunk_set_per_record",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(is_active=False) | models.Q(trial_variant__isnull=True),
+                name="trial_chunk_set_is_never_active",
+            ),
+            models.UniqueConstraint(
+                fields=["record", "trial_variant"],
+                condition=models.Q(trial_variant__isnull=False),
+                name="one_trial_chunk_set_per_record_and_variant",
             ),
         ]
 
