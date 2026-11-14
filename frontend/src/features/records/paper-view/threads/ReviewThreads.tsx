@@ -105,7 +105,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
             aria-pressed={filter === f}
             onClick={() => setFilter(f)}
             className={cn(
-              "min-h-9 rounded-full px-3 text-small font-semibold ring-1",
+              "min-h-11 reading-split:min-h-9 rounded-full px-3 text-small font-semibold ring-1",
               filter === f ? "bg-brand-50 text-brand ring-brand-200" : "text-stone-700 ring-stone-300 hover:text-brand",
               FOCUS_RING,
             )}
@@ -523,7 +523,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
         <fieldset className="flex flex-wrap items-center gap-3">
           <legend className="sr-only">Severity</legend>
           {(["must_fix", "suggestion"] as const).map((s) => (
-            <label key={s} className="inline-flex items-center gap-1.5 text-small text-stone-800 min-h-9">
+            <label key={s} className="inline-flex items-center gap-1.5 text-small text-stone-800 min-h-11 reading-split:min-h-9">
               <input type="radio" name={`${ids}-severity`} value={s} checked={severity === s}
                 onChange={() => setSeverity(s)} className="accent-brand" />
               {SEVERITY_WORDS[s]}

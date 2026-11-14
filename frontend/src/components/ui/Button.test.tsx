@@ -157,6 +157,34 @@ describe("Button disabled state", () => {
 });
 
 /**
+ * Every size is 44px on a touch pointer (IR-1092, audit RES-02). `touch:` is the
+ * `(pointer: coarse)` media query, not a window width, so a tablet or a phone
+ * gets it whatever its size and a mouse never does. jsdom has no layout, so
+ * this asserts the class each size asks for; the measured size is the browser
+ * check recorded on the PR.
+ */
+describe("Button touch size (IR-1092)", () => {
+  // `page` and `full` are already `min-h-11` at every width.
+  it.each(["sm", "md", "lg"] as const)("makes %s at least 44px tall on a touch pointer", (size) => {
+    renderScreen(
+      <>
+        <Button size={size}>Button</Button>
+        <ButtonLink to="/x" size={size}>Link</ButtonLink>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Button" })).toHaveClass("touch:min-h-11");
+    expect(screen.getByRole("link", { name: "Link" })).toHaveClass("touch:min-h-11");
+  });
+
+  it("keeps the icon button a 44px square on touch even beside a wide window", () => {
+    renderScreen(<Button size="icon" aria-label="Open">x</Button>);
+
+    expect(screen.getByRole("button", { name: "Open" })).toHaveClass("touch:w-11", "touch:h-11");
+  });
+});
+
+/**
  * A navigation action is a link, not a button (IR-538, IR-213's decision), but
  * it looks like one. `ButtonLink` renders an anchor through the same variant
  * and size steps, so no caller copies the button's classes onto an `<a>`.

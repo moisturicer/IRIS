@@ -243,6 +243,11 @@ export interface PaperPdfReaderProps {
    */
   clearCorner?: boolean;
   /**
+   * What starts the toolbar (IR-1092): the caller's, for what the one-row phone
+   * record bar has no room for -- the paper's version or its picker.
+   */
+  toolbarStart?: ReactNode;
+  /**
    * The toolbar's download control (IR-677): the caller's, because only the
    * record knows where the viewer's download stands. Absent, there is none --
    * the bytes this reader holds are never saved as a copy (ADR-048).
@@ -304,6 +309,7 @@ function PaperPdfReaderSource({
   contained = false,
   fill = false,
   clearCorner = false,
+  toolbarStart,
   downloadControl,
   bottomInset = 0,
   highlights = NO_HIGHLIGHTS,
@@ -673,6 +679,7 @@ function PaperPdfReaderSource({
               ),
         )}
       >
+        {toolbarStart && <div className="order-first flex items-center">{toolbarStart}</div>}
         {fill && ready && (
           <span className="order-first px-2 text-small text-stone-600 tabular-nums">
             Page {currentPage} / {pageCount}
@@ -792,7 +799,7 @@ function PaperPdfReaderSource({
       >
         {status === "loading" && (
           <div className="mx-auto max-w-2xl bg-white shadow-card ring-1 ring-stone-200">
-            <Skeleton rows={8} label="Loading the paper…" />
+            <Skeleton rows={8} label="Loading the paper…" onRetry={() => setAttempt((n) => n + 1)} />
           </div>
         )}
 
