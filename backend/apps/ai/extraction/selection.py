@@ -105,6 +105,7 @@ def unstructured_extractor() -> StructuredExtractor:
         max_pages=settings.PDF_VALIDATION_MAX_PAGES or settings.UNSTRUCTURED_MAX_PAGES,
         max_figures=settings.UNSTRUCTURED_MAX_FIGURES,
         max_figure_pixels=settings.UNSTRUCTURED_MAX_FIGURE_PIXELS,
+        describe_images=settings.UNSTRUCTURED_IMAGE_DESCRIPTIONS,
     )
 
 

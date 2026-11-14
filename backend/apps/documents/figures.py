@@ -49,6 +49,7 @@ def replace_figures(extraction, figures) -> None:
             extraction=extraction, source_revision=extraction.source_revision,
             page=figure.page, bbox=dict(figure.bbox), caption=figure.caption or "",
             media_type=figure.media_type, name=figure.name[:255],
+            description=figure.description,
         )
         stored.image.save(f"figure{_SUFFIX[figure.media_type]}", ContentFile(figure.data), save=False)
         stored.save()
