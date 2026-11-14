@@ -74,7 +74,7 @@ export function PendingApprovalPage() {
       <div
         role="group"
         aria-labelledby={registeredId}
-        className="mt-section-lg border border-stone-200 border-t-2 border-t-gold bg-surface px-5 py-4"
+        className="mt-section-lg border border-stone-200 bg-surface px-5 py-4"
       >
         <p id={registeredId} className="text-label font-semibold text-stone-600">
           Registered as

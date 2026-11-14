@@ -108,7 +108,7 @@ export function ReviewStep({
         </Row>
       </Group>
 
-      {exactMatches.length > 0 && <section role="alert" className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+      {exactMatches.length > 0 && <section role="alert" className="rounded-lg border border-stone-300 bg-surface p-4">
         <h3 className="font-semibold">Identical manuscript</h3>
         <p>Choose another file or open the matching record.</p>
         <ul>{exactMatches.map((match) => <li key={match.id}>
@@ -128,13 +128,13 @@ export function ReviewStep({
           {matchesAcknowledged ? "Matches acknowledged" : "Acknowledge matches"}
         </button>
       </section>}
-      {matchFailure && <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+      {matchFailure && <div role="alert" className="rounded-lg border border-stone-300 bg-surface p-4">
         <p>{matchFailure}</p>
         <button type="button" onClick={onCheckAgain} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-2 min-h-9 px-4")}>Check again</button>
       </div>}
 
       {failure && (
-        <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-body text-brand">
+        <div role="alert" className="rounded-lg border border-stone-300 bg-surface px-4 py-3 text-body text-brand">
           <p className="flex items-start gap-2">
             <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
             <span>{failure.message}</span>

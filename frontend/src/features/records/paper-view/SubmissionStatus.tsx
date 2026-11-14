@@ -33,7 +33,7 @@ export function SubmissionStatus({ status }: { status: Status }) {
       {waiting.length > 0 && (
         <section
           aria-labelledby="waiting-on-you-heading"
-          className="rounded-xl border border-brand-200 bg-brand-50 p-3"
+          className="rounded-xl border border-stone-300 bg-surface p-3"
         >
           <h3 id="waiting-on-you-heading" className="text-sm font-bold text-brand-dark">
             Waiting on you

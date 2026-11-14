@@ -1464,6 +1464,8 @@ export interface DeleteRequest {
   requested_by_email:  string | null;
   reason:              string;
   status:              "pending" | "approved" | "declined";
+  /** RDCO's reason for a decline (IR-1099). Blank on an approval and on a decline from before notes. */
+  rdco_note:           string;
   reviewed_by:         number | null;
   reviewed_at:         string | null;
   created_at:          string;

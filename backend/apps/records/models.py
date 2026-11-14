@@ -808,6 +808,10 @@ class DeleteRequest(models.Model):
     )
     created_at  = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    # RDCO's reason for a decline (IR-1099), as `DownloadRequest.rdco_note`. An
+    # approval takes none. Blank on a decline made before notes existed: "No
+    # note recorded".
+    rdco_note = models.CharField(max_length=DOWNLOAD_NOTE_MAX_LENGTH, blank=True, default="")
 
 
 #: A Comment's longest text (ADR-032 §7, amendment 2026-10-31).
