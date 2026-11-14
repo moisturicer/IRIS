@@ -263,6 +263,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-S6 | Account protection | [details](traceability/NFR-S6.md) | **PARTIAL** |
 | **IR-999** | Soft rate limits: each budget has a per-minute burst whose refusal clears in under a minute, and a daily backstop; extends NFR-S6 (IR-661) | [details](traceability/IR-999.md) | **IMPLEMENTED** |
 | **IR-1053** | PDF evidence: each Manuscript's word boxes, fonts, bookmarks, page labels and contents entries, read once at extraction in a sandbox and stored beside the raw result; a bad PDF stores its error and extraction still completes (ADR-067 decision 4) | [details](traceability/IR-1053.md) | **IMPLEMENTED** |
+| **IR-1073** | Every page has its own browser tab title: `<page> · IRIS` from the route, refined by a paper's, a conversation's or My Reviews' own name (audit NAV-01, WCAG 2.4.2) — epic IR-920; no FR- id | [details](traceability/IR-1073.md) | **IMPLEMENTED** |
 | **IR-1075** | Notifications show when their review task has closed: a notification that asked for action carries `resolved_at` and `resolved_label` from the server, leaves the unread count, and is final across a clearance reset — epic IR-671; ADR-069; no FR- id | [details](traceability/IR-1075.md) | **PARTIAL** |
 | NFR-P1 | 100 concurrent sessions | [details](traceability/NFR-P1.md) | **NOT STARTED** |
 | NFR-P2…P5 | Performance and processing | [details](traceability/NFR-P2-P5.md) | **NOT STARTED** |

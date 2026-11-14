@@ -4,6 +4,11 @@ import type { PageWidth } from "./PageContainer";
 
 export type RouteHandle = {
   crumb?: string;
+  /**
+   * The browser tab's name for a page that shows no breadcrumb (IR-1073). A
+   * route with a crumb needs no title: the tab reads the crumb.
+   */
+  title?: string;
   /** How wide the page may grow; `AppShell` reads it (IR-521). Standard when absent. */
   width?: PageWidth;
 };

@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { aiApi } from "@/api/ai";
+import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { conversationPath } from "@/lib/askHandoff";
 import { CitationConversationContext } from "@/lib/citedPage";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
@@ -32,6 +33,7 @@ export function earlierTranscript(conversation: ConversationDetail): ChatMessage
 export function EarlierConversation({ id }: { id: number }) {
   const [conversation, setConversation] = useState<ConversationDetail>();
   const [failure, setFailure] = useState<"unavailable" | "failed">();
+  usePageTitle(conversation?.title);
 
   useEffect(() => {
     let current = true;

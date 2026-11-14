@@ -9,6 +9,7 @@ import { ResearchCard } from "@/components/shared/ResearchCard";
 import { Badge, Button, Skeleton } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { errorDetail } from "@/lib/errorDetail";
 import { readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
 import { canAccess, pathFor } from "@/lib/access";
@@ -57,6 +58,9 @@ export default function MyReviewsPage() {
   const coordinatorOffice = access?.is_coordinator ? access.offices[0] ?? null : null;
 
   const [page, setPage] = useState<Page | null>(null);
+  // The tab carries the work waiting on the reader, so a count is seen without opening it (IR-1073).
+  const waiting = page?.counts.to_review;
+  usePageTitle(waiting ? `My Reviews (${waiting})` : null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** Why `loadError` is set (IR-906): a timeout offers Retry, a refusal offers none. */
