@@ -13,7 +13,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { errorDetail } from "@/lib/errorDetail";
 import { readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
-import { canAccess, pathFor } from "@/lib/access";
+import { canAccess, isCoordinator, pathFor } from "@/lib/access";
 import type { RoleName } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
@@ -56,7 +56,7 @@ export default function MyReviewsPage() {
   const { view, replace } = readView(params);
   const viewer = useAuthStore((s) => s.user);
   const access = viewer?.review_access;
-  const coordinatorOffice = access?.is_coordinator ? access.offices[0] ?? null : null;
+  const coordinatorOffice = isCoordinator(access) ? access?.offices[0] ?? null : null;
 
   const [page, setPage] = useState<Page | null>(null);
   // The tab carries the work waiting on the reader, so a count is seen without opening it (IR-1073).
@@ -191,7 +191,7 @@ export default function MyReviewsPage() {
               </Link>
             )}
             {coordinatorOffice && (
-              <Link to="/review/office"
+              <Link to={pathFor("reviewOffice")}
                 className={cn("inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
                 <i className="fas fa-users-gear" aria-hidden />
                 {officeLabel} console
