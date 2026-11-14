@@ -19,6 +19,7 @@ import { act, fireEvent, render, screen, userEvent, waitFor, within } from "@/te
 import type { TextRun } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 
+import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
 import { PaperPdfReader } from "./PaperPdfReader";
 import type { Passage } from "./threads/passage";
 import { ReaderAnnotationsContext } from "./threads/readerAnnotations";
@@ -439,6 +440,22 @@ describe("citation highlights", () => {
     // `getByRole` above already found accessibly.
     expect(page1.querySelector("[aria-hidden='true'] > div")).toBeNull();
     expect(page2.querySelector("[aria-hidden='true'] > div")).not.toBeNull();
+  });
+});
+
+describe("keeping clear of the corner buttons (IR-1079)", () => {
+  it("leaves room under the last page for Notes and Ask IRIS when the caller asks", async () => {
+    render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" contained fill clearCorner />,
+    );
+
+    expect(await screen.findByRole("region", { name: "Paper, 3 pages" })).toHaveClass(CORNER_CLEARANCE_CLASS);
+  });
+
+  it("adds none when the caller has no corner buttons over it", async () => {
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" contained fill />);
+
+    expect(await screen.findByRole("region", { name: "Paper, 3 pages" })).not.toHaveClass(CORNER_CLEARANCE_CLASS);
   });
 });
 

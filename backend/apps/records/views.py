@@ -2092,6 +2092,21 @@ class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DeleteRequestSerializer
     queryset         = DeleteRequest.objects.select_related("record", "requested_by")
 
+    def get_queryset(self):
+        """
+        `?status=` narrows the queue (IR-1076, audit WF-02). It was accepted and
+        ignored: this view declared no filter, so the Pending tab listed
+        declined requests. `pending`, `approved` and `declined` match one
+        state; `decided` is everything RDCO has already acted on.
+        """
+        qs = super().get_queryset()
+        status_filter = self.request.query_params.get("status")
+        if status_filter == "decided":
+            qs = qs.exclude(status=RequestStatus.PENDING)
+        elif status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs.order_by("-created_at", "-pk")
+
     def get_permissions(self):
         if self.action in ("list", "retrieve"):
             # The Delete Requests queue is RDCO's, matching approve/decline
