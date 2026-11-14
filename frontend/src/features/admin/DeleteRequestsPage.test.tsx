@@ -2,6 +2,10 @@
  * IR-914: RDCO's delete-request queue reads under `useApiRead`. A timed-out
  * read is the "interrupted" state with a Retry, a change of filter cancels the
  * read in flight, and the reader's Retry is the only thing that repeats it.
+ *
+ * IR-1076 (audit WF-02): Pending and Decided are the two tabs. Pending asks for
+ * pending requests and offers the action; Decided asks for the rest, shows each
+ * outcome and the requester's reason, and offers no action.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -74,7 +78,7 @@ describe("DeleteRequestsPage reads", () => {
     renderScreen(<DeleteRequestsPage />);
     await waitFor(() => expect(signals).toHaveLength(1));
 
-    await userEvent.click(screen.getByRole("button", { name: "Approved" }));
+    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
 
     await waitFor(() => expect(signals).toHaveLength(2));
     expect(signals[0].aborted).toBe(true);
@@ -94,5 +98,86 @@ describe("DeleteRequestsPage reads", () => {
     unmount();
 
     expect(signals[0].aborted).toBe(true);
+  });
+});
+
+describe("DeleteRequestsPage tabs (IR-1076)", () => {
+  const waiting = request({ id: 1, record_title: "Still waiting", status: "pending" });
+  const turnedDown = request({
+    id: 2,
+    record_title: "Turned down",
+    status: "declined",
+    reason: "Kept for the archive",
+    reviewed_at: "2026-11-02T08:00:00Z",
+  });
+  const removed = request({
+    id: 3,
+    record_title: "Removed thesis",
+    status: "approved",
+    reason: "Duplicate upload",
+    reviewed_at: "2026-11-03T08:00:00Z",
+  });
+
+  it("opens on Pending, asks for pending requests and offers the action", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+
+    renderScreen(<DeleteRequestsPage />);
+
+    expect(await screen.findByRole("link", { name: "Still waiting" })).toBeInTheDocument();
+    expect(listDeleteRequests.mock.calls[0][0]).toEqual({ status: "pending" });
+    expect(screen.getByRole("button", { name: "Pending" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Approve Deletion" })).toBeInTheDocument();
+  });
+
+  it("offers Pending and Decided, and no tab that mixes the two", () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [] } });
+
+    renderScreen(<DeleteRequestsPage />);
+
+    expect(screen.getByRole("button", { name: "Pending" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Decided" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approved" })).not.toBeInTheDocument();
+  });
+
+  it("shows decided requests with their outcome and reason, and no action", async () => {
+    listDeleteRequests.mockImplementation((params: { status?: string }) =>
+      Promise.resolve({
+        data: { results: params.status === "decided" ? [turnedDown, removed] : [waiting] },
+      }),
+    );
+
+    renderScreen(<DeleteRequestsPage />);
+    await screen.findByRole("link", { name: "Still waiting" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+
+    expect(await screen.findByRole("link", { name: "Turned down" })).toBeInTheDocument();
+    expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "decided" });
+    expect(screen.getByText("Declined")).toBeInTheDocument();
+    expect(screen.getByText("Approved")).toBeInTheDocument();
+    expect(screen.getByText("Kept for the archive")).toBeInTheDocument();
+    expect(screen.getByText("Duplicate upload")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Approve Deletion/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Still waiting" })).not.toBeInTheDocument();
+  });
+
+  it("never offers an action on a declined row, even if one reaches the Pending list", async () => {
+    // The WF-02 case: the server once answered `?status=pending` with everything.
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting, turnedDown] } });
+
+    renderScreen(<DeleteRequestsPage />);
+    await screen.findByRole("link", { name: "Turned down" });
+
+    expect(screen.getAllByRole("button", { name: "Approve Deletion" })).toHaveLength(1);
+  });
+
+  it("says plainly when nothing is decided yet", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [] } });
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+
+    expect(await screen.findByText("No requests have been decided yet.")).toBeInTheDocument();
   });
 });
