@@ -138,7 +138,7 @@ export default function DownloadRequestsPage() {
           {error}
         </div>
       )}
-      {!error && read.status === "failed" && (
+      {read.status === "failed" && (
         <LoadFailedAlert
           message={failureMessage(read.error, { lead: "The download requests didn't load." })}
           onRetry={load}

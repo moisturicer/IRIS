@@ -2,7 +2,7 @@
  * Role Requests page — staff/admin only.
  * Lists pending role requests and allows approve / decline.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { accountsApi }   from "@/api/accounts";
 import { failureMessage } from "@/lib/readFailure";
 import { useUIStore }    from "@/store/ui.store";
@@ -14,32 +14,25 @@ import { TONES } from "@/components/ui/statusTones";
 import type { RoleRequest } from "@/types/auth";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { LoadMore } from "@/components/shared/LoadMore";
+import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 
 export default function RoleRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
 
-  const [requests,  setRequests]  = useState<RoleRequest[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  // The API pages at 20; "Load more" reads the next page (IR-1100).
+  const read = usePagedRead(
+    (page, signal) => accountsApi.roleRequests({ signal, ...pageParam(page) }).then(({ data }) => toPage(data)),
+    [],
+  );
+  const requests = read.rows;
+  const loading = read.status === "loading";
   // A failed load is not an empty queue (IR-745): "All caught up!" after an
   // error would tell RDCO there is nothing to decide when there may be.
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [loadError, setLoadError] = useState<unknown>(null);
+  const loadFailed = read.status === "failed" || read.status === "interrupted";
+  const load = read.retry;
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
   const [_acting,   setActing]    = useState(false);
-
-  const load = () => {
-    setLoading(true);
-    accountsApi
-      .roleRequests()
-      .then(({ data }) => {
-        setRequests(data.results);
-        setLoadFailed(false);
-      })
-      .catch((error: unknown) => { setLoadFailed(true); setLoadError(error); })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
 
   const handleDecide = async () => {
     if (!target) return;
@@ -74,7 +67,7 @@ export default function RoleRequestsPage() {
           tone="error"
           icon="fa-circle-exclamation"
           title="Couldn't load role requests"
-          message={failureMessage(loadError)}
+          message={failureMessage(read.error)}
           action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
         />
       ) : requests.length === 0 ? (
@@ -138,6 +131,13 @@ export default function RoleRequestsPage() {
               ))}
             </tbody>
           </table>
+          <LoadMore
+            hasMore={read.hasMore}
+            error={read.moreError}
+            loading={read.loadingMore}
+            onLoadMore={read.loadMore}
+            className="border-t border-stone-100 px-5 py-3"
+          />
         </div>
       )}
 

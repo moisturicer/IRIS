@@ -27,7 +27,7 @@ import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { LoadMore } from "@/components/shared/LoadMore";
 import { failureMessage } from "@/lib/readFailure";
-import { toPage, usePagedRead } from "@/hooks/usePagedRead";
+import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
 
@@ -171,7 +171,7 @@ function RequestCard({
 export default function AccountDeletionRequestsPage() {
   // The API pages; "Load more" reads the next page and appends it (IR-1100).
   const read = usePagedRead(
-    (page, signal) => accountsApi.deletionRequests({ signal, page }).then(({ data }) => toPage(data)),
+    (page, signal) => accountsApi.deletionRequests({ signal, ...pageParam(page) }).then(({ data }) => toPage(data)),
     [],
   );
   const requests = read.rows;

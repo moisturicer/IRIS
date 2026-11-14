@@ -53,7 +53,7 @@ export interface PagedRead<T> {
   retry: () => void;
 }
 
-const MORE_FAILED = "Could not load more requests. Please try again.";
+const MORE_FAILED = "Could not load more. Please try again.";
 
 /**
  * A list the API pages (IR-1100): the first page under `useApiRead`, then
@@ -78,10 +78,12 @@ export function usePagedRead<T>(
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const reading = useRef(false);
 
   // A new first page (or its loss) ends whatever was being read after the old
   // one, and clears its failure.
   useEffect(() => {
+    reading.current = false;
     setLoadingMore(false);
     setMoreError(null);
     return () => controller.current?.abort();
@@ -92,7 +94,10 @@ export function usePagedRead<T>(
   const hasMore = (following ? following.next : firstPage?.next) != null;
 
   const loadMore = async () => {
-    if (!firstPage || loadingMore) return;
+    // The ref, not `loadingMore`: two clicks before a re-render both see the
+    // state as false, and the second would orphan the first read's controller.
+    if (!firstPage || reading.current) return;
+    reading.current = true;
     const page = (following?.page ?? 1) + 1;
     const own = new AbortController();
     controller.current = own;
@@ -107,11 +112,15 @@ export function usePagedRead<T>(
         page,
         next: data.next,
       });
-      setLoadingMore(false);
     } catch {
       if (own.signal.aborted) return;
       setMoreError(MORE_FAILED);
-      setLoadingMore(false);
+    } finally {
+      // An aborted read was ended by the effect above, which already reset this.
+      if (!own.signal.aborted) {
+        reading.current = false;
+        setLoadingMore(false);
+      }
     }
   };
 

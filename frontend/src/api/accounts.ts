@@ -131,7 +131,11 @@ export const accountsApi = {
   downloadMyData: () => apiClient.get<Blob>("/users/me/data/", { responseType: "blob" }),
 
   // Role requests
-  roleRequests:  () => apiClient.get<PaginatedResponse<RoleRequest>>("/users/role-requests/"),
+  roleRequests:  (opts?: { signal?: AbortSignal; page?: number }) =>
+    apiClient.get<PaginatedResponse<RoleRequest>>("/users/role-requests/", {
+      params: opts?.page ? { page: opts.page } : undefined,
+      signal: opts?.signal,
+    }),
   decideRequest: (id: number, action: "approve" | "decline") =>
     apiClient.patch<RoleRequest>(`/users/role-requests/${id}/`, { action }),
 
