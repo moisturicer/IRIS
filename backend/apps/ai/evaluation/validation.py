@@ -106,7 +106,9 @@ def check_label(question_id: str, label: Label, trial_variant: Optional[str] = N
     return LabelCheck(question_id, label, record_id=record.pk, found_on_pages=pages)
 
 
-def _check_region(question_id, label: Label, record: Record, trial_variant=None) -> LabelCheck:
+def _check_region(
+    question_id: str, label: Label, record: Record, trial_variant: Optional[str] = None
+) -> LabelCheck:
     """A figure label must overlap some chunk's box on its page (IR-1125)."""
     from apps.ai.regions import normalized_regions
     from apps.ai.retrieval.scope import chunk_set_scope
@@ -115,7 +117,7 @@ def _check_region(question_id, label: Label, record: Record, trial_variant=None)
         chunk_set_scope("", trial_variant), record=record, deleted_at__isnull=True,
     ).values_list("bboxes", "chunk_set__page_sizes")
     covered = any(
-        region.page == label.page and label.region.covered_by(region) >= MIN_REGION_OVERLAP
+        region.page == label.page and label.region.overlap(region) >= MIN_REGION_OVERLAP
         for bboxes, sizes in rows
         for region in normalized_regions(bboxes, sizes)
     )
@@ -142,7 +144,7 @@ def render_checks(checks: list[LabelCheck]) -> str:
     lines = [f"{len(good)}/{len(checks)} labels resolve against this database.", ""]
     for check in bad:
         lines.append(f"  x {check.question_id}: {check.problem}")
-        lines.append(f"      label: {check.label.describe[:70]}")
+        lines.append(f"      label: {check.label.display[:70]}")
         lines.append(f"      record: {str(check.label.record)[:70]}")
     if bad:
         lines.append("")

@@ -1,9 +1,8 @@
-"""What should the reranker read? IR-1125's paired arm comparison.
+"""IR-1125's paired arm comparison of what the reranker reads.
 
-Every arm reranks the same recalled candidates per question: recall runs once
-per question and is shared, so a difference on a question is caused by the
-arm. A rerank whose input list repeats one already sent for that question is
-served from memory, so an arm identical to today costs nothing.
+Recall runs once per question and every arm reranks it; an input list already
+reranked for that question is served from memory, so an arm identical to
+today costs nothing.
 """
 
 from __future__ import annotations
@@ -15,6 +14,7 @@ from typing import Any, Optional, Sequence
 
 from apps.ai.providers.ports import RerankedCandidate, Reranker
 from apps.ai.retrieval.ports import RetrievalResult, Retriever
+from apps.ai.retrieval.reranking import DEFAULT_RECALL_LIMIT
 from apps.ai.retrieval.reranker_input import (
     ARM_LABELS,
     DESCRIBED,
@@ -68,8 +68,6 @@ class SharedRecall(Retriever):
             self._memo[key] = self._inner.retrieve(question, user, limit=limit)
         return self._memo[key]
 
-    def candidates(self, question: str):
-        return tuple(p for (q, _), r in self._memo.items() if q == question for p in r.passages)
 
 
 class MeteredReranker(Reranker):
@@ -80,16 +78,18 @@ class MeteredReranker(Reranker):
         self.transmits_externally = real.transmits_externally if real else True
         self._memo: dict[tuple[str, tuple[str, ...]], list[RerankedCandidate]] = {}
         self.tokens = 0
+        self.billed = 0
         self.calls = 0
-        self.sent: list[tuple[str, tuple[str, ...]]] = []
+        #: Inputs of the last rerank asked for, sent or served from memory.
+        self.received: tuple[str, ...] = ()
 
     def rerank(self, query: str, candidates: Sequence[str]) -> list[RerankedCandidate]:
         key = (query, tuple(candidates))
+        self.received = key[1]
         if key in self._memo:
             return self._memo[key]
         self.calls += 1
         self.tokens += rerank_tokens(query, candidates)
-        self.sent.append(key)
         if self._real is None:
             ranked = [
                 RerankedCandidate(index=i, text=t, score=float(len(candidates) - i))
@@ -97,6 +97,7 @@ class MeteredReranker(Reranker):
             ]
         else:
             ranked = self._real.rerank(query, candidates)
+            self.billed += getattr(self._real, "last_usage", None) or 0
         self._memo[key] = ranked
         return ranked
 
@@ -140,6 +141,11 @@ def _recall(outcome: QuestionOutcome) -> float:
     return outcome.retrieved_hits / outcome.expected if outcome.expected else 0.0
 
 
+def _found(outcome: QuestionOutcome) -> bool:
+    """The paired unit: every expected passage in the top k."""
+    return bool(outcome.expected) and outcome.retrieved_hits == outcome.expected
+
+
 def _final(outcome: QuestionOutcome) -> float:
     return outcome.final_hits / outcome.expected if outcome.expected else 0.0
 
@@ -154,6 +160,8 @@ class ArmRun:
     paid_calls: dict[tuple[str, str], int] = field(default_factory=dict)
     defects: list[Defect] = field(default_factory=list)
     recall_calls: int = 0
+    billed_tokens: int = 0
+    recalls: dict[str, SharedRecall] = field(default_factory=dict)
     provenance: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -161,7 +169,9 @@ class ArmRun:
         return sum(self.tokens.values())
 
     def cost_usd(self, per_million: Optional[float]) -> Optional[float]:
-        return None if per_million is None else self.total_tokens * per_million / 1_000_000
+        """Billed tokens when the vendor reported them, else the local count."""
+        tokens = self.billed_tokens or self.total_tokens
+        return None if per_million is None else tokens * per_million / 1_000_000
 
     def identical_to_today(self, set_name: str, arm: str) -> bool:
         """Whether ``arm`` sent no rerank today had not already sent."""
@@ -188,8 +198,8 @@ class ArmRun:
         return sorted({q.kind for q in self.sets[set_name].scored if q.kind})
 
     def paired(self, set_name: str, first: str, second: str) -> Paired:
-        a = {o.question_id: _recall(o) for o in self.outcomes.get((set_name, first), [])}
-        b = {o.question_id: _recall(o) for o in self.outcomes.get((set_name, second), [])}
+        a = {o.question_id: _found(o) for o in self.outcomes.get((set_name, first), [])}
+        b = {o.question_id: _found(o) for o in self.outcomes.get((set_name, second), [])}
         shared = [q for q in a if q in b]
         return Paired(
             first=first, second=second,
@@ -199,7 +209,7 @@ class ArmRun:
         )
 
     def fully_recalled(self, set_name: str, arm: str) -> int:
-        return sum(1 for o in self.outcomes.get((set_name, arm), []) if o.retrieved_hits == o.expected)
+        return sum(1 for o in self.outcomes.get((set_name, arm), []) if _found(o))
 
     def decision(self) -> list[str]:
         """The rule applied as written; a person still records the decision."""
@@ -261,11 +271,14 @@ class ArmRun:
             "recall": recall,
             "comparisons": [p.as_dict() | {"set": name} for name, p in self._named_comparisons()],
             "per_question": {
-                f"{name}/{ARM_LABELS[arm]}": {o.question_id: round(_recall(o), 4) for o in rows}
+                f"{name}/{ARM_LABELS[arm]}": {
+                    o.question_id: {"recall": round(_recall(o), 4), "found": _found(o)} for o in rows
+                }
                 for (name, arm), rows in self.outcomes.items()
             },
             "defects": [d.__dict__ for d in self.defects],
             "tokens": self.total_tokens,
+            "billed_tokens": self.billed_tokens or None,
             "cost_per_million_usd": cost_per_million,
             "cost_usd": None if cost is None else round(cost, 4),
             "recall_calls": self.recall_calls,
@@ -286,6 +299,8 @@ class ArmRun:
     def render(self, cost_per_million: Optional[float] = None) -> str:
         lines = ["IR-1125: what the reranker reads", "", "Decision rule (fixed before any paid run):",
                  DECISION_RULE, ""]
+        if self.dry_run:
+            lines += ["DRY RUN: nothing was reranked, so recall below is recall order.", ""]
         for name in self.sets:
             lines.append(f"{name} set")
             for arm in self.arms:
@@ -300,21 +315,41 @@ class ArmRun:
                     kr, kf, kn = self.recall(name, arm, kind)
                     lines.append(f"         {kind:<22} recall@10 {kr:.3f}  final {kf:.3f}  n={kn}")
             lines.append("")
-        lines.append("Paired comparisons (first vs second: wins / losses / ties, exact p)")
+        lines.append("Paired comparisons, question found in top k (wins / losses / ties, exact p)")
         for name, p in self._named_comparisons():
             lines.append(
                 f"  {name:<7} {ARM_LABELS[p.first]} vs {ARM_LABELS[p.second]:<6} "
                 f"{len(p.wins)} / {len(p.losses)} / {p.ties}  p={p.p_value:.4f}"
             )
         cost = self.cost_usd(cost_per_million)
-        lines += ["", f"Rerank tokens {'estimated' if self.dry_run else 'sent'}: {self.total_tokens}"
-                  + (f"  (~${cost:.4f})" if cost is not None else "  (unpriced: pass --cost-per-million)")]
+        billed = f", billed {self.billed_tokens}" if self.billed_tokens else ""
+        lines += ["", f"Rerank tokens counted: {self.total_tokens}{billed}"
+                  + (f"  (${cost:.4f})" if cost is not None else "  (unpriced: pass --cost-per-million)")]
         if self.defects:
             lines.append(f"Defects (rule 4): {len(self.defects)}")
             lines += [f"  {d.set_name}/{d.question_id} {ARM_LABELS[d.arm]} chunk {d.chunk_id}"
                       for d in self.defects[:20]]
         lines += ["", "Decision:", *[f"  {line}" for line in self.decision()]]
         return "\n".join(lines)
+
+
+def _defects(set_name, question_id, passages, received) -> list[Defect]:
+    """Rule 4, on what the reranker was actually handed.
+
+    A passage today sent must reach every other arm unchanged unless that arm
+    is meant to change it. Arm A is meant to change every passage.
+    """
+    found = []
+    today = set(received.get(TODAY, ()))
+    for arm, inputs in received.items():
+        if arm in (TODAY, EMBEDDED):
+            continue
+        handed = set(inputs)
+        for passage in passages:
+            shown = reranker_text(passage, TODAY)
+            if shown in today and shown not in handed and not changes_expected(passage, arm):
+                found.append(Defect(set_name, question_id, arm, passage.chunk_id))
+    return found
 
 
 def compare(
@@ -326,12 +361,14 @@ def compare(
     arms: Sequence[str] = READS,
     retrieval_limit: int = 10,
     max_sources: int = 8,
+    recalls: Optional[dict[str, SharedRecall]] = None,
 ) -> ArmRun:
     """Rerank each question's shared candidates under every arm.
 
     ``roots`` names the root each set retrieves through: the figure papers may
     live in a trial chunk set. ``reranker`` None is the dry run: recall still
     runs, so the inputs and the token estimate are real, but nothing is reranked.
+    ``recalls`` reuses an earlier run's recall, so a paid run embeds nothing again.
     """
     arms = tuple(sorted(set(arms) | {TODAY}, key=READS.index))
     metered = MeteredReranker(reranker)
@@ -340,13 +377,17 @@ def compare(
 
     for name, question_set in sets.items():
         root = roots[name]
-        shared = SharedRecall(root.recall_stage())
+        shared = (recalls or {}).get(name) or SharedRecall(root.recall_stage())
+        run.recalls[name] = shared
         selection = root.source_selection(max_sources)
         for question in question_set.scored:
+            received: dict[str, tuple[str, ...]] = {}
             for arm in arms:
                 retriever = root.reranking_over(shared, metered, arm)
                 calls, tokens = metered.calls, metered.tokens
+                metered.received = ()
                 result = retriever.retrieve(question.question, user, limit=limit)
+                received[arm] = metered.received
                 passages = list(result.passages)
                 run.outcomes.setdefault((name, arm), []).append(_outcome(
                     question, passages[:retrieval_limit], selection.apply(passages),
@@ -354,12 +395,10 @@ def compare(
                 ))
                 run.paid_calls[(name, arm)] = run.paid_calls.get((name, arm), 0) + metered.calls - calls
                 run.tokens[(name, arm)] = run.tokens.get((name, arm), 0) + metered.tokens - tokens
-            for candidate in shared.candidates(question.question):
-                for arm in arms:
-                    changed = reranker_text(candidate, arm) != reranker_text(candidate, TODAY)
-                    if changed and not changes_expected(candidate, arm):
-                        run.defects.append(Defect(name, question.id, arm, candidate.chunk_id))
+            recalled = shared.retrieve(question.question, user, limit=DEFAULT_RECALL_LIMIT)
+            run.defects += _defects(name, question.id, recalled.passages, received)
         run.recall_calls += shared.calls
+    run.billed_tokens = metered.billed
 
     run.provenance = {
         "ran_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

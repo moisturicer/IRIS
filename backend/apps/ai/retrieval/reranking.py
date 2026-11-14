@@ -181,9 +181,7 @@ class RerankingRetriever(Retriever):
         # was told -- that the vendor was out, which path ran, which space --
         # is not its to restate (IR-279).
         inner = self._inner.retrieve(question, user, limit=self._recall_limit)
-        # The vendor refuses an empty document, so a passage with nothing for
-        # the reranker to read is dropped (IR-1102); `reads` decides what that
-        # is for an uncaptioned Figure (IR-1125).
+        # Nothing to read is dropped: the vendor refuses an empty document (IR-1102, IR-1125).
         permitted = self._permitted(inner.passages)
         texts = {c.chunk_id: reranker_text(c, self._reads) for c in permitted}
         candidates = [c for c in permitted if texts[c.chunk_id].strip()]

@@ -26,7 +26,7 @@ def test_an_uncaptioned_figure_needs_no_quote():
     label = _set(FIGURE).questions[0].expected[0]
 
     assert label.is_figure and label.quote == ""
-    assert label.describe.startswith("figure p3")
+    assert label.display.startswith("figure p3")
 
 
 def test_a_figure_matches_by_page_and_overlap_not_by_text():
@@ -36,6 +36,8 @@ def test_a_figure_matches_by_page_and_overlap_not_by_text():
     assert not label.matches(passage(Region(4, 0.1, 0.2, 0.5, 0.6)))
     assert not label.matches(passage(Region(3, 0.45, 0.2, 0.9, 0.6)))
     assert not label.matches(passage(Region(3, 0.1, 0.2, 0.5, 0.6), title="Other"))
+    # A text chunk whose box encloses the figure is not the figure.
+    assert not label.matches(passage(Region(3, 0.0, 0.0, 1.0, 1.0)))
 
 
 @pytest.mark.parametrize("bad", [

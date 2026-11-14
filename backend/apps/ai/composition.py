@@ -108,13 +108,6 @@ def _vendor_failures() -> Callable[[BaseException], bool]:
     return should_degrade
 
 
-def _reranker_reads() -> str:
-    """What the reranker reads (IR-1125); `today` until a run moves it."""
-    from django.conf import settings
-
-    return getattr(settings, "AI_RERANKER_READS", "today")
-
-
 class CompositionRoot:
     """The assembled query lane.
 
@@ -288,13 +281,11 @@ class CompositionRoot:
         ``records`` narrows to a set of Record ids (IR-500), on every path
         including the outage fallback, intersected with ``visible_to``.
         """
+        from django.conf import settings
+
         return DegradableRetriever(
-            RerankingRetriever(
-                self._candidates(record, records),
-                reranker=self.reranker(),
-                policy_enabled=self._policy_enabled,
-                permits=self._permits,
-                reads=_reranker_reads(),
+            self.reranking_over(
+                self._candidates(record, records), self.reranker(), settings.AI_RERANKER_READS
             ),
             fallback=FullTextRetriever(
                 record=record, records=records, trial_variant=self._trial_variant

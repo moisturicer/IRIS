@@ -21,6 +21,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai.composition import composition_root
 from apps.ai.evaluation.labels import QuestionSetError, load_question_set
+from apps.ai.evaluation.techniques import resolve
 from apps.ai.evaluation.reranker_arms import (
     COST_CEILING_USD,
     FIGURE_SET,
@@ -92,10 +93,13 @@ class Command(BaseCommand):
             raise CommandError(
                 f"estimated ${cost:.4f} exceeds --max-cost-usd {options['max_cost_usd']}"
             )
-        result = compare(roots, sets, user=user, reranker=root.reranker())
+        result = compare(roots, sets, user=user, reranker=root.reranker(), recalls=estimate.recalls)
         result.provenance["estimated_tokens"] = estimate.total_tokens
         result.provenance["labels_reviewed_by"] = options["labels_reviewed_by"].strip()
         self._finish(result, sets, options, user, price)
+        spent = result.cost_usd(price)
+        if spent is not None and spent > options["max_cost_usd"]:
+            self.stderr.write(f"Spent ${spent:.4f}, over the ${options['max_cost_usd']} ceiling.")
 
     def _check_labels(self, sets, trial):
         for name, question_set in sets.items():
@@ -109,6 +113,7 @@ class Command(BaseCommand):
             "git_commit": _git_commit(),
             "retrieved_as": user.email,
             "figure_trial": options["figure_trial"],
+            "techniques": resolve().as_dict(),
             "question_sets": {
                 name: {"path": qs.source, "sha256": _question_set_digest(qs.source)}
                 for name, qs in sets.items()

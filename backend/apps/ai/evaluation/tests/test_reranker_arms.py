@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from apps.ai.evaluation import reranker_arms
 from apps.ai.evaluation.labels import parse_question_set
 from apps.ai.evaluation.reranker_arms import DECISION_RULE, Paired, compare
 from apps.ai.providers.ports import RerankedCandidate, Reranker
@@ -136,11 +135,43 @@ def test_the_rule_is_copied_into_every_report_unchanged():
 
 
 def test_a_drifted_arm_is_a_defect_not_a_result(monkeypatch):
-    monkeypatch.setattr(reranker_arms, "changes_expected", lambda c, arm: arm == "embedded")
+    """Rule 4 reads what the reranker was handed, not the module's own rule."""
+    from apps.ai.retrieval import reranking
+
+    real = reranking.reranker_text
+    monkeypatch.setattr(
+        reranking, "reranker_text",
+        lambda c, reads: real(c, reads) + (" drift" if reads == "fallback" else ""),
+    )
     _, result = run(Vendor())
 
     assert result.defects
     assert result.decision()[0].startswith("BLOCKED")
+
+
+def test_billed_tokens_set_the_recorded_cost():
+    class Billing(Vendor):
+        last_usage = 1000
+
+    _, result = run(Billing())
+
+    assert result.billed_tokens == 1000 * sum(result.paid_calls.values())
+    assert result.cost_usd(1.0) == pytest.approx(result.billed_tokens / 1_000_000)
+
+
+def test_a_paid_run_reuses_the_estimate_recall():
+    root, estimate = run(None)
+    paid = compare({"text": root, "figure": root}, {"text": TEXT, "figure": FIGURES},
+                   user=None, reranker=Vendor(), recalls=estimate.recalls)
+
+    assert root.recall.calls == 2
+    assert paid.recall("figure", "fallback")[0] == 1.0
+
+
+def test_the_paired_unit_is_a_question_found_not_a_fraction():
+    _, result = run(Vendor())
+
+    assert result.as_dict()["per_question"]["figure/C"]["f1"] == {"recall": 1.0, "found": True}
 
 
 @pytest.mark.parametrize("wins, losses, p", [(0, 0, 1.0), (6, 0, 0.03125), (5, 1, 0.21875)])

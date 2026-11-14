@@ -847,9 +847,7 @@ AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False,
 AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
 
 # ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
-# today: shown text, blank passages dropped. embedded: the embedded text.
-# described: shown text plus a Figure's labelled AI description. fallback:
-# shown text, or the embedded text when it is blank. Today until a run moves it.
+# Modes in apps/ai/retrieval/reranker_input.py. Today until a run moves it.
 AI_RERANKER_READS = config("AI_RERANKER_READS", default="today")
 if AI_RERANKER_READS not in ("today", "embedded", "described", "fallback"):
     raise ImproperlyConfigured(

@@ -138,3 +138,14 @@ def test_a_cached_ranking_is_never_served_to_another_mode():
     ).retrieve("q", None)
 
     assert second.seen, "the embedded arm reused today's ranking"
+
+
+def test_voyage_reports_the_tokens_it_billed():
+    from apps.ai.providers.voyage import VoyageReranker
+
+    reranker = VoyageReranker(model="rerank-test", transport=lambda path, payload: {
+        "data": [{"index": 0, "relevance_score": 0.9}], "usage": {"total_tokens": 42},
+    })
+    reranker.rerank("q", ["only passage"])
+
+    assert reranker.last_usage == 42

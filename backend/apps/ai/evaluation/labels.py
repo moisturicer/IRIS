@@ -34,8 +34,7 @@ MIN_QUOTE_CHARS = 20
 #: which makes the label fail for a reason that is not about retrieval.
 MAX_QUOTE_WORDS = 30
 
-#: A figure label hits a passage whose box on the same page covers at least
-#: this share of the label's box (IR-1125). An uncaptioned figure has no quote.
+#: A figure label hits a passage box on its page at this IoU (IR-1125).
 MIN_REGION_OVERLAP = 0.5
 
 _WHITESPACE = re.compile(r"\s+")
@@ -72,13 +71,15 @@ class Box:
     def area(self) -> float:
         return (self.right - self.left) * (self.bottom - self.top)
 
-    def covered_by(self, other) -> float:
-        """The share of this box that ``other`` overlaps."""
+    def overlap(self, other) -> float:
+        """Intersection over union with ``other``, so an enclosing box misses."""
         width = min(self.right, other.right) - max(self.left, other.left)
         height = min(self.bottom, other.bottom) - max(self.top, other.top)
-        if width <= 0 or height <= 0 or self.area <= 0:
+        if width <= 0 or height <= 0:
             return 0.0
-        return width * height / self.area
+        inter = width * height
+        theirs = (other.right - other.left) * (other.bottom - other.top)
+        return inter / (self.area + theirs - inter)
 
     def as_dict(self) -> dict[str, float]:
         return {"left": self.left, "top": self.top, "right": self.right, "bottom": self.bottom}
@@ -105,7 +106,7 @@ class Label:
         return self.region is not None
 
     @property
-    def describe(self) -> str:
+    def display(self) -> str:
         """How a report names this label."""
         if self.region is None:
             return self.quote
@@ -132,7 +133,7 @@ class Label:
         if self.region is None:
             return self.found_in(passage.content)
         return any(
-            region.page == self.page and self.region.covered_by(region) >= MIN_REGION_OVERLAP
+            region.page == self.page and self.region.overlap(region) >= MIN_REGION_OVERLAP
             for region in getattr(passage, "regions", ()) or ()
         )
 
