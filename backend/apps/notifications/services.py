@@ -48,12 +48,14 @@ def _record_url(record) -> str:
 def _task(kind, row) -> dict:
     """
     The binding a notification that asks for action carries (ADR-069): which
-    row its task lives on. Empty when there is no row, so the notification is
-    sent and simply never resolves.
+    row its task lives on. Empty when there is no saved row (none given, or a
+    stand-in with no primary key), so the notification is sent and simply never
+    resolves: a binding must never stop the notice itself.
     """
-    if row is None:
+    pk = getattr(row, "pk", None)
+    if pk is None:
         return {}
-    return _task_id(kind, row.pk)
+    return _task_id(kind, pk)
 
 
 def _task_id(kind, pk) -> dict:
