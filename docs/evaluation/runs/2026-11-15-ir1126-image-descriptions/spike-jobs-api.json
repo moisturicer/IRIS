@@ -1,0 +1,198 @@
+{
+ "request": "POST https://platform.unstructuredapp.io/api/v1/jobs/ (multipart: request_data={job_nodes:[partition hi_res, prompter anthropic_image_description claude-sonnet-5]}, input_files)",
+ "job": {
+  "status": "COMPLETED",
+  "job_type": "ephemeral",
+  "created_at": "2026-11-14T22:33:22.601878Z"
+ },
+ "image_elements": [
+  {
+   "type": "Image",
+   "element_id": "a2b1e78a75368f19fa807a8b48dfc79c",
+   "text": "{\"type\": \"diagram\", \"texts\": \"|0⟩, |A_x⟩, q, T'_0, U, T'_0, ..., T'_{N-1}, U, T'_{N-1}\", \"description\": \"This is a quantum circuit diagram with two input wires. The top wire starts in state |0⟩ and the bottom wire starts in state |A_x⟩, with a slash labeled 'q' crossing the bottom wire indicating it represents multiple qubits (a quantum register of size q). The circuit proceeds left to right through a repeating pattern of gates. First, a gate labeled T'_0 acts on the top wire (the |0⟩ qubit). Immediately after, a controlled-U gate appears: the control dot is on the top wire and the U gate box is on the bottom wire (the q-qubit register), meaning U is applied to the register conditioned on the state of the top qubit. Following this controlled-U, another T'_0 gate acts on the top wire. This pattern (T'_0, controlled-U, T'_0) repeats, indicated by a horizontal ellipsis (...) showing the sequence continues. The pattern then repeats with gates labeled T'_{N-1} instead of T'_0: a T'_{N-1} gate on the top wire, followed by a controlled-U gate (control on top wire, U on bottom register), followed by another T'_{N-1} gate on the top wire. After the final T'_{N-1} gate, both wires terminate with open output lines on the right side of the circuit, representing the final measured or output qubits. Overall, the diagram represents an iterative quantum algorithm structure where an ancilla qubit (initialized to |0⟩) is repeatedly transformed by T' gates interspersed with controlled unitary operations U acting on the main quantum register |A_x⟩, indexed from 0 to N-1.\"}",
+   "metadata": {
+    "coordinates": {
+     "points": [
+      [
+       1120.655029296875,
+       241.8684539794922
+      ],
+      [
+       1120.655029296875,
+       371.44696044921875
+      ],
+      [
+       1921.6793212890625,
+       371.44696044921875
+      ],
+      [
+       1921.6793212890625,
+       241.8684539794922
+      ]
+     ],
+     "system": "PixelSpace",
+     "layout_width": 2125,
+     "layout_height": 2750
+    },
+    "filetype": "application/pdf",
+    "languages": [
+     "eng"
+    ],
+    "page_number": 2,
+    "image_mime_type": "image/jpeg",
+    "filename": "38-26e07d6b.pdf",
+    "enrichment_origins": {
+     "text": [
+      {
+       "type": "prompter:image_description",
+       "provider": "anthropic",
+       "model": "claude-sonnet-5",
+       "channel": "image_description"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "type": "Image",
+   "element_id": "e45ceb36114719559b0a19b807abacc0",
+   "text": "{\"type\": \"diagram\", \"texts\": [\"Λ^d\", \"b\", \"q\", \"T_k\", \"k\", \"+1 mod d\"], \"description\": \"This diagram shows an equivalence between a compact gate representation and its decomposed circuit implementation. On the left, a single box labeled 'Λ^d' with one input/output line represents the overall operation. An equivalence symbol (≡) connects it to the expanded circuit on the right. In the expanded circuit, there are two input wires labeled 'b' and 'q' (shown with diagonal slash marks indicating they may carry multi-bit or quantum register values) entering a box labeled 'T_k'. The two outputs of 'T_k' proceed to the right: the top wire connects to a circle labeled 'k', which itself connects via a vertical control line down to a box labeled '+1 mod d' on the bottom wire. The bottom wire from 'T_k' feeds into the '+1 mod d' box. Both the 'k' circle and the '+1 mod d' box then output to the right, completing the circuit. The vertical line connecting the 'k' circle and the '+1 mod d' box indicates a controlled operation, where the modular addition box's operation depends on or is linked to the value processed by the 'k' gate.\"}",
+   "metadata": {
+    "coordinates": {
+     "points": [
+      [
+       334.69873046875,
+       243.54910278320312
+      ],
+      [
+       334.69873046875,
+       376.0588073730469
+      ],
+      [
+       896.140380859375,
+       376.0588073730469
+      ],
+      [
+       896.140380859375,
+       243.54910278320312
+      ]
+     ],
+     "system": "PixelSpace",
+     "layout_width": 2125,
+     "layout_height": 2750
+    },
+    "filetype": "application/pdf",
+    "languages": [
+     "eng"
+    ],
+    "page_number": 3,
+    "image_mime_type": "image/jpeg",
+    "filename": "38-26e07d6b.pdf",
+    "enrichment_origins": {
+     "text": [
+      {
+       "type": "prompter:image_description",
+       "provider": "anthropic",
+       "model": "claude-sonnet-5",
+       "channel": "image_description"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "type": "Image",
+   "element_id": "56cd9beb1debcaae8bd9f5ff6914eccd",
+   "text": "{\"type\": \"diagram\", \"texts\": [\"cos(\\u03b8_k/2)\", \"sin(\\u03b8_k/2)\", \"-sin(\\u03b8_k/2)\", \"cos(\\u03b8_k/2)\", \"+\", \"+\", \"z^{-1}\"], \"description\": \"This is a signal flow diagram representing a rotation butterfly structure, commonly used in digital signal processing (e.g., Givens rotation or lattice filter stage). There are two input lines on the left, each marked with a filled dot (branch point). The top input branches into two paths: one goes through a gain block labeled cos(\\u03b8_k/2) straight to the top summation node (+), and the other crosses diagonally downward through a gain block labeled sin(\\u03b8_k/2) to the bottom summation node (+). The bottom input similarly branches into two paths: one goes through a gain block labeled cos(\\u03b8_k/2) straight to the bottom summation node (+), and the other crosses diagonally upward through a gain block labeled -sin(\\u03b8_k/2) to the top summation node (+). The top summation node (+) combines the top input's cos path and the bottom input's -sin path, then outputs directly to the top output line. The bottom summation node (+) combines the bottom input's cos path and the top input's sin path, then passes through a unit delay block labeled z^{-1} before reaching the bottom output line. This structure implements a 2x2 rotation matrix multiplication with an added delay on one output branch, typical of orthogonal/lattice filter implementations.\"}",
+   "metadata": {
+    "coordinates": {
+     "points": [
+      [
+       1247.1026611328125,
+       254.01751708984375
+      ],
+      [
+       1247.1026611328125,
+       509.3736877441406
+      ],
+      [
+       1778.0181884765625,
+       509.3736877441406
+      ],
+      [
+       1778.0181884765625,
+       254.01751708984375
+      ]
+     ],
+     "system": "PixelSpace",
+     "layout_width": 2125,
+     "layout_height": 2750
+    },
+    "filetype": "application/pdf",
+    "languages": [
+     "eng"
+    ],
+    "page_number": 3,
+    "image_mime_type": "image/jpeg",
+    "filename": "38-26e07d6b.pdf",
+    "enrichment_origins": {
+     "text": [
+      {
+       "type": "prompter:image_description",
+       "provider": "anthropic",
+       "model": "claude-sonnet-5",
+       "channel": "image_description"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "type": "Image",
+   "element_id": "3bc0cb3ba83b36edfb60dc88d1c1ccea",
+   "text": "{\"type\": \"diagram\", \"texts\": \"(a): R0, Λ, R1, Λ, ..., Λ, RM, |0⟩⟨0| (b): b, 0, T1, ..., TM, 0, RM, TM+1, M+1, +1, R0\", \"description\": \"The figure shows two related quantum circuit diagrams, labeled (a) and (b), representing an abstract and concrete implementation of the same process. In (a), the circuit is a horizontal sequence of alternating boxes: starting with R0, followed by Λ, then R1, Λ, continuing with an ellipsis indicating repetition, ending with Λ, RM, and finally a projector |0⟩⟨0|. Curly braces below pair up R0 with the following Λ, R1 with its following Λ, and so on, with the final brace grouping the last Λ, RM, and the projector together, suggesting these groupings represent repeated modules in the algorithm. In (b), the implementation is shown as a multi-qubit circuit with a top register line labeled 'b' (indicating multiple qubits, shown by the diagonal slash) and additional qubit lines below (indicated by vertical dots). The top line contains circled labels '0', then after the T1 block another circled '0', and after TM+1 block a circled 'M+1'. Below the top line, boxes labeled R0, T1, ..., TM, RM, TM+1 appear as vertically connected blocks spanning between the top control line and lower qubit lines, with control dots connecting the circles above to the boxes below (indicating controlled operations conditioned on the state of the top register, such as 0 or M+1). After the circled 'M+1', there's a connected box labeled '+1', suggesting an increment operation controlled by the M+1 state. Curly braces group T1 with R0, TM with RM, and TM+1 with the final +1 operation, paralleling the groupings in diagram (a). This represents a method to implement multiple applications of an operator Λ and rotations R_i within a larger quantum circuit using ancilla-controlled block-encodings labeled T_i, with control values 0 and M+1 determining which operations are applied.\"}",
+   "metadata": {
+    "coordinates": {
+     "points": [
+      [
+       1121.5372314453125,
+       666.0633544921875
+      ],
+      [
+       1121.5372314453125,
+       1071.0771484375
+      ],
+      [
+       1912.9552001953125,
+       1071.0771484375
+      ],
+      [
+       1912.9552001953125,
+       666.0633544921875
+      ]
+     ],
+     "system": "PixelSpace",
+     "layout_width": 2125,
+     "layout_height": 2750
+    },
+    "filetype": "application/pdf",
+    "languages": [
+     "eng"
+    ],
+    "page_number": 3,
+    "image_mime_type": "image/jpeg",
+    "filename": "38-26e07d6b.pdf",
+    "enrichment_origins": {
+     "text": [
+      {
+       "type": "prompter:image_description",
+       "provider": "anthropic",
+       "model": "claude-sonnet-5",
+       "channel": "image_description"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

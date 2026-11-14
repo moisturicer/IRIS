@@ -367,6 +367,52 @@ Also built:
   report there for transcription against `latex_truth.py` and the retrieval
   comparison.
 
+## Amendment — 2026-11-15 (IR-1126): Unstructured's image descriptions, data path and measurement
+
+This amendment records facts. It changes no decision: figures are still
+described by IRIS's own `describe_figure` call (ADR-056 §10). Whether the
+enrichment is ever turned on is Jive Tyler Revalde's decision. The evidence is
+`docs/evaluation/runs/2026-11-15-ir1126-image-descriptions/` (proxy tier,
+ADR-023).
+
+**1. Where it can be requested.** The partition endpoint this ADR adopted
+(`/general/v0/general`) accepts `advanced_options.enrichments.image_description`
+and ignores it. The enrichment is available only through the Jobs API
+(`https://platform.unstructuredapp.io/api/v1/jobs/`). That API is asynchronous
+and takes the same Platform key. Using it means a second, job-based client,
+which this ADR does not adopt.
+
+**2. Data path.**
+- **Provider:** with the `anthropic_image_description` node, the enrichment
+  sends each Figure image to Anthropic. The model is named in the request; the
+  measurement used `claude-sonnet-5`.
+- **Key:** on IRIS's SaaS plan, Unstructured makes the call under its own key.
+  Its AI-providers page says SaaS model costs are "already factored into the
+  pricing structures", and customer keys apply only to dedicated or in-VPC
+  deployments.
+- **Terms:** no retention, training or zero-data-retention terms are published
+  for these calls.
+- **Inputs:** an on-demand job keeps its inputs as an `ephemeral` job, for an
+  unstated period.
+
+This path is weaker than `describe_figure`'s, which sends only to a
+zero-retention route (`DataPolicy.ZERO_RETENTION`). **Real manuscripts must not
+use the enrichment unless that gap is closed in writing**, by Unstructured
+stating its terms or by a customer key under IRIS's own agreement.
+
+**3. Measured on six proxy papers (29 Figures).**
+- **Factual errors:** 14 Figures for the enrichment (9 major), against 1 for
+  `describe_figure`.
+- **Figure-set recall@10 with reranking:** 0.897 for the enrichment, against
+  0.931.
+- **Billed pages:** not shown by the Jobs API; they are read from Unstructured's
+  dashboard.
+
+**4. What the code keeps.** `UNSTRUCTURED_IMAGE_DESCRIPTIONS` (default off)
+stores a description that arrives in an Image element's JSON `text`, and a
+Figure stored with one is not sent to `describe_figure`. On the partition
+endpoint the switch has no effect, because nothing arrives.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
@@ -390,3 +436,4 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-1055, IR-1056: section-mate expansion and section-aligned embedding windows
 - IR-982: vendor registry, closed as won't do
 - IR-1102: formulas as exact LaTeX, behind a flag
+- IR-1126: Unstructured's image-description enrichment, measured and left off

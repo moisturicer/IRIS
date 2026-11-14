@@ -44,8 +44,8 @@ REQUEST_OPTIONS = {
     "include_page_breaks": "true",
     "extract_image_block_types": '["Image", "Table"]',
 }
-# IR-1126: describes each Image in its ``text``, as JSON. Off by default; that
-# the partition endpoint accepts it is the ticket's spike, not yet recorded.
+# IR-1126: the partition endpoint accepts this and ignores it; only the Jobs
+# API returns descriptions (ADR-067, 2026-11-15 amendment). Off by default.
 IMAGE_DESCRIPTION_OPTIONS = {
     "advanced_options": json.dumps({"enrichments": {"image_description": {}}}),
 }
