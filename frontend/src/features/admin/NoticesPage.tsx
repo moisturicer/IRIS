@@ -130,6 +130,11 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
   const next = base + 1;
   const unchanged = text === current.text;
   const blank = text.trim() === "";
+  const publishBlockedReason = blank
+    ? "Enter the notice text to publish."
+    : unchanged
+      ? "Change the text to publish a new version."
+      : undefined;
 
   const ask = async () => {
     setCounting(true);
@@ -200,7 +205,13 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
         <Button type="button" variant="outline" aria-expanded={preview} onClick={() => setPreview((p) => !p)}>
           {preview ? "Hide preview" : "Preview"}
         </Button>
-        <Button type="button" loading={counting} disabled={unchanged || blank} onClick={() => void ask()}>
+        <Button
+          type="button"
+          loading={counting}
+          disabled={unchanged || blank}
+          disabledReason={publishBlockedReason}
+          onClick={() => void ask()}
+        >
           Publish version {next}
         </Button>
       </div>

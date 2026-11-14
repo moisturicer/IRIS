@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { recordsApi } from "@/api/records";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/Button";
 import { downloadBlob } from "@/lib/utils";
 
 export default function ImportRecordsPage() {
@@ -38,11 +39,15 @@ export default function ImportRecordsPage() {
             <i className="fas fa-info-circle text-brand" aria-hidden /> Instructions
           </p>
           <ol className="list-decimal pl-4 space-y-2 text-[14px] text-stone-600">
-            <li>Follow the data entry format -- <button onClick={handleDownloadTemplate} className="text-brand font-semibold hover:underline">download template here</button>.</li>
+            <li>Follow the data entry format in the template below.</li>
             <li>To add a new entry, duplicate a row and replace the values.</li>
             <li>The migration stops when it reads a merged cell containing <strong>END OF RECORDS</strong>.</li>
             <li>Press <strong>Generate</strong> to import.</li>
           </ol>
+          <Button type="button" variant="outline" size="sm" className="mt-4" onClick={handleDownloadTemplate}>
+            <i className="fas fa-download" aria-hidden />
+            Download template
+          </Button>
         </div>
 
         {/* Upload */}
@@ -66,14 +71,18 @@ export default function ImportRecordsPage() {
             />
           </label>
 
-          <button
+          <Button
+            type="button"
+            size="full"
+            className="mt-4"
+            loading={loading}
+            disabled={!file}
+            disabledReason="Choose a spreadsheet to import."
             onClick={handleImport}
-            disabled={!file || loading}
-            className="mt-4 w-full bg-brand text-white py-2.5 rounded-lg text-[14px] font-semibold hover:bg-brand-light disabled:opacity-50"
           >
-            <i className="fas fa-cogs mr-1.5" aria-hidden />
+            {!loading && <i className="fas fa-cogs" aria-hidden />}
             {loading ? "Importing..." : "Generate"}
-          </button>
+          </Button>
         </div>
       </div>
 
