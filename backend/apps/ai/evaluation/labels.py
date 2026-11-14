@@ -34,6 +34,10 @@ MIN_QUOTE_CHARS = 20
 #: which makes the label fail for a reason that is not about retrieval.
 MAX_QUOTE_WORDS = 30
 
+#: A figure label hits a passage whose box on the same page covers at least
+#: this share of the label's box (IR-1125). An uncaptioned figure has no quote.
+MIN_REGION_OVERLAP = 0.5
+
 _WHITESPACE = re.compile(r"\s+")
 _QUOTES = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
 
@@ -56,6 +60,31 @@ def normalize(text: str) -> str:
 
 
 @dataclass(frozen=True)
+class Box:
+    """A rectangle in fractions of the page, as `Region` draws one."""
+
+    left: float
+    top: float
+    right: float
+    bottom: float
+
+    @property
+    def area(self) -> float:
+        return (self.right - self.left) * (self.bottom - self.top)
+
+    def covered_by(self, other) -> float:
+        """The share of this box that ``other`` overlaps."""
+        width = min(self.right, other.right) - max(self.left, other.left)
+        height = min(self.bottom, other.bottom) - max(self.top, other.top)
+        if width <= 0 or height <= 0 or self.area <= 0:
+            return 0.0
+        return width * height / self.area
+
+    def as_dict(self) -> dict[str, float]:
+        return {"left": self.left, "top": self.top, "right": self.right, "bottom": self.bottom}
+
+
+@dataclass(frozen=True)
 class Label:
     """One passage a question should retrieve.
 
@@ -66,8 +95,22 @@ class Label:
     """
 
     record: str | int
-    quote: str
+    quote: str = ""
     page: Optional[int] = None
+    #: A figure's box (IR-1125). Set, the label matches by page and overlap.
+    region: Optional[Box] = None
+
+    @property
+    def is_figure(self) -> bool:
+        return self.region is not None
+
+    @property
+    def describe(self) -> str:
+        """How a report names this label."""
+        if self.region is None:
+            return self.quote
+        box = self.region
+        return f"figure p{self.page} [{box.left:.2f},{box.top:.2f},{box.right:.2f},{box.bottom:.2f}]"
 
     @property
     def normalized_quote(self) -> str:
@@ -84,12 +127,20 @@ class Label:
     def matches(self, passage) -> bool:
         """Whether ``passage`` (anything with the `RetrievedChunk` fields) is
         this label's passage."""
-        return self.identifies(
-            passage.record_id, passage.record_title
-        ) and self.found_in(passage.content)
+        if not self.identifies(passage.record_id, passage.record_title):
+            return False
+        if self.region is None:
+            return self.found_in(passage.content)
+        return any(
+            region.page == self.page and self.region.covered_by(region) >= MIN_REGION_OVERLAP
+            for region in getattr(passage, "regions", ()) or ()
+        )
 
     def as_dict(self) -> dict[str, Any]:
-        return {"record": self.record, "page": self.page, "quote": self.quote}
+        data: dict[str, Any] = {"record": self.record, "page": self.page, "quote": self.quote}
+        if self.region is not None:
+            data["region"] = self.region.as_dict()
+        return data
 
 
 #: Does answering this need the corpus at all? (IR-463)
@@ -314,13 +365,16 @@ def parse_question_set(
             quote = str(raw_label.get("quote") or "")
             if quote.strip() == PLACEHOLDER:
                 raise QuestionSetError(f"{label_where}: has no quote yet")
-            _validate_quote(quote, label_where)
             page = raw_label.get("page")
+            region = _read_region(raw_label, label_where)
+            if region is None or quote.strip():
+                _validate_quote(quote, label_where)
             labels.append(
                 Label(
                     record=record,
                     quote=quote,
                     page=int(page) if page not in (None, "") else None,
+                    region=region,
                 )
             )
 
@@ -354,6 +408,27 @@ def parse_question_set(
         tier=str(data.get("tier") or "proxy"),
         skipped=tuple(skipped),
     )
+
+
+def _read_region(raw_label: dict, where: str) -> Optional[Box]:
+    """A figure label's ``region``: page fractions, and a page to put it on."""
+    raw = raw_label.get("region")
+    if raw is None:
+        return None
+    if raw_label.get("page") in (None, ""):
+        raise QuestionSetError(f"{where}: a region needs the page it is on")
+    try:
+        box = Box(*(float(raw[side]) for side in ("left", "top", "right", "bottom")))
+    except (TypeError, KeyError, ValueError):
+        raise QuestionSetError(
+            f"{where}: region needs numeric left, top, right and bottom"
+        ) from None
+    if not (0 <= box.left < box.right <= 1 and 0 <= box.top < box.bottom <= 1):
+        raise QuestionSetError(
+            f"{where}: region must be fractions of the page with left < right "
+            f"and top < bottom"
+        )
+    return box
 
 
 def _read_evidence_fields(raw: dict, where: str):

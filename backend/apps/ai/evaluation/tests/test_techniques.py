@@ -41,8 +41,9 @@ ADR_033_TECHNIQUES = {
 }
 
 # ADR-035 §1's evidence decision was registered here too, until IR-957
-# retired the shadow it switched. IR-1102 adds ADR-067's formula switch.
-REGISTERED = ADR_033_TECHNIQUES | {"formula_text"}
+# retired the shadow it switched. IR-1102 adds ADR-067's formula switch,
+# IR-1125 what the reranker reads.
+REGISTERED = ADR_033_TECHNIQUES | {"formula_text", "reranker_reads"}
 
 
 # -- the registry -------------------------------------------------------------
@@ -75,6 +76,14 @@ def test_an_index_time_switch_is_recorded_but_cannot_be_moved_by_a_run():
 
     assert "re-chunk" in str(exc.value)
     assert resolve()["formula_text"]["setting"] == "AI_FORMULA_TEXT_INDEXED"
+
+
+def test_what_the_reranker_reads_is_a_run_time_choice_defaulting_to_today():
+    """IR-1125: production is unchanged until a decision moves the default."""
+    assert resolve()["reranker_reads"]["value"] == "today"
+    assert parse_override("reranker_reads=fallback") == ("reranker_reads", "fallback")
+    with pytest.raises(TechniqueError):
+        parse_override("reranker_reads=caption")
 
 
 def test_the_registry_renders_for_an_operator_choosing_a_run():

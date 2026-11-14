@@ -141,6 +141,16 @@ TECHNIQUES: tuple[Technique, ...] = (
              "text (readers see the LaTeX either way); set at indexing, so re-chunk to move it",
         index_time=True,
     ),
+    Technique(
+        name="reranker_reads",
+        setting="AI_RERANKER_READS",
+        kind="choice",
+        choices=("today", "embedded", "described", "fallback"),
+        adr="ADR-033 §5",
+        ticket="IR-1125",
+        note="what the reranker reads: shown text (today), embedded text, shown text with a "
+             "Figure's labelled AI description, or embedded text only where shown is blank",
+    ),
 )
 
 

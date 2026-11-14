@@ -846,6 +846,17 @@ AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False,
 # so moving it needs a re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
 AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
 
+# ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
+# today: shown text, blank passages dropped. embedded: the embedded text.
+# described: shown text plus a Figure's labelled AI description. fallback:
+# shown text, or the embedded text when it is blank. Today until a run moves it.
+AI_RERANKER_READS = config("AI_RERANKER_READS", default="today")
+if AI_RERANKER_READS not in ("today", "embedded", "described", "fallback"):
+    raise ImproperlyConfigured(
+        "AI_RERANKER_READS must be today, embedded, described or fallback, "
+        f"not {AI_RERANKER_READS!r}"
+    )
+
 # ---- Vector scan depth (IR-440) ---------------------------------------
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.
 AI_HNSW_EF_SEARCH = config("AI_HNSW_EF_SEARCH", default=200, cast=int)
