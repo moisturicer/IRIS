@@ -7,11 +7,10 @@ from django.core.management import call_command
 
 from apps.ai.chunking.values import ChunkingOptions
 from apps.ai.extraction.shaping_unstructured import shape_unstructured, shaping_report
-from apps.ai.extraction.tests.fixtures import FIXTURES, pdf_bytes
 from apps.ai.ingestion.pipeline import build_chunk_set
 from apps.documents.pdf_evidence import reader
 from apps.documents.pdf_evidence.tests.thesis import thesis_pdf
-from .fixtures import DIRECTORY
+from .fixtures import DIRECTORY, FIXTURES, pdf_bytes
 from .unstructured_vendor import recording
 
 
@@ -34,12 +33,12 @@ def headings(document):
 
 
 def test_bookmarks_decide_depth_first():
-    raw = [element("Title", "Methods"), element("Title", "Sampling", top=900),
-           element("Title", "2 Results", page=2)]
+    raw = [element("Title", "Paper", top=200), element("Title", "Methods"),
+           element("Title", "Sampling", top=900), element("Title", "2 Results", page=2)]
     marks = [{"title": "Methods", "level": 1, "page": 1}, {"title": "Sampling", "level": 2, "page": 1},
              {"title": "2  Results", "level": 1, "page": 2}]
     assert headings(shape_unstructured(raw, evidence(2, bookmarks=marks))) == [
-        ("Methods", 2, "bookmark"), ("Sampling", 3, "bookmark"), ("2 Results", 2, "bookmark"),
+        ("Paper", 1, "title"), ("Methods", 2, "bookmark"), ("Sampling", 3, "bookmark"), ("2 Results", 2, "bookmark"),
     ]
 
 
@@ -217,5 +216,42 @@ def test_the_report_command_prints_signals_and_rates(tmp_path):
                  str(DIRECTORY / FIXTURES["two_columns"].filename), "--out", str(out),
                  stdout=StringIO())
     report = json.loads(out.read_text(encoding="utf-8"))["two_columns.pdf"]
-    assert (report["match_rate"], report["fallback_rate"]) == (0.667, 0.333)
+    assert (report["match_rate"], report["fallback_rate"], report["no_text_layer_rate"]) == (
+        0.667, 0.333, 0.0)
     assert report["signals"] == {"title": 1}
+
+
+def test_every_layout_fixture_that_prints_its_page_numbers_carries_them():
+    for name, pages in (("numbered_headings", 2), ("two_columns", 1), ("table_across_pages", 2)):
+        shaped = shape_unstructured(*fixture(name))
+        assert {e.page: e.printed_page_number for e in shaped.elements} == {
+            n: str(n) for n in range(1, pages + 1)}, name
+
+
+def test_a_bookmarked_title_stays_the_title_and_known_headings_outrank_parent_id():
+    raw = [element("Title", "Rice Study", element_id="t"),
+           element("Title", "Field work", element_id="f", top=900),
+           element("Title", "References", element_id="r", page=2, parent_id="f")]
+    marks = [{"title": "Rice Study", "level": 1, "page": 1}]
+    shaped = shape_unstructured(raw, evidence(2, bookmarks=marks))
+    assert headings(shaped) == [
+        ("Rice Study", 1, "title"), ("Field work", 2, "open_section"), ("References", 2, "known_heading"),
+    ]
+    assert shaped.title == "Rice Study"
+
+
+def test_a_running_header_repeating_a_heading_lends_it_no_style():
+    page = {"page": 1, "width": 612.0, "height": 792.0, "has_text_layer": True, "lines": [
+        line("Background", 8.0, False, 20), line("Background", 14.0, True, 120),
+        line("Prior work", 12.0, True, 200),
+    ]}
+    raw = [element("Title", "1 Study"), element("Title", "Background", top=400),
+           element("Title", "Prior work", top=700)]
+    assert headings(shape_unstructured(raw, dict(evidence(), pages=[page]))) == [
+        ("1 Study", 2, "numbering"), ("Background", 2, "font"), ("Prior work", 3, "font"),
+    ]
+
+
+def test_a_roman_looking_word_in_a_footer_is_not_a_page_number():
+    raw = [element("Footer", "DC", page=1), element("Footer", "xii", page=2)]
+    assert printed(shape_unstructured(raw, evidence(2))) == {1: None, 2: "xii"}

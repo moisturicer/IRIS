@@ -23,8 +23,9 @@ KNOWN_TOP = re.compile(
 _NUMBER_PREFIX = re.compile(r"^((chapter|appendix)\s+\S+|\d+(\.\d+)*\.?|[A-Z]\.|[IVXLC]+\.)\s+", re.IGNORECASE)
 _CONTENTS_NUMBER = re.compile(r"^\d+(\.\d+)*$")
 # A printed page number alone: "12", "- 12 -", "Page 12", "Page 12 of 40", "xii".
+# Roman only in lower case, so a footer reading "DC" or "Mix" is not a number.
 _PRINTED = re.compile(
-    r"^[-–—\s]*(?:page\s+)?(\d{1,4}|[ivxlcdm]{1,7})(?:\s+of\s+\d+)?[-–—\s]*$", re.IGNORECASE,
+    r"^[-–—\s]*(?:[Pp]age\s+)?(\d{1,4}|[ivxlcdm]{1,7})(?:\s+of\s+\d+)?[-–—\s]*$",
 )
 # Contents entries indented within this many points share a depth.
 _INDENT_STEP = 4.0
@@ -40,6 +41,10 @@ def usable(evidence: Optional[Mapping]) -> Optional[Mapping]:
 def key(text: str) -> str:
     """Letters and digits only, case-folded; ligatures and spacing do not count."""
     return "".join(ch for ch in unicodedata.normalize("NFKC", text).casefold() if ch.isalnum())
+
+
+def _pages(evidence: Mapping) -> dict:
+    return {p["page"]: p for p in evidence.get("pages") or []}
 
 
 def _keys(text: str) -> set[str]:
@@ -80,18 +85,18 @@ def _decide(position, head, static, fonts, parents, depths, anchor):
     for source, answers in (*static, ("font", fonts)):
         if answers[position] is not None:
             return answers[position], source
+    if KNOWN_TOP.match(head.text.strip()):
+        return 1, "known_heading"
     parent = parents.get(head.element_id)
     if parent in depths:
         return depths[parent] + 1, "parent_id"
-    if KNOWN_TOP.match(head.text.strip()):
-        return 1, "known_heading"
     return anchor + 1, "open_section"
 
 
 def _title(heads, static) -> Optional[int]:
-    """The first heading is the paper's title when nothing places it as a
-    section and it is on page 1: the IR-859 rule, kept at level 1."""
-    if not heads or heads[0].page != 1 or any(answers[0] is not None for _, answers in static):
+    """The first heading is the paper's title when it is on page 1 and
+    unnumbered: the IR-859 rule, kept at level 1 even when bookmarked."""
+    if not heads or heads[0].page != 1 or dict(static)["numbering"][0] is not None:
         return None
     text = heads[0].text.strip()
     return None if FRONT_MATTER.match(text) or KNOWN_TOP.match(text) else 0
@@ -141,7 +146,7 @@ def _contents_depths(heads, contents):
 def _font_depths(heads, evidence, title):
     """Larger, then bold, is shallower. Answers only when the headings use at
     least two styles: one style alone says nothing about depth."""
-    pages = {p["page"]: p for p in evidence.get("pages") or []}
+    pages = _pages(evidence)
     styles = [None if i == title else _style(h, pages.get(h.page)) for i, h in enumerate(heads)]
     ranked = sorted({s for s in styles if s}, key=lambda s: (-s[0], not s[1]))
     if len(ranked) < 2:
@@ -150,13 +155,18 @@ def _font_depths(heads, evidence, title):
 
 
 def _style(head, page):
+    """The heading's first line inside its own box, so a running header
+    repeating the heading elsewhere on the page lends no style."""
     if not page or not page.get("lines"):
         return None
     wanted = key(head.text)
     for line in page["lines"]:
+        if head.bboxes and not any(_inside(line["box"], box) for box in head.bboxes):
+            continue
         text = key(" ".join(word[0] for word in line["words"]))
         if text and (text == wanted or (wanted.startswith(text) and len(text) * 2 >= len(wanted))):
-            return (float(line["size"]), bool(line["bold"]))
+            # Half-point steps: 11.9 and 12 pt are one style.
+            return (round(float(line["size"]) * 2) / 2, bool(line["bold"]))
     return None
 
 
@@ -197,21 +207,25 @@ def line_boxes(text: str, boxes: tuple, evidence: Optional[Mapping]):
     """The element's lines among the stored ``pdfplumber`` words, one box per
     line, and whether that matched. The element box stays on any failure."""
     evidence = usable(evidence)
-    if not evidence or not boxes:
+    wanted = key(text)
+    if not evidence or not boxes or not wanted:
         return boxes, None
-    pages = {p["page"]: p for p in evidence.get("pages") or []}
+    pages = _pages(evidence)
     if any(not (pages.get(b.page) or {}).get("has_text_layer") for b in boxes):
         return boxes, NO_TEXT_LAYER
-    words = [(box.page, line_number, word)
-             for box in boxes
-             for line_number, line in enumerate(pages[box.page].get("lines") or [])
-             for word in line["words"] if _inside(word, box)]
-    wanted = key(text)
+    seen, words = set(), []
+    for box in boxes:
+        for line_number, line in enumerate(pages[box.page].get("lines") or []):
+            for index, word in enumerate(line["words"]):
+                spot = (box.page, line_number, index)
+                if spot not in seen and _inside(word[1:], box):
+                    seen.add(spot)
+                    words.append((box.page, line_number, word))
     joined, starts = "", []
     for _, _, word in words:
         starts.append(len(joined))
         joined += key(word[0])
-    at = joined.find(wanted) if wanted else -1
+    at = joined.find(wanted)
     if at < 0:
         return boxes, FALLBACK
     chosen = [w for w, start in zip(words, starts)
@@ -226,8 +240,9 @@ def line_boxes(text: str, boxes: tuple, evidence: Optional[Mapping]):
     ), MATCHED
 
 
-def _inside(word, box):
-    x = (word[1] + word[3]) / 2
-    y = (word[2] + word[4]) / 2
+def _inside(rect, box):
+    """Whether the centre of ``rect`` (left, top, right, bottom) lies in ``box``."""
+    x = (rect[0] + rect[2]) / 2
+    y = (rect[1] + rect[3]) / 2
     return (box.left - _BOX_TOLERANCE <= x <= box.right + _BOX_TOLERANCE
             and box.top - _BOX_TOLERANCE <= y <= box.bottom + _BOX_TOLERANCE)
