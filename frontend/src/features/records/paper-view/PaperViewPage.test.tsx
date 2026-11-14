@@ -51,6 +51,7 @@ import * as utils from "@/lib/utils";
 import { seatsApi } from "@/api/reviews";
 
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
+import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
 import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
 import { citationNavigationState } from "@/lib/citedPage";
@@ -295,7 +296,9 @@ vi.mock("./PaperPdfReader", () => ({
     version,
     highlights,
     selectionActions,
+    clearCorner,
   }: {
+    clearCorner?: boolean;
     scrollToPage: number | null;
     highlightRegions: unknown[];
     toolbarStart?: ReactNode;
@@ -311,6 +314,8 @@ vi.mock("./PaperPdfReader", () => ({
       </div>
       {/* IR-583: what the page hands the reader to draw and to offer on a selection. */}
       <p>{highlights?.length ?? 0} saved highlight(s) drawn</p>
+      {/* IR-1079: whether the page asked the reader to scroll clear of the corner buttons. */}
+      {clearCorner && <p>Reader keeps its last page clear of the corner buttons</p>}
       {(selectionActions ?? []).map((a) => (
         <button key={a.id} type="button" onClick={() => a.run(SELECTED, "rev-1")}>
           Selection: {a.label}
@@ -1375,6 +1380,37 @@ describe("the Paper tab (IR-372, IR-569)", () => {
 
       expect(panelWidth()).toBe("450px");
     });
+  });
+});
+
+// The Notes and Ask IRIS icons float over the bottom-right corner (IR-1079,
+// audit CMP-02). jsdom has no layout, so what is checked is that the reading
+// surface reserves the room the pair needs; the scrolled-to-the-bottom look at
+// 1440, 768 and 390 px is the by-hand check recorded on the PR.
+describe("the corner buttons never cover reading text (IR-1079)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+    useUIStore.setState({ sidebarCollapsed: false, sidebarOpen: false, readingRail: null });
+  });
+
+  it("offers Notes and Ask IRIS together on Overview, which reserves room beneath its last line", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(screen.getByRole("button", { name: "Notes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ask IRIS" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 }).closest(`.${CORNER_CLEARANCE_CLASS}`)).not.toBeNull();
+  });
+
+  it("asks the Paper reader to keep its last page clear of them", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await userEvent.click(screen.getByRole("tab", { name: "Paper" }));
+
+    expect(await screen.findByText(/keeps its last page clear of the corner buttons/i)).toBeInTheDocument();
   });
 });
 
