@@ -266,15 +266,12 @@ describe("the page head", () => {
 // criteria are checked as the class tokens that give them; the pixels are a manual
 // check at 390 and 360 px (see the traceability file).
 describe("the phone toolbar (IR-1080)", () => {
-  const original = window.innerWidth;
   const TOUCH_HEIGHT = /(^|\s)(min-)?h-11(\s|$)/;
-  afterEach(() => { window.innerWidth = original; });
 
   /** The 1/2/3 column toggle is `hidden xl:inline-flex`: out of the phone row, though jsdom still holds it. */
   const phoneControls = (row: HTMLElement) => within(row).getAllByRole("button").filter((b) => !/column/.test(b.getAttribute("aria-label") ?? ""));
 
   async function phoneToolbar() {
-    window.innerWidth = 360;
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     return screen.getByRole("group", { name: "Discover controls" });
@@ -334,7 +331,6 @@ describe("the phone toolbar (IR-1080)", () => {
 
   it("keeps the office reviewer's row to the controls that reviewer has", async () => {
     signInAs("RDCO");
-    window.innerWidth = 360;
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     const row = screen.getByRole("group", { name: "Discover controls" });

@@ -637,7 +637,7 @@ export default function DiscoverPage() {
       {discoverView === "people" ? <DiscoverPeopleResults query={activeQuery} /> : (
       <>
       <div role="group" aria-label="Discover controls"
-        className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+        className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
         <div role="group" aria-label="Discover feed" className="inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 shadow-[inset_0_1px_2px_rgb(41_37_36/0.12)] sm:h-11 sm:p-0.5">
           {([["for_you", "For you"], ["latest", "Latest"], ["trending", "Trending"]] as const).map(([value, label]) => (
             <button key={value} type="button" aria-pressed={feed === value}
@@ -677,7 +677,7 @@ export default function DiscoverPage() {
           </svg>
         </button>
         <DiscoverFilterBar
-          className="shrink-0 max-xl:ml-auto"
+          className="shrink-0"
           filters={filters}
           onChange={setFilters}
           showSort={feed === "latest"}

@@ -96,7 +96,7 @@ export function MyFeeds({ query, matchCount, options, activeFeedId, onOpen, onDe
       {open && (
         <div
           id={menuId}
-          className="fixed inset-x-4 bottom-4 z-40 w-auto sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-1.5 sm:w-72 sm:max-w-[calc(100vw-2rem)] rounded-lg border border-stone-200/90 bg-white py-1.5 shadow-card-md"
+          className="fixed inset-x-4 bottom-4 z-50 max-h-[min(80dvh,34rem)] w-auto overflow-y-auto sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-1.5 sm:z-40 sm:max-h-none sm:w-72 sm:max-w-[calc(100vw-2rem)] sm:overflow-visible rounded-lg border border-stone-200/90 bg-white py-1.5 shadow-card-md"
         >
           {load === "error" && (
             <div role="alert" className="mx-3 my-1.5 text-small text-stone-700">
