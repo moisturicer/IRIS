@@ -36,7 +36,7 @@ type ButtonProps =
 const VARIANT_CLASSES: Record<Variant, string> = {
   // Tokens, not hex: 01-design-system.md section 2 asks any component being
   // touched to adopt them, and names Button's hardcoded brand as an example.
-  primary:   "bg-brand text-white hover:bg-brand-light",
+  primary:   "bg-brand text-white hover:bg-brand-light active:bg-brand-press",
   secondary: "bg-stone-100 text-stone-700 hover:bg-stone-200",
   // Maroon, like primary (IR-359: the palette has no red), so it is told apart
   // by the glyph the component adds below and by the verb the caller writes
@@ -45,7 +45,7 @@ const VARIANT_CLASSES: Record<Variant, string> = {
   // `aria-pressed:` for a toggle (IR-352): the attribute selector outranks the
   // base colour whatever the stylesheet order, which a caller's className
   // would not (no tailwind-merge; see the note on Size above).
-  ghost:     "text-stone-600 hover:bg-stone-100 aria-pressed:bg-brand-50 aria-pressed:text-brand",
+  ghost:     "text-stone-600 hover:bg-stone-100 aria-pressed:bg-surface aria-pressed:text-stone-900 aria-pressed:ring-2 aria-pressed:ring-stone-900",
   outline:   "border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:border-stone-200",
 };
 

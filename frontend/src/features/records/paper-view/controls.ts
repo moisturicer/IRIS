@@ -10,6 +10,7 @@
  * The sizes read the `reading` container, not the window, so the sidebar
  * and Ask IRIS beside a paper change them too.
  */
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 /** 44px on touch, 36px beside a pointer. */
 export const CONTROL_SIZE = "min-h-11 reading-split:min-h-9";
@@ -27,8 +28,8 @@ export const CONTROL_BASE = `inline-flex items-center gap-1.5 ${CONTROL_SIZE} ${
 /** At rest: outlined, so the page has one filled thing at a time. */
 export const CONTROL_OUTLINE = "border border-stone-300 text-stone-700 hover:bg-stone-100 hover:text-stone-900";
 
-/** Switched on: a quiet maroon tint. */
-export const CONTROL_ON = "bg-brand-50 border border-brand-200 text-brand hover:bg-brand-100";
+/** Switched on: an Ink outline on white, never maroon (IR-1097). */
+export const CONTROL_ON = `border ${SELECTED} hover:bg-stone-50`;
 
 /** The one filled control (Send). */
 export const CONTROL_FILLED = "bg-brand border border-brand text-white hover:bg-brand-light disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-500 disabled:cursor-not-allowed";

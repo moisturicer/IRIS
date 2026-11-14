@@ -349,7 +349,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 {record.current_holders.length > 0 && (
-                  <p className="inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-2 py-0.5 text-2xs font-semibold text-brand">
+                  <p className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-surface px-2 py-0.5 text-2xs font-semibold text-brand">
                     <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
                     With {record.current_holders.map((h) => h.label).join(", ")}
                   </p>

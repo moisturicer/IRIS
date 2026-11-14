@@ -25,7 +25,7 @@ export const CHECKBOX = "w-4 h-4 rounded border-stone-300 text-brand accent-bran
 
 /** A warning notice: maroon, with a glyph supplied by the caller. */
 export const WARNING_NOTICE =
-  "flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-[14px] text-brand";
+  "flex items-start gap-2 rounded-lg border border-stone-300 bg-surface px-4 py-3 text-[14px] text-brand";
 
 /** Load failures use the same attention tone as warnings. */
 export const LOAD_ERROR = WARNING_NOTICE;

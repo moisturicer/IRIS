@@ -85,7 +85,7 @@ export function ReadingHeader({
           onClick={onBackToAnswer}
           title="Back to answer"
           className={cn(
-            "shrink-0 inline-flex items-center justify-center gap-1.5 min-w-11 px-2 text-small font-semibold text-brand hover:bg-brand-50",
+            "shrink-0 inline-flex items-center justify-center gap-1.5 min-w-11 px-2 text-small font-semibold text-brand hover:bg-stone-100",
             "reading-split:min-w-0 reading-split:justify-start",
             CONTROL_SIZE,
             CONTROL_SHAPE,

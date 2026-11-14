@@ -72,7 +72,7 @@ export function OpportunityRow({
           // beside the content from `sm`, where there is room for both.
           "flex items-center justify-center self-start shrink-0 rounded-lg border px-2.5 py-1",
           "sm:w-16 sm:px-0 sm:py-2 sm:text-center",
-          urgent ? "border-brand-200 bg-brand-50" : "border-stone-200 bg-white",
+          urgent ? "border-stone-300 bg-surface" : "border-stone-200 bg-white",
         )}
       >
         {date ? (

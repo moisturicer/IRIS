@@ -27,6 +27,7 @@ import {
   matchesQuery,
 } from "./opportunityUtils";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
+import { SELECTED } from "@/components/ui/highlightRoles";
 import { failureMessage } from "@/lib/readFailure";
 
 /** A filter chip, as My Reviews draws them: soft maroon when on. */
@@ -35,7 +36,7 @@ function chipClass(on: boolean) {
     "inline-flex shrink-0 items-center gap-1.5 min-h-11 lg:min-h-9 px-3 rounded-full border text-small font-medium whitespace-nowrap",
     COLOUR_TRANSITION,
     FOCUS_RING,
-    on ? "border-brand bg-brand-50 text-brand" : "border-stone-200 bg-white text-stone-700 hover:border-stone-400",
+    on ? SELECTED : "border-stone-200 bg-white text-stone-700 hover:border-stone-400",
     "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-stone-200",
   );
 }

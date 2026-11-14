@@ -146,7 +146,7 @@ export function ResearchCard({
       className={cn(
         "group relative flex flex-col bg-surface rounded-xl border border-stone-200",
         COLOUR_TRANSITION,
-        "hover:border-stone-400",
+        "hover:border-stone-300 hover:shadow-card-md",
         "focus-within:border-stone-400",
         grid && "h-full",
       )}

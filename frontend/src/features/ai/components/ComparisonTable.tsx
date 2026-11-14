@@ -45,7 +45,7 @@ function PageCitation({ source, record }: {
   return (
     <Link to={to} state={state}
       aria-label={label} title={label}
-      className="inline-flex rounded px-1.5 py-0.5 text-xs font-medium text-brand bg-brand/10 hover:bg-brand/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
+      className="inline-flex rounded px-1.5 py-0.5 text-xs font-medium text-brand bg-surface ring-1 ring-stone-300 hover:bg-brand hover:text-white hover:ring-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
       {source.page === null ? "Source" : `p. ${source.page}`}
     </Link>
   );

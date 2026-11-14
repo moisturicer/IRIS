@@ -4,10 +4,10 @@ import { initials } from "./commentThreads";
 
 /** Quiet tones from the palette, so two people are told apart without a rainbow. */
 const TONES = [
-  "bg-brand-100 text-brand",
+  "bg-brand text-white",
   "bg-stone-200 text-stone-800",
-  "bg-cream text-brand-800",
-  "bg-brand-50 text-brand-700",
+  "bg-stone-100 text-stone-700",
+  "bg-stone-300 text-stone-900",
 ];
 
 function toneFor(name: string): string {

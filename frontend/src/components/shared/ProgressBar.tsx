@@ -21,7 +21,7 @@ interface ProgressBarProps {
   label:     string;
   /** Any number; clamped to 0–100 and rounded. */
   progress:  number;
-  /** Size and track colour, e.g. "h-1.5 w-20 bg-brand-100". */
+  /** Size and track colour, e.g. "h-1.5 w-20 bg-stone-200". */
   className?: string;
   /** Focusable from script only, for a caller that moves keyboard focus onto it. */
   focusable?: boolean;

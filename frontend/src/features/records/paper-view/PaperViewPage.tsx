@@ -731,7 +731,7 @@ export default function PaperViewPage() {
       {/* The owner reads their own unsubmitted upload; nobody else is served
           it (IR-273), so only they are told. */}
       {!viewedVersion && record.manuscript_unsubmitted && (
-        <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 flex items-start gap-3">
+        <div className="rounded-xl border border-stone-300 bg-surface px-4 py-3 flex items-start gap-3">
           <i className="fas fa-file-pen text-sm text-brand mt-0.5" aria-hidden />
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-semibold text-stone-900">Your revised manuscript, not yet submitted</p>
@@ -1007,7 +1007,7 @@ export default function PaperViewPage() {
                 {record.record_type_name && <span className={META_CHIP}>{record.record_type_name}</span>}
                 {record.classification_name && <span className={META_CHIP}>{record.classification_name}</span>}
                 {record.is_ip && (
-                  <span className={cn(META_PILL, "gap-1.5 bg-brand-50 text-brand ring-1 ring-inset ring-brand-200")}>
+                  <span className={cn(META_PILL, "gap-1.5 bg-surface text-brand ring-1 ring-inset ring-stone-300")}>
                     <i className="fas fa-shield-halved text-2xs" aria-hidden />
                     Intellectual Property
                   </span>
@@ -1125,7 +1125,7 @@ export default function PaperViewPage() {
                     id={WAITING_TARGET.revision}
                     tabIndex={-1}
                     aria-labelledby="revision-requested-heading"
-                    className="rounded-2xl border border-brand-200 bg-brand-50 p-4 scroll-mt-20 focus:outline-none"
+                    className="rounded-2xl border border-stone-300 bg-surface p-4 scroll-mt-20 focus:outline-none"
                   >
                     <h2
                       id="revision-requested-heading"
@@ -1154,7 +1154,7 @@ export default function PaperViewPage() {
                       ))}
                     </ul>
                     {can.has("create_version") && record.revision.new_version && (
-                      <div className="mt-4 border-t border-brand-200 pt-3">
+                      <div className="mt-4 border-t border-stone-300 pt-3">
                         <p className="text-sm text-stone-700 leading-relaxed">
                           Upload your revised manuscript here, add any requested document below, or edit
                           the details, then submit. {newVersionSummary(record.revision.new_version)}
@@ -1220,7 +1220,7 @@ export default function PaperViewPage() {
                 )}
 
                 {record.workflow_state === "rejected" && (
-                  <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+                  <div className="rounded-2xl border border-stone-300 bg-surface p-4">
                     <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
                       <i className="fas fa-circle-xmark text-xs" aria-hidden />
                       This record was rejected

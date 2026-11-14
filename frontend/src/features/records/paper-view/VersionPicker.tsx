@@ -101,7 +101,7 @@ export function VersionBanner({
   onBack: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 flex items-start gap-3 flex-wrap">
+    <div className="rounded-xl border border-stone-300 bg-surface px-4 py-3 flex items-start gap-3 flex-wrap">
       <i className="fas fa-clock-rotate-left text-sm text-brand mt-0.5" aria-hidden />
       <div className="min-w-0 flex-1 text-sm">
         <p className="font-semibold text-stone-900">

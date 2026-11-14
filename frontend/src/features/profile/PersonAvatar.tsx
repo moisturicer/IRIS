@@ -12,7 +12,7 @@ interface PersonAvatarProps {
 }
 
 /**
- * A person's circular photo, or their initials on Maroon Wash when they added
+ * A person's circular photo, or their initials on maroon when they added
  * none or it has not arrived. `lg` is the Profile's mark (80 px on a phone, 112
  * from `sm`); `sm` sits beside a name in a list. Initials are Garamond only at
  * `lg`: a small one is a chip, and Garamond never sets a chip (DESIGN.md, Typeset
@@ -29,7 +29,7 @@ export function PersonAvatar({ photoUrl, initials, alt = "", size }: PersonAvata
       aria-hidden
       className={cn(
         box,
-        "grid shrink-0 place-items-center rounded-full bg-brand-50 font-semibold text-brand",
+        "grid shrink-0 place-items-center rounded-full bg-brand font-semibold text-white",
         size === "lg" ? "font-display text-title sm:text-display" : "text-small",
       )}
     >
