@@ -32,6 +32,9 @@ export const OVERVIEW_MARKDOWN = [
   "[&>p:first-child]:text-lg [&>p:first-child]:leading-[1.7] [&>p:first-child]:text-stone-800",
 ].join(" ");
 
+// The thread's width: one literal, so Tailwind sees the whole class.
+const CHAT_MEASURE = "max-w-[min(92vw,68ch)]";
+
 /**
  * The chat column, shared by the transcript and the composer below it so the
  * two cannot drift apart (IR-451).
@@ -41,7 +44,7 @@ export const OVERVIEW_MARKDOWN = [
  * reading measure of 68 characters (IR-1090; it was 60rem, about 110 characters
  * a line at the answer's 16px, which the audit found too long to read).
  */
-export const CHAT_COLUMN = "w-full max-w-[min(92vw,68ch)] mx-auto";
+export const CHAT_COLUMN = `w-full ${CHAT_MEASURE} mx-auto`;
 
 /**
  * Ask IRIS's history and sources sit beside the answer from this page width,
@@ -64,7 +67,7 @@ export const CHAT_COMPOSER_FIELD =
 
 // The opening's text, starter questions and composer share this width, which is
 // the thread's own (IR-1090), so the page does not widen when the first answer lands.
-export const CHAT_OPENING_COLUMN = "mx-auto w-full max-w-[min(92vw,68ch)]";
+export const CHAT_OPENING_COLUMN = `mx-auto w-full ${CHAT_MEASURE}`;
 
 // A round composer control: 44 px on touch, 36 px beside a pointer.
 export const CHAT_COMPOSER_ICON =

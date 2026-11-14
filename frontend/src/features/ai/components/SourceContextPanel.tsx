@@ -83,7 +83,7 @@ export function SourceContextPanel({ open, question = null, citations, sources, 
  */
 function sectionOf(citation: ChatCitation, title: string): string {
   if (!hasCitationQuote(citation)) return "";
-  const heading = plainSnippet([...citation.context_path].reverse().find((part) => part.trim()) ?? "");
+  const heading = plainSnippet([...(citation.context_path ?? [])].reverse().find((part) => part.trim()) ?? "");
   return heading.toLowerCase() === title.trim().toLowerCase() ? "" : heading;
 }
 

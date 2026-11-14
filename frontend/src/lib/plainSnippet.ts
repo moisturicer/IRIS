@@ -10,13 +10,13 @@
  */
 
 const DISPLAY_MATH = /\$\$[\s\S]+?\$\$/g;
-const HOLD = "\u0000";
+const MATH_SENTINEL = "\u0000";
 
 export function plainSnippet(text: string): string {
   const math: string[] = [];
   let out = text.replace(DISPLAY_MATH, (formula) => {
     math.push(formula);
-    return `${HOLD}${math.length - 1}${HOLD}`;
+    return `${MATH_SENTINEL}${math.length - 1}${MATH_SENTINEL}`;
   });
 
   out = out
@@ -42,7 +42,7 @@ export function plainSnippet(text: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  return out.replace(new RegExp(`${HOLD}(\\d+)${HOLD}`, "g"), (_, index: string) => math[Number(index)]);
+  return out.replace(new RegExp(`${MATH_SENTINEL}(\\d+)${MATH_SENTINEL}`, "g"), (_, index: string) => math[Number(index)]);
 }
 
 /** One line without its block markers: heading, quote, list, rule, or table row. */
