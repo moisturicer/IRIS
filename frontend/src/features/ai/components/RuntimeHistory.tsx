@@ -23,6 +23,9 @@ export function RuntimeHistory({ activeId }: Props) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [more, setMore] = useState(false);
   const request = useRef(0);
+  const [reloads, setReloads] = useState(0);
+  const shown = useRef<{ ready: boolean; ids: Set<string> }>({ ready: false, ids: new Set() });
+  shown.current = { ready: state === "ready", ids: new Set(entries.map(e => e.id)) };
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(text.trim()), DEBOUNCE_MS);
@@ -36,7 +39,12 @@ export function RuntimeHistory({ activeId }: Props) {
       if (mine !== request.current) return;
       setEntries(page.conversations); setNext(page.next); setState("ready");
     }).catch(() => { if (mine === request.current) setState("error"); });
-  }, [api, query, activeId]);
+  }, [api, query, reloads]);
+
+  // A Conversation not yet listed (a new one) reloads the list; opening a listed one keeps its pages.
+  useEffect(() => {
+    if (activeId && shown.current.ready && !shown.current.ids.has(activeId)) setReloads(n => n + 1);
+  }, [activeId]);
 
   const loadMore = async () => {
     if (!next || more) return;

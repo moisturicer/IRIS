@@ -645,13 +645,9 @@ class RunStore:
 
     async def list_conversations(self, grant, *, q: str | None = None, before=None,
                                  limit: int = LIST_LIMIT) -> dict:
-        """The reader's own Conversations, newest activity first, optionally matching `q`.
-
-        Runs under the reader's grant. A question is matched as the reader
-        wrote it; an answer only while every source it rests on is still
-        readable, the rule `reopen` applies when it withholds the text.
-        `before` is the `next` of the previous page.
-        """
+        """The reader's own Conversations, newest first; `q` matches questions, and answers only
+        while their sources stay readable (the `reopen` rule). `before` is a previous `next`.
+        A Paper Chat grant lists its paper's; an unscoped one lists those it can continue."""
         after = after_id = None
         if before is not None:
             after, after_id = before
@@ -672,7 +668,7 @@ class RunStore:
                                                   WHERE t.conversation_id = cv.id), cv.created_at) AS activity
                                   FROM iris_ai.conversation cv
                                  WHERE cv.reader_id = $3 AND cv.deleted_at IS NULL
-                                   AND ($2::bigint IS NULL OR cv.scope_record_id = $2)) c
+                                   AND cv.scope_record_id IS NOT DISTINCT FROM $2::bigint) c
                          WHERE ($4::timestamptz IS NULL OR (c.activity, c.id) < ($4::timestamptz, $5::uuid))
                            AND ($1::text IS NULL OR {_MATCH})
                          ORDER BY c.activity DESC, c.id DESC

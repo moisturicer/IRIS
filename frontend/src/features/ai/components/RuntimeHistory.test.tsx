@@ -79,3 +79,22 @@ test("a failed load says so and a late answer to an old search is ignored", asyn
   expect(screen.queryByText("Stale")).not.toBeInTheDocument();
   expect(screen.getByText("Current")).toBeInTheDocument();
 });
+
+test("opening a listed conversation keeps the pages loaded; a new one reloads the list", async () => {
+  const get = vi.spyOn(apiClient, "get")
+    .mockResolvedValueOnce(page(["First"], "cursor-1"))
+    .mockResolvedValueOnce(page(["Older"]));
+  const user = userEvent.setup();
+  const view = render(<MemoryRouter><RuntimeHistory activeId="id-First" /></MemoryRouter>);
+  await screen.findByText("First");
+  await user.click(screen.getByRole("button", { name: "Load more" }));
+  await screen.findByText("Older");
+  view.rerender(<MemoryRouter><RuntimeHistory activeId="id-Older" /></MemoryRouter>);
+  expect(get).toHaveBeenCalledTimes(2);
+  expect(screen.getByText("First")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /Older/ })).toHaveAttribute("aria-current", "page");
+  get.mockResolvedValue(page(["Brand new", "First"]));
+  view.rerender(<MemoryRouter><RuntimeHistory activeId="id-Brand new" /></MemoryRouter>);
+  expect(await screen.findByText("Brand new")).toBeInTheDocument();
+  expect(get).toHaveBeenCalledTimes(3);
+});

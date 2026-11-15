@@ -121,7 +121,9 @@ def test_paper_chat_search_stays_within_that_papers_conversations(api, runtime):
     assert found(listing(api, on_first, q="tracer dye")) == [in_first]
     assert found(listing(api, on_first)) == [in_first]
     assert found(listing(api, on_second, q="tracer dye")) == [in_second]
-    assert sorted(found(listing(api, general, q="tracer dye"))) == sorted([in_first, in_second, outside])
+    # An unscoped grant lists only what it can continue; a paper's Conversation needs that paper's grant.
+    assert found(listing(api, general, q="tracer dye")) == [outside]
+    assert sorted(found(listing(api, general))) == [outside]
 
 
 def test_the_list_pages_past_fifty_without_a_gap_or_a_repeat(api, runtime):
