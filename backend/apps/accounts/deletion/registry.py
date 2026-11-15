@@ -115,6 +115,7 @@ RELATIONS: dict[str, Rule] = {
     "opportunities.SavedCall.owner":       Rule(DELETE, "Saved Calls (IR-649)"),
     "library.SavedRecord.owner":           Rule(DELETE, "Saved papers and reading status"),
     "library.SavedFeed.owner":             Rule(DELETE, "Private custom feeds (IR-577)"),
+    "library.LibraryFolder.owner":         Rule(DELETE, "Private folders and what is filed in them (IR-572)"),
     "library.ReadingNote.owner":           Rule(DELETE, "Private reading notes (IR-580)"),
     "library.ReadingHighlight.owner":      Rule(DELETE, "Private highlights (IR-583)"),
     "reviews.SavedReply.owner":            Rule(DELETE, "Private saved review replies (IR-877)"),

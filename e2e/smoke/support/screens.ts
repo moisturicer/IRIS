@@ -213,6 +213,8 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/records/", paginated([PAPER]));
       api.on("GET", "/users/search/", { count: 0, next: null, results: [] });
       api.on("GET", "/library/saves/", { results: [] });
+      // IR-572: folders are read with the saves.
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
       api.on("GET", "/library/feeds/", { results: [], limit: 10 });
     },
     heading: "Discover",
@@ -225,6 +227,8 @@ export const SCREENS: Screen[] = [
       api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
       api.on("GET", `/records/${PAPER.id}/comments/`, { comments: [], count: 0 });
       api.on("GET", "/library/saves/", { results: [] });
+      // IR-572: folders are read with the saves.
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
       api.on("GET", `/library/highlights/${PAPER.id}/`, { results: [] });
       api.on("GET", `/ai/records/${PAPER.id}/overview/`, { state: "not_indexed", overview: null });
       api.on("GET", `/records/${PAPER.id}/similar/`, { results: [] });
@@ -240,6 +244,8 @@ export const SCREENS: Screen[] = [
     id: "my-library", path: "/records/mine", route: "/records/mine", role: "Student",
     mocks: wrap("Student", (api) => {
       api.on("GET", "/library/saves/", { results: [] });
+      // IR-572: folders are read with the saves.
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
       api.on("GET", "/records/mine/", []);
     }),
     heading: "My Library",

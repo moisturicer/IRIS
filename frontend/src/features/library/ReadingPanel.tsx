@@ -2,19 +2,20 @@ import { useEffect, useRef, useState } from "react";
 
 import { Select } from "@/components/ui/Select";
 import type { ReadingStatus } from "@/api/library";
-import type { Collection } from "@/lib/recordLibrary";
+import { MAX_FOLDER_NAME, atFolderLimit, type LibraryFolder } from "@/store/library.store";
 
 /**
  * Which part of My Library the main column shows. `research` is the owner's
  * own records. `saved` and `status` are the account's saves (IR-566,
- * ADR-044); `folder` is one of the reader's own folders and `history` this
- * browser's history, both still browser-only.
+ * ADR-044), and `folder` one of the reader's own folders, which follow the
+ * account too (IR-572, ADR-070). `history` is this browser's history, still
+ * browser-only until IR-756.
  */
 export type LibraryView =
   | { kind: "research" }
   | { kind: "saved" }
   | { kind: "status"; status: ReadingStatus }
-  | { kind: "folder"; id: string }
+  | { kind: "folder"; id: number }
   | { kind: "history" };
 
 export function isSameView(a: LibraryView, b: LibraryView): boolean {
@@ -31,7 +32,9 @@ export function viewKey(view: LibraryView): string {
 }
 
 interface FolderPickerProps {
-  collections:  Collection[];
+  folders:      LibraryFolder[];
+  /** How many folders the account may hold, when the server has said. */
+  limit:        number | null;
   view:         LibraryView;
   onViewChange: (view: LibraryView) => void;
   onCreate:     (name: string) => void;
@@ -41,11 +44,13 @@ const NEW_FOLDER = "__new__";
 
 /**
  * The reader's own folders as one picker in the Saved papers toolbar,
- * beside Sort, rather than a second panel to navigate. Folders are still
- * this browser's until IR-572; the toolbar says so. "New folder…" swaps the picker for a name field in place.
- * Renaming and deleting a folder happen in the folder's own view.
+ * beside Sort, rather than a second panel to navigate. They are the account's
+ * (IR-572), read from the server with the saves. "New folder…" swaps the
+ * picker for a name field in place, and is offered only while the account
+ * has room for another. Renaming and deleting a folder happen in the
+ * folder's own view.
  */
-export function FolderPicker({ collections, view, onViewChange, onCreate }: FolderPickerProps) {
+export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: FolderPickerProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -77,12 +82,14 @@ export function FolderPicker({ collections, view, onViewChange, onCreate }: Fold
         }}
         aria-label="New folder name"
         placeholder="Folder name, then Enter"
+        maxLength={MAX_FOLDER_NAME}
         className="min-h-9 w-48 rounded-control border border-field bg-white px-3 text-small placeholder:text-stone-600 focus:border-brand focus:outline-none"
       />
     );
   }
 
   const value = view.kind === "folder" ? `folder:${view.id}` : "";
+  const full = atFolderLimit(folders, limit);
 
   return (
     <Select
@@ -93,18 +100,20 @@ export function FolderPicker({ collections, view, onViewChange, onCreate }: Fold
       onChange={(e) => {
         const next = e.target.value;
         if (next === NEW_FOLDER) setCreating(true);
-        else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: next.slice("folder:".length) });
+        else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: Number(next.slice("folder:".length)) });
         else onViewChange({ kind: "saved" });
       }}
       className="max-w-[12rem]"
     >
       <option value="">All saved papers</option>
-      {collections.length > 0 && (
+      {folders.length > 0 && (
         <optgroup label="Your folders">
-          {collections.map((c) => <option key={c.id} value={`folder:${c.id}`}>{c.name}</option>)}
+          {folders.map((f) => <option key={f.id} value={`folder:${f.id}`}>{f.name}</option>)}
         </optgroup>
       )}
-      <option value={NEW_FOLDER}>+ New folder…</option>
+      {full
+        ? <option value={NEW_FOLDER} disabled>{`No room for a new folder (${limit} is the most)`}</option>
+        : <option value={NEW_FOLDER}>+ New folder…</option>}
     </Select>
   );
 }

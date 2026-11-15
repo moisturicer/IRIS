@@ -68,6 +68,8 @@ SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE)
 OWNS_FEED = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
 #: `saved_reply`, a person's private saved reply (IR-877): the same shape.
 OWNS_SAVED_REPLY = OWNS_FEED
+#: `folder`, a reader's own folder (IR-572): the same shape.
+OWNS_FOLDER = OWNS_FEED
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY, DENY)
 
@@ -826,6 +828,23 @@ LIBRARY = {
     "library-feed": Entry({
         "PATCH": _case(OWNS_FEED, kwargs={"feed_id": Ref("feed")}, data={"name": "Renamed feed"}),
         "DELETE": _case(OWNS_FEED, kwargs={"feed_id": Ref("feed")}),
+    }),
+    # IR-572, ADR-070 §4: a folder is the caller's own, so listing and creating
+    # are anyone's, and another account's folder is the same 404 as a missing
+    # one on a rename or a filing. Filing also rechecks `visible_to()` on the
+    # Record. Deleting a folder or a filing removes only the caller's own rows,
+    # so it answers 204 to everybody: it is idempotent and discloses nothing.
+    "library-folders": Entry({
+        "GET": _case(SIGNED_IN),
+        "POST": _case(SIGNED_IN, data={"name": "Matrix folder"}),
+    }),
+    "library-folder": Entry({
+        "PATCH": _case(OWNS_FOLDER, kwargs={"folder_id": Ref("folder")}, data={"name": "Renamed folder"}),
+        "DELETE": _case(SIGNED_IN, kwargs={"folder_id": Ref("folder")}),
+    }),
+    "library-folder-record": Entry({
+        "PUT": _case(OWNS_FOLDER, kwargs={"folder_id": Ref("folder"), "record_id": Ref("record")}),
+        "DELETE": _case(SIGNED_IN, kwargs={"folder_id": Ref("folder"), "record_id": Ref("record")}),
     }),
 }
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
