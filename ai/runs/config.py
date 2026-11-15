@@ -113,9 +113,11 @@ def problems(values) -> list[str]:
     for name in ("RUNS_JOIN_PASSAGES", "RUNS_SECTION_MATES"):
         if _text(values, name) not in ("", "off", "on"):
             found.append(f"{name} must be on or off")
-    for name in ("RUNS_PASSAGES_PER_PAPER", "RUNS_PASSAGE_TOKENS"):
-        if _text(values, name) and not _text(values, name).isdigit():
-            found.append(f"{name} must be a whole number; 0 turns it off")
+    if _text(values, "RUNS_PASSAGE_TOKENS") and not _text(values, "RUNS_PASSAGE_TOKENS").isdigit():
+        found.append("RUNS_PASSAGE_TOKENS must be a whole number; 0 turns it off")
+    share = _text(values, "RUNS_PAPER_SHARE")
+    if share and not (share.isdigit() and int(share) <= 100):
+        found.append("RUNS_PAPER_SHARE must be a percent from 0 to 100; 0 turns it off")
     return found
 
 
@@ -127,7 +129,7 @@ def selection(values) -> Policy:
     """Passage selection, on by default (owner decision 2026-11-15, ADR-033 amendment)."""
     default = Policy()
     return Policy(
-        per_paper=int(_text(values, "RUNS_PASSAGES_PER_PAPER") or default.per_paper),
+        paper_share=int(_text(values, "RUNS_PAPER_SHARE") or default.paper_share),
         join=_text(values, "RUNS_JOIN_PASSAGES") != "off",
         tokens_per_passage=int(_text(values, "RUNS_PASSAGE_TOKENS") or default.tokens_per_passage),
         section_mates=_text(values, "RUNS_SECTION_MATES") != "off",

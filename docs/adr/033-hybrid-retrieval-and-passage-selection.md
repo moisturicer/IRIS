@@ -221,6 +221,16 @@ The cap (3) applies outside Paper Chat only. When it removes a hit, the next-ran
 
 **On by default, unmeasured**, by the same decision as IR-397's amendment above (`RUNS_SECTION_MATES=off` switches it off). With a budget of 700 tokens per requested passage and chunks averaging 359 tokens on the dev corpus, mates roughly double a typical search's size; the total stays within requested passages × 700 tokens, the largest result a search could return before IR-397.
 
+## Amendment — 2026-11-15 (IR-1055): a paper's share of the budget replaces the count cap
+
+Jive Tyler Revalde replaced the runtime's 3-per-paper count with a share of the search's token budget, on 2026-11-15. The goal: a search should be bounded by how much context it is given, not by a fixed number of passages.
+
+- Outside Paper Chat, one paper may fill at most `RUNS_PAPER_SHARE` percent of the budget (default 50, provisional; 0 turns it off). **A paper's section-mates count toward its share.** Its first hit always enters.
+- **The limit is soft.** Each paper fills up to its share first. Any budget no other paper could use then goes back, in rank order: hits first, then section-mates. A search with only one relevant paper therefore still gets the whole budget.
+- Which percentage is best is being evaluated separately; 50 is a placeholder, not a measurement.
+
+This supersedes the count cap described in the IR-397 and IR-1055 amendments above.
+
 ## Alternatives Considered
 
 **Keyword search restricted to the vector candidates** — run the vector search, then keyword-match within its top *n*. Rejected. It cannot surface a passage the vector search missed, which is the entire failure hybrid retrieval addresses. It buys a smaller keyword query in exchange for the only benefit on offer.
