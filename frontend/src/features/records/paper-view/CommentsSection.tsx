@@ -29,10 +29,10 @@ const REPORT_REASONS: { value: ReportReason; label: string }[] = [
  * avatar: an elbow to this reply, and a straight run on to the next one.
  */
 const REPLY_ITEM =
-  "relative pl-7 pt-3 before:absolute before:left-0 before:top-0 before:h-[27px] before:w-[22px] before:rounded-bl-[14px] before:border-b-2 before:border-l-2 before:border-stone-300 after:absolute after:bottom-0 after:left-0 after:top-[27px] after:border-l-2 after:border-stone-300 last:after:hidden";
+  "relative pl-7 pt-3 before:absolute before:left-0 before:top-0 before:h-[27px] before:w-[22px] before:rounded-bl-card before:border-b-2 before:border-l-2 before:border-stone-300 after:absolute after:bottom-0 after:left-0 after:top-[27px] after:border-l-2 after:border-stone-300 last:after:hidden";
 
 const TOGGLE_BUTTON =
-  "inline-flex min-h-11 items-center gap-1.5 rounded-lg px-1.5 text-small font-semibold text-stone-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-8";
+  "inline-flex min-h-11 items-center gap-1.5 rounded-control px-1.5 text-small font-semibold text-stone-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-8";
 
 /** How long a comment that was just posted or linked to stays highlighted. */
 const HIGHLIGHT_MS = 1600;
@@ -410,7 +410,7 @@ export function CommentsSection({
       )}
 
       {reporting && (
-        <Modal open onClose={() => setReporting(null)} title="Report comment" size="max-w-md">
+        <Modal open onClose={() => setReporting(null)} title="Report comment" size="md">
           <p className="mt-1 text-sm text-stone-700">Choose the reason that best describes this comment.</p>
           <form onSubmit={submitReport} className="mt-4">
             <fieldset className="space-y-2">
@@ -425,7 +425,7 @@ export function CommentsSection({
             {reportReason === "other" && (
               <div className="mt-3">
                 <label htmlFor={`${id}-report-note`} className="mb-1 block text-sm font-medium text-stone-800">Note</label>
-                <textarea id={`${id}-report-note`} required value={reportNote} onChange={(event) => setReportNote(event.target.value)} rows={3} className="w-full rounded-lg border border-field px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" />
+                <textarea id={`${id}-report-note`} required value={reportNote} onChange={(event) => setReportNote(event.target.value)} rows={3} className="w-full rounded-control border border-field px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" />
               </div>
             )}
             <div className="mt-5 flex justify-end gap-3">
@@ -438,7 +438,7 @@ export function CommentsSection({
         </Modal>
       )}
 
-      <Modal open={confirmDelete !== null} onClose={() => setConfirmDelete(null)} title="Delete this comment?" size="max-w-sm">
+      <Modal open={confirmDelete !== null} onClose={() => setConfirmDelete(null)} title="Delete this comment?" size="sm">
         <p className="text-sm text-stone-700">This cannot be undone. If it has replies, they stay and this comment shows as [deleted].</p>
         <div className="mt-5 flex justify-end gap-3">
           <button type="button" className="text-sm text-stone-700 underline" onClick={() => setConfirmDelete(null)}>Cancel</button>

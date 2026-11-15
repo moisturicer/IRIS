@@ -36,7 +36,7 @@ export function StreamStatusRow({
   const elapsed = useElapsed(state.startedAt);
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[14px] font-medium text-stone-500", className)}>
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 text-body font-medium text-stone-500", className)}>
       <span className="inline-flex items-center gap-2">
         <span
           aria-hidden
@@ -49,10 +49,10 @@ export function StreamStatusRow({
         <button
           type="button"
           onClick={onStop}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5
-            text-[13px] font-medium text-stone-600 hover:border-stone-300 hover:text-stone-900"
+          className="inline-flex items-center gap-1.5 rounded-control border border-stone-200 px-3 py-1.5
+            text-small font-medium text-stone-600 hover:border-stone-300 hover:text-stone-900"
         >
-          <i className="fas fa-stop text-[10px]" aria-hidden />
+          <i className="fas fa-stop text-label" aria-hidden />
           Stop answering
         </button>
       )}

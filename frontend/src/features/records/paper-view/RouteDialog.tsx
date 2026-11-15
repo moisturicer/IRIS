@@ -134,7 +134,7 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-700 leading-relaxed">
           {accepting
             ? "This accepts the work at your stage and sends it to RDCO. RDCO decides, and asks the offices it needs. Only RDCO publishes."
             : "Ask another office, as a whole or specific officers in it. Your own review carries on."}
@@ -157,7 +157,7 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
                 // reviewer must be chosen -- and the dialog says so.
                 const needsNominee = choice.ticked && target.already_holds && !choice.nominees.length;
                 return (
-                  <li key={target.party} className="rounded-lg border border-stone-200 px-3 py-2.5">
+                  <li key={target.party} className="rounded-control border border-stone-200 px-3 py-2.5">
                     <div className="flex items-start gap-2.5">
                       <input
                         id={checkId}
@@ -168,20 +168,20 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
                         aria-describedby={target.author_hint ? hintId : undefined}
                       />
                       <div className="min-w-0">
-                        <label htmlFor={checkId} className="text-[14px] font-medium text-stone-900">
+                        <label htmlFor={checkId} className="text-body font-medium text-stone-900">
                           {target.label}
                           {/* A real space, not only a margin: the checkbox's accessible
                               name must read "ITSO already reviewing", not run together. */}
                           {target.already_holds && " "}
                           {target.already_holds && (
-                            <span className="ml-1 text-[13px] font-normal text-stone-600">
+                            <span className="ml-1 text-small font-normal text-stone-600">
                               already reviewing
                             </span>
                           )}
                         </label>
                         {target.author_hint && (
-                          <p id={hintId} className="mt-0.5 text-[13px] text-stone-600">
-                            <i className="fas fa-flag mr-1.5 text-[11px]" aria-hidden />
+                          <p id={hintId} className="mt-0.5 text-small text-stone-600">
+                            <i className="fas fa-flag mr-1.5 text-label" aria-hidden />
                             {target.author_hint}
                           </p>
                         )}
@@ -205,11 +205,11 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
                           ))}
                         </fieldset>
                         {needsNominee ? (
-                          <p id={`${pickId}-why`} className="mt-1 text-[13px] text-brand">
+                          <p id={`${pickId}-why`} className="mt-1 text-small text-brand">
                             {target.label} already has this record. Choose someone to add.
                           </p>
                         ) : (
-                          <p className="mt-1 text-[13px] text-stone-600">
+                          <p className="mt-1 text-small text-stone-600">
                             {choice.nominees.length
                               ? `${joinLabels(target.members.filter((m) => choice.nominees.includes(m.id)).map((m) => m.name))} ${choice.nominees.length > 1 ? "are" : "is"} asked directly and told now.`
                               : `Nobody picked: it goes to ${target.label}'s pool, and anyone there can claim it.`}
@@ -228,7 +228,7 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
           <legend className={LABEL}>Suggested specialist offices (optional)</legend>
           <p className="text-small text-stone-600">RDCO sees these and decides which offices to ask. A suggestion requests nothing.</p>
           {authorHints.length > 0 && <p className="text-small text-stone-700">
-            <i className="fas fa-flag mr-1.5 text-[11px]" aria-hidden />The author flagged: {authorHints.join("; ")}
+            <i className="fas fa-flag mr-1.5 text-label" aria-hidden />The author flagged: {authorHints.join("; ")}
           </p>}
           {["itso", "ierc", "ktto"].map((p) => <label key={p} className="flex items-center gap-2 text-small">
             <input type="checkbox" className={CHECKBOX} checked={suggested.includes(p)} onChange={(e) => setSuggested(e.target.checked ? [...suggested, p] : suggested.filter((v) => v !== p))} />{p.toUpperCase()}
@@ -251,7 +251,7 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
             placeholder="What should they look at? Point to the section."
             className={fieldClasses(false)}
           />
-          <p id={`${ids}-reason-help`} className="mt-1 text-[13px] text-stone-600">
+          <p id={`${ids}-reason-help`} className="mt-1 text-small text-stone-600">
             {accepting ? "RDCO sees this with the record." : "The offices see this with the record."}
           </p>
         </div>

@@ -30,7 +30,7 @@ export function ChatToolbar({
       {(asDrawers || !historyOpen) && <button
         type="button"
         onClick={onToggleHistory}
-        className={`inline-flex items-center p-2 rounded-lg text-[13px] transition-colors ${touch}
+        className={`inline-flex items-center p-2 rounded-control text-small transition-colors ${touch}
           ${historyOpen
             ? "bg-stone-100 text-stone-800"
             : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
@@ -45,10 +45,10 @@ export function ChatToolbar({
       </button>}
 
       <div className="min-w-0 flex-1 px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-stone-600 truncate">
+        <p className="text-label font-semibold text-stone-600 truncate">
           Ask IRIS
         </p>
-        <h1 className="text-[15px] font-semibold text-stone-900 truncate">{sessionTitle}</h1>
+        <h1 className="text-body font-semibold text-stone-900 truncate">{sessionTitle}</h1>
       </div>
 
 

@@ -44,6 +44,7 @@ RELATIONS: dict[str, Rule] = {
     "accounts.RoleRequest.reviewed_by": Rule(KEEP, "Who decided someone else's request"),
     "accounts.SystemSetting.updated_by": Rule(KEEP, "Who last changed a setting"),
     "accounts.DataNotice.published_by": Rule(KEEP, "Who published a notice version"),
+    "accounts.NoticeDraft.updated_by": Rule(KEEP, "Who last saved the unpublished notice draft (IR-1138)"),
     "accounts.NoticeAnswer.user":     Rule(KEEP, "Consent history: each answer is kept with its version and time (ADR-054 decision 3)"),
     "accounts.UserSession.user":      Rule(KEEP, "Ended sign-in history, needed to refuse its tokens"),
     "accounts.RecoveryToken.user":    Rule(DELETE, "Unused recovery links"),

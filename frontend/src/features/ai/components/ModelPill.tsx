@@ -77,7 +77,7 @@ export function ModelPill<T extends string>({ name, value, options, onChange, no
       >
         <i className={cn(current.icon, "text-xs")} aria-hidden />
         {current.short}
-        <i className={cn("fas fa-chevron-up text-[10px] transition-transform duration-150 motion-reduce:transition-none", open || "rotate-180")} aria-hidden />
+        <i className={cn("fas fa-chevron-up text-label transition-transform duration-150 motion-reduce:transition-none", open || "rotate-180")} aria-hidden />
       </button>
 
       {open && (
@@ -87,7 +87,7 @@ export function ModelPill<T extends string>({ name, value, options, onChange, no
           role="menu"
           aria-label={name}
           onKeyDown={onMenuKey}
-          className="absolute bottom-full left-0 z-30 mb-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-stone-200 bg-surface p-1.5 text-left shadow-card-md motion-safe:animate-fade-in"
+          className="absolute bottom-full left-0 z-30 mb-2 w-72 max-w-[calc(100vw-3rem)] rounded-card border border-stone-200 bg-surface p-1.5 text-left shadow-card-md motion-safe:animate-fade-in"
         >
           {options.map((option) => {
             const selected = option.value === value;
@@ -102,7 +102,7 @@ export function ModelPill<T extends string>({ name, value, options, onChange, no
                   close();
                 }}
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left",
+                  "flex w-full items-start gap-3 rounded-control px-3 py-2 text-left",
                   selected ? "bg-surface text-stone-900 ring-1 ring-inset ring-stone-900" : "text-stone-800 hover:bg-stone-100",
                   COLOUR_TRANSITION,
                   FOCUS_RING,

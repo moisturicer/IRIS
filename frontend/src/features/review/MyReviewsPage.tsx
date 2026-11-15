@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { ClearanceStrip, hasStrip } from "@/components/shared/ClearanceStrip";
 import { ResearchCard } from "@/components/shared/ResearchCard";
-import { Badge, Button, Skeleton } from "@/components/ui";
+import { Badge, Button, ButtonLink, Skeleton } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
@@ -27,7 +27,9 @@ import {
   WAITING_ON_LABEL,
   dueLabel,
   holderLine,
+  kickerParts,
   overdueLabel,
+  pageLine,
   readView,
   routingLine,
   viewSearch,
@@ -182,92 +184,64 @@ export default function MyReviewsPage() {
     <div>
       <PageHeader
         title="My Reviews"
-        description="What you need to review, what you have opened, and what you have finished."
+        description={pageLine(access?.offices[0])}
         actions={
-          <div className="flex flex-wrap items-center gap-3">
-            {canAccess(viewer?.role_name as RoleName | undefined, "reviewAnalytics") && (
-              <Link to={pathFor("reviewAnalytics")}
-                    className={cn("inline-flex min-h-11 items-center text-sm font-medium text-brand hover:underline", FOCUS_RING)}>
-                Workflow analytics
-              </Link>
-            )}
+          <>
             {coordinatorOffice && (
-              <Link to={pathFor("reviewOffice")}
-                className={cn("inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
-                <i className="fas fa-users-gear" aria-hidden />
-                {officeLabel} console
-              </Link>
+              <ButtonLink to={pathFor("reviewOffice")} variant="secondary">
+                <i className="fas fa-table-cells-large" aria-hidden />
+                Office console
+              </ButtonLink>
             )}
-          </div>
+            {canAccess(viewer?.role_name as RoleName | undefined, "reviewAnalytics") && (
+              <ButtonLink to={pathFor("reviewAnalytics")} variant="secondary">
+                <i className="fas fa-chart-column" aria-hidden />
+                Workflow analytics
+              </ButtonLink>
+            )}
+          </>
         }
-
       />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div
-          role="tablist"
-          aria-label="My Reviews"
-          onKeyDown={onTabKeyDown}
-          className="inline-flex flex-wrap gap-1 rounded-full bg-stone-100 p-1"
-        >
-          {TABS.map((t) => {
-            const active = t.key === tab;
-            const count = page?.counts[t.key];
-            return (
-              <button
-                key={t.key}
-                ref={(el) => {
-                  tabRefs.current[t.key] = el;
-                }}
-                id={`${ids}-tab-${t.key}`}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-controls={`${ids}-panel`}
-                tabIndex={active ? 0 : -1}
-                onClick={() => go({ tab: t.key })}
-                className={cn(
-                  "min-h-11 px-4 rounded-full text-small font-semibold",
-                  COLOUR_TRANSITION,
-                  FOCUS_RING,
-                  active ? "bg-brand text-white shadow-card" : "text-stone-600 hover:text-brand",
-                )}
-              >
-                {t.label}
-                {count != null && " "}
-                {count != null && (
-                  <span className={cn("ml-1 tabular-nums", active ? "text-white" : "text-stone-600")}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {coordinatorOffice && (
-          <div role="group" aria-label="Whose reviews" className="inline-flex gap-1 rounded-full border border-stone-200 p-1">
-            {[
-              { key: null, label: "Mine" },
-              { key: coordinatorOffice, label: `All of ${officeLabel}` },
-            ].map((choice) => (
-              <button
-                key={choice.label}
-                type="button"
-                aria-pressed={office === choice.key}
-                onClick={() => go({ office: choice.key })}
-                className={cn(
-                  "min-h-11 px-3 rounded-full text-small font-medium",
-                  COLOUR_TRANSITION,
-                  FOCUS_RING,
-                  office === choice.key ? "bg-stone-900 text-white" : "text-stone-600 hover:text-brand",
-                )}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
-        )}
+      <div
+        role="tablist"
+        aria-label="My Reviews"
+        onKeyDown={onTabKeyDown}
+        className="mb-4 flex flex-wrap gap-x-6 border-b border-stone-200"
+      >
+        {TABS.map((t) => {
+          const active = t.key === tab;
+          const count = page?.counts[t.key];
+          return (
+            <button
+              key={t.key}
+              ref={(el) => {
+                tabRefs.current[t.key] = el;
+              }}
+              id={`${ids}-tab-${t.key}`}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              aria-controls={`${ids}-panel`}
+              tabIndex={active ? 0 : -1}
+              onClick={() => go({ tab: t.key })}
+              className={cn(
+                "-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-1 text-small font-semibold",
+                COLOUR_TRANSITION,
+                FOCUS_RING,
+                active ? "border-brand text-stone-900" : "border-transparent text-stone-600 hover:text-brand",
+              )}
+            >
+              {t.label}
+              {count != null && " "}
+              {count != null && (
+                <span className="rounded-full bg-stone-100 px-2 text-label tabular-nums text-stone-700">
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Polite, and always rendered, so a change to it is what gets announced. */}
@@ -276,47 +250,75 @@ export default function MyReviewsPage() {
       </p>
 
       <div id={`${ids}-panel`} role="tabpanel" aria-labelledby={`${ids}-tab-${tab}`}>
-        {tab === "done" && (
-          <div role="group" aria-label="Filter by outcome" className="mb-4 flex flex-wrap gap-2">
-            {[{ key: null, label: "All" }, ...OUTCOME_FILTERS].map((f) => (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          {tab === "done" ? (
+            <div role="group" aria-label="Filter by outcome" className="flex flex-wrap gap-2">
+              {[{ key: null, label: "All" }, ...OUTCOME_FILTERS].map((f) => {
+                const count = page?.outcome_counts?.[f.key ?? "all"];
+                return (
+                  <button
+                    key={f.label}
+                    type="button"
+                    aria-pressed={outcome === f.key}
+                    onClick={() => go({ outcome: f.key })}
+                    className={chipClass(outcome === f.key)}
+                  >
+                    {f.label}
+                    {count != null && <span className="ml-1.5 tabular-nums text-stone-600">{count}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <div role="group" aria-label="Sort" className="flex flex-wrap gap-2">
+                {SORTS.map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    aria-pressed={view.sort === s.key}
+                    onClick={() => go({ sort: s.key })}
+                    className={chipClass(view.sort === s.key)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
               <button
-                key={f.label}
                 type="button"
-                aria-pressed={outcome === f.key}
-                onClick={() => go({ outcome: f.key })}
-                className={chipClass(outcome === f.key)}
+                aria-pressed={overdue}
+                onClick={() => go({ overdue: !overdue })}
+                className={chipClass(overdue)}
               >
-                {f.label}
+                Overdue only
               </button>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
 
-        {tab !== "done" && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div role="group" aria-label="Sort" className="flex flex-wrap gap-2">
-              {SORTS.map((s) => (
+          {coordinatorOffice && (
+            <div role="group" aria-label="Whose reviews" className="ml-auto inline-flex gap-1 rounded-control border border-stone-200 bg-stone-50 p-1">
+              {[
+                { key: null, label: "Mine" },
+                { key: coordinatorOffice, label: `All of ${officeLabel}` },
+              ].map((choice) => (
                 <button
-                  key={s.key}
+                  key={choice.label}
                   type="button"
-                  aria-pressed={view.sort === s.key}
-                  onClick={() => go({ sort: s.key })}
-                  className={chipClass(view.sort === s.key)}
+                  aria-pressed={office === choice.key}
+                  onClick={() => go({ office: choice.key })}
+                  className={cn(
+                    "min-h-9 px-3 rounded-control text-small font-medium",
+                    COLOUR_TRANSITION,
+                    FOCUS_RING,
+                    office === choice.key ? "bg-surface text-stone-900 shadow-card" : "text-stone-600 hover:text-brand",
+                  )}
                 >
-                  {s.label}
+                  {choice.label}
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              aria-pressed={overdue}
-              onClick={() => go({ overdue: !overdue })}
-              className={chipClass(overdue)}
-            >
-              Overdue only
-            </button>
-          </div>
-        )}
+          )}
+        </div>
 
         {loading ? (
           <Skeleton rows={3} label="Loading My Reviews…" onRetry={retry} />
@@ -341,7 +343,7 @@ export default function MyReviewsPage() {
             />
           )
         ) : rows.length === 0 ? (
-          <EmptyState icon={EMPTY_ICON[tab]} {...emptyCopy(tab, outcome, overdue, office ? officeLabel : access?.offices[0]?.toUpperCase())} />
+          <EmptyState icon={EMPTY_ICON[tab]} {...emptyCopy(tab, outcome, overdue, coordinatorOffice ? officeLabel : undefined, office == null)} />
         ) : (
           <ul className="space-y-3">
             {rows.map((r) => (
@@ -405,31 +407,27 @@ const EMPTY_ICON: Record<MyReviewsTab, string> = {
 };
 
 /** Empty states say what arrives there, not "no data" (ui-ux/16 §5). */
-function emptyCopy(tab: MyReviewsTab, outcome: string | null, overdue: boolean, office: string | undefined) {
+function emptyCopy(
+  tab: MyReviewsTab, outcome: string | null, overdue: boolean, office: string | undefined, scopedToMine: boolean,
+) {
   if (overdue) {
-    return { title: "Nothing overdue", message: "Turn off Overdue only to see everything here." };
+    return { title: "Nothing overdue", message: "Every review waiting for you is still within its due date." };
   }
   if (tab === "to_review") {
     return {
-      title: "Nothing to review",
-      message: office
-        ? `Records routed to ${office} appear here until someone claims them, and so do the reviews you are given.`
-        : "Records your advisees submit, and reviews you are given, appear here.",
+      title: "Nothing waiting for you",
+      message: "When a paper needs your review, it appears here and in your notifications.",
     };
   }
-  if (tab === "in_review") {
-    return {
-      title: "Nothing in review",
-      message: "A review you open stays here until you finish it.",
-    };
-  }
-  if (outcome) {
+  if (tab === "done" && outcome) {
     const label = OUTCOME_FILTERS.find((f) => f.key === outcome)?.label ?? outcome;
-    return { title: `Nothing ${label.toLowerCase()}`, message: "Try All to see every decision you have made." };
+    return { title: `No reviews ended “${label}”`, message: "Choose All to see every finished review." };
   }
   return {
-    title: "No decisions yet",
-    message: "Records you finish reviewing stay here as your decision history.",
+    title: "Nothing here",
+    message: scopedToMine && office != null
+      ? `Switch to “All of ${office}” to see the office's reviews.`
+      : "Reviews move here as they progress.",
   };
 }
 
@@ -443,8 +441,12 @@ interface ReviewRowProps {
 }
 
 function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps) {
-  const href = `/records/${row.record}?section=review`;
+  // Where the server says it opens: the Review section, or the Overview once published (IR-1135).
+  const href = `/records/${row.record}?section=${row.opens}`;
   const routing = routingLine(row);
+  const waited = tab !== "done" && row.waiting_days != null ? `Waiting ${waitLabel(row.waiting_days)}` : null;
+  const byline = [routing, waited].filter(Boolean).join(" · ");
+  const kicker = kickerParts(row);
 
   const status = (
     <>
@@ -452,12 +454,6 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
       {row.waiting_on && tab !== "done" && <Badge variant="warning">{WAITING_ON_LABEL[row.waiting_on]}</Badge>}
       {/* Overdue is said in words; the badge's tone only repeats it (IR-622). */}
       {row.is_overdue && <Badge variant="danger">{overdueLabel(row.overdue_days)}</Badge>}
-      {row.due_at && (
-        <span className="text-stone-600">
-          {dueLabel(row.due_at)}
-          {row.clock_paused && " · clock paused"}
-        </span>
-      )}
       {tab === "done" && (
         <Badge variant={row.outcome == null ? "default" : "success"}>
           {row.outcome_label ?? "Completed by your office"}
@@ -466,10 +462,16 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
     </>
   );
 
-  const meta =
-    tab === "done"
-      ? row.decided_at && <span>{formatDate(row.decided_at)}</span>
-      : row.waiting_days != null && <span>Waiting {waitLabel(row.waiting_days)}</span>;
+  // A decision's date on Done. On a current tab the due date sits in the kicker, where
+  // it may wrap on a phone, as the prototype has it.
+  const meta = tab === "done" && row.decided_at ? <span>{formatDate(row.decided_at)}</span> : undefined;
+  const due = tab !== "done" && row.due_at ? (
+    <span className={cn("inline-flex items-center gap-1.5", row.is_overdue && "font-semibold text-brand")}>
+      <i className="far fa-calendar" aria-hidden />
+      {dueLabel(row.due_at)}
+      {row.clock_paused && " · clock paused"}
+    </span>
+  ) : null;
 
   // A record waiting on its author shows the badge in place of any action
   // (ADR-032 §9 Amendment); its title still opens it.
@@ -500,7 +502,7 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
         to={href}
         aria-label={`${label}: ${row.title}`}
         className={cn(
-          "inline-flex min-h-9 items-center rounded-lg bg-brand px-3 text-small font-semibold text-white hover:bg-brand-dark",
+          "inline-flex min-h-9 items-center rounded-control bg-brand px-3 text-small font-semibold text-white hover:bg-brand-dark",
           COLOUR_TRANSITION,
           FOCUS_RING,
         )}
@@ -515,9 +517,14 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
       <ResearchCard
         href={href}
         title={row.title}
-        eyebrow={row.record_type_name ?? "Unspecified type"}
-        meta={meta || undefined}
-        byline={routing ?? undefined}
+        eyebrow={
+          <>
+            {kicker.length ? kicker.join(" · ") : (row.record_type_name ?? "Unspecified type")}
+            {due && <> · {due}</>}
+          </>
+        }
+        meta={meta}
+        byline={byline || undefined}
         status={status}
         footer={hasStrip(row.clearance_strip) ? <ClearanceStrip entries={row.clearance_strip} /> : undefined}
         actions={actions ?? undefined}

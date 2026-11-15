@@ -34,7 +34,8 @@ const collaborator = (id: number, over: Partial<Collaborator> = {}): Collaborato
   id, first_name: "Ana", middle_initial: "L", last_name: `Reyes${id}`, photo_url: null, shared_papers: 14, ...over,
 });
 
-const page = <T,>(results: T[], more = false) => ({ data: { results, next: more ? "next" : null } }) as never;
+const page = <T,>(results: T[], more = false, count?: number) =>
+  ({ data: { results, next: more ? "next" : null, ...(count === undefined ? {} : { count }) } }) as never;
 
 /** Stub every call; pass what a test cares about. */
 function serve(over: {
@@ -81,20 +82,30 @@ describe("a full profile", () => {
     open(101);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Marites C. Villanueva" })).toBeVisible();
-    expect(screen.getByText("Adviser")).toBeVisible();
-    expect(screen.getByText("College of Engineering and Architecture · Department of Computer Engineering")).toBeVisible();
+    expect(screen.getByText("Adviser · College of Engineering and Architecture · Department of Computer Engineering")).toBeVisible();
     expect(screen.getByText("Cebu Institute of Technology – University")).toBeVisible();
     expect(peopleApi.get).toHaveBeenCalledWith(101);
   });
 
-  it("shows About, interests, Research, Advised and Collaborators, with no totals in a heading", async () => {
+  it("shows About, interests, Papers, Advised and Collaborators, each list heading carrying its count", async () => {
     serve();
     open(101);
 
-    for (const name of ["About", "Research interests", "Research", "Advised", "Collaborators"]) {
+    for (const name of ["About", "Research interests", /^Papers\b/, /^Advised\b/, "Collaborators"]) {
       expect(await screen.findByRole("heading", { level: 2, name })).toBeVisible();
     }
     expect(screen.getByRole("list", { name: "Research interests" })).toHaveTextContent("Flood risk");
+  });
+
+  it("shows the server's whole count beside Papers and Advised, not the page length", async () => {
+    serve({
+      research: () => Promise.resolve(page([paper(500)], true, 23)),
+      advised: () => Promise.resolve(page([paper(600)], false, 1)),
+    });
+    open(101);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Papers 23" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: "Advised 1" })).toBeVisible();
   });
 
   it("asks for the first page of each list at the settled size", async () => {
@@ -110,7 +121,7 @@ describe("a full profile", () => {
   it("gives each paper its own views, linked to the paper", async () => {
     serve();
     open(101);
-    const research = await screen.findByRole("list", { name: "Research" });
+    const research = await screen.findByRole("list", { name: "Papers" });
 
     const first = within(research).getAllByRole("listitem")[0];
     expect(within(first).getByRole("link", { name: "Paper 500" })).toHaveAttribute("href", "/records/500");
@@ -217,11 +228,11 @@ describe("a short or empty profile", () => {
     serve({ advised: () => Promise.resolve(page([])) });
     open(101);
 
-    expect(await screen.findByRole("heading", { level: 2, name: "Research" })).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "Advised" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: /^Papers\b/ })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: /^Advised/ })).not.toBeInTheDocument();
   });
 
-  it("says so once when there is nothing published, and shows no empty sections", async () => {
+  it("says so under Papers when there is nothing published, and shows no other empty sections", async () => {
     serve({
       person: () => Promise.resolve({ data: { ...person, bio: "", research_interests: [] } }),
       research: () => Promise.resolve(page([])),
@@ -230,8 +241,8 @@ describe("a short or empty profile", () => {
     });
     open(101);
 
-    expect(await screen.findByText("No published papers yet.")).toBeVisible();
-    for (const name of ["About", "Research interests", "Research", "Advised", "Collaborators"]) {
+    expect(await screen.findByText("Marites has no published papers yet")).toBeVisible();
+    for (const name of ["About", "Research interests", "Advised", "Collaborators"]) {
       expect(screen.queryByRole("heading", { name })).not.toBeInTheDocument();
     }
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
@@ -307,9 +318,9 @@ describe("loading and failing", () => {
     serve({ research });
     open(101);
 
-    const section = (await screen.findByRole("heading", { level: 2, name: "Research" })).closest("section")!;
+    const section = (await screen.findByRole("heading", { level: 2, name: /^Papers\b/ })).closest("section")!;
     expect(within(section).getByRole("alert")).toBeVisible();
-    expect(screen.getByRole("heading", { level: 2, name: "Advised" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 2, name: /^Advised/ })).toBeVisible();
 
     await userEvent.click(within(section).getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("link", { name: "Paper 500" })).toBeVisible();

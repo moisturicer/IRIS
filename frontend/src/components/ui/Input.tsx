@@ -92,7 +92,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={invalid ? true : undefined}
             aria-describedby={describedByIds || undefined}
             aria-required={required || undefined}
-            className={`w-full border rounded-lg outline-none transition-colors
+            className={`w-full border rounded-control outline-none transition-colors
               placeholder:text-stone-600 text-stone-900
               ${SIZE_CLASSES[size]}
               ${leading ? "pl-9" : ""}

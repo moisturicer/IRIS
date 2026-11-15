@@ -55,7 +55,7 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
       aria-expanded={selected}
       aria-label={`${label} for this answer`}
       className={cn(
-        "inline-flex items-center gap-2 min-h-8 px-2 -ml-2 rounded-lg text-small font-medium transition-colors",
+        "inline-flex items-center gap-2 min-h-8 px-2 -ml-2 rounded-control text-small font-medium transition-colors",
         selected ? "text-brand" : "text-stone-600 hover:text-stone-900 hover:bg-stone-100",
       )}
     >
@@ -74,7 +74,7 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
         ))}
       </span>
       {label}
-      <i aria-hidden className={cn("fas fa-chevron-down text-[9px] transition-transform duration-200", selected && "rotate-180")} />
+      <i aria-hidden className={cn("fas fa-chevron-down text-label transition-transform duration-200", selected && "rotate-180")} />
     </button>
   );
 }
@@ -91,11 +91,11 @@ function RetryButton({ onRetry, disabled }: { onRetry?: () => void; disabled?: b
         type="button"
         onClick={onRetry}
         disabled={disabled}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5
-          text-[13px] font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900
+        className="inline-flex items-center gap-1.5 rounded-control border border-stone-200 px-3 py-1.5
+          text-small font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900
           disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <i className="fas fa-rotate-right text-[11px]" aria-hidden />
+        <i className="fas fa-rotate-right text-label" aria-hidden />
         Retry
       </button>
     </div>
@@ -150,8 +150,8 @@ export function ChatMessageBubble({
           compact ? "text-sm leading-relaxed" : "text-md leading-relaxed",
           isUser
             ? cn(
-                "max-w-[85%] rounded-2xl",
-                compact ? "bg-stone-100 rounded-tr-md px-3.5 py-2.5" : "bg-stone-100 px-4 py-3",
+                "max-w-[85%] rounded-card",
+                compact ? "bg-stone-100 rounded-tr-none px-3.5 py-2.5" : "bg-stone-100 px-4 py-3",
               )
             : "min-w-0 flex-1",
         )}

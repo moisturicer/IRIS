@@ -26,7 +26,7 @@ afterEach(() => useAuthStore.setState({ user: null, isAuthenticated: false }));
 
 describe("Help", () => {
   it("lists its sections as contents that link to each one", async () => {
-    const { container } = renderAs({ role_name: ROLES.STUDENT });
+    const { container } = renderAs({ role_name: ROLES.STUDENT, can_author: true });
 
     expect(screen.getByRole("heading", { level: 1, name: "Help" })).toBeInTheDocument();
     const contents = screen.getByRole("navigation", { name: "Help contents" });
@@ -36,7 +36,7 @@ describe("Help", () => {
   });
 
   it("calls the in-paper assistant Ask IRIS, the name the screen uses (IR-1090)", () => {
-    renderAs({ role_name: ROLES.STUDENT });
+    renderAs({ role_name: ROLES.STUDENT, can_author: true });
 
     const finding = section("Finding research")!;
     expect(within(finding).getByText(/use Ask IRIS to ask questions about that one paper/)).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe("Help", () => {
   });
 
   it("shows a Student how to publish, and nothing about reviewing or administration", () => {
-    renderAs({ role_name: ROLES.STUDENT });
+    renderAs({ role_name: ROLES.STUDENT, can_author: true });
 
     expect(section("Publishing your research")).toBeInTheDocument();
     expect(section("Reviewing records")).not.toBeInTheDocument();
@@ -54,7 +54,7 @@ describe("Help", () => {
   });
 
   it("tells an author every paper starts embargoed, and who ends it (ADR-052, IR-882)", () => {
-    renderAs({ role_name: ROLES.STUDENT });
+    renderAs({ role_name: ROLES.STUDENT, can_author: true });
 
     const publishing = section("Publishing your research")!;
     expect(within(publishing).queryByText(/asks first whether/)).not.toBeInTheDocument();
@@ -65,7 +65,7 @@ describe("Help", () => {
   });
 
   it("always explains the review workflow and who to contact", () => {
-    renderAs({ role_name: ROLES.STUDENT });
+    renderAs({ role_name: ROLES.STUDENT, can_author: true });
 
     expect(section("How a record moves through review")).toBeInTheDocument();
     const stuck = section("Still stuck?")!;
@@ -75,7 +75,7 @@ describe("Help", () => {
   });
 
   it("says the Adviser sends a paper to RDCO and only RDCO publishes (ADR-047)", () => {
-    renderAs({ role_name: ROLES.STUDENT });
+    renderAs({ role_name: ROLES.STUDENT, can_author: true });
 
     const workflow = section("How a record moves through review")!;
     expect(within(workflow).getByText(/accept it and send it to RDCO/)).toBeInTheDocument();
@@ -97,6 +97,11 @@ describe("Help", () => {
     expect(section("Reviewing records")).toBeInTheDocument();
     expect(section("Workflow analytics")).toBeInTheDocument();
     expect(section("Coordinating your office")).not.toBeInTheDocument();
+    expect(section("Publishing your research")).not.toBeInTheDocument();
+  });
+
+  it("shows publishing help by the server's can_author, not the role (IR-1096)", () => {
+    renderAs({ role_name: ROLES.STUDENT, can_author: false });
     expect(section("Publishing your research")).not.toBeInTheDocument();
   });
 

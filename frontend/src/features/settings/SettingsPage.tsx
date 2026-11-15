@@ -78,7 +78,7 @@ export default function SettingsPage() {
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <nav
-          className="w-full lg:w-[260px] shrink-0 bg-white rounded-xl border border-stone-200 p-2
+          className="w-full lg:w-[260px] shrink-0 bg-white rounded-card border border-stone-200 p-2
             flex lg:flex-col gap-1 overflow-x-auto scrollbar-thin"
           aria-label="Settings sections"
         >
@@ -91,7 +91,7 @@ export default function SettingsPage() {
                 onClick={() => setTab(t.id)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-body font-medium",
+                  "flex items-center gap-2.5 px-3 py-2.5 rounded-control text-body font-medium",
                   "whitespace-nowrap transition-colors text-left",
                   active
                     ? HERE
@@ -124,7 +124,7 @@ function Field({
 }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-label font-bold uppercase tracking-wider text-stone-500 mb-1.5">
+      <span className="block text-label font-bold text-stone-500 mb-1.5">
         {label}
       </span>
       {children}
@@ -134,18 +134,18 @@ function Field({
 }
 
 const inputClass =
-  "w-full px-3 py-2 rounded-lg border border-field text-control text-stone-900 " +
+  "w-full px-3 py-2 rounded-control border border-field text-control text-stone-900 " +
   FOCUS_RING;
 
 const readOnlyClass =
-  "w-full px-3 py-2 rounded-lg border border-field bg-stone-50 text-control text-stone-600";
+  "w-full px-3 py-2 rounded-control border border-field bg-stone-50 text-control text-stone-600";
 
 function Notice({ tone, children }: { tone: "ok" | "error"; children: React.ReactNode }) {
   return (
     <p
       role="status"
       className={cn(
-        "text-small rounded-lg px-3 py-2 flex items-start gap-2",
+        "text-small rounded-control px-3 py-2 flex items-start gap-2",
         tone === "ok" ? TONES.settled : TONES.active,
       )}
     >
@@ -261,7 +261,7 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
         title="Data privacy & consent"
         caption="The consent recorded against your account under the Data Privacy Act of 2012 (RA 10173)."
       >
-        <div className="flex items-start gap-3 rounded-lg border border-stone-200 p-4">
+        <div className="flex items-start gap-3 rounded-control border border-stone-200 p-4">
           <i
             className={cn(
               "fas text-body mt-0.5",
@@ -311,16 +311,16 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
     <div className="space-y-4">
       <Panel title="Role & access" caption="What your role lets you do in IRIS.">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="px-3 py-1.5 rounded-lg bg-brand text-white text-small font-bold uppercase tracking-wider">
+          <span className="px-3 py-1.5 rounded-control bg-brand text-white text-small font-bold">
             {user.role_name ?? "No role assigned"}
           </span>
           {user.is_superuser && (
-            <span className="px-2.5 py-1 rounded-md border border-stone-200 text-label font-semibold text-stone-600">
+            <span className="px-2.5 py-1 rounded-control border border-stone-200 text-label font-semibold text-stone-600">
               Superuser
             </span>
           )}
           {user.is_staff && !user.is_superuser && (
-            <span className="px-2.5 py-1 rounded-md border border-stone-200 text-label font-semibold text-stone-600">
+            <span className="px-2.5 py-1 rounded-control border border-stone-200 text-label font-semibold text-stone-600">
               Django admin
             </span>
           )}

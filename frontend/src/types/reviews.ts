@@ -33,6 +33,14 @@ export interface MyReviewsRow {
   record:           number;
   title:            string;
   record_type_name: string | null;
+  /** The paper's authors, in order (IR-1135). */
+  authors:          string[];
+  /** The primary owner's college; empty when unknown. */
+  unit:             string;
+  /** The latest version of the paper; null when none is recorded. */
+  version:          number | null;
+  /** Where the title opens: the Review section, or the Overview once published. */
+  opens:            "review" | "overview";
   party:            MyReviewsParty;
   party_label:      string;
   seat:             number | null;
@@ -67,6 +75,9 @@ export interface MyReviewsRow {
   clearance_strip:  ClearanceStripEntry[];
 }
 
+/** An outcome Done can be filtered by: every outcome but the old pipeline's decline. */
+export type OutcomeFilter = Exclude<ReviewOutcome, "revision_requested">;
+
 /** The current tabs' orders (IR-622). Done is always newest first. */
 export type MyReviewsSort = "due" | "waiting";
 
@@ -74,6 +85,11 @@ export interface MyReviewsPage {
   rows:   MyReviewsRow[];
   /** Every tab's size in this view. The office view narrows them; the outcome filter never does. */
   counts: Record<MyReviewsTab, number>;
+  /**
+   * Each of Done's chips with the size of the list it shows (IR-1135): `all`
+   * plus one per outcome filter. The filter never narrows them.
+   */
+  outcome_counts: Record<"all" | OutcomeFilter, number>;
   /** The next page of Done, or null. */
   next:   string | null;
 }
@@ -115,7 +131,16 @@ export interface OfficeConsoleRow {
   can_extend:       boolean;
   /** Which clearances this record holds, in the server's words (IR-1083). */
   clearance_strip:  ClearanceStripEntry[];
+  /** "Ada Lovelace, Alan Turing · v2": the authors and the Version under review. */
+  authors_line:     string;
+  /** The status chip, worded by the server; `kind` picks only its tone. */
+  status:           { kind: OfficeConsoleStatusKind; text: string };
+  /** What the viewer may do to this row, in menu order. */
+  actions:          OfficeConsoleAction[];
 }
+
+export type OfficeConsoleStatusKind = "kept" | "overdue" | "unassigned" | "due" | "paused" | "no_date";
+export type OfficeConsoleAction = "assign" | "reassign" | "extend";
 
 /** One member's load in the console: every member, idle ones too. */
 export interface OfficeLoad {

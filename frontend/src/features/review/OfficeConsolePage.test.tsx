@@ -46,6 +46,9 @@ function row(overrides: Partial<OfficeConsoleRow> = {}): OfficeConsoleRow {
     opened_at: "2026-10-01T02:00:00Z", due_at: "2026-10-06T15:59:00Z",
     original_due_at: "2026-10-06T15:59:00Z", is_overdue: true, clock_paused: false, can_extend: true,
     clearance_strip: [],
+    authors_line: "Ada Lovelace · v2",
+    status: { kind: "overdue", text: "Overdue by 3 days" },
+    actions: ["reassign", "extend"],
     ...overrides,
   };
 }
@@ -53,8 +56,14 @@ function row(overrides: Partial<OfficeConsoleRow> = {}): OfficeConsoleRow {
 const POOL = row({
   key: "pool:4", kind: "pool", record: 8, title: "AI-Based Medical Imaging", assignment: 4,
   seat: null, reviewer: null, reviewer_name: null, seat_state: null, seat_state_label: null,
-  is_overdue: false,
+  is_overdue: false, authors_line: "Alan Turing · v1",
+  status: { kind: "unassigned", text: "Unassigned" }, actions: ["assign", "extend"],
 });
+
+/** The table row holding a paper's title. */
+function rowOf(title: string) {
+  return within(screen.getByRole("table")).getByRole("link", { name: title }).closest("tr") as HTMLElement;
+}
 
 function payload(overrides: Partial<OfficeConsole> = {}): { data: OfficeConsole } {
   return {
@@ -104,53 +113,73 @@ describe("OfficeConsolePage", () => {
     }));
     show();
 
-    const kept = await screen.findByRole("article", { name: "Smart Campus Energy Monitor" });
+    await screen.findByRole("table");
+    const kept = rowOf("Smart Campus Energy Monitor");
     const strip = within(kept).getByRole("list", { name: "Clearances" });
     expect(strip).toHaveTextContent("ITSO: Cleared · Kept from v1");
     expect(strip).toHaveTextContent("IERC: Reviewing v2 · Reset by v2");
 
-    const reset = screen.getByRole("article", { name: "Rainwater Harvesting Survey" });
+    const reset = rowOf("Rainwater Harvesting Survey");
     expect(within(reset).getByRole("list", { name: "Clearances" })).toHaveTextContent("Reset by v2");
     expect(within(reset).queryByText(/kept from/i)).not.toBeInTheDocument();
 
-    const pool = screen.getByRole("article", { name: "AI-Based Medical Imaging" });
-    expect(within(pool).queryByRole("list", { name: "Clearances" })).not.toBeInTheDocument();
+    expect(within(rowOf("AI-Based Medical Imaging")).queryByRole("list", { name: "Clearances" }))
+      .not.toBeInTheDocument();
   });
 
-  it("lists the office's open reviews and each reviewer's load", async () => {
+  it("lists the office's open reviews in one table, in the server's words", async () => {
     const { container } = show();
 
-    expect(await screen.findByRole("heading", { level: 1, name: "ITSO console" })).toBeInTheDocument();
-    const reviews = screen.getByRole("list", { name: "Open reviews" });
-    const [held, unclaimed] = within(reviews).getAllByRole("listitem");
+    expect(await screen.findByRole("heading", { level: 1, name: "ITSO office console" })).toBeInTheDocument();
+    expect(screen.getByText("Assign ITSO's reviews, and move due dates when a reviewer needs more time."))
+      .toBeInTheDocument();
+    const table = screen.getByRole("table", { name: /ITSO open reviews/ });
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent))
+      .toEqual(["Paper", "Reviewer", "Due", "Status", "Actions"]);
+
+    const held = rowOf("Smart Campus Energy Monitor");
     expect(within(held).getByRole("link", { name: "Smart Campus Energy Monitor" }))
       .toHaveAttribute("href", "/records/7?section=review");
-    expect(held).toHaveTextContent("Maria Reyes · In review");
-    // Overdue is said in words, never by colour alone.
-    expect(held).toHaveTextContent(/Overdue/);
-    expect(unclaimed).toHaveTextContent("Unclaimed");
-    expect(unclaimed).not.toHaveTextContent(/Overdue/);
+    expect(held).toHaveTextContent("Ada Lovelace · v2");
+    expect(held).toHaveTextContent("Maria Reyes");
+    // Overdue is said in words, never by colour alone, and the words are the server's.
+    expect(held).toHaveTextContent("Overdue by 3 days");
 
-    const load = screen.getByRole("table", { name: "Workload" });
-    const [, maria, juan] = within(load).getAllByRole("row");
-    expect(within(maria).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Maria Reyes", "1", "1"]);
-    expect(within(juan).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Juan Santos", "0", "0"]);
+    const unclaimed = rowOf("AI-Based Medical Imaging");
+    expect(unclaimed).toHaveTextContent("Nobody yet");
+    expect(unclaimed).toHaveTextContent("Unassigned");
+
+    const [maria, juan] = within(screen.getByRole("list", { name: "Workload" })).getAllByRole("listitem");
+    expect(maria).toHaveTextContent("Maria Reyes · 1 open · 1 overdue");
+    expect(juan).toHaveTextContent("Juan Santos · 0 open");
     expect(office).toHaveBeenCalledWith(null);
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("offers Assign on an unclaimed record and Reassign on a held one", async () => {
+  it("offers Assign on an unassigned row and a More actions menu on a held one", async () => {
     show();
-    await screen.findByRole("list", { name: "Open reviews" });
+    await screen.findByRole("table");
 
     expect(screen.getByRole("button", { name: "Assign reviewer: AI-Based Medical Imaging" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reassign: Smart Campus Energy Monitor" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Reassign: AI-Based Medical Imaging" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Assign reviewer: Smart Campus Energy Monitor" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "More actions: Smart Campus Energy Monitor" }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent))
+      .toEqual(["Reassign…", "Extend due date…"]);
+  });
+
+  it("offers only what the server lists for the row", async () => {
+    office.mockResolvedValue(payload({ rows: [row({ actions: ["reassign"] })] }));
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "More actions: Smart Campus Energy Monitor" }));
+    expect(within(await screen.findByRole("menu")).getAllByRole("menuitem").map((i) => i.textContent))
+      .toEqual(["Reassign…"]);
   });
 
   it("reassigns only with a reason, then reloads and says where it went", async () => {
     show();
-    await userEvent.click(await screen.findByRole("button", { name: "Reassign: Smart Campus Energy Monitor" }));
+    await userEvent.click(await screen.findByRole("button", { name: "More actions: Smart Campus Energy Monitor" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Reassign…" }));
     const dialog = await screen.findByRole("dialog", { name: "Reassign a reviewer" });
 
     await userEvent.selectOptions(await within(dialog).findByRole("combobox", { name: "New reviewer at ITSO" }), "6");
@@ -168,7 +197,8 @@ describe("OfficeConsolePage", () => {
 
   it("extends a due date to 23:59 Manila on the day picked, with a reason", async () => {
     show();
-    await userEvent.click(await screen.findByRole("button", { name: "Extend due date: Smart Campus Energy Monitor" }));
+    await userEvent.click(await screen.findByRole("button", { name: "More actions: Smart Campus Energy Monitor" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Extend due date…" }));
     const dialog = await screen.findByRole("dialog", { name: "Extend the due date" });
 
     await userEvent.type(within(dialog).getByLabelText("New due date"), "2026-10-12");
@@ -180,16 +210,17 @@ describe("OfficeConsolePage", () => {
   });
 
   it("offers no extension where the server allows none", async () => {
-    office.mockResolvedValue(payload({ rows: [row({ can_extend: false })] }));
+    office.mockResolvedValue(payload({ rows: [row({ can_extend: false, actions: ["reassign"] })] }));
     show();
-    await screen.findByRole("list", { name: "Open reviews" });
-    expect(screen.queryByRole("button", { name: /Extend due date/ })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "More actions: Smart Campus Energy Monitor" }));
+    expect(screen.queryByRole("menuitem", { name: /Extend due date/ })).not.toBeInTheDocument();
   });
 
   it("shows the server's refusal on a failed act, inside its dialog", async () => {
     extend.mockRejectedValue({ response: { data: { detail: "The deadline must be at 23:59 Asia/Manila." } } });
     show();
-    await userEvent.click(await screen.findByRole("button", { name: "Extend due date: Smart Campus Energy Monitor" }));
+    await userEvent.click(await screen.findByRole("button", { name: "More actions: Smart Campus Energy Monitor" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Extend due date…" }));
     const dialog = await screen.findByRole("dialog", { name: "Extend the due date" });
     await userEvent.type(within(dialog).getByLabelText("New due date"), "2026-10-12");
     await userEvent.type(within(dialog).getByRole("textbox", { name: /Reason/ }), "Late committee.");
@@ -212,7 +243,7 @@ describe("OfficeConsolePage", () => {
 
     expect(await screen.findByText("Could not load the console")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByRole("list", { name: "Open reviews" })).toBeInTheDocument();
+    expect(await screen.findByRole("table")).toBeInTheDocument();
   });
 
   it("shows a console that timed out as interrupted, and Retry reads again (IR-906)", async () => {
@@ -222,7 +253,7 @@ describe("OfficeConsolePage", () => {
     expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
     expect(screen.queryByText("Could not load the console")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("list", { name: "Open reviews" })).toBeInTheDocument();
+    expect(await screen.findByRole("table")).toBeInTheDocument();
   });
 
   it("tells a non-coordinator the console is not theirs, and links back", async () => {

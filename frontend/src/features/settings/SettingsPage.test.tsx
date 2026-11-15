@@ -108,7 +108,7 @@ describe("changing your password", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Password changed");
     expect(alert).toHaveTextContent("Sign in again with your new password.");
-    expect(screen.getByRole("button", { name: "Sign In" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 });

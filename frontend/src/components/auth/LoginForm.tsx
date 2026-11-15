@@ -57,7 +57,7 @@ export function LoginForm({
       <Input
         {...identifier}
         id="login-identifier"
-        label="Email Address"
+        label="Email address"
         size="lg"
         type="email"
         autoComplete="email"
@@ -119,7 +119,7 @@ export function LoginForm({
           those as a className instead would collide with the primitive's
           own sizing -- clsx keeps both and stylesheet order decides. */}
       <Button ref={submitRef} type="submit" variant="primary" size="full" loading={isSubmitting} disabled={disabled}>
-        {isSubmitting ? "Signing in…" : "Sign In"}
+        {isSubmitting ? "Signing in…" : "Sign in"}
       </Button>
     </form>
   );

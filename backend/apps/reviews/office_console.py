@@ -17,14 +17,17 @@ coordinator may read My Reviews' office view.
 
 from __future__ import annotations
 
-from django.db.models import Prefetch
+from datetime import datetime
 
-from apps.records.models import Record
+from django.db.models import Prefetch
+from django.utils import timezone
+
+from apps.records.models import Record, RecordVersion
 from core.enums import OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus, SeatState
 from core.permissions import is_office_coordinator, office_parties_of
 
 from .clearance_strip import attach_clearance_strips
-from .deadlines import deadline_payload, with_deadlines
+from .deadlines import MANILA, deadline_payload, with_deadlines
 from .models import RecordAssignment, ReviewerSeat
 from .seats import office_members
 
@@ -50,6 +53,50 @@ def _office(user, office) -> str:
     return str(office)
 
 
+def _days(n: int) -> str:
+    return f"{n} day" if n == 1 else f"{n} days"
+
+
+def _authors_line(record, version) -> str:
+    """"Ada Lovelace, Alan Turing · v2": who wrote it and which Version is under review."""
+    names = ", ".join(a.name for a in record.authors.all())
+    tag = f"v{version}" if version else None
+    return " · ".join(part for part in (names, tag) if part)
+
+
+def _status(row, *, now) -> dict:
+    """
+    The row's status chip, worded here (ADR-043): the browser computes no
+    "overdue". `kind` is `kept` `overdue` `unassigned` `due` `paused` `no_date`.
+    A clearance this office already holds from an earlier Version leads.
+    """
+    for entry in row["clearance_strip"]:
+        if entry["party"] == row["office"] and entry["kind"] == "kept":
+            return {"kind": "kept", "text": f"Cleared on v{entry['version']} · kept"
+                    if entry["version"] else "Cleared · kept"}
+    due = row["due_at"]
+    today = now.astimezone(MANILA).date()
+    if due and row["is_overdue"]:
+        late = (today - datetime.fromisoformat(due).astimezone(MANILA).date()).days
+        return {"kind": "overdue", "text": f"Overdue by {_days(max(late, 1))}"}
+    if row["kind"] == "pool":
+        return {"kind": "unassigned", "text": "Unassigned"}
+    if row["clock_paused"]:
+        return {"kind": "paused", "text": "Clock paused"}
+    if not due:
+        return {"kind": "no_date", "text": "No due date"}
+    left = (datetime.fromisoformat(due).astimezone(MANILA).date() - today).days
+    return {"kind": "due", "text": "Due today" if left <= 0 else f"Due in {_days(left)}"}
+
+
+def _actions(row) -> list[str]:
+    """What the viewer may do to this row, in menu order. The server re-checks each act."""
+    acts = ["assign"] if row["kind"] == "pool" else ["reassign"]
+    if row["can_extend"]:
+        acts.append("extend")
+    return acts
+
+
 def _row(assignment, user, seat=None) -> dict:
     record = assignment.record
     return {
@@ -57,6 +104,7 @@ def _row(assignment, user, seat=None) -> dict:
         "kind": "seat" if seat else "pool",
         "record": record.pk,
         "title": record.title,
+        "office": str(assignment.party),
         "assignment": assignment.pk,
         "seat": seat.pk if seat else None,
         "reviewer": seat.reviewer_id if seat else None,
@@ -85,6 +133,7 @@ def office_console(user, *, office=None) -> dict:
             record__pipeline_status=PipelineStatus.IN_REVIEW,
             record__in=Record.objects.visible_to(user),
         ).select_related("record").prefetch_related(
+            "record__authors",
             Prefetch("seats", queryset=live.order_by("assigned_at", "pk"), to_attr="console_seats"),
         )
     )
@@ -99,6 +148,18 @@ def office_console(user, *, office=None) -> dict:
         rows.extend(_row(assignment, user, s) for s in seats if s.state in OPEN_SEAT_STATES)
     rows.sort(key=_order)
     attach_clearance_strips(rows)  # which clearances each record holds (IR-1083)
+
+    version_of = {}
+    for record_id, number in RecordVersion.objects.filter(
+        record_id__in={r["record"] for r in rows},
+    ).order_by("record_id", "number").values_list("record_id", "number"):
+        version_of[record_id] = number
+    authors = {a.record_id: a.record for a in assignments}
+    now = timezone.now()
+    for row in rows:
+        row["authors_line"] = _authors_line(authors[row["record"]], version_of.get(row["record"]))
+        row["status"] = _status(row, now=now)
+        row["actions"] = _actions(row)
 
     load = []
     for member in office_members(office):

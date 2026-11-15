@@ -104,7 +104,7 @@ function draftDetail(overrides: Record<string, unknown> = {}) {
 
 function mockReadyDraft(api: MockApi, initialDraft = draftDetail()) {
   mockShell(api);
-  api.on("GET", "/users/role-requests/", paginated([]));
+  api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
   api.on("GET", "/users/advisers/", paginated([{
     id: 21, first_name: "Maria", middle_initial: "C.", last_name: "Santos", role_name: "Adviser",
   }]));
@@ -181,7 +181,7 @@ function mockReadyDraft(api: MockApi, initialDraft = draftDetail()) {
 
 function mockNewSubmission(api: MockApi) {
   mockShell(api);
-  api.on("GET", "/users/role-requests/", paginated([]));
+  api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
   api.on("GET", "/users/advisers/", paginated([{
     id: 21, first_name: "Maria", middle_initial: "C.", last_name: "Santos", role_name: "Adviser",
     email: "maria@cit.edu", department_name: "Computer Science",

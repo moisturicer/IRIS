@@ -407,9 +407,9 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         </div>}
         {canRetry && run && <div className="flex justify-end gap-1">
           <button type="button" onClick={() => setDraft(run.question)} aria-label="Edit this question" title="Edit"
-            className={ICON_ACTION}><i aria-hidden className="fas fa-pen text-[13px]" /></button>
+            className={ICON_ACTION}><i aria-hidden className="fas fa-pen text-small" /></button>
           <button type="button" onClick={() => void retryRun()} aria-label="Try this question again" title="Retry"
-            className={ICON_ACTION}><i aria-hidden className="fas fa-rotate-right text-[13px]" /></button>
+            className={ICON_ACTION}><i aria-hidden className="fas fa-rotate-right text-small" /></button>
         </div>}
         {run && activeRun(run) && compactionRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
           className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
@@ -429,9 +429,9 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         aria-pressed={scopeToggle.allPapers}
         aria-label={scopeToggle.allPapers ? "Searching all papers. Search only this paper" : "Searching this paper. Search all papers"}
         title={scopeToggle.locked ? "This chat started across all papers" : scopeToggle.allPapers ? "All papers" : "This paper"}
-        className={cn("inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-brand",
+        className={cn("inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-label font-medium transition-colors focus-visible:outline-brand",
           scopeToggle.allPapers ? "bg-brand text-white hover:bg-brand-dark" : "text-stone-600 hover:bg-stone-100")}>
-        <i aria-hidden className={cn("text-[11px]", scopeToggle.allPapers ? "fas fa-layer-group" : "far fa-file-lines")} />
+        <i aria-hidden className={cn("text-label", scopeToggle.allPapers ? "fas fa-layer-group" : "far fa-file-lines")} />
         {scopeToggle.allPapers ? "All papers" : "This paper"}
       </button>}
     </ChatInput>

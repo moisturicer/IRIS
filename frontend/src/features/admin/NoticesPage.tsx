@@ -14,7 +14,7 @@
  *   POST /auth/notice/versions/          RDCO   {based_on_version, text}
  */
 import { useEffect, useId, useState } from "react";
-import { noticeApi, staleNoticeFrom, type NoticeVersion } from "@/api/notice";
+import { noticeApi, staleNoticeFrom, type NoticeDraft, type NoticeVersion } from "@/api/notice";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
@@ -62,7 +62,7 @@ export default function NoticesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Notices"
-        description="The data notice everyone answers before using IRIS, and every version published so far."
+        description="The privacy notice every account answers. Publishing a new version asks everyone to read it again."
       />
 
       <div role="note" className={WARNING_NOTICE}>
@@ -81,7 +81,7 @@ export default function NoticesPage() {
           Loading the notices…
         </p>
       ) : !list || !current ? (
-        <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-5">
+        <div className="space-y-3 rounded-card border border-stone-200 bg-white p-5">
           <p role="alert" className="text-small text-stone-700">{failureMessage(read.error, { lead: "The notices didn't load." })}</p>
           <div className="flex flex-wrap gap-3">
             <Button type="button" variant="outline" onClick={read.retry}>Try again</Button>
@@ -89,14 +89,22 @@ export default function NoticesPage() {
         </div>
       ) : (
         <>
-          <div role="group" aria-label="Current version" className="rounded-xl border border-stone-200 bg-white p-5">
-            <p className="text-small font-semibold text-stone-900">
-              Version {current.version}, {published(current)}
-            </p>
-            {!canPublish && <p className="mt-1 text-small text-stone-600">Only RDCO publishes a new version.</p>}
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="order-2 lg:order-1">
+              {canPublish && <PublishForm current={current} onPublished={read.retry} />}
+            </div>
+            <aside
+              role="group"
+              aria-label="Current version"
+              className="order-1 rounded-card border border-stone-200 bg-white p-5 lg:order-2"
+            >
+              <h2 className="text-heading font-semibold text-stone-900">Live now</h2>
+              <p className="mt-1 text-small font-semibold text-stone-900">
+                Version {current.version}, {published(current)}
+              </p>
+              {!canPublish && <p className="mt-1 text-small text-stone-600">Only RDCO publishes a new version.</p>}
+            </aside>
           </div>
-
-          {canPublish && <PublishForm current={current} onPublished={read.retry} />}
 
           <VersionHistory versions={list} />
         </>
@@ -123,10 +131,30 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
   const [textError, setTextError] = useState<string | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // The saved draft, if any (IR-1138): read once, and applied only while the
+  // paste is still the live text, so it never overwrites what RDCO has typed.
+  const [draft, setDraft] = useState<NoticeDraft | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   useEffect(() => {
     setBase(current.version);
   }, [current.version]);
+
+  useEffect(() => {
+    let live = true;
+    Promise.resolve()
+      .then(() => noticeApi.draft())
+      .then(({ data }) => {
+        if (!live || !data) return;
+        setDraft(data);
+        setText((typed) => (typed === current.text ? data.text : typed));
+      })
+      // No draft read is no draft: the form still works.
+      .catch(() => undefined);
+    return () => { live = false; };
+    // Read once, when the form opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const next = base + 1;
   const unchanged = text === current.text;
@@ -151,12 +179,28 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
     }
   };
 
+  const saveDraft = async () => {
+    setSavingDraft(true);
+    setAlert(null);
+    setDone(null);
+    try {
+      const { data } = await noticeApi.saveDraft({ based_on_version: base, text });
+      setDraft(data);
+      setDone("Draft saved. Only RDCO can see it, and nobody is asked to answer it.");
+    } catch (err) {
+      setAlert(errorDetail(err, "The draft wasn't saved. Try again."));
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const publish = async () => {
     setPublishing(true);
     setTextError(null);
     try {
       const { data } = await noticeApi.publish({ based_on_version: base, text });
       setConfirm(null);
+      setDraft(null);
       setDone(`Version ${data.version} is published. Everyone answers it the next time they use IRIS.`);
       onPublished();
     } catch (err) {
@@ -179,11 +223,18 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
   };
 
   return (
-    <section aria-labelledby={`${fieldId}-title`} className="rounded-xl border border-stone-200 bg-white p-5 space-y-4">
+    <section aria-labelledby={`${fieldId}-title`} className="rounded-card border border-stone-200 bg-white p-5 space-y-4">
       <h2 id={`${fieldId}-title`} className="text-heading font-semibold text-stone-900">Publish a new version</h2>
 
       {alert && <p role="alert" className={WARNING_NOTICE}>{alert}</p>}
       {done && <p role="status" className="text-small text-stone-700">{done}</p>}
+      {draft && (
+        <p className="text-label text-stone-600">
+          Draft saved {formatDate(draft.updated_at)}{draft.updated_by ? ` by ${draft.updated_by}` : ""}.
+          {draft.based_on_version < current.version &&
+            ` It started from version ${draft.based_on_version}; version ${current.version} is live now.`}
+        </p>
+      )}
 
       <div>
         <label htmlFor={fieldId} className="block text-small font-semibold text-stone-900">Notice text</label>
@@ -197,12 +248,22 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
           rows={16}
           aria-invalid={textError ? true : undefined}
           aria-describedby={textError ? errorId : undefined}
-          className="mt-2 w-full rounded-lg border border-field px-3 py-2 font-mono text-small text-stone-900"
+          className="mt-2 w-full rounded-control border border-field px-3 py-2 font-mono text-small text-stone-900"
         />
         {textError && <p id={errorId} className="mt-1.5 text-small text-brand">{textError}</p>}
       </div>
 
       <div className="flex flex-wrap gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          loading={savingDraft}
+          disabled={blank}
+          disabledReason={blank ? "Enter the notice text to save a draft." : undefined}
+          onClick={() => void saveDraft()}
+        >
+          Save draft
+        </Button>
         <Button type="button" variant="outline" aria-expanded={preview} onClick={() => setPreview((p) => !p)}>
           {preview ? "Hide preview" : "Preview"}
         </Button>
@@ -218,7 +279,7 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
       </div>
 
       {preview && (
-        <section aria-label="Preview" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
+        <section aria-label="Preview" className="rounded-card border border-stone-200 bg-stone-50 px-4 py-3">
           <NoticeText notice={{ version: next, text, published_at: null }} headingLevel={3} />
         </section>
       )}
@@ -250,7 +311,7 @@ function VersionHistory({ versions }: { versions: NoticeVersion[] }) {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section aria-labelledby={titleId} className="rounded-xl border border-stone-200 bg-white p-5">
+    <section aria-labelledby={titleId} className="rounded-card border border-stone-200 bg-white p-5">
       <h2 id={titleId} className="text-heading font-semibold text-stone-900">Version history</h2>
       <ul className="mt-4 divide-y divide-stone-100">
         {versions.map((v) => {
@@ -274,7 +335,7 @@ function VersionHistory({ versions }: { versions: NoticeVersion[] }) {
                 </div>
               </div>
               {expanded && (
-                <div className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
+                <div className="mt-3 rounded-card border border-stone-200 bg-stone-50 px-4 py-3">
                   <NoticeText notice={v} headingLevel={3} />
                 </div>
               )}

@@ -224,7 +224,7 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 - **Pen Rose** (underline #b4474b, fill #fbeaea, open thread #f5d5d6): a reviewer's mark on a passage, and nothing else.
 
 ### Neutral
-- **Endpaper** (#fafaf9): the ground under every screen (`canvas`), and the ground the Overview and the Ask IRIS panel sit on.
+- **Endpaper** (#fafaf9): a section fill (`stone-50`) where white on white would lose an edge, such as the Ask IRIS conversation list and table headers. Since IR-1132 the ground under every screen (`canvas`) is white, not Endpaper.
 - **Page White** (#ffffff): the PDF pages, fields, cards that hold records, dialogs and menus (`surface`, `overlay`).
 - **Bar Stone** (#f5f5f4): the record bar, the reader toolbar, the Ask IRIS header, and the "Not open yet" chip.
 - **Desk Stone** (#e7e5e4): the desk behind the PDF pages, the recessed section track, and the hairlines between sections and regions.

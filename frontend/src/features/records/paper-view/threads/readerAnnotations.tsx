@@ -63,7 +63,7 @@ export function ThreadMarks({ marks, page }: { marks: ReaderMark[]; page: number
                 key={i}
                 aria-hidden
                 className={cn(
-                  "absolute rounded-sm",
+                  "absolute rounded-none",
                   mark.pending ? "thread-mark-pending" : "thread-mark",
                   mark.open && "thread-mark-open",
                 )}

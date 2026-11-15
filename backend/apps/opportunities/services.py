@@ -42,8 +42,9 @@ def build_ics(opportunity) -> str:
     description_parts = [opportunity.description or ""]
     if opportunity.external_url:
         description_parts.append(f"Apply: {opportunity.external_url}")
-    if opportunity.posting_office:
-        description_parts.append(f"Posted by: {opportunity.posting_office}")
+    poster = opportunity.poster_name()
+    if poster:
+        description_parts.append(f"Posted by: {poster}")
 
     lines = [
         "BEGIN:VCALENDAR",

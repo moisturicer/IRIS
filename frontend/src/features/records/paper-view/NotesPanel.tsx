@@ -52,7 +52,7 @@ export function NotesPanel({ record, note, highlights, onOpenHighlight, canOpenV
     <aside ref={panelRef} style={style} tabIndex={-1} aria-labelledby={headingId}
       role={modal ? "dialog" : undefined} aria-modal={modal || undefined}
       className={cn("bg-canvas flex flex-col overflow-hidden focus:outline-none motion-safe:animate-panel-in", className)}>
-      {resize && <ResizeEdge {...resize} label="Resize Notes" />}
+      {resize && <ResizeEdge {...resize} label="Resize notes" />}
 
       <div className="shrink-0 border-b border-stone-200 bg-stone-100 px-4 pb-3 pt-3">
         {onBackToPaper && <button type="button" onClick={onBackToPaper}
@@ -67,7 +67,7 @@ export function NotesPanel({ record, note, highlights, onOpenHighlight, canOpenV
             className={ICON_BUTTON}>
             <AskIrisMark className="h-4 w-4" />
           </button>}
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close Notes" className="-mr-2">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close notes" className="-mr-2">
             <i className="fas fa-xmark" aria-hidden />
           </Button>
         </div>
@@ -99,7 +99,7 @@ export function NotesPanel({ record, note, highlights, onOpenHighlight, canOpenV
               <textarea id={editorId} value={note.text} onChange={(e) => note.setText(e.target.value)}
                 maxLength={MAX_NOTE_LENGTH} aria-describedby={hintId}
                 placeholder="What do you want to remember about this paper? A question, a page, a thought."
-                className="min-h-40 w-full flex-1 resize-none rounded-lg border border-field bg-white p-3 text-body leading-relaxed text-stone-900 placeholder:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" />
+                className="min-h-40 w-full flex-1 resize-none rounded-control border border-field bg-white p-3 text-body leading-relaxed text-stone-900 placeholder:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" />
             </div>
             <SaveStatus note={note} />
           </>
@@ -124,7 +124,7 @@ function HighlightsSection({ highlights, onOpen, canOpenVersion }: {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="max-h-[45%] shrink-0 overflow-y-auto border-t border-stone-200 px-4 py-3">
-      <h3 id={headingId} className="text-3xs font-semibold uppercase tracking-wider text-stone-600">Highlights</h3>
+      <h3 id={headingId} className="text-3xs font-semibold text-stone-600">Highlights</h3>
 
       {highlights.phase === "load_failed" && (
         <div className="mt-2">
@@ -165,8 +165,8 @@ function HighlightItem({ highlight: h, onOpen, canOpenVersion, removeFailed, onR
   const openable = !stale || (version !== null && canOpenVersion(version) === true);
   const where = `page ${h.page}${stale && version !== null ? ` in v${version}` : ""}`;
   return (
-    <li className="rounded-lg border border-stone-300 bg-white p-2">
-      <p className="text-3xs font-semibold uppercase tracking-wider text-stone-600">
+    <li className="rounded-control border border-stone-300 bg-white p-2">
+      <p className="text-3xs font-semibold text-stone-600">
         Page {h.page}
         {stale && <span className="ml-2 normal-case tracking-normal text-brand">· From an earlier version of this paper</span>}
       </p>
@@ -241,8 +241,8 @@ function ConflictNotice({ note }: { note: ReadingNoteState }) {
 
 function TextBlock({ title, text }: { title: string; text: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-stone-300 bg-white p-2">
-      <p className="text-3xs font-semibold uppercase tracking-wider text-stone-600">{title}</p>
+    <div className="min-w-0 rounded-control border border-stone-300 bg-white p-2">
+      <p className="text-3xs font-semibold text-stone-600">{title}</p>
       <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-2xs text-stone-900">{text || "(empty)"}</p>
     </div>
   );

@@ -51,9 +51,6 @@ interface DiscoverFilterBarProps {
   className?: string;
   filters:   DiscoverFilters;
   onChange:  (next: DiscoverFilters) => void;
-  showSort?: boolean;
-  sort:      DiscoverSort;
-  onSort:    (next: DiscoverSort) => void;
   options:   DiscoverFilterOptions;
   /** Reference data still loading: the lists say so rather than look empty. */
   loading:   boolean;
@@ -72,16 +69,14 @@ export function activeFilterCount(filters: DiscoverFilters): number {
 }
 
 /**
- * One Filters control keeps the feed toolbar compact at every width. Its
- * dropdown holds every catalogue filter and the optional Latest sort control.
+ * One Filters control keeps the feed toolbar compact at every width. Its panel
+ * holds every catalogue filter, each with a visible label. Sort is not here: it
+ * sits in the results header beside the count (IR-1082).
  */
 export function DiscoverFilterBar({
   className,
   filters,
   onChange,
-  showSort = true,
-  sort,
-  onSort,
   options,
   loading,
   resultCount,
@@ -176,13 +171,13 @@ export function DiscoverFilterBar({
           aria-controls={open ? panelId : undefined}
           aria-label={count ? `Filters, ${count} active` : "Filters"}
           className={cn(
-            "relative inline-flex h-11 px-3 items-center justify-center gap-2 rounded-lg border text-small font-medium",
+            "relative inline-flex h-11 px-3 items-center justify-center gap-2 rounded-control border text-small font-medium",
             COLOUR_TRANSITION,
             FOCUS_RING,
             count > 0 ? SELECTED : "bg-white border-stone-300 text-stone-700",
           )}
         >
-          <i className="fas fa-sliders text-[12px]" aria-hidden />
+          <i className="fas fa-sliders text-label" aria-hidden />
           <span>Filters</span>
           {/* A real space: the button is a flex row, which draws none, but the
               visible text a checker compares with the name reads "Filters1"
@@ -197,20 +192,16 @@ export function DiscoverFilterBar({
         </button>
 
       {open && <div id={panelId} role="dialog" aria-label="Filters"
-        className="fixed inset-x-4 bottom-4 z-50 flex max-h-[min(80dvh,34rem)] flex-col rounded-xl border border-stone-200 bg-white shadow-card-md sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]">
+        className="fixed inset-x-4 bottom-4 z-50 flex max-h-[min(80dvh,34rem)] flex-col rounded-card border border-stone-200 bg-white shadow-card-md sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]">
         <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
           <h2 className="text-small font-semibold text-stone-900">Filters</h2>
           <button type="button" ref={closeRef} onClick={() => { setOpen(false); triggerRef.current?.focus(); }} aria-label="Close filters"
-            className={cn("flex h-9 w-9 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
-            <i className="fas fa-xmark text-[13px]" aria-hidden />
+            className={cn("flex h-9 w-9 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
+            <i className="fas fa-xmark text-small" aria-hidden />
           </button>
         </div>
         <div className="flex flex-col gap-3 overflow-y-auto px-4 py-4">
           {controls()}
-          {showSort && <DiscoverFilterDropdown
-            inline block neutral name="Sort" options={SORT_OPTIONS} selected={sort}
-            onChange={(v) => onSort(v as DiscoverSort)}
-          />}
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3">
             <button

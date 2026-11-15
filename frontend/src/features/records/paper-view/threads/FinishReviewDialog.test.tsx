@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Capability } from "@/features/records/capabilities";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen } from "@/test/render";
-import type { DecisionFlags, RecordDetail, ReviewComment } from "@/types/records";
+import type { DecisionFlags, RecordDetail, ReviewComment, ReviewVerdict } from "@/types/records";
 
 import { FinishReviewDialog } from "./FinishReviewDialog";
 import { comment } from "./threadFixtures";
@@ -42,12 +42,12 @@ function record(over: Partial<RecordDetail> = {}): RecordDetail {
   } as unknown as RecordDetail;
 }
 
-function open(caps: Capability[], drafts: ReviewComment[] = [], rec = record()) {
+function open(caps: Capability[], drafts: ReviewComment[] = [], rec = record(), initialVerdict?: ReviewVerdict) {
   const onDone = vi.fn();
   const onSendToRdco = vi.fn();
   const view = renderScreen(
     <FinishReviewDialog record={rec} can={new Set<Capability>(["finish_review", ...caps])} drafts={drafts}
-      onClose={vi.fn()} onDone={onDone} onSendToRdco={onSendToRdco} />,
+      initialVerdict={initialVerdict} onClose={vi.fn()} onDone={onDone} onSendToRdco={onSendToRdco} />,
   );
   return { ...view, onDone, onSendToRdco };
 }
@@ -111,6 +111,22 @@ describe("Finish review", () => {
     expect(onSendToRdco).toHaveBeenCalledWith("Ready for RDCO.");
     expect(finishReview).not.toHaveBeenCalled();
   });
+  it("opens on the verdict a footer button named (IR-1139)", () => {
+    open(["accept_publish", "keep_unlisted", "reject"], [], record(), "keep_unlisted");
+
+    expect(screen.getByRole("group", { name: "Your decision" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Keep unlisted/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Keep unlisted" })).toBeInTheDocument();
+  });
+
+  it("falls back to Comment only when the named verdict is held (IR-1139)", () => {
+    const held = record({ decision: { ...DECISION, blocked_outcomes: { publish: "Under embargo. Release the embargo, then publish." } } });
+    open(["accept_publish", "keep_unlisted"], [], held, "publish");
+
+    expect(screen.getByRole("radio", { name: /Accept & publish/ })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /Comment only/ })).toBeChecked();
+  });
+
 });
 
 describe("a Decision with open threads", () => {

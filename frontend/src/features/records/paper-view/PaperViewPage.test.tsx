@@ -366,6 +366,29 @@ it("names the configured institution on an institutional paper", async () => {
   expect(await screen.findByText("Example Research University")).toBeVisible();
 });
 
+describe("loading the record (IR-939)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+  });
+
+  it("announces the load once, by role and name, and says nothing more when the record draws", async () => {
+    signInAs(99, "Student");
+    vi.mocked(recordsApi.detail).mockReturnValueOnce(new Promise(() => {}) as never);
+    renderPaperView();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading this record…");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  it("removes the status when the page replaces the skeleton", async () => {
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await screen.findByRole("heading", { name: record.title });
+    expect(screen.queryByText("Loading this record…")).not.toBeInTheDocument();
+  });
+});
+
 describe("arriving from a citation", () => {
   beforeEach(() => {
     shownRecord = record;
@@ -2002,7 +2025,8 @@ describe("the Review section (IR-412)", () => {
 
       await userEvent.click(await findColumns());
       expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
-        "Conversation on the right", "Threads on the right", "Details on the right",
+        // Changes is a tab on the first version too (IR-1139).
+        "Conversation on the right", "Threads on the right", "Changes on the right", "Details on the right",
       ]);
       await userEvent.click(screen.getByRole("menuitem", { name: "Conversation on the right" }));
 
@@ -2876,6 +2900,23 @@ describe("the Overview's header (IR-569)", () => {
     expect(within(details).getByText("Applied Research")).toBeInTheDocument();
   });
 
+  it("sets the authors and the Adviser in one row, with the program line under them (IR-1142)", async () => {
+    shownRecord = {
+      ...record, origin: "institutional", adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos",
+      paper_details: { ...sidebarDetails, programs: ["BS Computer Science"] },
+    };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const authors = screen.getByRole("list", { name: "Authors" });
+    const adviser = screen.getByRole("list", { name: "Adviser" });
+    expect(authors.parentElement).toBe(adviser.parentElement);
+    // The Adviser is named once as a role; an author is a name, not a pill saying "Author".
+    expect(within(adviser).getByText("Adviser")).toBeInTheDocument();
+    expect(within(authors).queryByText("Author")).not.toBeInTheDocument();
+    expect(screen.getByText(/^BS Computer Science · /)).toBeInTheDocument();
+  });
+
   it("names the authors once and dates the work once, above the abstract (IR-1089)", async () => {
     shownRecord = { ...record, publication_year: 2025, access_count: 3 };
     renderPaperView();
@@ -3140,8 +3181,9 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent("That citation points at another paper, so nothing is highlighted here.");
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    // Wait for the page: while the record loads, the skeleton is itself a status (IR-939).
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("That citation points at another paper, so nothing is highlighted here.");
   });
 
   it("highlights nothing from a citation the answer no longer has", async () => {
@@ -3149,8 +3191,8 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/no longer part of the answer/);
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/no longer part of the answer/);
     expect(screen.getByRole("button", { name: "Back to answer" })).toBeInTheDocument();
   });
 
@@ -3160,8 +3202,8 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/answer this citation came from is no longer available/);
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/answer this citation came from is no longer available/);
     expect(screen.queryByRole("button", { name: "Back to answer" })).not.toBeInTheDocument();
   });
 
@@ -3476,7 +3518,7 @@ describe("Notes in the reading workspace (IR-580)", () => {
     await userEvent.click(screen.getByRole("button", NOTES));
     await screen.findByRole("textbox", { name: "Your note on this paper" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Close Notes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close notes" }));
     expect(screen.queryByRole("complementary", NOTES)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", NOTES));
 
@@ -3523,7 +3565,7 @@ describe("Notes in the reading workspace (IR-580)", () => {
     const panel = await screen.findByRole("complementary", NOTES);
     await waitFor(() => expect(panel).toHaveFocus());
 
-    await userEvent.click(screen.getByRole("button", { name: "Close Notes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close notes" }));
 
     await waitFor(() => expect(screen.getByRole("button", NOTES)).toHaveFocus());
   });

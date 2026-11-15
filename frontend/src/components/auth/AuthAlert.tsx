@@ -35,7 +35,7 @@ export function AuthAlert({ variant, title, children, onDismiss, focusRef }: Aut
     <div
       ref={focusRef}
       tabIndex={focusRef ? -1 : undefined}
-      className="relative mb-6 rounded-lg border border-stone-300 bg-surface px-4 py-3 text-brand"
+      className="relative mb-6 rounded-control border border-stone-300 bg-surface px-4 py-3 text-brand"
       role="alert"
     >
       {onDismiss && (

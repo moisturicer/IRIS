@@ -119,15 +119,15 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
   return createPortal(
     <>
       {box && (
-        <div aria-hidden className="fixed z-[60] pointer-events-none rounded-lg ring-2 ring-brand"
+        <div aria-hidden className="fixed z-[60] pointer-events-none rounded-control ring-2 ring-brand"
           style={{ top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8,
             boxShadow: "0 0 0 9999px rgb(41 37 36 / .4)" }} />
       )}
       <div ref={panel} role="dialog" aria-label="Review workspace tour" tabIndex={-1}
-        className="fixed z-[61] rounded-2xl bg-white ring-1 ring-stone-200 shadow-card-md p-4 text-stone-700"
+        className="fixed z-[61] rounded-card bg-white ring-1 ring-stone-200 shadow-card-md p-4 text-stone-700"
         style={{ top: place.top, left: place.left, width: place.width }}>
         <div aria-live="polite">
-          <p className="text-2xs font-semibold uppercase tracking-wider text-stone-600">Step {at + 1} of {usable.length}</p>
+          <p className="text-2xs font-semibold text-stone-600">Step {at + 1} of {usable.length}</p>
           <h2 className="font-display text-lg font-semibold text-stone-900 mt-1">{step.title}</h2>
           <p className="mt-1.5 text-small">{step.body}</p>
           {step.items && (

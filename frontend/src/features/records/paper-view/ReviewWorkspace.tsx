@@ -68,7 +68,7 @@ export function ReviewWorkspace(props: ReviewWorkspaceProps) {
  */
 function DocumentsDrawer({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
   return (
-    <Modal open={open} onClose={onClose} title="All documents" size="max-w-3xl" sheet>
+    <Modal open={open} onClose={onClose} title="All documents" size="lg" sheet>
       {children}
     </Modal>
   );
@@ -136,7 +136,7 @@ function AuthorReviewWorkspace({
       <div
         className={cn(
           "contents reading-wide:flex reading-wide:flex-col reading-wide:shrink-0 reading-wide:overflow-hidden",
-          "reading-wide:rounded-2xl reading-wide:bg-white reading-wide:ring-1 reading-wide:ring-stone-200",
+          "reading-wide:rounded-card reading-wide:bg-white reading-wide:ring-1 reading-wide:ring-stone-200",
           reader
             ? cn("reading-wide:sticky reading-wide:w-[26rem]", READING_PANE_TOP, READING_PANE_HEIGHT)
             : "reading-wide:w-full",
@@ -144,7 +144,7 @@ function AuthorReviewWorkspace({
       >
         <div
           className={cn(
-            "mt-6 rounded-2xl bg-white ring-1 ring-stone-200 p-card space-y-4",
+            "mt-6 rounded-card bg-white ring-1 ring-stone-200 p-card space-y-4",
             "reading-wide:mt-0 reading-wide:rounded-none reading-wide:ring-0 reading-wide:flex-1",
             "reading-wide:min-h-0 reading-wide:overflow-y-auto",
           )}
@@ -199,7 +199,7 @@ function AuthorReviewWorkspace({
           onChanged={onChanged}
           boxRef={measureBar}
           className={cn(
-            "sticky bottom-0 z-20 mt-4 rounded-t-2xl bg-white ring-1 ring-stone-200 shadow-card-md px-3 py-2",
+            "sticky bottom-0 z-20 mt-4 rounded-t-card bg-white ring-1 ring-stone-200 shadow-card-md px-3 py-2",
             "reading-wide:static reading-wide:z-auto reading-wide:mt-0 reading-wide:rounded-none",
             "reading-wide:ring-0 reading-wide:shadow-none reading-wide:border-t reading-wide:border-stone-200",
             "reading-wide:px-5 reading-wide:py-3",

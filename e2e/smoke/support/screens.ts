@@ -46,7 +46,7 @@ function shell(api: MockApi, role: SmokeRole) {
     total_mine: 0, pending_mine: 0, approved_mine: 0, declined_mine: 0, needs_action_mine: 0, total_published: 1,
   });
   api.on("GET", "/notifications/", paginated([]));
-  if (role === "RDCO") api.on("GET", "/users/role-requests/", paginated([]));
+  if (role === "RDCO") api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
 }
 
 const wrap = (role: SmokeRole, extra?: (api: MockApi) => void) => (api: MockApi) => {
@@ -68,11 +68,12 @@ const USERS = Array.from({ length: 6 }, (_, i) => ({
 
 /** One open call, so the board draws its filters as it does with data. */
 const OPPORTUNITY = {
-  id: 1, opportunity_type: "funding_window", type_display: "Funding Window",
-  title: "Internal research grant, second cycle", posting_office: "RDCO", audience: "Faculty and graduate students",
-  description: "Seed funding for projects that start in the next term.", funding_ceiling: "50000.00",
-  external_url: "https://example.edu/grants", due_date: "2026-12-15", is_featured: false, tags: ["funding"],
-  source: "internal", posted_by: 2, posted_by_name: "RDCO", created_at: when("11-01"), updated_at: when("11-01"),
+  id: 1, opportunity_type: "conference", type_display: "Conference",
+  title: "International Conference on Applied Computing", description: "Full papers on applied computing.",
+  external_url: "https://example.edu/icac", due_date: "2026-12-15", location: "Cebu City, Philippines",
+  areas: [1], area_names: ["Agriculture"], start_date: "2027-02-10", end_date: "2027-02-12",
+  registration_fee: "PHP 5,000", is_featured: false,
+  posted_by: 2, posted_by_name: "RDCO", created_at: when("11-01"), updated_at: when("11-01"),
   days_left: 39, is_closed: false, can_edit: false,
 };
 
@@ -372,7 +373,10 @@ export const SCREENS: Screen[] = [
   },
   {
     id: "delete-requests", path: "/rdco/delete-requests", route: "/rdco/delete-requests", role: "RDCO",
-    mocks: wrap("RDCO", (api) => api.on("GET", "/records/delete-requests/", paginated([DELETE_REQUEST]))),
+    mocks: wrap("RDCO", (api) => {
+      api.on("GET", "/records/delete-requests/", paginated([DELETE_REQUEST]));
+      api.on("GET", "/records/delete-requests/counts/", { pending: 1, approved: 0, declined: 0, all: 1 });
+    }),
     heading: "Delete Requests",
     primary: (p) => p.getByRole("button", { name: "Refresh" }), primaryLabel: "Refresh",
     table: (p) => p.getByRole("table").first(),
@@ -407,10 +411,10 @@ export const SCREENS: Screen[] = [
   // publishes the next version of the data notice here.
   {
     id: "notices", path: "/notices", route: "/notices", role: "RDCO",
-    mocks: wrap("RDCO", (api) => api.on("GET", "/auth/notice/versions/", [{
+    mocks: wrap("RDCO", (api) => (api.on("GET", "/auth/notice/draft/", null), api.on("GET", "/auth/notice/versions/", [{
       version: 1, text: "IRIS data notice\n\nWhat IRIS keeps\nYour name and CIT-U email.",
       published_at: when("11-01"), published_by: { id: 4, name: "Rita Dela Cruz", email: "rdco@cit.edu" },
-    }])),
+    }]))),
     heading: "Notices",
     primary: (p) => p.getByRole("button", { name: "Preview" }), primaryLabel: "Preview",
   },

@@ -20,13 +20,16 @@ import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { LoadMore } from "@/components/shared/LoadMore";
 import { failureMessage } from "@/lib/readFailure";
+import { useFocusAfterCommit } from "@/hooks/useFocusAfterCommit";
 import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
-import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { errorDetail } from "@/lib/errorDetail";
 import { formatDate }  from "@/lib/utils";
+import { useUIStore } from "@/store/ui.store";
+import { queueCountsChanged } from "@/lib/queueCounts";
 import type { DownloadRequest } from "@/types/records";
 
 import { NO_NOTE, RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
@@ -60,12 +63,19 @@ function grantLine(req: DownloadRequest): string | null {
   return req.grant_live ? `Until ${date}` : `Expired ${date}`;
 }
 
+const readerName = (req: DownloadRequest) =>
+  req.requested_by_name ?? req.requested_by_email ?? "the reader";
+
 export default function DownloadRequestsPage() {
-  const [approving, setApproving] = useState<number | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
+  // The request the approval dialog is asking about, and whether it is in flight.
+  const [approveTarget, setApproveTarget] = useState<DownloadRequest | null>(null);
+  const [approving,     setApproving]     = useState(false);
   const [noteAct,  setNoteAct]  = useState<NoteAct | null>(null);
-  const [error,    setError]    = useState<string | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<Filter>("pending");
+  // The row an action came from is gone after the reload, so focus goes to the filter.
+  const filterFocus = useFocusAfterCommit<HTMLButtonElement>();
 
   // The API pages at 20; "Load more" reads the next page. Changing the filter
   // cancels the read in flight and starts again from the first page (IR-914).
@@ -79,22 +89,23 @@ export default function DownloadRequestsPage() {
   const requests = read.rows;
   const loading = read.status === "loading";
 
-  // Reading again also clears an earlier failed action, as it always has.
-  const load = () => {
-    setError(null);
-    read.retry();
-  };
-
-  const handleApprove = async (id: number) => {
-    if (!confirm("Approve this download request? The requester is told in-app and by email.")) return;
-    setApproving(id);
+  // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
+  // the server's own reason on a refusal.
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    const req = approveTarget;
+    setApproving(true);
     try {
-      await recordsApi.approveDownloadRequest(id);
-      load();
+      await recordsApi.approveDownloadRequest(req.id);
+      addToast({ type: "success", message: `Download request from ${readerName(req)} approved.` });
+      queueCountsChanged();
+      read.retry();
+      filterFocus.focusNext();
     } catch (err) {
-      setError(errorDetail(err, "Action failed. Please try again."));
+      addToast({ type: "error", message: errorDetail(err, "Action failed. Please try again.") });
     } finally {
-      setApproving(null);
+      setApproving(false);
+      setApproveTarget(null);
     }
   };
 
@@ -102,7 +113,7 @@ export default function DownloadRequestsPage() {
     <div>
       <PageHeader
         title="Download Requests"
-        description="Approve or decline requests to download a paper, and revoke access granted earlier."
+        description="Requests for a PDF copy of a paper. Reading in IRIS needs no approval."
       />
 
       {/* Filter bar */}
@@ -110,6 +121,7 @@ export default function DownloadRequestsPage() {
         {FILTERS.map((s) => (
           <Button
             key={s}
+            ref={filterStatus === s ? filterFocus.ref : undefined}
             type="button"
             onClick={() => setFilterStatus(s)}
             aria-pressed={filterStatus === s}
@@ -121,7 +133,7 @@ export default function DownloadRequestsPage() {
         ))}
         <Button
           type="button"
-          onClick={load}
+          onClick={read.retry}
           disabled={loading}
           variant="outline"
           size="sm"
@@ -132,24 +144,18 @@ export default function DownloadRequestsPage() {
         </Button>
       </div>
 
-      {error && (
-        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
-        </div>
-      )}
       {read.status === "failed" && (
         <LoadFailedAlert
           message={failureMessage(read.error, { lead: "The download requests didn't load." })}
-          onRetry={load}
+          onRetry={read.retry}
           className="mb-4"
         />
       )}
 
       {read.status === "interrupted" ? (
-        <InterruptedState what="download requests" onRetry={load} />
+        <InterruptedState what="download requests" onRetry={read.retry} />
       ) : loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" onRetry={load} /></div>
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" onRetry={read.retry} /></div>
       ) : read.status === "failed" ? null : requests.length === 0 ? (
         <EmptyState
           icon="fa-download"
@@ -157,7 +163,7 @@ export default function DownloadRequestsPage() {
           message={filterStatus === "pending" ? "No requests are currently pending." : "No requests match this filter."}
         />
       ) : (
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <div className="bg-white rounded-card border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
             <span className="text-small text-stone-500 font-medium">
               {requests.length} request{requests.length !== 1 ? "s" : ""}{read.hasMore ? " shown" : ""}
@@ -169,7 +175,7 @@ export default function DownloadRequestsPage() {
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
-                  <th className="px-4 py-3 font-semibold text-stone-600">Requested By</th>
+                  <th className="px-4 py-3 font-semibold text-stone-600">Requested by</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Reader's note</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Date</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Status</th>
@@ -216,20 +222,16 @@ export default function DownloadRequestsPage() {
                             <Button
                               type="button"
                               size="sm"
-                              variant="outline"
-                              onClick={() => handleApprove(req.id)}
-                              loading={approving === req.id}
+                              variant="primary"
+                              onClick={() => setApproveTarget(req)}
                             >
-                              {approving === req.id
-                                ? "Approving…"
-                                : <><i className="fas fa-check" aria-hidden /> Approve</>}
+                              <i className="fas fa-check" aria-hidden /> Approve
                             </Button>
                             <Button
                               type="button"
                               size="sm"
-                              variant="danger"
+                              variant="ghost"
                               onClick={() => setNoteAct({ kind: "decline", request: req })}
-                              disabled={approving === req.id}
                             >
                               Decline
                             </Button>
@@ -267,6 +269,23 @@ export default function DownloadRequestsPage() {
         </div>
       )}
 
+      {/* Names the reader and the paper, so a slip on the wrong row is seen. */}
+      <ConfirmDialog
+        open={!!approveTarget}
+        title={approveTarget ? `Approve ${readerName(approveTarget)}'s download request?` : ""}
+        message={
+          approveTarget
+            ? `${readerName(approveTarget)} will be able to download "${approveTarget.record_title}" ` +
+              "for a limited time, and is told in-app and by email."
+            : ""
+        }
+        confirmLabel="Approve request"
+        focusCancel
+        confirming={approving}
+        onConfirm={() => void handleApprove()}
+        onCancel={() => setApproveTarget(null)}
+      />
+
       {noteAct && (
         <RdcoNoteDialog
           title={NOTE_ACTS[noteAct.kind].title}
@@ -277,7 +296,19 @@ export default function DownloadRequestsPage() {
           intro={NOTE_ACTS[noteAct.kind].intro}
           send={(note) => NOTE_ACTS[noteAct.kind].send(noteAct.request.id, note)}
           onClose={() => setNoteAct(null)}
-          onDone={() => { setNoteAct(null); load(); }}
+          onDone={() => {
+            // A refusal stays inside the dialog with the note; only success is a toast.
+            addToast({
+              type: "success",
+              message: noteAct.kind === "decline"
+                ? `Download request from ${readerName(noteAct.request)} declined.`
+                : `Download access for ${readerName(noteAct.request)} revoked.`,
+            });
+            setNoteAct(null);
+            queueCountsChanged();
+            read.retry();
+            filterFocus.focusNext();
+          }}
         />
       )}
     </div>

@@ -143,6 +143,6 @@ export default function AuditLogPage() {
     {error && loadFailed
       ? <LoadFailedAlert message={error} onRetry={() => setAttempt((n) => n + 1)} className="mb-4" />
       : error && <p role="alert" className="mb-4 text-danger">{error}</p>}
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden"><DataTable caption="Audit log events" data={events} columns={columns} loading={loading} onRetry={() => setAttempt((n) => n + 1)} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
+    <div className="bg-white rounded-card border border-stone-200 overflow-hidden"><DataTable caption="Audit log events" data={events} columns={columns} loading={loading} onRetry={() => setAttempt((n) => n + 1)} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
   </div>;
 }

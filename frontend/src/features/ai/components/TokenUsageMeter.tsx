@@ -72,18 +72,18 @@ export function TokenUsageMeter({ usage }: { usage: ReaderUsage }) {
         <Ring used={share} size={20} stroke={3} />
       </button>
       {open && <span id={tipId} role="tooltip"
-        className={cn("absolute bottom-full right-0 z-30 mb-2 flex w-60 items-center gap-3.5 rounded-xl border border-stone-200 bg-white p-3.5 text-left shadow-card-md",
+        className={cn("absolute bottom-full right-0 z-30 mb-2 flex w-60 items-center gap-3.5 rounded-card border border-stone-200 bg-white p-3.5 text-left shadow-card-md",
           "motion-safe:animate-fade-in-up")}>
         <span className="relative inline-flex shrink-0">
           <Ring used={share} reserved={reserved} size={52} stroke={5} />
-          <span className="absolute inset-0 flex items-center justify-center font-display text-[15px] tabular-nums text-stone-900">{percent}%</span>
+          <span className="absolute inset-0 flex items-center justify-center font-display text-body tabular-nums text-stone-900">{percent}%</span>
         </span>
         <span className="min-w-0">
-          <span className="block font-display text-[15px] leading-tight text-stone-900">Context window</span>
-          <span className="mt-1 block text-[13px] tabular-nums text-stone-600">
+          <span className="block font-display text-body leading-tight text-stone-900">Context window</span>
+          <span className="mt-1 block text-small tabular-nums text-stone-600">
             <strong className="font-semibold text-stone-800">{shortTokens(used)}</strong> / {shortTokens(capacity)} tokens
           </span>
-          {reserved > 0 && <span className="mt-1 flex items-center gap-1.5 text-[12px] text-stone-600">
+          {reserved > 0 && <span className="mt-1 flex items-center gap-1.5 text-label text-stone-600">
             <svg aria-hidden width="14" height="6" className="shrink-0"><line x1="1" y1="3" x2="13" y2="3"
               className="stroke-brand/30" strokeWidth="4" strokeLinecap="round" strokeDasharray="2 2" /></svg>
             Reserved for response

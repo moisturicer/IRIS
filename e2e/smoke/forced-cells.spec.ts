@@ -170,8 +170,8 @@ test.describe("Ask IRIS", () => {
 
 test.describe("My Reviews", () => {
   for (const [tab, title] of [
-    ["in_review", "Nothing in review"],
-    ["done", "No decisions yet"],
+    ["in_review", "Nothing here"],
+    ["done", "Nothing here"],
   ] as const) {
     test(`the ${tab.replace("_", " ")} tab with nothing in it says what arrives there`, async ({ page, api }) => {
       await openScreen(page, api, { ...screen("my-reviews"), path: `/review?tab=${tab}` }, {

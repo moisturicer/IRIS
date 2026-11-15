@@ -85,7 +85,7 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
   return (
     <section
       aria-labelledby={HEADING_ID}
-      className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card"
+      className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card"
     >
       {/* No status chip here: the title badge states where the record stands,
           once (IR-525). This panel says who holds it and what each party did. */}
@@ -107,10 +107,13 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
           </button>
         </div>
       ) : !data ? (
-        <div aria-hidden className="space-y-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-4 rounded bg-stone-100 animate-pulse" />
-          ))}
+        <div role="status">
+          <span className="sr-only">Loading the review tracker…</span>
+          <div aria-hidden className="space-y-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-4 rounded-control bg-stone-100 animate-pulse" />
+            ))}
+          </div>
         </div>
       ) : (
         <TrackerBody data={data} />
@@ -141,7 +144,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
             {holders.map((h) => (
               <li
                 key={h.party}
-                className="px-2 py-0.5 rounded-md bg-surface text-brand ring-1 ring-stone-300 text-xs font-bold"
+                className="px-2 py-0.5 rounded-control bg-surface text-brand ring-1 ring-stone-300 text-xs font-bold"
               >
                 {h.label}
               </li>
@@ -178,7 +181,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
         <div>
           <h3
             id="tracker-document-requests-label"
-            className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
+            className="text-2xs font-semibold text-stone-600 mb-1.5"
           >
             Document requests
           </h3>
@@ -211,7 +214,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
         <div>
           <h3
             id="tracker-resubmissions-label"
-            className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
+            className="text-2xs font-semibold text-stone-600 mb-1.5"
           >
             Resubmission history
           </h3>
@@ -298,7 +301,7 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
           )}
           {row.preserved && (
             <span
-              className="px-1.5 py-0.5 rounded bg-stone-100 text-stone-900 border border-stone-300 text-2xs font-bold flex items-center gap-1"
+              className="px-1.5 py-0.5 rounded-control bg-stone-100 text-stone-900 border border-stone-300 text-2xs font-bold flex items-center gap-1"
               title="Cleared before the current submission and carried over — this office will not review again"
             >
               <i className="fas fa-shield-halved text-2xs" aria-hidden />
@@ -352,7 +355,7 @@ function RoutingHistory({
     <div>
       <h3
         id="tracker-routing-label"
-        className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
+        className="text-2xs font-semibold text-stone-600 mb-1.5"
       >
         Routing history
       </h3>

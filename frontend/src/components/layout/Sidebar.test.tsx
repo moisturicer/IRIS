@@ -20,6 +20,8 @@ import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
 
+import { queueCountsChanged } from "@/lib/queueCounts";
+
 import { AppShell } from "./AppShell";
 
 vi.mock("@/api/client", () => ({ apiClient: { get: vi.fn() } }));
@@ -162,19 +164,66 @@ describe("the sidebar's list", () => {
     expect(mainLinks()).not.toContain("My Reviews");
   });
 
-  it("names RDCO's group and counts its waiting role requests", async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: { count: 3, results: [] } } as never);
+  const queues = (counts: { download_requests: number; delete_requests: number; role_change_requests: number }) =>
+    vi.mocked(apiClient.get).mockImplementation(((url: string) =>
+      url === "/dashboard/queue-counts/"
+        ? Promise.resolve({ data: counts })
+        : Promise.resolve({ data: {} })) as never);
+
+  it("names RDCO's group and counts what waits in each of its queues", async () => {
+    queues({ role_change_requests: 3, download_requests: 2, delete_requests: 1 });
     signIn(ROLES.RDCO, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
     const admin = screen.getByRole("list", { name: "RDCO" });
     expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import Records");
-    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 waiting" })).toHaveAttribute("href", "/rdco/role-requests");
+    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/rdco/users");
-    expect(within(admin).getByRole("link", { name: "Download Requests" })).toHaveAttribute("href", "/rdco/download-requests");
-    expect(within(admin).getByRole("link", { name: "Delete Requests" })).toHaveAttribute("href", "/rdco/delete-requests");
+    expect(within(admin).getByRole("link", { name: "Download Requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
+    expect(within(admin).getByRole("link", { name: "Delete Requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
     expect(screen.queryByRole("link", { name: "Audit Log" })).not.toBeInTheDocument();
+  });
+
+  it("shows no count at zero", async () => {
+    queues({ role_change_requests: 0, download_requests: 0, delete_requests: 0 });
+    signIn(ROLES.RDCO, true);
+    renderAt("/records/mine");
+
+    const admin = await screen.findByRole("list", { name: "RDCO" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
+    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Delete Requests" })).toBeInTheDocument();
+  });
+
+  it("shows no count, not a stale one, when the read fails", async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error("down"));
+    signIn(ROLES.RDCO, true);
+    renderAt("/records/mine");
+
+    const admin = await screen.findByRole("list", { name: "RDCO" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
+    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
+  });
+
+  it("reads the counts again when a decision is made, without a reload", async () => {
+    queues({ role_change_requests: 0, download_requests: 2, delete_requests: 1 });
+    signIn(ROLES.RDCO, true);
+    renderAt("/records/mine");
+    const admin = await screen.findByRole("list", { name: "RDCO" });
+    expect(await within(admin).findByRole("link", { name: "Download Requests, 2 pending" })).toBeInTheDocument();
+
+    queues({ role_change_requests: 0, download_requests: 1, delete_requests: 1 });
+    act(() => { queueCountsChanged(); });
+    expect(await within(admin).findByRole("link", { name: "Download Requests, 1 pending" })).toBeInTheDocument();
+  });
+
+  it.each([ROLES.STUDENT, ROLES.ITSO, ROLES.SYSTEM_ADMIN])("never asks %s for the queue counts", async (role) => {
+    signIn(role, true);
+    renderAt("/records/mine");
+
+    await screen.findByRole("navigation", { name: "Main" });
+    expect(apiClient.get).not.toHaveBeenCalledWith("/dashboard/queue-counts/");
   });
 
   it.each([false, true])("gives the System Admin only its administration and catalogue links (collapsed: %s)", async (collapsed) => {
@@ -441,6 +490,9 @@ describe("the account menu", () => {
     expect(screen.queryByRole("link", { name: "Settings & Profile" })).not.toBeInTheDocument();
     // The one Help link is the footer's, outside the menu the trigger controls.
     const menu = document.getElementById(trigger.getAttribute("aria-controls")!)!;
+    // IR-1137: Notifications is reachable from the account menu too.
+    expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings", "Notifications"]);
+    expect(within(menu).getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
     expect(within(menu).queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Help" })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
@@ -577,6 +629,7 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
     for (const item of [
       screen.getByRole("link", { name: "Profile" }),
       screen.getByRole("link", { name: "Settings" }),
+      screen.getByRole("link", { name: "Notifications" }),
       screen.getByRole("button", { name: "Sign out" }),
     ]) {
       expect(item).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");

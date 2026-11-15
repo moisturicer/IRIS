@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent } from "react";
 
 import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
-import { LABEL, fieldClasses } from "@/components/ui/fieldClasses";
+import { fieldClasses } from "@/components/ui/fieldClasses";
 import type { Capability } from "@/features/records/capabilities";
 import { errorDetail } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,6 @@ import type { DecisionFlags, RecordDetail, ReviewComment, ReviewVerdict } from "
 
 import { closingLines } from "../DecisionDialog";
 import { plural, verdictOptions, type Thread } from "./threadModel";
-import { SELECTED } from "@/components/ui/highlightRoles";
 
 export interface FinishReviewDialogProps {
   record: RecordDetail;
@@ -19,6 +18,8 @@ export interface FinishReviewDialogProps {
   drafts: ReviewComment[];
   /** The sent threads, so a Decision names each one it closes by its pin and quote. */
   sent?: Thread[];
+  /** The verdict a footer button opened it on (IR-1139); *Comment only* otherwise. */
+  initialVerdict?: ReviewVerdict;
   onClose: () => void;
   /** Finished: the sentence to announce. */
   onDone: (outcome: string) => void;
@@ -62,11 +63,13 @@ const DONE_WORDS: Record<Exclude<ReviewVerdict, "send_to_rdco">, string> = {
  * is open; its token is the server's, and a 409 brings the fresh one back so
  * the next press decides into the record as it now is.
  */
-export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, onDone, onSendToRdco }: FinishReviewDialogProps) {
+export function FinishReviewDialog({ record, can, drafts, sent = [], initialVerdict, onClose, onDone, onSendToRdco }: FinishReviewDialogProps) {
   const ids = useId();
   const [decision, setDecision] = useState<DecisionFlags>(record.decision);
   const options = verdictOptions(can, { ...record, decision }, drafts);
-  const [verdict, setVerdict] = useState<ReviewVerdict>("comment_only");
+  // A footer button opens it on its own verdict, when that one is on offer and not held (IR-1139).
+  const [verdict, setVerdict] = useState<ReviewVerdict>(() =>
+    options.find((o) => o.verdict === initialVerdict && o.unavailable === null)?.verdict ?? "comment_only");
   const [summary, setSummary] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -116,7 +119,7 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, on
       sheet
       footer={
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>Keep reviewing</Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={sending}>Keep reviewing</Button>
           <Button type="submit" form={formId} variant={chosen.verdict === "reject" ? "danger" : "primary"}
             disabled={!ready} loading={sending}>
             {SUBMIT_WORDS[chosen.verdict]}
@@ -125,49 +128,50 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, on
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-4">
-        <p className="text-[14px] text-stone-700">
-          {drafts.length
-            ? `${plural(drafts.length, "draft comment", "draft comments")}${mustFix ? `, ${mustFix} Must fix,` : ""} will be sent with it.`
-            : "No draft comments. You can still send a summary."}
-        </p>
-
-        <div>
-          <label htmlFor={summaryId} className={LABEL}>
-            Summary{chosen.reasonRequired ? " (required: it is this act's reason)" : ""}
-          </label>
-          <textarea id={summaryId} rows={4} value={summary} onChange={(e) => setSummary(e.target.value)}
-            aria-required={chosen.reasonRequired}
-            placeholder="What the authors and the other reviewers read first"
-            className={fieldClasses(false)} />
-        </div>
-
-        <fieldset className="space-y-1.5">
-          <legend className="text-[14px] font-medium text-stone-700 mb-1">Verdict</legend>
+        {/* The decision first, then the summary, as the prototype's dialog
+            reads (IR-1139): each option is "Label · what it does" on one line. */}
+        <fieldset className="space-y-1">
+          <legend className="mb-1.5 text-small font-semibold text-stone-900">Your decision</legend>
           {options.map((o) => {
             const descId = `${ids}-${o.verdict}-desc`;
             const nameId = `${ids}-${o.verdict}-name`;
             return (
               <label key={o.verdict} className={cn(
-                "flex items-start gap-2.5 rounded-lg border px-3 py-2",
-                verdict === o.verdict ? SELECTED : "border-stone-200",
-                o.unavailable && "opacity-70",
+                "flex items-start gap-2.5 rounded-control px-1 py-1",
+                o.unavailable ? "cursor-not-allowed text-stone-500" : "cursor-pointer",
               )}>
                 <input type="radio" name={`${ids}-verdict`} value={o.verdict} checked={verdict === o.verdict}
                   disabled={o.unavailable !== null} onChange={() => setVerdict(o.verdict)}
-                  aria-labelledby={nameId} aria-describedby={descId} className="mt-1 accent-brand" />
-                <span>
-                  <span id={nameId} className="block text-small font-semibold text-stone-900">{o.label}</span>
-                  <span id={descId} className="block text-2xs text-stone-600">
-                    {o.unavailable ? `Unavailable: ${o.unavailable}` : o.description}
-                  </span>
+                  aria-labelledby={nameId} aria-describedby={descId} className="mt-[3px] size-4 shrink-0 accent-brand" />
+                <span className="text-small leading-snug text-stone-700">
+                  <span id={nameId} className="font-semibold text-stone-900">{o.label}</span>
+                  <span aria-hidden> · </span>
+                  <span id={descId}>{o.unavailable ? `Unavailable: ${o.unavailable}` : o.description}</span>
                 </span>
               </label>
             );
           })}
         </fieldset>
 
+        <div>
+          <label htmlFor={summaryId} className="mb-1.5 block text-small font-semibold text-stone-900">
+            Summary{" "}
+            <span className="font-normal text-stone-600">
+              {chosen.reasonRequired ? "(required: it is this act's reason)" : "(what the authors and other reviewers read first)"}
+            </span>
+          </label>
+          <textarea id={summaryId} rows={4} value={summary} onChange={(e) => setSummary(e.target.value)}
+            aria-required={chosen.reasonRequired}
+            className={fieldClasses(false)} />
+          <p className="mt-1.5 text-2xs text-stone-600">
+            {drafts.length
+              ? `${plural(drafts.length, "draft comment", "draft comments")}${mustFix ? `, ${mustFix} Must fix,` : ""} will be sent with it.`
+              : "No draft comments. You can still send a summary."}
+          </p>
+        </div>
+
         {(closing.length > 0 || closingThreads.length > 0) && (
-          <section aria-label="What this Decision closes" className="rounded-lg bg-stone-100 px-3 py-2 text-[13px] text-stone-800 space-y-1">
+          <section aria-label="What this Decision closes" className="rounded-control bg-stone-100 px-3 py-2 text-small text-stone-800 space-y-1">
             <p className="font-semibold">This Decision also closes</p>
             <ul className="list-disc pl-5">
               {closing.map((line) => <li key={line}>{line}</li>)}

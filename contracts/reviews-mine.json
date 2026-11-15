@@ -10,6 +10,10 @@
         "record": 1,
         "title": "Matrix: a Thesis at ITSO",
         "record_type_name": "Thesis / Research",
+        "opens": "review",
+        "authors": [],
+        "unit": "",
+        "version": 1,
         "party": "itso",
         "party_label": "ITSO",
         "seat": 3,
@@ -52,6 +56,10 @@
         "record": 3,
         "title": "Matrix: a Thesis awaiting revision",
         "record_type_name": "Thesis / Research",
+        "opens": "review",
+        "authors": [],
+        "unit": "",
+        "version": 1,
         "party": "itso",
         "party_label": "ITSO",
         "seat": 7,
@@ -94,6 +102,14 @@
       "in_review": 2,
       "done": 0
     },
-    "next": null
+    "next": null,
+    "outcome_counts": {
+      "all": 0,
+      "cleared": 0,
+      "finding": 0,
+      "accepted": 0,
+      "rejected": 0,
+      "published": 0
+    }
   }
 }

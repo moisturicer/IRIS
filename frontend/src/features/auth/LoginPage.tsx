@@ -300,7 +300,7 @@ export default function LoginPage() {
         <Link
           to="/signup"
           className={cn(
-            "inline-flex min-h-11 min-w-11 items-center justify-center rounded text-brand font-semibold hover:underline",
+            "inline-flex min-h-11 min-w-11 items-center justify-center rounded-control text-brand font-semibold hover:underline",
             FOCUS_RING,
           )}
         >

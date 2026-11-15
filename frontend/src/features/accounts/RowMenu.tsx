@@ -120,7 +120,7 @@ export function RowMenu({ label, items }: RowMenuProps) {
           aria-label={label}
           onKeyDown={onMenuKeyDown}
           style={{ top: anchor.top, right: anchor.right }}
-          className="fixed z-40 min-w-44 rounded-xl border border-stone-200 bg-overlay p-1 shadow-card-md"
+          className="fixed z-40 min-w-44 rounded-card border border-stone-200 bg-overlay p-1 shadow-card-md"
         >
           {items.map((item) => (
             <button
@@ -132,7 +132,7 @@ export function RowMenu({ label, items }: RowMenuProps) {
                 item.onSelect();
               }}
               className={cn(
-                "flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-stone-100 focus-visible:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand",
+                "flex min-h-11 w-full items-center gap-2 rounded-control px-3 text-left text-sm hover:bg-stone-100 focus-visible:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand",
                 item.danger ? "text-brand-dark" : "text-stone-800",
               )}
             >

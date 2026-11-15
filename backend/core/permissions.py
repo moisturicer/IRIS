@@ -108,10 +108,22 @@ class IsIERC(BasePermission):
         return get_role_name(request.user) == ROLE_IERC
 
 
+def can_author(user) -> bool:
+    """
+    May `user` author a record: a Record Owner, which is a Student or an Adviser.
+
+    The one rule behind `IsAuthor` (the gate on creating a record) and
+    `can_author` on `GET /users/me/` (IR-1096), which is what the client reads
+    to show Publish. Keeping them one function means the page never offers what
+    the API refuses.
+    """
+    return get_role_name(user) in AUTHOR_ROLES
+
+
 class IsAuthor(BasePermission):
     """Student or Adviser -- the roles the SRS names as a Record Owner."""
     def has_permission(self, request, view):
-        return get_role_name(request.user) in AUTHOR_ROLES
+        return can_author(request.user)
 
 
 class IsReviewer(BasePermission):

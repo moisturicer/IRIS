@@ -8,7 +8,7 @@ interface CardProps {
 
 export function Card({ children, className = "", padding = true }: CardProps) {
   return (
-    <div className={`bg-surface rounded-xl border border-stone-200 overflow-hidden ${padding ? "p-5" : ""} ${className}`}>
+    <div className={`bg-surface rounded-card border border-stone-200 overflow-hidden ${padding ? "p-5" : ""} ${className}`}>
       {children}
     </div>
   );

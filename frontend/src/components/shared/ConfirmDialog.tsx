@@ -46,7 +46,7 @@ export function ConfirmDialog({
       open={open}
       onClose={confirming ? STAY_OPEN : onCancel}
       title={title}
-      size="max-w-sm"
+      size="sm"
       footer={
         <div className="flex justify-end gap-2">
           <Button ref={cancelRef} type="button" variant="outline" className="min-h-11" onClick={onCancel} disabled={confirming}>

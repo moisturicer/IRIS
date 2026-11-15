@@ -35,7 +35,7 @@ import { recordsApi, type ManuscriptMatch } from "@/api/records";
 import { Modal } from "@/components/ui/Modal";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { rolesFor } from "@/lib/access";
+import { canAuthor } from "@/lib/access";
 import { errorDetail } from "@/lib/errorDetail";
 import { tabbableWithin } from "@/lib/focusTrap";
 import { cn } from "@/lib/utils";
@@ -93,9 +93,11 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 /**
- * Mounted on the home route. Renders nothing unless the URL asks for Publish
- * and the signed-in user may author a record; the server's `IsAuthor` is the
- * real boundary, this only keeps the dialog from opening onto a refusal.
+ * Mounted on the home route. Renders nothing unless the URL asks for Publish.
+ * Whether the signed-in user may author is the server's `can_author`
+ * (IR-1096), the rule `IsAuthor` enforces, so the dialog never opens onto a
+ * refusal. A link to Publish from someone who cannot author opens a short
+ * explanation instead of nothing, and starts nothing.
  */
 export function PublishDialog() {
   const [params, setParams] = useSearchParams();
@@ -104,8 +106,7 @@ export function PublishDialog() {
   const [instance, setInstance] = useState(0);
 
   const target = params.get(PUBLISH_PARAM);
-  const role = user?.role_name ?? null;
-  const isAuthor = role != null && rolesFor("submit").includes(role);
+  const isAuthor = canAuthor(user);
 
   const setTarget = useCallback(
     (value: string | null) =>
@@ -121,7 +122,8 @@ export function PublishDialog() {
     [setParams],
   );
 
-  if (target == null || !isAuthor || !user) return null;
+  if (target == null || !user) return null;
+  if (!isAuthor) return <PublishUnavailable onClose={() => setTarget(null)} />;
 
   return (
     <PublishFlow
@@ -135,6 +137,26 @@ export function PublishDialog() {
         setInstance((n) => n + 1);
       }}
     />
+  );
+}
+
+/** What a link to Publish opens for someone the server says cannot author (IR-1096). */
+function PublishUnavailable({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Publishing isn't available to your account"
+      footer={
+        <div className="flex justify-end">
+          <Button type="button" size="page" onClick={onClose}>Got it</Button>
+        </div>
+      }
+    >
+      <p className="text-body text-stone-700">
+        Your account can read, save and request papers, but it can&rsquo;t start a submission.
+      </p>
+    </Modal>
   );
 }
 
@@ -796,7 +818,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       title="Publish your research"
       displayTitle
       sheet
-      size={phase.kind === "form" && step === 2 ? "max-w-[1180px]" : "max-w-[720px]"}
+      size={phase.kind === "form" && step === 2 ? "xl" : "lg"}
       footer={footer}
     >
       <span role="status" className="sr-only">
@@ -808,7 +830,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           role="alertdialog"
           aria-labelledby="publish-close-title"
           aria-describedby="publish-close-body"
-          className="mb-section rounded-xl border border-stone-300 bg-stone-50 p-card-compact"
+          className="mb-section rounded-card border border-stone-300 bg-stone-50 p-card-compact"
         >
           <p id="publish-close-title" className="text-body font-medium text-stone-900">Stop the upload and close?</p>
           <p id="publish-close-body" className="mt-1 text-small text-stone-600">

@@ -91,7 +91,7 @@ export function ReviewerDocumentRequests({
               setRequested(false);
               setRequesting(true);
             }}
-            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 bg-white text-xs font-bold text-stone-700 hover:border-brand/40 transition-colors"
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control border border-stone-200 bg-white text-xs font-bold text-stone-700 hover:border-brand/40 transition-colors"
           >
             <i className="fas fa-file-circle-plus text-2xs" aria-hidden />
             Request documents
@@ -106,7 +106,7 @@ export function ReviewerDocumentRequests({
 
       {mine.length > 0 && (
         <section aria-labelledby={headingId} className="space-y-2">
-          <h2 id={headingId} className="text-2xs font-bold uppercase tracking-wider text-stone-500">
+          <h2 id={headingId} className="text-2xs font-bold text-stone-500">
             Documents you requested
           </h2>
           {mine.map((r) => (
@@ -143,7 +143,7 @@ function ManagedRequest({
 }) {
   const listId = useId();
   return (
-    <article className="bg-white border border-stone-200 rounded-xl p-3.5">
+    <article className="bg-white border border-stone-200 rounded-card p-3.5">
       <p className="text-2xs text-stone-500">
         {request.label} · {request.state_label} · {formatDate(request.created_at, "MMM d")}
       </p>
@@ -209,7 +209,7 @@ function ManagedItem({
                 disabled={busy}
                 aria-label={`Accept ${item.label}`}
                 onClick={() => void decide({ action: "accept" })}
-                className="px-2 py-1 rounded-lg bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 disabled:opacity-60"
+                className="px-2 py-1 rounded-control bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 disabled:opacity-60"
               >
                 Accept
               </button>
@@ -219,7 +219,7 @@ function ManagedItem({
                 aria-label={`Reject ${item.label}`}
                 aria-expanded={rejecting}
                 onClick={() => setRejecting((v) => !v)}
-                className="px-2 py-1 rounded-lg border border-stone-300 text-xs font-bold text-brand hover:bg-stone-100 disabled:opacity-60"
+                className="px-2 py-1 rounded-control border border-stone-300 text-xs font-bold text-brand hover:bg-stone-100 disabled:opacity-60"
               >
                 Reject
               </button>
@@ -251,13 +251,13 @@ function ManagedItem({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-field p-2 text-sm focus:outline-none focus:border-brand"
+            className="w-full rounded-control border border-field p-2 text-sm focus:outline-none focus:border-brand"
           />
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={busy || !reason.trim()}
-              className="px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-60"
+              className="px-2.5 py-1 rounded-control bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-60"
             >
               Send rejection
             </button>
@@ -267,7 +267,7 @@ function ManagedItem({
                 setRejecting(false);
                 setReason("");
               }}
-              className="px-2.5 py-1 rounded-lg border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+              className="px-2.5 py-1 rounded-control border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50"
             >
               Cancel
             </button>
@@ -329,7 +329,7 @@ function Withdraw({
           type="button"
           disabled={busy}
           onClick={() => void withdraw()}
-          className="px-2.5 py-1 rounded-lg bg-stone-800 text-white text-xs font-bold hover:bg-stone-900 disabled:opacity-60"
+          className="px-2.5 py-1 rounded-control bg-stone-800 text-white text-xs font-bold hover:bg-stone-900 disabled:opacity-60"
         >
           Confirm withdrawal
         </button>
@@ -337,7 +337,7 @@ function Withdraw({
           type="button"
           disabled={busy}
           onClick={() => setConfirming(false)}
-          className="px-2.5 py-1 rounded-lg border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+          className="px-2.5 py-1 rounded-control border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50"
         >
           Keep request
         </button>

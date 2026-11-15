@@ -1,5 +1,5 @@
 /**
- * Role Requests when its list fails to load (IR-745): "All caught up!" would
+ * Role Requests when its list fails to load (IR-745): "No role requests" would
  * tell RDCO there is nothing to decide when there may be.
  *
  * IR-1100: the API pages at 20, so a queue longer than one page offers Load more.
@@ -29,10 +29,10 @@ describe("Role Requests", () => {
     renderScreen(<RoleRequestsPage />);
 
     expect(await screen.findByRole("heading", { name: "Couldn't load role requests" })).toBeInTheDocument();
-    expect(screen.queryByText("All caught up!")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "No role requests" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("All caught up!")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No role requests" })).toBeInTheDocument();
   });
 });
 

@@ -80,7 +80,7 @@ export function highlightTerms(text: string | null | undefined, query: string): 
       i % 2 === 1
         ? React.createElement(
             "mark",
-            { key: i, className: `${MATCH} rounded-sm px-px` },
+            { key: i, className: `${MATCH} rounded-none px-px` },
             part,
           )
         : part,

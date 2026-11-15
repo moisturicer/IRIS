@@ -16,7 +16,7 @@ export function ReasoningSummary({ summary, compact = false }: { summary?: strin
         aria-controls={open ? bodyId : undefined}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 -ml-1.5",
+          "inline-flex items-center gap-1.5 rounded-control px-1.5 py-1 -ml-1.5",
           "text-xs font-medium text-stone-500 transition-colors",
           "hover:text-stone-700 hover:bg-stone-100",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
@@ -38,7 +38,7 @@ export function ReasoningSummary({ summary, compact = false }: { summary?: strin
           role="region"
           aria-label="Reasoning summary"
           className={cn(
-            "mt-1.5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-stone-600",
+            "mt-1.5 rounded-control border border-stone-200 bg-stone-50 px-3 py-2.5 text-stone-600",
             compact ? "text-2xs leading-relaxed" : "text-xs leading-relaxed",
           )}
         >

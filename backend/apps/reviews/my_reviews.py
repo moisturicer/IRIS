@@ -32,13 +32,14 @@ import binascii
 from dataclasses import dataclass
 from datetime import datetime
 
-from django.db.models import Exists, F, OuterRef, Q, Subquery
+from django.db.models import Exists, F, Max, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from apps.accounts import profile as accounts_profile
 from apps.documents.models import DocumentRequest
-from apps.records.models import Record, RecordOwner, UnlistedPublication
+from apps.records.models import Author, Record, RecordOwner, RecordVersion, UnlistedPublication
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
@@ -368,6 +369,13 @@ def _row(*, kind, pk, record, party, party_label, **fields) -> dict:
         "record": record.pk,
         "title": record.title,
         "record_type_name": record.record_type.name if record.record_type_id else None,
+        # Where the title opens (IR-1135): the Review section while the paper is
+        # in review, its Overview once published. Said here so the browser maps
+        # no pipeline state to a place; `_add_context` fills the rest.
+        "opens": "overview" if record.pipeline_status == PipelineStatus.PUBLISHED else "review",
+        "authors": [],
+        "unit": "",
+        "version": None,
         "party": str(party),
         "party_label": party_label,
         "seat": None,
@@ -497,6 +505,42 @@ def _add_context(rows):
             row["waiting_on"] = "document"
 
 
+def _add_record_facts(rows):
+    """
+    What a row's kicker line names (IR-1135): the paper's authors, the primary
+    owner's college and its latest version. Read once for the whole page, so the
+    query count stays flat in the number of rows.
+    """
+    if not rows:
+        return
+    record_ids = {r["record"] for r in rows}
+
+    authors: dict[int, list[str]] = {}
+    for author in Author.objects.filter(record_id__in=record_ids).order_by("record_id", "pk"):
+        authors.setdefault(author.record_id, []).append(author.name)
+
+    owners = {}
+    for owner in (
+        RecordOwner.objects.filter(record_id__in=record_ids)
+        .select_related(
+            "user__student_profile__course__department__college",
+            "user__adviser_profile__college", "user__adviser_profile__department",
+        ).order_by("record_id", "-is_primary", "pk")
+    ):
+        owners.setdefault(owner.record_id, owner.user)
+
+    versions = dict(
+        RecordVersion.objects.filter(record_id__in=record_ids)
+        .values("record_id").annotate(latest=Max("number")).values_list("record_id", "latest")
+    )
+
+    for row in rows:
+        owner = owners.get(row["record"])
+        row["authors"] = authors.get(row["record"], [])
+        row["unit"] = accounts_profile.affiliation(owner).college if owner else ""
+        row["version"] = versions.get(row["record"])
+
+
 def _add_overdue_days(rows):
     """
     How many working days each overdue row is late (IR-622). Counted here, not
@@ -576,6 +620,20 @@ def _counts(scope) -> dict:
     }
 
 
+def _outcome_counts(scope) -> dict:
+    """
+    Done's chips, each with the size of the list it shows (IR-1135): `all` is
+    Done's own count, and a filter never narrows any of them. The words are the
+    server's (`ReviewOutcome`), so the browser maps no state to a label.
+    """
+    seats, reviews = _done_seats(scope), _seatless_reviews(scope)
+    counts = {"all": seats.count() + reviews.count()}
+    for outcome in _FILTERS:
+        q = _outcome_q(outcome)
+        counts[outcome.value] = seats.filter(q).count() + reviews.filter(q).count()
+    return counts
+
+
 def my_reviews(user, *, tab=None, outcome=None, office=None, cursor=None,
                sort=None, overdue=None) -> dict:
     """
@@ -598,5 +656,9 @@ def my_reviews(user, *, tab=None, outcome=None, office=None, cursor=None,
         if overdue_only:
             rows = [r for r in rows if r["is_overdue"]]
         _add_overdue_days(rows)
+    _add_record_facts(rows)
     attach_clearance_strips(rows)  # which clearances each record holds (IR-1083)
-    return {"rows": rows, "counts": _counts(scope), "next": next_cursor}
+    return {
+        "rows": rows, "counts": _counts(scope),
+        "outcome_counts": _outcome_counts(scope), "next": next_cursor,
+    }

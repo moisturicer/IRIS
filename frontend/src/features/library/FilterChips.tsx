@@ -26,7 +26,7 @@ export function FilterChips<T extends string>({ label, options, value, onChange 
             aria-pressed={on}
             onClick={() => onChange(option.value)}
             className={cn(
-              "min-h-9 rounded-lg px-3 text-small font-semibold",
+              "min-h-9 rounded-control px-3 text-small font-semibold",
               COLOUR_TRANSITION,
               FOCUS_RING,
               on ? SELECTED_RING : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",

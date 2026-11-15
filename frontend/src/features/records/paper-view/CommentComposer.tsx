@@ -84,7 +84,7 @@ export function CommentComposer({
           rows={1}
           placeholder={placeholder}
           aria-describedby={remaining <= SHOW_COUNTER_AT ? counterId : undefined}
-          className="block max-h-64 min-h-11 w-full resize-none overflow-y-auto rounded-2xl border border-field bg-stone-100 py-2.5 pl-3.5 pr-12 text-sm text-stone-900 placeholder:text-stone-600 focus-visible:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-10"
+          className="block max-h-64 min-h-11 w-full resize-none overflow-y-auto rounded-card border border-field bg-stone-100 py-2.5 pl-3.5 pr-12 text-sm text-stone-900 placeholder:text-stone-600 focus-visible:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-10"
         />
         <button
           type="submit"

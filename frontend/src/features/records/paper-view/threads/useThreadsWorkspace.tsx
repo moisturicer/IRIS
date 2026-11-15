@@ -5,7 +5,7 @@ import { recordsApi } from "@/api/records";
 import type { Capability } from "@/features/records/capabilities";
 import { joinLabels } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import type { PageRegion, Party, RecordDetail } from "@/types/records";
+import type { PageRegion, Party, RecordDetail, ReviewVerdict } from "@/types/records";
 
 import { RouteDialog } from "../RouteDialog";
 import { FinishReviewDialog } from "./FinishReviewDialog";
@@ -42,7 +42,8 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
   const [party, setParty] = useState<Party | "owner" | null>(null);
   const [focus, setFocus] = useState<{ id: number; key: number } | null>(null);
   const [landing, setLanding] = useState<ReaderAnnotations["landing"]>(null);
-  const [finishing, setFinishing] = useState(false);
+  // The verdict to open *Finish your review* on, or false while it is shut (IR-1139).
+  const [finishing, setFinishing] = useState<ReviewVerdict | true | false>(false);
   const [routingSummary, setRoutingSummary] = useState<string | null>(null);
   const currentVersion = record.versions?.length ? record.versions[record.versions.length - 1].number : null;
 
@@ -106,6 +107,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
       {finishing && (
         <FinishReviewDialog
           record={record} can={can} drafts={threads.drafts.map((t) => t.root)} sent={threads.sent}
+          initialVerdict={finishing === true ? undefined : finishing}
           onClose={() => setFinishing(false)} onDone={done}
           onSendToRdco={(summary) => { setFinishing(false); setRoutingSummary(summary); }}
         />
@@ -135,7 +137,8 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
       setParty(target as Party | "owner" | null);
       showThreads();
     },
-    finish: () => setFinishing(true),
+    /** Open *Finish your review*, on `verdict` when a footer button names one (IR-1139). */
+    finish: (verdict?: ReviewVerdict) => setFinishing(verdict ?? true),
     /** Open one thread in the Threads tab (the Changes tab's thread links). */
     openThread,
     /** Show the paper and land on this page's band (the Changes tab's *Show in paper*). */

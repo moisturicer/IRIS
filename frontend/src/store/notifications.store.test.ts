@@ -56,3 +56,13 @@ describe("unread notifications across session changes", () => {
     expect(useNotificationsStore.getState().unreadCount).toBe(0);
   });
 });
+
+describe("the unread count when the list is paged (IR-1137)", () => {
+  it("uses the server's total, never fewer than the items it holds", () => {
+    useNotificationsStore.getState().setItems([unread], 25);
+    expect(useNotificationsStore.getState().unreadCount).toBe(25);
+
+    useNotificationsStore.getState().setItems([unread, { ...unread, id: 2 }], undefined);
+    expect(useNotificationsStore.getState().unreadCount).toBe(2);
+  });
+});

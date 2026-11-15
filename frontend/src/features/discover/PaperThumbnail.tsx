@@ -1,24 +1,29 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { recordsApi } from "@/api/records";
 import type { LoadedPdf } from "@/lib/pdf";
 
-/** Share of the page's height the cover shows, from the top. */
-const VISIBLE_PAGE_SHARE = 0.6;
-const RENDER_SCALE = 1.5;
+const RENDER_SCALE = 0.6;
 
-interface ManuscriptCoverProps {
+interface PaperThumbnailProps {
   recordId: number;
+  /** Whether the record has a manuscript to draw. Without one the outline stays. */
   available: boolean;
 }
 
-export function ManuscriptCover({ recordId, available }: ManuscriptCoverProps) {
+/**
+ * The 96 px page beside a one-column result (IR-1082, D4; spec §4.6), showing the
+ * paper's real first page (IR-1141). Until that is drawn, and wherever it can't
+ * be (no manuscript, a failed read), the drawn page outline stands in, so a row
+ * is the same size either way. The page is fetched only once the row nears the
+ * viewport. Decoration only, so a screen reader skips it. Phones drop it, as the
+ * prototype does, to give the title the width.
+ */
+export function PaperThumbnail({ recordId, available }: PaperThumbnailProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(false);
-  const [status, setStatus] = useState<"loading" | "ready" | "unavailable">(
-    available ? "loading" : "unavailable",
-  );
+  const [drawn, setDrawn] = useState(false);
 
   useEffect(() => {
     if (!available || !hostRef.current) return;
@@ -56,9 +61,9 @@ export function ManuscriptCover({ recordId, available }: ManuscriptCoverProps) {
         const rendered = renderPageToCanvas(page, canvas, RENDER_SCALE);
         cancelRender = rendered.cancel;
         await rendered.promise;
-        if (!cancelled) setStatus("ready");
+        if (!cancelled) setDrawn(true);
       } catch {
-        if (!cancelled) setStatus("unavailable");
+        // The outline stays.
       } finally {
         if (loaded) void loaded.destroy();
       }
@@ -71,33 +76,23 @@ export function ManuscriptCover({ recordId, available }: ManuscriptCoverProps) {
   }, [available, recordId, visible]);
 
   return (
-    <div ref={hostRef} style={{ containerType: "size" }}
-      className="relative min-h-56 flex-1 overflow-hidden rounded-lg border border-stone-200 bg-stone-100 xl:rounded-none xl:rounded-tr-xl xl:border-0">
-      {status !== "unavailable" && (
+    <div
+      ref={hostRef}
+      aria-hidden="true"
+      className="relative hidden aspect-[3/4] w-24 shrink-0 overflow-hidden rounded-control border border-stone-200 bg-surface shadow-card sm:block"
+    >
+      <div className="grid content-start gap-[5px] px-2 py-2.5">
+        <span className="mx-auto mb-0.5 h-3.5 w-3.5 rounded-full border-2 border-stone-300" />
+        <i className="mx-auto mb-1.5 mt-1 block h-[5px] w-4/5 rounded-full bg-stone-300" />
+        {["w-full", "w-full", "w-3/5", "w-full", "w-full", "w-3/5"].map((width, index) => (
+          <i key={index} className={`block h-[3px] rounded-full bg-stone-200 ${width}`} />
+        ))}
+      </div>
+      {available && (
         <canvas
           ref={canvasRef}
-          aria-label="First page of manuscript"
-          role="img"
-          style={{ height: `calc(100cqh / ${VISIBLE_PAGE_SHARE})` }}
-          className={`absolute left-1/2 top-0 w-auto max-w-none -translate-x-1/2 ${status === "ready" ? "block" : "hidden"}`}
+          className={`absolute inset-0 h-full w-full bg-white object-cover object-top ${drawn ? "block" : "hidden"}`}
         />
-      )}
-      {status === "loading" && (
-        <div className="absolute inset-0 flex items-center justify-center gap-2 text-small text-stone-600">
-          <i className="far fa-file-pdf text-lg" aria-hidden />
-          Preparing first page…
-        </div>
-      )}
-      {status === "unavailable" && (
-        <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-small text-stone-600">
-          <i className="far fa-file-pdf text-2xl text-stone-400" aria-hidden />
-          <span>First page not available</span>
-        </div>
-      )}
-      {status === "ready" && (
-        <span className="absolute bottom-2 left-2 rounded bg-overlay px-2 py-1 text-[11px] font-semibold text-stone-700 shadow-sm">
-          First page
-        </span>
       )}
     </div>
   );

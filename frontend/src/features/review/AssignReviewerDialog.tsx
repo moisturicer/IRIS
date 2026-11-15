@@ -91,7 +91,7 @@ export function AssignReviewerDialog({
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-700 leading-relaxed">
           <span className="font-semibold text-stone-900">{recordTitle}</span> is waiting in {office}'s
           pool. The person you choose reviews it for {office} and finds it in their To review.
         </p>

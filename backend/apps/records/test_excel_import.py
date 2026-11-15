@@ -377,3 +377,71 @@ class ImportRefusesValuesItCannotAcceptTests(ImportTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])
+
+
+class CsvAndPdfImportTests(ImportTestCase):
+    """A CSV, the PDFs its File Name column names, and a check that writes nothing (IR-1138)."""
+
+    CSV = "Title,Authors,Year Accomplished,File Name\n"
+
+    def post_files(self, csv_text, pdfs=(), **extra):
+        from apps.documents.testing import pdf_upload
+
+        data = {
+            "file": SimpleUploadedFile("legacy.csv", csv_text.encode("utf-8"), content_type="text/csv"),
+            **extra,
+        }
+        if pdfs:
+            data["pdfs"] = [pdf_upload(name) for name in pdfs]
+        return self.client.post(reverse("record-import-excel"), data, format="multipart")
+
+    def test_a_csv_imports_like_a_sheet(self):
+        response = self.post_files(self.CSV + "A paper from a CSV,Ana Reyes; Ben Cruz,2019,\n")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["created"], 1)
+        self.assertTrue(Record.objects.filter(title="A paper from a CSV").exists())
+
+    def test_a_csv_with_an_excel_byte_order_mark_is_read(self):
+        text = "﻿" + self.CSV + "Marked paper,Ana Reyes,2019,\n"
+        self.assertEqual(self.post_files(text).data["created"], 1)
+
+    def test_a_check_lists_every_row_and_writes_nothing(self):
+        response = self.post_files(
+            self.CSV + "Good paper,Ana,2019,\n,Nobody,2019,\nBad year,Ana,3000,\n", check="1",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["check"])
+        self.assertEqual((response.data["ok"], response.data["skipped"]), (1, 2))
+        by_row = {r["row"]: r for r in response.data["rows"]}
+        self.assertEqual(by_row[2]["problems"], [])
+        self.assertIn("Title is required", by_row[3]["problems"])
+        self.assertTrue(any("Year Accomplished" in p for p in by_row[4]["problems"]))
+        self.assertFalse(Record.objects.filter(title="Good paper").exists())
+
+    def test_a_row_naming_a_pdf_that_was_not_uploaded_is_skipped_with_the_reason(self):
+        response = self.post_files(self.CSV + "Needs a file,Ana,2019,missing.pdf\n")
+        self.assertEqual(response.data["created"], 0)
+        self.assertIn('File Name "missing.pdf" was not uploaded', response.data["log"])
+        self.assertFalse(Record.objects.filter(title="Needs a file").exists())
+
+    def test_a_named_pdf_becomes_the_manuscript_and_is_sent_to_extraction(self):
+        with patch("apps.documents.sources.reset_manuscript") as reset:
+            response = self.post_files(self.CSV + "With a file,Ana,2019,Paper.PDF\n", pdfs=["paper.pdf"])
+
+        self.assertEqual(response.data["created"], 1, response.data["log"])
+        record = Record.objects.get(title="With a file")
+        self.assertTrue(record.abstract_file)
+        self.assertEqual(record.manuscript_filename, "paper.pdf")
+        reset.assert_called_once()
+
+    def test_a_pdf_is_never_attached_to_two_rows(self):
+        response = self.post_files(
+            self.CSV + "First,Ana,2019,paper.pdf\nSecond,Ana,2019,paper.pdf\n", pdfs=["paper.pdf"], check="1",
+        )
+        problems = {r["row"]: r["problems"] for r in response.data["rows"]}
+        self.assertEqual(problems[2], [])
+        self.assertEqual(problems[3], ['File Name "paper.pdf" is already used by row 2'])
+
+    def test_a_check_names_pdfs_no_row_uses(self):
+        response = self.post_files(self.CSV + "Alone,Ana,2019,\n", pdfs=["spare.pdf"], check="1")
+        self.assertEqual(response.data["unused_pdfs"], ["spare.pdf"])

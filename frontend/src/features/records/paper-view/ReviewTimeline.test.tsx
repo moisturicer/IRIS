@@ -91,6 +91,22 @@ function respond(data: RecordTracker) {
 describe("ReviewTimeline", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("announces its loading once, by role and name, until the timeline arrives (IR-939)", async () => {
+    tracker.mockReturnValue(new Promise(() => {}));
+    renderScreen(<ReviewTimeline recordId={7} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading the review timeline…");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  it("drops the loading status once the timeline is drawn (IR-939)", async () => {
+    respond(payload);
+    renderScreen(<ReviewTimeline recordId={7} />);
+
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.queryByText("Loading the review timeline…")).not.toBeInTheDocument();
+  });
+
   it("lists what happened, oldest first, with who did it and as which party", async () => {
     respond(payload);
     const { container } = renderScreen(<ReviewTimeline recordId={7} />);

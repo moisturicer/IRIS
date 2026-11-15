@@ -10,15 +10,17 @@ import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
+import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { Spinner } from "@/components/ui/Spinner";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
 import type { SavedFeed } from "@/api/library";
-import { useRole } from "@/hooks/useRole";
-import { canAccess } from "@/lib/access";
+import { canAuthor } from "@/lib/access";
 import { ASK_PATH, askHandoffState } from "@/lib/askHandoff";
+import { useAuthStore } from "@/store/auth.store";
 import { useFeedsStore } from "@/store/feeds.store";
 import { cn } from "@/lib/utils";
 import { IP_TYPE_LABELS } from "@/types/records";
@@ -32,6 +34,7 @@ import {
   type DiscoverSort,
 } from "./DiscoverFilterBar";
 import { DiscoverResultCard } from "./DiscoverResultCard";
+import { DiscoverResultsHeader } from "./DiscoverResultsHeader";
 import { DiscoverPeopleResults } from "./DiscoverPeopleResults";
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
 import { DiscoverTabs } from "./DiscoverTabs";
@@ -55,6 +58,13 @@ const PAGE_SIZE = 12;
 const COLUMNS_KEY = "iris.discover.columns";
 
 type ColumnCount = 1 | 2 | 3;
+
+/** Both segmented controls share one track and one height (IR-1082): the chosen
+ *  segment is white and raised (the Selected role), never maroon. */
+const SEGMENT_TRACK = "inline-flex shrink-0 items-center rounded-control border border-stone-200 bg-stone-100 p-0 sm:h-11 sm:p-0.5";
+const segmentClass = (chosen: boolean, padding: "px-3" | "px-4" = "px-3") =>
+  cn("h-full min-h-11 rounded-control text-small font-semibold sm:min-h-0", padding, COLOUR_TRANSITION, FOCUS_RING,
+    chosen ? SELECTED_SEGMENT : "text-stone-700 hover:bg-stone-200");
 
 function readColumns(): ColumnCount {
   try {
@@ -115,9 +125,8 @@ export default function DiscoverPage() {
   // writes back a URL that predates anything set since (IR-554).
   const latestSetSearchParams = useRef(setSearchParams);
   latestSetSearchParams.current = setSearchParams;
-  const { roleName } = useRole();
-  // The access map is the one place that says who authors (Student, Adviser).
-  const canPublish = canAccess(roleName as never, "submit");
+  // The server says who authors (`can_author`, IR-1096), never the role name.
+  const canPublish = useAuthStore((s) => canAuthor(s.user));
 
   const [records, setRecords] = useState<RecordListItem[]>([]);
   const [feedRecords, setFeedRecords] = useState<ForYouItem[]>([]);
@@ -525,6 +534,11 @@ export default function DiscoverPage() {
     [recordTypes, colleges, classifications, years, filters.year],
   );
 
+  /** Areas shape For you. Until there are Areas to choose (or the reader already holds some),
+   *  the button would open a dialog with nothing in it, so it is not drawn (IR-1082). */
+  const hasAreas = interestOptions.classifications.length > 0 || interestOptions.psced.length > 0
+    || interests.classifications.length > 0 || interests.psced.length > 0;
+
   const openPublish = () =>
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -632,10 +646,10 @@ export default function DiscoverPage() {
   /* Papers / People sit in the page header, so on a phone the toolbar row below
      search holds only what narrows the feed (IR-1080, audit RES-01). */
   const resultsSwitch = (
-    <div role="group" aria-label="Discover results" className="inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 sm:h-10 sm:p-0.5">
+    <div role="group" aria-label="Discover results" className={SEGMENT_TRACK}>
       {([ ["papers", "Papers"], ["people", "People"] ] as const).map(([value, label]) => (
         <button key={value} type="button" aria-pressed={discoverView === value} onClick={() => setDiscoverView(value)}
-          className={cn("h-full min-h-11 rounded-md px-4 text-small font-semibold sm:min-h-0", COLOUR_TRANSITION, FOCUS_RING, discoverView === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-white")}>
+          className={segmentClass(discoverView === value, "px-4")}>
           {label}
         </button>
       ))}
@@ -648,7 +662,7 @@ export default function DiscoverPage() {
       <>
       <div role="group" aria-label="Discover controls"
         className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-        <div role="group" aria-label="Discover feed" className="inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 shadow-[inset_0_1px_2px_rgb(41_37_36/0.12)] sm:h-11 sm:p-0.5">
+        <div role="group" aria-label="Discover feed" className={SEGMENT_TRACK}>
           {([["for_you", "For you"], ["latest", "Latest"], ["trending", "Trending"]] as const).map(([value, label]) => (
             <button key={value} type="button" aria-pressed={feed === value}
               title={value === "trending" ? "Most viewed research" : undefined}
@@ -659,15 +673,17 @@ export default function DiscoverPage() {
                 updateQuery((current) => ({ ...current, feed: value, q: value === "for_you" ? "" : current.q }));
                 if (value === "for_you") setSearchInput("");
               }}
-               className={cn("h-full min-h-11 rounded-md px-3 text-small font-semibold sm:min-h-0", COLOUR_TRANSITION, FOCUS_RING, feed === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-surface")}>{label}</button>
+              className={segmentClass(feed === value)}>{label}</button>
           ))}
         </div>
-        <button type="button" onClick={() => setInterestOpen(true)}
-          aria-label={interests.classifications.length || interests.psced.length ? "Edit Areas" : "Choose Areas"}
-          className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
-          <i className="fas fa-compass text-[12px]" aria-hidden />
-          <span>Areas</span>
-        </button>
+        {hasAreas && (
+          <button type="button" onClick={() => setInterestOpen(true)}
+            aria-label={interests.classifications.length || interests.psced.length ? "Edit areas" : "Choose areas"}
+            className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-control border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+            <i className="fas fa-compass text-label" aria-hidden />
+            <span>Areas</span>
+          </button>
+        )}
         <MyFeeds
           query={query}
           matchCount={loading || holdQuietly ? null : totalCount}
@@ -679,7 +695,7 @@ export default function DiscoverPage() {
         <button type="button" onClick={() => chooseColumns(nextColumns)}
           aria-label={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
           title={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
-          className={cn("ml-auto hidden xl:inline-flex h-11 w-11 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+          className={cn("ml-auto hidden xl:inline-flex h-11 w-11 items-center justify-center rounded-control border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
           <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
             <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" />
             {columns === 2 && <path d="M8 2.75v10.5" />}
@@ -690,9 +706,6 @@ export default function DiscoverPage() {
           className="shrink-0"
           filters={filters}
           onChange={setFilters}
-          showSort={feed === "latest"}
-          sort={sort}
-          onSort={setSort}
           options={filterOptions}
           loading={refLoading}
           resultCount={loading ? null : totalCount}
@@ -700,13 +713,13 @@ export default function DiscoverPage() {
         {canPublish && (
           <button type="button" onClick={openPublish} aria-label="Publish"
             className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 shrink-0 !px-4 sm:!px-5")}>
-            <i className="fas fa-plus text-[12px]" aria-hidden />
+            <i className="fas fa-plus text-label" aria-hidden />
             <span>Publish</span>
           </button>
         )}
       </div>
       {feedUnchecked && (
-        <section aria-label="Saved feed" className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3">
+        <section aria-label="Saved feed" className="mt-3 rounded-card border border-stone-200 bg-white px-4 py-3">
           <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-small text-stone-700">
             <p>This feed could not be checked right now, so its list is not shown.</p>
             <button type="button" onClick={() => void ensureFeeds(true)}
@@ -721,7 +734,7 @@ export default function DiscoverPage() {
         </section>
       )}
       {activeFeed && (
-        <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3">
+        <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-card border border-stone-200 bg-white px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <p className="text-small font-semibold text-stone-900">Feed: {activeFeed.name}</p>
             {!correctionPending && feedHasCriteria && !sameFeedQuery(activeFeed.query, query) && (
@@ -784,14 +797,17 @@ export default function DiscoverPage() {
         </p>
       )}
 
-      <DiscoverPeopleResults query={peopleQuery} preview onSeeAll={() => setDiscoverView("people")} />
+      {/* The count and Sort. Always mounted, so its live region exists before a count lands in it
+          and Sort keeps focus while a new sort loads; Sort itself is only offered over a list
+          that is loading or has papers to order, never over a failure or an empty page. */}
+      <DiscoverResultsHeader
+        count={holdQuietly || loading || failed ? null : totalCount}
+        showSort={feed === "latest" && !holdQuietly && !failed && (loading || shownRecords.length > 0)}
+        sort={sort}
+        onSort={setSort}
+      />
 
-      <p aria-live="polite" className="sr-only">
-        {/* No count over an empty state: its own message already says so. */}
-        {loading || !totalCount ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
-      </p>
-
-      <div className="mt-4">
+      <div className="mt-3">
       {holdQuietly ? null : loading ? (
         <ResultsSkeleton columns={gridColumns} onRetry={() => setAttempt((n) => n + 1)} />
       ) : failed && interrupted ? (
@@ -856,13 +872,13 @@ export default function DiscoverPage() {
         )
       ) : (
         <>
-          <div className={cn("grid gap-4", gridColumns)}>
+          <div className={cn("grid", columns === 1 ? "gap-3" : "gap-4", gridColumns)}>
             {shownRecords.map((record) => (
               <DiscoverResultCard
                 key={record.id}
                 record={record}
                 reason={record.reason}
-                expanded={columns === 1}
+                row={columns === 1}
                 searchHighlight={activeQuery}
                 onCite={() => setCiteRecord(record)}
                 onNotInterested={feed === "for_you" ? () => notInterested(record as ForYouItem) : undefined}
@@ -915,9 +931,9 @@ export default function DiscoverPage() {
         />
       </div>
 
-      <Modal open={interestOpen} onClose={() => { setInterestOpen(false); setResetConfirming(false); }} title="Choose Areas for your recommendations" sheet
+      <Modal open={interestOpen} onClose={() => { setInterestOpen(false); setResetConfirming(false); }} title="Choose areas for your recommendations" sheet
         footer={<div className="flex items-center justify-between gap-3">
-          <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setInterestSelection({ classification_ids: [], psced_ids: [] })}>Clear Areas</button>
+          <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setInterestSelection({ classification_ids: [], psced_ids: [] })}>Clear areas</button>
           <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={interestSaving || interestLoading || Boolean(interestLoadFailed)} onClick={() => void saveInterests()}>{interestLoading ? "Loading…" : interestSaving ? "Saving…" : "Save Areas"}</button>
         </div>}>
         <div className="space-y-5 p-5">
@@ -968,7 +984,7 @@ function InterestChoices({ title, options, selected, onChange }: {
     {options.length ? <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
       {options.map((option) => {
         const checked = selected.includes(option.id);
-        return <label key={option.id} className="flex items-start gap-2 rounded-lg border border-stone-200 p-2.5 text-small text-stone-700">
+        return <label key={option.id} className="flex items-start gap-2 rounded-control border border-stone-200 p-2.5 text-small text-stone-700">
           <input type="checkbox" checked={checked} onChange={() => onChange(checked ? selected.filter((id) => id !== option.id) : [...selected, option.id])} className={cn("mt-0.5 accent-brand", FOCUS_RING)} />
           <span>{option.name}</span>
         </label>;
@@ -982,12 +998,12 @@ function ResultsSkeleton({ columns, onRetry }: { columns: string; onRetry: () =>
   return (
     <LoadingRegion label="Loading research…" onRetry={onRetry} className={cn("grid gap-4", columns)}>
       {Array.from({ length: 4 }, (_, i) => (
-        <div key={i} className="bg-white rounded-xl border border-stone-200 p-card-compact md:p-card">
-          <div className="h-3 w-1/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="mt-3 h-5 w-5/6 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="mt-2 h-5 w-2/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="mt-4 h-3 w-full rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="mt-2 h-3 w-11/12 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+        <div key={i} className="bg-white rounded-card border border-stone-200 p-card-compact md:p-card">
+          <SkeletonBlock className="h-3 w-1/3" />
+          <SkeletonBlock className="mt-3 h-5 w-5/6" />
+          <SkeletonBlock className="mt-2 h-5 w-2/3" />
+          <SkeletonBlock className="mt-4 h-3 w-full" />
+          <SkeletonBlock className="mt-2 h-3 w-11/12" />
         </div>
       ))}
     </LoadingRegion>

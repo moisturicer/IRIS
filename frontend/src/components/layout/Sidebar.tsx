@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { apiClient } from "@/api/client";
-import { dashboardApi } from "@/api/dashboard";
+import { dashboardApi, type QueueCounts } from "@/api/dashboard";
+import { onQueueCountsChanged } from "@/lib/queueCounts";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
@@ -58,7 +58,7 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
         className={({ isActive }) =>
           cn(
             // 44px on the phone drawer; compact from md, where a pointer is (IR-1092).
-            "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm",
+            "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center gap-3 rounded-control px-3 py-2 text-sm",
             collapsed && "md:h-10 md:justify-center md:px-0",
             // Active is "here" (a Desk Stone fill); hover is the lighter Bar Stone, so a
             // hovered row can never be mistaken for the page you are on (IR-1097).
@@ -89,7 +89,7 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
                 )}
               >
                 <span aria-hidden>{badge > 9 ? "9+" : badge}</span>
-                <span className="sr-only">, {badge} waiting</span>
+                <span className="sr-only">, {badge} pending</span>
               </span>
             )}
             {dot != null && (
@@ -157,7 +157,7 @@ function NavGroup({
       <p
         id={`nav-${section}`}
         className={cn(
-          "px-3 pb-2 text-3xs font-semibold uppercase tracking-wider text-stone-500",
+          "px-3 pb-2 text-3xs font-semibold text-stone-500",
           collapsed && "md:sr-only",
         )}
       >
@@ -191,6 +191,8 @@ interface SidebarProps {
  * 1024 px it is at full width, or as the rail if the user chooses (stored per
  * browser; the choice is not read below 1024 px).
  */
+const NO_QUEUES: QueueCounts = { download_requests: 0, delete_requests: 0, role_change_requests: 0 };
+
 export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ className, inert, onDismiss }, ref) {
   const { user } = useAuth();
   const { roleName } = useRole();
@@ -205,7 +207,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // it opens and closes the full sidebar over the page and saves nothing.
   const dismiss = onDismiss ?? closeSidebar;
   const onMark = mode !== "rail" ? toggleCollapsed : collapsed ? () => setSidebarOpen(true) : dismiss;
-  const [roleRequestBadge, setRoleRequestBadge] = useState(0);
+  const [queueCounts, setQueueCounts] = useState<QueueCounts>(NO_QUEUES);
   const [needsAction, setNeedsAction] = useState(false);
   const { pathname, search } = useLocation();
 
@@ -213,13 +215,28 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // on, and My Reviews from the same `review_access` flag its route reads.
   const nav = navFor(roleName as Parameters<typeof navFor>[0], user?.review_access);
 
+  // RDCO's three queues, in one call (IR-1138). Read again when the address
+  // changes, as the Library dot is, and when a decision is made on a queue
+  // page. Only RDCO asks; a failed read shows no count rather than a stale one.
+  const showsQueues = canAccess(roleName as never, "roleRequests");
   useEffect(() => {
-    if (!canAccess(roleName as never, "roleRequests")) return;
-    apiClient
-      .get<{ count: number; results: unknown[] }>("/users/role-requests/")
-      .then(({ data }) => setRoleRequestBadge(data.count ?? 0))
-      .catch(() => {});
-  }, [roleName]);
+    if (!showsQueues) { setQueueCounts(NO_QUEUES); return; }
+    let live = true;
+    const read = () => {
+      dashboardApi
+        .queueCounts()
+        .then(({ data }) => {
+          // A reply of another shape is a failed read, not three zeros (F1).
+          const ok = [data?.download_requests, data?.delete_requests, data?.role_change_requests]
+            .every((n) => typeof n === "number");
+          if (live) setQueueCounts(ok ? data : NO_QUEUES);
+        })
+        .catch(() => { if (live) setQueueCounts(NO_QUEUES); });
+    };
+    read();
+    const off = onQueueCountsChanged(read);
+    return () => { live = false; off(); };
+  }, [showsQueues, pathname, search]);
 
   // My Library's dot: some record of the user's waits on them -- a revision or
   // a document was asked for (B2, `needs_action_mine`). Asked again whenever
@@ -238,10 +255,12 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   }, [pathname, search, showsLibrary]);
 
   // Badges are the only per-item state the map does not carry: the map answers
-  // "may this role open it", never "how many are waiting". Role requests are
-  // the one count that is someone's to act on.
+  // "may this role open it", never "how many are waiting". RDCO's three request
+  // queues are the counts that are someone's to act on.
   const BADGES: Partial<Record<NavEntry["key"], number | undefined>> = {
-    roleRequests: roleRequestBadge,
+    roleRequests: queueCounts.role_change_requests,
+    downloadRequests: queueCounts.download_requests,
+    deleteRequests: queueCounts.delete_requests,
   };
   // A dot, not a count: what matters is that something waits (spec §4.2).
   const DOTS: Partial<Record<NavEntry["key"], string | undefined>> = {
@@ -302,7 +321,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
               // and puts it back when that closes.
               data-sidebar-mark
               {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
-              className={cn("block h-9 w-9 touch:h-11 touch:w-11 rounded-lg", FOCUS_RING)}
+              className={cn("block h-9 w-9 touch:h-11 touch:w-11 rounded-control", FOCUS_RING)}
             >
               <IrisMark className="h-9 w-9 text-brand" />
             </button>
@@ -331,7 +350,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             // Where AppShell puts focus when the phone drawer opens.
             {...(mode === "rail" ? {} : { "data-drawer-focus": "" })}
             className={cn(
-              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 md:hidden",
+              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control text-stone-500 hover:bg-stone-100 hover:text-stone-900 md:hidden",
               COLOUR_TRANSITION,
               FOCUS_RING,
             )}
