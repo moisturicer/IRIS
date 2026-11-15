@@ -156,6 +156,12 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
                 Settings
               </Link>
             </li>
+            <li>
+              <Link to={pathFor("notifications")} onClick={choose} className={ITEM}>
+                <i aria-hidden className="fas fa-bell w-4 text-center text-stone-500" />
+                Notifications
+              </Link>
+            </li>
             <li className="mt-1.5 border-t border-stone-100 pt-1.5">
               <button type="button" onClick={handleSignOut} className={ITEM}>
                 <i aria-hidden className="fas fa-arrow-right-from-bracket w-4 text-center text-stone-500" />

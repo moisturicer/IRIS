@@ -1,25 +1,37 @@
 /**
  * Notifications when its list fails to load (IR-745): "No notifications yet"
- * after an error would be untrue.
+ * after an error would be untrue. And the page's shape (IR-1137): All / Unread
+ * segments, day groups, an Open button on each record's row.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { renderScreen, screen, userEvent } from "@/test/render";
 
+import { NotificationBell } from "@/components/layout/NotificationBell";
+import { useNotificationsStore } from "@/store/notifications.store";
+
 import NotificationsPage from "./NotificationsPage";
 
 const list = vi.fn();
 const markRead = vi.fn();
+const markAllRead = vi.fn();
 
 vi.mock("@/api/notifications", () => ({
   notificationsApi: {
     list: () => list(),
     markRead: (id: number) => markRead(id),
-    markAllRead: vi.fn(),
+    markAllRead: () => markAllRead(),
   },
 }));
 
 afterEach(() => vi.clearAllMocks());
+
+const at = (id: number, created_at: string, message: string) => ({
+  id, notif_type: 1, notif_type_name: "Record Routed", message,
+  record: id, record_title: "T", sender: null, sender_name: null,
+  recipient: 1, broadcast_to_role: null, created_at, is_read: false,
+  resolved_at: null, resolved_label: "",
+});
 
 describe("Notifications", () => {
   it("says a failed load failed, never that the inbox is empty, and tries again", async () => {
@@ -35,30 +47,115 @@ describe("Notifications", () => {
     expect(await screen.findByRole("heading", { name: "No notifications yet." })).toBeInTheDocument();
   });
 
-  it("makes the whole notification one link to its record, and opening it marks it read", async () => {
+  it("gives a record's notification an Open button, and opening it marks it read", async () => {
     markRead.mockResolvedValue({});
     list.mockResolvedValueOnce({
       data: {
         results: [
           {
-            id: 7, notif_type: 1, notif_type_name: "Record Advanced",
-            message: 'ITSO finished its review of "Tide Gauge": Cleared.',
-            record: 42, record_title: "Tide Gauge", sender: null, sender_name: null,
-            recipient: 1, broadcast_to_role: null,
-            created_at: new Date().toISOString(), is_read: false,
-            resolved_at: null, resolved_label: "",
+            ...at(7, new Date().toISOString(), 'ITSO finished its review of "Tide Gauge": Cleared.'),
+            notif_type_name: "Record Advanced", record: 42, record_title: "Tide Gauge",
           },
         ],
       },
     });
     renderScreen(<NotificationsPage />);
 
-    const link = await screen.findByRole("link", { name: /ITSO finished its review of "Tide Gauge"/ });
+    const link = await screen.findByRole("link", { name: /Open: .*ITSO finished its review of "Tide Gauge"/ });
     expect(link).toHaveAttribute("href", "/records/42");
-    expect(screen.queryByRole("link", { name: "View record" })).not.toBeInTheDocument();
+    expect(link).toHaveTextContent("Open");
 
     await userEvent.click(link);
     expect(markRead).toHaveBeenCalledWith(7);
+  });
+
+  describe("the page (IR-1137)", () => {
+    it("groups by day as Today, Yesterday, then the date", async () => {
+      const day = 24 * 3600 * 1000;
+      const now = new Date();
+      now.setHours(12, 0, 0, 0);
+      list.mockResolvedValueOnce({
+        data: {
+          results: [
+            at(1, now.toISOString(), "From today"),
+            at(2, new Date(now.getTime() - day).toISOString(), "From yesterday"),
+            at(3, "2026-01-05T09:00:00", "From January"),
+          ],
+        },
+      });
+      renderScreen(<NotificationsPage />);
+
+      await screen.findByText("From today");
+      expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent))
+        .toEqual(["Today", "Yesterday", "Jan 5, 2026"]);
+    });
+
+    it("keeps the Unread count in step after marking one and marking all", async () => {
+      markRead.mockResolvedValue({});
+      markAllRead.mockResolvedValue({});
+      const now = new Date().toISOString();
+      list.mockResolvedValueOnce({
+        data: { results: [at(1, now, "First"), at(2, now, "Second"), at(3, now, "Third")] },
+      });
+      renderScreen(<NotificationsPage />);
+
+      expect(await screen.findByRole("button", { name: "Unread 3" })).toBeInTheDocument();
+      await userEvent.click(screen.getAllByRole("button", { name: "Mark as read" })[0]);
+      expect(await screen.findByRole("button", { name: "Unread 2" })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: /Mark all as read/ }));
+      expect(await screen.findByRole("button", { name: "Unread 0" })).toBeInTheDocument();
+    });
+  });
+
+  describe("with the bell beside it (IR-1137)", () => {
+    const seed = () => {
+      const now = new Date().toISOString();
+      const rows = [at(1, now, "First"), at(2, now, "Second"), at(3, now, "Third")];
+      useNotificationsStore.setState({ items: rows, unreadCount: 3 });
+      list.mockResolvedValueOnce({ data: { results: rows } });
+    };
+
+    it("agrees on the unread count after marking one and after marking all", async () => {
+      markRead.mockResolvedValue({});
+      markAllRead.mockResolvedValue({});
+      seed();
+      renderScreen(
+        <>
+          <NotificationBell />
+          <NotificationsPage />
+        </>,
+      );
+
+      expect(await screen.findByRole("button", { name: "Unread 3" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Notifications, 3 unread" })).toBeInTheDocument();
+
+      await userEvent.click(screen.getAllByRole("button", { name: "Mark as read" })[0]);
+      expect(await screen.findByRole("button", { name: "Unread 2" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Notifications, 2 unread" })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: /Mark all as read/ }));
+      expect(await screen.findByRole("button", { name: "Unread 0" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
+    });
+
+    it("says so when marking read fails, and leaves the row unread", async () => {
+      markRead.mockRejectedValue(new Error("Network Error"));
+      seed();
+      renderScreen(<NotificationsPage />);
+
+      await userEvent.click((await screen.findAllByRole("button", { name: "Mark as read" }))[0]);
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't update your notifications");
+      expect(screen.getByRole("button", { name: "Unread 3" })).toBeInTheDocument();
+    });
+
+    it("keeps Mark all as read on the page, disabled when nothing is unread", async () => {
+      list.mockResolvedValueOnce({ data: { results: [{ ...at(1, new Date().toISOString(), "Done"), is_read: true }] } });
+      renderScreen(<NotificationsPage />);
+
+      expect(await screen.findByRole("button", { name: /Mark all as read/ })).toBeDisabled();
+    });
   });
 
   describe("a notification whose task has ended (ADR-069)", () => {
@@ -82,34 +179,31 @@ describe("Notifications", () => {
       renderScreen(<NotificationsPage />);
 
       // The open one still asks: unread, with a way to mark it read.
-      const openLink = await screen.findByRole("link", { name: /It waits in ITSO's pool/ });
-      expect(openLink).toHaveTextContent("Unread:");
+      expect(await screen.findByText(/It waits in ITSO's pool/)).toBeInTheDocument();
+      expect(screen.getAllByText("Unread:")).toHaveLength(1);
       expect(screen.getAllByRole("button", { name: "Mark as read" })).toHaveLength(1);
 
       // The settled one says what happened, from the server's words alone.
-      const settledLink = screen.getByRole("link", { name: /Review the new version/ });
-      expect(settledLink).toHaveTextContent("Reviewed by you on 20 Oct");
-      expect(settledLink).not.toHaveTextContent("Unread:");
+      expect(screen.getByText("Reviewed by you on 20 Oct")).toBeInTheDocument();
     });
 
     it("is not counted as unread, nor shown under the Unread filter", async () => {
       list.mockResolvedValueOnce({ data: { results: [open, settled] } });
       renderScreen(<NotificationsPage />);
 
-      await userEvent.click(await screen.findByRole("button", { name: "Unread (1)" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Unread 1" }));
 
-      expect(screen.getByRole("link", { name: /It waits in ITSO's pool/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Open: .*It waits in ITSO's pool/ })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /Review the new version/ })).not.toBeInTheDocument();
     });
 
-    it("says nothing is waiting when only settled notifications remain", async () => {
+    it("says you're up to date when only settled notifications remain", async () => {
       list.mockResolvedValueOnce({ data: { results: [settled] } });
       renderScreen(<NotificationsPage />);
 
-      await userEvent.click(await screen.findByRole("button", { name: "Unread" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Unread 0" }));
 
-      expect(screen.getByRole("heading", { name: "You're all caught up." })).toBeInTheDocument();
-      expect(screen.getByText("Nothing is waiting on you.")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "You're up to date" })).toBeInTheDocument();
     });
 
     it("labels each notification in plain words, not by its system name", async () => {

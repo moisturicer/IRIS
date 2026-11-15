@@ -3,10 +3,11 @@ import { Link } from "react-router-dom";
 import { notificationsApi } from "@/api/notifications";
 import { useNotificationsStore } from "@/store/notifications.store";
 import type { Notification } from "@/types/notifications";
+import { isUnread, UnreadDot, UnreadWord } from "@/features/notifications/unread";
 import { formatDate, cn } from "@/lib/utils";
 
-/** How many unread items the dropdown shows before deferring to the full page. */
-const PREVIEW_LIMIT = 5;
+/** How many of the latest unread items the popover shows before deferring to the full page. */
+const PREVIEW_LIMIT = 3;
 
 /**
  * The notification bell: at the top of the sidebar, and in the phone bar
@@ -45,11 +46,23 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const items = useNotificationsStore((s) => s.items);
   const markReadInStore = useNotificationsStore((s) => s.markRead);
-  const markAllReadInStore = useNotificationsStore((s) => s.markAllRead);
   const unreadBadge = unreadCount > 9 ? "9+" : String(unreadCount);
+
+  // Newest first, whatever order the store was filled in.
+  const latest = [...items]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, PREVIEW_LIMIT);
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Closing hands focus back to the bell, so a keyboard user is not dropped at
+  // the top of the page. A pointer click outside leaves focus where it went.
+  const close = (returnFocus: boolean) => {
+    setOpen(false);
+    if (returnFocus) triggerRef.current?.focus();
+  };
 
   // Close on outside click and on Escape -- a dropdown that traps the page is
   // worse than no dropdown.
@@ -59,7 +72,9 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -69,36 +84,29 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
     };
   }, [open]);
 
-  // Optimistic in both handlers: the bell is a glance surface, and a spinner
-  // would take longer than the information is worth. The store is the shared
-  // truth, so the sidebar badge moves at the same instant.
-  const handleMarkAllRead = async () => {
-    markAllReadInStore();
-    try {
-      await notificationsApi.markAllRead();
-    } catch {
-      /* left cleared locally; the next session's or page load's fetch re-syncs */
-    }
-  };
-
+  // Optimistic: the bell is a glance surface, and a spinner would take longer
+  // than the information is worth. The store is the shared truth, so the
+  // sidebar badge moves at the same instant. "Mark all as read" lives on the
+  // Notifications page, not here.
   const handleOpenItem = async (n: Notification) => {
-    setOpen(false);
+    close(true);
     markReadInStore(n.id);
     try {
       await notificationsApi.markRead(n.id);
     } catch {
-      /* same -- a stale read flag is not worth blocking navigation over */
+      /* a stale read flag is not worth blocking navigation over */
     }
   };
 
   return (
     <div className="relative" ref={containerRef}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadBadge} unread` : "Notifications"}
         aria-expanded={open}
-        aria-haspopup="true"
+        aria-haspopup="dialog"
         title={showTitle ? "Notifications" : undefined}
         className="relative w-11 h-11 md:w-[34px] md:h-[34px] touch:w-11 touch:h-11 rounded-control border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
       >
@@ -115,60 +123,56 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
           role="dialog"
           aria-label="Notifications"
           className={cn(
-            "absolute top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-overlay rounded-card border border-stone-200 shadow-card-md z-50 overflow-hidden",
+            "absolute top-full mt-2 w-[380px] max-w-[calc(100vw-2rem)] max-h-[60vh] flex flex-col bg-overlay rounded-card border border-stone-200 shadow-card-md z-50 overflow-hidden",
             align === "start" ? "left-0" : "right-0",
           )}
         >
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-stone-100">
-            <p className="text-small font-bold uppercase tracking-wider text-stone-600">
-              Notifications
-            </p>
-            {items.length > 0 && (
-              <button
-                type="button"
-                onClick={handleMarkAllRead}
-                className="inline-flex items-center min-h-11 md:min-h-0 touch:min-h-11 text-label font-semibold text-brand hover:underline"
-              >
-                Mark all read
-              </button>
-            )}
+            <p className="text-body font-semibold text-stone-900">Notifications</p>
+            <Link
+              to="/notifications"
+              onClick={() => close(false)}
+              className="inline-flex items-center min-h-11 md:min-h-0 touch:min-h-11 text-label font-semibold text-brand hover:underline"
+            >
+              See all
+            </Link>
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="min-h-0 overflow-y-auto">
             {items.length === 0 ? (
               <p className="px-4 py-6 text-center text-small text-stone-600">
                 Nothing new. You&apos;re all caught up.
               </p>
             ) : (
-              <ul className="divide-y divide-stone-100">
-                {items.slice(0, PREVIEW_LIMIT).map((n) => {
+              <ul>
+                {latest.map((n) => {
+                  const unread = isUnread(n);
                   const body = (
                     <>
-                      <p className="text-small text-stone-700 leading-snug">{n.message}</p>
-                      <p className="text-label text-stone-600 mt-0.5">
-                        {n.record_title ? `${n.record_title} · ` : ""}
-                        {formatDate(n.created_at)}
-                      </p>
+                      <UnreadDot unread={unread} className="mt-1.5" />
+                      <span className="min-w-0 flex-1">
+                        <span className={cn("block text-small leading-snug", unread ? "text-stone-900 font-medium" : "text-stone-600")}>
+                          <UnreadWord unread={unread} />
+                          {n.message}
+                        </span>
+                        <span className="block text-label text-stone-600 mt-0.5">
+                          {n.record_title ? `${n.record_title} · ` : ""}
+                          {formatDate(n.created_at)}
+                        </span>
+                      </span>
                     </>
                   );
+                  const rowClass = "flex items-start gap-3 w-full text-left px-4 py-2.5 hover:bg-stone-50 transition-colors";
                   return (
                     <li key={n.id}>
                       {/* Only link to a record when there is one -- a broadcast
                           notification has no record attached. */}
                       {n.record ? (
-                        <Link
-                          to={`/records/${n.record}`}
-                          onClick={() => void handleOpenItem(n)}
-                          className="block px-4 py-2.5 hover:bg-stone-50 transition-colors"
-                        >
+                        <Link to={`/records/${n.record}`} onClick={() => void handleOpenItem(n)} className={rowClass}>
                           {body}
                         </Link>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => void handleOpenItem(n)}
-                          className="block w-full text-left px-4 py-2.5 hover:bg-stone-50 transition-colors"
-                        >
+                        <button type="button" onClick={() => void handleOpenItem(n)} className={rowClass}>
                           {body}
                         </button>
                       )}
@@ -178,17 +182,6 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
               </ul>
             )}
           </div>
-
-          <Link
-            to="/notifications"
-            onClick={() => setOpen(false)}
-            className={cn(
-              "flex items-center justify-center min-h-11 md:min-h-0 touch:min-h-11 px-4 py-2.5 border-t border-stone-100 text-center text-small font-semibold",
-              "text-brand hover:bg-stone-50 transition-colors",
-            )}
-          >
-            View all notifications
-          </Link>
         </div>
       )}
     </div>
