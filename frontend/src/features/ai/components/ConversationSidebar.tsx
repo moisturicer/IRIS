@@ -1,13 +1,26 @@
+import { useId } from "react";
 import { Link } from "react-router-dom";
 import { cn, formatDate } from "@/lib/utils";
 import type { ReaderConversationSummary } from "@/api/runtimeReader";
 import { EarlierConversationList } from "./EarlierConversations";
 import { HERE } from "@/components/ui/highlightRoles";
 
+/** The history search and paging, from `useConversationHistory`. */
+export interface HistorySearch {
+  text:        string;
+  onText:      (text: string) => void;
+  query:       string;
+  state:       "loading" | "ready" | "error";
+  hasMore:     boolean;
+  loadingMore: boolean;
+  onMore:      () => void;
+}
+
 interface ConversationSidebarProps {
   conversations:    ReaderConversationSummary[];
   activeId:         string | null;
   open:             boolean;
+  search:           HistorySearch;
   onDelete:         (id: string) => void;
   onNewChat:        () => void;
   onCollapse:       () => void;
@@ -17,6 +30,7 @@ export function ConversationSidebar({
   conversations,
   activeId,
   open,
+  search,
   onDelete,
   onNewChat,
   onCollapse,
@@ -47,7 +61,7 @@ export function ConversationSidebar({
         </button>
       </div>
 
-      <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={onDelete} />
+      <ConversationHistoryList conversations={conversations} activeId={activeId} search={search} onDelete={onDelete} />
 
       </div>
     </aside>
@@ -62,13 +76,28 @@ export function ConversationSidebar({
 export function ConversationHistoryList({
   conversations,
   activeId,
+  search,
   onDelete,
 }: Omit<ConversationSidebarProps, "open" | "onNewChat" | "onCollapse">) {
+  const searchId = useId();
   return (<>
-    <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-2 py-2 space-y-1">
+    <div className="shrink-0 px-3 pt-3">
+      <label htmlFor={searchId} className="sr-only">Search your past conversations</label>
+      <input id={searchId} type="search" value={search.text} onChange={e => search.onText(e.target.value)}
+        placeholder="Search past conversations" autoComplete="off" maxLength={200}
+        className="min-h-10 w-full rounded-card border border-stone-200 bg-white px-3 text-control text-stone-900 placeholder:text-stone-500 focus-visible:outline-brand" />
+      <p role="status" aria-live="polite" className="px-1 pt-1 text-label text-stone-600">
+        {search.query && search.state === "ready" ? `${conversations.length}${search.hasMore ? "+" : ""} found` : ""}
+      </p>
+    </div>
+    <nav aria-label="Past conversations"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-2 py-2 space-y-1">
+      {search.state === "error" && (
+        <p className="px-3 py-3 text-small text-stone-700">Could not load your conversations. Try again.</p>
+      )}
       {conversations.length === 0 ? (
-        <p className="px-3 py-6 text-small text-stone-500 text-center">
-          Your past chats will appear here.
+        search.state === "ready" && <p className="px-3 py-6 text-small text-stone-500 text-center">
+          {search.query ? `No conversations match “${search.query}”.` : "Your past chats will appear here."}
         </p>
       ) : (
         conversations.map((c) => {
@@ -109,6 +138,12 @@ export function ConversationHistoryList({
             </div>
           );
         })
+      )}
+      {search.hasMore && (
+        <button type="button" onClick={search.onMore} disabled={search.loadingMore}
+          className="min-h-11 w-full rounded-card text-small text-brand underline focus-visible:outline-brand">
+          {search.loadingMore ? "Loading…" : "Load more"}
+        </button>
       )}
     </nav>
     {/* Conversations Django answered before IR-957, read-only. */}
