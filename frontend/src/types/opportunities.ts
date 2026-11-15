@@ -1,27 +1,36 @@
+/** ADR-050 decision 2. Grants, funding windows and internal calls are off the board. */
 export type OpportunityType =
-  | "internal_call"
-  | "conference_deadline"
-  | "funding_window"
-  | "institutional_grant";
-
-export type OpportunitySource = "internal" | "external";
+  | "conference"
+  | "congress"
+  | "symposium"
+  | "workshop"
+  | "journal"
+  | "book_chapter";
 
 export interface Opportunity {
   id:               number;
   opportunity_type: OpportunityType;
-  /** Server-rendered label for `opportunity_type`, e.g. "Funding Window". */
+  /** Server-rendered label for `opportunity_type`, e.g. "Book Chapter". */
   type_display:     string;
   title:            string;
-  posting_office:   string;
-  audience:         string;
+  /** "About" on screen. */
   description:      string;
-  /** Decimal string from DRF, or null — a conference deadline has no ceiling. */
-  funding_ceiling:  string | null;
+  /** "Link" on screen. Empty only on a Call migrated from a Conference Deadline. */
   external_url:     string;
+  /** The paper deadline. */
   due_date:         string;
+  /** Empty only on a Call migrated from a Conference Deadline. */
+  location:         string;
+  /** Classification ids (ADR-050 amendment 1). */
+  areas:            number[];
+  /** Their names, sorted, for display. */
+  area_names:       string[];
+  /** Always null on a Journal or Book Chapter, which has no event. */
+  start_date:       string | null;
+  end_date:         string | null;
+  /** Free text: fees are often tiered or in another currency. */
+  registration_fee: string;
   is_featured:      boolean;
-  tags:             string[];
-  source:           OpportunitySource;
   posted_by:        number | null;
   posted_by_name:   string;
   created_at:       string;
@@ -45,15 +54,15 @@ export interface Opportunity {
 export interface OpportunityInput {
   opportunity_type: OpportunityType;
   title:            string;
-  posting_office:   string;
-  audience:         string;
   description:      string;
-  funding_ceiling:  string | null;
   external_url:     string;
   due_date:         string;
+  location:         string;
+  areas:            number[];
+  start_date:       string | null;
+  end_date:         string | null;
+  registration_fee: string;
   is_featured:      boolean;
-  tags:             string[];
-  source:           OpportunitySource;
 }
 
 /** The whole board, every page of it, and whether this viewer may post. */

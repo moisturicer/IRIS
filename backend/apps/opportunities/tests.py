@@ -31,17 +31,24 @@ def make_user(email, role_name=None, **extra):
 
 
 def make_opportunity(**overrides):
+    areas = overrides.pop("areas", None)
     fields = {
-        "opportunity_type": Opportunity.TYPE_INSTITUTIONAL_GRANT,
-        "title":            "CIT-U Seed Grant",
-        "posting_office":   "Research & Development Coordinating Office (RDCO)",
-        "audience":         "CIT-U Faculty Researchers",
-        "description":      "Competitive institutional seed funding.",
+        "opportunity_type": Opportunity.TYPE_CONFERENCE,
+        "title":            "International Conference on Research",
+        "description":      "Full papers on any research topic.",
         "due_date":         date.today() + timedelta(days=28),
-        "tags":             ["Seed Grant"],
+        "location":         "Cebu City, Philippines",
+        "external_url":     "https://example.org/icr",
     }
     fields.update(overrides)
-    return Opportunity.objects.create(**fields)
+    call = Opportunity.objects.create(**fields)
+    call.areas.set(areas if areas is not None else [an_area()])
+    return call
+
+
+def an_area(name="Computer Science"):
+    from apps.records.models import Classification
+    return Classification.objects.get_or_create(name=name)[0]
 
 
 class OpportunityPermissionTests(APITestCase):
@@ -67,13 +74,13 @@ class OpportunityPermissionTests(APITestCase):
 
     def _payload(self, **overrides):
         payload = {
-            "opportunity_type": Opportunity.TYPE_INTERNAL_CALL,
-            "title":            "Departmental Call for Capstone Proposals",
-            "posting_office":   "College of Computer Studies",
-            "audience":         "All Undergraduate Thesis Students",
-            "description":      "Submit capstone proposals for review.",
+            "opportunity_type": Opportunity.TYPE_WORKSHOP,
+            "title":            "Workshop on Capstone Research",
+            "description":      "Short papers on capstone research.",
             "due_date":         str(date.today() + timedelta(days=14)),
-            "tags":             ["Capstone"],
+            "location":         "CIT-U, Cebu City",
+            "areas":            [an_area().pk],
+            "external_url":     "https://example.org/capstone",
         }
         payload.update(overrides)
         return payload
@@ -117,7 +124,7 @@ class OpportunityPermissionTests(APITestCase):
         )
         self.assertEqual(self.client.delete(self.detail_url).status_code, status.HTTP_403_FORBIDDEN)
         self.opportunity.refresh_from_db()
-        self.assertEqual(self.opportunity.title, "CIT-U Seed Grant")
+        self.assertEqual(self.opportunity.title, "International Conference on Research")
 
     def test_a_poster_cannot_edit_another_posters_call(self):
         """
@@ -254,10 +261,13 @@ class OpportunityCapabilityTests(APITestCase):
     def test_a_created_call_comes_back_editable_by_its_poster(self):
         self.client.force_authenticate(self.adviser)
         response = self.client.post(reverse("opportunity-list"), {
-            "opportunity_type": Opportunity.TYPE_INTERNAL_CALL,
+            "opportunity_type": Opportunity.TYPE_JOURNAL,
             "title":            "New Call",
-            "posting_office":   "College of Computer Studies",
+            "description":      "A special issue.",
             "due_date":         str(date.today() + timedelta(days=10)),
+            "location":         "Online",
+            "areas":            [an_area().pk],
+            "external_url":     "https://example.org/issue",
         }, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertIs(response.data["can_edit"], True)
@@ -345,28 +355,197 @@ class IcsExportTests(APITestCase):
     def test_uses_crlf_line_endings(self):
         self.assertIn("\r\n", build_ics(make_opportunity()))
 
-
-class TagValidationTests(APITestCase):
-    def setUp(self):
-        self.rdco = make_user("rdco2@cit.edu", "RDCO")
-        self.client.force_authenticate(self.rdco)
-
-    def _payload(self, tags):
-        return {
-            "opportunity_type": Opportunity.TYPE_FUNDING_WINDOW,
-            "title":            "DOST-PCIEERD Call",
-            "posting_office":   "External Grants Liaison / KTTO",
-            "due_date":         str(date.today() + timedelta(days=43)),
-            "tags":             tags,
-        }
-
-    def test_non_string_tags_are_rejected(self):
-        response = self.client.post(reverse("opportunity-list"), self._payload([1, 2]), format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_blank_tags_are_stripped(self):
-        response = self.client.post(
-            reverse("opportunity-list"), self._payload(["  Agri  ", "", "  "]), format="json",
+    def _description(self, opportunity):
+        return next(
+            line for line in build_ics(opportunity).split("\r\n")
+            if line.startswith("DESCRIPTION:")
         )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["tags"], ["Agri"])
+
+    def test_the_description_names_the_poster(self):
+        """ADR-050 decision 3: Posted by is the account's name, never a typed office."""
+        poster = User.objects.create_user(
+            email="maria@cit.edu", password="pw12345!", first_name="Maria",
+            last_name="Santos", is_verified=True,
+        )
+        self.assertIn("Posted by: Maria Santos", self._description(make_opportunity(posted_by=poster)))
+
+    def test_a_call_whose_poster_is_gone_names_nobody(self):
+        self.assertNotIn("Posted by", self._description(make_opportunity(posted_by=None)))
+
+
+class CallFieldsTests(APITestCase):
+    """
+    What a Call carries (ADR-050 decisions 2-5, IR-760): a type from the six,
+    title, about, paper deadline, location, at least one Area and a link, and
+    optionally event dates and a registration fee.
+    """
+
+    def setUp(self):
+        self.rdco = make_user("fields-rdco@cit.edu", "RDCO")
+        self.client.force_authenticate(self.rdco)
+        self.area = an_area()
+        self.other_area = an_area("Engineering")
+
+    def _payload(self, **overrides):
+        payload = {
+            "opportunity_type": "conference",
+            "title":            "International Conference on Applied Computing",
+            "description":      "Full papers on applied computing.",
+            "due_date":         "2026-12-01",
+            "location":         "Cebu City, Philippines",
+            "areas":            [self.area.pk, self.other_area.pk],
+            "external_url":     "https://example.org/icac",
+            "start_date":       "2027-02-10",
+            "end_date":         "2027-02-12",
+            "registration_fee": "PHP 5,000 (students PHP 3,000)",
+        }
+        payload.update(overrides)
+        return payload
+
+    def _post(self, **overrides):
+        return self.client.post(reverse("opportunity-list"), self._payload(**overrides), format="json")
+
+    def test_a_conference_is_posted_with_every_field(self):
+        response = self._post()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        call = Opportunity.objects.get(pk=response.data["id"])
+        self.assertEqual(call.opportunity_type, "conference")
+        self.assertEqual(call.location, "Cebu City, Philippines")
+        self.assertEqual(call.start_date, date(2027, 2, 10))
+        self.assertEqual(call.end_date, date(2027, 2, 12))
+        self.assertEqual(call.registration_fee, "PHP 5,000 (students PHP 3,000)")
+        self.assertEqual(
+            sorted(call.areas.values_list("name", flat=True)), ["Computer Science", "Engineering"],
+        )
+        self.assertEqual(call.posted_by, self.rdco)
+
+    def test_each_required_field_is_refused_when_missing(self):
+        for name in ("opportunity_type", "title", "description", "due_date",
+                     "location", "areas", "external_url"):
+            with self.subTest(field=name):
+                payload = self._payload()
+                del payload[name]
+                response = self.client.post(reverse("opportunity-list"), payload, format="json")
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn(name, response.data)
+
+    def test_blank_about_location_and_link_and_no_areas_are_refused(self):
+        response = self._post(description="", location="  ", external_url="", areas=[])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            set(response.data), {"description", "location", "external_url", "areas"},
+        )
+
+    def test_event_dates_and_fee_are_optional(self):
+        payload = self._payload()
+        for name in ("start_date", "end_date", "registration_fee"):
+            del payload[name]
+        response = self.client.post(reverse("opportunity-list"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertIsNone(response.data["start_date"])
+        self.assertEqual(response.data["registration_fee"], "")
+
+    def test_every_new_type_is_accepted_and_the_retired_ones_are_not(self):
+        for kind in ("conference", "congress", "symposium", "workshop", "journal", "book_chapter"):
+            with self.subTest(type=kind):
+                self.assertEqual(self._post(opportunity_type=kind).status_code, status.HTTP_201_CREATED)
+        for kind in ("internal_call", "conference_deadline", "funding_window", "institutional_grant"):
+            with self.subTest(type=kind):
+                response = self._post(opportunity_type=kind)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("opportunity_type", response.data)
+
+    def test_a_journal_or_book_chapter_stores_no_event_dates(self):
+        for kind in ("journal", "book_chapter"):
+            with self.subTest(type=kind):
+                response = self._post(opportunity_type=kind, location="Online")
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+                self.assertIsNone(response.data["start_date"])
+                self.assertIsNone(response.data["end_date"])
+
+    def test_changing_a_conference_to_a_journal_clears_its_dates(self):
+        created = self._post().data
+        url = reverse("opportunity-detail", args=[created["id"]])
+        response = self.client.patch(url, {"opportunity_type": "journal"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        call = Opportunity.objects.get(pk=created["id"])
+        self.assertIsNone(call.start_date)
+        self.assertIsNone(call.end_date)
+
+    def test_the_link_must_be_a_web_address(self):
+        for url in ("ftp://example.org/cfp", "javascript:alert(1)", "example.org/cfp"):
+            with self.subTest(url=url):
+                response = self._post(external_url=url)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("external_url", response.data)
+        self.assertEqual(self._post(external_url="http://example.org/cfp").status_code, status.HTTP_201_CREATED)
+
+    def test_the_fee_is_free_text_of_at_most_200_characters(self):
+        self.assertEqual(self._post(registration_fee="x" * 200).status_code, status.HTTP_201_CREATED)
+        response = self._post(registration_fee="x" * 201)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("registration_fee", response.data)
+
+    def test_an_area_that_does_not_exist_is_refused(self):
+        response = self._post(areas=[999999])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("areas", response.data)
+
+    def test_the_server_checks_no_date(self):
+        """Decision 5: a past deadline, or an end before its start, is the poster's to fix."""
+        response = self._post(due_date="2020-01-01", start_date="2027-03-05", end_date="2027-03-01")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_the_removed_fields_are_neither_stored_nor_served(self):
+        response = self._post(
+            posting_office="College of Computer Studies", audience="Faculty",
+            funding_ceiling="100000.00", tags=["AI"], source="external",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        for name in ("posting_office", "audience", "funding_ceiling", "tags", "source"):
+            self.assertNotIn(name, response.data)
+            self.assertFalse(hasattr(Opportunity, name))
+
+    def test_posted_by_is_read_only(self):
+        other = make_user("fields-adviser@cit.edu", "Adviser")
+        response = self._post(posted_by=other.pk, posted_by_name="Someone Else")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["posted_by"], self.rdco.pk)
+        self.assertEqual(response.data["posted_by_name"], "Test User")
+
+
+class MigratedCallTests(APITestCase):
+    """
+    A Conference Deadline that migration 0002 turned into a Conference may lack
+    about, location, Areas and link until its next save (ADR-050 decision 16).
+    """
+
+    def setUp(self):
+        self.rdco = make_user("migrated-rdco@cit.edu", "RDCO")
+        self.client.force_authenticate(self.rdco)
+        self.call = Opportunity.objects.create(
+            opportunity_type="conference", title="Migrated Conference",
+            due_date=date.today() + timedelta(days=20),
+        )
+        self.url = reverse("opportunity-detail", args=[self.call.pk])
+
+    def test_it_is_served_with_blank_new_fields(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["location"], "")
+        self.assertEqual(response.data["areas"], [])
+
+    def test_its_next_save_must_supply_what_it_lacks(self):
+        response = self.client.patch(self.url, {"title": "Renamed"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(set(response.data), {"description", "location", "areas", "external_url"})
+        self.call.refresh_from_db()
+        self.assertEqual(self.call.title, "Migrated Conference")
+
+    def test_a_save_that_supplies_them_succeeds(self):
+        response = self.client.patch(self.url, {
+            "title": "Renamed", "description": "About it.", "location": "Manila",
+            "areas": [an_area().pk], "external_url": "https://example.org",
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)

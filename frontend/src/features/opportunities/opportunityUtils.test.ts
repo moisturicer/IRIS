@@ -35,22 +35,20 @@ describe("countdown", () => {
 });
 
 describe("the form's draft", () => {
-  it("names the four required fields when they are empty", () => {
+  it("names the seven required fields when they are empty", () => {
     expect(Object.keys(checkDraft(EMPTY_DRAFT)).sort()).toEqual(
-      ["due_date", "opportunity_type", "posting_office", "title"],
+      ["areas", "description", "due_date", "external_url", "location", "opportunity_type", "title"],
     );
   });
 
-  it("refuses a ceiling that is not a number, and accepts one with commas", () => {
-    const base = { ...EMPTY_DRAFT, opportunity_type: "funding_window" as const, title: "T", posting_office: "O", due_date: "2026-11-01" };
-    expect(checkDraft({ ...base, funding_ceiling: "lots" }).funding_ceiling).toBeDefined();
-    expect(checkDraft({ ...base, funding_ceiling: "150,000" })).toEqual({});
-    expect(inputFrom({ ...base, funding_ceiling: "150,000" }).funding_ceiling).toBe("150000");
-    expect(inputFrom({ ...base, funding_ceiling: " " }).funding_ceiling).toBeNull();
-  });
-
-  it("splits tags on commas and drops blanks", () => {
-    expect(inputFrom({ ...EMPTY_DRAFT, tags: " AI , , Robotics," }).tags).toEqual(["AI", "Robotics"]);
+  it("sends an empty event date as none, and checks no date", () => {
+    const base = {
+      ...EMPTY_DRAFT, opportunity_type: "workshop" as const, title: "T", description: "A",
+      due_date: "2026-11-01", location: "Online", areas: [1], external_url: "https://example.org",
+    };
+    // An end before its start is the poster's to fix (ADR-050 decision 5).
+    expect(checkDraft({ ...base, start_date: "2027-03-05", end_date: "2027-03-01" })).toEqual({});
+    expect(inputFrom(base)).toMatchObject({ start_date: null, end_date: null, areas: [1] });
   });
 });
 
