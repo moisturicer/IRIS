@@ -506,7 +506,6 @@ class ContractTests(MyReviewsTestBase):
         self.seat(record, Party.ITSO, self.itso)
         Author.objects.create(record=record, name="Maria Clara Santos")
         Author.objects.create(record=record, name="Jose Rizal")
-        RecordVersion.objects.create(record=record, number=1, cause=VersionCause.SUBMISSION)
         RecordVersion.objects.create(record=record, number=2, cause=VersionCause.REVISION)
 
         row = self.rows(self.itso, tab="to_review")[0]
