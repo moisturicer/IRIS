@@ -40,7 +40,51 @@ class Placed:
     section_mate: bool = False
 
 
-def select(ranked, limit: int, policy: Policy, *, scoped: bool = False) -> list[Placed]:
+#: How far from a hit a section-mate may sit, in chunks (IR-1055, provisional).
+MATE_RADIUS = 2
+
+
+def select(ranked, limit: int, policy: Policy, *, scoped: bool = False, neighbours=()) -> list[Placed]:
+    """Hits by rank under the cap and budget, then section-mates from `neighbours` while the budget holds."""
+    kept = choose(ranked, limit, policy, scoped=scoped)
+    mates = _mates(kept, neighbours, limit, policy) if policy.section_mates else []
+    return _arrange(kept + mates, {m.id for m in mates}, policy.join)
+
+
+def neighbour_positions(kept) -> set[tuple[int, int]]:
+    """(chunk set, sequence) pairs a section-mate of `kept` could occupy."""
+    return {(h.chunk_set_id, h.sequence + d) for h in kept
+            for d in range(-MATE_RADIUS, MATE_RADIUS + 1) if d} - {(h.chunk_set_id, h.sequence) for h in kept}
+
+
+def _mates(kept, neighbours, limit: int, policy: Policy) -> list[Hit]:
+    """Nearest first, every hit taking its turn at each distance; never across a section."""
+    budget = limit * policy.tokens_per_passage
+    spent = sum(h.tokens for h in kept)
+    at = {(n.chunk_set_id, n.sequence): n for n in (*neighbours, *kept)}
+    taken = {(h.chunk_set_id, h.sequence) for h in kept}
+    added = []
+    for distance in range(1, MATE_RADIUS + 1):
+        for h in kept:
+            if not h.section_key:
+                continue
+            for step in (distance, -distance):
+                between = (h.chunk_set_id, h.sequence + step - (1 if step > 0 else -1))
+                position = (h.chunk_set_id, h.sequence + step)
+                mate = at.get(position)
+                if (mate is None or position in taken or mate.section_key != h.section_key
+                        or between not in taken or at[between].section_key != h.section_key):
+                    continue
+                if budget and spent + mate.tokens > budget:
+                    continue
+                taken.add(position)
+                added.append(mate)
+                spent += mate.tokens
+    return added
+
+
+def choose(ranked, limit: int, policy: Policy, *, scoped: bool = False) -> list[Hit]:
+    """The retrieved hits kept: rank order under the per-paper cap and the token budget."""
     budget = limit * policy.tokens_per_passage
     kept, per_paper, spent = [], {}, 0
     for hit in ranked:
@@ -53,7 +97,7 @@ def select(ranked, limit: int, policy: Policy, *, scoped: bool = False) -> list[
         per_paper[hit.record_id] = per_paper.get(hit.record_id, 0) + 1
         kept.append(hit)
         spent += hit.tokens
-    return _arrange(kept, set(), policy.join)
+    return kept
 
 
 def _arrange(items, mates: set[int], join: bool) -> list[Placed]:

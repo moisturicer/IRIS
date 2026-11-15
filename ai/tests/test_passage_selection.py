@@ -85,3 +85,54 @@ def test_each_part_of_selection_switches_off_on_its_own():
 def test_a_misspelt_selection_setting_refuses_runs(name, value):
     with pytest.raises(config.RunsUnavailable, match=name):
         config.read(settings(**{name: value}))
+
+
+# --- Section-mates (IR-1055) ------------------------------------------------------
+
+def test_an_unretrieved_neighbour_from_the_hits_section_is_added_and_linked():
+    neighbours = [hit(6)]
+    placed = select([hit(5)], limit=1, policy=ON, neighbours=neighbours)
+    assert ids(placed) == [5, 6]
+    assert [(p.continues, p.section_mate) for p in placed] == [(None, False), (5, True)]
+
+
+def test_expansion_never_crosses_a_section_boundary():
+    neighbours = [hit(4, section=("T", "2 Methods")), hit(6, section=("T", "3 Results"))]
+    assert ids(select([hit(5, section=("T", "3 Results"))], limit=1, policy=ON,
+                      neighbours=neighbours)) == [5, 6]
+
+
+def test_without_a_known_section_nothing_is_added():
+    assert ids(select([hit(5, section=None)], limit=1, policy=ON,
+                      neighbours=[hit(6, section=None)])) == [5]
+
+
+def test_expansion_stops_at_the_token_budget():
+    # One passage requested: a 700-token budget holds the hit and one 300-token mate.
+    neighbours = [hit(4, tokens=300), hit(6, tokens=300)]
+    placed = select([hit(5, tokens=300)], limit=1, policy=ON, neighbours=neighbours)
+    assert len(placed) == 2
+
+
+def test_a_mate_further_out_is_added_only_after_the_one_between():
+    # Chunk 7 shares the section, but chunk 6 between them is in another one.
+    neighbours = [hit(6, section=("T", "Box 1")), hit(7)]
+    assert ids(select([hit(5)], limit=1, policy=ON, neighbours=neighbours)) == [5]
+
+
+def test_a_mate_never_jumps_over_a_hit_from_another_section():
+    ranked = [hit(5), hit(6, section=("T", "Box 1"))]
+    assert ids(select(ranked, limit=2, policy=ON, neighbours=[hit(7)])) == [5, 6]
+
+
+def test_every_hit_gets_its_nearest_mate_before_any_hit_gets_a_second():
+    budget_for_two_mates = Policy(per_paper=3, join=True, tokens_per_passage=200, section_mates=True)
+    neighbours = [hit(6), hit(7), hit(21, record=2)]
+    placed = select([hit(5), hit(20, record=2)], limit=2, policy=budget_for_two_mates,
+                    neighbours=neighbours)
+    assert ids(placed) == [5, 6, 20, 21]
+
+
+def test_section_mates_switch_off():
+    off = Policy(per_paper=3, join=True, tokens_per_passage=700, section_mates=False)
+    assert ids(select([hit(5)], limit=1, policy=off, neighbours=[hit(6)])) == [5]

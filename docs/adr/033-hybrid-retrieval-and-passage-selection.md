@@ -213,6 +213,14 @@ A lost two text questions to C and won none, so C stands against A (rule 2). B l
 
 The cap (3) applies outside Paper Chat only. When it removes a hit, the next-ranked hits from other papers fill the slot.
 
+## Amendment — 2026-11-15 (IR-1055): a hit brings its section-mates
+
+**What changes.** After the hits are chosen, the runtime's search adds each hit's unretrieved neighbours from the same section, marked `section_context`, linked to the hit as continuing text. A neighbour is added only when it shares the hit's `section_key` (IR-1050), and every chunk between it and the hit does too. It is never more than two chunks away, and it is added only while the §4 budget has room. Every hit takes its nearest neighbour before any hit takes a second. A chunk set chunked before section keys existed gets none. Mates are read under the reader's grant like every search row.
+
+**Why.** An answer split across two chunks of one section loses the half search did not rank (recall@10 0.885 against final-set recall 0.846 on the proxy tier). Small-to-big expansion is the documented remedy (arXiv 2509.11552, moderate evidence).
+
+**On by default, unmeasured**, by the same decision as IR-397's amendment above (`RUNS_SECTION_MATES=off` switches it off). With a budget of 700 tokens per requested passage and chunks averaging 359 tokens on the dev corpus, mates roughly double a typical search's size, and never exceed the largest search possible before IR-397.
+
 ## Alternatives Considered
 
 **Keyword search restricted to the vector candidates** — run the vector search, then keyword-match within its top *n*. Rejected. It cannot surface a passage the vector search missed, which is the entire failure hybrid retrieval addresses. It buys a smaller keyword query in exchange for the only benefit on offer.

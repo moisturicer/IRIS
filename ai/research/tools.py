@@ -21,7 +21,7 @@ import asyncpg
 
 from ai.infrastructure import db
 from ai.research import metadata
-from ai.research.selection import Hit, Policy, select
+from ai.research.selection import Hit, Policy, choose, neighbour_positions, select
 from ai.runs.store import CURRENT_HANDOFF, CURRENT_SOURCE_TURN, RunStore
 
 log = logging.getLogger(__name__)
@@ -538,10 +538,22 @@ class ResearchTools:
             for n, (row, h) in enumerate(zip(rows, handles))
         )
 
-    def _chosen(self, rows, limit: int):
+    async def _chosen(self, conn, rows, limit: int):
         """Rows as selection orders them, with each continued part's repeated text measured."""
-        by_id = {r["id"]: r for r in rows}
-        placed = select([_hit(r) for r in rows], limit, self.selection, scoped=self.scope is not None)
+        hits, scoped = [_hit(r) for r in rows], self.scope is not None
+        neighbours = []
+        if self.selection.section_mates:
+            positions = neighbour_positions(choose(hits, limit, self.selection, scoped=scoped))
+            neighbours = await conn.fetch(
+                # Read under the grant like every search row: an unreadable mate is never added.
+                f"""SELECT {_COLUMNS} {_CHUNKS}
+                      JOIN unnest($1::bigint[], $2::int[]) AS p(set_id, seq)
+                        ON c.chunk_set_id = p.set_id AND c.sequence = p.seq
+                     WHERE c.deleted_at IS NULL AND ($3::bigint IS NULL OR c.record_id = $3)""",
+                [s for s, _ in positions], [q for _, q in positions], self.scope,
+            ) if positions else []
+        by_id = {r["id"]: r for r in (*rows, *neighbours)}
+        placed = select(hits, limit, self.selection, scoped=scoped, neighbours=[_hit(r) for r in neighbours])
         chosen = [by_id[p.hit.id] for p in placed]
         overlaps = [overlap(by_id[p.continues]["content"], by_id[p.hit.id]["content"]) if p.continues else 0
                     for p in placed]
@@ -549,7 +561,7 @@ class ResearchTools:
 
     async def _found(self, conn, rows, limit: int):
         """Records and passages for a search's ranked rows, after selection."""
-        rows, placed, overlaps = self._chosen(rows, limit)
+        rows, placed, overlaps = await self._chosen(conn, rows, limit)
         firsts = list({row["record_id"]: row for row in rows}.values())
         record_handles = await self._handles(
             conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in firsts])
