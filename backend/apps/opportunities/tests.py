@@ -18,6 +18,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
+from core.enums import CallStatus
 
 from .models import Opportunity
 from .services import build_ics
@@ -40,6 +41,8 @@ def make_opportunity(**overrides):
         "due_date":         timezone.localdate() + timedelta(days=28),
         "location":         "Cebu City, Philippines",
         "external_url":     "https://example.org/icr",
+        # The model defaults to pending (IR-762); most tests need a Call on the board.
+        "status":           CallStatus.CONFIRMED,
     }
     fields.update(overrides)
     call = Opportunity.objects.create(**fields)
@@ -288,6 +291,10 @@ class OpportunityVisibilityTests(APITestCase):
     **Updated deliberately by IR-761.** These pinned the 30-day rule the Over
     rule replaces, and read the machine's date where the server now reads
     Manila's. `test_call_states.py` pins each boundary day.
+
+    **Updated deliberately by IR-762:** `test_featured_sorts_before_a_sooner_deadline`
+    is removed. Featured no longer moves a Call (ADR-050 decision 12), and
+    `test_call_review.FeaturedTests` pins the new order.
     """
 
     def setUp(self):
@@ -321,12 +328,6 @@ class OpportunityVisibilityTests(APITestCase):
         )
         self.assertEqual(row["days_left"], -2)
         self.assertTrue(row["is_closed"])
-
-    def test_featured_sorts_before_a_sooner_deadline(self):
-        make_opportunity(title="Soon",     due_date=timezone.localdate() + timedelta(days=1))
-        make_opportunity(title="Featured", due_date=timezone.localdate() + timedelta(days=40), is_featured=True)
-        titles = [r["title"] for r in self.client.get(reverse("opportunity-list")).data["results"]]
-        self.assertLess(titles.index("Featured"), titles.index("Soon"))
 
 
 class IcsExportTests(APITestCase):

@@ -68,12 +68,40 @@ export interface Opportunity {
    */
   event_label:      string | null;
   /**
-   * May this viewer edit or delete it (IR-530)? Decided server-side by the
-   * same permission class that guards the update and delete endpoints, so the
-   * board never compares role names to decide whether to offer them.
+   * Where it stands with RDCO (ADR-050 decision 8, IR-762). Only a confirmed
+   * Call is on the board; a pending or rejected one is seen only by its
+   * Adviser and RDCO. Show `status_label` as sent.
+   */
+  status:           CallStatus;
+  /** "Waiting for RDCO", "Confirmed" or "Rejected". */
+  status_label:     string;
+  /** RDCO's reason, while it is rejected; otherwise empty. */
+  review_reason:    string;
+  /** When RDCO last confirmed or rejected it. */
+  reviewed_at:      string | null;
+  /**
+   * What this viewer may do with it (IR-530, IR-762), decided server-side by
+   * the same rules the endpoints enforce, so no screen compares role names.
    */
   can_edit:         boolean;
+  /** Plain delete. False for RDCO on an Adviser's Call: that is `can_remove`. */
+  can_delete:       boolean;
+  /** RDCO may delete it with a reason its Adviser receives. */
+  can_remove:       boolean;
+  /**
+   * Confirm and reject send back `updated_at` as served. A Call edited since
+   * answers 409, so the screen reloads it rather than deciding it unseen.
+   */
+  can_confirm:      boolean;
+  /** Rejecting needs a reason. */
+  can_reject:       boolean;
+  can_feature:      boolean;
+  /** Saving an edit sends it back to RDCO and off the board: warn first. */
+  edit_returns_to_pending: boolean;
 }
+
+/** ADR-050 decision 8 as amended (IR-762): a lapsed request is deleted, so there is no "expired". */
+export type CallStatus = "pending" | "confirmed" | "rejected";
 
 /** What a poster sends. Everything the server derives is left out. */
 export interface OpportunityInput {

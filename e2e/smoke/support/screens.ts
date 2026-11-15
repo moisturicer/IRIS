@@ -76,7 +76,10 @@ const OPPORTUNITY = {
   posted_by: 2, posted_by_name: "RDCO", created_at: when("11-01"), updated_at: when("11-01"),
   days_left: 39, is_closed: false,
   papers_state: "accepting", papers_label: "Accepting papers",
-  event_state: "upcoming", event_label: "Upcoming", can_edit: false,
+  event_state: "upcoming", event_label: "Upcoming",
+  status: "confirmed", status_label: "Confirmed", review_reason: "", reviewed_at: null,
+  can_edit: false, can_delete: false, can_remove: false, can_confirm: false,
+  can_reject: false, can_feature: false, edit_returns_to_pending: false,
 };
 
 const LONG_TITLE = "A comparative study of low-cost capacitive soil moisture sensing for upland rice in Cebu";
@@ -228,7 +231,7 @@ export const SCREENS: Screen[] = [
   },
   {
     id: "opportunities", path: "/opportunities", route: "/opportunities", role: "Student",
-    mocks: wrap("Student", (api) => api.on("GET", "/opportunities/", { count: 1, next: null, previous: null, results: [OPPORTUNITY], can_post: false })),
+    mocks: wrap("Student", (api) => api.on("GET", "/opportunities/", { count: 1, next: null, previous: null, results: [OPPORTUNITY], can_post: false, can_review_requests: false })),
     heading: "Calls & Conferences",
     primary: (p) => p.getByRole("button", { name: /^All\s*\d*$/ }).first(), primaryLabel: "All (filter)",
   },

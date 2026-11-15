@@ -7,6 +7,8 @@ interface OpportunityPage {
   results:  Opportunity[];
   /** Whether this viewer may post (IR-530), sent beside every page. */
   can_post: boolean;
+  /** Whether this viewer works RDCO's Call Requests queue (IR-762). */
+  can_review_requests: boolean;
 }
 
 /**

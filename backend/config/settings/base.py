@@ -387,6 +387,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.accounts.tasks.expire_unverified_registrations",
         "schedule": crontab(hour=3, minute=0),
     },
+    # ADR-050 decision 9, amended (IR-762): delete Call requests whose paper
+    # deadline has passed, daily at 00:15 Manila, just after the deadline day ends.
+    "lapsed-call-requests": {
+        "task": "apps.opportunities.tasks.remove_lapsed_requests",
+        "schedule": crontab(hour=0, minute=15),
+    },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due
     # retries, expires stale intents and purges terminal records. Its interval

@@ -10,6 +10,8 @@ This is the feature's first ADR. It replaces IR-121's decisions on types, postin
 
 An amendment of 2026-11-12 (IR-758, below) restates both in this ADR's own text and settles which list a Call's Areas come from.
 
+An amendment of 2026-11-15 (IR-762, below, Proposed) deletes a request whose paper deadline passes instead of expiring it, and stops an Adviser saving a past paper deadline.
+
 ## Context
 
 Observed on `main`, 2026-11-01:
@@ -129,3 +131,19 @@ IR-758 (spec, under IR-671), IR-759 (this ADR), IR-760, IR-761, IR-762, IR-763, 
 3. **The Call Requests page is at `/rdco/call-requests`, in the RDCO section of the navigation** (decision 8), not under Administration. This restates ADR-051, which already placed it there.
 4. **A saved Call is declared in both account-data registries** (decision 13): `apps/accounts/deletion/registry.py`, saying what deleting the account does to it, and `apps/accounts/personal_data/registry.py`, saying which section of the personal-data download carries it. Both registries came after this ADR (IR-794, IR-786); their guard tests fail until a new table that points at a person is declared. The likely rules, for IR-649 to confirm: deleting the account deletes the person's saved Calls, and the download lists them.
 5. **The posting form follows IR-585**: it marks optional fields, not required ones.
+
+## Amendment — 2026-11-15 (IR-762): a lapsed request is deleted, and an Adviser can't enter a past deadline
+
+**Status of this amendment: Proposed** — decided by Hermoine Zozobrado, 2026-11-15, while building IR-762. It is accepted when IR-762's PR merges.
+
+1. **An Adviser can't save a Call whose paper deadline has passed** (decision 5). The check uses Manila's date, and covers a new Call and an edit. RDCO's dates stay unchecked, so RDCO can still post a late-breaking deadline. A request can no longer be entered already expired, so decision 9's last sentence no longer applies.
+   - Consequence: once its paper deadline has passed, an Adviser can still edit their Call, but only by moving the deadline to today or later. The edit returns it to waiting (decision 10). An edit that keeps the past deadline is refused, since point 2 would delete it. RDCO's edits stay unchecked.
+2. **A request whose paper deadline passes is deleted, not expired** (decision 9).
+   - It leaves RDCO's list at once, and RDCO can no longer confirm or reject it.
+   - A daily job deletes it just after midnight in Manila. Its Adviser gets one notice saying they may post a new one.
+   - There is no expired status. A Call is waiting, confirmed or rejected.
+   - A rejected Call is deleted the same way. Until the job runs, its Adviser can still resubmit it by moving its deadline forward (point 1).
+   - These deletions are deletions under decision 15, with a copy of the Call (IR-763).
+3. **Which removals need a reason** (decision 11): removing a Call posted by an account that isn't RDCO, and that still exists. RDCO removes its own Calls, a colleague's, or one whose poster's account is gone without a reason, since nobody would receive it. Each case has one way in: a Call needing a reason is removed with one, and one needing none is deleted.
+4. **RDCO decides the version it saw** (decision 8). A confirm or reject names the Call's last-changed time as RDCO read it. An Adviser may edit a waiting Call meanwhile, and a decision on a Call changed since is refused, so RDCO never confirms content it hasn't read.
+5. **Consequences, restated.** A slow review now costs an Adviser their post outright, not only its place in RDCO's list. The notice softens that but doesn't remove it.

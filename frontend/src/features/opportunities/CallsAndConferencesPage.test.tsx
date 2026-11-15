@@ -67,7 +67,17 @@ function call(overrides: Partial<Opportunity> = {}): Opportunity {
     papers_label: "Accepting papers",
     event_state: null,
     event_label: null,
+    status: "confirmed",
+    status_label: "Confirmed",
+    review_reason: "",
+    reviewed_at: null,
     can_edit: false,
+    can_delete: false,
+    can_remove: false,
+    can_confirm: false,
+    can_reject: false,
+    can_feature: false,
+    edit_returns_to_pending: false,
     ...overrides,
   };
 }

@@ -22,6 +22,7 @@ from datetime import date, timedelta
 from apps.accounts.models import User
 from apps.opportunities.models import Opportunity
 from apps.records.models import Classification
+from core.enums import CallStatus
 
 poster = (
     User.objects.filter(email="rdco@iris.test").first()
@@ -121,8 +122,10 @@ for row in SEED:
     end = row.pop("end", None)
     row["start_date"] = today + timedelta(days=start) if start is not None else None
     row["end_date"] = today + timedelta(days=end) if end is not None else None
+    # RDCO's own posts are confirmed at once (ADR-050 decision 8, IR-762); the
+    # model's default is pending, which would keep these off the board.
     call, was_created = Opportunity.objects.get_or_create(
-        title=row["title"], defaults={**row, "posted_by": poster},
+        title=row["title"], defaults={**row, "posted_by": poster, "status": CallStatus.CONFIRMED},
     )
     if was_created:
         call.areas.set([Classification.objects.get_or_create(name=name)[0] for name in area_names])
