@@ -27,6 +27,12 @@ export interface ReaderConversation {
     citations: { record_id: number; page: number; quote: string; revision: string }[] }[];
 }
 
+export interface ConversationPage {
+  protocol: typeof READER_PROTOCOL;
+  conversations: { id: string; title: string; updated_at: string }[];
+  next: string | null;
+}
+
 export const activeRun = (run: ReaderRun) => run.state === "queued" || run.state === "running";
 
 function checked<T extends { protocol: string }>(data: T): T {
@@ -52,6 +58,13 @@ export function runtimeReader(recordId?: number) {
     },
     async stop(id: string) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/cancel`, {}, config);
+      return checked(data);
+    },
+    /** The reader's own Conversations, newest first; `q` searches their questions and answers. */
+    async list(params: { q?: string; before?: string } = {}) {
+      const { data } = await apiClient.get<ConversationPage>(`${base}/conversations`, {
+        ...config, params: { ...(params.q ? { q: params.q } : {}), ...(params.before ? { before: params.before } : {}) },
+      });
       return checked(data);
     },
     async reopen(id: string) {

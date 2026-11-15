@@ -38,6 +38,7 @@ import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useConversationClient } from "./conversation/useConversationClient";
 import { runtimeReaderEnabled } from "@/api/runtimeReader";
+import { RuntimeHistory } from "./components/RuntimeHistory";
 import { RuntimeReader } from "./components/RuntimeReader";
 
 /** History or sources: the two panels that sit beside the answer, or open over it (IR-570). */
@@ -101,8 +102,15 @@ function RuntimeAskPage() {
       <h1 className="font-display text-2xl text-stone-900">Ask IRIS</h1>
       <button type="button" className="min-h-11 text-sm text-brand underline" onClick={() => navigate("/ai")}>New conversation</button>
     </header>
-    <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
-      onConversation={id => { if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true }); }} />
+    <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      {!recordId && <aside className="max-h-64 shrink-0 overflow-y-auto border-b border-stone-200 md:max-h-none md:w-[260px] md:border-b-0 md:border-r">
+        <RuntimeHistory activeId={conversationId} />
+      </aside>}
+      <div className="min-h-0 min-w-0 flex-1">
+        <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
+          onConversation={id => { if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true }); }} />
+      </div>
+    </div>
   </div>;
 }
 

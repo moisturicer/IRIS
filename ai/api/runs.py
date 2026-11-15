@@ -12,15 +12,16 @@ from __future__ import annotations
 
 import functools
 import uuid
+from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from ai.runs import config as runs_config
 from ai.runs.service import RunService
-from ai.runs.store import Busy, Conflict, NotFound, Unauthorized
+from ai.runs.store import LIST_LIMIT, Busy, Conflict, NotFound, Unauthorized
 from ai.runs import public
 
 router = APIRouter()
@@ -123,6 +124,39 @@ async def cancel_run(
     async def act(s: RunService):
         snapshot = await s.store.cancel(grant, run_id, reader_projection=bool(protocol))
         return JSONResponse(public.run(snapshot) if protocol else snapshot)
+
+    return await _call(service, act, protocol)
+
+
+def _cursor(raw: str | None):
+    """The (activity, id) a page ended at; ValueError if `raw` is not one."""
+    if raw is None:
+        return None
+    stamp, _, ident = raw.partition("|")
+    when = datetime.fromisoformat(stamp)
+    if when.tzinfo is None:
+        raise ValueError(raw)
+    return when, uuid.UUID(ident)
+
+
+@router.get("/conversations")
+async def list_conversations(
+    q: str | None = Query(default=None, max_length=200),
+    before: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=LIST_LIMIT, ge=1, le=100),
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
+):
+    try:
+        cursor = _cursor(before)
+    except ValueError:
+        return JSONResponse({"status": "invalid_cursor"}, status_code=422)
+    search = (q or "").strip() or None
+
+    async def act(s: RunService):
+        page = await s.store.list_conversations(grant, q=search, before=cursor, limit=limit)
+        return JSONResponse(public.conversation_list(page))
 
     return await _call(service, act, protocol)
 

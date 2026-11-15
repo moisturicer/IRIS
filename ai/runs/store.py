@@ -51,6 +51,35 @@ DISPATCH_LOCK = "iris_ai.dispatch"
 IN_SCOPE = "($2::bigint IS NULL OR scope_record_id = $2)"
 
 
+#: Conversations a list page returns unless asked for fewer (IR-1161).
+LIST_LIMIT = 50
+
+#: `$1` appears in a Conversation `c` as a question, or in an answer whose
+#: every source (cited, or read by a tool) is still readable under the grant.
+_MATCH = """(
+    EXISTS (SELECT 1 FROM iris_ai.ask_run r
+             WHERE r.conversation_id = c.id AND r.question IS NOT NULL
+               AND position(lower($1::text) in lower(r.question)) > 0)
+    OR EXISTS (
+        SELECT 1 FROM iris_ai.turn t
+         WHERE t.conversation_id = c.id
+           AND position(lower($1::text) in lower(t.answer)) > 0
+           AND NOT EXISTS (
+               SELECT 1
+                 FROM (SELECT ct.revision AS rev FROM iris_ai.citation ct WHERE ct.turn_id = t.id
+                       UNION
+                       SELECT s.rev
+                         FROM iris_ai.run_event e
+                        CROSS JOIN LATERAL jsonb_array_elements_text(
+                              CASE WHEN jsonb_typeof(e.data -> 'sources') = 'array'
+                                   THEN e.data -> 'sources' ELSE '[]'::jsonb END) AS s(rev)
+                        WHERE e.run_id = t.run_id AND e.name = 'tool') d
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM public.ai_chunkset cs
+                      JOIN public.records_record rr ON rr.id = cs.record_id
+                     WHERE cs.is_active AND cs.id::text || ':' || cs.extraction_hash = d.rev))))"""
+
+
 class NotFound(Exception):
     pass
 
@@ -612,6 +641,49 @@ class RunStore:
                 "pinned": t["pinned"],
                 "citations": by_turn.get(t["id"], []),
             } for t in turns],
+        }
+
+    async def list_conversations(self, grant, *, q: str | None = None, before=None,
+                                 limit: int = LIST_LIMIT) -> dict:
+        """The reader's own Conversations, newest activity first, optionally matching `q`.
+
+        Runs under the reader's grant. A question is matched as the reader
+        wrote it; an answer only while every source it rests on is still
+        readable, the rule `reopen` applies when it withholds the text.
+        `before` is the `next` of the previous page.
+        """
+        after = after_id = None
+        if before is not None:
+            after, after_id = before
+        async with self._connect() as conn:
+            async with conn.transaction(isolation="repeatable_read"):
+                reader, scope = await self._principal(conn, grant)
+                rows = await conn.fetch(
+                    f"""SELECT c.id, c.activity,
+                               left(coalesce(
+                                   (SELECT t.question FROM iris_ai.turn t
+                                     WHERE t.conversation_id = c.id ORDER BY t.ordinal LIMIT 1),
+                                   (SELECT r.question FROM iris_ai.ask_run r
+                                     WHERE r.conversation_id = c.id AND r.question IS NOT NULL
+                                     ORDER BY r.created_at LIMIT 1),
+                                   ''), 200) AS title
+                          FROM (SELECT cv.id,
+                                       coalesce((SELECT max(t.created_at) FROM iris_ai.turn t
+                                                  WHERE t.conversation_id = cv.id), cv.created_at) AS activity
+                                  FROM iris_ai.conversation cv
+                                 WHERE cv.reader_id = $3 AND cv.deleted_at IS NULL
+                                   AND ($2::bigint IS NULL OR cv.scope_record_id = $2)) c
+                         WHERE ($4::timestamptz IS NULL OR (c.activity, c.id) < ($4::timestamptz, $5::uuid))
+                           AND ($1::text IS NULL OR {_MATCH})
+                         ORDER BY c.activity DESC, c.id DESC
+                         LIMIT $6""",
+                    q, scope, reader, after, after_id, limit + 1,
+                )
+        page = rows[:limit]
+        return {
+            "conversations": [{"id": str(r["id"]), "title": r["title"],
+                               "updated_at": r["activity"].isoformat()} for r in page],
+            "next": f"{page[-1]['activity'].isoformat()}|{page[-1]['id']}" if len(rows) > limit else None,
         }
 
     async def delete_conversation(self, grant, conversation_id) -> None:

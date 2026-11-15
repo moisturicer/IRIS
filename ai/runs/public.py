@@ -50,6 +50,10 @@ def run(snapshot):
     }
 
 
+def conversation_list(page):
+    return {"protocol": PROTOCOL, "conversations": page["conversations"], "next": page["next"]}
+
+
 def conversation(snapshot):
     available = {item["id"]: item.get("sources_available", True) for item in snapshot["runs"]}
     return {
