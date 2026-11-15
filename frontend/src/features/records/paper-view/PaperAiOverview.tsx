@@ -124,9 +124,9 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
             Reading the indexed record set…
           </p>
           <div className="space-y-2 animate-pulse">
-            <div className="h-3 w-full rounded bg-stone-100" />
-            <div className="h-3 w-11/12 rounded bg-stone-100" />
-            <div className="h-3 w-4/5 rounded bg-stone-100" />
+            <div className="h-3 w-full rounded-control bg-stone-100" />
+            <div className="h-3 w-11/12 rounded-control bg-stone-100" />
+            <div className="h-3 w-4/5 rounded-control bg-stone-100" />
           </div>
         </div>
       )}

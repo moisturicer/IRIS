@@ -204,10 +204,10 @@ export function UploadDropzone({
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           className={cn(
-            "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 select-none",
+            "flex flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed px-6 py-10 select-none",
             COLOUR_TRANSITION,
             FOCUS_RING,
-            dragging ? "border-brand bg-brand-50" : "border-stone-300 bg-stone-50",
+            dragging ? "border-brand bg-stone-100" : "border-stone-300 bg-stone-50",
             disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-stone-500",
           )}
         >
@@ -277,7 +277,7 @@ const ProgressPanel = forwardRef<HTMLDivElement, ProgressPanelProps>(function Pr
       role="group"
       aria-label="Upload in progress"
       tabIndex={-1}
-      className={cn("rounded-xl border border-stone-200 bg-surface px-5 py-4", FOCUS_RING)}
+      className={cn("rounded-card border border-stone-200 bg-surface px-5 py-4", FOCUS_RING)}
     >
       <div className="flex items-center justify-between gap-3 text-small" aria-hidden="true">
         <span className="font-medium text-stone-800 truncate">{name}</span>

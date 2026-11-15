@@ -1,0 +1,4213 @@
+{
+ "ticket": "IR-1126",
+ "tier": "proxy",
+ "rubric": "major: a wrong axis, unit, value, range or structure; minor: a wrong marker shape or colour only",
+ "review": {
+  "drafted_by": "agent (Claude), 2026-11-15, from each Figure image",
+  "reviewer": "Jive Tyler Revalde",
+  "confirmed": false
+ },
+ "enrichment": {
+  "api": "Unstructured Jobs API, on-demand job",
+  "node": {
+   "type": "prompter",
+   "subtype": "anthropic_image_description",
+   "provider_type": "anthropic",
+   "model": "claude-sonnet-5"
+  }
+ },
+ "summary": {
+  "figures": 29,
+  "image_checked": 27,
+  "sonnet": {
+   "with_error": 1,
+   "major": 1,
+   "minor": 0
+  },
+  "unstructured": {
+   "with_error": 14,
+   "major": 9,
+   "minor": 5
+  }
+ },
+ "figures": [
+  {
+   "n": 0,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 5,
+   "figure_name": "539bef70983ad41ca2ea6dd55ca8e56b",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a schematic diagram of how warps (groups of three trajectories) are scheduled into a fixed number of warp slots, with a new warp replacing one that finishes. It has no printed caption.\n\n**Left column, \"Trajectories\":** Five rounded boxes are labeled warp 1 to warp 5. Each holds three numbered squares.\n- Warp 1 holds trajectories 1, 2, 3 (purple/blue).\n- Warp 2 holds 4, 5, 6 (teal).\n- Warp 3 holds 7, 8, 9 (pink/lavender).\n- Warp 4 holds 10, 11, 12 (orange).\n- Warp 5 holds 13, 14, 15 (gray).\n\n**Middle column, \"Warp slots at initial time\":** Three dashed boxes, labeled slot 1, slot 2 and slot 3, contain warps 1, 2 and 3 respectively. Their trajectories are 1–3, 4–6 and 7–9. Arrows run from the warp boxes on the left into these slots. Warps 4 and 5 are not yet in any slot.\n\n**Right column, \"Warp slots after warp 3 completes\":** The same three slots appear again, with some trajectory numbers circled.\n- Slot 1 shows 1, 2, 3, with only 1 circled.\n- Slot 2 shows 4, 5, 6, with 5 and 6 circled.\n- Slot 3 shows 7, 8, 9, with all three circled. This slot is outlined in a thick orange box.\n\nAn arrow points down from the orange box to the text \"solution out\". A long arrow labeled \"new warp in\" runs from warp 4 (trajectories 10, 11, 12) to the orange slot 3, showing that warp 4 takes the place of the finished warp 3.\n\nThe circles seem to mark trajectories that have finished, but the figure does not say so.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "The diagram illustrates a warp-based trajectory scheduling process divided into three columns: 'Trajectories', 'Warp slots at initial time', and 'Warp slots after warp 3 completes'. On the left, five warps (warp 1 through warp 5) each contain a trajectory of three sequential numbers: warp 1 has 1,2,3; warp 2 has 4,5,6; warp 3 has 7,8,9; warp 4 has 10,11,12; warp 5 has 13,14,15. Warps 1, 2, and 3 are connected via arrows to the middle column 'Warp slots at initial time', which shows slot 1 containing 1,2,3 (matching warp 1), slot 2 containing 4,5,6 (matching warp 2), and slot 3 containing 7,8,9 (matching warp 3). Each slot in the middle column connects via an arrow to the corresponding slot in the right column, 'Warp slots after warp 3 completes'. In this final state, slot 1 shows 1 (circled) and 2, 3 not circled; slot 2 shows 4 not circled, with 5 and 6 circled; slot 3 shows 7, 8, 9 all circled and enclosed in an orange highlighted box, indicating warp 3 has completed. An arrow labeled 'solution out' points downward from slot 3, indicating the completed trajectory is output as a solution. Another arrow labeled 'new warp in' points from warp 4 upward into slot 3, indicating that once warp 3 completes and exits, a new warp (warp 4) is loaded into the now-empty slot 3. Warp 5 remains unconnected, waiting to be processed later.",
+    "texts": "Trajectories; warp 1: 1 2 3; warp 2: 4 5 6; warp 3: 7 8 9; warp 4: 10 11 12; warp 5: 13 14 15; Warp slots at initial time; slot 1: 1 2 3; slot 2: 4 5 6; slot 3: 7 8 9; Warp slots after warp 3 completes; slot 1: 1 2 3 (1 circled); slot 2: 4 5 6 (5 and 6 circled); slot 3: 7 8 9 (7, 8, 9 all circled, highlighted box); new warp in; solution out",
+    "data": null,
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 1,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 7,
+   "figure_name": "4d10ddf05af0bf582cc0e737dd5361d1",
+   "caption": "",
+   "image_checked": false,
+   "sonnet": {
+    "description": "This is a flowchart of an adaptive step-size explicit Runge–Kutta ODE solver. The method has seven stages and uses the FSAL (first same as last) property. The boxes are connected by gray arrows, and the loop runs through the following steps.\n\n1. **Input** (gray box, top left): initializes y_n ← y_0, t_n ← t_0, and h ← h_0.\n2. **Current state** (orange box): holds (y_n, t_n, h) and says to loop while t_n < t_f.\n3. **Stage 1 (FSAL)** (purple box): sets k_1 to k_7 of the last accepted step. Otherwise k_1 = f(t_n, y_n).\n4. **Stages i = 2, ..., 7** (purple box): computes the predicted state u_i = y_n + h Σ_{j<i} a_ij k_j at t_n + c_i h. It then computes k_i = f(t_n + c_i h, u_i), which costs one f evaluation.\n5. **Error check** (teal box): computes y_{n+1} = y_n + h Σ_i b_i k_i and the error estimate ê_n = h Σ_i (b_i − b̂_i) k_i. It then tests whether the weighted norm ||ê_n||_w ≤ 1.\n6. **Reject branch**: if the test fails, y_{n+1} is discarded and control goes to the step-size controller.\n7. **Step-size controller** (gray box): updates h ← h · factor(ê_n) using the PID rule, referenced as eq. (3). An arrow labeled \"Next step\" returns to the Current state box.\n8. **Accept branch**: if the test passes, control goes to the New state box.\n9. **New state** (gray box): sets y_n ← y_{n+1}, t_n ← t_n + h, and k_1 ← k_7 (FSAL). It feeds into the step-size controller, which sets the next h.\n10. **Output** (gray box, bottom left): gives dense output at save times in [t_n, t_n + h].",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "A flowchart describing an adaptive Runge-Kutta ODE solver algorithm with FSAL (First Same As Last) property and PID step-size control. The flow begins at 'Input' box where initial conditions y_n ← y_0, t_n ← t_0, h ← h_0 are set. This feeds into 'Current state' box which holds (y_n, t_n, h) and loops while t_n < t_f. From there, flow proceeds to 'Stage 1 (FSAL)' box, where k_1 is set either from k_7 of the last accepted step or computed as f(t_n, y_n). This connects downward to 'Stages i = 2,...,7' box, which computes predicted states u_i and corresponding k_i values via function evaluations. This flows down to 'Error check' box, which computes y_{n+1}, the error estimate ê_n, and checks if the weighted norm ||ê_n||_w ≤ 1. From the Error check box, two outcomes branch: 'Reject: discard y_{n+1}' which flows left into the 'Step-size controller' box, and 'Accept' which flows down into the 'New state' box. The 'Step-size controller' box updates h using a PID rule based on ê_n, then flows upward (labeled 'Next step') back into the 'Current state' box, continuing the loop. The 'New state' box (reached upon acceptance) updates y_n, t_n and k_1, then flows left into 'Output' box, which produces dense output at save times within [t_n, t_n+h]. The 'New state' box also flows upward into the 'Step-size controller' box to compute the next step size. This creates a cyclic flow of state propagation, error checking, and adaptive step size control typical of embedded Runge-Kutta methods (likely referencing a 7-stage, FSAL method like Dormand-Prince or similar).",
+    "texts": "Input\ny_n ← y_0\nt_n ← t_0, h ← h_0\n\nCurrent state\n(y_n, t_n, h)\nLoop while t_n < t_f\n\nStage 1 (FSAL)\nk_1 ← k_7 of the last accepted step,\nelse k_1 = f(t_n, y_n)\n\nStages i = 2, ..., 7\nu_i = y_n + h ∑_{j<i} a_ij k_j (predicted state at t_n + c_i h)\nk_i = f(t_n + c_i h, u_i) (one f evaluation)\n\nError check\ny_{n+1} = y_n + h ∑_i b_i k_i\nê_n = h ∑_i (b_i - b̂_i) k_i\nWeighted norm\n||ê_n||_w ≤ 1?\n\nReject: discard y_{n+1}\nAccept\n\nStep-size controller\nh ← h · factor(ê_n)\nfrom the PID rule, eq. (3)\n\nNext step\n\nNew state\ny_n ← y_{n+1}, t_n ← t_n + h\nk_1 ← k_7 (FSAL)\n\nOutput\nDense output at save times in [t_n, t_n + h]",
+    "data": null,
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 2,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 9,
+   "figure_name": "7dcff452157b3e250c4cd1c6c5697bbd",
+   "caption": "",
+   "image_checked": false,
+   "sonnet": {
+    "description": "This is a flowchart of an adaptive-step-size ODE solver loop. It appears to be an eight-stage Rosenbrock-type method that uses sparse LU factorisation and a PID step-size controller. The figure has no printed caption.\n\n**Boxes and flow:**\n1. **Input** (grey): initialises yₙ ← y₀, tₙ ← t₀ and h ← h₀. An arrow leads to the current state.\n2. **Current state** (orange): holds (yₙ, tₙ, h) and loops while tₙ < t_f. An arrow leads to the Jacobian sweeps.\n3. **Jacobian sweeps** (blue): forward-mode jvp at (tₙ, yₙ). I/hγ − J is written to B, a sparse buffer. f_t is written to b, an array buffer. An arrow leads to factorisation.\n4. **Factorisation** (blue): pivot-free sparse LU in place, with L + U → B. An arrow leads down to the stages.\n5. **Stages i = 1, …, 8** (pink):\n   - uᵢ = yₙ + Σ_{j<i} aᵢⱼ kⱼ, the predicted state at tₙ + αᵢh.\n   - rᵢ = f(tₙ + αᵢh, uᵢ) + (1/h) Σ_{j<i} cᵢⱼ kⱼ + dᵢ h f_t, which takes one f evaluation.\n   - LU kᵢ = rᵢ, which takes two triangular solves.\n   An arrow leads down to the error check.\n6. **Error check** (teal): yₙ₊₁ = yₙ + Σᵢ mᵢ kᵢ, and the error estimate êₙ = k₈. The test is whether the weighted norm ‖êₙ‖_w ≤ 1.\n   - **Reject:** an arrow labelled \"Reject: discard yₙ₊₁\" goes left to the step-size controller.\n   - **Accept:** an arrow labelled \"Accept\" goes left to the new state.\n7. **New state:** yₙ ← yₙ₊₁ and tₙ ← tₙ + h. One arrow leads left to the Output box. Another leads up to the step-size controller.\n8. **Output:** dense output at save times in [tₙ, tₙ + h].\n9. **Step-size controller:** h ← h · factor(êₙ), from the PID rule in equation (3). An arrow labelled \"Next step\" goes up to the current state, closing the loop.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "This is a flowchart describing an adaptive-step implicit Runge-Kutta ODE solver algorithm. The flow begins at 'Input', where initial values y0, t0, and h0 are set. This connects to 'Current state', which loops while t_n < t_f. From 'Current state', the flow moves right to 'Jacobian sweeps', computing a forward-mode Jacobian-vector product and building a sparse buffer B and array buffer b. This connects to 'Factorisation', where a pivot-free sparse LU decomposition is performed in place on B. The flow continues downward to 'Stages i=1,...,8', a box describing an 8-stage computation involving predicted states u_i, residuals r_i, and triangular solves using LU k_i = r_i. This connects down to 'Error check', which computes the new state y_{n+1} and error estimate ê_n, then checks if the weighted norm of the error is ≤ 1. If the check fails ('Reject'), the flow goes left to 'Step-size controller', discarding y_{n+1} and adjusting h using a PID step-size rule; this then loops back up to 'Current state' for 'Next step'. If the check passes ('Accept'), the flow goes down to 'New state', updating y_n and t_n, which also feeds back into the 'Step-size controller' (for computing the next step size) and separately into 'Output', which produces dense output at save times within the current step interval. The overall structure represents a cyclic process: Input → Current state → Jacobian sweeps → Factorisation → Stages → Error check → (Accept/Reject branch) → Step-size controller → Current state (loop), with New state and Output as side outcomes of acceptance.",
+    "texts": "Input\ny_n ← y_0\nt_n ← t_0, h ← h_0\n\nCurrent state\n(y_n, t_n, h)\nLoop while t_n < t_f\n\nJacobian sweeps\nForward-mode jvp at (t_n, y_n)\nI/hγ − J → B (sparse buffer)\nf_t → b (array buffer)\n\nFactorisation\nPivot-free sparse LU in place:\nL + U → B\n\nStages i = 1, ..., 8\nu_i = y_n + Σ_{j<i} a_ij k_j (predicted state at t_n + α_i h)\nr_i = f(t_n + α_i h, u_i) + (1/h) Σ_{j<i} c_ij k_j + d_i h f_t (one f evaluation)\nLU k_i = r_i (two triangular solves)\n\nError check\ny_{n+1} = y_n + Σ_i m_i k_i\nê_n = k_8\nWeighted norm ||ê_n||_w ≤ 1?\n\nReject: discard y_{n+1}\nAccept\n\nStep-size controller\nh ← h · factor(ê_n)\nfrom the PID rule, eq. (3)\n\nNew state\ny_n ← y_{n+1}, t_n ← t_n + h\n\nOutput\nDense output at save times in [t_n, t_n + h]\n\nNext step",
+    "data": null,
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 3,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 10,
+   "figure_name": "51fe62033cfc9a6bc72ce08a1ebd140a",
+   "caption": "Figure 6. Wall-clock solve time as a function of ensemble size 𝑁 for identical Lorenz trajectories using the Tsit5 solver. modax is roughly an order of magnitude faster than diffrax across values of 𝑁.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a log-log line chart of solve time against ensemble size for Lorenz trajectories. The x-axis is \"Ensemble size\" with ticks at 3, 10, 30, 100, 300, 1000, 3000, 10000, 30000 and 100000. The y-axis is \"Solve time (ms)\" on a logarithmic scale, with labeled ticks at 10, 10², 10³ and 10⁴. A light dashed grid covers the plot. The legend is in the upper left.\n\nThere are five series:\n\n- **modax Tsit5** (orange line, plus markers): This is the fastest series at every ensemble size. It is flat at roughly 3 to 4 ms from N=3 through 1000, then rises to about 4 ms at 3000, about 10 ms at 10000, about 34 ms at 30000 and about 85 ms at 100000.\n- **diffrax Tsit5** (blue line, square markers): It starts near 120 ms at N=3, dips to about 80–90 ms at N=10 and 30, and is about 100 ms at 100 through 1000. It then rises to about 130 ms at 3000, 135 ms at 10000, 195 ms at 30000 and about 450 ms at 100000.\n- **torchdiffeq Dopri8** (red line, diamond markers): It is nearly constant at about 340 to 350 ms from N=3 to 10000, then about 360 ms at 30000 and about 720 ms at 100000.\n- **DiffEqGPU.jl Tsit5 EnsembleGPUArray** (solid purple line, upward triangles): It is about 70 ms at small N and about 80 ms at 1000. It rises to about 130 ms at 3000 and 270 ms at 10000, then climbs steeply to about 2,000 ms at 30000 and about 27,000 ms at 100000. This is the slowest series at large N.\n- **DiffEqGPU.jl Tsit5 EnsembleGPUKernel** (dashed purple line, downward triangles): It is about 5 to 6 ms at small N and about 8 ms at 1000. It then rises to about 14 ms at 3000, 43 ms at 10000, 145 ms at 30000 and about 470 ms at 100000.\n\nmodax lies roughly an order of magnitude below diffrax across the range, consistent with the caption. At N=100000 the diffrax and EnsembleGPUKernel curves nearly meet at around 450 to 470 ms.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A log-log line chart showing solve time (ms) versus ensemble size for five different ODE solver implementations. The x-axis (ensemble size) ranges from 3 to 100000 on a logarithmic scale. The y-axis (solve time in ms) ranges from below 10 to above 10^4 on a logarithmic scale. Five series are plotted: 'modax Tsit5' (orange, circle markers, solid line) stays lowest, around 4ms for small ensembles, rising to about 85ms at 100000. 'diffrax Tsit5' (blue, square markers, solid line) starts around 120ms, dips to about 80ms, then rises to about 450ms at 100000. 'torchdiffeq Dopri8' (red, diamond markers, solid line) stays roughly flat around 350-400ms across most ensemble sizes, rising to about 730ms at 100000. 'DiffEqGPU.jl Tsit5 EnsembleGPUArray' (purple, triangle-up markers, solid line) starts around 65ms, stays flat until about 1000, then rises sharply to about 27000ms at 100000. 'DiffEqGPU.jl Tsit5 EnsembleGPUKernel' (purple, triangle-down markers, dashed line) starts around 5.5ms, stays low until about 100, then rises gradually to about 500ms at 100000.",
+    "texts": "modax Tsit5, diffrax Tsit5, torchdiffeq Dopri8, DiffEqGPU.jl Tsit5 EnsembleGPUArray, DiffEqGPU.jl Tsit5 EnsembleGPUKernel, Solve time (ms), Ensemble size, 3, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000, 10^3, 10^4",
+    "data": [
+     {
+      "series": "modax Tsit5",
+      "points": [
+       [
+        3,
+        4
+       ],
+       [
+        10,
+        4
+       ],
+       [
+        30,
+        3.8
+       ],
+       [
+        100,
+        3.9
+       ],
+       [
+        300,
+        3.9
+       ],
+       [
+        1000,
+        4
+       ],
+       [
+        3000,
+        4.5
+       ],
+       [
+        10000,
+        10.5
+       ],
+       [
+        30000,
+        33
+       ],
+       [
+        100000,
+        85
+       ]
+      ]
+     },
+     {
+      "series": "diffrax Tsit5",
+      "points": [
+       [
+        3,
+        120
+       ],
+       [
+        10,
+        90
+       ],
+       [
+        30,
+        80
+       ],
+       [
+        100,
+        95
+       ],
+       [
+        300,
+        100
+       ],
+       [
+        1000,
+        100
+       ],
+       [
+        3000,
+        125
+       ],
+       [
+        10000,
+        130
+       ],
+       [
+        30000,
+        195
+       ],
+       [
+        100000,
+        450
+       ]
+      ]
+     },
+     {
+      "series": "torchdiffeq Dopri8",
+      "points": [
+       [
+        3,
+        350
+       ],
+       [
+        10,
+        350
+       ],
+       [
+        30,
+        350
+       ],
+       [
+        100,
+        350
+       ],
+       [
+        300,
+        350
+       ],
+       [
+        1000,
+        350
+       ],
+       [
+        3000,
+        350
+       ],
+       [
+        10000,
+        360
+       ],
+       [
+        30000,
+        370
+       ],
+       [
+        100000,
+        730
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Tsit5 EnsembleGPUArray",
+      "points": [
+       [
+        3,
+        65
+       ],
+       [
+        10,
+        68
+       ],
+       [
+        30,
+        65
+       ],
+       [
+        100,
+        65
+       ],
+       [
+        300,
+        75
+       ],
+       [
+        1000,
+        80
+       ],
+       [
+        3000,
+        125
+       ],
+       [
+        10000,
+        270
+       ],
+       [
+        30000,
+        2100
+       ],
+       [
+        100000,
+        27000
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Tsit5 EnsembleGPUKernel",
+      "points": [
+       [
+        3,
+        5.5
+       ],
+       [
+        10,
+        6
+       ],
+       [
+        30,
+        5.8
+       ],
+       [
+        100,
+        7
+       ],
+       [
+        300,
+        6
+       ],
+       [
+        1000,
+        8.5
+       ],
+       [
+        3000,
+        14.5
+       ],
+       [
+        10000,
+        44
+       ],
+       [
+        30000,
+        150
+       ],
+       [
+        100000,
+        500
+       ]
+      ]
+     }
+    ],
+    "error": "minor",
+    "note": "modax Tsit5 drawn with circle markers; they are plus markers"
+   }
+  },
+  {
+   "n": 4,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 10,
+   "figure_name": "2436d0f6c5966d5b084f10433f6236fa",
+   "caption": "Figure 7. Sensitivity of explicit solvers to trajectory divergence for 𝑁 = 105 Lorenz trajectories. Dopri8 is used for torchdiffeq as it does not implement Tsit5. Normalised solve time is plotted against the standard deviation be- tween trajectories of the number of attempted steps – the greater the standard deviation, the more divergent the trajectories. In general, more divergent tra- jectories cause increased solve times, unless similar trajectories are batched together and solved independently.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a scatter plot with a logarithmic y-axis. It compares how sensitive several explicit ODE solvers are to trajectory divergence for Lorenz trajectories.\n\n**Axes:**\n- The x-axis is \"Normalised standard deviation of attempted steps\" and runs from about 0 to 0.45, with gridlines at 0.0, 0.1, 0.2, 0.3 and 0.4.\n- The y-axis is \"Solve time / mean attempted steps (ms)\" on a log scale. Labelled ticks are at 10^-1, 10^0 and 10^1.\n\n**Series (from the legend):**\n- modax Tsit5 (orange squares)\n- modax Tsit5 (sorted) (orange plus signs)\n- diffrax Tsit5 (blue squares)\n- torchdiffeq Dopri8 (red diamonds)\n- DiffEqGPU.jl Tsit5 EnsembleGPUArray (purple upward triangles)\n- DiffEqGPU.jl Tsit5 EnsembleGPUKernel (purple downward triangles)\n- DiffEqGPU.jl Tsit5 EnsembleGPUKernel (sorted) (purple crosses)\n\nEach series has about ten points at the same x positions.\n\n**Values read from the plot:**\n- EnsembleGPUArray is the slowest series. It rises from about 40 ms at x=0 to about 65 ms at x≈0.45.\n- EnsembleGPUKernel (unsorted) starts at about 2 at x≈0.025 and rises slowly to about 2.8 at the right.\n- EnsembleGPUKernel (sorted) starts near 0.45 at x=0 and rises to about 1.5. It sits close to torchdiffeq and diffrax at larger x.\n- torchdiffeq Dopri8 starts at about 1.0 and rises to about 1.4.\n- diffrax Tsit5 starts at about 0.6 and rises to about 1.3.\n- modax Tsit5 (unsorted) starts at about 0.13 and rises to about 0.2.\n- modax Tsit5 (sorted) stays nearly flat at about 0.115 across all x.\n\n**Overall pattern:** Most unsorted solvers show solve time per step increasing as trajectories become more divergent. The sorted variants, where similar trajectories are batched together, are flat or increase much less. modax is the fastest per step, and DiffEqGPU's EnsembleGPUArray is the slowest by more than an order of magnitude.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A scatter plot showing 'Solve time / mean attempted steps (ns)' on a log-scale y-axis (ranging from 10^-1 to beyond 10^1) versus 'Normalised standard deviation of attempted steps' on the x-axis (ranging from 0.0 to about 0.45). Seven data series are plotted, representing different ODE solver implementations. DiffEqGPU.jl Tsit5 EnsembleGPUArray (purple triangle up) has the highest values, starting around 37 at x=0 and gradually increasing to about 58 at x=0.45. DiffEqGPU.jl Tsit5 EnsembleGPUKernel (purple triangle down) starts around 1.0 at x=0 and rises to about 2.9 at x=0.45. DiffEqGPU.jl Tsit5 EnsembleGPUKernel (sorted) (purple X/asterisk marker) starts around 0.5 at x=0 and rises to about 1.5 at x=0.45. torchdiffeq Dopri8 (red diamond) stays fairly flat, from about 1.0 at x=0 to about 1.3 at x=0.45. diffrax Tsit5 (blue square) starts around 0.63 at x=0 and rises to about 1.25 at x=0.45. modax Tsit5 (orange square) starts around 0.13 at x=0 and rises slightly to about 0.21 at x=0.45. modax Tsit5 (sorted) (orange plus) stays flat around 0.12 across all x values. Overall trend: most series show increasing solve time ratios as the normalised standard deviation of attempted steps increases, except the sorted modax series which remains flat.",
+    "texts": "Solve time / mean attempted steps (ns); Normalised standard deviation of attempted steps; 10^-1; 10^1; 0.0; 0.1; 0.2; 0.3; 0.4; modax Tsit5; modax Tsit5 (sorted); diffrax Tsit5; torchdiffeq Dopri8; DiffEqGPU.jl Tsit5 EnsembleGPUArray; DiffEqGPU.jl Tsit5 EnsembleGPUKernel; DiffEqGPU.jl Tsit5 EnsembleGPUKernel (sorted)",
+    "data": [
+     {
+      "series": "modax Tsit5",
+      "points": [
+       [
+        0.0,
+        0.13
+       ],
+       [
+        0.03,
+        0.12
+       ],
+       [
+        0.06,
+        0.13
+       ],
+       [
+        0.09,
+        0.13
+       ],
+       [
+        0.12,
+        0.14
+       ],
+       [
+        0.15,
+        0.15
+       ],
+       [
+        0.19,
+        0.16
+       ],
+       [
+        0.24,
+        0.17
+       ],
+       [
+        0.3,
+        0.18
+       ],
+       [
+        0.37,
+        0.19
+       ],
+       [
+        0.45,
+        0.21
+       ]
+      ]
+     },
+     {
+      "series": "modax Tsit5 (sorted)",
+      "points": [
+       [
+        0.0,
+        0.12
+       ],
+       [
+        0.03,
+        0.12
+       ],
+       [
+        0.06,
+        0.12
+       ],
+       [
+        0.09,
+        0.12
+       ],
+       [
+        0.12,
+        0.12
+       ],
+       [
+        0.15,
+        0.12
+       ],
+       [
+        0.19,
+        0.12
+       ],
+       [
+        0.24,
+        0.12
+       ],
+       [
+        0.3,
+        0.12
+       ],
+       [
+        0.37,
+        0.12
+       ],
+       [
+        0.45,
+        0.12
+       ]
+      ]
+     },
+     {
+      "series": "diffrax Tsit5",
+      "points": [
+       [
+        0.0,
+        0.63
+       ],
+       [
+        0.03,
+        0.67
+       ],
+       [
+        0.06,
+        0.7
+       ],
+       [
+        0.09,
+        0.75
+       ],
+       [
+        0.12,
+        0.8
+       ],
+       [
+        0.15,
+        0.85
+       ],
+       [
+        0.19,
+        0.9
+       ],
+       [
+        0.24,
+        0.95
+       ],
+       [
+        0.3,
+        1.02
+       ],
+       [
+        0.37,
+        1.1
+       ],
+       [
+        0.45,
+        1.25
+       ]
+      ]
+     },
+     {
+      "series": "torchdiffeq Dopri8",
+      "points": [
+       [
+        0.0,
+        1.0
+       ],
+       [
+        0.03,
+        0.95
+       ],
+       [
+        0.06,
+        1.0
+       ],
+       [
+        0.09,
+        1.0
+       ],
+       [
+        0.12,
+        1.05
+       ],
+       [
+        0.15,
+        1.08
+       ],
+       [
+        0.19,
+        1.1
+       ],
+       [
+        0.24,
+        1.15
+       ],
+       [
+        0.3,
+        1.2
+       ],
+       [
+        0.37,
+        1.25
+       ],
+       [
+        0.45,
+        1.3
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Tsit5 EnsembleGPUArray",
+      "points": [
+       [
+        0.0,
+        37
+       ],
+       [
+        0.03,
+        36
+       ],
+       [
+        0.06,
+        38
+       ],
+       [
+        0.09,
+        38
+       ],
+       [
+        0.12,
+        42
+       ],
+       [
+        0.15,
+        43
+       ],
+       [
+        0.19,
+        46
+       ],
+       [
+        0.24,
+        48
+       ],
+       [
+        0.3,
+        50
+       ],
+       [
+        0.37,
+        53
+       ],
+       [
+        0.45,
+        58
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Tsit5 EnsembleGPUKernel",
+      "points": [
+       [
+        0.0,
+        1.0
+       ],
+       [
+        0.03,
+        2.0
+       ],
+       [
+        0.06,
+        2.3
+       ],
+       [
+        0.09,
+        2.3
+       ],
+       [
+        0.12,
+        2.5
+       ],
+       [
+        0.15,
+        2.5
+       ],
+       [
+        0.19,
+        2.6
+       ],
+       [
+        0.24,
+        2.6
+       ],
+       [
+        0.3,
+        2.7
+       ],
+       [
+        0.37,
+        2.8
+       ],
+       [
+        0.45,
+        2.9
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Tsit5 EnsembleGPUKernel (sorted)",
+      "points": [
+       [
+        0.0,
+        0.5
+       ],
+       [
+        0.03,
+        1.1
+       ],
+       [
+        0.06,
+        1.15
+       ],
+       [
+        0.09,
+        1.2
+       ],
+       [
+        0.12,
+        1.25
+       ],
+       [
+        0.15,
+        1.25
+       ],
+       [
+        0.19,
+        1.3
+       ],
+       [
+        0.24,
+        1.3
+       ],
+       [
+        0.3,
+        1.4
+       ],
+       [
+        0.37,
+        1.4
+       ],
+       [
+        0.45,
+        1.45
+       ]
+      ]
+     }
+    ],
+    "error": "major",
+    "note": "y-axis unit given as ns; the axis is ms. EnsembleGPUKernel said to start near 1.0 at x=0; its first point is about 2 at x≈0.025"
+   }
+  },
+  {
+   "n": 5,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 11,
+   "figure_name": "43fa41c25dacdc3b6b3b42b7460d3125",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a log-log line chart comparing solve time against ensemble size for five ODE solver implementations. There is no printed caption.\n\n**Axes:** The x-axis is \"Ensemble size\", with tick labels at 1, 3, 10, 30, 100, 300, 1000, 3000, 10000, 30000 and 100000. The y-axis is \"Solve time (ms)\" on a log scale. Its labeled ticks run from 10^0 to 10^3, and the plotted values go up to a few thousand ms.\n\n**Series, as listed in the legend:**\n1. modax Rodas5P FP32 is an orange dashed line with plus markers. It starts near 1.6 ms at size 1, sits around 1.3 ms from size 3 to 1000, then rises to about 1.7 ms at 3000, 4 ms at 10000, 12 ms at 30000 and 35 ms at 100000.\n2. modax Rodas5P FP64 is an orange solid line with x markers. It starts near 2 ms at size 1 and stays between about 1.8 and 2.2 ms up to size 1000. It then climbs to about 2.4 ms at 3000, 5 ms at 10000, 16 ms at 30000 and 45 ms at 100000.\n3. diffrax Kvaerno5 is a blue solid line with square markers. It stays near 900 ms from size 1 to 300 and is about 920 ms at 1000. It then increases to about 970 ms at 3000, 1250 ms at 10000, 2000 ms at 30000 and 4700 ms at 100000.\n4. DiffEqGPU.jl Rodas5P EnsembleGPUArray is a purple solid line with upward triangle markers. It starts at size 3 at about 135 ms and stays flat near 135 to 145 ms up to size 1000. It then rises to about 210 ms at 3000, 360 ms at 10000 and 3100 ms at 30000. It has no point at size 100000.\n5. DiffEqGPU.jl Rodas5P EnsembleGPUKernel is a purple dashed line with downward triangle markers. It starts at size 3 at about 4.7 ms and is about 5.5 ms at 100 and 7.5 ms at 1000. It then rises to about 13 ms at 3000, 40 ms at 10000, 130 ms at 30000 and 450 ms at 100000.\n\n**Overall pattern:** The two modax curves are the lowest at every ensemble size, with FP32 slightly below FP64. EnsembleGPUKernel comes next, then EnsembleGPUArray, and diffrax Kvaerno5 is the slowest at most sizes. All curves are roughly flat at small ensemble sizes and rise steeply at large ones. The EnsembleGPUArray curve jumps sharply between 10000 and 30000, approaching the diffrax curve.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A log-log line chart plotting Solve time (ms) on the y-axis against Ensemble size on the x-axis for five different ODE solver configurations. The x-axis ranges from 1 to 100000 (ensemble size) and y-axis ranges from about 1 to 10^3+ ms. Two orange series (modax Rodas5P FP32 and FP64) remain low and nearly flat from ensemble size 1 to 1000 (around 1-2 ms), then rise gradually to about 35-45 ms at 100000. The blue series (diffrax Kvaerno5) only has data from ensemble size 1000 to 100000, starting around 900 ms and rising steadily to about 4300 ms at 100000. The purple triangle series (DiffEqGPU.jl Rodas5P EnsembleGPUArray) starts at ensemble size 3 with about 130 ms, stays flat until 1000, then rises sharply to about 3000 ms at 30000, with the last data point around 30000. The purple downward-triangle dashed series (DiffEqGPU.jl Rodas5P EnsembleGPUKernel) starts at ensemble size 3 with about 5 ms, stays relatively flat until 1000, then rises to about 450 ms at 100000.",
+    "texts": "modax Rodas5P FP32, modax Rodas5P FP64, diffrax Kvaerno5, DiffEqGPU.jl Rodas5P EnsembleGPUArray, DiffEqGPU.jl Rodas5P EnsembleGPUKernel, Solve time (ms), Ensemble size, 1, 3, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000, 10^3",
+    "data": [
+     {
+      "series": "modax Rodas5P FP32",
+      "points": [
+       [
+        1,
+        1.7
+       ],
+       [
+        3,
+        1.3
+       ],
+       [
+        10,
+        1.4
+       ],
+       [
+        30,
+        1.3
+       ],
+       [
+        100,
+        1.3
+       ],
+       [
+        300,
+        1.3
+       ],
+       [
+        1000,
+        1.3
+       ],
+       [
+        3000,
+        1.8
+       ],
+       [
+        10000,
+        4.2
+       ],
+       [
+        30000,
+        12
+       ],
+       [
+        100000,
+        36
+       ]
+      ]
+     },
+     {
+      "series": "modax Rodas5P FP64",
+      "points": [
+       [
+        1,
+        2.1
+       ],
+       [
+        3,
+        2.2
+       ],
+       [
+        10,
+        2.2
+       ],
+       [
+        30,
+        2.1
+       ],
+       [
+        100,
+        1.9
+       ],
+       [
+        300,
+        1.9
+       ],
+       [
+        1000,
+        1.9
+       ],
+       [
+        3000,
+        2.4
+       ],
+       [
+        10000,
+        5
+       ],
+       [
+        30000,
+        16
+       ],
+       [
+        100000,
+        46
+       ]
+      ]
+     },
+     {
+      "series": "diffrax Kvaerno5",
+      "points": [
+       [
+        1000,
+        900
+       ],
+       [
+        3000,
+        950
+       ],
+       [
+        10000,
+        1250
+       ],
+       [
+        30000,
+        1950
+       ],
+       [
+        100000,
+        4300
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUArray",
+      "points": [
+       [
+        3,
+        135
+       ],
+       [
+        10,
+        135
+       ],
+       [
+        30,
+        135
+       ],
+       [
+        100,
+        135
+       ],
+       [
+        300,
+        140
+       ],
+       [
+        1000,
+        145
+       ],
+       [
+        3000,
+        215
+       ],
+       [
+        10000,
+        360
+       ],
+       [
+        30000,
+        3000
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUKernel",
+      "points": [
+       [
+        3,
+        4.8
+       ],
+       [
+        10,
+        4.8
+       ],
+       [
+        30,
+        4.8
+       ],
+       [
+        100,
+        5.5
+       ],
+       [
+        300,
+        5.5
+       ],
+       [
+        1000,
+        7.5
+       ],
+       [
+        3000,
+        13.5
+       ],
+       [
+        10000,
+        42
+       ],
+       [
+        30000,
+        135
+       ],
+       [
+        100000,
+        450
+       ]
+      ]
+     }
+    ],
+    "error": "major",
+    "note": "diffrax Kvaerno5 said to have data only from ensemble size 1000; it has points from size 1"
+   }
+  },
+  {
+   "n": 6,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 11,
+   "figure_name": "841899e38f54705134e8e7575e473b42",
+   "caption": "Figure 8. Wall-clock solve time as a function of ensemble size 𝑁 for iden- tical stiff Robertson trajectories. modax’s Rodas5P solver is roughly two to three orders of magnitude faster than the diffrax Kvaerno5 solver. DiffE- qGPU.jl’s 𝑁 = 1 point is omitted because it handles one-trajectory ensem- bles differently from batches, making that timing incomparable.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a log-log line chart of solve time in milliseconds against ODE dimension for five solver implementations. The printed caption does not match the plot. The caption refers to ensemble size N, stiff Robertson trajectories, and the Rodas5P and Kvaerno5 solvers. The plot's x-axis is \"ODE dimension\", and its legend lists Tsit5 and Dopri8 solvers.\n\n**Axes:** The x-axis is ODE dimension on a log scale, with ticks at 2, 4, 6, 8, 10, 12, 16, 32, 64 and 128. The y-axis is solve time in ms on a log scale, running from below 1 to a few hundred, with gridlines at the decades 10⁰, 10¹ and 10².\n\n**Series and approximate values, listed for dimensions 2 up to 128:**\n- **modax Tsit5** (orange, plus markers) is the fastest series. It rises from about 0.19 ms at dimension 2 to 0.25 ms at 6, 0.35 ms at 16, 0.68 ms at 32, 2 ms at 64 and about 5.3 ms at 128.\n- **diffrax Tsit5** (blue squares) starts near 2.4 ms and climbs to about 4.6 ms at dimension 12. It dips to about 3 ms at 16, then reaches about 4.3 ms at 32, 6.1 ms at 64 and 10 ms at 128.\n- **torchdiffeq Dopri8** (red diamonds) is the slowest series. It rises from about 16 ms at dimension 2 to 35 ms at 10, 50 ms at 16, 89 ms at 32, 165 ms at 64 and about 320 ms at 128.\n- **DiffEqGPU.jl Tsit5 EnsembleGPUArray** (purple solid line, up-triangles) goes from about 9 ms at dimension 2 to 13 ms at 8, 22 ms at 16, 43 ms at 32, 73 ms at 64 and about 107 ms at 128.\n- **DiffEqGPU.jl Tsit5 EnsembleGPUKernel** (purple dashed line, down-triangles) stays near 3.3 to 4 ms up to dimension 12. It then rises to about 4.6 ms at 16, 7.3 ms at 32, 11 ms at 64 and about 26 ms at 128.\n\n**Overall:** The ordering from fastest to slowest is modax, then diffrax and EnsembleGPUKernel (which are close at small dimensions), then EnsembleGPUArray, then torchdiffeq. modax is roughly one order of magnitude faster than diffrax at small dimensions, and the gap narrows to about a factor of 2 at dimension 128.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A log-scale line chart showing solve time in milliseconds versus ODE dimension for five different ODE solver implementations. The y-axis (Solve time (ms)) is logarithmic ranging from below 1 to above 100. The x-axis (ODE dimension) shows values 2, 4, 6, 8, 10, 12, 16, 32, 64, 128 on a log-like scale. The torchdiffeq Dopri8 (red diamonds) line is the highest, starting around 16ms at dimension 2 and rising steadily to about 300ms at dimension 128. The DiffEqGPU.jl Tsit5 EnsembleGPUArray (purple triangles, solid line) starts around 9ms and rises to about 110ms at dimension 128, with a notable plateau between dimensions 8-12. The DiffEqGPU.jl Tsit5 EnsembleGPUKernel (purple inverted triangles, dashed line) starts around 3.5ms and rises to about 27ms at dimension 128. The diffrax Tsit5 (blue squares) starts around 2.5ms and rises to about 10ms at dimension 128. The modax Tsit5 (orange plus markers) is the lowest line, starting around 0.2ms and rising to about 5.5ms at dimension 128.",
+    "texts": "modax Tsit5, diffrax Tsit5, torchdiffeq Dopri8, DiffEqGPU.jl Tsit5 EnsembleGPUArray, DiffEqGPU.jl Tsit5 EnsembleGPUKernel, Solve time (ms), ODE dimension, 2, 4, 6, 8, 10, 12, 16, 32, 64, 128, 10^0, 10^1, 10^2",
+    "data": [
+     {
+      "series": "modax Tsit5",
+      "points": [
+       [
+        2,
+        0.2
+       ],
+       [
+        4,
+        0.25
+       ],
+       [
+        6,
+        0.27
+       ],
+       [
+        8,
+        0.27
+       ],
+       [
+        10,
+        0.32
+       ],
+       [
+        12,
+        0.35
+       ],
+       [
+        16,
+        0.38
+       ],
+       [
+        32,
+        0.7
+       ],
+       [
+        64,
+        2.0
+       ],
+       [
+        128,
+        5.5
+       ]
+      ]
+     },
+     {
+      "series": "diffrax Tsit5",
+      "points": [
+       [
+        2,
+        2.4
+       ],
+       [
+        4,
+        2.5
+       ],
+       [
+        6,
+        2.8
+       ],
+       [
+        8,
+        3.7
+       ],
+       [
+        10,
+        4.3
+       ],
+       [
+        12,
+        4.6
+       ],
+       [
+        16,
+        2.9
+       ],
+       [
+        32,
+        4.2
+       ],
+       [
+        64,
+        6.2
+       ],
+       [
+        128,
+        10
+       ]
+      ]
+     },
+     {
+      "series": "torchdiffeq Dopri8",
+      "points": [
+       [
+        2,
+        16
+       ],
+       [
+        4,
+        21
+       ],
+       [
+        6,
+        24
+       ],
+       [
+        8,
+        30
+       ],
+       [
+        10,
+        36
+       ],
+       [
+        12,
+        40
+       ],
+       [
+        16,
+        50
+       ],
+       [
+        32,
+        91
+       ],
+       [
+        64,
+        165
+       ],
+       [
+        128,
+        300
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Tsit5 EnsembleGPUArray",
+      "points": [
+       [
+        2,
+        9
+       ],
+       [
+        4,
+        10
+       ],
+       [
+        6,
+        11.5
+       ],
+       [
+        8,
+        13
+       ],
+       [
+        10,
+        12.2
+       ],
+       [
+        12,
+        12.5
+       ],
+       [
+        16,
+        21
+       ],
+       [
+        32,
+        41
+       ],
+       [
+        64,
+        73
+       ],
+       [
+        128,
+        110
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Tsit5 EnsembleGPUKernel",
+      "points": [
+       [
+        2,
+        3.5
+       ],
+       [
+        4,
+        3.6
+       ],
+       [
+        6,
+        3.8
+       ],
+       [
+        8,
+        4.1
+       ],
+       [
+        10,
+        4.3
+       ],
+       [
+        12,
+        4.1
+       ],
+       [
+        16,
+        4.5
+       ],
+       [
+        32,
+        7.5
+       ],
+       [
+        64,
+        11.5
+       ],
+       [
+        128,
+        27
+       ]
+      ]
+     }
+    ],
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 7,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 11,
+   "figure_name": "c67bd11f49f0c0bbe96116e58fcc8555",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a scatter plot with a logarithmic y-axis. It compares two GPU solver implementations of the Rodas5P method, with and without sorting.\n\n**Axes**\n- The x-axis is \"Normalised standard deviation of attempted steps\" and runs from about 0.0 to 0.55. Gridlines are at 0.1 intervals.\n- The y-axis is \"Solve time / mean attempted steps (ms)\" on a log scale. Labelled ticks are at 10^-1 and 10^0, and the data span roughly 0.07 to 5 ms.\n\n**Legend and series**\n- Orange squares: modax Rodas5P FP32.\n- Orange plus signs: modax Rodas5P FP32 (sorted).\n- Purple triangles: DiffEqGPU.jl Rodas5P EnsembleGPUKernel.\n- Purple crosses: DiffEqGPU.jl Rodas5P EnsembleGPUKernel (sorted).\n\n**Values you can read (approximate)**\n- The DiffEqGPU.jl unsorted series starts near 0.65 ms at x = 0. It then sits at about 1.4 ms at x ≈ 0.15 and rises steadily to about 4.5 ms at x ≈ 0.5.\n- The DiffEqGPU.jl sorted series also starts near 0.65 ms at x = 0. It is about 1.3 ms at x ≈ 0.15 and rises to about 2.7 ms at x ≈ 0.5. It stays below the unsorted series, and the gap widens as x increases.\n- The modax unsorted series starts near 0.08 ms at x = 0. It rises to about 0.11 ms at x ≈ 0.15 and about 0.12 ms at x ≈ 0.21, then to about 0.15–0.17 ms from x ≈ 0.4 onward. It ends near 0.16 ms at x ≈ 0.53.\n- The modax sorted series stays roughly flat at about 0.075–0.09 ms across the whole range, with no clear upward trend.\n\n**Overall pattern**\n- The DiffEqGPU.jl results are about one order of magnitude higher than the modax results at every x value.\n- Normalised time per step grows with the variation in attempted steps for the unsorted runs. It grows for sorted DiffEqGPU.jl too, but less steeply.\n- Sorting has almost no effect at x = 0. It gives the largest benefit at higher variation.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A scatter plot with a log-scaled y-axis showing 'Solve time / mean attempted steps (ns)' versus x-axis 'Normalised standard deviation of attempted steps'. Four data series are plotted: 'modax Rodas5P FP32' (orange squares), 'modax Rodas5P FP32 (sorted)' (orange crosses), 'DiffEqGPU.jl Rodas5P EnsembleGPUKernel' (purple triangles), and 'DiffEqGPU.jl Rodas5P EnsembleGPUKernel (sorted)' (purple x markers). The purple triangle series shows the highest values, increasing from about 0.65 at x=0 to above 4 at x=0.5. The purple x series (sorted) is consistently lower than the triangles, rising from about 0.65 to around 2.8. The orange square series rises gradually from about 0.08 to 0.18 across the x range. The orange cross series (sorted) stays relatively flat around 0.08-0.09 throughout. Overall, both DiffEqGPU.jl series show increasing solve time with increasing normalised standard deviation, while the modax series remain much lower and flatter, with the sorted variants showing less variance than unsorted ones.",
+    "texts": "modax Rodas5P FP32, modax Rodas5P FP32 (sorted), DiffEqGPU.jl Rodas5P EnsembleGPUKernel, DiffEqGPU.jl Rodas5P EnsembleGPUKernel (sorted), Solve time / mean attempted steps (ns), Normalised standard deviation of attempted steps, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 10^0, 10^-1",
+    "data": [
+     {
+      "series": "modax Rodas5P FP32",
+      "points": [
+       [
+        0.0,
+        0.078
+       ],
+       [
+        0.155,
+        0.108
+       ],
+       [
+        0.21,
+        0.118
+       ],
+       [
+        0.265,
+        0.133
+       ],
+       [
+        0.315,
+        0.148
+       ],
+       [
+        0.36,
+        0.153
+       ],
+       [
+        0.395,
+        0.163
+       ],
+       [
+        0.43,
+        0.17
+       ],
+       [
+        0.455,
+        0.178
+       ],
+       [
+        0.495,
+        0.172
+       ],
+       [
+        0.53,
+        0.178
+       ]
+      ]
+     },
+     {
+      "series": "modax Rodas5P FP32 (sorted)",
+      "points": [
+       [
+        0.0,
+        0.082
+       ],
+       [
+        0.155,
+        0.079
+       ],
+       [
+        0.21,
+        0.09
+       ],
+       [
+        0.265,
+        0.085
+       ],
+       [
+        0.315,
+        0.084
+       ],
+       [
+        0.36,
+        0.075
+       ],
+       [
+        0.395,
+        0.076
+       ],
+       [
+        0.43,
+        0.08
+       ],
+       [
+        0.455,
+        0.079
+       ],
+       [
+        0.495,
+        0.083
+       ],
+       [
+        0.53,
+        0.088
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUKernel",
+      "points": [
+       [
+        0.0,
+        0.65
+       ],
+       [
+        0.155,
+        1.35
+       ],
+       [
+        0.21,
+        1.9
+       ],
+       [
+        0.265,
+        2.05
+       ],
+       [
+        0.315,
+        2.55
+       ],
+       [
+        0.36,
+        3.2
+       ],
+       [
+        0.395,
+        3.9
+       ],
+       [
+        0.43,
+        4.1
+       ],
+       [
+        0.455,
+        4.9
+       ],
+       [
+        0.495,
+        5.1
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUKernel (sorted)",
+      "points": [
+       [
+        0.0,
+        0.65
+       ],
+       [
+        0.155,
+        1.25
+       ],
+       [
+        0.21,
+        1.45
+       ],
+       [
+        0.265,
+        1.55
+       ],
+       [
+        0.315,
+        1.85
+       ],
+       [
+        0.36,
+        2.1
+       ],
+       [
+        0.395,
+        2.45
+       ],
+       [
+        0.43,
+        2.5
+       ],
+       [
+        0.455,
+        2.8
+       ],
+       [
+        0.495,
+        2.8
+       ]
+      ]
+     }
+    ],
+    "error": "major",
+    "note": "y-axis unit given as ns; the axis is ms"
+   }
+  },
+  {
+   "n": 8,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 12,
+   "figure_name": "0eeb05df903e29d582b029b451534620",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a log-log line chart comparing ODE solver solve times across problem sizes. It has no printed caption.\n\n**Axes:** The x-axis is \"ODE dimension\", with ticks at 2, 4, 6, 8, 10, 12, 16, 32, 64, 96 and 128. The y-axis is \"Solve time (ms)\" on a logarithmic scale, running from about 0.2 to about 2000 ms, with labeled ticks at 10^0, 10^1, 10^2 and 10^3. A light dashed grid is drawn behind the data.\n\n**Series (six lines, listed in the legend):**\n1. modax Rodas5P FP32: orange dotted line with circle markers.\n2. modax Rodas5P FP32 (non-sparse): orange dashed line with plus-shaped markers.\n3. modax Rodas5P FP64 (non-sparse): orange solid line with x-shaped markers.\n4. diffrax Kvaerno5: blue solid line with square markers.\n5. DiffEqGPU.jl Rodas5P EnsembleGPUArray: purple solid line with upward triangles.\n6. DiffEqGPU.jl Rodas5P EnsembleGPUKernel: purple dashed line with downward triangles. It stops at dimension 16.\n\n**Approximate values and trends:**\n- **modax FP32 (sparse):** This is the fastest series at nearly every dimension. It starts near 0.28 ms at dimension 2 and is about 0.3 ms at 4, 0.4 ms at 8, 0.75 ms at 16, 1.6 ms at 32, 5.8 ms at 64, 9 ms at 96 and 15 ms at 128.\n- **modax FP32 and FP64 (non-sparse):** Both start near 0.28 ms at dimension 2. They rise faster than the sparse version, to about 1–2.5 ms at dimension 10–12 and about 4–5 ms at 16. At 32 they are about 45–55 ms, at 64 about 330–380 ms, and at 96 about 1300–1400 ms. The FP64 line is slightly above the FP32 non-sparse line at small dimensions. The non-sparse lines end at dimension 96.\n- **diffrax Kvaerno5:** It starts near 19 ms at dimension 2 and rises slowly to about 30 ms at 8 and 58 ms at 16. It reaches about 180 ms at 32, about 480 ms at 64 and 470 ms at 96, and ends near 750 ms at 128.\n- **DiffEqGPU.jl EnsembleGPUArray:** It starts near 26 ms at dimension 2 and follows a path close to diffrax, at about 30 ms at 8 and 60 ms at 16. It reaches about 160 ms at 32, about 500 ms at 64 and about 1200 ms at 96, and ends near 1800 ms at 128.\n- **DiffEqGPU.jl EnsembleGPUKernel:** It starts near 4 ms at dimension 2 and rises to about 6 ms at 6, 8 ms at 8, 13 ms at 10, 25 ms at 12 and about 85 ms at 16, where it ends.\n\n**Overall pattern:** At small dimensions the modax variants are far faster than diffrax and the DiffEqGPU.jl variants, by roughly two orders of magnitude at dimension 2. The gap narrows as dimension grows, and the non-sparse modax variants reach about the same solve times as the other solvers by dimension 64–96. The sparse FP32 modax variant stays well below all the others through dimension 128.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A log-log line chart showing Solve time (ms) on the y-axis (log scale from below 1 to over 1000) versus ODE dimension on the x-axis (log scale from 2 to 128). Six series are plotted comparing different ODE solver implementations: modax Rodas5P FP32 (orange dotted circles) which shows the lowest solve times, scaling from about 0.3ms at dimension 2 to about 14ms at dimension 128. modax Rodas5P FP32 non-sparse (orange dashed squares) and modax Rodas5P FP64 non-sparse (orange solid circles) track closely together, rising from about 0.3ms at dimension 2 to about 1500ms at dimension 96. diffrax Kvaerno5 (blue solid squares) starts around 20ms at dimension 2 and rises to about 750ms at dimension 128, with a relatively flatter slope at higher dimensions. DiffEqGPU.jl Rodas5P EnsembleGPUArray (purple solid triangles) starts around 28ms at dimension 2 and rises steadily to about 1800ms at dimension 128. DiffEqGPU.jl Rodas5P EnsembleGPUKernel (purple dashed triangles) starts around 4ms at dimension 2, rises gradually to about 13ms at dimension 12, then jumps sharply, converging with EnsembleGPUArray around dimension 16 onward to about 500ms at dimension 64.",
+    "texts": "modax Rodas5P FP32, modax Rodas5P FP32 (non-sparse), modax Rodas5P FP64 (non-sparse), diffrax Kvaerno5, DiffEqGPU.jl Rodas5P EnsembleGPUArray, DiffEqGPU.jl Rodas5P EnsembleGPUKernel, Solve time (ms), ODE dimension, 2, 4, 6, 8, 10, 12, 16, 32, 64, 96, 128, 10^0, 10^1, 10^2, 10^3",
+    "data": [
+     {
+      "series": "modax Rodas5P FP32",
+      "points": [
+       [
+        2,
+        0.28
+       ],
+       [
+        4,
+        0.32
+       ],
+       [
+        6,
+        0.38
+       ],
+       [
+        8,
+        0.42
+       ],
+       [
+        10,
+        0.5
+       ],
+       [
+        12,
+        0.6
+       ],
+       [
+        16,
+        0.72
+       ],
+       [
+        32,
+        1.6
+       ],
+       [
+        64,
+        5.8
+       ],
+       [
+        96,
+        9.5
+       ],
+       [
+        128,
+        14
+       ]
+      ]
+     },
+     {
+      "series": "modax Rodas5P FP32 (non-sparse)",
+      "points": [
+       [
+        2,
+        0.28
+       ],
+       [
+        4,
+        0.42
+       ],
+       [
+        6,
+        0.55
+       ],
+       [
+        8,
+        0.9
+       ],
+       [
+        10,
+        1.3
+       ],
+       [
+        12,
+        2.0
+       ],
+       [
+        16,
+        4.3
+       ],
+       [
+        32,
+        47
+       ],
+       [
+        64,
+        320
+       ],
+       [
+        96,
+        1300
+       ]
+      ]
+     },
+     {
+      "series": "modax Rodas5P FP64 (non-sparse)",
+      "points": [
+       [
+        2,
+        0.28
+       ],
+       [
+        4,
+        0.45
+       ],
+       [
+        6,
+        0.6
+       ],
+       [
+        8,
+        1.0
+       ],
+       [
+        10,
+        1.6
+       ],
+       [
+        12,
+        2.3
+       ],
+       [
+        16,
+        4.5
+       ],
+       [
+        32,
+        52
+       ],
+       [
+        64,
+        340
+       ],
+       [
+        96,
+        1400
+       ]
+      ]
+     },
+     {
+      "series": "diffrax Kvaerno5",
+      "points": [
+       [
+        2,
+        20
+       ],
+       [
+        4,
+        22
+       ],
+       [
+        6,
+        24
+       ],
+       [
+        8,
+        29
+       ],
+       [
+        10,
+        33
+       ],
+       [
+        12,
+        40
+       ],
+       [
+        16,
+        60
+       ],
+       [
+        32,
+        170
+       ],
+       [
+        64,
+        480
+       ],
+       [
+        96,
+        460
+       ],
+       [
+        128,
+        750
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUArray",
+      "points": [
+       [
+        2,
+        28
+       ],
+       [
+        4,
+        28
+       ],
+       [
+        6,
+        29
+       ],
+       [
+        8,
+        30
+       ],
+       [
+        10,
+        33
+       ],
+       [
+        12,
+        38
+       ],
+       [
+        16,
+        62
+       ],
+       [
+        32,
+        160
+       ],
+       [
+        64,
+        500
+       ],
+       [
+        96,
+        1250
+       ],
+       [
+        128,
+        1800
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUKernel",
+      "points": [
+       [
+        2,
+        4
+       ],
+       [
+        4,
+        4.5
+       ],
+       [
+        6,
+        6
+       ],
+       [
+        8,
+        8.5
+       ],
+       [
+        10,
+        13
+       ],
+       [
+        12,
+        25
+       ],
+       [
+        16,
+        85
+       ],
+       [
+        32,
+        165
+       ],
+       [
+        64,
+        520
+       ]
+      ]
+     }
+    ],
+    "error": "minor",
+    "note": "FP32 non-sparse given square markers and FP64 non-sparse circle markers; they are plus and x"
+   }
+  },
+  {
+   "n": 9,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 12,
+   "figure_name": "898ac5295a39e43b6e74d09480650b35",
+   "caption": "Figure 11. Effect of state dimension 𝐷 on Rodas5P solver performance for 1000 identical stiff van der Pol lattice trajectories. In its baseline configura- tion modax is the fastest at every dimension; the non-sparse configurations disable the sparsity analysis. DiffEqGPU.jl’s EnsembleGPUKernel appears to exceed register/cache limits and fails above 𝐷 = 16.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a line chart with a logarithmic y-axis. It plots solve time in milliseconds (about 5 to 1000) against Jacobian density, the fraction of structurally nonzero entries, on the x-axis. The x-axis runs from about 0.04 to 0.27 and has eight sampled points. The caption refers to state dimension D, but the axis shown is Jacobian density. Four series are in the legend.\n\n1. modax Rodas5P FP32 is an orange dashed line with plus markers. It is the fastest series by a wide margin and rises with density. It starts near 5.5 ms at density 0.04. It reaches about 6 ms at 0.055 and about 7 ms at 0.07 and 0.085. It is near 8 ms at 0.117 and about 9 ms at 0.148. It rises to about 18 ms at 0.21 and about 24 ms at 0.265.\n\n2. modax Rodas5P FP32 (non-sparse) is an orange solid line with x markers. It is nearly flat at roughly 380 ms across all densities.\n\n3. diffrax Kvaerno5 is a blue line with square markers. It starts near 490 ms at 0.04 and climbs to about 560 ms at 0.055, 630 ms at 0.07 and 690 ms at 0.085. It peaks near 830 ms at 0.117. It then falls to about 510 ms at 0.148 and about 390 ms at 0.21, and ends near 395 ms at 0.265.\n\n4. DiffEqGPU.jl Rodas5P EnsembleGPUArray is a purple line with triangle markers. It rises slowly from about 520 ms at 0.04 to about 600 ms at 0.265.\n\nThe sparse modax configuration is roughly 15 to 70 times faster than the other three series. The non-sparse modax line sits below diffrax and DiffEqGPU.jl at most densities, and it is about equal to diffrax at the highest densities.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A log-scale line chart showing solve time (ms) versus Jacobian density (fraction of structurally nonzero entries) for four solver configurations. The x-axis ranges from about 0.04 to 0.27, and the y-axis (log scale) ranges from 10 to 10^3 ms. 'modax Rodas5P FP32' (orange dashed, square markers) stays very low, around 6-10 ms for low density, rising to about 23 ms at density 0.27, consistently lowest performer. 'modax Rodas5P FP32 (non-sparse)' (orange solid, circle markers) stays flat around 390-400 ms across all densities. 'diffrax Kvaerno5' (blue, square markers) starts around 500 ms at density 0.04, rises to a peak of about 830 ms at density 0.12, then drops sharply to about 430 ms at density 0.21 and stays flat to 0.27. 'DiffEqGPU.jl Rodas5P EnsembleGPUArray' (purple, triangle markers) stays relatively flat, fluctuating slightly between 510-610 ms across the density range.",
+    "texts": "10^3, 10^2, 10^1, Solve time (ms), Jacobian density (fraction of structurally nonzero entries), 0.05, 0.10, 0.15, 0.20, 0.25, modax Rodas5P FP32, modax Rodas5P FP32 (non-sparse), diffrax Kvaerno5, DiffEqGPU.jl Rodas5P EnsembleGPUArray",
+    "data": [
+     {
+      "series": "modax Rodas5P FP32",
+      "points": [
+       [
+        0.04,
+        6
+       ],
+       [
+        0.055,
+        6.5
+       ],
+       [
+        0.07,
+        7.5
+       ],
+       [
+        0.085,
+        7.3
+       ],
+       [
+        0.117,
+        8.3
+       ],
+       [
+        0.148,
+        9.2
+       ],
+       [
+        0.21,
+        18.5
+       ],
+       [
+        0.265,
+        23
+       ]
+      ]
+     },
+     {
+      "series": "modax Rodas5P FP32 (non-sparse)",
+      "points": [
+       [
+        0.04,
+        390
+       ],
+       [
+        0.055,
+        390
+       ],
+       [
+        0.07,
+        390
+       ],
+       [
+        0.085,
+        390
+       ],
+       [
+        0.117,
+        390
+       ],
+       [
+        0.148,
+        390
+       ],
+       [
+        0.21,
+        390
+       ],
+       [
+        0.265,
+        390
+       ]
+      ]
+     },
+     {
+      "series": "diffrax Kvaerno5",
+      "points": [
+       [
+        0.04,
+        500
+       ],
+       [
+        0.055,
+        600
+       ],
+       [
+        0.07,
+        650
+       ],
+       [
+        0.085,
+        720
+       ],
+       [
+        0.117,
+        830
+       ],
+       [
+        0.148,
+        530
+       ],
+       [
+        0.21,
+        430
+       ],
+       [
+        0.265,
+        430
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUArray",
+      "points": [
+       [
+        0.04,
+        540
+       ],
+       [
+        0.055,
+        540
+       ],
+       [
+        0.07,
+        530
+       ],
+       [
+        0.085,
+        540
+       ],
+       [
+        0.117,
+        550
+       ],
+       [
+        0.148,
+        580
+       ],
+       [
+        0.21,
+        600
+       ],
+       [
+        0.265,
+        610
+       ]
+      ]
+     }
+    ],
+    "error": "minor",
+    "note": "FP32 given square markers and FP32 non-sparse circle markers; they are plus and x"
+   }
+  },
+  {
+   "n": 10,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 12,
+   "figure_name": "a70254b3dd94feb93873c3de9ced93d4",
+   "caption": "Figure 13. Effect of state dimension 𝐷 on the cost of computing both the value and gradient of the final state with respect to each trajectory’s damping parameter, for 1000 identical stiff van der Pol lattice trajectories. modax and DiffEqGPU.jl integrate a single forward sensitivity column jointly with the state whilst diffrax uses its default reverse-mode checkpointing adjoint.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a log-log line chart of solve time in milliseconds (y-axis, about 0.3 to 10,000 ms) against ODE dimension (x-axis, ticks at 2, 4, 6, 8, 10, 12, 16, 32, 64, 96 and 128). It belongs to a benchmark of value-and-gradient computation for 1000 identical stiff van der Pol lattice trajectories. Five series are plotted, each with markers joined by lines.\n\n1. modax Rodas5P FP32 (orange dashed line, plus markers) is the fastest series. It starts near 0.37 ms at dimension 2 and reaches about 0.55 ms at 4, 0.65 ms at 6, 0.9 ms at 8, 1.2 ms at 10, 2.1 ms at 12 and 2.1 ms at 16. It then rises to about 6.3 ms at 32, 14.5 ms at 64, 23 ms at 96 and 35 ms at 128.\n\n2. modax Rodas5P FP32 (non-sparse) (solid orange line, x markers) begins at the same point, about 0.37 ms at dimension 2. It rises to about 0.55 ms at 4, 1.05 ms at 6, 1.5 ms at 8, 2.2 ms at 10, 3.1 ms at 12, 8 ms at 16, 70 ms at 32 and 500 ms at 64. The series ends at dimension 64.\n\n3. diffrax Kvaerno5 (solid blue line, square markers) starts near 62 ms at dimension 2 and climbs to about 70 ms at 4, 78 ms at 6, 97 ms at 8, 112 ms at 10, 130 ms at 12, 195 ms at 16, 800 ms at 32 and 2,500 ms at 64. It dips to about 1,900 ms at 96 and rises to about 3,300 ms at 128.\n\n4. DiffEqGPU.jl Rodas5P EnsembleGPUArray (solid purple line, triangle markers) starts near 30 ms at dimension 2, with about 32 ms at 4, 45 ms at 6, 70 ms at 8, 85 ms at 10, 120 ms at 12, 175 ms at 16, 570 ms at 32 and 2,050 ms at 64. It then grows to about 5,300 ms at 96 and 8,200 ms at 128.\n\n5. DiffEqGPU.jl Rodas5P EnsembleGPUKernel (purple dashed line, downward-triangle markers) starts near 4.5 ms at dimension 2, then reaches about 9 ms at 4, 29 ms at 6 and 90 ms at 8. It stops at dimension 8, where it meets the other DiffEqGPU curve and the diffrax curve.\n\nAll curves rise with dimension. The modax series are one to two orders of magnitude below diffrax and DiffEqGPU.jl EnsembleGPUArray at most dimensions. The sparse modax variant scales most gently at large dimensions, and the non-sparse variant grows steeply from dimension 16 to 64.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A log-log line plot showing solve time (ms) versus ODE dimension for five different ODE solver configurations. The x-axis (ODE dimension) ranges from 2 to 128 on a logarithmic scale, and the y-axis (Solve time in ms) ranges from 10^0 to 10^4 on a logarithmic scale. Five series are shown: 'modax Rodas5P FP32' (orange dashed line with square markers), 'modax Rodas5P FP32 (non-sparse)' (orange solid line with circle markers), 'diffrax Kvaerno5' (blue solid line with square markers), 'DiffEqGPU.jl Rodas5P EnsembleGPUArray' (purple solid line with triangle-up markers), and 'DiffEqGPU.jl Rodas5P EnsembleGPUKernel' (purple dashed line with triangle-down markers). All series show increasing solve time with increasing ODE dimension. The modax Rodas5P FP32 (sparse) series has the lowest solve times throughout, from about 0.4 ms at dimension 2 to about 35 ms at dimension 128. The non-sparse modax series starts similarly low but rises more steeply to about 500 ms at dimension 64. The diffrax Kvaerno5 series starts around 63 ms at dimension 2 and rises to about 3500 ms at dimension 128, with values fluctuating slightly between 64 and 128. The DiffEqGPU.jl EnsembleGPUArray series starts around 30 ms at dimension 2 and rises steadily to about 7800 ms at dimension 128. The DiffEqGPU.jl EnsembleGPUKernel series starts lowest among the GPU-based series at about 4.5 ms at dimension 2, rises to meet the GPUArray series around dimension 12-16, then continues upward closely tracking the GPUArray series to about 2200 ms at dimension 64 (no data beyond 64 for this series).",
+    "texts": "modax Rodas5P FP32\nmodax Rodas5P FP32 (non-sparse)\ndiffrax Kvaerno5\nDiffEqGPU.jl Rodas5P EnsembleGPUArray\nDiffEqGPU.jl Rodas5P EnsembleGPUKernel\nODE dimension\nSolve time (ms)\n2 4 6 8 10 12 16 32 64 96 128\n10^0 10^1 10^2 10^3 10^4",
+    "data": [
+     {
+      "series": "modax Rodas5P FP32",
+      "points": [
+       [
+        2,
+        0.4
+       ],
+       [
+        4,
+        0.5
+       ],
+       [
+        6,
+        0.65
+       ],
+       [
+        8,
+        0.85
+       ],
+       [
+        10,
+        1.2
+       ],
+       [
+        12,
+        2.1
+       ],
+       [
+        16,
+        2.1
+       ],
+       [
+        32,
+        6.2
+       ],
+       [
+        64,
+        14
+       ],
+       [
+        96,
+        23
+       ],
+       [
+        128,
+        35
+       ]
+      ]
+     },
+     {
+      "series": "modax Rodas5P FP32 (non-sparse)",
+      "points": [
+       [
+        2,
+        0.4
+       ],
+       [
+        4,
+        0.55
+       ],
+       [
+        6,
+        1.05
+       ],
+       [
+        8,
+        1.5
+       ],
+       [
+        10,
+        2.2
+       ],
+       [
+        12,
+        3.1
+       ],
+       [
+        16,
+        8
+       ],
+       [
+        32,
+        71
+       ],
+       [
+        64,
+        500
+       ]
+      ]
+     },
+     {
+      "series": "diffrax Kvaerno5",
+      "points": [
+       [
+        2,
+        63
+       ],
+       [
+        4,
+        69
+       ],
+       [
+        6,
+        78
+       ],
+       [
+        8,
+        96
+       ],
+       [
+        10,
+        112
+       ],
+       [
+        12,
+        128
+       ],
+       [
+        16,
+        200
+       ],
+       [
+        32,
+        820
+       ],
+       [
+        64,
+        2500
+       ],
+       [
+        96,
+        1950
+       ],
+       [
+        128,
+        3500
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUArray",
+      "points": [
+       [
+        2,
+        29
+       ],
+       [
+        4,
+        32
+       ],
+       [
+        6,
+        42
+       ],
+       [
+        8,
+        70
+       ],
+       [
+        10,
+        82
+       ],
+       [
+        12,
+        120
+       ],
+       [
+        16,
+        180
+       ],
+       [
+        32,
+        560
+       ],
+       [
+        64,
+        2100
+       ],
+       [
+        96,
+        5500
+       ],
+       [
+        128,
+        7800
+       ]
+      ]
+     },
+     {
+      "series": "DiffEqGPU.jl Rodas5P EnsembleGPUKernel",
+      "points": [
+       [
+        2,
+        4.5
+       ],
+       [
+        4,
+        9
+       ],
+       [
+        6,
+        27
+       ],
+       [
+        8,
+        70
+       ],
+       [
+        10,
+        95
+       ],
+       [
+        12,
+        120
+       ],
+       [
+        16,
+        185
+       ],
+       [
+        32,
+        600
+       ],
+       [
+        64,
+        2200
+       ]
+      ]
+     }
+    ],
+    "error": "minor",
+    "note": "FP32 given square markers and FP32 non-sparse circle markers; they are plus and x"
+   }
+  },
+  {
+   "n": 11,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 14,
+   "figure_name": "76b328d88975323df803c6b7320640e6",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a scatter plot of posterior samples in two parameters, with point color showing the posterior weight. There is no printed caption.\n\n**Axes:** The horizontal axis is η₁₀, running from about 3 to 10 with ticks at 4, 6, 8 and 10. The vertical axis is N_eff, running from about 2.0 to 4.0 with ticks every 0.25. Light dashed grid lines are drawn.\n\n**Color scale:** A vertical colorbar on the right is labeled \"Posterior weight\". It runs from 0.000 (dark purple) through blue and teal to green and yellow at about 0.011. Ticks are at 0.000, 0.002, 0.004, 0.006, 0.008 and 0.010.\n\n**What the points show:**\n- Many small semi-transparent points are spread over the whole plotting area. Most of the outlying ones are dark purple, meaning their weights are near zero.\n- The points concentrate in a dense cluster around η₁₀ ≈ 6 to 6.5 and N_eff ≈ 3.0. The darkest, densest core sits at about N_eff 3.0 to 3.1.\n- The cluster is elongated vertically. It extends from roughly N_eff 2.7 to 3.4 and spans about η₁₀ 5.5 to 7.\n- The highest-weight points, shown in teal, green and a few yellow-green, lie inside this central region. They are mostly at η₁₀ of about 6 to 7 and N_eff of about 2.8 to 3.3.\n- Sparse low-weight points reach the edges of the plot, including η₁₀ near 3 and near 10, and N_eff near 2.0 and near 4.0.\n\nThe figure shows that the posterior is concentrated near η₁₀ ≈ 6.2 and N_eff ≈ 3.0. The sampling covers a much wider prior range, but the points outside the central cluster carry little weight.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A scatter plot showing posterior samples with eta_10 on the x-axis (ranging from about 2 to 10) and N_eff on the y-axis (ranging from 2.00 to 4.00). Points are colored according to posterior weight, from dark purple (near 0.000) to bright yellow (near 0.010+), as shown in the colorbar on the right. The majority of points cluster densely around eta_10 = 6 and N_eff = 3.0-3.1, with these dense central points showing higher posterior weights (green to yellow colors). Sparse, low-weight points (dark purple) are scattered broadly across the entire plot area, extending from eta_10 = 2 to 10 and N_eff = 2.0 to 4.0, representing low-probability regions of parameter space.",
+    "texts": "Neff; eta_10; 4.00; 3.75; 3.50; 3.25; 3.00; 2.75; 2.50; 2.25; 2.00; 4; 6; 8; 10; Posterior weight; 0.010; 0.008; 0.006; 0.004; 0.002; 0.000",
+    "data": {
+     "x": [
+      6.0,
+      6.1,
+      5.9,
+      6.2,
+      6.0,
+      6.1,
+      5.8,
+      6.3,
+      3.0,
+      4.0,
+      5.0,
+      7.0,
+      8.0,
+      9.0,
+      10.0,
+      3.5,
+      4.5,
+      5.5,
+      6.5,
+      7.5,
+      8.5,
+      9.5,
+      2.5,
+      6.0,
+      6.1
+     ],
+     "y": [
+      3.0,
+      3.05,
+      3.1,
+      2.95,
+      3.0,
+      3.08,
+      2.92,
+      3.15,
+      3.9,
+      2.9,
+      2.6,
+      3.3,
+      3.5,
+      2.5,
+      3.9,
+      2.2,
+      3.7,
+      2.1,
+      3.8,
+      2.3,
+      3.6,
+      2.0,
+      3.95,
+      3.02,
+      2.98
+     ],
+     "colors": "posterior weight approx: center cluster ~0.008-0.011, outer points ~0.0001-0.001"
+    },
+    "error": "major",
+    "note": "eta_10 said to run from about 2; points start near 3. The dense central core is said to be high-weight green/yellow; it is dark purple, with the higher weights around it"
+   }
+  },
+  {
+   "n": 12,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 14,
+   "figure_name": "c523ca58d8856fc1788695d69c6c3e3f",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a histogram of a posterior distribution for the parameter η₁₀, drawn as orange bars on a white background with light dashed gridlines.\n\n**Axes:**\n- The x-axis is labeled η₁₀. It is marked at 4, 6, 8 and 10, and the visible range runs from about 3 to 10.3.\n- The y-axis is labeled \"Posterior density\". It is marked from 0.0 to 1.2 in steps of 0.2, and the top of the plot is just above 1.2.\n\n**Shape of the distribution:**\n- There is one series, and it has a single peak. It looks roughly bell-shaped, with a slightly longer tail on the high side.\n- The bars are narrow, about 0.14 units wide.\n- Nearly all of the mass lies between about 5.2 and 7.2. Outside that range the density is essentially zero, and the large empty regions from 3 to 5 and from 7.3 to 10 contain no bars.\n- The tallest bar is at about η₁₀ ≈ 6.1–6.2, with a density of about 1.26.\n- The neighboring bars are about 1.12 just to the right of the peak and about 1.0 just to the left.\n- Further left, the bars are roughly 0.78, 0.41, 0.12 and 0.04 as the values approach 5.2.\n- Further right, the bars are roughly 0.73 near 6.4, 0.30 near 6.6, 0.10 near 6.8, and then values near 0.02 or below out to about 7.2.\n\n**Summary:** The posterior for η₁₀ is concentrated around a value of about 6.2, with most of the probability between about 5.5 and 6.9.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A histogram showing the posterior density distribution of the parameter eta_10 (η10). The x-axis ranges from about 3 to 10, and the y-axis (Posterior density) ranges from 0.0 to about 1.26. The distribution is unimodal and roughly bell-shaped, centered around x=6.1-6.2, with a peak density value of approximately 1.26. The distribution is narrow, with most of the density concentrated between x=5.2 and x=7.0, and tails tapering off to near zero outside this range.",
+    "texts": "1.2, 1.0, 0.8, 0.6, 0.4, 0.2, 0.0, 4, 6, 8, 10, Posterior density, η10",
+    "data": {
+     "x": [
+      5.2,
+      5.4,
+      5.6,
+      5.8,
+      6.0,
+      6.1,
+      6.2,
+      6.3,
+      6.4,
+      6.6,
+      6.8,
+      7.0
+     ],
+     "y": [
+      0.02,
+      0.12,
+      0.42,
+      0.78,
+      1.0,
+      1.26,
+      1.13,
+      0.75,
+      0.3,
+      0.12,
+      0.05,
+      0.01
+     ]
+    },
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 13,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 14,
+   "figure_name": "95ec69f6efb8107774b72d88c639be83",
+   "caption": "Figure 14. Posterior recovered by nested slice sampling for the phenomenological toy BBN network, fitting synthetic𝑌𝑃 and 𝐷/𝐻 observations generated from the same network at 𝜂10 ≈ 6.1 and 𝑁eff = 3.044. Left: the dead and live points of the run coloured by posterior weight; the lightly weighted points scattered across the prior box are the early, low-likelihood dead points that nested sampling discards on its way to the peak. Centre and right: the weighted marginal posteriors of 𝜂10 and 𝑁eff.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a histogram of the weighted marginal posterior of N_eff. It is the right-hand panel of a three-panel figure from a nested slice sampling run on a toy BBN network. The other two panels are not shown here.\n\nThe x-axis is N_eff and runs from about 1.9 to 4.1, with ticks at 2.0, 2.5, 3.0, 3.5 and 4.0. The y-axis is posterior density, from 0 to a little above 2.7, with ticks at 0, 0.5, 1.0, 1.5, 2.0 and 2.5. The bars are orange, on a light dashed grid.\n\nThe histogram has a single broad peak centred near N_eff ≈ 3.0 to 3.1. Its density is essentially zero below about 2.5 and above about 3.55. The bars rise from about 0.05 near 2.55 and about 0.15 near 2.6–2.7, to about 0.25 near 2.75 and about 0.6 near 2.8. Around 2.85 to 3.3 the bars are noisy and jagged. Some of the heights I can read are:\n\n- about 1.45 near 2.85\n- about 1.3 near 2.9\n- about 2.27 near 2.95\n- about 1.95 near 3.0\n- about 1.65 near 3.05\n- the tallest bar, about 2.67, just above 3.05\n- about 1.73 near 3.15\n- about 1.67 near 3.2\n- about 1.22 near 3.25\n- about 1.45 near 3.3\n- about 1.2 near 3.35\n\nBeyond that the density falls off, to about 0.25 near 3.4, about 0.12 near 3.45 and about 0.08 near 3.5, then to zero. The distribution is roughly symmetric about a mean near 3.05, which is consistent with the true value of 3.044 mentioned in the caption. The spread is about ±0.2 to 0.3.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A histogram showing the posterior density distribution of N_eff (effective number of neutrino species). The x-axis ranges from 2.0 to 4.0 and represents N_eff, while the y-axis represents Posterior density ranging from 0.0 to about 2.7. The distribution is roughly bell-shaped and unimodal, centered around N_eff ≈ 3.0-3.1, with the peak posterior density reaching approximately 2.68 at around N_eff = 3.05-3.1. The distribution starts rising from about 2.5, climbs steeply around 2.9-3.1 with some jagged fluctuations (multiple sharp peaks around 2.9, 3.0, and 3.1), then declines gradually to near zero by about 3.5. The overall spread is roughly between 2.5 and 3.6, indicating the posterior constraint on N_eff is centered near the standard value of 3.",
+    "texts": "N_eff, Posterior density, 2.0, 2.5, 3.0, 3.5, 4.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5",
+    "data": {
+     "x": [
+      2.5,
+      2.55,
+      2.6,
+      2.65,
+      2.7,
+      2.75,
+      2.8,
+      2.85,
+      2.9,
+      2.95,
+      3.0,
+      3.05,
+      3.1,
+      3.15,
+      3.2,
+      3.25,
+      3.3,
+      3.35,
+      3.4,
+      3.45,
+      3.5,
+      3.55
+     ],
+     "y": [
+      0.02,
+      0.05,
+      0.1,
+      0.2,
+      0.35,
+      0.6,
+      1.45,
+      1.3,
+      2.25,
+      1.9,
+      1.65,
+      3.1,
+      2.68,
+      1.65,
+      1.7,
+      1.2,
+      1.45,
+      0.6,
+      0.3,
+      0.15,
+      0.08,
+      0.03
+     ]
+    },
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 14,
+   "record": "Accelerating massive ensembles of ordinary differential equations-with-annotatio",
+   "page": 14,
+   "figure_name": "bb73464405e5cd1fd1571f0eec71fccc",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a line chart with a shaded band. It shows a prior distribution of the global 21-cm brightness temperature signal, δT_b in millikelvin, as a function of observed frequency in MHz. No caption is printed.\n\n**Axes:**\n- The x-axis is \"Observed frequency (MHz)\". It runs from about 13 to 237 MHz, with ticks labeled at 50, 100, 150 and 200.\n- The y-axis is δT_b (mK). It runs from about −250 to +20, with ticks at 0, −50, −100, −150, −200 and −250.\n- Light dashed grid lines mark the ticks. A thin horizontal line marks δT_b = 0.\n\n**Series (from the legend):**\n- A pale orange filled band is labeled \"95% prior envelope\".\n- A solid orange line is labeled \"median\".\n\n**Median curve:**\n- It starts near −36 mK at about 13 MHz.\n- It dips slightly to about −39 mK near 20 MHz.\n- It rises to a small local peak of about −29 mK near 36 MHz.\n- It then falls to a minimum of about −77 mK near 60 MHz.\n- After that it rises steadily, reaching about −25 mK near 100 MHz and about −5 mK near 150 MHz.\n- It levels off close to 0 mK, at about −1 mK, from about 200 MHz to the end of the range.\n\n**Envelope:**\n- The upper edge stays near 0 mK, rising to a few mK above zero at high frequencies. At low frequencies, below about 50 MHz, it follows close to the median curve.\n- The lower edge drops sharply near 35 to 40 MHz to about −85 mK. It then declines gradually, reaching about −170 mK near 100 MHz and about −240 mK near 215 MHz. It ends near −237 mK at the right edge.\n- The band is therefore narrow at the lowest frequencies and widens strongly toward higher frequencies, mostly on the negative side.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "This is a line graph showing the predicted global 21-cm signal (brightness temperature deviation) as a function of observed frequency, with a shaded 95% prior envelope and a median curve. The x-axis represents observed frequency in MHz, ranging from about 10 to 240 MHz. The y-axis represents δT_b in mK, ranging from about -250 to 10 mK. The median curve starts around -38 mK at 15 MHz, rises slightly to a local peak near -28 mK at around 35 MHz, then drops sharply to a minimum (absorption trough) of about -78 mK near 60 MHz, then gradually rises back toward 0 mK by around 150-200 MHz, staying near 0 mK through 240 MHz. The shaded envelope (95% prior) is wide, starting narrow around 10-20 MHz, widening greatly especially on the negative side, with the lower bound reaching as low as -240 mK around 210-220 MHz, while the upper bound stays close to 0 mK and slightly positive (up to about 7 mK) at higher frequencies. A horizontal reference line at y=0 is shown in gray.",
+    "texts": "δT_b (mK); Observed frequency (MHz); 0; -50; -100; -150; -200; -250; 50; 100; 150; 200; 95% prior envelope; median",
+    "data": [
+     {
+      "series": "median",
+      "points": [
+       [
+        15,
+        -38
+       ],
+       [
+        25,
+        -32
+       ],
+       [
+        35,
+        -28
+       ],
+       [
+        45,
+        -45
+       ],
+       [
+        55,
+        -70
+       ],
+       [
+        60,
+        -78
+       ],
+       [
+        65,
+        -76
+       ],
+       [
+        75,
+        -65
+       ],
+       [
+        90,
+        -45
+       ],
+       [
+        110,
+        -28
+       ],
+       [
+        130,
+        -15
+       ],
+       [
+        150,
+        -7
+       ],
+       [
+        170,
+        -3
+       ],
+       [
+        190,
+        -1
+       ],
+       [
+        210,
+        0
+       ],
+       [
+        240,
+        0
+       ]
+      ]
+     },
+     {
+      "series": "95% prior envelope upper",
+      "points": [
+       [
+        15,
+        -35
+       ],
+       [
+        25,
+        -20
+       ],
+       [
+        35,
+        -5
+       ],
+       [
+        45,
+        -2
+       ],
+       [
+        55,
+        -3
+       ],
+       [
+        65,
+        -2
+       ],
+       [
+        75,
+        -1
+       ],
+       [
+        90,
+        -1
+       ],
+       [
+        110,
+        0
+       ],
+       [
+        130,
+        0
+       ],
+       [
+        150,
+        1
+       ],
+       [
+        170,
+        2
+       ],
+       [
+        190,
+        4
+       ],
+       [
+        210,
+        6
+       ],
+       [
+        240,
+        7
+       ]
+      ]
+     },
+     {
+      "series": "95% prior envelope lower",
+      "points": [
+       [
+        15,
+        -40
+       ],
+       [
+        25,
+        -45
+       ],
+       [
+        35,
+        -55
+       ],
+       [
+        45,
+        -80
+       ],
+       [
+        55,
+        -110
+       ],
+       [
+        65,
+        -140
+       ],
+       [
+        75,
+        -165
+       ],
+       [
+        90,
+        -185
+       ],
+       [
+        110,
+        -205
+       ],
+       [
+        130,
+        -220
+       ],
+       [
+        150,
+        -230
+       ],
+       [
+        170,
+        -238
+       ],
+       [
+        190,
+        -241
+       ],
+       [
+        210,
+        -240
+       ],
+       [
+        240,
+        -238
+       ]
+      ]
+     }
+    ],
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 15,
+   "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+   "page": 6,
+   "figure_name": "bc3bb6cd3b2dc7cfed0144755db29bf2",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a line chart combining a step histogram and a smooth curve. It is titled \"DEEP2-3_ID1\" and shows the redshift distribution of [O III] emitters in that field, compared with the redshift distribution of g-dropouts.\n\n**Axes:** The x-axis is spectroscopic redshift, z_spec, running from 3.2 to 3.9 with ticks every 0.1. The y-axis is the count N, running from 0 to 5 with integer ticks.\n\n**Series:**\n- The solid black step histogram is labeled \"[O III] Emitters\". It is zero below about z = 3.29. It rises to N = 1 from about 3.29 to 3.41, then to N = 3 from about 3.41 to 3.45. It drops to 0 from about 3.45 to 3.49, returns to N = 3 from about 3.49 to 3.53, and drops to 0 again from about 3.53 to 3.57. It then returns to N = 3 from about 3.57 to 3.61, falls to N = 2 from about 3.61 to 3.65, and is zero beyond about 3.65.\n- The dotted smooth curve is labeled \"g-dropouts\". It starts at about 0.3 at z = 3.2 and rises to about 1 near z = 3.35. It reaches about 1.5 near z = 3.5 to 3.55 and peaks at about 1.55 near z = 3.63. It then dips to about 1.4 near z = 3.7, has a small bump of about 1.5 near z = 3.75, and declines slowly to about 1.35 at z = 3.9.\n\n**Legend:** It is in the upper right and lists the two series.\n\nThe [O III] emitters cluster between z ≈ 3.3 and 3.65 in several discrete peaks. The g-dropout distribution is broad and smooth across the whole range.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "Histogram and dotted line plot titled 'DEEP2-3_ID1', showing N (y-axis, 0 to 5) versus z_spec (x-axis, 3.2 to 3.9). The solid-line histogram represents '[OIII] Emitters' counts in bins, showing a step pattern: N=0 from 3.2-3.3, N=1 from 3.3-3.42, N=3 from 3.42-3.45, N=0 from 3.45-3.5, N=3 from 3.5-3.52, N=0 from 3.52-3.58, N=3 from 3.58-3.62, N=2 from 3.62-3.65, N=0 from 3.65-3.9. The dotted line represents 'g-dropouts' showing a smooth curve that rises from about 0.3 at z=3.2 to a peak of about 1.6 around z=3.6, then gently declines to about 1.35 by z=3.9.",
+    "texts": "DEEP2-3_ID1; N; z_spec; [OIII] Emitters; g-dropouts; 3.2; 3.3; 3.4; 3.5; 3.6; 3.7; 3.8; 3.9; 0; 1; 2; 3; 4; 5",
+    "data": [
+     {
+      "series": "[OIII] Emitters",
+      "points": [
+       [
+        3.2,
+        0
+       ],
+       [
+        3.3,
+        0
+       ],
+       [
+        3.3,
+        1
+       ],
+       [
+        3.42,
+        1
+       ],
+       [
+        3.42,
+        3
+       ],
+       [
+        3.45,
+        3
+       ],
+       [
+        3.45,
+        0
+       ],
+       [
+        3.5,
+        0
+       ],
+       [
+        3.5,
+        3
+       ],
+       [
+        3.52,
+        3
+       ],
+       [
+        3.52,
+        0
+       ],
+       [
+        3.58,
+        0
+       ],
+       [
+        3.58,
+        3
+       ],
+       [
+        3.62,
+        3
+       ],
+       [
+        3.62,
+        2
+       ],
+       [
+        3.65,
+        2
+       ],
+       [
+        3.65,
+        0
+       ],
+       [
+        3.9,
+        0
+       ]
+      ]
+     },
+     {
+      "series": "g-dropouts",
+      "points": [
+       [
+        3.2,
+        0.3
+       ],
+       [
+        3.3,
+        0.75
+       ],
+       [
+        3.4,
+        1.1
+       ],
+       [
+        3.5,
+        1.3
+       ],
+       [
+        3.6,
+        1.6
+       ],
+       [
+        3.65,
+        1.55
+       ],
+       [
+        3.7,
+        1.45
+       ],
+       [
+        3.8,
+        1.45
+       ],
+       [
+        3.9,
+        1.35
+       ]
+      ]
+     }
+    ],
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 16,
+   "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+   "page": 9,
+   "figure_name": "afc149441a2375b926f148970f190799",
+   "caption": "Figure 5. Sky distribution of 𝑔-dropout galaxies with protocluster member probability predicted by PCFNet for ELAIS-N1_ID4_PC1 (top left), DEEP2- 3_ID2_PC2 (top right), COSMOS_ID0_PC3 (bottom left), and COSMOS_ID0_PC4 (bottom right). Coloured circles and black stars represent the 𝑔-dropout galaxies and spectroscopically identified protocluster members, with their colours indicating the probability of being a protocluster member as predicted by PCFNet. Background-filled contours show the mean density map 𝝈VMC derived by the VMC approach. Black lines indicate the watershed segmentation boundaries, while red dashed lines indicate the estimated protocluster regions defined from the density threshold and watershed segmentation.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This figure has four sky-distribution panels in a 2×2 grid. Each panel is titled with a protocluster name: ELAIS-N1_ID4_PC1 (top left), DEEP2-3_ID2_PC2 (top right), COSMOS_ID0_PC3 (bottom left) and COSMOS_ID0_PC4 (bottom right).\n\n**Axes.** In every panel the x-axis is R.A. in cMpc, running from 20 on the left to −20 on the right. The y-axis is Decl. in cMpc, running from −20 to 20. Tick marks fall every 5 cMpc on the y-axis and every 10 cMpc on the x-axis.\n\n**Background.** Each panel is filled with a smooth density map labelled σ_VMC. A vertical colour bar to the right of each panel runs from about −3 (dark purple) through teal and green to 20 (yellow), with ticks at 0, 5, 10, 15 and 20.\n\n**Points and overlays.**\n- Small coloured circles mark g-dropout galaxies. Their colours come from a second, horizontal colour bar under each panel, labelled \"Protocluster Membership Probability\". It runs from 0.0 (pale yellow) through orange, red and purple to 1.0 (black). Most circles are pale yellow to orange, meaning low probability. Circles in the dense central regions are redder and purple, meaning higher probability.\n- Black star symbols mark spectroscopically identified protocluster members. They sit near the centre of each panel, close to the density peaks.\n- Black lines show the watershed segmentation boundaries, which divide each panel into irregular cells.\n- A red dashed contour outlines the estimated protocluster region.\n\n**Panel details.**\n- ELAIS-N1_ID4_PC1: There is a bright density peak at about R.A. 0 and Decl. −2, with a smaller clump near Decl. +4. Stars lie in both clumps. The red dashed outline has a small upper loop and a larger lower region reaching to about Decl. −10.\n- DEEP2-3_ID2_PC2: A very bright yellow peak lies at about R.A. 0 to −3 and Decl. 0 to 2, with several stars on it. The red dashed region is elongated horizontally, spanning roughly R.A. 6 to −9. The upper part of the map is a uniformly low-density dark band, and other weaker clumps appear elsewhere, such as near R.A. −13 and Decl. 3.\n- COSMOS_ID0_PC3: A bright elongated yellow-green peak runs roughly vertically near the centre, from about Decl. −3 to 6. About eight stars lie along it, and the red dashed outline surrounds it from about Decl. −8 to 8.\n- COSMOS_ID0_PC4: There are two bright clumps, one near R.A. 0 to 2 and Decl. 0 to 2, and another near R.A. −3 and Decl. 3. Several stars lie on and around them. The red dashed region is broad, spanning about R.A. 7 to −5 and Decl. −9 to 7.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A 2x2 panel figure showing spatial maps (R.A. vs Decl. in comoving Mpc) of protocluster candidate overdensity fields from galaxy survey fields. Each panel shows a colormap (viridis-like, labeled sigma_VMC, ranging 0-20) representing density significance, with scattered points colored by a separate scale (Protocluster Membership Probability, 0.0-1.0, using a magma-like color scale from light yellow to black) overlaid. Black solid lines appear to represent Voronoi cell boundaries or survey tessellation regions. Red dashed contours outline identified protocluster regions. Black star markers (some filled, some open/white) indicate specific galaxy or source positions within the clusters. Top-left panel 'ELAIS-N1_ID4_PC1' shows a compact high-density yellow/green blob near the center (RA~0, Dec~0 to -5) enclosed by red dashed contour, with a few scattered black stars. Top-right panel 'DEEP2-3_ID2_PC2' shows a large bright yellow region spanning RA~5 to -5, Dec~-2 to 3, with multiple black stars clustered inside the red dashed boundary, and another smaller yellow clump near RA~-15, Dec~2. Bottom-left panel 'COSMOS_ID0_PC3' shows two merged yellow blobs around RA~0, Dec~-2 to 5, enclosed by a red dashed contour with several black stars (some open stars) scattered within and below the contour. Bottom-right panel 'COSMOS_ID0_PC4' shows a double-lobed yellow/green overdensity around RA~0 to -5, Dec~0 to 5, with red dashed contour enclosing it and black stars marking galaxy positions. All panels have axes labeled 'R.A. / cMpc' and 'Decl. / cMpc' ranging from 20 to -20, with gridlines at -20,-15,-10,-5,0,5,10,15,20. Each panel has its own vertical colorbar for sigma_VMC on the right (0 to 20) and a horizontal colorbar below for Protocluster Membership Probability (0.0 to 1.0).",
+    "texts": "ELAIS-N1_ID4_PC1; DEEP2-3_ID2_PC2; COSMOS_ID0_PC3; COSMOS_ID0_PC4; R.A. / cMpc; Decl. / cMpc; sigma_VMC; 20, 15, 10, 5, 0, -5, -10, -15, -20; Protocluster Membership Probability; 0.0, 0.2, 0.4, 0.6, 0.8, 1.0",
+    "data": {},
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 17,
+   "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+   "page": 10,
+   "figure_name": "70dfe220c4348b9b06d6acfc087f7ed5",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a scatter plot with error bars that compares star formation rate density (SFRD) against redshift. It has no printed caption.\n\n**Axes:** The x-axis is redshift z, running linearly from 0 to 6. The y-axis is SFRD in M☉ yr⁻¹ cMpc⁻³, on a logarithmic scale from about 3×10⁻⁴ to about 30, with tick labels at 10⁻³, 10⁻², 10⁻¹, 10⁰ and 10¹.\n\n**Curves:** Two smooth curves show the cosmic star formation history. The black solid line is Madau & Dickinson 14, and the red dashed line is Harikane+22. Both start near 0.015 at z=0 and rise to a peak of roughly 0.13 to 0.15 near z≈2. They then decline to about 0.02 to 0.025 at z=6. The red dashed curve lies slightly above the black one at higher redshift.\n\n**Protocluster points near z≈3.4:** A cluster of colored markers with error bars sits at z≈3.4 and is far above the curves. The legend names these as:\n- ELAIS-N1_ID4_PC1 (blue circle)\n- DEEP2-3_ID2_PC2 (red triangle)\n- COSMOS_ID0_PC3 (green inverted triangle)\n- COSMOS_ID0_PC4 (orange left-pointing triangle)\n\nBoth filled and open versions of these markers appear. The open ones are at about 10 to 15, and the filled ones are lower, at about 2 to 3. The red triangle is near 3, with error bars reaching about 4 and 2. The orange markers are near 1.6 and 8.\n\n**Other literature points:**\n- Staab+24 PC (purple x): at z≈4.55, near 1.8, with a large error bar.\n- Staab+24 PC peak (orange pentagon): at z≈4.55, near 7.5.\n- Staab+24 field (gray square): at z≈4.55, near 0.15.\n- Popescu+23 stacked PC (brown right-pointing triangles): at z≈2 (about 1.6), z≈3 (about 3.5) and z≈3.3 (about 1.6).\n- Kubo+19 stacked PC (magenta left-pointing triangle): at z≈3.8, near 0.45, with an error bar reaching up to about 1.9.\n- Gruppioni+20 (light orange diamonds): between z≈1 and 5, with values around 0.05 to 0.13.\n- Rowan-Robinson+16 (green squares): from z≈0.25 to 5.75, with values from about 0.013 up to about 0.16.\n- Bouwens+15 (dark red circles with error bars): at z≈3 to 4, with values around 0.07 to 0.1.\n- Bouwens+20 (dark red markers with error bars): at z≈4.9 to 5.9, with values around 0.014 to 0.055.\n- van der Burg+10 (blue-gray x markers): at z≈3.1, 3.8 and 4.7, with values around 0.03 to 0.13.\n\n**Legend:** The legend is in the lower center of the plot and lists all of the series above.\n\nThe protocluster measurements lie one to two orders of magnitude above the cosmic average curves and the field measurements.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A scatter plot showing the star formation rate density (SFRD) in units of M_sun/yr/cMpc^3 on a logarithmic y-axis (ranging from 10^-3 to beyond 10^1) versus redshift z on the x-axis (0 to 6). Two theoretical model curves (Madau & Dickinson 14 as solid black line, Harikane+22 as dashed red line) show a smooth rise from z=0 to a peak around z=1.5-2 at approximately 0.13-0.15, then decline toward z=6 to about 0.02-0.03. Multiple data series from various surveys are overlaid, including protocluster (PC) measurements which show significantly elevated SFRD values (up to ~15-20) around z=3.3-3.8, notably higher than the general field measurements and model curves. Field galaxy survey points (Rowan-Robinson+16, Bouwens+15/20, Gruppioni+20, van der Burg+10) generally follow closer to the model curves with values between 0.01 and 0.3 across the redshift range. Protocluster-related points (ELAIS-N1_ID4_PC1, DEEP2-3_ID2_PC2, COSMOS_ID0_PC3, COSMOS_ID0_PC4, Staab+24 PC, Popescu+23 stacked PC, Kubo+19 stacked PC, Staab+24 PC peak) cluster around z=2-4.6 with much higher SFRD values, some exceeding 10, indicating enhanced star formation in protocluster environments compared to the field.",
+    "texts": "10^1, 10^0, 10^-1, 10^-2, 10^-3, SFRD / M_sun yr^-1 cMpc^-3, z, 0, 1, 2, 3, 4, 5, 6, Madau & Dickinson 14, Harikane+22, ELAIS-N1_ID4_PC1, DEEP2-3_ID2_PC2, COSMOS_ID0_PC3, COSMOS_ID0_PC4, Staab+24 PC, Staab+24 field, Staab+24 PC peak, Popescu+23 stacked PC, Kubo+19 stacked PC, Gruppioni+20, Rowan-Robinson+16, Bouwens+15, Bouwens+20, van der Burg+10",
+    "data": [
+     {
+      "series": "Madau & Dickinson 14",
+      "points": [
+       [
+        0,
+        0.016
+       ],
+       [
+        0.5,
+        0.03
+       ],
+       [
+        1,
+        0.09
+       ],
+       [
+        1.5,
+        0.13
+       ],
+       [
+        2,
+        0.13
+       ],
+       [
+        2.5,
+        0.11
+       ],
+       [
+        3,
+        0.08
+       ],
+       [
+        3.5,
+        0.055
+       ],
+       [
+        4,
+        0.04
+       ],
+       [
+        4.5,
+        0.03
+       ],
+       [
+        5,
+        0.022
+       ],
+       [
+        5.5,
+        0.017
+       ],
+       [
+        6,
+        0.014
+       ]
+      ]
+     },
+     {
+      "series": "Harikane+22",
+      "points": [
+       [
+        0,
+        0.017
+       ],
+       [
+        0.5,
+        0.035
+       ],
+       [
+        1,
+        0.1
+       ],
+       [
+        1.5,
+        0.14
+       ],
+       [
+        2,
+        0.145
+       ],
+       [
+        2.5,
+        0.12
+       ],
+       [
+        3,
+        0.085
+       ],
+       [
+        3.5,
+        0.06
+       ],
+       [
+        4,
+        0.045
+       ],
+       [
+        4.5,
+        0.035
+       ],
+       [
+        5,
+        0.03
+       ],
+       [
+        5.5,
+        0.025
+       ],
+       [
+        6,
+        0.022
+       ]
+      ]
+     },
+     {
+      "series": "ELAIS-N1_ID4_PC1",
+      "points": [
+       [
+        3.4,
+        9.5
+       ]
+      ]
+     },
+     {
+      "series": "DEEP2-3_ID2_PC2",
+      "points": [
+       [
+        3.3,
+        18
+       ],
+       [
+        3.4,
+        2.8
+       ]
+      ]
+     },
+     {
+      "series": "COSMOS_ID0_PC3",
+      "points": [
+       [
+        3.4,
+        8.5
+       ],
+       [
+        3.4,
+        1.9
+       ]
+      ]
+     },
+     {
+      "series": "COSMOS_ID0_PC4",
+      "points": [
+       [
+        3.3,
+        10
+       ],
+       [
+        3.4,
+        1.6
+       ]
+      ]
+     },
+     {
+      "series": "Staab+24 PC",
+      "points": [
+       [
+        4.6,
+        1.9
+       ]
+      ]
+     },
+     {
+      "series": "Staab+24 field",
+      "points": [
+       [
+        4.6,
+        0.15
+       ]
+      ]
+     },
+     {
+      "series": "Staab+24 PC peak",
+      "points": [
+       [
+        4.6,
+        7.3
+       ]
+      ]
+     },
+     {
+      "series": "Popescu+23 stacked PC",
+      "points": [
+       [
+        2.0,
+        1.6
+       ],
+       [
+        3.0,
+        3.5
+       ]
+      ]
+     },
+     {
+      "series": "Kubo+19 stacked PC",
+      "points": [
+       [
+        3.8,
+        0.48
+       ]
+      ]
+     },
+     {
+      "series": "Gruppioni+20",
+      "points": [
+       [
+        1.1,
+        0.065
+       ],
+       [
+        3.0,
+        0.12
+       ],
+       [
+        3.8,
+        0.075
+       ]
+      ]
+     },
+     {
+      "series": "Rowan-Robinson+16",
+      "points": [
+       [
+        0.25,
+        0.013
+       ],
+       [
+        0.75,
+        0.05
+       ],
+       [
+        1.1,
+        0.11
+       ],
+       [
+        1.9,
+        0.09
+       ],
+       [
+        2.3,
+        0.09
+       ],
+       [
+        2.8,
+        0.13
+       ],
+       [
+        3.3,
+        0.13
+       ],
+       [
+        3.8,
+        0.08
+       ],
+       [
+        4.3,
+        0.13
+       ],
+       [
+        4.6,
+        0.15
+       ],
+       [
+        5.2,
+        0.12
+       ],
+       [
+        5.8,
+        0.1
+       ]
+      ]
+     },
+     {
+      "series": "Bouwens+15",
+      "points": [
+       [
+        3.0,
+        0.075
+       ],
+       [
+        3.8,
+        0.08
+       ],
+       [
+        4.8,
+        0.045
+       ]
+      ]
+     },
+     {
+      "series": "Bouwens+20",
+      "points": [
+       [
+        3.8,
+        0.07
+       ],
+       [
+        4.8,
+        0.05
+       ],
+       [
+        5.9,
+        0.015
+       ]
+      ]
+     },
+     {
+      "series": "van der Burg+10",
+      "points": [
+       [
+        3.0,
+        0.12
+       ],
+       [
+        3.0,
+        0.3
+       ],
+       [
+        3.8,
+        0.05
+       ]
+      ]
+     }
+    ],
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 18,
+   "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+   "page": 12,
+   "figure_name": "9ff6433d38a13d22400f5354a9b45eac",
+   "caption": "Figure 7. Stacked emission line spectra (left: H𝛽, middle: [Oiii]𝜆4959, right: [Oiii]𝜆5007) of protocluster members in ELAIS-N1_ID4_PC1 (top left), DEEP2- 3_ID2_PC2 (top right), COSMOS_ID0_PC3 (bottom left), and COSMOS_ID0_PC4 (bottom right). The coloured dashed and solid lines indicate the stacked spectrum and best-fit model of each protocluster, and the shaded region indicates the 1𝜎 uncertainty. The grey dotted and solid lines indicate the stacked spectrum and best-fit model of the field galaxies. The vertical axis is normalised by the maximum value of the stacked [Oiii] spectrum.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This figure is a set of twelve line-plot panels showing stacked emission line spectra. It is arranged as four blocks in a 2×2 grid, and each block has three panels for Hβ, [O III]λ4959 and [O III]λ5007. The blocks are titled ELAIS-N1_ID4_PC1 (top left, blue), DEEP2-3_ID2_PC2 (top right, red), COSMOS_ID0_PC3 (bottom left, green) and COSMOS_ID0_PC4 (bottom right, orange).\n\nEvery panel has \"Normalized Flux\" on the y-axis and \"Rest-frame wavelength [Å]\" on the x-axis. The Hβ panels span roughly 4852 to 4871 Å and are centred near 4861 Å. The [O III]λ4959 panels span roughly 4949 to 4969 Å and are centred near 4959 Å. The [O III]λ5007 panels span roughly 4998 to 5017 Å and are centred near 5007 Å. The y-range is about -0.1 to 0.45 for Hβ and λ4959. For λ5007 it is about -0.25 to 1.05.\n\nIn each panel a coloured dashed line shows the noisy stacked protocluster spectrum. A coloured solid line shows its Gaussian best-fit model, and a lighter shaded band shows the 1σ uncertainty. A grey dotted line shows the stacked field-galaxy spectrum, and a grey solid line shows its Gaussian fit. Each panel is labelled with a signal-to-noise value in the protocluster's colour.\n\nThe S/N values are:\n- ELAIS-N1_ID4_PC1: Hβ 5.1, λ4959 7.3, λ5007 20.0.\n- DEEP2-3_ID2_PC2: Hβ 4.3, λ4959 7.5, λ5007 22.7.\n- COSMOS_ID0_PC3: Hβ 5.2, λ4959 10.2, λ5007 33.3.\n- COSMOS_ID0_PC4: Hβ 6.7, λ4959 9.6, λ5007 22.8.\n\nApproximate peak heights of the fitted curves:\n- The [O III]λ5007 peaks are near 0.9 to 1.0 for all the protoclusters and the field.\n- The [O III]λ4959 field fit peaks near 0.30.\n- The field Hβ fit peaks near 0.10.\n\nComparing the fits with the field fit:\n- ELAIS-N1_ID4_PC1: the Hβ fit is slightly higher, near 0.13. The λ4959 fit is lower, near 0.21, and the λ5007 fit is lower, near 0.83.\n- DEEP2-3_ID2_PC2: the Hβ fit is slightly higher, near 0.13. The λ4959 fit is slightly lower, near 0.27, and the λ5007 fit is similar to the field.\n- COSMOS_ID0_PC3: the Hβ fit is higher and broader, near 0.14. The [O III] fits are close to the field, with λ4959 near 0.31.\n- COSMOS_ID0_PC4: the Hβ fit is clearly higher, near 0.22. The λ4959 fit is slightly higher, near 0.35, and the λ5007 fit is similar to the field.\n\nThe protocluster lines in the [O III] panels appear narrower than the field lines in the DEEP2-3_ID2_PC2 and COSMOS_ID0_PC4 blocks. The caption says the vertical axis is normalised by the maximum value of the stacked [O III] spectrum.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A grid of 12 spectral line-fitting plots arranged in 4 groups of 3 panels each, corresponding to four different galaxy/PC identifications: ELAIS-N1_ID4_PC1 (blue), DEEP2-3_ID2_PC2 (red), COSMOS_ID0_PC3 (green), and COSMOS_ID0_PC4 (orange). Each group shows three emission line fits: Hβ, [OIII]λ4959, and [OIII]λ5007, plotted as Normalized Flux versus Rest-frame wavelength in Angstroms. Each panel contains a dashed/dotted noisy spectrum line, a shaded uncertainty region in the group color, a gray fit curve, and a colored best-fit Gaussian curve. Signal-to-noise ratios (S/N) are labeled in each panel. For ELAIS-N1_ID4_PC1: Hβ S/N=5.1, [OIII]4959 S/N=7.3, [OIII]5007 S/N=20.0. For DEEP2-3_ID2_PC2: Hβ S/N=4.3, [OIII]4959 S/N=7.5, [OIII]5007 S/N=22.7. For COSMOS_ID0_PC3: Hβ S/N=5.2, [OIII]4959 S/N=10.2, [OIII]5007 S/N=33.3. For COSMOS_ID0_PC4: Hβ S/N=6.7, [OIII]4959 S/N=9.6, [OIII]5007 S/N=22.8. The [OIII]5007 lines show the strongest, narrowest peaks reaching close to 1.0 normalized flux, while Hβ lines are weaker and noisier with peaks around 0.1-0.25. The [OIII]4959 lines show intermediate peak heights around 0.2-0.3.",
+    "texts": "ELAIS-N1_ID4_PC1, DEEP2-3_ID2_PC2, COSMOS_ID0_PC3, COSMOS_ID0_PC4, Hβ, [OIII]λ4959, [OIII]λ5007, Normalized Flux, Rest-frame wavelength [Å], S/N=5.1, S/N=7.3, S/N=20.0, S/N=4.3, S/N=7.5, S/N=22.7, S/N=5.2, S/N=10.2, S/N=33.3, S/N=6.7, S/N=9.6, S/N=22.8, 4860, 4870, 4950, 4960, 5000, 5010, 0.0, 0.1, 0.2, 0.3, 0.4, 0.00, 0.25, 0.50, 0.75, 1.00, -0.1, -0.25",
+    "data": [
+     {
+      "series": "ELAIS-N1_ID4_PC1 Hβ",
+      "points": [
+       [
+        4855,
+        0.0
+       ],
+       [
+        4860,
+        0.05
+       ],
+       [
+        4863,
+        0.14
+       ],
+       [
+        4866,
+        0.05
+       ],
+       [
+        4870,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "ELAIS-N1_ID4_PC1 [OIII]4959",
+      "points": [
+       [
+        4950,
+        0.0
+       ],
+       [
+        4955,
+        0.05
+       ],
+       [
+        4958,
+        0.21
+       ],
+       [
+        4962,
+        0.05
+       ],
+       [
+        4967,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "ELAIS-N1_ID4_PC1 [OIII]5007",
+      "points": [
+       [
+        5000,
+        0.0
+       ],
+       [
+        5004,
+        0.3
+       ],
+       [
+        5007,
+        0.85
+       ],
+       [
+        5010,
+        0.3
+       ],
+       [
+        5014,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "DEEP2-3_ID2_PC2 Hβ",
+      "points": [
+       [
+        4855,
+        0.0
+       ],
+       [
+        4860,
+        0.05
+       ],
+       [
+        4863,
+        0.14
+       ],
+       [
+        4866,
+        0.05
+       ],
+       [
+        4870,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "DEEP2-3_ID2_PC2 [OIII]4959",
+      "points": [
+       [
+        4950,
+        0.0
+       ],
+       [
+        4955,
+        0.1
+       ],
+       [
+        4958,
+        0.28
+       ],
+       [
+        4962,
+        0.1
+       ],
+       [
+        4967,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "DEEP2-3_ID2_PC2 [OIII]5007",
+      "points": [
+       [
+        5000,
+        0.0
+       ],
+       [
+        5004,
+        0.35
+       ],
+       [
+        5007,
+        0.95
+       ],
+       [
+        5010,
+        0.35
+       ],
+       [
+        5014,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "COSMOS_ID0_PC3 Hβ",
+      "points": [
+       [
+        4855,
+        0.0
+       ],
+       [
+        4860,
+        0.07
+       ],
+       [
+        4863,
+        0.14
+       ],
+       [
+        4866,
+        0.07
+       ],
+       [
+        4870,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "COSMOS_ID0_PC3 [OIII]4959",
+      "points": [
+       [
+        4950,
+        0.0
+       ],
+       [
+        4955,
+        0.1
+       ],
+       [
+        4958,
+        0.3
+       ],
+       [
+        4962,
+        0.1
+       ],
+       [
+        4967,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "COSMOS_ID0_PC3 [OIII]5007",
+      "points": [
+       [
+        5000,
+        0.0
+       ],
+       [
+        5004,
+        0.4
+       ],
+       [
+        5007,
+        0.93
+       ],
+       [
+        5010,
+        0.4
+       ],
+       [
+        5014,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "COSMOS_ID0_PC4 Hβ",
+      "points": [
+       [
+        4855,
+        0.0
+       ],
+       [
+        4860,
+        0.1
+       ],
+       [
+        4863,
+        0.22
+       ],
+       [
+        4866,
+        0.1
+       ],
+       [
+        4870,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "COSMOS_ID0_PC4 [OIII]4959",
+      "points": [
+       [
+        4950,
+        0.0
+       ],
+       [
+        4955,
+        0.1
+       ],
+       [
+        4958,
+        0.3
+       ],
+       [
+        4962,
+        0.1
+       ],
+       [
+        4967,
+        0.0
+       ]
+      ]
+     },
+     {
+      "series": "COSMOS_ID0_PC4 [OIII]5007",
+      "points": [
+       [
+        5000,
+        0.0
+       ],
+       [
+        5004,
+        0.4
+       ],
+       [
+        5007,
+        0.93
+       ],
+       [
+        5010,
+        0.4
+       ],
+       [
+        5014,
+        0.0
+       ]
+      ]
+     }
+    ],
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 19,
+   "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+   "page": 17,
+   "figure_name": "64420b74ca06c0074e6e9a58c8d0b7cf",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a scatter plot with marginal histograms on the top and right. It has no printed caption. It appears to compare candidate sources by predicted significance and i-band magnitude, and it labels follow-up outcomes.\n\n**Main scatter panel:**\n- The x-axis is σ_pred, running from about -1 to 7, with tick labels at 0, 2, 4 and 6.\n- The y-axis is i, running from 23.0 at the bottom to about 26.2 at the top, with the magnitude axis inverted in the sense that fainter values are higher on the plot. Ticks run from 23.0 to 26.0 in steps of 0.5.\n- A vertical dashed gray line sits at σ_pred of about 2.5.\n- The legend lists five marker types:\n  - Black filled triangles are \"unobserved\". They are the most numerous and cluster mostly between σ_pred of about 2.5 and 4.5 and i of about 24.3 to 26.\n  - Gray crosses are \"undetected\". They are scattered across the panel, with many near the dashed line and others at larger σ_pred.\n  - Blue filled circles are \"field\". They are spread between σ_pred of about 2 and 6.5, and between i of about 23.7 and 26.\n  - Open cyan circles are \"field (DEEP2-3_ID1)\". They are found at i of about 23.3 to 26 and σ_pred of about 1.5 to 5.\n  - Orange filled squares are \"PC member\". They range from σ_pred of about 0.3 to 5.4 and i of about 24 to 25.9.\n\n**Top histogram:**\n- Its y-axis is N, from 0 to about 8.\n- The top x-axis is \"PCFNet membership probability\", running from 0.1 to 0.8.\n- It contains overlapping gray, blue, cyan and orange bars. The tallest bar, a gray bar of about 8, is near a probability of 0.45. The orange bars peak at about 6 there.\n- Other bars are lower, at about 1 to 5.\n\n**Right histogram:**\n- Its x-axis is N, from 0 to about 6, and it shares the i axis with the scatter panel.\n- It contains overlapping gray, blue, cyan and orange bars. The largest gray bar, of about 6.5, is near i of 25.6. Orange and other bars reach about 4 around i of 24.7 to 25.3.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A scatter plot with marginal histograms showing i-band magnitude versus sigma_pred (a predictor variable related to PCFNet membership probability). The main panel plots i (y-axis, 23.0 to 26.0) against sigma_pred (x-axis, 0 to 6). Five categories are shown: unobserved (black triangles), undetected (gray x marks), field (filled blue circles), field DEEP2-3_ID1 (open cyan circles), and PC member (orange/salmon squares). A vertical dashed gray line is at sigma_pred ~2.5, likely indicating a selection threshold. The unobserved triangles and undetected x marks are scattered widely across sigma_pred 0-6 and i 23.5-26. Field points (blue) cluster mostly at sigma_pred 2-6 with i between 24.5-26. PC member squares cluster mostly between sigma_pred 2-4.5, i between 24-26. The top histogram shows N (counts, 0-7) versus sigma_pred bins with a secondary x-axis showing PCFNet membership probability from 0.1 to 0.8+, with stacked/overlapping bars colored gray, cyan, blue, and orange representing different categories, peaking around sigma_pred 2.5-3.5 with N~8. The right histogram shows N (0-5) versus i-band bins, with bars colored similarly, showing counts increasing towards i=25-25.5 with N~5-6, colored with gray, orange, cyan, and blue overlapping bars.",
+    "texts": [
+     "PCFNet membership probability",
+     "0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8",
+     "N",
+     "i",
+     "σ_pred",
+     "unobserved",
+     "undetected",
+     "field",
+     "field (DEEP2-3_ID1)",
+     "PC member",
+     "26.0",
+     "25.5",
+     "25.0",
+     "24.5",
+     "24.0",
+     "23.5",
+     "23.0",
+     "0",
+     "2",
+     "4",
+     "6",
+     "0",
+     "5",
+     "7"
+    ],
+    "data": [
+     {
+      "series": "unobserved",
+      "points": [
+       [
+        1.5,
+        25.8
+       ],
+       [
+        2.0,
+        25.7
+       ],
+       [
+        2.8,
+        25.75
+       ],
+       [
+        3.0,
+        25.7
+       ],
+       [
+        3.2,
+        25.6
+       ],
+       [
+        3.5,
+        25.5
+       ],
+       [
+        3.8,
+        25.4
+       ],
+       [
+        4.0,
+        25.3
+       ],
+       [
+        2.5,
+        25.2
+       ],
+       [
+        3.0,
+        25.1
+       ],
+       [
+        3.3,
+        25.0
+       ],
+       [
+        3.6,
+        24.9
+       ],
+       [
+        2.9,
+        24.8
+       ],
+       [
+        3.1,
+        24.7
+       ],
+       [
+        2.6,
+        24.6
+       ],
+       [
+        3.4,
+        24.5
+       ],
+       [
+        2.7,
+        24.4
+       ],
+       [
+        3.2,
+        24.2
+       ],
+       [
+        2.0,
+        24.0
+       ],
+       [
+        5.3,
+        23.8
+       ],
+       [
+        1.8,
+        23.7
+       ]
+      ]
+     },
+     {
+      "series": "undetected",
+      "points": [
+       [
+        2.8,
+        26.1
+       ],
+       [
+        1.4,
+        25.8
+       ],
+       [
+        3.0,
+        25.6
+       ],
+       [
+        4.5,
+        25.5
+       ],
+       [
+        1.6,
+        25.3
+       ],
+       [
+        3.5,
+        25.2
+       ],
+       [
+        2.0,
+        24.9
+       ],
+       [
+        4.0,
+        24.7
+       ],
+       [
+        2.5,
+        24.5
+       ],
+       [
+        1.9,
+        24.3
+       ],
+       [
+        3.8,
+        24.1
+       ],
+       [
+        2.2,
+        23.9
+       ],
+       [
+        2.0,
+        23.5
+       ]
+      ]
+     },
+     {
+      "series": "field",
+      "points": [
+       [
+        2.9,
+        25.6
+       ],
+       [
+        6.3,
+        25.6
+       ],
+       [
+        3.0,
+        25.2
+       ],
+       [
+        2.8,
+        25.1
+       ],
+       [
+        6.3,
+        25.0
+       ],
+       [
+        5.3,
+        24.8
+       ],
+       [
+        3.0,
+        24.75
+       ],
+       [
+        3.2,
+        24.0
+       ],
+       [
+        2.8,
+        23.65
+       ]
+      ]
+     },
+     {
+      "series": "field (DEEP2-3_ID1)",
+      "points": [
+       [
+        2.0,
+        26.0
+       ],
+       [
+        2.5,
+        25.95
+       ],
+       [
+        2.2,
+        25.6
+       ],
+       [
+        2.8,
+        25.4
+       ],
+       [
+        4.0,
+        25.15
+       ],
+       [
+        3.5,
+        25.1
+       ],
+       [
+        3.0,
+        24.9
+       ],
+       [
+        3.2,
+        24.6
+       ],
+       [
+        3.5,
+        24.0
+       ],
+       [
+        5.0,
+        23.3
+       ]
+      ]
+     },
+     {
+      "series": "PC member",
+      "points": [
+       [
+        0.8,
+        25.9
+       ],
+       [
+        0.7,
+        25.15
+       ],
+       [
+        0.5,
+        24.8
+       ],
+       [
+        1.5,
+        25.3
+       ],
+       [
+        2.9,
+        25.75
+       ],
+       [
+        3.0,
+        25.3
+       ],
+       [
+        2.8,
+        24.85
+       ],
+       [
+        3.0,
+        24.65
+       ],
+       [
+        3.5,
+        24.55
+       ],
+       [
+        2.9,
+        24.3
+       ],
+       [
+        4.3,
+        25.65
+       ],
+       [
+        4.5,
+        24.6
+       ],
+       [
+        5.1,
+        24.0
+       ],
+       [
+        2.6,
+        24.1
+       ]
+      ]
+     }
+    ],
+    "error": "major",
+    "note": "unobserved triangles said to spread across sigma_pred 0-6; none lies left of the 2.5 line"
+   }
+  },
+  {
+   "n": 20,
+   "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+   "page": 2,
+   "figure_name": "3a3e58e31d5745ce64597c5dc2c125a0",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a quantum circuit diagram with two horizontal wires and no printed caption.\n\nThe top wire is labeled |0⟩ on the left and is a single-qubit register. The bottom wire is labeled |A_x⟩ and carries a slash marked \"q\", meaning it is a bundle of q qubits.\n\nReading left to right, the circuit has these blocks:\n1. A tall box labeled T′_0 spans both wires.\n2. A controlled-U gate follows. A filled control dot sits on the top wire and a vertical line runs down to a box labeled U on the bottom wire.\n3. A second tall box labeled T′_0 spans both wires.\n4. An ellipsis (\"· · ·\") on both wires indicates that the pattern repeats for intermediate indices.\n5. A tall box labeled T′_{N−1} spans both wires.\n6. Another controlled-U gate follows, with the control on the top wire and U on the bottom wire.\n7. A final tall box labeled T′_{N−1} spans both wires.\n\nThe wires continue past the last box on the right. Each index therefore contributes a T′_i block, a controlled-U, and a second T′_i block, with i running from 0 to N−1. The figure shows no numerical data, axes, or measurement operations.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "This is a quantum circuit diagram with two input wires. The top wire starts in state |0⟩ and the bottom wire starts in state |A_x⟩, with a slash labeled 'q' crossing the bottom wire indicating it represents multiple qubits (a quantum register of size q). The circuit proceeds left to right through a repeating pattern of gates. First, a gate labeled T'_0 acts on the top wire (the |0⟩ qubit). Immediately after, a controlled-U gate appears: the control dot is on the top wire and the U gate box is on the bottom wire (the q-qubit register), meaning U is applied to the register conditioned on the state of the top qubit. Following this controlled-U, another T'_0 gate acts on the top wire. This pattern (T'_0, controlled-U, T'_0) repeats, indicated by a horizontal ellipsis (...) showing the sequence continues. The pattern then repeats with gates labeled T'_{N-1} instead of T'_0: a T'_{N-1} gate on the top wire, followed by a controlled-U gate (control on top wire, U on bottom register), followed by another T'_{N-1} gate on the top wire. After the final T'_{N-1} gate, both wires terminate with open output lines on the right side of the circuit, representing the final measured or output qubits. Overall, the diagram represents an iterative quantum algorithm structure where an ancilla qubit (initialized to |0⟩) is repeatedly transformed by T' gates interspersed with controlled unitary operations U acting on the main quantum register |A_x⟩, indexed from 0 to N-1.",
+    "texts": "|0⟩, |A_x⟩, q, T'_0, U, T'_0, ..., T'_{N-1}, U, T'_{N-1}",
+    "data": null,
+    "error": "major",
+    "note": "the T' gates are said to act on the top wire; each spans both wires"
+   }
+  },
+  {
+   "n": 21,
+   "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+   "page": 3,
+   "figure_name": "2dc1c369aea188de5e8ba917e1dbb2f5",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a quantum circuit diagram showing a definition of a gate. On the left, a single-wire box labeled with a bold Λ and superscript d is set equal (≡) to a larger circuit on the right.\n\nThe right-hand circuit has two input wires. The upper wire carries a slash marked \"b\", meaning it is a bundle of b lines. The lower wire carries a slash marked \"q\", meaning a bundle of q lines. Both wires enter a tall box labeled with a bold T and subscript k, which acts on both wires together.\n\nAfter this box the upper wire continues to a circle containing the letter k. This circle is a measurement-style or control node. A vertical line runs down from it to a box on the lower wire labeled \"+1 mod d\". Both wires then exit to the right. The lower wire passes through the \"+1 mod d\" box, and the upper wire ends at the circle.\n\nIn short, the diagram defines the operation Λ^d as the joint operation T_k on the b and q wires, followed by an operation on the lower wire that adds 1 modulo d, controlled by the value k from the upper wire. The figure has no numerical data, axes or series.",
+    "error": "major",
+    "note": "the upper wire is said to end at the k circle; it continues past it"
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "This diagram shows an equivalence between a compact gate representation and its decomposed circuit implementation. On the left, a single box labeled 'Λ^d' with one input/output line represents the overall operation. An equivalence symbol (≡) connects it to the expanded circuit on the right. In the expanded circuit, there are two input wires labeled 'b' and 'q' (shown with diagonal slash marks indicating they may carry multi-bit or quantum register values) entering a box labeled 'T_k'. The two outputs of 'T_k' proceed to the right: the top wire connects to a circle labeled 'k', which itself connects via a vertical control line down to a box labeled '+1 mod d' on the bottom wire. The bottom wire from 'T_k' feeds into the '+1 mod d' box. Both the 'k' circle and the '+1 mod d' box then output to the right, completing the circuit. The vertical line connecting the 'k' circle and the '+1 mod d' box indicates a controlled operation, where the modular addition box's operation depends on or is linked to the value processed by the 'k' gate.",
+    "texts": [
+     "Λ^d",
+     "b",
+     "q",
+     "T_k",
+     "k",
+     "+1 mod d"
+    ],
+    "data": null,
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 22,
+   "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+   "page": 3,
+   "figure_name": "fc8e8d204ceca33eb34a97c9055c6d15",
+   "caption": "Fig. 3. Block diagram of the rotation Rk = Ry(θk) and delay Λ(z) lattice sections.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a block diagram (signal-flow diagram) of one lattice section. It combines a rotation Rk = Ry(θk) with a delay Λ(z). It has two inputs on the left and two outputs on the right.\n\nEach input line has a branch point (a filled dot). From each dot, a direct path goes through a triangular gain element, and a cross path goes through a second gain element to the opposite output.\n\nThe upper path has a gain of cos(θk/2). It feeds a summing node, drawn as a circle with a plus sign, which produces the upper output. The lower path also has a gain of cos(θk/2). It feeds a lower summing node.\n\nThe cross paths connect each input to the other summing node:\n- The upper input goes through a gain of sin(θk/2) and then down to the lower summing node.\n- The lower input goes through a gain of −sin(θk/2) and then up to the upper summing node.\n\nThe upper summing node output goes straight to the upper output arrow. The lower summing node output passes through a delay block labeled z⁻¹ before reaching the lower output arrow. The delay is therefore applied only to the lower branch.\n\nIn summary, the figure shows a 2×2 rotation by angle θk, built from cosine and sine half-angle gains, followed by a one-sample delay on the second channel.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "This is a signal flow diagram representing a rotation butterfly structure, commonly used in digital signal processing (e.g., Givens rotation or lattice filter stage). There are two input lines on the left, each marked with a filled dot (branch point). The top input branches into two paths: one goes through a gain block labeled cos(θ_k/2) straight to the top summation node (+), and the other crosses diagonally downward through a gain block labeled sin(θ_k/2) to the bottom summation node (+). The bottom input similarly branches into two paths: one goes through a gain block labeled cos(θ_k/2) straight to the bottom summation node (+), and the other crosses diagonally upward through a gain block labeled -sin(θ_k/2) to the top summation node (+). The top summation node (+) combines the top input's cos path and the bottom input's -sin path, then outputs directly to the top output line. The bottom summation node (+) combines the bottom input's cos path and the top input's sin path, then passes through a unit delay block labeled z^{-1} before reaching the bottom output line. This structure implements a 2x2 rotation matrix multiplication with an added delay on one output branch, typical of orthogonal/lattice filter implementations.",
+    "texts": [
+     "cos(θ_k/2)",
+     "sin(θ_k/2)",
+     "-sin(θ_k/2)",
+     "cos(θ_k/2)",
+     "+",
+     "+",
+     "z^{-1}"
+    ],
+    "data": null,
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 23,
+   "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+   "page": 3,
+   "figure_name": "a9f8dd2f1ebeb93a5d8dbf45092f8852",
+   "caption": "Fig. 4. (a) The FIR filter circuit in the z-domain and (b) its realiza- tion with the delay and projection gates expanded. Braces indicate corresponding groups of gates between the two circuits. Rotations Rk are applied in (b) to the least significant qubit at the bottom.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This figure contains two quantum circuit diagrams, labeled (a) and (b), showing an FIR filter circuit and its gate-level realization.\n\nPanel (a) is a single-wire circuit in the z-domain. From left to right the boxes are R_0, Λ, R_1, Λ, an ellipsis, Λ, R_M, and a projector |0⟩⟨0|. Curly braces under the diagram mark groups of gates. One brace covers R_0 and Λ. Another covers the final Λ and R_M. A third covers the |0⟩⟨0| projector.\n\nPanel (b) is a multi-qubit circuit with three visible horizontal wires, and vertical dots indicate more wires between and below them. A slash with the label b on the top wire shows that it is a bundle of b qubits. Reading from left to right:\n\n- A control circle labeled 0 on the top wire is connected by a vertical line to a rotation box R_0 on the bottom wire.\n- A tall box T_1 spans all the wires.\n- An ellipsis follows, then a tall box T_M.\n- A second control circle labeled 0 on the top wire is connected to a box R_M on the bottom wire.\n- A tall box T_{M+1} follows.\n- A rounded control labeled M+1 on the top wire is connected to a box labeled +1 on the lower wires.\n\nCurly braces above panel (b) group the gates and correspond to the groups of gates in panel (a). One brace spans the first control, R_0 and T_1. Another spans T_M, the second control and R_M. A third spans T_{M+1} and the M+1 controlled +1 operation. The caption notes that the rotations R_k in (b) act on the least significant qubit at the bottom.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "The figure shows two related quantum circuit diagrams, labeled (a) and (b), representing an abstract and concrete implementation of the same process. In (a), the circuit is a horizontal sequence of alternating boxes: starting with R0, followed by Λ, then R1, Λ, continuing with an ellipsis indicating repetition, ending with Λ, RM, and finally a projector |0⟩⟨0|. Curly braces below pair up R0 with the following Λ, R1 with its following Λ, and so on, with the final brace grouping the last Λ, RM, and the projector together, suggesting these groupings represent repeated modules in the algorithm. In (b), the implementation is shown as a multi-qubit circuit with a top register line labeled 'b' (indicating multiple qubits, shown by the diagonal slash) and additional qubit lines below (indicated by vertical dots). The top line contains circled labels '0', then after the T1 block another circled '0', and after TM+1 block a circled 'M+1'. Below the top line, boxes labeled R0, T1, ..., TM, RM, TM+1 appear as vertically connected blocks spanning between the top control line and lower qubit lines, with control dots connecting the circles above to the boxes below (indicating controlled operations conditioned on the state of the top register, such as 0 or M+1). After the circled 'M+1', there's a connected box labeled '+1', suggesting an increment operation controlled by the M+1 state. Curly braces group T1 with R0, TM with RM, and TM+1 with the final +1 operation, paralleling the groupings in diagram (a). This represents a method to implement multiple applications of an operator Λ and rotations R_i within a larger quantum circuit using ancilla-controlled block-encodings labeled T_i, with control values 0 and M+1 determining which operations are applied.",
+    "texts": "(a): R0, Λ, R1, Λ, ..., Λ, RM, |0⟩⟨0| (b): b, 0, T1, ..., TM, 0, RM, TM+1, M+1, +1, R0",
+    "data": null,
+    "error": "major",
+    "note": "panel (a) braces said to pair every R with its Lambda and to group the last Lambda, R_M and the projector together; there are three braces, the projector on its own. The second circled 0 is placed after T_1; it follows T_M"
+   }
+  },
+  {
+   "n": 24,
+   "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertai",
+   "page": 4,
+   "figure_name": "de4c0c8921ea6eb01235d51f5dd24077",
+   "caption": "Figure 1: Hypervolume of the region dominated by f( { x1,x2,x3,x4} ), upper bounded by yref in shades of red.",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a schematic two-dimensional diagram of the hypervolume indicator in a bi-objective minimization setting. It is not a data plot, and no numeric values can be read from it.\n\nThe horizontal axis is labeled f1 and the vertical axis is labeled f2. Both are drawn as arrows with no tick marks or numbers.\n\nFour points are marked with small red circles and labeled f(x1), f(x2), f(x3) and f(x4). From upper left to lower right, f(x1) has the highest f2 and lowest f1, f(x2) is lower and further right, and f(x4) is lowest and furthest right. f(x3) lies inside the shaded area, to the right of f(x2) and above f(x4), and it is not on the boundary.\n\nA thick dark-red staircase line runs through f(x1), f(x2) and f(x4). It starts with a vertical segment going up from f(x1), then steps horizontally right and down at each point, and ends with a horizontal segment to the right of f(x4). This line is the boundary of the dominated region. Since f(x3) is dominated by f(x2) and f(x4), it is not on the staircase.\n\nA reference point, yref, is shown as an open circle at the upper right. The light pink shaded region lies between the staircase and the reference point, bounded above by the top edge at the height of yref and on the right by the vertical line at the f1 position of yref. The text \"HV(f({x1, x2, x3, x4}))\" is written inside the shaded region to label its area as the hypervolume.\n\nThe figure shows how the hypervolume of a set of four objective vectors is the area dominated by the set and bounded by the reference point, with one point contributing nothing to the boundary.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A 2D plot illustrating the Hypervolume (HV) concept in multi-objective optimization, with axes f1 (horizontal) and f2 (vertical). Four points representing f(x1), f(x2), f(x3), f(x4) are plotted in objective space, along with a reference point y_ref at the top right. The Pareto front formed by f(x1), f(x2), and f(x4) creates a staircase-like boundary (shown as a thick red line) descending from upper left to lower right, with f(x1) having high f2 and low f1, f(x2) in the middle, and f(x4) having low f2 and high f1. The point f(x3) lies inside the dominated region, below and to the right of the staircase line, indicating it is dominated by the other points and does not contribute to the Pareto front. The shaded pink region between the staircase line and the reference point y_ref represents the hypervolume HV(f({x1,x2,x3,x4})), which is the area dominated by the Pareto-optimal points up to the reference point. The staircase shape is formed by horizontal and vertical line segments connecting f(x1) to f(x2) to f(x4), with the shaded area extending to y_ref's coordinates.",
+    "texts": "f2, f1, y_ref, HV(f({x1, x2, x3, x4})), f(x1), f(x2), f(x3), f(x4)",
+    "data": [
+     {
+      "series": "Pareto front points",
+      "points": [
+       [
+        "f(x1)",
+        "high f2, low f1"
+       ],
+       [
+        "f(x2)",
+        "medium f2, medium f1"
+       ],
+       [
+        "f(x4)",
+        "low f2, high f1"
+       ]
+      ]
+     },
+     {
+      "series": "Dominated point",
+      "points": [
+       [
+        "f(x3)",
+        "inside hypervolume region, dominated"
+       ]
+      ]
+     },
+     {
+      "series": "Reference point",
+      "points": [
+       [
+        "y_ref",
+        "top right corner, used as hypervolume boundary"
+       ]
+      ]
+     }
+    ],
+    "error": "major",
+    "note": "f(x3) said to lie below and to the right of the staircase; it lies above and right of it, inside the shaded region"
+   }
+  },
+  {
+   "n": 25,
+   "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertai",
+   "page": 5,
+   "figure_name": "37279cb1a4747383a8a01069fb6aa664",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a schematic diagram in two-objective space, with the horizontal axis labeled f1 and the vertical axis labeled f2. It illustrates the region dominated by a set of points, in the style of a hypervolume or dominated-region picture from multi-objective optimization.\n\nThree red filled circles form a staircase that descends from upper left to lower right. The first is at upper left, the second is in the middle, and the third is at lower right. A thick red line joins them in steps: a vertical segment rises from the first circle to the top of the shaded region, then a horizontal segment runs right from that circle. At the middle circle the line drops down and then runs right again. At the lower-right circle there is another drop, followed by a horizontal segment that extends to the right edge of the region.\n\nTwo green diamonds sit at the inner corners of the staircase. One is at the corner right of the first circle, where the horizontal segment meets the drop. The other is at the corner right of the middle circle, where the next drop begins.\n\nThe area above and to the right of the staircase is filled with light pink. It is bounded on the upper right by a small open circle labeled \"nadir\", which marks the reference point at the top-right corner of the shaded region. The picture gives no numeric tick values or legend, so the green diamonds and red circles are not explained beyond their positions.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A 2D plot with axes f1 (horizontal) and f2 (vertical), showing a Pareto front represented as a step-shaped red staircase line with filled red dots at the endpoints of each step segment and green diamond markers at the corners where segments connect. A shaded pink/red region extends above and to the right of the step function, bounded by a hollow circle labeled 'nadir' at the top right corner, representing the nadir point. The staircase starts from a vertical line at upper left, moving down to a red dot, then right to a green diamond, down to a red dot, right to a green diamond, down to a red dot, then right along the bottom to a horizontal line extending right. The shaded region represents the dominated area relative to the Pareto front.",
+    "texts": "f2, f1, nadir",
+    "data": [
+     {
+      "series": "Pareto front points (red dots)",
+      "points": [
+       [
+        1,
+        5
+       ],
+       [
+        3,
+        3
+       ],
+       [
+        6,
+        1
+       ]
+      ]
+     },
+     {
+      "series": "connection points (green diamonds)",
+      "points": [
+       [
+        3,
+        5
+       ],
+       [
+        6,
+        3
+       ]
+      ]
+     },
+     {
+      "series": "nadir point",
+      "points": [
+       [
+        8,
+        7
+       ]
+      ]
+     }
+    ],
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 26,
+   "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accel",
+   "page": 2,
+   "figure_name": "3042b9fda05ec45d8b0040f616bec2d1",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is an architecture diagram of a 4×4 tiled accelerator mesh. Tiles are labeled by coordinates from (0,0) at the bottom left to (3,3) at the top right.\n\n**Tile contents.** Every tile has the same four parts:\n- a blue MAC array (\"MAC arr\")\n- a green KV SRAM block\n- a purple scratchpad (\"Scrpad\")\n- an orange router box marked \"R\"\n\nRouters are joined to their neighbors by gray horizontal and vertical lines, which forms a 2D mesh.\n\n**Labels and regions.**\n- The four quadrants are labeled Q2 (top left), Q3 (top right), Q0 (bottom left) and Q1 (bottom right). Faint blue and green shading marks some of these regions.\n- A thick orange vertical line labeled \"bisection\" runs between columns 1 and 2.\n- Above the mesh, four purple boxes labeled DC0, DC1, DC2 and DC3 each feed one column.\n- On the right edge, three plane labels read \"memory plane (TaKV)\", \"router plane (Mare)\" and \"compute plane (Pad)\".\n- At the bottom is a box reading \"HBM2 · 8 GB · 460 GB/s\". Dotted pink arrows labeled \"tile-local prefetch descriptors\" and \"HBM prefetch\" connect it to the tiles. A small \"PF credit\" label sits near the bisection.\n\n**Highlighted example.**\n- Tile (1,1) is outlined in orange and tagged \"home: π(ℓ, s) = (1, 1)\".\n- From its router, a thick orange KV_DATA arrow runs east to the router at (2,1). There it splits at a small \"mcast branch\" label, with a \"BF\" tag nearby.\n- One branch continues east to (3,1). The other goes north to (2,2).\n- A dashed blue \"PART\" arrow runs from the router at (2,1) down to tile (2,0).\n\n**Legend.**\n- A line legend lists \"VN1: KV_DATA multicast\" as a solid orange line, \"VN0: PART unicast\" as a dashed blue line, and \"HBM prefetch\" as a dotted line.\n- A color legend maps blue to MAC, green to KV SRAM, purple to Scrpad and orange to Router.\n\nThe figure appears to show how key-value data is multicast across the mesh from a home tile, while partial results are sent by unicast, and how HBM prefetch feeds the tiles. It does not show any numeric results beyond the HBM2 capacity and bandwidth.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "The diagram shows a 4x4 grid of tiles arranged in columns labeled DC0, DC1, DC2, DC3 (top) and grouped into quadrants Q0 (bottom-left), Q1 (bottom-right), Q2 (top-left), Q3 (top-right). A vertical red line labeled 'bisection' runs down the middle between columns DC1 and DC2, separating Q2/Q0 from Q3/Q1. Each tile in the grid is identified by coordinates (column,row), ranging from (0,0) to (3,3), and contains four sub-blocks: 'MAC arr' (blue), 'KV SRAM' (green), 'Scrpad' (purple), and 'R' (Router, orange), arranged in a 2x2 layout within each tile. The grid is divided horizontally into three planes labeled on the right side: 'memory plane (TAKV)' for the top row (row 3), 'router plane (MARE)' for middle rows (rows 1-2), and 'compute plane (PAD)' for the bottom row (row 0). Vertical gray lines connect routers vertically within each column, and horizontal gray lines connect routers across tiles in each row, forming a network-on-chip topology. At the top, rounded rectangles labeled DC0, DC1, DC2, DC3 sit above each column, with downward arrows pointing into the top tiles. A specific dataflow example is highlighted: tile (1,1) is outlined in bold orange and labeled 'home: π(ℓ,s)=(1,1)'. An orange arrow path labeled 'KV_DATA' and 'VN1: KV_DATA multicast' runs horizontally from the router at (1,1) through (2,1) to (3,1), with a 'mcast branch' label and 'BF' tag near (2,1), then continues upward via a thick orange vertical line from (2,1) through (2,2) to (2,3), crossing the bisection line. A dashed blue arrow labeled 'PART' and 'VN0: PART unicast' goes from router (2,1) down to the KV SRAM block in tile (2,0). A dotted line labeled 'HBM prefetch' and 'tile-local prefetch descriptors' extends from the bottom area upward into the grid, near an 'HBM2 · 8 GB · 460 GB/s' label box at the bottom center. A small red arrow labeled 'PF credit' points near the bisection line at the bottom. A legend at the bottom right explains color coding: blue=MAC, green=KV SRAM, purple=Scrpad, orange=Router. Another legend at bottom left shows line styles: solid orange = 'VN1: KV_DATA multicast', dashed blue = 'VN0: PART unicast', dotted = 'HBM prefetch'.",
+    "texts": [
+     "Q2",
+     "Q3",
+     "Q0",
+     "Q1",
+     "bisection",
+     "DC0",
+     "DC1",
+     "DC2",
+     "DC3",
+     "(0,3)",
+     "(1,3)",
+     "(2,3)",
+     "(3,3)",
+     "(0,2)",
+     "(1,2)",
+     "(2,2)",
+     "(3,2)",
+     "(0,1)",
+     "(1,1)",
+     "(2,1)",
+     "(3,1)",
+     "(0,0)",
+     "(1,0)",
+     "(2,0)",
+     "(3,0)",
+     "MAC arr",
+     "KV SRAM",
+     "Scrpad",
+     "R",
+     "memory plane (TAKV)",
+     "router plane (MARE)",
+     "compute plane (PAD)",
+     "KV_DATA",
+     "mcast branch",
+     "BF",
+     "PART",
+     "PF credit",
+     "home: π(ℓ, s)=(1,1)",
+     "HBM2 · 8 GB · 460 GB/s",
+     "tile-local prefetch descriptors",
+     "VN1: KV_DATA multicast",
+     "VN0: PART unicast",
+     "HBM prefetch",
+     "MAC",
+     "KV SRAM",
+     "Scrpad",
+     "Router"
+    ],
+    "data": null,
+    "error": "minor",
+    "note": "the bisection line is called red; it is orange"
+   }
+  },
+  {
+   "n": 27,
+   "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accel",
+   "page": 3,
+   "figure_name": "d9c5ad5f40c42da40ceac6b3477fbfe9",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a pipeline diagram of a three-stage dataflow for one layer, probably for attention computation over key/value segments. A timing strip at the top is paired with a block diagram below it.\n\n**Timing strip (top).** Three rows of four cells run left to right along an arrow labeled \"time\". The rows are labeled PF (blue), TM (orange) and RD (green).\n- PF row: s, s+1, s+2, s+3.\n- TM row: s−1, s, s+1, s+2.\n- RD row: s−2, s−1, s, s+1.\n\nEach stage works on a different segment at the same time, with TM one segment behind PF and RD two segments behind PF.\n\n**Block diagram (main part).** Three boxes are stacked vertically inside a dashed rounded outline labeled \"one layer\". A blue curly brace on the left is labeled \"overlap across segments\".\n- Stage 0: PF, prefetch (blue box). The text reads \"issue KV_FETCH(s+1) · credit counter\".\n- Between stages 0 and 1 is a gray box reading \"async FIFO F = 48 flits\". An arrow labeled \"KV_DATA from home tile\" enters it from the right.\n- Stage 1: TM, tile multiply (orange box). The text reads \"q_{ℓ,h} · K_s; logit accumulate in scratchpad\".\n- Between stages 1 and 2 is a second gray box reading \"async FIFO F = 48 flits\".\n- Stage 2: RD, stream reduce (green box). The text reads \"online softmax: update (m_s, ℓ_s, o_s)\".\n- An arrow leaves the bottom of the dashed outline and is labeled \"o_layer (FP16)\".\n\n**Right-side annotation.** An orange arrow leaves Stage 0 toward the right, labeled \"KV_FETCH VNi → home tile\". A red vertical double-headed arrow is labeled \"RTT 2L_max + t_ack ≈ 22 cy\". This marks the round-trip latency of the fetch request and its response.",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "diagram",
+    "description": "This is a pipeline diagram illustrating a three-stage hardware/software pipeline for processing attention computations across time segments. At the top, a timing table shows three pipeline stages (PF, TM, RD) each operating on overlapping time segments: PF operates on s, s+1, s+2, s+3; TM operates on s-1, s, s+1, s+2; RD operates on s-2, s-1, s, s+1 — showing that each stage is offset by one segment from the previous, indicating pipelined overlap across segments (annotated on the left side with 'overlap across segments'). Below this table, a vertical flow diagram shows the three pipeline stages connected sequentially within a dashed box labeled 'one layer'. Stage 0 (PF, blue box) performs 'prefetch': it issues KV_FETCH(s+1) with a credit counter, and sends a KV_FETCH signal to the right labeled with 'VNI → home tile' and timing info 'RTT = 2L_max + t_ack ≈ 22 cy'. The output of Stage 0 flows down through an async FIFO (F=48 flits) buffer, which also receives KV_DATA input from the home tile (blue arrow from the right). This feeds into Stage 1 (TM, orange box): 'tile multiply', computing q_{ℓ,h} · K_s and accumulating logits in a scratchpad. The output of Stage 1 flows through another async FIFO (F=48 flits) buffer into Stage 2 (RD, green box): 'stream reduce', performing online softmax to update (m_s, ℓ_s, o_s). The final output of the pipeline is o_layer in FP16 format, shown exiting the bottom of the dashed box labeled 'one layer'.",
+    "texts": [
+     "PF: s | s+1 | s+2 | s+3",
+     "TM: s-1 | s | s+1 | s+2",
+     "RD: s-2 | s-1 | s | s+1",
+     "time →",
+     "Stage 0: PF prefetch",
+     "issue KV_FETCH(s+1) · credit counter",
+     "KV_FETCH",
+     "VNI → home tile",
+     "RTT",
+     "2L_max + t_ack",
+     "≈ 22 cy",
+     "async FIFO F=48 flits",
+     "KV_DATA",
+     "from home tile",
+     "Stage 1: TM tile multiply",
+     "q_{ℓ,h} · K_s; logit accumulate in scratchpad",
+     "async FIFO F=48 flits",
+     "Stage 2: RD stream reduce",
+     "online softmax: update (m_s, ℓ_s, o_s)",
+     "o_layer (FP16)",
+     "← one layer",
+     "overlap across segments"
+    ],
+    "data": null,
+    "error": null,
+    "note": null
+   }
+  },
+  {
+   "n": 28,
+   "record": "Noise-adjusted turnover in estimated networks",
+   "page": 7,
+   "figure_name": "eb0db37b3928776ea9cb0a572a424a1d",
+   "caption": "",
+   "image_checked": true,
+   "sonnet": {
+    "description": "This is a line chart with no printed caption. It plots the expected false turnover divided by network size against the number of nodes p, for three choices of q_p.\n\n**Axes**\n- The x-axis is \"Number of nodes p\". It is labeled at 100, 200, 300, 400 and 500, and the curves start at about p = 20.\n- The y-axis is \"Expected false turnover / network size\". It runs from 0 to 14 in steps of 2.\n- A faint dotted horizontal reference line sits at y = 0.\n\n**Series** (the legend is in the upper right)\n- **Solid line, q_p = p^(-1/2):** This curve rises steadily and is concave. It starts near 1.8 at p ≈ 20 and is about 5.7 at p = 100. It reaches about 8.5 at p = 200, about 10.7 at p = 300 and about 12.6 at p = 400. It ends near 14.1 at p = 500. It is the highest curve throughout.\n- **Dashed line, q_p = p^(-1):** This curve is nearly flat. It starts around 0.5 at small p and levels off at roughly 0.6 to 0.7 for the rest of the range.\n- **Dotted line, q_p = p^(-3/2):** This curve stays very close to zero. It has a tiny bump of about 0.1 at small p and then lies on the zero line out to p = 500.\n\n**Overall pattern:** The expected false turnover per network size grows with the number of nodes only when q_p = p^(-1/2). It stays bounded below 1 when q_p = p^(-1) and is essentially zero when q_p = p^(-3/2).",
+    "error": null,
+    "note": null
+   },
+   "unstructured": {
+    "type": "graph",
+    "description": "A line graph showing the relationship between number of nodes p (x-axis, 0-500) and Expected false turnover / network size (y-axis, 0-14) for three different decay functions q_p. The solid line (q_p = p^-1/2) shows strong growth, starting around 1.8 at p=20 and increasing steadily to about 14.3 at p=500, with a concave shape typical of a square root function. The dashed line (q_p = p^-1) shows mild growth, starting near 0.3 at p=20 and leveling off around 0.65-0.7 by p=500, remaining fairly flat for most of the range. The dotted line (q_p = p^-3/2) stays very close to 0 across the entire range of p, showing minimal growth.",
+    "texts": "Expected false turnover / network size; Number of nodes p; q_p = p^-1/2; q_p = p^-1; q_p = p^-3/2; 0; 2; 4; 6; 8; 10; 12; 14; 100; 200; 300; 400; 500",
+    "data": [
+     {
+      "series": "q_p = p^-1/2",
+      "points": [
+       [
+        20,
+        1.8
+       ],
+       [
+        50,
+        3.5
+       ],
+       [
+        100,
+        5.8
+       ],
+       [
+        150,
+        7.3
+       ],
+       [
+        200,
+        8.5
+       ],
+       [
+        250,
+        9.5
+       ],
+       [
+        300,
+        10.4
+       ],
+       [
+        350,
+        11.2
+       ],
+       [
+        400,
+        12.0
+       ],
+       [
+        450,
+        12.7
+       ],
+       [
+        500,
+        14.3
+       ]
+      ]
+     },
+     {
+      "series": "q_p = p^-1",
+      "points": [
+       [
+        20,
+        0.3
+       ],
+       [
+        50,
+        0.45
+       ],
+       [
+        100,
+        0.55
+       ],
+       [
+        150,
+        0.6
+       ],
+       [
+        200,
+        0.62
+       ],
+       [
+        250,
+        0.63
+       ],
+       [
+        300,
+        0.64
+       ],
+       [
+        350,
+        0.65
+       ],
+       [
+        400,
+        0.65
+       ],
+       [
+        450,
+        0.66
+       ],
+       [
+        500,
+        0.67
+       ]
+      ]
+     },
+     {
+      "series": "q_p = p^-3/2",
+      "points": [
+       [
+        20,
+        0.02
+       ],
+       [
+        50,
+        0.03
+       ],
+       [
+        100,
+        0.03
+       ],
+       [
+        150,
+        0.03
+       ],
+       [
+        200,
+        0.03
+       ],
+       [
+        250,
+        0.03
+       ],
+       [
+        300,
+        0.03
+       ],
+       [
+        350,
+        0.03
+       ],
+       [
+        400,
+        0.03
+       ],
+       [
+        450,
+        0.03
+       ],
+       [
+        500,
+        0.03
+       ]
+      ]
+     }
+    ],
+    "error": "major",
+    "note": "the dashed p^-1 series said to start near 0.3; it starts near 0.5"
+   }
+  }
+ ]
+}

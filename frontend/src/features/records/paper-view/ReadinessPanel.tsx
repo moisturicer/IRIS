@@ -33,12 +33,12 @@ export function ReadinessPanel({ readiness, onAction, id }: {
 }) {
   const headingId = useId();
   return (
-    <section id={id} tabIndex={-1} aria-labelledby={headingId} className={cn("space-y-3 rounded", FOCUS_RING)}>
+    <section id={id} tabIndex={-1} aria-labelledby={headingId} className={cn("space-y-3 rounded-control", FOCUS_RING)}>
       <RailHeading id={headingId}>Readiness</RailHeading>
       {/* No side stripe: the icon and the words carry the verdict (IR-1094, spec §4.9). */}
       <p
         role="status"
-        className="flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-small font-semibold text-stone-900"
+        className="flex items-center gap-2 rounded-control border border-stone-300 bg-white px-3 py-2.5 text-small font-semibold text-stone-900"
       >
         <i className={cn("fas", VERDICT_ICON[readiness.verdict])} aria-hidden />
         {readiness.headline}
@@ -66,7 +66,7 @@ export function ReadinessFacts({ items, onAction }: {
         <li
           key={`${item.kind}-${i}`}
           className={cn(
-            "rounded-lg px-3 py-2 text-small",
+            "rounded-control px-3 py-2 text-small",
             item.severity === "blocker" ? "bg-stone-100 text-stone-900" : "border border-stone-300 text-stone-700",
           )}
         >

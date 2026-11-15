@@ -53,8 +53,11 @@ const saves = (entries: SavedRecordEntry[]) =>
   vi.mocked(libraryApi.saves).mockResolvedValue({ data: { results: entries } } as SavesResponse);
 
 /** A sign-in as `login` does it: a new session, so a new epoch. */
-function signIn(id: number, role = "Student") {
-  useAuthStore.getState().login({ id, email: `reader${id}@cit.edu`, role_name: role } as unknown as User, "access", "refresh");
+function signIn(id: number, role = "Student", canAuthor = role === "Student" || role === "Adviser") {
+  // `can_author` is the server's flag (IR-1096); a test says what the server said.
+  useAuthStore.getState().login(
+    { id, email: `reader${id}@cit.edu`, role_name: role, can_author: canAuthor } as unknown as User, "access", "refresh",
+  );
 }
 
 /** What a resubmission left on a record: ITSO's clearance kept, IERC's reset (IR-1083). */
@@ -634,5 +637,25 @@ describe("My Library: download requests (IR-743)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "No download requests yet" })).toBeInTheDocument();
     expect(recordsApi.myDownloadRequests).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("My Library follows the server's can_author (IR-1096)", () => {
+  it("gives a Student the server refuses only Saved papers and Download requests, and no Publish", async () => {
+    signIn(12, "Student", false);
+    renderScreen(<MyLibraryPage />);
+
+    expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Download requests"]);
+    expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
+    await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
+  });
+
+  it("gives anyone the server says can author the research tabs and Publish, whatever their role", async () => {
+    signIn(13, "RDCO", true);
+    renderScreen(<MyLibraryPage />);
+
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "My submissions", "Saved papers", "Download requests"]);
+    expect(screen.getByRole("link", { name: "Publish" })).toBeInTheDocument();
   });
 });

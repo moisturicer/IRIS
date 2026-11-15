@@ -17,6 +17,7 @@ import { Link } from "react-router-dom";
 import { differenceInCalendarDays, formatDistanceToNowStrict, parseISO } from "date-fns";
 
 import { notificationsApi } from "@/api/notifications";
+import { failureMessage } from "@/lib/readFailure";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -26,6 +27,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
 import { notificationTypeLabel } from "./notificationLabels";
+import { SELECTED } from "@/components/ui/highlightRoles";
 
 type Filter = "all" | "unread";
 
@@ -56,6 +58,7 @@ export default function NotificationsPage() {
   // A failed load is not an empty inbox (IR-745): saying "No notifications
   // yet" after an error would tell the reader something untrue.
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [filter, setFilter] = useState<Filter>("all");
 
   const load = () => {
@@ -66,7 +69,7 @@ export default function NotificationsPage() {
         setNotifications(data.results ?? data);
         setLoadFailed(false);
       })
-      .catch(() => setLoadFailed(true))
+      .catch((error: unknown) => { setLoadFailed(true); setLoadError(error); })
       .finally(() => setLoading(false));
   };
 
@@ -115,11 +118,11 @@ export default function NotificationsPage() {
       aria-pressed={filter === value}
       onClick={() => setFilter(value)}
       className={cn(
-        "h-9 px-3.5 rounded-lg text-small font-semibold border",
+        "h-9 px-3.5 rounded-control text-small font-semibold border",
         COLOUR_TRANSITION,
         FOCUS_RING,
         filter === value
-          ? "bg-brand-50 border-brand-200 text-brand"
+          ? SELECTED
           : "border-stone-300 text-stone-700 hover:border-brand hover:text-brand",
       )}
     >
@@ -149,15 +152,15 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      <div className="bg-surface rounded-2xl border border-stone-200 overflow-hidden">
+      <div className="bg-surface rounded-card border border-stone-200 overflow-hidden">
         {loading ? (
-          <Skeleton />
+          <Skeleton onRetry={load} />
         ) : loadFailed ? (
           <EmptyState
             tone="error"
             icon="fa-circle-exclamation"
             title="Couldn't load your notifications"
-            message="Check your connection and try again."
+            message={failureMessage(loadError)}
             action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
           />
         ) : notifications.length === 0 ? (
@@ -280,18 +283,18 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
             aria-label="Mark as read"
             title="Mark as read"
             className={cn(
-              "w-9 h-9 rounded-lg flex items-center justify-center text-stone-500 hover:bg-stone-100 hover:text-stone-900",
+              "w-9 h-9 rounded-control flex items-center justify-center text-stone-500 hover:bg-stone-100 hover:text-stone-900",
               COLOUR_TRANSITION,
               FOCUS_RING,
             )}
           >
-            <i className="fas fa-check text-[13px]" aria-hidden />
+            <i className="fas fa-check text-small" aria-hidden />
           </button>
         )}
         {opens && (
           <i
             aria-hidden
-            className="fas fa-chevron-right w-9 text-center text-[12px] text-stone-400 group-hover:text-brand pointer-events-none"
+            className="fas fa-chevron-right w-9 text-center text-label text-stone-400 group-hover:text-brand pointer-events-none"
           />
         )}
       </div>

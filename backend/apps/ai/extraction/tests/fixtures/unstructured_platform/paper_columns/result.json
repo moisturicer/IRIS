@@ -1,0 +1,278 @@
+[
+  {
+    "type": "Header",
+    "element_id": "8d249eb2a3f08bc9be79922cd6affb5e",
+    "text": "IRIS contract fixture",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.31878662109375,
+            126.22476959228516
+          ],
+          [
+            245.31878662109375,
+            158.56358337402344
+          ],
+          [
+            495.7679138183594,
+            158.56358337402344
+          ],
+          [
+            495.7679138183594,
+            126.22476959228516
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "paper_columns.pdf"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "320242254b674f2ccdfa23baaf0dd98d",
+    "text": "Paper column study",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            245.1921844482422,
+            249.02316284179688
+          ],
+          [
+            245.1921844482422,
+            307.0951232910156
+          ],
+          [
+            717.4711303710938,
+            307.0951232910156
+          ],
+          [
+            717.4711303710938,
+            249.02316284179688
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "paper_columns.pdf",
+      "parent_id": "8d249eb2a3f08bc9be79922cd6affb5e"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "c5b56f1dc114cb9e068a207aefaa5ba7",
+    "text": "Left paragraph one opens its column. Left prose goes on along line 01 here. Left prose goes on along line 02 here. Left prose goes on along line 03 here. Left prose goes on along line 04 here. Left prose goes on along line 05 here. Left prose goes on along line 06 here. Left prose goes on along line 07 here. Left prose goes on along line 08 here. Left prose goes on along line 09 here. Left prose goes on along line 10 here. Left prose goes on along line 11 here. Left prose goes on along line 12 here. Left prose goes on along line 13 here. Left prose goes on along line 14 here. Left prose goes on along line 15 here. Left prose goes on along line 16 here.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            241.4119873046875,
+            347.6861267089844
+          ],
+          [
+            241.4119873046875,
+            1175.17822265625
+          ],
+          [
+            839.1935424804688,
+            1175.17822265625
+          ],
+          [
+            839.1935424804688,
+            347.6861267089844
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "paper_columns.pdf",
+      "parent_id": "320242254b674f2ccdfa23baaf0dd98d"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "39311f1f3faf2b62acef9f446a918eb4",
+    "text": "Left paragraph two opens its column. Left prose goes on along line 01 here. Left prose goes on along line 02 here. Left prose goes on along line 03 here. Left prose goes on along line 04 here. Left prose goes on along line 05 here. Left prose goes on along line 06 here. Left prose goes on along line 07 here. Left prose goes on along line 08 here. Left prose goes on along line 09 here. Left prose goes on along line 10 here. Left prose goes on along line 11 here. Left prose goes on along line 12 here. Left prose goes on along line 13 here. Left prose goes on along line 14 here. Left prose goes on along line 15 here. Left prose goes on along line 16 here. Left prose goes on along line 17 here. Left prose goes on along line 18 here. Left prose goes on along line 19 here. Left prose goes on along line 20 here. Left prose goes on along line 21 here. Left prose goes on along line 22 here. Left prose goes on along line 23 here. Left prose goes on along line 24 here. Left prose goes on along line 25 here.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            241.25062561035156,
+            1215.4166259765625
+          ],
+          [
+            241.25062561035156,
+            2477.857177734375
+          ],
+          [
+            839.67041015625,
+            2477.857177734375
+          ],
+          [
+            839.67041015625,
+            1215.4166259765625
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "paper_columns.pdf",
+      "parent_id": "320242254b674f2ccdfa23baaf0dd98d"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "56ff4f7abd8180d7564c7f750eead599",
+    "text": "Right paragraph one opens its column. Right prose goes on along line 01 here. Right prose goes on along line 02 here. Right prose goes on along line 03 here. Right prose goes on along line 04 here. Right prose goes on along line 05 here. Right prose goes on along line 06 here. Right prose goes on along line 07 here. Right prose goes on along line 08 here. Right prose goes on along line 09 here. Right prose goes on along line 10 here. Right prose goes on along line 11 here. Right prose goes on along line 12 here. Right prose goes on along line 13 here. Right prose goes on along line 14 here. Right prose goes on along line 15 here. Right prose goes on along line 16 here. Right prose goes on along line 17 here. Right prose goes on along line 18 here. Right prose goes on along line 19 here. Right prose goes on along line 20 here. Right prose goes on along line 21 here. Right prose goes on along line 22 here. Right prose goes on along line 23 here. Right prose goes on along line 24 here.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            1117.0848388671875,
+            347.3954162597656
+          ],
+          [
+            1117.0848388671875,
+            1562.6435546875
+          ],
+          [
+            1737.153076171875,
+            1562.6435546875
+          ],
+          [
+            1737.153076171875,
+            347.3954162597656
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "paper_columns.pdf",
+      "parent_id": "320242254b674f2ccdfa23baaf0dd98d"
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "67b793fb410d3e98dbb776f1d81a55c0",
+    "text": "Right paragraph two opens its column. Right prose goes on along line 01 here. Right prose goes on along line 02 here. Right prose goes on along line 03 here. Right prose goes on along line 04 here. Right prose goes on along line 05 here. Right prose goes on along line 06 here. Right prose goes on along line 07 here. Right prose goes on along line 08 here. Right prose goes on along line 09 here. Right prose goes on along line 10 here. Right prose goes on along line 11 here. Right prose goes on along line 12 here. Right prose goes on along line 13 here. Right prose goes on along line 14 here. Right prose goes on along line 15 here. Right prose goes on along line 16 here. Right prose goes on along line 17 here.",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            1117.535400390625,
+            1605.5086669921875
+          ],
+          [
+            1117.535400390625,
+            2477.728515625
+          ],
+          [
+            1737.0579833984375,
+            2477.728515625
+          ],
+          [
+            1737.0579833984375,
+            1605.5086669921875
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "paper_columns.pdf",
+      "parent_id": "320242254b674f2ccdfa23baaf0dd98d"
+    }
+  },
+  {
+    "type": "Footer",
+    "element_id": "81cab24600e4741206dee04d41d69aa9",
+    "text": "Page 1",
+    "metadata": {
+      "is_extracted": "true",
+      "coordinates": {
+        "points": [
+          [
+            1002.1915893554688,
+            2605.478271484375
+          ],
+          [
+            1002.1915893554688,
+            2639.9794921875
+          ],
+          [
+            1094.9722222222222,
+            2639.9794921875
+          ],
+          [
+            1094.9722222222222,
+            2605.478271484375
+          ]
+        ],
+        "system": "PixelSpace",
+        "layout_width": 2125,
+        "layout_height": 2750
+      },
+      "filetype": "application/pdf",
+      "languages": [
+        "eng"
+      ],
+      "page_number": 1,
+      "filename": "paper_columns.pdf"
+    }
+  },
+  {
+    "type": "PageBreak",
+    "element_id": "175f37dbc01030b748806b7b02d195f7",
+    "text": "",
+    "metadata": {
+      "languages": [
+        "eng"
+      ],
+      "filename": "paper_columns.pdf",
+      "filetype": "application/pdf"
+    }
+  }
+]

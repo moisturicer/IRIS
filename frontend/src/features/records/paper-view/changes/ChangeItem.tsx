@@ -25,8 +25,8 @@ interface Props {
 // Removed and added text are told apart by a word, a strikethrough or an
 // underline, never by colour alone (12-accessibility.md); the palette is grey
 // and maroon only (IR-358).
-const DELETED = "line-through decoration-stone-500 text-stone-600 bg-stone-200 rounded-sm px-0.5";
-const INSERTED = "underline decoration-brand decoration-2 underline-offset-2 text-stone-900 bg-brand-50 px-0.5";
+const DELETED = "line-through decoration-stone-500 text-stone-600 bg-stone-200 rounded-none px-0.5";
+const INSERTED = "underline decoration-brand decoration-2 underline-offset-2 text-stone-900 px-0.5";
 
 function Deleted({ text }: { text: string }) {
   return <del className={DELETED}><span className="sr-only">Removed: </span>{text}</del>;
@@ -86,7 +86,7 @@ export function ChangeItem({ change, from, to, view, sectionName, onShow }: Prop
     : null;
   return (
     <article aria-label={`${label}, page ${page ?? "unknown"}`}
-      className="rounded-lg border border-stone-200 bg-white p-3 text-small text-stone-800">
+      className="rounded-control border border-stone-200 bg-white p-3 text-small text-stone-800">
       <header className="mb-2 flex flex-wrap items-center gap-2">
         <span className={cn("review-tag font-semibold",
           change.kind === "added" && "border-brand/40 text-brand",

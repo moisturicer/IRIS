@@ -9,6 +9,7 @@ import { isSessionEndCode, SESSION_LOST_CODE } from "@/lib/authSession";
 import { ForbiddenScreen } from "./ForbiddenScreen";
 import { PendingApprovalPage } from "@/features/auth/PendingApprovalPage";
 import { Spinner } from "@/components/ui/Spinner";
+import { reloadPage } from "@/lib/readFailure";
 import { useNoticeStore } from "@/store/notice.store";
 import { NoticeAnswerScreen } from "@/features/auth/notice/NoticeAnswerScreen";
 
@@ -79,7 +80,7 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
           `Skeleton`'s wording keeps every wait in the product sounding alike.
         */}
         <span className="sr-only">{announceWait ? "Loading…" : ""}</span>
-        <Spinner size="md" />
+        <Spinner size="md" onRetry={reloadPage} />
       </div>
     );
   }

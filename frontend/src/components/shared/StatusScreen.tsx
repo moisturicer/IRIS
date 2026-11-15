@@ -59,8 +59,8 @@ export function StatusScreen({
       <div role={error ? "alert" : undefined} className="w-full max-w-md text-center">
         <div
           className={cn(
-            "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl text-xl",
-            error ? "bg-brand-50 text-brand" : "bg-stone-100 text-stone-500",
+            "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-card text-xl",
+            error ? "bg-stone-100 text-brand" : "bg-stone-100 text-stone-600",
           )}
         >
           <i className={cn("fas", icon)} aria-hidden="true" />

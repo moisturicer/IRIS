@@ -46,7 +46,7 @@ export function ConfirmDialog({
       open={open}
       onClose={confirming ? STAY_OPEN : onCancel}
       title={title}
-      size="max-w-sm"
+      size="sm"
       footer={
         <div className="flex justify-end gap-2">
           <Button ref={cancelRef} type="button" variant="outline" className="min-h-11" onClick={onCancel} disabled={confirming}>
@@ -64,7 +64,7 @@ export function ConfirmDialog({
         </div>
       }
     >
-      <p className="text-[14px] text-stone-600">{message}</p>
+      <p className="text-body text-stone-600">{message}</p>
       {error && (
         <p role="alert" className="mt-3 text-small text-brand">
           {error}

@@ -22,8 +22,8 @@ from apps.ai.chunking.regions import dedupe_regions
 
 _KINDS = {"heading", "text", "list", "table", "image", "code", "link", "header", "footer"}
 # "Table 1:", "TABLE I:", "Fig. 3", but not "Table of Contents" or "TABLES".
-_CAPTION = re.compile(r"^(?:(?i:table|figure)(?![A-Za-z])|(?i:tab|fig)\.)\s*(?:\d+|[IVXLC]+|[A-Z]\d*)\b")
-_FRONT_MATTER = re.compile(r"^(abstract|keywords|contents|table of contents|summary|a preprint)\b", re.IGNORECASE)
+CAPTION = re.compile(r"^(?:(?i:table|figure)(?![A-Za-z])|(?i:tab|fig)\.)\s*(?:\d+|[IVXLC]+|[A-Z]\d*)\b")
+FRONT_MATTER = re.compile(r"^(abstract|keywords|contents|table of contents|summary|a preprint)\b", re.IGNORECASE)
 
 
 def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
@@ -42,7 +42,7 @@ def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
         for item in evidence_page.get("items", []) or []:
             if item.get("type") == "table" and item.get("merged_into_page"):
                 continue
-            elements.extend(_split_formulas(_element(item, number, metadata)))
+            elements.extend(split_formulas(_element(item, number, metadata)))
         if evidence_page is not page:
             elements[start:] = _named_images(elements[start:], page)
     elements = _repair_headings(elements)
@@ -82,7 +82,7 @@ def _element(item, page, metadata, *, nested=False):
         figure=_image_name(item) if label == "image" else "",
     )
     if nested and label == "text" and DISPLAY_FORMULA.search(text):
-        element = replace(element, children=tuple(_split_formulas(element)))
+        element = replace(element, children=tuple(split_formulas(element)))
     return element
 
 
@@ -108,7 +108,7 @@ def _repair_headings(elements):
     """Captions become text, the title heads the paper, and section numbering
     sets heading depth (IR-859)."""
     elements = [
-        replace(e, kind="text", level=None) if e.kind == "heading" and _CAPTION.match(e.text.strip()) else e
+        replace(e, kind="text", level=None) if e.kind == "heading" and CAPTION.match(e.text.strip()) else e
         for e in elements
     ]
     headings = [i for i, e in enumerate(elements) if e.kind == "heading"]
@@ -149,7 +149,7 @@ def _title(elements, headings, depths):
     if named is not None:
         return named
     if front and front[0] == headings[0] and elements[front[0]].page == 1 \
-            and not _FRONT_MATTER.match(elements[front[0]].text.strip()):
+            and not FRONT_MATTER.match(elements[front[0]].text.strip()):
         return front[0]
     return None
 
@@ -166,7 +166,7 @@ def _list_text(children, ordered):
     return "\n".join(lines)
 
 
-def _split_formulas(element):
+def split_formulas(element):
     if element.kind != "text":
         return [element]
     parts = []

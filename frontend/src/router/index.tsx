@@ -128,8 +128,8 @@ export const routes: RouteObject[] = [{
             ],
           },
           { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings" } },
-          // Another person's Profile (IR-700). Prototype: sample people, no API yet.
-          { path: "people/:id",            element: <PersonProfilePage />, handle: { crumb: "Profile" } },
+          // Another person's Profile (IR-700); its breadcrumb is Discover / People (IR-1133).
+          { path: "people/:id",            element: <PersonProfilePage />, handle: { crumb: "People" } },
 
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,

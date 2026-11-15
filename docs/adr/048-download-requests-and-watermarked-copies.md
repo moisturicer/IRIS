@@ -19,7 +19,7 @@ Observed on `main`, 2026-10-30:
 
 ## Decision
 
-1. **Reading stays open; downloading is gated.** The in-app reader keeps rendering the full text for everyone `visible_to` admits, so Ask IRIS citations, which open the paper at a page, are unchanged. Saving a copy of the manuscript needs an approved request.
+1. **Reading stays open; downloading is gated.** The in-app reader keeps rendering the full text for everyone `visible_to` admits, so Ask IRIS citations, which open the paper at a page, are unchanged. Saving a copy of the manuscript needs an approved request. *(Amended 2026-11-15, IR-1128: the reader draws a mark over each page it shows; see the Amendment below.)*
 2. **Some readers are exempt from the request:** the record's owners, its adviser, the four offices and its assigned reviewers. They download without one. The rule is the same for every published record, whatever its declared origin (ADR-046).
 3. **A download request carries the reader's note** saying why. A reader holds at most one pending request per record, and may cancel it.
 4. **RDCO alone approves, declines or revokes.** A decline always carries a note. RDCO may revoke an unexpired grant early, also with a note. A declined, revoked or expired request may be made again.
@@ -30,10 +30,34 @@ Observed on `main`, 2026-10-30:
 9. **Every download is audited** as `DOWNLOAD`, with its source (`grant` or `exempt`) and the request. Every cancel and revoke is audited too.
 10. **Every downloaded copy is watermarked, once IR-676 lands.** Until then, the download route serves the manuscript unmarked: still stricter than today, when the reader's own button saves an unmarked copy for anyone. The watermark is built per download and never stored:
     - a footer on every page: "Downloaded by <name> (<email>) on <date> via CIT-U IRIS · request #N", or the exemption reason in place of the request;
-    - a large grey diagonal **"CIT-U"** drawn in each page's background, beneath the content;
+    - a large grey diagonal **"CIT-U"** drawn in each page's background, beneath the content; *(amended 2026-11-15, IR-1127: drawn over the content, translucent, as shapes; see the Amendment below)*
     - the same identity, date and request in the PDF's metadata.
 11. **Fail closed, from IR-676 on.** A copy that cannot be watermarked is not served. The failure is audited and the reader is told to contact RDCO.
 12. **Libraries for the watermark:** pypdf merges the pages and reportlab draws the overlay. Both are BSD-licensed.
+
+## Amendment — 2026-11-15 (IR-1127): the "CIT-U" mark is drawn over the content
+
+Decided by Ashlee Sean, 2026-11-15; awaiting the project lead's acceptance on the PR.
+
+**What was observed.** A copy of *Predicting Student Absenteeism* downloaded from the deployed site had its footer but no "CIT-U". Each page of that PDF begins by filling a white rectangle over the whole page, which Word and Google Docs exports commonly do, and that fill covered a mark drawn beneath it. The Consequences expected this only on scanned pages; ordinary exported papers hide it too, so many copies carried no visible mark.
+
+**Decision.** Decision 10's mark is drawn **over** each page's content, translucent (stroke opacity 0.18, grey 0.45, so over white paper it prints about as light as the old grey 0.88), and drawn as lines and arcs rather than in a font, so it adds no "CIT-U" to the copy's extractable text. The footer is still drawn last, on top of everything. Nothing else in decision 10 or 11 changes: the identity, the metadata, the per-download copy that is never stored, and fail closed.
+
+**Alternatives.** *Remove full-page white fills before drawing beneath them* keeps the background look, but it rewrites each paper's drawing commands, can damage unusual PDFs, and still fails on scanned pages. *Leave it* costs nothing, but most exported papers would carry no visible mark.
+
+**Consequences.** Text under the mark is very slightly tinted; black text stays near black (measured: lightest pixel 20 of 255 under the mark on a black page). The reader's own preview is unchanged by this amendment; marking it is a separate decision (IR-1128).
+
+## Amendment — 2026-11-15 (IR-1128): the reader draws a mark over each page it shows
+
+Decided by Ashlee Sean, 2026-11-15; awaiting the project lead's acceptance on the PR.
+
+**Why.** Under decision 1 the reader shows each page unmarked, so a screenshot or a print from the reader carries nothing to say where it came from or who was reading.
+
+**Decision.** The reader draws, over every page it shows, the same faint diagonal "CIT-U" as a downloaded copy and a line "Viewed by <name> (<email>) via CIT-U IRIS". It is drawn in the browser: the PDF the reader fetches is unchanged, and the server does no work per view. The mark takes no pointer events, cannot be selected, is outside the text layer (find, selection, highlights and citations see only the paper) and is hidden from assistive technology. Reading stays open, and citations still open the paper at a page.
+
+**The gap, decided rather than overlooked.** The PDF the browser holds is still unmarked, so a reader who saves it with browser tools gets a copy without the mark or their name (Consequences, first point). This amendment does not close it. Closing it means building a copy that names the reader on the server on every view, measured 2026-11-15 at 1.2 s and 625 KB → 2.1 MB for a 27-page paper with no caching possible, or sending page images instead of a PDF, which costs more and loses selection, find and highlights. Either is a later decision for a person to make. A pre-built "CIT-U" copy per version without a name is IR-1129, waiting on a team decision.
+
+**Alternatives.** *Mark the PDF on the server for each view* closes the gap but costs the server on every paper opened, with nothing shareable between readers to cache. *Leave the reader unmarked* costs nothing, but screenshots and prints stay anonymous.
 
 ## Alternatives Considered
 
@@ -44,7 +68,7 @@ Observed on `main`, 2026-10-30:
 - **Requests and declines without notes.** Simpler, but RDCO would decide blind and a declined reader would not know why.
 - **No revocation; a grant simply expires.** Simpler, but RDCO could not stop a grant given by mistake or misused, short of hiding the record from everyone.
 - **Tell a record's owners who requested or downloaded it.** It was rejected to keep a reader's interest private, as saving a record is; RDCO's audit already records every download.
-- **A watermark drawn over the content at low opacity**, rather than beneath it. It would survive scanned pages, but it was rejected because the decision asks for a background mark. The footer is drawn on top and identifies the copy either way.
+- **A watermark drawn over the content at low opacity**, rather than beneath it. It would survive scanned pages, but it was rejected because the decision asks for a background mark. The footer is drawn on top and identifies the copy either way. *(Adopted 2026-11-15 by the IR-1127 Amendment below.)*
 - **PyMuPDF.** It is faster and a single library, but it is AGPL-licensed, which conflicts with the commercial track.
 - **Fail open.** Downloads would never break on an odd PDF, but the guarantee would weaken to "usually watermarked".
 
@@ -54,9 +78,9 @@ Downloading is the act that produces a copy leaving IRIS. Gating it, and later m
 
 ## Consequences
 
-- **The gate is a deterrent, not a control.** The reader fetches the full PDF to render it, so a determined reader can still save an unmarked copy using browser tools. Closing that gap means either watermarking the reader's copy too, which costs a per-request PDF rewrite and breaks range requests and caching, or gating the full text, the first alternative above. Either one is a later decision for a person to make.
+- **The gate is a deterrent, not a control.** The reader fetches the full PDF to render it, so a determined reader can still save an unmarked copy using browser tools. Closing that gap means either watermarking the reader's copy too, which costs a per-request PDF rewrite and breaks range requests and caching, or gating the full text, the first alternative above. Either one is a later decision for a person to make. *(2026-11-15, IR-1128: the reader now draws a mark over each page, which marks screenshots and prints but leaves this gap open, as decided.)*
 - **Until IR-676 lands, downloaded copies are unmarked.** They are still attributable through the audit log. *(corrected 2026-11-07, IR-968: IR-676 is Done, so every downloaded copy is watermarked.)*
-- On a scanned page that is one opaque image, the background "CIT-U" is hidden beneath the image. The footer still identifies the copy.
+- On a scanned page that is one opaque image, the background "CIT-U" is hidden beneath the image. The footer still identifies the copy. *(Superseded 2026-11-15, IR-1127: the mark is drawn over the page, so it shows on scanned pages too.)*
 - Watermarked downloads cost CPU per request. The time for the largest dev-corpus manuscript is recorded in IR-676.
 - Links already emailed stop working when `DownloadRedeemView` is removed. Their holders get a grant through decision 8 and download while signed in.
 - Two new dependencies go through IR-613's audit gate when IR-676 lands.

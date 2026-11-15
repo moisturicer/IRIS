@@ -88,7 +88,7 @@ export function RdcoPaperControls({ record, onChanged, onWithdrawn }: RdcoPaperC
   return (
     <section
       aria-labelledby={headingId}
-      className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card space-y-3"
+      className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card space-y-3"
     >
       <RailHeading id={headingId}>RDCO controls</RailHeading>
       <p className="text-xs text-stone-600">
@@ -169,7 +169,7 @@ function ActDialog({ title, verb, danger, busy, disabled, error, onSubmit, onCan
       open
       onClose={busy ? STAY_OPEN : onCancel}
       title={title}
-      size="max-w-md"
+      size="md"
       footer={
         <div className="flex flex-wrap justify-end gap-2">
           <Button type="button" variant="outline" className="min-h-11" onClick={onCancel} disabled={busy}>

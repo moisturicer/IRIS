@@ -19,7 +19,11 @@ LIMIT_NAMES = (
 PROBLEMS = {
     2: "This file is not a readable PDF.",
     3: "Encrypted PDFs are not accepted.",
-    4: "This PDF contains unsupported active content.",
+    # What to do, not only what is wrong: no retry of the same file can pass (IR-1048)
+    4: (
+        "This PDF contains unsupported active content, such as attached files or scripts. "
+        "Save a copy without them (for example, with Print to PDF) and upload that."
+    ),
     5: "This PDF exceeds the processing limits.",
     6: "PDF checking is temporarily unavailable. Please try again later.",
 }

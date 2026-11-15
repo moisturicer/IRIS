@@ -56,18 +56,18 @@ export function SourceContextPanel({ open, question = null, citations, sources, 
       <div className="w-[min(100vw,320px)] sm:w-[300px] flex flex-col h-full">
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60">
         <div className="min-w-0">
-          <h2 className="text-[14px] font-bold text-stone-800">Referenced passages</h2>
-          <p className="text-[12px] text-stone-500 mt-0.5 line-clamp-2">
+          <h2 className="text-body font-bold text-stone-800">Referenced passages</h2>
+          <p className="text-label text-stone-500 mt-0.5 line-clamp-2">
             {question ? <>For “{question}”</> : "The exact text behind the answer"}
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+          className="p-2 rounded-control text-stone-400 hover:bg-stone-100 hover:text-stone-700"
           aria-label="Hide sources panel"
         >
-          <i className="fas fa-xmark text-[14px]" aria-hidden />
+          <i className="fas fa-xmark text-body" aria-hidden />
         </button>
       </div>
 
@@ -98,8 +98,8 @@ function PassageRow({ citation, title }: { citation: ChatCitation; title: string
   return (
     <Link to={to} state={state} title={snippet || undefined}
       aria-label={openCitationLabel(citation, title)}
-      className="group/row grid grid-cols-[1.375rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-stone-100">
-      <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-md bg-brand-50 text-2xs font-semibold tabular-nums leading-none text-brand">
+      className="group/row grid grid-cols-[1.375rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-control px-2 py-1.5 transition-colors duration-150 hover:bg-stone-100">
+      <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-control bg-surface text-2xs font-semibold tabular-nums leading-none text-brand ring-1 ring-stone-300">
         {citation.marker}
       </span>
       <span className="min-w-0">
@@ -110,7 +110,7 @@ function PassageRow({ citation, title }: { citation: ChatCitation; title: string
       </span>
       <span className="mt-0.5 flex items-center gap-1.5 text-label font-medium tabular-nums text-stone-500">
         {citation.page != null && <>p. {citation.page}</>}
-        <i aria-hidden className="fas fa-arrow-right text-[9px] opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-visible/row:opacity-100" />
+        <i aria-hidden className="fas fa-arrow-right text-label opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-visible/row:opacity-100" />
       </span>
     </Link>
   );
@@ -132,7 +132,7 @@ export function SourcePassages({
 }) {
   if (citations.length === 0) {
     return (
-      <p className={cn("px-2 py-4 text-center text-[13px] text-stone-500", className)}>
+      <p className={cn("px-2 py-4 text-center text-small text-stone-500", className)}>
         {answered ? "This answer cited no passages." : "Ask a question to see the passages IRIS used in its answer."}
       </p>
     );

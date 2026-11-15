@@ -57,7 +57,7 @@ def _outcome(
         }
         if pages and label.page not in pages:
             page_mismatches.append(
-                f"{label.quote[:60]} (labelled p{label.page}, found on "
+                f"{label.display[:60]} (labelled p{label.page}, found on "
                 f"p{sorted(pages)[0]})"
             )
 
@@ -72,7 +72,7 @@ def _outcome(
         degraded=degraded,
         mode=mode,
         missed=tuple(
-            label.quote[:80]
+            label.display[:80]
             for label in question.expected
             if label not in found
         ),

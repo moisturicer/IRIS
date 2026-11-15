@@ -9,6 +9,12 @@ from pypdf.generic import DictionaryObject, NameObject, TextStringObject
 from apps.documents.testing import pdf_upload
 from apps.documents.validators import pdf_upload_problem
 
+# Says what to do as well as what is wrong (IR-1048), so it is spelled out here
+# rather than read from PROBLEMS: a change to the wording should fail a test.
+ACTIVE_CONTENT = (
+    "This PDF contains unsupported active content, such as attached files or scripts. "
+    "Save a copy without them (for example, with Print to PDF) and upload that."
+)
 
 def encoded(writer):
     stream = BytesIO()
@@ -39,14 +45,14 @@ def test_parsed_actions_are_refused(action):
         NameObject("/S"): NameObject(action),
         NameObject("/JS"): TextStringObject("app.alert('hello')"),
     })
-    assert pdf_upload_problem(encoded(writer)) == "This PDF contains unsupported active content."
+    assert pdf_upload_problem(encoded(writer)) == ACTIVE_CONTENT
 
 
 def test_embedded_files_are_refused():
     writer = PdfWriter()
     writer.add_blank_page(width=200, height=200)
     writer.add_attachment("readme.txt", b"attachment")
-    assert pdf_upload_problem(encoded(writer)) == "This PDF contains unsupported active content."
+    assert pdf_upload_problem(encoded(writer)) == ACTIVE_CONTENT
 
 
 def test_indirect_action_names_cannot_hide_launch_actions():
@@ -56,7 +62,7 @@ def test_indirect_action_names_cannot_hide_launch_actions():
         NameObject("/S"): writer._add_object(NameObject("/Launch")),
         NameObject("/F"): TextStringObject("program.exe"),
     })
-    assert pdf_upload_problem(encoded(writer)) == "This PDF contains unsupported active content."
+    assert pdf_upload_problem(encoded(writer)) == ACTIVE_CONTENT
 
 
 def test_extra_dictionary_type_cannot_hide_an_automatic_action():
@@ -66,7 +72,7 @@ def test_extra_dictionary_type_cannot_hide_an_automatic_action():
         NameObject("/Type"): NameObject("/Anything"),
         NameObject("/WC"): DictionaryObject({NameObject("/S"): NameObject("/Named"), NameObject("/N"): NameObject("/Print")}),
     })
-    assert pdf_upload_problem(encoded(writer)) == "This PDF contains unsupported active content."
+    assert pdf_upload_problem(encoded(writer)) == ACTIVE_CONTENT
 
 
 @pytest.mark.parametrize("uri", ["https://example.org/paper", "www.sdss.org", "ftp://example.org/paper"])

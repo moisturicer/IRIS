@@ -156,7 +156,8 @@ describe("drafts", () => {
     const drafts = within(screen.getByRole("region", { name: "Your drafts" }));
     expect(drafts.getByText("Only you see these until you finish")).toBeInTheDocument();
     const draft = within(drafts.getByRole("article", { name: /Draft D1/ }));
-    expect(draft.getByText("p.3 · v2")).toBeInTheDocument();
+    // The place is a link to the passage (IR-1139).
+    expect(draft.getByRole("button", { name: "Go to page 3 of v2" })).toHaveTextContent("p. 3 · v2");
     await user.click(draft.getByRole("button", { name: "Discard" }));
     expect(api.deleteReviewComment).toHaveBeenCalledWith(9, 2);
   });

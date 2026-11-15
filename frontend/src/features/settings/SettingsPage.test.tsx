@@ -41,6 +41,23 @@ async function changePassword(user: ReturnType<typeof userEvent.setup>, next: st
 }
 
 describe("changing your password", () => {
+  it("shows Change password as a pill that says what it is waiting for (IR-1088)", async () => {
+    const user = userEvent.setup();
+    renderScreen(<SettingsPage />, { route: "/settings" });
+    await user.click(screen.getByRole("button", { name: "Account & security" }));
+
+    const submit = screen.getByRole("button", { name: "Change password" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveClass("rounded-full");
+    expect(submit).not.toHaveClass("uppercase");
+    expect(submit).toHaveAccessibleDescription("Enter your current password and a new one.");
+
+    await user.type(screen.getByLabelText("Current password"), "old-Passw0rd");
+    await user.type(screen.getByLabelText(/^New password/), "new-Passw0rd");
+    expect(screen.getByRole("button", { name: "Change password" })).toBeEnabled();
+    expect(screen.queryByText("Enter your current password and a new one.")).not.toBeInTheDocument();
+  });
+
   it("shows every reason the server refused the new password, not just the first", async () => {
     const user = userEvent.setup();
     vi.spyOn(authApi, "changePassword").mockRejectedValue({

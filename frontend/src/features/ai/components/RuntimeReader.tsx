@@ -4,7 +4,7 @@ import { isAxiosError } from "axios";
 import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
-import { readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
+import { failureMessage, readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { Skeleton } from "@/components/ui";
@@ -153,6 +153,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   // Opening a conversation by its address: loading, then its content or one of the shared read states (IR-906).
   const [opening, setOpening] = useState<ReadFailureKind | "loading">();
   const [openAttempt, setOpenAttempt] = useState(0);
+  const [openFailure, setOpenFailure] = useState<unknown>();
   const reopen = useCallback(async (id: string, version = generation.current) => {
     const next = await api.reopen(id);
     if (version !== generation.current) return;
@@ -176,7 +177,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         const status = isAxiosError(failure) ? failure.response?.status : undefined;
         // A lapsed session or an old page says so in the reader's own words; any other failure is a read state.
         if (failure instanceof ProtocolMismatch || status === 401 || status === 406) { setOpening(undefined); fail(failure); }
-        else setOpening(readFailureKind(failure));
+        else { setOpenFailure(failure); setOpening(readFailureKind(failure)); }
       }).finally(() => { if (version === generation.current) setBusy(false); });
     }
     const epoch = generation;
@@ -355,14 +356,14 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
           {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
         {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}
-        {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" />}
+        {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" onRetry={() => setOpenAttempt(n => n + 1)} />}
         {opening === "unavailable" && <div className="py-10 text-center">
           <h2 className="font-display text-xl text-stone-900">This conversation is not available.</h2>
           <p className="mt-2 text-sm text-stone-600">It may have been deleted, or the link may be wrong.</p>
           <Link to="/ai" className={cn(PILL_SECONDARY, FOCUS_RING, "mt-5 inline-flex")}>Start a new chat</Link>
         </div>}
         {opening === "failed" && <EmptyState icon="fa-plug-circle-xmark" tone="error" title="Could not load this conversation"
-          message="Check that the AI service is available, then try again."
+          message={failureMessage(openFailure)}
           action={<button type="button" onClick={() => setOpenAttempt(n => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>} />}
         {opening === "interrupted" && <InterruptedState what="conversation" onRetry={() => setOpenAttempt(n => n + 1)} />}
         {runs.map(item => {
@@ -381,7 +382,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
               if (!activeRun(current) && !showDraft) return null;
               const active = activeRun(current);
               return <div className={cn("flex", dense ? "gap-2.5" : "gap-3")}>
-                <div className={cn("rounded-full shrink-0 flex items-center justify-center bg-brand/10 text-brand", dense ? "w-7 h-7" : "w-8 h-8")}>
+                <div className={cn("rounded-full shrink-0 flex items-center justify-center bg-stone-100 text-brand", dense ? "w-7 h-7" : "w-8 h-8")}>
                   <AskIrisMark className={dense ? "w-4 h-4" : "w-[18px] h-[18px]"} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -406,9 +407,9 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         </div>}
         {canRetry && run && <div className="flex justify-end gap-1">
           <button type="button" onClick={() => setDraft(run.question)} aria-label="Edit this question" title="Edit"
-            className={ICON_ACTION}><i aria-hidden className="fas fa-pen text-[13px]" /></button>
+            className={ICON_ACTION}><i aria-hidden className="fas fa-pen text-small" /></button>
           <button type="button" onClick={() => void retryRun()} aria-label="Try this question again" title="Retry"
-            className={ICON_ACTION}><i aria-hidden className="fas fa-rotate-right text-[13px]" /></button>
+            className={ICON_ACTION}><i aria-hidden className="fas fa-rotate-right text-small" /></button>
         </div>}
         {run && activeRun(run) && compactionRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
           className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
@@ -428,9 +429,9 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         aria-pressed={scopeToggle.allPapers}
         aria-label={scopeToggle.allPapers ? "Searching all papers. Search only this paper" : "Searching this paper. Search all papers"}
         title={scopeToggle.locked ? "This chat started across all papers" : scopeToggle.allPapers ? "All papers" : "This paper"}
-        className={cn("inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-brand",
+        className={cn("inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-label font-medium transition-colors focus-visible:outline-brand",
           scopeToggle.allPapers ? "bg-brand text-white hover:bg-brand-dark" : "text-stone-600 hover:bg-stone-100")}>
-        <i aria-hidden className={cn("text-[11px]", scopeToggle.allPapers ? "fas fa-layer-group" : "far fa-file-lines")} />
+        <i aria-hidden className={cn("text-label", scopeToggle.allPapers ? "fas fa-layer-group" : "far fa-file-lines")} />
         {scopeToggle.allPapers ? "All papers" : "This paper"}
       </button>}
     </ChatInput>

@@ -127,6 +127,8 @@ Each kind of highlight gets one look, and no look means two things:
 | Pen (a reviewer's passage mark) | Rose fill with a 2 px underline and a numbered pin; the open thread's passage is stronger |
 | Status | White chip, tone in text and outline; only Attention is filled |
 
+**The ground is white (IR-1132).** `canvas`, `surface` and `overlay` are all opaque white, so every page a person reads or works on sits on white, as Discover does; `canvas` stays a role of its own so the ground can change in one place. Where white on white loses an edge (a card, the sidebar, the Ask IRIS conversation list, a table header) the edge is a Rule Stone (`stone-200`) hairline or a `stone-50` section fill, never a shadow. The one exception is the paper column in Paper View, which stays on Desk Stone so a page reads as paper.
+
 Gold and stray hexes are removed. The full table is in `design-system.md` §1. **`DESIGN.md`'s Four Inks Rule allows no yellow, and it makes Maroon Wash the "on" tint for all of the above. Accepted on 2026-11-14 (D6, IR-1072): `DESIGN.md` records it, and `palette.test.ts` changes with IR-1097, before highlight code does.**
 
 ### 4.10 Components and type

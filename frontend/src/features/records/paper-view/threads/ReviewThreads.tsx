@@ -86,34 +86,43 @@ export function ReviewThreads(props: ReviewThreadsProps) {
     <section aria-labelledby={headingId} className="space-y-4">
       <h3 id={headingId} className="sr-only">Threads</h3>
       {props.letter && <ResponseLetterPanel letter={props.letter} />}
+      {/* The prototype's Threads head (IR-1139): the filter as one segmented
+          control with its counts, *New comment* on the right, and how to
+          comment on a passage under them. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div role="group" aria-label="Filter threads" className="inline-flex flex-wrap gap-0.5 rounded-control bg-stone-100 p-1">
+          {(Object.keys(FILTER_NAMES) as ThreadFilter[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={filter === f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                "min-h-11 reading-split:min-h-9 rounded-control px-3 text-small font-semibold",
+                filter === f ? "bg-surface text-stone-900 ring-1 ring-stone-300" : "text-stone-600 hover:text-stone-900",
+                FOCUS_RING,
+              )}
+            >
+              {FILTER_NAMES[f]} <span className="font-normal text-stone-500">{groups[f].length}</span>
+            </button>
+          ))}
+        </div>
+        {canComment && !props.composing && (
+          <Button variant="outline" size="sm" onClick={() => props.onCompose({ kind: "general" })}>
+            <i className="fas fa-comment-medical" aria-hidden />
+            New comment
+          </Button>
+        )}
+      </div>
       {props.composing
         ? <Composer {...props} target={props.composing} />
         : canComment && (
-          <p className="flex items-center justify-between gap-2 text-small text-stone-600">
-            <span>Select a passage in the paper and press C, or find one, to comment on it.</span>
-            <Button variant="outline" size="sm" onClick={() => props.onCompose({ kind: "general" })}>
-              New comment
-            </Button>
+          <p className="text-small text-stone-600">
+            Select a passage in the paper and press{" "}
+            <kbd className="rounded-control border border-stone-300 bg-surface px-1.5 font-mono text-2xs text-stone-700">C</kbd>
+            , or use New comment.
           </p>
         )}
-
-      <div role="group" aria-label="Filter threads" className="flex flex-wrap gap-1.5">
-        {(Object.keys(FILTER_NAMES) as ThreadFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            aria-pressed={filter === f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "min-h-9 rounded-full px-3 text-small font-semibold ring-1",
-              filter === f ? "bg-brand-50 text-brand ring-brand-200" : "text-stone-700 ring-stone-300 hover:text-brand",
-              FOCUS_RING,
-            )}
-          >
-            {FILTER_NAMES[f]} {groups[f].length}
-          </button>
-        ))}
-      </div>
       {party !== null && (
         <p className="text-small text-stone-700">
           Showing {party === "owner" ? "the authors'" : `${threads.sent.find((t) => t.root.party === party)?.root.party_label ?? party}'s`} threads.{" "}
@@ -134,9 +143,9 @@ export function ReviewThreads(props: ReviewThreadsProps) {
 
       {threads.drafts.length > 0 && (
         <section aria-label="Your drafts" className="space-y-2">
-          <p className="flex justify-between gap-2 text-2xs font-semibold uppercase tracking-wider text-stone-600">
-            <span>Your drafts</span>
-            <span className="normal-case tracking-normal font-normal">Only you see these until you finish</span>
+          <p className="flex flex-wrap items-baseline gap-x-2 text-small">
+            <span className="font-semibold text-stone-900">Your drafts</span>
+            <span className="text-2xs text-stone-600">Only you see these until you finish</span>
           </p>
           {threads.drafts.map((t) => <ThreadItem key={t.root.id} thread={t} {...props} />)}
         </section>
@@ -147,7 +156,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
           {filter === "resolved" ? "Resolved threads stay here, in the record's history." : "No threads here."}
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {shown.map((t) => <ThreadItem key={t.root.id} thread={t} {...props} />)}
         </div>
       ))}
@@ -163,7 +172,7 @@ function Chip({ children, tone = "quiet" }: { children: ReactNode; tone?: "quiet
   return (
     <span className={cn(
       "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold",
-      tone === "brand" && "bg-brand-50 text-brand ring-1 ring-brand-200",
+      tone === "brand" && "bg-surface text-brand ring-1 ring-stone-300",
       tone === "ink" && "bg-stone-900 text-white",
       tone === "quiet" && "text-stone-700 ring-1 ring-stone-300",
     )}>
@@ -199,41 +208,63 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
     }
   };
   const id = props.recordId;
+  // The thread a pin opened: its passage on the paper and its quote here share one colour.
+  const now = props.focus?.id === root.id;
   const otherSeverity: ThreadSeverity = root.severity === "must_fix" ? "suggestion" : "must_fix";
 
+  // Whether the foot has anything to hold: the box draws no empty foot.
+  const anyAction = root.can_answer || root.can_resolve || root.can_reopen
+    || (root.can_change_severity && Boolean(root.severity)) || canReply || root.can_delete;
+
+  // The same box as the Conversation's comments (IR-1131): who and which
+  // party in its head, the passage and what was said in its body, and the
+  // actions in its foot. A draft's box is dashed.
   return (
     <article
       id={threadDomId(root.id)}
       tabIndex={-1}
       aria-labelledby={`${ids}-h`}
-      className={cn("rounded-lg border border-stone-200 bg-white px-3 py-3 space-y-2", FOCUS_RING)}
+      className={cn("review-box", root.is_draft && "review-box-draft", FOCUS_RING)}
     >
-      <header className="flex flex-wrap items-center gap-2">
+      <header className="review-box-head">
         <h4 id={`${ids}-h`} className="sr-only">
           {pinWords(thread)}{root.party_label ? `, ${root.party_label}` : ""}
         </h4>
         <span aria-hidden className={cn(
-          "inline-grid place-items-center min-w-5 h-5 px-1 rounded-full text-[11px] font-semibold",
-          root.is_draft ? "bg-white text-brand ring-1 ring-brand/40" : root.state === "open" ? "bg-brand text-white" : "bg-stone-900 text-white",
+          "inline-grid place-items-center min-w-5 h-5 px-1 rounded-full text-label font-semibold",
+          root.is_draft || root.state !== "open" ? "bg-white text-pen ring-1 ring-pen" : "bg-pen text-white",
         )}>{thread.pin}</span>
-        {root.party_label && <span className="text-small font-semibold text-stone-900">{root.party_label}</span>}
+        <p>
+          <b>{root.author_name ?? "Someone"}</b>
+          {root.party_label && <> · {root.party_label}</>}
+          {" · "}{formatDate(root.created_at)}{root.edited_at ? " · edited" : ""}
+        </p>
         {root.anchor && (
-          <span className="text-2xs text-stone-600">p.{root.anchor.page} · v{root.anchor.version}</span>
+          // The place as a link, as the prototype's card has it (IR-1139): it
+          // goes to the passage, where the quote below does too.
+          <button type="button" onClick={() => props.onShowInPaper(thread)}
+            aria-label={`Go to page ${root.anchor.page} of v${root.anchor.version}`}
+            className={cn("whitespace-nowrap font-semibold text-brand underline underline-offset-2 hover:text-brand-dark", FOCUS_RING)}>
+            p. {root.anchor.page} · v{root.anchor.version}
+          </button>
         )}
-        <span className="flex-1" />
-        {root.outdated_since != null && <Chip>Outdated since v{root.outdated_since}</Chip>}
+      </header>
+
+      <div className="review-box-body space-y-2">
+      <p className="flex flex-wrap items-center gap-1.5">
         {root.severity && <Chip tone={root.severity === "must_fix" ? "brand" : "quiet"}>{SEVERITY_WORDS[root.severity]}</Chip>}
         {root.is_draft
-          ? <Chip><i className="fas fa-pen text-[9px]" aria-hidden />Draft</Chip>
+          ? <Chip><i className="fas fa-pen text-label" aria-hidden />Draft</Chip>
           : status && <Chip tone={root.state === "open" ? "quiet" : "ink"}>{status}</Chip>}
-      </header>
+        {root.outdated_since != null && <Chip>Outdated since v{root.outdated_since}</Chip>}
+      </p>
 
       {root.anchor && (
         <button
           type="button"
           onClick={() => props.onShowInPaper(thread)}
           aria-label={`Show in paper: “${root.anchor.quote}”`}
-          className={cn("block w-full text-left border-l-2 border-brand/40 pl-2 text-small italic text-stone-700 hover:text-brand", FOCUS_RING)}
+          className={cn("block w-full rounded-control bg-stone-100 px-3 py-2 text-left font-display text-small italic text-stone-800 hover:text-brand", now && "bg-pen-now", FOCUS_RING)}
         >
           “{root.anchor.quote}”
         </button>
@@ -245,15 +276,12 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       {root.suggestion && <SuggestedWording root={root} />}
 
       <div className="text-small text-stone-800">
-        <p className="text-2xs text-stone-600">
-          {root.author_name ?? "Someone"} · {formatDate(root.created_at)}{root.edited_at ? " · edited" : ""}
-        </p>
         <p className="whitespace-pre-wrap break-words">{root.body}</p>
         <MentionedPeople people={root.mentions} />
       </div>
 
       {root.answer && (
-        <p className="rounded bg-stone-50 px-2 py-1.5 text-small text-stone-800">
+        <p className="rounded-control bg-stone-50 px-2 py-1.5 text-small text-stone-800">
           <span className="font-semibold">
             {root.answer.by ?? "The authors"} {root.answer.kind === "addressed" ? "marked it addressed" : "declined it"}:
           </span>{" "}
@@ -291,9 +319,11 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           onSubmit={(note) => act(() => recordsApi.answerThread(id, root.id, { answer: form, note }), "Your answer could not be saved.")}
         />
       )}
+      {error && <p role="alert" className="text-small text-brand">{error}</p>}
+      </div>
 
-      {form === null && (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label={`${pinWords(thread)} actions`}>
+      {form === null && anyAction && (
+        <div className="review-box-foot flex flex-wrap gap-1.5" role="group" aria-label={`${pinWords(thread)} actions`}>
           {root.can_answer && <>
             {root.suggestion && (
               <Button size="sm" variant="outline" disabled={busy}
@@ -331,7 +361,6 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           )}
         </div>
       )}
-      {error && <p role="alert" className="text-small text-brand">{error}</p>}
     </article>
   );
 }
@@ -369,7 +398,7 @@ function SuggestedWording({ root }: { root: ReviewComment }) {
   const ids = useId();
   const check = root.wording_check;
   return (
-    <section aria-labelledby={`${ids}-wording`} className="rounded bg-stone-50 px-2 py-1.5 space-y-0.5">
+    <section aria-labelledby={`${ids}-wording`} className="rounded-control bg-stone-50 px-2 py-1.5 space-y-0.5">
       <p id={`${ids}-wording`} className="text-2xs font-semibold text-stone-600">Suggested wording</p>
       <p className="text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
       {check && (
@@ -505,7 +534,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   };
 
   return (
-    <form onSubmit={submit} aria-label="New comment" className="rounded-lg border border-stone-300 bg-white p-3 space-y-2">
+    <form onSubmit={submit} aria-label="New comment" className="rounded-control border border-stone-300 bg-white p-3 space-y-2">
       <p className="text-2xs text-stone-600">
         {target.kind === "passage"
           ? <>Comment on <b className="text-stone-800">p.{target.passage.page}</b> of v{target.version}</>
@@ -523,7 +552,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
         <fieldset className="flex flex-wrap items-center gap-3">
           <legend className="sr-only">Severity</legend>
           {(["must_fix", "suggestion"] as const).map((s) => (
-            <label key={s} className="inline-flex items-center gap-1.5 text-small text-stone-800 min-h-9">
+            <label key={s} className="inline-flex items-center gap-1.5 text-small text-stone-800 min-h-11 reading-split:min-h-9">
               <input type="radio" name={`${ids}-severity`} value={s} checked={severity === s}
                 onChange={() => setSeverity(s)} className="accent-brand" />
               {SEVERITY_WORDS[s]}

@@ -57,6 +57,7 @@ class Command(BaseCommand):
             batch_size=options["batch_size"],
             limit=options["limit"],
             on_batch=lambda total: self.stdout.write(f"  filled {total}/{outstanding}"),
+            keyword_text=True,
         )
         remaining = chunks_awaiting_backfill()
         self.stdout.write(

@@ -90,7 +90,7 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
     return (
       <p
         role="alert"
-        className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-dark"
+        className="rounded-card border border-stone-300 bg-surface p-4 text-sm text-brand-dark"
       >
         {failed}
       </p>
@@ -113,7 +113,7 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
       id={id}
       tabIndex={id ? -1 : undefined}
       aria-labelledby={headingId}
-      className="rounded-2xl border border-brand-200 bg-brand-50 p-4 space-y-4 scroll-mt-20 focus:outline-none"
+      className="rounded-card border border-stone-300 bg-surface p-4 space-y-4 scroll-mt-20 focus:outline-none"
     >
       <h2 id={headingId} className="text-sm font-bold text-brand-dark flex items-center gap-2">
         <i className="fas fa-file-circle-exclamation text-xs" aria-hidden />
@@ -142,7 +142,7 @@ function RequestEntry({
 }) {
   const listId = useId();
   return (
-    <article className="bg-white border border-brand-200 rounded-xl p-3.5">
+    <article className="bg-white border border-stone-300 rounded-card p-3.5">
       <h3 className="text-sm font-bold text-stone-900">
         {request.label} requested documents
       </h3>
@@ -282,7 +282,7 @@ function ItemRow({
             <label
               htmlFor={inputId}
               className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light",
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-control bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light",
                 COLOUR_TRANSITION,
                 // FOCUS_RING's ring, on the label: the focused element is its hidden input.
                 "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand has-[:focus-visible]:ring-offset-2",
@@ -344,7 +344,7 @@ const CompactProgress = forwardRef<HTMLSpanElement, { fileName: string; progress
           focusable
           label={`Uploading ${fileName}`}
           progress={progress}
-          className={cn("h-1.5 w-20 bg-brand-100", FOCUS_RING)}
+          className={cn("h-1.5 w-20 bg-stone-200", FOCUS_RING)}
         />
         <span className="text-2xs font-semibold text-stone-600 tabular-nums" aria-hidden>
           {toPercent(progress)}%

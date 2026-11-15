@@ -80,6 +80,34 @@ def _verify_llamaextract() -> None:
         )
 
 
+def _verify_unstructured() -> None:
+    from .unstructured_client import BASE_URL
+
+    if not settings.UNSTRUCTURED_PLATFORM_API_KEY:
+        raise ImproperlyConfigured("UNSTRUCTURED_PLATFORM_API_KEY is required to read with Unstructured (IR-985).")
+    if urlparse(settings.UNSTRUCTURED_BASE_URL).netloc != urlparse(BASE_URL).netloc:
+        raise ImproperlyConfigured(f"UNSTRUCTURED_BASE_URL must be {BASE_URL} (ADR-067).")
+
+
+def unstructured_extractor() -> StructuredExtractor:
+    """The Unstructured adapter, unadmitted. Not a selectable backend until
+    IR-988's cutover (ADR-067 decision 1); refuses a bad configuration."""
+    from .shaping_unstructured import shape_unstructured
+    from .unstructured_client import UnstructuredExtractor
+
+    _verify_unstructured()
+    return UnstructuredExtractor(
+        shape=shape_unstructured,
+        api_key=settings.UNSTRUCTURED_PLATFORM_API_KEY,
+        base_url=settings.UNSTRUCTURED_BASE_URL,
+        timeout_base_seconds=settings.UNSTRUCTURED_TIMEOUT_BASE_SECONDS,
+        timeout_per_page_seconds=settings.UNSTRUCTURED_TIMEOUT_PER_PAGE_SECONDS,
+        max_pages=settings.PDF_VALIDATION_MAX_PAGES or settings.UNSTRUCTURED_MAX_PAGES,
+        max_figures=settings.UNSTRUCTURED_MAX_FIGURES,
+        max_figure_pixels=settings.UNSTRUCTURED_MAX_FIGURE_PIXELS,
+    )
+
+
 BACKENDS: dict[str, Callable[[], StructuredExtractor]] = {"llamaparse": _llamaparse}
 
 # A module global, not a contextvar: worker threads in tests must see it.

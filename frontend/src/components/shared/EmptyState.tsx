@@ -41,13 +41,13 @@ export function EmptyState({
       role={error ? "alert" : undefined}
       className={cn(
         "flex flex-col items-center justify-center text-center px-6 py-16",
-        framed && "bg-surface rounded-2xl border border-stone-200",
+        framed && "bg-surface rounded-card border border-stone-200",
       )}
     >
       <div
         className={cn(
-          "w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-lg",
-          error ? "bg-brand-50 text-brand" : "bg-stone-100 text-stone-500",
+          "w-12 h-12 rounded-card flex items-center justify-center mb-3 text-lg",
+          error ? "bg-stone-100 text-brand" : "bg-stone-100 text-stone-600",
         )}
       >
         <i className={cn("fas", icon)} aria-hidden="true" />

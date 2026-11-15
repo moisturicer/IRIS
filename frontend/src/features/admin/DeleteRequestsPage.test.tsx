@@ -10,17 +10,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RequestTimeoutError } from "@/api/requestPolicy";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { useUIStore } from "@/store/ui.store";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { DeleteRequest } from "@/types/records";
 
 import DeleteRequestsPage from "./DeleteRequestsPage";
 
 const listDeleteRequests = vi.fn();
+const declineDeleteRequest = vi.fn();
+const approveDeleteRequest = vi.fn();
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
     listDeleteRequests: (...args: unknown[]) => listDeleteRequests(...args),
-    approveDeleteRequest: vi.fn(),
+    approveDeleteRequest: (...args: unknown[]) => approveDeleteRequest(...args),
+    declineDeleteRequest: (...args: unknown[]) => declineDeleteRequest(...args),
   },
 }));
 
@@ -34,6 +39,7 @@ function request(overrides: Partial<DeleteRequest>): DeleteRequest {
     requested_by_email: "ana@cit.edu",
     reason: "Duplicate upload",
     status: "pending",
+    rdco_note: "",
     created_at: "2026-10-30T08:00:00Z",
     reviewed_by: null,
     reviewed_at: null,
@@ -49,6 +55,9 @@ function readSignal(options?: { signal?: AbortSignal }): AbortSignal {
 
 beforeEach(() => {
   listDeleteRequests.mockReset();
+  declineDeleteRequest.mockReset();
+  approveDeleteRequest.mockReset();
+  useUIStore.setState({ toasts: [] });
 });
 
 describe("DeleteRequestsPage reads", () => {
@@ -179,6 +188,241 @@ describe("DeleteRequestsPage tabs (IR-1076)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Decided" }));
 
     expect(await screen.findByText("No requests have been decided yet.")).toBeInTheDocument();
+  });
+});
+
+describe("DeleteRequestsPage decline with a note (IR-1099)", () => {
+  const waiting = request({ id: 4, record_title: "Still waiting", status: "pending" });
+
+  async function rowFor(title: string) {
+    return (await screen.findByRole("link", { name: title })).closest("tr") as HTMLElement;
+  }
+
+  it("offers Decline beside Approve on a pending row", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+
+    renderScreen(<DeleteRequestsPage />);
+
+    const row = await rowFor("Still waiting");
+    expect(within(row).getByRole("button", { name: "Approve Deletion" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Decline" })).toBeInTheDocument();
+  });
+
+  it("asks for a note before declining, sends it trimmed, and reads the queue again", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    declineDeleteRequest.mockResolvedValue({});
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    await expectNoBlockingA11yViolations(dialog);
+    const send = within(dialog).getByRole("button", { name: "Decline" });
+    expect(send).toBeDisabled();
+    const note = within(dialog).getByRole("textbox", { name: "Note to the requester" });
+    expect(note).toHaveAttribute("maxLength", "500");
+
+    await userEvent.type(note, "   ");
+    expect(send).toBeDisabled();
+    await userEvent.type(note, " Cited by a published paper. ");
+    await userEvent.click(send);
+
+    await waitFor(() => expect(declineDeleteRequest).toHaveBeenCalledWith(4, "Cited by a published paper."));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(listDeleteRequests).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps the note and shows the server's reason when the decline is refused", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    declineDeleteRequest.mockRejectedValue({
+      response: { data: { note: ["Keep the note to 500 characters."] } },
+    });
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    const note = within(dialog).getByRole("textbox", { name: "Note to the requester" });
+    await userEvent.type(note, "Cited by a published paper.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Decline" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Keep the note to 500 characters.");
+    expect(note).toHaveValue("Cited by a published paper.");
+    expect(listDeleteRequests).toHaveBeenCalledTimes(1);
+  });
+
+  it("says so in a toast once the decline goes through (IR-1028)", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    declineDeleteRequest.mockResolvedValue({});
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Note to the requester" }), "Cited.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Decline" }));
+
+    await waitFor(() => expect(useUIStore.getState().toasts).toEqual([
+      expect.objectContaining({ type: "success", message: expect.stringContaining("Still waiting") }),
+    ]));
+  });
+
+  it("keeps a refused decline inside the dialog, with no toast (IR-1028)", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    declineDeleteRequest.mockRejectedValue({ response: { data: { detail: "Already decided." } } });
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Note to the requester" }), "Cited.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Decline" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Already decided.");
+    expect(useUIStore.getState().toasts).toHaveLength(0);
+  });
+
+  it("sends nothing when the dialog is cancelled", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(declineDeleteRequest).not.toHaveBeenCalled();
+  });
+
+  it("shows RDCO's note on a declined row, and says so when an older decline has none", async () => {
+    const declined = request({
+      id: 2, record_title: "Turned down", status: "declined",
+      rdco_note: "Cited by a published paper.", reviewed_at: "2026-11-02T08:00:00Z",
+    });
+    const older = request({
+      id: 3, record_title: "Turned down long ago", status: "declined",
+      rdco_note: "", reviewed_at: "2026-10-02T08:00:00Z",
+    });
+    const removed = request({
+      id: 5, record_title: "Removed thesis", status: "approved", reviewed_at: "2026-11-03T08:00:00Z",
+    });
+    listDeleteRequests.mockImplementation((params: { status?: string }) =>
+      Promise.resolve({
+        data: { results: params.status === "decided" ? [declined, older, removed] : [waiting] },
+      }),
+    );
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+
+    const noted = within(await rowFor("Turned down"));
+    expect(noted.getByText("RDCO's note:")).toBeInTheDocument();
+    expect(noted.getByText("Cited by a published paper.")).toBeInTheDocument();
+    expect(within(await rowFor("Turned down long ago")).getByText("No note recorded")).toBeInTheDocument();
+    // An approval takes no note, so none is shown or missing.
+    expect(within(await rowFor("Removed thesis")).queryByText(/RDCO's note/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
+  });
+});
+
+describe("DeleteRequestsPage approve confirmation (IR-1028)", () => {
+  const waiting = request({ id: 9, record_title: "Still waiting", status: "pending" });
+  const toasts = () => useUIStore.getState().toasts;
+
+  async function openApprove() {
+    const row = (await screen.findByRole("link", { name: "Still waiting" })).closest("tr") as HTMLElement;
+    const trigger = within(row).getByRole("button", { name: "Approve Deletion" });
+    await userEvent.click(trigger);
+    return { trigger, dialog: await screen.findByRole("dialog", { name: /Approve deletion of/ }) };
+  }
+
+  it("asks in a dialog that names the paper and the requester, never the browser's confirm", async () => {
+    const nativeConfirm = vi.spyOn(window, "confirm");
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+
+    renderScreen(<DeleteRequestsPage />);
+    const { dialog } = await openApprove();
+
+    expect(dialog).toHaveTextContent("Still waiting");
+    expect(dialog).toHaveTextContent("Ana Reyes");
+    expect(dialog).toHaveTextContent(/cannot be undone/i);
+    await expectNoBlockingA11yViolations(dialog);
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    expect(approveDeleteRequest).not.toHaveBeenCalled();
+    nativeConfirm.mockRestore();
+  });
+
+  it("does nothing on Cancel, and returns focus to the button that opened it", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+
+    renderScreen(<DeleteRequestsPage />);
+    const { trigger, dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(approveDeleteRequest).not.toHaveBeenCalled();
+    expect(listDeleteRequests).toHaveBeenCalledTimes(1);
+    expect(toasts()).toHaveLength(0);
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("approves once on confirm, says so in a toast and reads the queue again", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    approveDeleteRequest.mockResolvedValue({});
+
+    renderScreen(<DeleteRequestsPage />);
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve deletion" }));
+
+    await waitFor(() => expect(approveDeleteRequest).toHaveBeenCalledTimes(1));
+    expect(approveDeleteRequest).toHaveBeenCalledWith(9);
+    await waitFor(() => expect(toasts()).toEqual([
+      expect.objectContaining({ type: "success", message: expect.stringContaining("Still waiting") }),
+    ]));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(listDeleteRequests).toHaveBeenCalledTimes(2));
+  });
+
+  it("puts focus on the Pending tab after an approval, since the row it came from is gone", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    approveDeleteRequest.mockResolvedValue({});
+
+    renderScreen(<DeleteRequestsPage />);
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve deletion" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Pending" })).toHaveFocus());
+  });
+
+  it("disables the buttons while the approval is in flight", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    let finish: () => void = () => undefined;
+    approveDeleteRequest.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
+
+    renderScreen(<DeleteRequestsPage />);
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve deletion" }));
+
+    const waitingButton = await within(dialog).findByRole("button", { name: "Please wait…" });
+    expect(waitingButton).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(approveDeleteRequest).toHaveBeenCalledTimes(1);
+    finish();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("shows the server's reason in an error toast when the approval is refused", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    approveDeleteRequest.mockRejectedValue({
+      response: { status: 403, data: { detail: "Only RDCO can approve a deletion." } },
+    });
+
+    renderScreen(<DeleteRequestsPage />);
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve deletion" }));
+
+    await waitFor(() => expect(toasts()).toEqual([
+      expect.objectContaining({ type: "error", message: "Only RDCO can approve a deletion." }),
+    ]));
+    expect(listDeleteRequests).toHaveBeenCalledTimes(1);
   });
 });
 

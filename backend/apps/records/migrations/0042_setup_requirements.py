@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('records', '0040_rebuild_record_views'),
+        ('records', '0041_deleterequest_rdco_note'),
     ]
 
     operations = [

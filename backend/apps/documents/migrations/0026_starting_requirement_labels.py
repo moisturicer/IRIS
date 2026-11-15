@@ -56,8 +56,8 @@ def backwards(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("documents", "0024_setup_requirements"),
-        ("records", "0041_setup_requirements"),
+        ("documents", "0025_setup_requirements"),
+        ("records", "0042_setup_requirements"),
     ]
 
     operations = [migrations.RunPython(forwards, backwards)]

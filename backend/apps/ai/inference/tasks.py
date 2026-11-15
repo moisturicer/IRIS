@@ -19,6 +19,8 @@ class InferenceTask(Enum):
 
     ``DESCRIBE_FIGURE`` writes retrieval-only Figure descriptions (IR-852,
     ADR-056 §10), reached only through ``CompositionRoot.figure_describer``.
+    ``TRANSCRIBE_FORMULA`` reads a Formula crop as LaTeX (IR-1102, ADR-067
+    §Amendment), reached only through ``CompositionRoot.formula_transcriber``.
     """
 
     ANSWER = "answer"
@@ -29,6 +31,7 @@ class InferenceTask(Enum):
     SCREEN = "screen"
     SUMMARY = "summary"
     DESCRIBE_FIGURE = "describe_figure"
+    TRANSCRIBE_FORMULA = "transcribe_formula"
 
     @property
     def settings_prefix(self) -> str:

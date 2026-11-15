@@ -137,8 +137,10 @@ export const SCREEN_ACCESS = {
   // Not a sidebar item and not really a screen any more: `/records/add`
   // redirects to the Publish dialog (IR-408), which every author reaches from
   // Discover's Publish button now that Discover is everyone's home (IR-534).
-  // The entry stays as the authors gate the Publish button, My Library and
-  // Help read; spec §4.2 renames it `publish`, which no ticket has done yet.
+  // Who sees Publish, My Library's research tabs and Help's publishing
+  // section is the server's `can_author` (`canAuthor()`, IR-1096), not this
+  // entry; it remains only as the screen map's record of the redirect, and
+  // spec §4.2 renames it `publish`, which no ticket has done yet.
   submit:     { path: "/records/add",       roles: AUTHORS },
 
   // --- review ------------------------------------------------------------
@@ -308,6 +310,17 @@ export function hasReviewWork(reviewAccess?: { my_reviews: boolean } | null): bo
  */
 export function isCoordinator(reviewAccess?: { is_coordinator?: boolean } | null): boolean {
   return reviewAccess?.is_coordinator === true;
+}
+
+/**
+ * Whether the server says this user may author a record (`can_author` on
+ * `/users/me/`, IR-1096). Publish, and My Library's research tabs, read this
+ * and nothing else: the client does not turn a role name into an answer, so
+ * what the page offers is what `IsAuthor` will accept. Missing counts as no,
+ * like the other flags, so a payload that predates it offers nothing.
+ */
+export function canAuthor(user?: { can_author?: boolean } | null): boolean {
+  return user?.can_author === true;
 }
 
 /** The sidebar's section order. */

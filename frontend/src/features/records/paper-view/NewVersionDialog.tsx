@@ -94,8 +94,8 @@ export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDon
       }
     >
       <div className="space-y-4">
-        <p className="text-[14px] text-stone-900 font-semibold leading-relaxed">{newVersionSummary(hint)}</p>
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-900 font-semibold leading-relaxed">{newVersionSummary(hint)}</p>
+        <p className="text-body text-stone-700 leading-relaxed">
           {newManuscript
             ? "Your revised manuscript and any details you edited go with it."
             : "Your manuscript is unchanged; the details you edited and the documents you uploaded go with it."}{" "}
@@ -103,7 +103,7 @@ export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDon
         </p>
         {letter.length > 0 && <LetterPreview entries={letter} />}
         {hint.blocked && (
-          <p id={blockedId} className="text-[14px] text-brand leading-relaxed">{hint.blocked}</p>
+          <p id={blockedId} className="text-body text-brand leading-relaxed">{hint.blocked}</p>
         )}
       </div>
     </Modal>
@@ -114,7 +114,7 @@ function LetterPreview({ entries }: { entries: ResponseLetterEntry[] }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="space-y-2">
-      <h3 id={headingId} className="text-[14px] font-semibold text-stone-900">Response to reviewers</h3>
+      <h3 id={headingId} className="text-body font-semibold text-stone-900">Response to reviewers</h3>
       <p className="text-small text-stone-600">
         Sent with this version, from your answers in Threads. Reviewers read it first.
       </p>

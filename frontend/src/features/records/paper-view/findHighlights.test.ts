@@ -62,3 +62,19 @@ describe("paintFindHits", () => {
     expect(spans.map((span) => span.textContent)).toEqual(["robot", "arm"]);
   });
 });
+
+describe("find match styling (IR-1143)", () => {
+  it("fills matches translucently so the words stay visible", async () => {
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync("src/index.css", "utf8");
+    const rule = (selector: string) =>
+      css.slice(css.indexOf(selector)).split("}")[0] ?? "";
+    for (const selector of [".textLayer mark.find-hit {", ".textLayer mark.find-hit-current {"]) {
+      const body = rule(selector);
+      // multiply blends only within the text layer's stacking context, i.e. with
+      // nothing, so it paints opaque yellow over the canvas text beneath.
+      expect(body).not.toContain("mix-blend-mode");
+      expect(body).toMatch(/background-color:\s*rgb\([^)]*\/\s*0?\.\d+\)/);
+    }
+  });
+});

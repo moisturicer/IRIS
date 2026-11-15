@@ -304,6 +304,18 @@ straight out of a run file back into a command.
   is 0.05 of the score. The comparison table prints that threshold; a delta
   below it moved nothing.
 
+### Figure labels (IR-1125)
+
+A Figure printed with no caption has no quote to match, so a label can name it by page and box instead: `{"record": "<title>", "page": 3, "region": {"left": 0.1, "top": 0.2, "right": 0.5, "bottom": 0.6}}`, in fractions of the page. It hits a passage whose box on that page overlaps it at IoU 0.5 or more, so a text chunk enclosing the figure does not count. A quote is optional beside a region and is still validated when given. Mark each figure question's `kind` as `figure-captioned` or `figure-uncaptioned`, so the report gives the two apart.
+
+## What the reranker reads (IR-1125)
+
+`reranker_reads` (`AI_RERANKER_READS`, default `fallback` since IR-1125's run; see the ADR-033 amendment) decides the text the reranker scores: `today` (shown text, blank passages dropped), `embedded` (arm A), `described` (arm B: shown text plus a Figure's description, labelled as AI-written) or `fallback` (arm C: embedded text only where shown text is blank). Readers see the shown text whichever it is.
+
+`manage.py eval_reranker_input --help` lists its options: a text set, a figure set, the trial chunk set the figure papers live in, and a user.
+
+Recall runs once per question and every arm reranks those same candidates; a rerank whose inputs repeat one already sent for that question is served from memory, so an arm identical to today costs nothing. The dry run checks labels and prints the token estimate. A paid run needs `--labels-reviewed-by NAME` and `--cost-per-million`, and refuses past `--max-cost-usd` (default 2). The decision rule is written into every run file. It has not been run against a database yet.
+
 ## Measuring a chunking variant (IR-1051)
 
 `--variant` measures a different chunker setup without touching the live

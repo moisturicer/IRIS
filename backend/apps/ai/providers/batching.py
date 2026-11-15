@@ -114,11 +114,36 @@ def batch_documents_by_token_budget(
 #: the request budget in ``voyage.py`` so a window always fits a request alone.
 EMBED_WINDOW_TOKENS = 30_000
 
+#: How a long paper is cut into windows: by token count, or at top-level
+#: section breaks where one fits (IR-1056).
+WINDOW_MODES = ("count", "section")
+
+
+def top_level_sections(section_keys: Sequence) -> list[str | None]:
+    """Each chunk's top-level section label, or None when its key is missing.
+
+    The top level is the first heading below what every keyed chunk shares,
+    usually the title. A key equal to that shared prefix (front matter) is
+    its own section, labelled "".
+    """
+    keys = [tuple(k) if k else () for k in section_keys]
+    keyed = [k for k in keys if k]
+    prefix: tuple[str, ...] = ()
+    if keyed:
+        shortest = min(keyed, key=len)
+        n = 0
+        while n < len(shortest) and all(k[n] == shortest[n] for k in keyed):
+            n += 1
+        prefix = shortest[:n]
+    return [None if not k else (k[len(prefix)] if len(k) > len(prefix) else "") for k in keys]
+
 
 def window_for_embedding(
     texts: Sequence[str],
     budget: int | None = None,
     estimate: Callable[[str], int] = estimate_tokens,
+    *,
+    section_keys: Sequence | None = None,
 ) -> list[list[str]]:
     """Cut one document's chunk texts into consecutive windows that each fit
     the model's context window (IR-423).
@@ -131,9 +156,38 @@ def window_for_embedding(
     to the model's limit; the alternative is no vectors at all. A paper that
     fits in one window is unchanged.
 
+    With ``section_keys`` (IR-1056), a window that must end early ends at the
+    last top-level section break that still fits, and falls back to the count
+    cut when none does.
+
     The budget is read at call time, so a test (or a future setting) can move
     it without rebinding a default.
     """
-    return batch_by_token_budget(
-        texts, EMBED_WINDOW_TOKENS if budget is None else budget, estimate
-    )
+    budget = EMBED_WINDOW_TOKENS if budget is None else budget
+    if section_keys is None:
+        return batch_by_token_budget(texts, budget, estimate)
+    if len(section_keys) != len(texts):
+        raise ValueError(f"{len(section_keys)} section keys for {len(texts)} texts")
+    if budget <= 0:
+        raise ValueError(f"budget must be positive, got {budget}")
+
+    tops = top_level_sections(section_keys)
+    breaks = {
+        i for i in range(1, len(texts))
+        if tops[i] is not None and tops[i - 1] is not None and tops[i] != tops[i - 1]
+    }
+    costs = [estimate(t) for t in texts]
+    windows: list[list[str]] = []
+    start = 0
+    while start < len(texts):
+        end, running = start, 0
+        while end < len(texts) and (end == start or running + costs[end] <= budget):
+            running += costs[end]
+            end += 1
+        if end < len(texts):
+            fitting = [b for b in breaks if start < b <= end]
+            if fitting:
+                end = max(fitting)
+        windows.append(list(texts[start:end]))
+        start = end
+    return windows

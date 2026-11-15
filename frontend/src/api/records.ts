@@ -328,8 +328,11 @@ export const recordsApi = {
   // Download requests
   requestDownload:         (recordId: number, note: string) =>
     apiClient.post("/records/download-requests/", { record: recordId, note }),
-  listDownloadRequests:    (params?: Record<string, unknown>) =>
-    apiClient.get<PaginatedResponse<DownloadRequest>>("/records/download-requests/", { params }),
+  listDownloadRequests:    (params?: Record<string, unknown>, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<PaginatedResponse<DownloadRequest>>("/records/download-requests/", {
+      params,
+      signal: options.signal,
+    }),
   approveDownloadRequest:  (id: number) =>
     apiClient.post(`/records/download-requests/${id}/approve/`),
   declineDownloadRequest:  (id: number, note: string) =>
@@ -351,6 +354,6 @@ export const recordsApi = {
     }),
   approveDeleteRequest:    (id: number) =>
     apiClient.post(`/records/delete-requests/${id}/approve/`),
-  declineDeleteRequest:    (id: number) =>
-    apiClient.post(`/records/delete-requests/${id}/decline/`),
+  declineDeleteRequest:    (id: number, note: string) =>
+    apiClient.post(`/records/delete-requests/${id}/decline/`, { note }),
 };

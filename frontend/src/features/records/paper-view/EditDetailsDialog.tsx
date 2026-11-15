@@ -60,6 +60,7 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
   const [lists, setLists] = useState<Lists | null>(null);
   const [failed, setFailed] = useState({ advisers: false, classification: false, psced: false });
   const [moreOpen, setMoreOpen] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
 
@@ -92,9 +93,10 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
       cancelled = true;
     };
     // The record is the one the dialog opened on; a re-render must not
-    // discard what has been typed.
+    // discard what has been typed. `attempt` runs it again only while the
+    // lists are still loading, when Try again is the one thing on screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [attempt]);
 
   async function save(values: MetadataValues) {
     setSaving(true);
@@ -125,7 +127,7 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
       title="Edit details"
       displayTitle
       sheet
-      size="max-w-2xl"
+      size="lg"
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button type="button" onClick={onClose} className={cn(PILL_SECONDARY, FOCUS_RING)}>
@@ -144,7 +146,7 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
       }
     >
       {lists == null ? (
-        <Skeleton rows={6} label="Loading the details…" />
+        <Skeleton rows={6} label="Loading the details…" onRetry={() => setAttempt((n) => n + 1)} />
       ) : (
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-section-sm">
         {revising && (

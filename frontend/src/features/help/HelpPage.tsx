@@ -17,7 +17,7 @@ import { sectionsFor } from "./helpSections";
  */
 export default function HelpPage() {
   const user = useAuthStore((s) => s.user);
-  const sections = sectionsFor({ role: user?.role_name, reviewAccess: user?.review_access });
+  const sections = sectionsFor({ role: user?.role_name, reviewAccess: user?.review_access, canAuthor: user?.can_author });
   const { hash } = useLocation();
 
   // The router does not scroll to a fragment on a client-side navigation.
@@ -30,12 +30,12 @@ export default function HelpPage() {
     <div>
       <PageHeader title="Help" description="How to find, publish and review research in IRIS." />
 
-      <nav aria-label="Help contents" className="mb-section-lg rounded-xl border border-stone-200 bg-surface p-card">
+      <nav aria-label="Help contents" className="mb-section-lg rounded-card border border-stone-200 bg-surface p-card">
         <h2 className="text-label font-semibold uppercase tracking-wide text-stone-500">Contents</h2>
         <ul className="mt-2 grid gap-1 sm:grid-cols-2">
           {sections.map((s) => (
             <li key={s.id}>
-              <a href={`#${s.id}`} className={cn("rounded text-small font-medium text-brand hover:underline", FOCUS_RING)}>
+              <a href={`#${s.id}`} className={cn("rounded-control text-small font-medium text-brand hover:underline", FOCUS_RING)}>
                 {s.title}
               </a>
             </li>

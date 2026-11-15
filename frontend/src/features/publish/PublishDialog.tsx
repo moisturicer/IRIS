@@ -28,15 +28,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { recordsApi, type ManuscriptMatch } from "@/api/records";
 import { Modal } from "@/components/ui/Modal";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
-import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { rolesFor } from "@/lib/access";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { canAuthor } from "@/lib/access";
 import { errorDetail } from "@/lib/errorDetail";
 import { tabbableWithin } from "@/lib/focusTrap";
 import { cn } from "@/lib/utils";
@@ -94,9 +93,11 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 /**
- * Mounted on the home route. Renders nothing unless the URL asks for Publish
- * and the signed-in user may author a record; the server's `IsAuthor` is the
- * real boundary, this only keeps the dialog from opening onto a refusal.
+ * Mounted on the home route. Renders nothing unless the URL asks for Publish.
+ * Whether the signed-in user may author is the server's `can_author`
+ * (IR-1096), the rule `IsAuthor` enforces, so the dialog never opens onto a
+ * refusal. A link to Publish from someone who cannot author opens a short
+ * explanation instead of nothing, and starts nothing.
  */
 export function PublishDialog() {
   const [params, setParams] = useSearchParams();
@@ -105,8 +106,7 @@ export function PublishDialog() {
   const [instance, setInstance] = useState(0);
 
   const target = params.get(PUBLISH_PARAM);
-  const role = user?.role_name ?? null;
-  const isAuthor = role != null && rolesFor("submit").includes(role);
+  const isAuthor = canAuthor(user);
 
   const setTarget = useCallback(
     (value: string | null) =>
@@ -122,7 +122,8 @@ export function PublishDialog() {
     [setParams],
   );
 
-  if (target == null || !isAuthor || !user) return null;
+  if (target == null || !user) return null;
+  if (!isAuthor) return <PublishUnavailable onClose={() => setTarget(null)} />;
 
   return (
     <PublishFlow
@@ -136,6 +137,26 @@ export function PublishDialog() {
         setInstance((n) => n + 1);
       }}
     />
+  );
+}
+
+/** What a link to Publish opens for someone the server says cannot author (IR-1096). */
+function PublishUnavailable({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Publishing isn't available to your account"
+      footer={
+        <div className="flex justify-end">
+          <Button type="button" size="page" onClick={onClose}>Got it</Button>
+        </div>
+      }
+    >
+      <p className="text-body text-stone-700">
+        Your account can read, save and request papers, but it can&rsquo;t start a submission.
+      </p>
+    </Modal>
   );
 }
 
@@ -197,6 +218,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [attempt, setAttempt] = useState(0);
 
   const [step, setStep] = useState<PublishStep>(1);
+  // Set when Continue was pressed on step 1, which is when the manuscript step
+  // starts naming what is missing. Cleared on leaving the step.
+  const [continueTried, setContinueTried] = useState(false);
   const [typeId, setTypeId] = useState<number | null>(null);
   const [isContinuation, setIsContinuation] = useState(false);
   // The type the server holds, so Continue saves only a change.
@@ -365,6 +389,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   function goTo(next: PublishStep) {
     setStep(next);
+    setContinueTried(false);
     setStepFailure(null);
     setAnnouncement(`Step ${next} of 3: ${STEPS[next - 1].title}`);
   }
@@ -439,6 +464,13 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   function handleFile(file: File) {
     fileRef.current = file;
     void startUpload();
+  }
+
+  /** Validation on press (IR-1088): name what is missing, or go on. */
+  function validateThenContinueFromManuscript() {
+    setContinueTried(true);
+    if (typeId == null || acceptedUpload == null) return;
+    void continueFromManuscript();
   }
 
   async function continueFromManuscript() {
@@ -544,6 +576,15 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   }
 
   const acceptedUpload = acceptedManuscript(upload);
+  // What step 1's Continue names as missing, once it has been pressed.
+  const manuscriptErrors = {
+    type: continueTried && typeId == null ? "Choose what you're publishing." : undefined,
+    file: !continueTried || acceptedUpload != null
+      ? undefined
+      : upload.status === "uploading"
+        ? "Your manuscript is still uploading. Continue when it finishes."
+        : "Upload your manuscript as a PDF to continue.",
+  };
   const prefill = usePrefill({
     recordId: draftId,
     active: phase.kind === "form" && step === 2 && acceptedUpload != null,
@@ -731,52 +772,39 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <p className="text-small text-stone-600">
           {draftId == null ? " " : step === 2 ? SAVE_STATUS[autosave.status] : "Saved as a draft. You can close this and finish later."}
           {step === 2 && autosave.status === "failed" && (
-            <button type="button" onClick={() => void autosave.saveNow()} className={cn("ml-2 rounded-full font-medium text-stone-800 underline underline-offset-2", FOCUS_RING)}>
+            <Button type="button" variant="ghost" size="sm" className="ml-2" onClick={() => void autosave.saveNow()}>
               Try again
-            </button>
+            </Button>
           )}
         </p>
         <div className="ml-auto flex gap-2">
           {step > 1 && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="page"
               onClick={() => goTo((step - 1) as PublishStep)}
               disabled={saving || submitting || upload.status === "uploading"}
-              className={cn(PILL_SECONDARY, FOCUS_RING)}
             >
               Back
-            </button>
+            </Button>
           )}
           {step === 1 && (
-            <button
-              type="button"
-              onClick={() => void continueFromManuscript()}
-              disabled={acceptedUpload == null || typeId == null || saving}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
+            // Never disabled for what is missing: pressing it says which field
+            // needs what (IR-1088), where a dead button left the author guessing.
+            <Button type="button" size="page" loading={saving} onClick={validateThenContinueFromManuscript}>
               Continue
-            </button>
+            </Button>
           )}
           {step === 2 && (
-            <button
-              type="button"
-              onClick={() => void continueFromDetails()}
-              disabled={saving}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
+            <Button type="button" size="page" loading={saving} onClick={() => void continueFromDetails()}>
               Continue
-            </button>
+            </Button>
           )}
           {step === 3 && (
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={submitting}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
-              {submitting && <i className="fas fa-spinner fa-spin" aria-hidden />}
+            <Button type="button" size="page" loading={submitting} onClick={() => void submit()}>
               Submit for review
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -790,7 +818,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       title="Publish your research"
       displayTitle
       sheet
-      size={phase.kind === "form" && step === 2 ? "max-w-[1180px]" : "max-w-[720px]"}
+      size={phase.kind === "form" && step === 2 ? "xl" : "lg"}
       footer={footer}
     >
       <span role="status" className="sr-only">
@@ -802,24 +830,19 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           role="alertdialog"
           aria-labelledby="publish-close-title"
           aria-describedby="publish-close-body"
-          className="mb-section rounded-xl border border-stone-300 bg-stone-50 p-card-compact"
+          className="mb-section rounded-card border border-stone-300 bg-stone-50 p-card-compact"
         >
           <p id="publish-close-title" className="text-body font-medium text-stone-900">Stop the upload and close?</p>
           <p id="publish-close-body" className="mt-1 text-small text-stone-600">
             Your draft is kept, but the file has not finished uploading. You can add it when you come back.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              ref={keepUploadingRef}
-              onClick={() => setConfirmingClose(false)}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
+            <Button type="button" size="page" ref={keepUploadingRef} onClick={() => setConfirmingClose(false)}>
               Keep uploading
-            </button>
-            <button type="button" onClick={stopAndClose} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+            </Button>
+            <Button type="button" variant="outline" size="page" onClick={stopAndClose}>
               Stop and close
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -834,9 +857,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <Notice
           message={phase.message}
           action={
-            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+            <Button type="button" variant="outline" size="page" onClick={() => setAttempt((n) => n + 1)}>
               Try again
-            </button>
+            </Button>
           }
         />
       )}
@@ -845,9 +868,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <Notice
           message="We couldn't find that draft. It may have been deleted, or it isn't yours."
           action={
-            <button type="button" onClick={onRestart} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+            <Button type="button" size="page" onClick={onRestart}>
               Start a new submission
-            </button>
+            </Button>
           }
         />
       )}
@@ -856,9 +879,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <Notice
           message="This record has already been submitted, so it can't be changed here."
           action={
-            <Link to={`/records/${phase.recordId}`} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+            <ButtonLink to={`/records/${phase.recordId}`} size="page">
               Open paper
-            </Link>
+            </ButtonLink>
           }
         />
       )}
@@ -882,13 +905,14 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
               <span className="flex-1">{stepFailure.message}</span>
               {stepFailure.network && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => void (step === 1 ? continueFromManuscript() : continueFromDetails())}
-                  className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}
                 >
                   Try again
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -903,6 +927,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               onFile={handleFile}
               onRetry={() => void startUpload()}
               exactMatches={exactMatches}
+              typeError={manuscriptErrors.type}
+              fileError={manuscriptErrors.file}
             />
           )}
 
@@ -913,9 +939,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
                   <div role="alert" className={cn(LOAD_ERROR, "mb-section flex-wrap")}>
                     <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
                     <span className="flex-1">{STALE_DRAFT}</span>
-                    <button type="button" onClick={reloadDraft} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}>
+                    <Button type="button" variant="outline" size="sm" onClick={reloadDraft}>
                       Reload draft
-                    </button>
+                    </Button>
                   </div>
                 )}
                 {/* One announcement for the prefill, where the visible lines sit
@@ -1032,9 +1058,9 @@ function prefillFieldNotes(
 /** The line above Details when reading has stopped, or found nothing. */
 function PrefillLine({ reading, retrying, onRetry }: { reading: Prefill; retrying: boolean; onRetry: () => void }) {
   const action = (label: string, onClick: () => void, disabled = false) => (
-    <button type="button" onClick={onClick} disabled={disabled} className={cn(PILL_SECONDARY, FOCUS_RING, "ml-2 min-h-9 px-4")}>
+    <Button type="button" variant="outline" size="sm" className="ml-2" onClick={onClick} disabled={disabled}>
       {label}
-    </button>
+    </Button>
   );
   if (reading.status === "stalled") {
     return (

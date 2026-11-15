@@ -112,7 +112,7 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-700 leading-relaxed">
           Send back to the owner for changes. They may resubmit after revising.{" "}
           Nothing can be decided until they do, and your review for {party} stays open for the new
           version.
@@ -132,7 +132,7 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
             aria-describedby={helpId}
             className={fieldClasses(false)}
           />
-          <p id={helpId} className="mt-1 text-[13px] text-stone-600">
+          <p id={helpId} className="mt-1 text-small text-stone-600">
             The owner sees this as you write it
             {version != null ? `, against v${version}, the version you reviewed` : ""}.
           </p>

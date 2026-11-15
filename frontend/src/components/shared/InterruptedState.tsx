@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/Button";
+import { RequestTimeoutError } from "@/api/requestPolicy";
+import { failureMessage } from "@/lib/readFailure";
 
 import { EmptyState } from "./EmptyState";
 
@@ -22,7 +24,7 @@ export function InterruptedState({ what, onRetry, framed }: InterruptedStateProp
       tone="error"
       icon="fa-hourglass-half"
       title="This took too long"
-      message={`The ${what} did not finish loading. Your connection or the server may be slow.`}
+      message={failureMessage(new RequestTimeoutError(0), { lead: `The ${what} did not finish loading.` })}
       action={<Button type="button" variant="outline" size="sm" onClick={onRetry}>Retry</Button>}
     />
   );

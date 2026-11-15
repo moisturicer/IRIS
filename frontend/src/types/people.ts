@@ -73,8 +73,13 @@ export interface PeopleSearchPage {
   results: PeopleSearchResult[];
 }
 
-/** One page of a list: `next` is `null` on the last. Totals are not sent. */
+/**
+ * One page of a list: `next` is `null` on the last. The papers lists also send
+ * `count`, the whole list's size for what the reader may read (IR-1133);
+ * collaborators send none.
+ */
 export interface ProfilePage<T> {
+  count?:  number;
   next:    string | null;
   results: T[];
 }

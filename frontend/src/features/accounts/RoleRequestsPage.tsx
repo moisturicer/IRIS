@@ -2,8 +2,9 @@
  * Role Requests page — staff/admin only.
  * Lists pending role requests and allows approve / decline.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { accountsApi }   from "@/api/accounts";
+import { failureMessage } from "@/lib/readFailure";
 import { useUIStore }    from "@/store/ui.store";
 import { PageHeader }    from "@/components/layout/PageHeader";
 import { Button }        from "@/components/ui/Button";
@@ -13,31 +14,25 @@ import { TONES } from "@/components/ui/statusTones";
 import type { RoleRequest } from "@/types/auth";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { LoadMore } from "@/components/shared/LoadMore";
+import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 
 export default function RoleRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
 
-  const [requests,  setRequests]  = useState<RoleRequest[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  // The API pages at 20; "Load more" reads the next page (IR-1100).
+  const read = usePagedRead(
+    (page, signal) => accountsApi.roleRequests({ signal, ...pageParam(page) }).then(({ data }) => toPage(data)),
+    [],
+  );
+  const requests = read.rows;
+  const loading = read.status === "loading";
   // A failed load is not an empty queue (IR-745): "All caught up!" after an
   // error would tell RDCO there is nothing to decide when there may be.
-  const [loadFailed, setLoadFailed] = useState(false);
+  const loadFailed = read.status === "failed" || read.status === "interrupted";
+  const load = read.retry;
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
   const [_acting,   setActing]    = useState(false);
-
-  const load = () => {
-    setLoading(true);
-    accountsApi
-      .roleRequests()
-      .then(({ data }) => {
-        setRequests(data.results);
-        setLoadFailed(false);
-      })
-      .catch(() => setLoadFailed(true))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
 
   const handleDecide = async () => {
     if (!target) return;
@@ -65,25 +60,25 @@ export default function RoleRequestsPage() {
       />
 
       {loading ? (
-        <Skeleton />
+        <Skeleton onRetry={load} />
       ) : loadFailed ? (
         <EmptyState
           framed
           tone="error"
           icon="fa-circle-exclamation"
           title="Couldn't load role requests"
-          message="Check your connection and try again."
+          message={failureMessage(read.error)}
           action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
         />
       ) : requests.length === 0 ? (
-        <div className="bg-white rounded-xl border border-stone-200 py-16 text-center">
-          <i className="fas fa-check-circle text-[32px] text-stone-500 mb-3 block" aria-hidden />
-          <p className="text-[15px] font-medium text-stone-700">All caught up!</p>
-          <p className="text-[13px] text-stone-500 mt-1">No pending role requests.</p>
+        <div className="bg-white rounded-card border border-stone-200 py-16 text-center">
+          <i className="fas fa-check-circle text-display text-stone-500 mb-3 block" aria-hidden />
+          <p className="text-body font-medium text-stone-700">All caught up!</p>
+          <p className="text-small text-stone-500 mt-1">No pending role requests.</p>
         </div>
       ) : (
-        <div className="relative bg-white rounded-xl border border-stone-200 overflow-x-auto">
-          <table className="w-full text-[14px]">
+        <div className="relative bg-white rounded-card border border-stone-200 overflow-x-auto">
+          <table className="w-full text-body">
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50">
                 <th className="text-left px-5 py-3 font-semibold text-stone-600">User</th>
@@ -100,7 +95,7 @@ export default function RoleRequestsPage() {
                     <div className="font-medium text-stone-900">{req.user_name}</div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${TONES.active}`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label font-semibold ${TONES.active}`}>
                       {req.role_name}
                     </span>
                   </td>
@@ -136,6 +131,13 @@ export default function RoleRequestsPage() {
               ))}
             </tbody>
           </table>
+          <LoadMore
+            hasMore={read.hasMore}
+            error={read.moreError}
+            loading={read.loadingMore}
+            onLoadMore={read.loadMore}
+            className="border-t border-stone-100 px-5 py-3"
+          />
         </div>
       )}
 

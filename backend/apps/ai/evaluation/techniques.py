@@ -24,6 +24,8 @@ from typing import Any, Iterable, Iterator, Optional
 from django.conf import settings
 from django.test import override_settings
 
+from apps.ai.retrieval.reranker_input import READS
+
 
 class TechniqueError(Exception):
     """A run asked for a technique that is unknown, unbuilt, or misspelled."""
@@ -48,6 +50,9 @@ class Technique:
     note: str = ""
     #: For `kind="choice"`, the only values accepted.
     choices: tuple[str, ...] = ()
+    #: Read when chunks are built, not when a run queries: a run records it
+    #: and cannot move it, since the index would not change (IR-1102).
+    index_time: bool = False
 
     @property
     def implemented(self) -> bool:
@@ -128,6 +133,26 @@ TECHNIQUES: tuple[Technique, ...] = (
         ticket="IR-397",
         note="token ceiling on the assembled passage set; 0 is unbudgeted",
     ),
+    Technique(
+        name="formula_text",
+        setting="AI_FORMULA_TEXT_INDEXED",
+        kind="bool",
+        adr="ADR-067 §Amendment 2026-11-14",
+        ticket="IR-1102",
+        note="transcribed formulas' LaTeX and description in the embedded and keyword-indexed "
+             "text (readers see the LaTeX either way); set at indexing, so re-chunk to move it",
+        index_time=True,
+    ),
+    Technique(
+        name="reranker_reads",
+        setting="AI_RERANKER_READS",
+        kind="choice",
+        choices=READS,
+        adr="ADR-033 §5",
+        ticket="IR-1125",
+        note="what the reranker reads: shown text (today), embedded text, shown text with a "
+             "Figure's labelled AI description, or embedded text only where shown is blank",
+    ),
 )
 
 
@@ -159,6 +184,11 @@ def parse_override(text: str) -> tuple[str, Any]:
             f"this deployment's settings. It lands with {found.ticket} "
             f"({found.adr}). A run cannot measure it meanwhile, and recording "
             f"it as measured would be a false result."
+        )
+    if found.index_time:
+        raise TechniqueError(
+            f"{found.name} is read when chunks are built, so a run cannot move it: "
+            f"set {found.setting}, re-chunk the corpus, then run. Every run records it."
         )
     return found.name, found.parse(raw)
 

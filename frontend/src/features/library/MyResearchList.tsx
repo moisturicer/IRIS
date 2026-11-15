@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,7 @@ function Group({ group, open, onDeleted }: { group: FilterGroup; open: boolean; 
   const waiting = group.id === "waiting";
   return (
     <details open={open} className="group/fold">
-      <summary className={cn("grid cursor-pointer list-none grid-cols-[0.75rem_minmax(0,1fr)] items-start gap-x-3 rounded-lg py-1 [&::-webkit-details-marker]:hidden", FOCUS_RING)}>
+      <summary className={cn("grid cursor-pointer list-none grid-cols-[0.75rem_minmax(0,1fr)] items-start gap-x-3 rounded-control py-1 [&::-webkit-details-marker]:hidden", FOCUS_RING)}>
         <i
           className="fas fa-chevron-right row-span-2 mt-2 w-3 text-label text-stone-500 transition-transform duration-200 group-open/fold:rotate-90 motion-reduce:transition-none"
           aria-hidden
@@ -86,12 +87,11 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
 
   if (loading) {
     return (
-      <div className="space-y-3" role="status">
-        <span className="sr-only">Loading your research…</span>
+      <LoadingRegion label="Loading your research…" onRetry={onRetry} className="space-y-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-28 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" aria-hidden />
+          <div key={i} className="h-28 rounded-card border border-stone-200 bg-white motion-safe:animate-pulse" />
         ))}
-      </div>
+      </LoadingRegion>
     );
   }
 
@@ -101,7 +101,7 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
         interrupted={interrupted}
         what="research list"
         title="Could not load your research"
-        message="Nothing was changed. Check your connection and try again."
+        lead="Nothing was changed."
         onRetry={onRetry}
       />
     );
@@ -121,7 +121,7 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
 
   return (
     <div>
-      <div className="mb-section rounded-2xl border border-stone-200 bg-white p-card-compact md:p-card">
+      <div className="mb-section rounded-card border border-stone-200 bg-white p-card-compact md:p-card">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <label className="relative block lg:w-80">
             <span className="sr-only">Search your research</span>
@@ -131,7 +131,7 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by title or author"
-              className="w-full rounded-lg border border-stone-300 bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded-control border border-field bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-600 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
           </label>
           <FilterChips label="Show" options={filters} value={filter} onChange={onFilterChange} />

@@ -6,6 +6,19 @@ import { cn } from "@/lib/utils";
 import type { YourPart } from "./yourPart";
 
 /**
+ * The footer's icon in a 32 px circle, as a pull request's merge box draws it
+ * (IR-1131): filled maroon where someone must act, outlined in Ink once
+ * settled, quiet otherwise. Keyed by the part's own icon, so nothing here
+ * decides a state.
+ */
+const CIRCLE: Record<string, { tone: string; glyph: string }> = {
+  "fa-circle-check": { tone: "settled", glyph: "fa-check" },
+  "fa-circle-xmark": { tone: "attention", glyph: "fa-xmark" },
+  "fa-circle-exclamation": { tone: "attention", glyph: "fa-exclamation" },
+  "fa-circle-info": { tone: "quiet", glyph: "fa-info" },
+};
+
+/**
  * The Review pane's "Your part" footer (IR-1094; spec §4.8), shaped like a
  * pull request's merge box: a status icon, one heading, one line under it and
  * the actions the server grants -- one of them filled. It replaces the
@@ -26,9 +39,13 @@ export function YourPartFooter({ id, part, hasFacts, onShowFacts, footerRef, chi
 }) {
   return (
     <footer ref={footerRef} id={id} className="review-pane-foot" aria-label="Your part">
-      <div className="flex items-start gap-3">
-        <i className={cn("fas mt-0.5 text-base text-stone-700", part.icon)} aria-hidden />
-        <div className="min-w-0 flex-1">
+      {/* One row, as the prototype's merge box: who-and-what on the left, the
+          actions on the right, wrapping under it in a narrow pane (IR-1139). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span aria-hidden className={cn("review-mb-ic self-start", (CIRCLE[part.icon] ?? CIRCLE["fa-circle-info"]).tone)}>
+          <i className={cn("fas", (CIRCLE[part.icon] ?? { glyph: part.icon }).glyph)} />
+        </span>
+        <div className="min-w-0 flex-1 basis-40">
           <p className="text-small font-semibold text-stone-900">{part.heading}</p>
           {part.line && <p className="text-2xs text-stone-600">{part.line}</p>}
           {hasFacts && (
@@ -38,8 +55,8 @@ export function YourPartFooter({ id, part, hasFacts, onShowFacts, footerRef, chi
             </button>
           )}
         </div>
+        {children}
       </div>
-      {children}
     </footer>
   );
 }

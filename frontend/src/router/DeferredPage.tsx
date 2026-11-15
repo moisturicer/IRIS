@@ -1,6 +1,7 @@
 import { Suspense, type ReactNode } from "react";
 
 import { Spinner } from "@/components/ui/Spinner";
+import { reloadPage } from "@/lib/readFailure";
 
 interface DeferredPageProps {
   name: string;
@@ -17,7 +18,7 @@ export function DeferredPage({ name, children }: DeferredPageProps) {
     <Suspense
       fallback={
         <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-stone-600">
-          <Spinner size="lg" label={`Loading ${name}`} />
+          <Spinner size="lg" label={`Loading ${name}`} onRetry={reloadPage} />
           <p aria-hidden="true" className="text-sm">Loading {name}…</p>
         </div>
       }

@@ -35,7 +35,7 @@ import { cn, downloadBlob, formatDate } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
-import { errorDetail } from "@/lib/errorDetail";
+import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { ItemStatusChip, itemStatus } from "@/features/document-requests/itemStatus";
 import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerDocumentRequests";
 
@@ -105,6 +105,17 @@ function askedFor(requests: DocumentRequest[]): { bySlot: Map<number, Asked>; ot
 async function saveBlob(fetch: () => Promise<{ data: unknown }>, filename: string) {
   const { data } = await fetch();
   downloadBlob(data as Blob, filename);
+}
+
+/**
+ * Why the server refused an upload, or "Please try again." when it gave no
+ * reason (a dropped connection, a 5xx). A document upload carries `detail`;
+ * the manuscript goes up as a PATCH of the record, so DRF refuses it keyed by
+ * field (`abstract_file`) with no `detail` (IR-1048). A fixed reason like
+ * "unsupported active content" must show: retrying the same file can't help.
+ */
+function uploadRefusal(err: unknown): string {
+  return errorDetail(err, "") || fieldError(err, "abstract_file", "file") || "Please try again.";
 }
 
 export function FilesSection({
@@ -195,7 +206,7 @@ export function FilesSection({
         [key]: {
           status: "failed",
           fileName: file.name,
-          error: errorDetail(err, "Please try again."),
+          error: uploadRefusal(err),
           onRetry: () => void send(key, file, post),
         },
       }));
@@ -204,7 +215,7 @@ export function FilesSection({
 
   if (failed && slots == null) {
     return (
-      <div role="alert" className="rounded-2xl border border-brand-200 bg-brand-50 p-card text-small text-brand-dark">
+      <div role="alert" className="rounded-card border border-stone-300 bg-surface p-card text-small text-brand-dark">
         Could not load this record's files.{" "}
         <button type="button" onClick={() => void load()} className={cn("font-semibold underline", FOCUS_RING)}>
           Try again
@@ -212,7 +223,7 @@ export function FilesSection({
       </div>
     );
   }
-  if (slots == null) return <Skeleton rows={6} label="Loading the files…" />;
+  if (slots == null) return <Skeleton rows={6} label="Loading the files…" onRetry={() => void load()} />;
 
   const { bySlot, other } = askedFor(requests);
   const shownSlots = slots.filter((s) => editable || s.uploads.length > 0 || bySlot.has(s.id));
@@ -228,7 +239,7 @@ export function FilesSection({
       <section>
         <SectionHeading>Manuscript</SectionHeading>
         {record.manuscript_unsubmitted && (
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-small font-semibold text-brand-dark">
+          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-small font-semibold text-brand-dark ring-1 ring-stone-300">
             <i className="fas fa-file-pen text-2xs" aria-hidden />
             Revised, not yet submitted
           </p>
@@ -368,7 +379,7 @@ export function FilesSection({
             />
           )}
           {files.length > 0 && (
-            <ul className="divide-y divide-stone-200 rounded-2xl border border-stone-200 bg-white">
+            <ul className="divide-y divide-stone-200 rounded-card border border-stone-200 bg-white">
               {files.map((f) => (
                 <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 px-card-compact py-3">
                   <span className="min-w-0">
@@ -422,7 +433,7 @@ export function FilesSection({
 function DocumentCard({ name, asked, children }: { name: string; asked?: Asked; children: ReactNode }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className="rounded-2xl border border-stone-200 bg-white p-card-compact sm:p-card space-y-3">
+    <section aria-labelledby={headingId} className="rounded-card border border-stone-200 bg-white p-card-compact sm:p-card space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 id={headingId} className="text-heading font-semibold text-stone-900">
           {name}
@@ -495,7 +506,7 @@ function DownloadButton({ name, onClick }: { name: string; onClick: () => void }
       type="button"
       onClick={onClick}
       aria-label={`Download ${name}`}
-      className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}
+      className={cn(PILL_SECONDARY, FOCUS_RING, "reading-split:min-h-9 px-3")}
     >
       <i className="fas fa-download text-2xs" aria-hidden />
       Download
@@ -509,7 +520,7 @@ function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) 
       type="button"
       onClick={onClick}
       aria-label={`Remove ${name}`}
-      className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}
+      className={cn(PILL_SECONDARY, FOCUS_RING, "reading-split:min-h-9 px-3")}
     >
       <i className="fas fa-trash-can text-2xs" aria-hidden />
       Remove

@@ -85,7 +85,7 @@ function Provenance({ field, entry }: { field: string; entry: SuggestionEntry<un
 
 export function PrefillChip({ field, suggestion, replaces, page, tooLong = false, entry, onUse, onDismiss }: PrefillChipProps) {
   return (
-    <div role="group" aria-label={`Suggested ${field}`} className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
+    <div role="group" aria-label={`Suggested ${field}`} className="mt-2 rounded-card border border-stone-200 bg-stone-50 p-3">
       <p className="flex items-center gap-1.5 text-label font-medium text-stone-600">
         <i className="fas fa-file-lines" aria-hidden />
         {foundIn(page)}

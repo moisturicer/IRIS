@@ -79,15 +79,15 @@ export function MyFeeds({ query, matchCount, options, activeFeedId, onOpen, onDe
   const full = load === "ready" && feeds.length >= limit;
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative shrink-0" ref={containerRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className={cn("inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
+        className={cn("inline-flex h-11 items-center justify-center gap-1.5 rounded-control border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
       >
-        <i className="fas fa-rss text-[12px]" aria-hidden />
+        <i className="fas fa-rss text-label" aria-hidden />
         <span>My feeds</span>
         {feeds.length > 0 && <span className="text-stone-500" aria-hidden>{feeds.length}</span>}
       </button>
@@ -96,7 +96,7 @@ export function MyFeeds({ query, matchCount, options, activeFeedId, onOpen, onDe
       {open && (
         <div
           id={menuId}
-          className="absolute left-0 top-full z-40 mt-1.5 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-stone-200/90 bg-white py-1.5 shadow-card-md"
+          className="fixed inset-x-4 bottom-4 z-50 max-h-[min(80dvh,34rem)] w-auto overflow-y-auto sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-1.5 sm:z-40 sm:max-h-none sm:w-72 sm:max-w-[calc(100vw-2rem)] sm:overflow-visible rounded-control border border-stone-200/90 bg-white py-1.5 shadow-card-md"
         >
           {load === "error" && (
             <div role="alert" className="mx-3 my-1.5 text-small text-stone-700">
@@ -118,18 +118,18 @@ export function MyFeeds({ query, matchCount, options, activeFeedId, onOpen, onDe
                     aria-label={`Open ${feed.name}`}
                     aria-current={feed.id === activeFeedId ? "true" : undefined}
                     onClick={() => { setOpen(false); onOpen(feed); }}
-                    className={cn("flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded-md px-2 text-left hover:bg-stone-50", FOCUS_RING)}
+                    className={cn("flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded-control px-2 text-left hover:bg-stone-50", FOCUS_RING)}
                   >
                     <span className={cn("max-w-full truncate text-small", feed.id === activeFeedId ? "font-semibold text-brand" : "text-stone-800")}>{feed.name}</span>
                     {Object.keys(feed.stale).length > 0 && <span className="text-2xs text-stone-600">Needs attention</span>}
                   </button>
                   <button type="button" aria-label={`Rename ${feed.name}`} onClick={() => choose({ kind: "rename", feed })}
-                    className={cn("flex h-11 w-9 items-center justify-center rounded-md text-stone-600 hover:text-brand", FOCUS_RING)}>
-                    <i className="fas fa-pen text-[11px]" aria-hidden />
+                    className={cn("flex h-11 w-9 items-center justify-center rounded-control text-stone-600 hover:text-brand", FOCUS_RING)}>
+                    <i className="fas fa-pen text-label" aria-hidden />
                   </button>
                   <button type="button" aria-label={`Delete ${feed.name}`} onClick={() => choose({ kind: "delete", feed })}
-                    className={cn("flex h-11 w-9 items-center justify-center rounded-md text-stone-600 hover:text-brand", FOCUS_RING)}>
-                    <i className="fas fa-trash-can text-[11px]" aria-hidden />
+                    className={cn("flex h-11 w-9 items-center justify-center rounded-control text-stone-600 hover:text-brand", FOCUS_RING)}>
+                    <i className="fas fa-trash-can text-label" aria-hidden />
                   </button>
                 </li>
               ))}

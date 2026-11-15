@@ -5,6 +5,7 @@ import { ResearchCard } from "@/components/shared/ResearchCard";
 import { Spinner } from "@/components/ui/Spinner";
 import { FOCUS_RING, COLOUR_TRANSITION } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { PaperThumbnail } from "@/features/discover/PaperThumbnail";
 import { INSTITUTION } from "@/config/institution";
 import { personPath } from "@/lib/access";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,8 @@ interface PersonProfileViewProps {
    * simply have not been loaded. Your own Profile leaves it out until IR-949.
    */
   lists?: ProfileLists;
+  /** Your own Profile: its empty state says "You have", not "<Name> has". */
+  self?: boolean;
 }
 
 /**
@@ -48,21 +51,17 @@ interface PersonProfileViewProps {
  * width allows it, read from the container and never the window (DESIGN.md,
  * Container Rule), and fall under them otherwise.
  *
- * Nothing here is a total: no counts in a heading, no summed views, no
- * citations. A paper shows its own views, because that figure is the paper's.
+ * Papers and Advised each carry the server's count for what the reader may
+ * read (IR-1133). There are no summed views and no citations; a paper shows its
+ * own views, because that figure is the paper's.
  */
-export function PersonProfileView({ profile, lists }: PersonProfileViewProps) {
+export function PersonProfileView({ profile, lists, self = false }: PersonProfileViewProps) {
   const name = displayName(profile);
-  const affiliation = affiliationOf(profile);
+  const roleAndUnit = [profile.role_label, affiliationOf(profile)].filter(Boolean).join(" · ");
   const interests = profile.research_interests;
   // A list that failed is not an empty one: it keeps its place and says so.
   const showsRail = lists !== undefined
     && (lists.collaborators.items.length > 0 || lists.collaborators.error !== null || lists.collaborators.loading);
-  const noPapers = lists !== undefined
-    && lists.research.items.length === 0 && lists.advised.items.length === 0
-    && !lists.research.loading && !lists.advised.loading
-    && !lists.research.loadingMore && !lists.advised.loadingMore
-    && lists.research.error === null && lists.advised.error === null;
 
   return (
     <div className="[container-type:inline-size] [container-name:profile]">
@@ -71,8 +70,7 @@ export function PersonProfileView({ profile, lists }: PersonProfileViewProps) {
           <PersonAvatar photoUrl={profile.photo_url} initials={initialsOf(profile)} alt={name} size="lg" />
           <div className="min-w-0 flex-1 basis-48">
             <h1 className="font-display text-title font-semibold text-stone-900 sm:text-display">{name}</h1>
-            {profile.role_label && <p className="mt-1 text-body text-stone-700">{profile.role_label}</p>}
-            {affiliation && <p className="text-body text-stone-600">{affiliation}</p>}
+            {roleAndUnit && <p className="mt-1 text-body text-stone-700">{roleAndUnit}</p>}
             <p className="text-small text-stone-600">{INSTITUTION.name}</p>
           </div>
         </header>
@@ -104,13 +102,14 @@ export function PersonProfileView({ profile, lists }: PersonProfileViewProps) {
 
             {lists && (
               <>
-                <PaperSection title="Research" list={lists.research} onMore={() => lists.onMore("research")} />
+                <PaperSection
+                  title="Papers"
+                  list={lists.research}
+                  onMore={() => lists.onMore("research")}
+                  empty={self ? "You have no published papers yet" : `${profile.first_name} has no published papers yet`}
+                />
                 <PaperSection title="Advised" list={lists.advised} onMore={() => lists.onMore("advised")} />
               </>
-            )}
-
-            {noPapers && (
-              <p className="py-6 text-body text-stone-600 first:pt-0">No published papers yet.</p>
             )}
           </div>
 
@@ -124,11 +123,14 @@ export function PersonProfileView({ profile, lists }: PersonProfileViewProps) {
 }
 
 /** One section under its hairline; the first one has nothing above it to divide from. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, count, children }: { title: string; count?: number | null; children: ReactNode }) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="py-6 first:pt-0 last:pb-0">
-      <h2 id={id} className="font-display text-title font-semibold text-stone-900">{title}</h2>
+      <h2 id={id} className="font-display text-title font-semibold text-stone-900">
+        {title}
+        {count != null && <>{" "}<span className="ml-1 text-body font-medium text-stone-600">{count}</span></>}
+      </h2>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -179,12 +181,20 @@ function ListFooter({ list, label, onMore }: { list: ListState<unknown>; label: 
   );
 }
 
-function PaperSection({ title, list, onMore }: { title: string; list: ListState<ProfilePaper>; onMore: () => void }) {
+function PaperSection({ title, list, onMore, empty }: {
+  title: string; list: ListState<ProfilePaper>; onMore: () => void;
+  /** Said when there are no papers; left out, the section is hidden instead. */
+  empty?: string;
+}) {
   const { list: rows, mark } = useFocusFirstNewRow(list.items.length);
   // A first page that is being retried keeps its place: the section does not vanish and come back.
-  if (list.items.length === 0 && !list.error && !list.loading && !list.loadingMore) return null;
+  const none = list.items.length === 0 && !list.error && !list.loading && !list.loadingMore;
+  if (none && !empty) return null;
+  // A list that is loading or failed has no honest number yet; a loaded one with no count from the server and more to come has none either.
+  const shownCount = list.loading || list.error ? null : none ? 0 : list.count ?? (list.hasMore ? null : list.items.length);
   return (
-    <Section title={title}>
+    <Section title={title} count={shownCount}>
+      {none && <p className="text-body text-stone-600">{empty}</p>}
       {list.items.length > 0 && (
         <ul ref={rows} aria-label={title} className="space-y-3">
           {list.items.map((paper) => (
@@ -192,6 +202,7 @@ function PaperSection({ title, list, onMore }: { title: string; list: ListState<
               <ResearchCard
                 layout="list"
                 compact
+                thumbnail={<PaperThumbnail recordId={paper.id} available={false} />}
                 headingLevel={3}
                 href={`/records/${paper.id}`}
                 title={paper.title}
@@ -200,7 +211,7 @@ function PaperSection({ title, list, onMore }: { title: string; list: ListState<
                 byline={paper.authors.join(", ")}
                 footer={
                   <span className="inline-flex items-center gap-1.5 text-stone-700" title="Accounts that have opened this paper">
-                    <i className="fas fa-eye text-[12px] text-brand" aria-hidden />
+                    <i className="fas fa-eye text-label text-brand" aria-hidden />
                     {paper.views} {paper.views === 1 ? "view" : "views"}
                   </span>
                 }
@@ -209,7 +220,7 @@ function PaperSection({ title, list, onMore }: { title: string; list: ListState<
           ))}
         </ul>
       )}
-      <ListFooter list={list} label={`${title.toLowerCase()} papers`} onMore={() => { mark(); onMore(); }} />
+      <ListFooter list={list} label={title === "Papers" ? "research papers" : `${title.toLowerCase()} papers`} onMore={() => { mark(); onMore(); }} />
     </Section>
   );
 }
@@ -234,7 +245,7 @@ function CollaboratorRail({ list, onMore }: { list: ListState<Collaborator>; onM
             <li
               key={person.id}
               className={cn(
-                "relative flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-stone-100 focus-within:bg-stone-100",
+                "relative flex min-h-11 items-center gap-3 rounded-control px-2 py-1.5 hover:bg-stone-100 focus-within:bg-stone-100",
                 COLOUR_TRANSITION,
               )}
             >
@@ -243,7 +254,7 @@ function CollaboratorRail({ list, onMore }: { list: ListState<Collaborator>; onM
                 <Link
                   to={personPath(person.id)}
                   className={cn(
-                    "block truncate rounded-sm text-body font-semibold text-stone-900 hover:text-brand",
+                    "block truncate rounded-control text-body font-semibold text-stone-900 hover:text-brand",
                     COLOUR_TRANSITION,
                     FOCUS_RING,
                     "after:absolute after:inset-0 after:content-['']",

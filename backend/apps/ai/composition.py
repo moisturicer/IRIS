@@ -211,6 +211,23 @@ class CompositionRoot:
             return None
         return require_image_describing(self.llm_for(InferenceTask.DESCRIBE_FIGURE))
 
+    def formula_transcriber(self) -> Optional["ImageDescribingLLM"]:
+        """The ``transcribe_formula`` model, or ``None`` while its Profile is unset (IR-1102)."""
+        from apps.ai.inference import InferenceTask, profile_for
+        from apps.ai.providers.vision import require_image_describing
+
+        if self._llm is None and not profile_for(InferenceTask.TRANSCRIBE_FORMULA).is_configured:
+            return None
+        return require_image_describing(self.llm_for(InferenceTask.TRANSCRIBE_FORMULA))
+
+    def formula_transcriber_models(self) -> tuple[str, ...]:
+        """The models ``formula_transcriber`` tries, in order, for the stored request."""
+        from apps.ai.inference import InferenceTask, profile_for
+
+        if self._llm is not None:
+            return (type(self._llm).__name__,)
+        return profile_for(InferenceTask.TRANSCRIBE_FORMULA).models
+
     def generation_configured(self) -> bool:
         """Whether a model would actually answer, without calling one.
 
@@ -264,17 +281,27 @@ class CompositionRoot:
         ``records`` narrows to a set of Record ids (IR-500), on every path
         including the outage fallback, intersected with ``visible_to``.
         """
+        from django.conf import settings
+
         return DegradableRetriever(
-            RerankingRetriever(
-                self._candidates(record, records),
-                reranker=self.reranker(),
-                policy_enabled=self._policy_enabled,
-                permits=self._permits,
+            self.reranking_over(
+                self._candidates(record, records), self.reranker(), settings.AI_RERANKER_READS
             ),
             fallback=FullTextRetriever(
                 record=record, records=records, trial_variant=self._trial_variant
             ),
             degrade_on=_vendor_failures(),
+        )
+
+    def recall_stage(self) -> Retriever:
+        """What reranking is handed, unwrapped; IR-1125 shares it across arms."""
+        return self._candidates(None)
+
+    def reranking_over(self, inner: Retriever, reranker: Reranker, reads: str) -> Retriever:
+        """This root's reranking decorator over ``inner`` (IR-1125)."""
+        return RerankingRetriever(
+            inner, reranker=reranker, policy_enabled=self._policy_enabled,
+            permits=self._permits, reads=reads,
         )
 
     def vendor_permits(self) -> Callable[[Record], bool]:

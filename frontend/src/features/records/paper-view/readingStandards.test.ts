@@ -37,7 +37,7 @@ describe("the control scale", () => {
   it("is 44px on touch and 36px beside a pointer, whichever way it is written", () => {
     expect(CONTROL_SIZE).toBe("min-h-11 reading-split:min-h-9");
     expect(CONTROL_SQUARE).toBe("w-11 h-11 reading-split:w-9 reading-split:h-9");
-    expect(CONTROL_SHAPE).toBe("rounded-lg");
+    expect(CONTROL_SHAPE).toBe("rounded-control");
     expect(CONTROL_BASE).toContain(CONTROL_SIZE);
     expect(CONTROL_BASE).toContain(CONTROL_SHAPE);
   });
@@ -56,24 +56,31 @@ describe("controls in the reading surfaces", () => {
     expect(offenders(/\blg:(min-h-|h-|w-)/)).toEqual([]);
   });
 
-  it("are rounded-lg, not rounded-md", () => {
-    // ReadingHeader's section thumb sits one radius step inside its track on
-    // purpose, so the two are concentric. The others are older.
-    expect(offenders(/\brounded-md\b/)).toEqual([
-      "PaperDocuments.tsx",
-      "ReadingHeader.tsx",
-      "ReviewRoutingTracker.tsx",
-    ]);
+  it("are never shorter than 44px on touch (IR-1092, audit RES-02)", () => {
+    // A bare `min-h-9` applies on a phone too; the pointer size is written
+    // `reading-split:min-h-9` after the touch one. The `:` guard lets that
+    // through and catches the unprefixed ones.
+    const small = /(?<![:\w-])min-h-(?:8|9|10)\b/;
+    expect(offenders(small)).toEqual([]);
+    // The threads folder holds reading controls too (the glob above is flat).
+    const threads = import.meta.glob("./threads/*.tsx", { query: "?raw", import: "default", eager: true }) as Record<
+      string,
+      string
+    >;
+    expect(
+      Object.entries(threads)
+        .filter(([name, text]) => !name.endsWith(".test.tsx") && small.test(text))
+        .map(([name]) => name),
+    ).toEqual([]);
   });
 
-  it("use the type scale's names, not a pixel size, for text", () => {
-    expect(offenders(/\btext-\[\d+px\]/)).toEqual([
-      "AddReviewerDialog.tsx",
-      "DecisionDialog.tsx",
-      "NewVersionDialog.tsx",
-      "OfficeReviewDialog.tsx",
-      "RequestRevisionDialog.tsx",
-      "RouteDialog.tsx",
-    ]);
+  it("are rounded-control, one corner for every control (IR-1043)", () => {
+    // IR-1043 folded the section thumb's concentric `rounded-md` into the same
+    // token, so no reading control names a Tailwind size any more.
+    expect(offenders(/\brounded-(?:sm|md|lg|xl|2xl)\b/)).toEqual([]);
   });
+
+  // The no-pixel-text rule that lived here moved to the global font-size guard
+  // (`src/test/fontSize.test.ts`, IR-1037) when the last six dialogs were
+  // migrated (IR-1042).
 });
