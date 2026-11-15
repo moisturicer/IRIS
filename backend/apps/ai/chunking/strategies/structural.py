@@ -29,8 +29,9 @@ embeds its caption and description and shows only the caption.
 
 With ``sibling_merge_floor`` (IR-1147) a passage under the floor merges
 forward with the next section under the same parent heading (3.1 with 3.2,
-never 3 with 4), up to the target, and carries the parent's path. A Figure
-passage is never merged and is never merged across.
+never 3 with 4), up to the target, and carries the parent's path; a short
+last section merges back. A Figure passage is never merged; a merge passes
+over it.
 """
 
 import hashlib
@@ -41,10 +42,11 @@ from ..assembly import (
     Draft,
     Joiners,
     body_budget,
-    combine,
     finalize,
     fold_heading_only,
+    is_figure,
     merge_short_siblings,
+    merge_sibling_sections,
 )
 from ..document import (
     FORMULA,
@@ -86,47 +88,26 @@ class StructuralCascadeChunker:
 
         def fits(draft: Draft) -> bool:
             # A Figure passage is never folded into (IR-1054).
-            return draft.element_kinds != {"image"} and _fits(
+            return not is_figure(draft) and _fits(
                 draft.body, body_budget(draft.trail, options))
 
         # Across sections, so it cannot live in _chunk_section (IR-241).
         drafts = fold_heading_only(drafts, options, fits, _JOINERS)
-        drafts = _merge_sibling_sections(drafts, document.title, options, fits)
+        drafts = merge_sibling_sections(
+            drafts, options, _root(document.title, drafts), fits, _JOINERS,
+            trail_for=lambda key: bounded_trail(key, options))
         return finalize(
             drafts, strategy_id=STRATEGY_ID, options=options, page_sizes=document.page_sizes,
             content_hash=lambda chunks: _set_hash(chunks, options),
         )
 
 
-def _merge_sibling_sections(drafts: list[Draft], title: str, options: ChunkingOptions, fits) -> list[Draft]:
-    """Fold a passage under the floor into the next section sharing its parent."""
-    floor = options.sibling_merge_floor
-    if not floor or len(drafts) <= 1:
-        return list(drafts)
-
-    def parent(draft: Draft) -> tuple[str, ...] | None:
-        if draft.element_kinds == {"image"}:
-            return None
-        group = draft.section_key[:-1]
-        # The document title is not a parent heading: 3 never merges with 4.
-        return group if group and group != (title.strip(),) else None
-
-    result: list[Draft] = []
-    pending, pending_parent = drafts[0], parent(drafts[0])
-    for nxt in drafts[1:]:
-        if (pending_parent is not None and pending_parent == parent(nxt)
-                and pending.section_key != nxt.section_key
-                and count_tokens(pending.body) < floor):
-            candidate = replace(combine([pending, nxt], _JOINERS),
-                                trail=bounded_trail(pending_parent, options), section_key=pending_parent)
-            if fits(candidate):
-                # Its key is now the parent, so the next sibling is compared by group.
-                pending = candidate
-                continue
-        result.append(pending)
-        pending, pending_parent = nxt, parent(nxt)
-    result.append(pending)
-    return result
+def _root(title: str, drafts: list[Draft]) -> tuple[str, ...]:
+    """The path above every chapter: the title, or a heading every key starts with."""
+    if title.strip():
+        return (title.strip(),)
+    firsts = {d.section_key[0] for d in drafts if d.section_key}
+    return (firsts.pop(),) if len(firsts) == 1 else ()
 
 
 def _set_hash(chunks, options: ChunkingOptions) -> str:

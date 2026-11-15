@@ -4,10 +4,10 @@ Every strategy builds ``Draft``s (a body without its trail), and this module
 merges, numbers, decorates and checks them the same way for all of them.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
-from .document import HEADING, BoundingBox
+from .document import HEADING, IMAGE, BoundingBox
 from .hashing import chunkset_hash
 from .outline import embedded_text, trail_cost
 from .ports import ChunkingError
@@ -29,6 +29,8 @@ class Draft:
     bboxes: tuple[BoundingBox, ...] = ()
     # What the keyword index reads instead of ``content``; ``None`` reads it (IR-1102).
     keyword: str | None = None
+    # Merged across sibling sections, so it spans its key's children (IR-1147).
+    spans_children: bool = False
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,75 @@ def _fold_into(pending: list[Draft], draft: Draft, fits: Fits, joiners: Joiners)
     return [*pending, draft]
 
 
+def is_figure(draft: Draft) -> bool:
+    """A Figure passage (IR-1054)."""
+    return draft.element_kinds == {IMAGE}
+
+
+def merge_sibling_sections(
+    drafts: list[Draft],
+    options: ChunkingOptions,
+    root: tuple[str, ...],
+    fits: Fits,
+    joiners: Joiners,
+    trail_for: Callable[[tuple[str, ...]], tuple[str, ...]],
+) -> list[Draft]:
+    """Merge a draft under ``sibling_merge_floor`` with a neighbouring section
+    under the same parent heading below ``root`` (IR-1147): forward first,
+    then backward. Figure passages are passed over, never merged."""
+    floor = options.sibling_merge_floor
+    if not floor or len(drafts) <= 1:
+        return list(drafts)
+
+    def merge(earlier: Draft, later: Draft) -> Draft | None:
+        parent = _common_prefix(earlier.section_key, later.section_key)
+        if len(parent) <= len(root) or not (_under(earlier, parent) and _under(later, parent)):
+            return None
+        candidate = replace(combine([earlier, later], joiners), trail=trail_for(parent),
+                            section_key=parent, spans_children=True)
+        return candidate if fits(candidate) else None
+
+    forward = _sibling_pass(drafts, floor, lambda pending, nxt: merge(pending, nxt))
+    backward = _sibling_pass(forward[::-1], floor, lambda pending, nxt: merge(nxt, pending))
+    return backward[::-1]
+
+
+def _sibling_pass(drafts: list[Draft], floor: int, merge) -> list[Draft]:
+    result: list[Draft] = []
+    held: list[Draft] = []
+    pending: Draft | None = None
+    for draft in drafts:
+        if is_figure(draft):
+            (held if pending is not None else result).append(draft)
+            continue
+        if pending is not None and count_tokens(pending.body) < floor:
+            merged = merge(pending, draft)
+            if merged is not None:
+                pending = merged
+                continue
+        if pending is not None:
+            result.append(pending)
+        result.extend(held)
+        held = []
+        pending = draft
+    if pending is not None:
+        result.append(pending)
+    return result + held
+
+
+def _common_prefix(a: tuple[str, ...], b: tuple[str, ...]) -> tuple[str, ...]:
+    n = 0
+    while n < min(len(a), len(b)) and a[n] == b[n]:
+        n += 1
+    return a[:n]
+
+
+def _under(draft: Draft, parent: tuple[str, ...]) -> bool:
+    """Whether ``draft`` lies strictly inside ``parent``'s children."""
+    key = draft.section_key
+    return len(key) > len(parent) or (draft.spans_children and key == parent)
+
+
 def finalize(
     drafts: list[Draft],
     *,
@@ -175,5 +246,7 @@ __all__ = [
     "combine",
     "finalize",
     "fold_heading_only",
+    "is_figure",
     "merge_short_siblings",
+    "merge_sibling_sections",
 ]

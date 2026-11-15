@@ -23,6 +23,7 @@ TABLE_HEADER = "table_header"
 LIST_ITEM = "list_item"
 CAPTION = "caption"
 FORMULA = "formula"
+IMAGE = "image"
 
 # Docling's running header and footer labels, still carried by structures it
 # stored before IR-843. LlamaParse's are ``header`` and ``footer``.

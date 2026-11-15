@@ -2,8 +2,8 @@
 
 With ``sibling_merge_floor`` above 0, a structural passage under that many
 tokens folds forward into the next section that shares its parent heading
-(3.1 with 3.2, never 3 with 4), up to the target. Off (0) is the default and
-leaves chunk sets exactly as before.
+(3.1 with 3.2, never 3 with 4), up to the target; a short last section merges
+back. Off (0) is the default and leaves chunk sets exactly as before.
 """
 
 import re
@@ -90,9 +90,7 @@ _PINNED_OPTIONS = {
 def test_off_leaves_chunk_sets_identical_to_before(name):
     result = chunk(nested_document(), **_PINNED_OPTIONS[name])
     assert result.content_hash == PINNED_OFF[name]
-    sections = [c.section_key for c in result.chunks]
     assert chunk(nested_document(), sibling_merge_floor=0, **_PINNED_OPTIONS[name]).chunks == result.chunks
-    assert sections
 
 
 def test_off_is_the_default():
@@ -156,6 +154,41 @@ def test_top_level_sections_never_merge_without_a_title():
     assert [c.section_key for c in chunks] == [("3 Results",), ("4 Discussion",)]
 
 
+def test_chapters_under_an_untitled_documents_title_heading_never_merge():
+    document = NormalizedDocument(title="", elements=(
+        heading("My Paper", 1),
+        heading("3 Results", 2), para("Short results."),
+        heading("4 Discussion", 2), para("Short discussion."),
+    ))
+    chunks = chunk(document, sibling_merge_floor=300).chunks
+    assert [c.section_key[-1] for c in chunks] == ["3 Results", "4 Discussion"]
+
+
+def test_merged_subsections_merge_on_with_the_next_section():
+    document = build(
+        heading("3 Results", 1),
+        heading("3.1 Agreement", 2),
+        heading("3.1.1 Codes", 3), para("Codes agreed."),
+        heading("3.1.2 Scope", 3), para("Scope agreed."),
+        heading("3.2 Disagreement", 2), para("Some disagreed."),
+    )
+    (merged,) = chunk(document, sibling_merge_floor=300).chunks
+    assert merged.section_key == (TITLE, "3 Results")
+    assert all(t in merged.content for t in ("Codes agreed.", "Scope agreed.", "Some disagreed."))
+
+
+def test_a_short_last_section_merges_back_into_its_sibling():
+    long_text = " ".join(f"word{i}" for i in range(80)) + "."
+    document = build(
+        heading("3 Results", 1),
+        heading("3.1 Agreement", 2), para(long_text),
+        heading("3.2 Summary", 2), para("In short, they agreed."),
+    )
+    (merged,) = chunk(document, sibling_merge_floor=50).chunks
+    assert merged.section_key == (TITLE, "3 Results")
+    assert merged.content.index("word0") < merged.content.index("In short")
+
+
 def test_merges_never_cross_a_parent_heading():
     document = build(
         heading("3 Results", 1), heading("3.2 Last", 2), para("End of results."),
@@ -176,7 +209,7 @@ def test_a_parent_intro_does_not_merge_into_its_first_child():
     assert [c.section_key[-1] for c in chunks] == ["2 Method", "2.1 Data"]
 
 
-def test_a_figure_passage_is_never_merged_and_blocks_a_merge_across_it():
+def test_a_figure_passage_is_never_merged_and_a_merge_passes_over_it():
     document = build(
         heading("2 Method", 1),
         heading("2.1 Data", 2), para("Data came from forty theses."),
@@ -189,7 +222,9 @@ def test_a_figure_passage_is_never_merged_and_blocks_a_merge_across_it():
     (fig,) = [c for c in chunks if c.element_kinds == frozenset({"image"})]
     assert fig.section_key == (TITLE, "2 Method", "2.1 Data")
     assert fig.content == "Figure 1: The coding map."
-    assert len(chunks) == 3
+    (merged,) = [c for c in chunks if c is not fig]
+    assert merged.section_key == (TITLE, "2 Method")
+    assert "forty theses" in merged.content and "coded each thesis" in merged.content
 
 
 def test_a_passage_at_or_over_the_floor_does_not_merge():
@@ -199,7 +234,7 @@ def test_a_passage_at_or_over_the_floor_does_not_merge():
         heading("2.1 Data", 2), para(first),
         heading("2.2 Coding", 2), para("Two readers coded each thesis."),
     )
-    floor = count_tokens(chunk(document).chunks[0].content)
+    floor = min(count_tokens(c.content) for c in chunk(document).chunks)
     assert len(chunk(document, sibling_merge_floor=floor).chunks) == 2
     assert len(chunk(document, sibling_merge_floor=floor + 1).chunks) == 1
 
@@ -279,9 +314,9 @@ def test_property_contract_holds_with_the_option_on(sections, target, floor, fig
             # The passage's key is a prefix of every section it holds.
             assert keys[tag][: len(c.section_key)] == c.section_key
         if len(tags) > 1:
-            # Merged: only siblings under one parent heading, never the title alone.
+            # Merged: sections strictly under one parent heading, never the title alone.
             assert len(c.section_key) >= 2
-            assert {len(keys[t]) for t in tags} == {len(c.section_key) + 1}
+            assert all(len(keys[t]) > len(c.section_key) for t in tags)
         if figures and c.element_kinds == frozenset({"image"}):
             (fig_tag,) = {int(m.group(1)) for m in re.finditer(r"F(\d+)", c.text)}
             assert c.section_key == keys[fig_tag]
