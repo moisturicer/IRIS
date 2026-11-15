@@ -85,7 +85,7 @@ export function ConversationHistoryList({
       <label htmlFor={searchId} className="sr-only">Search your past conversations</label>
       <input id={searchId} type="search" value={search.text} onChange={e => search.onText(e.target.value)}
         placeholder="Search past conversations" autoComplete="off" maxLength={200}
-        className="min-h-10 w-full rounded-card border border-stone-200 bg-white px-3 text-control text-stone-900 placeholder:text-stone-500 focus-visible:outline-brand" />
+        className="min-h-10 w-full rounded-card border border-field bg-white px-3 text-control text-stone-900 placeholder:text-stone-600 focus-visible:outline-brand" />
       <p role="status" aria-live="polite" className="px-1 pt-1 text-label text-stone-600">
         {search.query && search.state === "ready" ? `${conversations.length}${search.hasMore ? "+" : ""} found` : ""}
       </p>

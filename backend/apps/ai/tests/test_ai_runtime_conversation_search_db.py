@@ -17,9 +17,8 @@ from apps.records.models import PipelineStatus
 
 from .corpus import make_user
 from .test_ai_runtime_research_db import paper
-from .test_ai_runtime_runs_db import (  # noqa: F401
-    DISPATCH, LIMITS, ScriptedExecutor, api, as_reader, run, runtime, service, session,
-)
+from . import test_ai_runtime_runs_db as runs_db
+from .test_ai_runtime_runs_db import LIMITS, ScriptedExecutor, as_reader, run, service, session
 from ai.runs.executor import Citation, Result  # noqa: E402  (the runs test puts the repo root on sys.path)
 from ai.runs.store import RunStore  # noqa: E402
 
@@ -27,6 +26,10 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
 PATH = "/api/v1/ai/conversations"
 PUBLIC = {"X-IRIS-Protocol": "runs-reader-1"}
+
+# Fixtures of the runs tests, made visible to pytest here.
+api = runs_db.api
+runtime = runs_db.runtime
 
 
 class ReaderExecutor(ScriptedExecutor):
