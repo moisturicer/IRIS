@@ -150,7 +150,7 @@ IR-758 (spec, under IR-671), IR-759 (this ADR), IR-760, IR-761, IR-762, IR-763, 
 
 ## Amendment — 2026-11-15 (IR-763): the daily job's deletions have their own audit type
 
-**Status of this amendment: Proposed** — decided by Hermoine Zozobrado, 2026-11-15, while building IR-763. It is accepted when IR-763's PR merges.
+**Status of this amendment: Accepted** — decided by Hermoine Zozobrado, 2026-11-15, while building IR-763. Accepted by Lee Jasmin Adolfo on 2026-11-15, as relayed by Hermoine Zozobrado, when IR-763's PR (#812) merged.
 
 1. **A lapsed request's deletion is audited as `CALL_LAPSED`**, not `CALL_DELETED`. It has no actor and carries a snapshot of the Call. This refines the 2026-11-15 (IR-762) amendment's point 2: these are still deletions under decision 15, with a copy of the Call, but they get a type of their own so they can be told apart from a person's delete and counted.
 2. **Decision 15's acts are therefore seven event types:** `CALL_POSTED`, `CALL_EDITED`, `CALL_DELETED`, `CALL_CONFIRMED`, `CALL_REJECTED`, `CALL_REMOVED` and `CALL_LAPSED`. `CALL_POSTED` carries a full snapshot too, so the log alone can follow a Call's versions. Areas appear as ids and names. The keys are in `docs/evaluation/AUDIT_EXPORT.md`.
