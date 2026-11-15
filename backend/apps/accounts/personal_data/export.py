@@ -604,6 +604,29 @@ def opportunities_posted(user) -> list[dict]:
     ]
 
 
+def saved_calls(user) -> list[dict]:
+    """The Calls the person saved (IR-649). The title is given only while the
+    Call is confirmed, which is when the saved list shows it too."""
+    from apps.opportunities.models import Opportunity, SavedCall
+    from core.enums import CallStatus
+
+    rows = list(SavedCall.objects.filter(owner=user).order_by("id"))
+    titles = dict(
+        Opportunity.objects.visible_to(user)
+        .filter(pk__in=[row.call_id for row in rows], status=CallStatus.CONFIRMED)
+        .values_list("pk", "title")
+    )
+    return [
+        {
+            "call_id": row.call_id,
+            "title": titles.get(row.call_id),
+            "available": row.call_id in titles,
+            "saved_at": row.saved_at,
+        }
+        for row in rows
+    ]
+
+
 # -- acts as an Adviser or office reviewer -------------------------------------
 
 def workflow_acts(user) -> dict:
@@ -743,6 +766,7 @@ SECTIONS: dict[str, Callable] = {
     "delete_requests": delete_requests,
     "notifications": notifications,
     "opportunities_posted": opportunities_posted,
+    "saved_calls": saved_calls,
     "workflow_acts": workflow_acts,
     "consent": consent,
 }

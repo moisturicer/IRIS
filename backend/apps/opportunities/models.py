@@ -234,3 +234,36 @@ class Opportunity(models.Model):
         if not self.posted_by:
             return ""
         return self.posted_by.get_full_name() or self.posted_by.email
+
+
+class SavedCall(models.Model):
+    """
+    One Call one reader saved (ADR-050 decision 13, IR-649).
+
+    Its own table, beside the board, because `library.SavedRecord` points at
+    papers, and keeping it here leaves the board removable as a unit (IR-121).
+    Unique on `(owner, call)`, so saving twice is one row.
+
+    Both foreign keys cascade: removing an account removes its saved Calls, and
+    a deleted Call vanishes from every reader's list. A Call sent back to RDCO
+    or rejected keeps its row, and is listed as unavailable until it is
+    confirmed again.
+
+    Like saved papers, it is not in Django admin and writes no `AuditEvent`
+    (ADR-044 §3).
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_calls",
+    )
+    call = models.ForeignKey(Opportunity, on_delete=models.CASCADE, related_name="saves")
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "call"], name="unique_saved_call"),
+        ]
+        indexes = [models.Index(fields=["owner", "-saved_at"], name="opportunity_saved_owner_idx")]
+
+    def __str__(self):
+        return f"SavedCall(owner={self.owner_id}, call={self.call_id})"

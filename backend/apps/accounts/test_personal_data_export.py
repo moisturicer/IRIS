@@ -250,6 +250,34 @@ class ExportContentTests(APITestCase):
         self.assertEqual(saved[0]["title"], "Public work")
         self.assertEqual(saved[0]["reading_status"], ReadingStatus.READING)
 
+    def test_saved_calls_are_the_persons_own(self):
+        # IR-649: id and saved time always; the title only while the Call is
+        # still confirmed, as the saved list itself shows it.
+        from apps.opportunities.models import SavedCall
+        from apps.opportunities.tests import make_opportunity
+
+        listed = make_opportunity(title="ICACSIS 2027")
+        SavedCall.objects.create(owner=self.me, call=listed)
+        SavedCall.objects.create(owner=self.stranger, call=make_opportunity(title="Not mine"))
+        [saved] = self.export()["saved_calls"]
+        self.assertEqual(saved["call_id"], listed.pk)
+        self.assertEqual(saved["title"], "ICACSIS 2027")
+        self.assertTrue(saved["available"])
+        self.assertIn("saved_at", saved)
+
+    def test_a_saved_call_no_longer_confirmed_is_listed_without_its_title(self):
+        from apps.opportunities.models import SavedCall
+        from apps.opportunities.tests import make_opportunity
+        from core.enums import CallStatus
+
+        call = make_opportunity(title="Sent back to RDCO")
+        SavedCall.objects.create(owner=self.me, call=call)
+        call.status = CallStatus.PENDING
+        call.save(update_fields=["status"])
+        [saved] = self.export()["saved_calls"]
+        self.assertEqual((saved["call_id"], saved["title"], saved["available"]), (call.pk, None, False))
+        self.assertNotIn("Sent back to RDCO", _text(self.client.get(URL)))
+
     def test_the_optional_profile_is_in_the_account_section(self):
         from apps.accounts import profile
 

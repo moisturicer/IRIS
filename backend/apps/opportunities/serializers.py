@@ -32,6 +32,9 @@ class OpportunitySerializer(serializers.ModelSerializer):
         many=True, allow_empty=False, queryset=Classification.objects.all(),
     )
     area_names       = serializers.SerializerMethodField()
+    # Whether the viewer saved it (IR-649), so the board draws its Save button
+    # and Saved filter from the page it already fetched.
+    is_saved         = serializers.SerializerMethodField()
     # The link opens in a reader's browser, so only a web address is accepted:
     # URLField's default also allows ftp:// and ftps://.
     external_url     = serializers.CharField(
@@ -47,7 +50,7 @@ class OpportunitySerializer(serializers.ModelSerializer):
             "posted_by", "posted_by_name", "created_at", "updated_at",
             "days_left", "is_closed", "papers_state", "papers_label",
             "event_state", "event_label", "status", "status_label", "review_reason",
-            "reviewed_at",
+            "reviewed_at", "is_saved",
         ]
         # posted_by is set from request.user in perform_create, never accepted
         # from the client -- otherwise a poster could attribute a call to
@@ -145,6 +148,16 @@ class OpportunitySerializer(serializers.ModelSerializer):
 
     def get_posted_by_name(self, obj):
         return obj.poster_name()
+
+    def get_is_saved(self, obj):
+        # Lists annotate it in one query (`OpportunityViewSet._with_saved`); a
+        # Call just posted, edited or decided is one row, so asking is cheap.
+        if hasattr(obj, "saved_by_viewer"):
+            return obj.saved_by_viewer
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        return obj.saves.filter(owner=request.user).exists()
 
 
 class ReasonSerializer(serializers.Serializer):

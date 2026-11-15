@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Exists, OuterRef
 from django.http import Http404, HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -9,7 +10,7 @@ from core.enums import CallStatus
 from core.permissions import IsCallModerator, IsOpportunityPoster, is_call_moderator
 
 from . import audit, review
-from .models import Opportunity
+from .models import Opportunity, SavedCall
 from .serializers import DecisionSerializer, OpportunitySerializer, ReasonSerializer, RejectionSerializer
 from .services import build_ics
 
@@ -43,7 +44,7 @@ class OpportunityViewSet(viewsets.ModelViewSet):
         # for everyone, posters included. Detail, edit, delete and the
         # calendar still reach an Over Call, so a poster can fix a mistyped
         # date that ended it (owner, 2026-11-15).
-        calls = (
+        calls = self._with_saved(
             Opportunity.objects.visible_to(self.request.user)
             .select_related("posted_by__role").prefetch_related("areas")
         )
@@ -54,12 +55,19 @@ class OpportunityViewSet(viewsets.ModelViewSet):
             # `update` and `destroy`).
             # Only the Call's own row: Postgres can't lock a missing poster.
             return calls.select_for_update(of=("self",))
-        if self.action == "calendar":
-            # Like the board, the calendar serves confirmed Calls only. Filtered
-            # here, not checked after lookup, so a waiting Call's 404 is the very
-            # same response as a missing one's.
+        if self.action in ("calendar", "save_call", "saved"):
+            # Like the board, the calendar serves confirmed Calls only, and only
+            # a confirmed Call can be saved or listed in full among saved Calls
+            # (owner, 2026-11-16). Filtered here, not checked after lookup, so a
+            # waiting Call's 404 is the very same response as a missing one's.
             return calls.filter(status=CallStatus.CONFIRMED)
         return calls
+
+    def _with_saved(self, calls):
+        """Whether this reader saved each Call: one EXISTS per query, not one per Call (IR-649)."""
+        return calls.annotate(saved_by_viewer=Exists(
+            SavedCall.objects.filter(owner_id=self.request.user.pk, call=OuterRef("pk"))
+        ))
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
@@ -210,6 +218,54 @@ class OpportunityViewSet(viewsets.ModelViewSet):
             call = serializer.save(posted_by=self.request.user, status=CallStatus.PENDING)
             review.submitted(call)
         audit.posted(call, by=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def saved(self, request):
+        """
+        The reader's saved Calls, newest first (ADR-050 decision 13, IR-649).
+
+        A confirmed Call is listed in full, Over ones included, so My Library
+        keeps it after it leaves the board. One sent back to RDCO or rejected
+        is `{"call_id", "available": false}` and nothing more, for everyone,
+        posters and RDCO included (owner, 2026-11-16). The id is the one the
+        reader saved, so it discloses nothing new.
+        """
+        saves = list(
+            SavedCall.objects.filter(owner=request.user).order_by("-saved_at", "-pk")
+        )
+        calls = {call.pk: call for call in self.get_queryset().filter(pk__in=[s.call_id for s in saves])}
+        return Response({"results": [self._saved_entry(save, calls.get(save.call_id)) for save in saves]})
+
+    def _saved_entry(self, save, call):
+        if call is None:
+            return {"call_id": save.call_id, "available": False}
+        return {
+            "call_id": save.call_id,
+            "available": True,
+            "saved_at": save.saved_at,
+            "call": self.get_serializer(call).data,
+        }
+
+    @action(detail=True, methods=["put", "delete"], url_path="save", url_name="save")
+    def save_call(self, request, pk=None):
+        """
+        PUT saves a confirmed Call; DELETE unsaves it. Both are idempotent, and
+        the owner is always the signed-in reader (the PR #406 rules).
+        """
+        if request.method == "DELETE":
+            # No visibility check: removing your own row discloses nothing, and
+            # a reader must be able to drop a save that became unavailable.
+            if not str(pk).isdigit():
+                raise Http404  # the router accepts any text; no Call has it as an id
+            SavedCall.objects.filter(owner=request.user, call_id=pk).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        call = self.get_object()
+        save, created = SavedCall.objects.get_or_create(owner=request.user, call=call)
+        call.saved_by_viewer = True  # read before the save, so set it to what is now true
+        return Response(
+            self._saved_entry(save, call),
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["get"])
     def calendar(self, request, pk=None):
