@@ -99,19 +99,19 @@ export function QuestionControls({
   className?: string;
 }) {
   if (!onAskAgain && !onEdit) return null;
-  const button = "inline-flex items-center gap-1.5 min-h-8 px-2 rounded-md text-[13px] font-medium text-stone-500 " +
+  const button = "inline-flex items-center gap-1.5 min-h-8 px-2 rounded-control text-small font-medium text-stone-600 " +
     "hover:text-stone-900 hover:bg-stone-100 disabled:opacity-50 disabled:cursor-not-allowed";
   return (
     <div className={cn("flex items-center gap-1", className)}>
       {onAskAgain && (
         <button type="button" disabled={disabled} onClick={() => onAskAgain(question)} className={button}>
-          <i className="fas fa-rotate-right text-[10px]" aria-hidden />
+          <i className="fas fa-rotate-right text-label" aria-hidden />
           Ask again
         </button>
       )}
       {onEdit && (
         <button type="button" disabled={disabled} onClick={() => onEdit(question)} className={button}>
-          <i className="fas fa-pen text-[10px]" aria-hidden />
+          <i className="fas fa-pen text-label" aria-hidden />
           Edit
         </button>
       )}
