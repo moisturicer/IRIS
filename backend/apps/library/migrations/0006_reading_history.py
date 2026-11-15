@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('library', '0004_readinghighlight'),
+        ('library', '0005_libraryfolder_foldermembership'),
         ('records', '0042_comment_reports'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
