@@ -114,6 +114,7 @@ def default_chunking_options() -> ChunkingOptions:
         context_path_max_tokens=settings.AI_CHUNK_CONTEXT_PATH_MAX_TOKENS,
         exclude_sections=tuple(settings.AI_CHUNK_EXCLUDE_SECTIONS),
         index_formulas=settings.AI_FORMULA_TEXT_INDEXED,
+        figure_passages=settings.AI_CHUNK_FIGURE_PASSAGES,
     )
 
 

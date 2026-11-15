@@ -846,6 +846,11 @@ AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False,
 # so moving it needs a re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
 AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
 
+# Figures as passages of their own in the structural strategy (IR-1054): each
+# captioned or described Figure leaves the text flow and is citable alone.
+# Read at chunking, so moving it needs a re-chunk. Off until measured.
+AI_CHUNK_FIGURE_PASSAGES = config("AI_CHUNK_FIGURE_PASSAGES", default=False, cast=bool)
+
 # ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
 # Modes in apps/ai/retrieval/reranker_input.py. fallback since IR-1125 (ADR-033).
 AI_RERANKER_READS = config("AI_RERANKER_READS", default="fallback")

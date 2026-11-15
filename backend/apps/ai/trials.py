@@ -37,7 +37,7 @@ TRAIL_MODES = ("on", "off", "shuffled")
 
 _NAME = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 _INT_OPTIONS = ("max_tokens", "target_tokens", "min_tokens", "context_path_max_tokens")
-_BOOL_OPTIONS = ("merge_short_siblings", "index_formulas")
+_BOOL_OPTIONS = ("merge_short_siblings", "index_formulas", "figure_passages")
 _OPTION_KEYS = (*_INT_OPTIONS, *_BOOL_OPTIONS, "exclude_sections", "trail", "windows")
 
 
