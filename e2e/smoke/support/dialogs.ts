@@ -204,7 +204,11 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "post a call", screen: "opportunities", sources: ["features/opportunities/OpportunityFormDialog.tsx", "features/opportunities/CallsAndConferencesPage.tsx"],
-    override: (api) => api.on("GET", "/opportunities/", { count: 0, next: null, previous: null, results: [], can_post: true }),
+    override: (api) => {
+      api.on("GET", "/opportunities/", { count: 0, next: null, previous: null, results: [], can_post: true });
+      // The form's Areas (IR-760), so the scan sees the checkboxes, not a load error.
+      api.on("GET", "/records/classifications/", paginated([{ id: 1, name: "Agriculture" }]));
+    },
     open: press("Post a call"), dialog: anyDialog,
   },
   {
