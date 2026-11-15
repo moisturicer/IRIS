@@ -49,27 +49,10 @@ REQUIRED_SETTINGS = (
     "AI_ADMISSION_QUEUE_PER_USER",
 )
 
-#: What an off-campus read costs (IR-850). Required only for extraction, so an
-#: unset one refuses extraction and nothing else.
-EXTRACTION_SETTINGS = (
-    "AI_ADMISSION_EXTRACTION_CREDIT_USD",
-    "AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE",
-    "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE",
-)
-
-#: Unstructured's flat price per page (IR-983), held as one credit a page.
-#: IR-988 deletes the LlamaParse keys above and this branch with them.
-LLAMAPARSE = "llamaparse"
-UNSTRUCTURED = "unstructured"
-UNSTRUCTURED_EXTRACTION_SETTINGS = ("AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE",)
-
-#: What a LlamaExtract reading of a parsed Manuscript costs per page (IR-846).
-#: Its credit is priced by ``AI_ADMISSION_EXTRACTION_CREDIT_USD``, the same
-#: account's. Unset refuses the reading, and Publish falls back.
-METADATA_SETTINGS = (
-    "AI_ADMISSION_EXTRACTION_CREDIT_USD",
-    "AI_ADMISSION_METADATA_CREDITS_PER_PAGE",
-)
+#: What an off-campus read costs: Unstructured's flat price per page (IR-983),
+#: held as one credit a page. Required only for extraction, so an unset one
+#: refuses extraction and nothing else.
+EXTRACTION_SETTINGS = ("AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE",)
 
 
 class NotConfigured(Exception):
@@ -240,8 +223,8 @@ def read_limits() -> Limits:
 
 @dataclass(frozen=True)
 class ExtractionPrice:
-    """A credit's price, and the credits one page may cost: the tier's most
-    expensive rate plus every add-on the request turns on (ADR-056 §2-3)."""
+    """A credit's price and the credits one page may cost. Unstructured bills
+    a flat price per page, held as one credit a page (IR-983)."""
 
     credit_usd: Decimal
     credits_per_page: Decimal
@@ -273,42 +256,16 @@ def selected_extractor() -> str:
     return selection.selected_backend()
 
 
-def extraction_settings(extractor: Optional[str] = None) -> tuple[str, ...]:
-    """The price settings the named (or selected) Extractor needs."""
-    if (extractor or selected_extractor()) == UNSTRUCTURED:
-        return UNSTRUCTURED_EXTRACTION_SETTINGS
-    return EXTRACTION_SETTINGS
-
-
-def read_extraction_price(extractor: Optional[str] = None) -> ExtractionPrice:
-    """The named (or selected) Extractor's price, or `NotConfigured` naming the unset settings."""
-    names = extraction_settings(extractor)
-    missing = [name for name in names if not _raw(name)]
-    if missing:
-        raise NotConfigured(", ".join(missing))
-    if names == UNSTRUCTURED_EXTRACTION_SETTINGS:
-        return ExtractionPrice(
-            credit_usd=_decimal(names[0]),
-            credits_per_page=Decimal(1),
-            addon_credits_per_page=Decimal(0),
-            billed_per_page=True,
-        )
-    return ExtractionPrice(
-        credit_usd=_decimal("AI_ADMISSION_EXTRACTION_CREDIT_USD"),
-        credits_per_page=_decimal("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE"),
-        addon_credits_per_page=_decimal("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", allow_zero=True),
-    )
-
-
-def read_metadata_price() -> ExtractionPrice:
-    """LlamaExtract's price per page, or `NotConfigured` naming the unset settings."""
-    missing = [name for name in METADATA_SETTINGS if not _raw(name)]
+def read_extraction_price() -> ExtractionPrice:
+    """Unstructured's price per page, or `NotConfigured` naming the unset setting."""
+    missing = [name for name in EXTRACTION_SETTINGS if not _raw(name)]
     if missing:
         raise NotConfigured(", ".join(missing))
     return ExtractionPrice(
-        credit_usd=_decimal("AI_ADMISSION_EXTRACTION_CREDIT_USD"),
-        credits_per_page=_decimal("AI_ADMISSION_METADATA_CREDITS_PER_PAGE"),
+        credit_usd=_decimal(EXTRACTION_SETTINGS[0]),
+        credits_per_page=Decimal(1),
         addon_credits_per_page=Decimal(0),
+        billed_per_page=True,
     )
 
 
@@ -336,9 +293,7 @@ def verify_admission_configuration() -> None:
     if enforcing():
         reads = (
             read_limits,
-            lambda: read_extraction_price(LLAMAPARSE),
-            lambda: read_extraction_price(UNSTRUCTURED),
-            read_metadata_price,
+            read_extraction_price,
         )
         for read in reads:
             try:

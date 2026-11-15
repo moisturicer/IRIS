@@ -1,7 +1,7 @@
 """A Manuscript's Figures: stored when it is read, removed when superseded (IR-845).
 
-ADR-056 §9: the image LlamaParse cropped is downloaded right after the read
-and stored with the Manuscript, in storage nothing serves directly.
+ADR-067 decision 10: the image Unstructured returns is stored right after the read
+with the Manuscript, in storage nothing serves directly.
 """
 
 import logging
