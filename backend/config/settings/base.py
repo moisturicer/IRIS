@@ -862,9 +862,10 @@ AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=True, cast=b
 # (docs/evaluation/runs/2026-11-15-ir1054-hybrid/, ADR-067 IR-1054 amendment).
 AI_CHUNK_FIGURE_PASSAGES = config("AI_CHUNK_FIGURE_PASSAGES", default=True, cast=bool)
 
-# Structural passages under this many tokens merge with the next section under
-# the same parent heading (IR-1147). 0 is off. Re-chunk after moving it.
-AI_CHUNK_SIBLING_MERGE_FLOOR = config("AI_CHUNK_SIBLING_MERGE_FLOOR", default=0, cast=int)
+# Structural passages under this many tokens merge with a neighbouring section
+# under the same parent heading (IR-1147). 0 is off. Re-chunk after moving it.
+# 450 since measured (ADR-067 IR-1147 amendment).
+AI_CHUNK_SIBLING_MERGE_FLOOR = config("AI_CHUNK_SIBLING_MERGE_FLOOR", default=450, cast=int)
 
 # ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
 # Modes in apps/ai/retrieval/reranker_input.py. fallback since IR-1125 (ADR-033).

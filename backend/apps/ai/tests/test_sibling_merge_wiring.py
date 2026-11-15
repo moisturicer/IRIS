@@ -8,9 +8,9 @@ from apps.ai.repositories import _deserialize_options, _serialize_options
 from apps.ai.trials import VariantError, parse_variant
 
 
-def test_the_setting_is_off_by_default(settings):
-    assert settings.AI_CHUNK_SIBLING_MERGE_FLOOR == 0
-    assert default_chunking_options().sibling_merge_floor == 0
+def test_the_setting_defaults_to_the_measured_floor(settings):
+    assert settings.AI_CHUNK_SIBLING_MERGE_FLOOR == 450
+    assert default_chunking_options().sibling_merge_floor == 450
 
 
 def test_ingestion_reads_the_setting(settings):
