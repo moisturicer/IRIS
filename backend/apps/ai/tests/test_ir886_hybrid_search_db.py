@@ -7,7 +7,7 @@ from a recording provider: a deterministic contract, never answer quality.
 
 import asyncio
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pytest
 
@@ -75,15 +75,16 @@ def embed(space, record, *, record_axis, chunk_axes):
         ChunkEmbedding.objects.create(chunk=chunk, space=space, embedding=axis(n))
 
 
-def run(api, reader, script, *, request, embedder=None, record_id=None, **service_kw):
+def run(api, reader, script, *, request, embedder=None, record_id=None, selection=None, **service_kw):
     from ai.admission.ledger import Ledger
     from ai.runs.service import RunService
 
     client, holder = api
     executor = ScriptedResearch(script)
     base = runs_db.service(holder["dsn"], executor)
+    cfg = base.cfg if selection is None else replace(base.cfg, selection=selection)
     built = RunService(
-        base.store, base.cfg, base.executor, base.notifier,
+        base.store, cfg, base.executor, base.notifier,
         embedding_provider=embedder,
         embedding_ledger=Ledger(holder["dsn"], limits(
             AI_ADMISSION_LANE_CONCURRENCY=json.dumps({"research": 4}),
