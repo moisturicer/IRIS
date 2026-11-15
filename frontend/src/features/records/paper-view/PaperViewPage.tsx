@@ -202,12 +202,16 @@ function MainColumnSkeleton() {
 }
 
 function LoadingSkeleton() {
+  // The shapes are decoration; the page announces its load once, as the other surfaces do (IR-939).
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start animate-pulse">
-      <MainColumnSkeleton />
-      <div className="space-y-4">
-        <div className="h-44 rounded-2xl bg-stone-100" />
-        <div className="h-36 rounded-2xl bg-stone-100" />
+    <div role="status">
+      <span className="sr-only">Loading this record…</span>
+      <div aria-hidden className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start animate-pulse">
+        <MainColumnSkeleton />
+        <div className="space-y-4">
+          <div className="h-44 rounded-2xl bg-stone-100" />
+          <div className="h-36 rounded-2xl bg-stone-100" />
+        </div>
       </div>
     </div>
   );

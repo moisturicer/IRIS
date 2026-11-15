@@ -366,6 +366,29 @@ it("names the configured institution on an institutional paper", async () => {
   expect(await screen.findByText("Example Research University")).toBeVisible();
 });
 
+describe("loading the record (IR-939)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+  });
+
+  it("announces the load once, by role and name, and says nothing more when the record draws", async () => {
+    signInAs(99, "Student");
+    vi.mocked(recordsApi.detail).mockReturnValueOnce(new Promise(() => {}) as never);
+    renderPaperView();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading this record…");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  it("removes the status when the page replaces the skeleton", async () => {
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await screen.findByRole("heading", { name: record.title });
+    expect(screen.queryByText("Loading this record…")).not.toBeInTheDocument();
+  });
+});
+
 describe("arriving from a citation", () => {
   beforeEach(() => {
     shownRecord = record;
@@ -3140,8 +3163,9 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent("That citation points at another paper, so nothing is highlighted here.");
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    // Wait for the page: while the record loads, the skeleton is itself a status (IR-939).
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("That citation points at another paper, so nothing is highlighted here.");
   });
 
   it("highlights nothing from a citation the answer no longer has", async () => {
@@ -3149,8 +3173,8 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/no longer part of the answer/);
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/no longer part of the answer/);
     expect(screen.getByRole("button", { name: "Back to answer" })).toBeInTheDocument();
   });
 
@@ -3160,8 +3184,8 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/answer this citation came from is no longer available/);
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/answer this citation came from is no longer available/);
     expect(screen.queryByRole("button", { name: "Back to answer" })).not.toBeInTheDocument();
   });
 

@@ -107,10 +107,13 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
           </button>
         </div>
       ) : !data ? (
-        <div aria-hidden className="space-y-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-4 rounded bg-stone-100 animate-pulse" />
-          ))}
+        <div role="status">
+          <span className="sr-only">Loading the review tracker…</span>
+          <div aria-hidden className="space-y-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-4 rounded bg-stone-100 animate-pulse" />
+            ))}
+          </div>
         </div>
       ) : (
         <TrackerBody data={data} />
