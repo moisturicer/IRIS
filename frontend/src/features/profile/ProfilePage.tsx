@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { PILL_PRIMARY } from "@/components/ui/pillStyles";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
 import { pathFor } from "@/lib/access";
@@ -56,7 +56,10 @@ export default function ProfilePage() {
       >
         <i className="fas fa-eye" aria-hidden />
         <span className="flex-1">This is how other IRIS accounts see your profile.</span>
-        <Link to={pathFor("profileEdit")} className={cn(PILL_PRIMARY, FOCUS_RING)}>Edit profile</Link>
+        <Link to={pathFor("profileEdit")} className={cn(PILL_SECONDARY, FOCUS_RING, "gap-1.5 bg-white")}>
+          <i className="fas fa-pencil text-label" aria-hidden />
+          Edit profile
+        </Link>
       </p>
 
       <PersonProfileView profile={profile} lists={lists} self />
