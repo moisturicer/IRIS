@@ -21,7 +21,7 @@ import asyncpg
 
 from ai.infrastructure import db
 from ai.research import metadata
-from ai.research.selection import Hit, Policy, select
+from ai.research.selection import Hit, Policy, choose, neighbour_positions, select
 from ai.runs.store import CURRENT_HANDOFF, CURRENT_SOURCE_TURN, RunStore
 
 log = logging.getLogger(__name__)
@@ -352,14 +352,23 @@ def overlap(previous: str, text: str) -> int:
     return 0
 
 
+#: Characters per token, for a chunk with no stored count.
+CHARS_PER_TOKEN = 4
+
+
+def _retrieved(passages) -> int:
+    """Passages search found; section context is not a match."""
+    return sum(not p.section_mate for p in passages)
+
+
 def _hit(row) -> Hit:
-    """A row as selection sees it; a chunk with no stored count is estimated at 4 chars a token."""
+    """A row as selection sees it."""
     key = row["section_key"]
     if isinstance(key, str):
         key = json.loads(key)
     tokens = row["token_count"]
     return Hit(row["id"], row["record_id"], row["chunk_set_id"], row["sequence"],
-               tuple(key) if key else None, tokens if tokens is not None else len(row["content"]) // 4 + 1)
+               tuple(key) if key else None, tokens if tokens is not None else len(row["content"]) // CHARS_PER_TOKEN + 1)
 
 
 def shown_bytes(text: str) -> int:
@@ -538,10 +547,22 @@ class ResearchTools:
             for n, (row, h) in enumerate(zip(rows, handles))
         )
 
-    def _chosen(self, rows, limit: int):
+    async def _chosen(self, conn, rows, limit: int):
         """Rows as selection orders them, with each continued part's repeated text measured."""
-        by_id = {r["id"]: r for r in rows}
-        placed = select([_hit(r) for r in rows], limit, self.selection, scoped=self.scope is not None)
+        hits, scoped = [_hit(r) for r in rows], self.scope is not None
+        neighbours = []
+        if self.selection.section_mates:
+            positions = neighbour_positions(choose(hits, limit, self.selection, scoped=scoped))
+            neighbours = await conn.fetch(
+                # Read under the grant like every search row: an unreadable mate is never added.
+                f"""SELECT {_COLUMNS} {_CHUNKS}
+                      JOIN unnest($1::bigint[], $2::int[]) AS p(set_id, seq)
+                        ON c.chunk_set_id = p.set_id AND c.sequence = p.seq
+                     WHERE c.deleted_at IS NULL AND ($3::bigint IS NULL OR c.record_id = $3)""",
+                [s for s, _ in positions], [q for _, q in positions], self.scope,
+            ) if positions else []
+        by_id = {r["id"]: r for r in (*rows, *neighbours)}
+        placed = select(hits, limit, self.selection, scoped=scoped, neighbours=[_hit(r) for r in neighbours])
         chosen = [by_id[p.hit.id] for p in placed]
         overlaps = [overlap(by_id[p.continues]["content"], by_id[p.hit.id]["content"]) if p.continues else 0
                     for p in placed]
@@ -549,7 +570,7 @@ class ResearchTools:
 
     async def _found(self, conn, rows, limit: int):
         """Records and passages for a search's ranked rows, after selection."""
-        rows, placed, overlaps = self._chosen(rows, limit)
+        rows, placed, overlaps = await self._chosen(conn, rows, limit)
         firsts = list({row["record_id"]: row for row in rows}.values())
         record_handles = await self._handles(
             conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in firsts])
@@ -582,12 +603,7 @@ class ResearchTools:
                 # non-matching rows, which ts_rank scores 1e-20.
                 f"""WITH q AS (SELECT replace(plainto_tsquery('{CONFIG}', $1)::text, '&', '|')::tsquery AS q),
                     hits AS (
-                        SELECT c.id, c.record_id, c.chunk_set_id, cs.extraction_hash, c.source_page,
-                               c.content, c.context_path, r.title, c.sequence, c.token_count,
-                               c.section_key, ts_rank(c.search_vector, q.q) AS rank
-                          FROM q, iris_ai.research_chunks() c
-                          JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active
-                          JOIN public.records_record r ON r.id = c.record_id
+                        SELECT {_COLUMNS}, ts_rank(c.search_vector, q.q) AS rank {_CHUNKS}, q
                          WHERE c.deleted_at IS NULL AND c.search_vector @@ q.q
                            AND ($2::bigint IS NULL OR c.record_id = $2))
                     SELECT *, count(*) OVER () AS total FROM hits
@@ -599,10 +615,10 @@ class ResearchTools:
                 return ToolResult(NO_MATCH, coverage=Coverage(total=0, inspected_records=inspected))
             records, passages = await self._found(conn, rows, limit)
             total = rows[0]["total"]
-            hits = sum(not p.section_mate for p in passages)
+            hits = _retrieved(passages)
             return ToolResult(
                 OK, records=records, passages=passages,
-                coverage=Coverage(len(passages), total, total > hits, inspected),
+                coverage=Coverage(hits, total, total > hits, inspected),
                 dependencies=frozenset(p.source for p in passages),
             )
 
@@ -1211,7 +1227,7 @@ class ResearchTools:
                 return ToolResult(NO_MATCH, coverage=Coverage(0, None, truncated, found["inspected"]),
                                   signals=signals)
             records, passages = await self._found(conn, rows, limit)
-            coverage = Coverage(len(passages), None, truncated, found["inspected"])
+            coverage = Coverage(_retrieved(passages), None, truncated, found["inspected"])
             return ToolResult(OK, records=records, passages=passages, coverage=coverage,
                               dependencies=frozenset(p.source for p in passages), signals=signals)
 

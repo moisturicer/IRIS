@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # Optional (IR-1003): read-only calls in one tool group fetched at once; blank is 1.
     RUNS_AGENT_TOOL_CONCURRENCY: str = ""
     # Optional (IR-397, IR-1055): passage selection, all on when blank.
-    RUNS_PASSAGES_PER_PAPER: str = ""
+    RUNS_PAPER_SHARE: str = ""
     RUNS_JOIN_PASSAGES: str = ""
     RUNS_PASSAGE_TOKENS: str = ""
     RUNS_SECTION_MATES: str = ""

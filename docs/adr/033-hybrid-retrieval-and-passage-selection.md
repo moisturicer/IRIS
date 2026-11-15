@@ -209,9 +209,27 @@ A lost two text questions to C and won none, so C stands against A (rule 2). B l
 **How §4 reads in the runtime.** Two divergences from the text above, both chosen by the same person:
 
 - **Joined chunks stay separate passages, linked.** Adjacent hits from one Manuscript arrive consecutively, in reading order. Each one after the first names the passage it `continues`, and repeated text is shown once. Each part keeps its own handle, so a citation still opens its own page, with its own regions and its own Figure. A single merged passage would need one handle to carry several pages' regions.
-- **The budget scales with the request.** The agent picks how many passages to ask for, so the budget is that number × 700 tokens: the chunker's maximum chunk, counted from the chunk's stored `token_count`. A search therefore never returns fewer hits than it did before this change. Hits that would push the total past the budget are skipped for smaller ones further down the ranking, and the top hit is always returned.
+- **The budget scales with the request.** The agent picks how many passages to ask for, so the budget is that number × 700 tokens: the chunker's maximum chunk, counted from the chunk's stored `token_count`. The budget alone never removes a hit that fits a full-size chunk; only the per-paper cap below returns fewer hits than before, when one paper holds most of the matches. Hits that would push the total past the budget are skipped for smaller ones further down the ranking, and the top hit is always returned.
 
 The cap (3) applies outside Paper Chat only. When it removes a hit, the next-ranked hits from other papers fill the slot.
+
+## Amendment — 2026-11-15 (IR-1055): a hit brings its section-mates
+
+**What changes.** After the hits are chosen, the runtime's search adds each hit's unretrieved neighbours from the same section, marked `section_context`, linked to the hit as continuing text. A neighbour is added only when it shares the hit's `section_key` (IR-1050), and every chunk between it and the hit does too. It is never more than two chunks away, and it is added only while the §4 budget has room. Every hit takes its nearest neighbour before any hit takes a second. A chunk set chunked before section keys existed gets none. Mates are read under the reader's grant like every search row. **Mates do not count against the per-paper cap**: they are a kept hit's own context, so a paper with three hits can contribute up to twelve passages. Whether they should count is open for the owner.
+
+**Why.** An answer split across two chunks of one section loses the half search did not rank (recall@10 0.885 against final-set recall 0.846 on the proxy tier). Small-to-big expansion is the documented remedy (arXiv 2509.11552, moderate evidence).
+
+**On by default, unmeasured**, by the same decision as IR-397's amendment above (`RUNS_SECTION_MATES=off` switches it off). With a budget of 700 tokens per requested passage and chunks averaging 359 tokens on the dev corpus, mates roughly double a typical search's size; the total stays within requested passages × 700 tokens, the largest result a search could return before IR-397.
+
+## Amendment — 2026-11-15 (IR-1055): a paper's share of the budget replaces the count cap
+
+Jive Tyler Revalde replaced the runtime's 3-per-paper count with a share of the search's token budget, on 2026-11-15. The goal: a search should be bounded by how much context it is given, not by a fixed number of passages.
+
+- Outside Paper Chat, one paper may fill at most `RUNS_PAPER_SHARE` percent of the budget (0, off, by default; see below). **A paper's section-mates count toward its share.** Its first hit always enters.
+- **The limit is soft.** Each paper fills up to its share first. Any budget no other paper could use then goes back, in rank order: hits first, then section-mates. A search with only one relevant paper therefore still gets the whole budget.
+- **Default off, by measurement (IR-1150).** Replaying selection on hybrid candidates over the proxy tier, every share below 75% lost recall and none gained any; 50% traded about 0.05 single-paper recall for fewer one-paper searches (74% to 60%). Multi-paper questions were too few to measure. Jive Tyler Revalde set the default to 0 (off) on 2026-11-16; the budget alone now bounds a search. Run: `docs/evaluation/runs/2026-11-16-ir1150-paper-share/`.
+
+This supersedes the count cap described in the IR-397 and IR-1055 amendments above.
 
 ## Alternatives Considered
 
