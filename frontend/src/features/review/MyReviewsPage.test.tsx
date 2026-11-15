@@ -41,7 +41,9 @@ const RESET: ClearanceStripEntry = {
 function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
   return {
     key: "seat:1", kind: "seat", record: 7, title: "Smart Campus Energy Monitor",
-    record_type_name: "Thesis / Research", party: "itso", party_label: "ITSO",
+    record_type_name: "Thesis / Research", authors: ["Maria Clara Santos"],
+    unit: "College of Computer Studies", version: 1, opens: "review",
+    party: "itso", party_label: "ITSO",
     seat: 1, assignment: 3, holder: 5, holder_name: "Ana Reyes",
     is_mine: true, routed_by: "Prof. Santos", routed_reason: "Potential IP concern",
     submitted_by: null, waiting_since: "2026-10-01T00:00:00Z", waiting_days: 2,
@@ -60,7 +62,15 @@ const POOL = row({
 });
 
 function page(rows: MyReviewsRow[], overrides: Partial<Page> = {}): { data: Page } {
-  return { data: { rows, counts: { to_review: 2, in_review: 1, done: 4 }, next: null, ...overrides } };
+  return {
+    data: {
+      rows,
+      counts: { to_review: 2, in_review: 1, done: 4 },
+      outcome_counts: { all: 4, cleared: 2, finding: 1, accepted: 1, rejected: 0, published: 0 },
+      next: null,
+      ...overrides,
+    },
+  };
 }
 
 function signIn(isCoordinator = false) {
@@ -256,12 +266,12 @@ describe("MyReviewsPage", () => {
     show("/review?tab=done");
 
     expect(await screen.findByText("Cleared", { selector: "span" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Finding recorded" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Finding recorded/ }));
     await waitFor(() =>
       expect(mine).toHaveBeenLastCalledWith({ tab: "done", outcome: "finding", office: null, cursor: null, sort: null, overdue: false }),
     );
     expect(screen.getByLabelText("Location")).toHaveValue("/review?tab=done&outcome=finding");
-    expect(screen.getByRole("button", { name: "Finding recorded" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Finding recorded/ })).toHaveAttribute("aria-pressed", "true");
 
     mine.mockResolvedValueOnce(page([row({ key: "seat:10", record: 11, title: "Older paper", outcome: "finding", outcome_label: "Finding recorded" })]));
     await userEvent.click(await screen.findByRole("button", { name: "Show more" }));
@@ -291,13 +301,50 @@ describe("MyReviewsPage", () => {
   it("links a coordinator, and only a coordinator, to their office's console (IR-623)", async () => {
     show();
     await screen.findByRole("tablist", { name: "My Reviews" });
-    expect(screen.queryByRole("link", { name: "ITSO console" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Office console" })).not.toBeInTheDocument();
   });
 
   it("puts the console link where a coordinator lands", async () => {
     signIn(true);
     show();
-    expect(await screen.findByRole("link", { name: "ITSO console" })).toHaveAttribute("href", "/review/office");
+    expect(await screen.findByRole("link", { name: "Office console" })).toHaveAttribute("href", "/review/office");
+  });
+
+  it("says, from the viewer's seat, what the page lists (IR-1135)", async () => {
+    show();
+    expect(await screen.findByText("Papers routed to ITSO. Claim one, or let your coordinator assign it."))
+      .toBeInTheDocument();
+  });
+
+  it("names authors, unit and version on a row, and opens a published paper at its Overview (IR-1135)", async () => {
+    mine.mockResolvedValue(page([
+      row({ authors: ["Maria Clara Santos", "Jose Rizal"], version: 2 }),
+      row({ key: "seat:2", record: 9, title: "Published Paper", opens: "overview" }),
+    ]));
+    show();
+
+    const card = await screen.findByRole("article", { name: "Smart Campus Energy Monitor" });
+    expect(card).toHaveTextContent("Maria Clara Santos, Jose Rizal · College of Computer Studies · v2");
+    expect(screen.getByRole("link", { name: "Published Paper" })).toHaveAttribute("href", "/records/9?section=overview");
+    expect(screen.getByRole("link", { name: "Smart Campus Energy Monitor" }))
+      .toHaveAttribute("href", "/records/7?section=review");
+  });
+
+  it("gives each Done outcome chip the count of the rows it shows (IR-1135)", async () => {
+    show("/review?tab=done");
+    const chips = await screen.findByRole("group", { name: "Filter by outcome" });
+    expect(within(chips).getByRole("button", { name: /^All\s*4$/ })).toBeInTheDocument();
+    expect(within(chips).getByRole("button", { name: /^Cleared\s*2$/ })).toBeInTheDocument();
+    expect(within(chips).getByRole("button", { name: /^Finding recorded\s*1$/ })).toBeInTheDocument();
+    expect(within(chips).getByRole("button", { name: /^Rejected\s*0$/ })).toBeInTheDocument();
+  });
+
+  it("offers Mine / All of the office to a coordinator, on the toolbar's right (IR-1135)", async () => {
+    signIn(true);
+    show();
+    const scope = await screen.findByRole("group", { name: "Whose reviews" });
+    expect(within(scope).getByRole("button", { name: "Mine" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(scope).getByRole("button", { name: "All of ITSO" })).toBeInTheDocument();
   });
 
   it("translates an old Review Queue bookmark once", async () => {
@@ -309,8 +356,16 @@ describe("MyReviewsPage", () => {
   it("says what arrives in an empty tab", async () => {
     mine.mockResolvedValue(page([], { counts: { to_review: 0, in_review: 0, done: 0 } }));
     show();
-    expect(await screen.findByText("Nothing to review")).toBeInTheDocument();
-    expect(screen.getByText(/Records routed to ITSO appear here until someone claims them/)).toBeInTheDocument();
+    expect(await screen.findByText("Nothing waiting for you")).toBeInTheDocument();
+    expect(screen.getByText("When a paper needs your review, it appears here and in your notifications."))
+      .toBeInTheDocument();
+  });
+
+  it("words an empty Done outcome as the prototype does (IR-1135)", async () => {
+    mine.mockResolvedValue(page([]));
+    show("/review?tab=done&outcome=rejected");
+    expect(await screen.findByText("No reviews ended “Rejected”")).toBeInTheDocument();
+    expect(screen.getByText("Choose All to see every finished review.")).toBeInTheDocument();
   });
 });
 

@@ -271,6 +271,26 @@ class DoneTests(MyReviewsTestBase):
             {r["record"] for r in self.rows(self.itso, tab="done", outcome="cleared")}, {cleared.pk},
         )
 
+    def test_each_outcome_chip_carries_the_count_of_the_rows_it_shows(self):
+        """IR-1135: one response holds every chip's count, and each equals its rows."""
+        cleared = self.routed(Party.ITSO)
+        self.opened(self.seat(cleared, Party.ITSO, self.itso))
+        self.office_review(cleared, self.itso, "cleared")
+        found = self.routed(Party.ITSO)
+        self.opened(self.seat(found, Party.ITSO, self.itso))
+        self.office_review(found, self.itso, "finding")
+        old = self.legacy(PipelineStatus.IN_REVIEW)
+        self.legacy_review(old, self.itso, "itso", "declined")
+
+        counts = self.page(self.itso, tab="done", outcome="finding")["outcome_counts"]
+        # A filter never narrows them; `all` is Done's own count, a decline included.
+        self.assertEqual(counts["all"], 3)
+        self.assertEqual(counts["all"], self.page(self.itso)["counts"]["done"])
+        for outcome in ("cleared", "finding", "accepted", "rejected", "published"):
+            with self.subTest(outcome=outcome):
+                self.assertEqual(counts[outcome], len(self.rows(self.itso, tab="done", outcome=outcome)))
+        self.assertEqual((counts["cleared"], counts["finding"]), (1, 1))
+
     def test_an_advisers_accept_and_route_is_accepted(self):
         record = self.routed(Party.ITSO)
         rows = self.rows(self.adviser, tab="done")
@@ -406,6 +426,20 @@ class CoordinatorTests(MyReviewsTestBase):
         office_view = self.page(self.itso_coordinator, office="itso")["counts"]
         self.assertEqual((mine_view["to_review"], office_view["to_review"]), (0, 1))
 
+    def test_the_office_view_has_its_own_outcome_counts(self):
+        record = self.routed(Party.ITSO)
+        self.opened(self.seat(record, Party.ITSO, self.itso2))
+        self.office_review(record, self.itso2, "cleared")
+        self.assertEqual(self.page(self.itso_coordinator)["outcome_counts"]["cleared"], 0)
+        self.assertEqual(self.page(self.itso_coordinator, office="itso")["outcome_counts"]["cleared"], 1)
+
+    def office_review(self, record, as_user, outcome, comment="A reason."):
+        response = self.post(
+            reverse("record-office-review", args=[record.pk]), as_user,
+            {"outcome": outcome, "comment": comment},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
     def test_a_non_coordinator_is_refused_the_office_parameter(self):
         self.assertEqual(self.mine(self.itso, office="itso").status_code, status.HTTP_403_FORBIDDEN)
 
@@ -471,6 +505,29 @@ class ContractTests(MyReviewsTestBase):
     def test_an_anonymous_caller_is_refused(self):
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get(MINE).status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_a_row_names_its_authors_version_and_where_it_opens(self):
+        """IR-1135: the prototype's kicker line, read from the server on every tab."""
+        from apps.records.models import Author, RecordVersion
+        from core.enums import VersionCause
+
+        record = self.routed(Party.ITSO)
+        self.seat(record, Party.ITSO, self.itso)
+        Author.objects.create(record=record, name="Maria Clara Santos")
+        Author.objects.create(record=record, name="Jose Rizal")
+        RecordVersion.objects.create(record=record, number=1, cause=VersionCause.SUBMISSION)
+        RecordVersion.objects.create(record=record, number=2, cause=VersionCause.REVISION)
+
+        row = self.rows(self.itso, tab="to_review")[0]
+        self.assertEqual(row["authors"], ["Maria Clara Santos", "Jose Rizal"])
+        self.assertEqual(row["version"], 2)
+        self.assertEqual(row["opens"], "review")
+        self.assertIsInstance(row["unit"], str)
+
+        published = self.legacy(PipelineStatus.PUBLISHED)
+        Review.objects.create(record=published, reviewed_by=self.itso, stage="itso", status="approved")
+        done = self.rows(self.itso, tab="done")
+        self.assertEqual({r["record"]: r["opens"] for r in done}, {published.pk: "overview"})
 
     def test_the_query_count_does_not_grow_with_the_rows(self):
         """Settled 2026-10-08: more rows must never mean more queries."""
