@@ -857,8 +857,8 @@ class SavedVersionIsReportedSavedTests(APITransactionTestCase):
         self.assertEqual(extraction.source_revision, record.manuscript_revision)
         # With the queue back, Retry sends it.
         self.client.force_authenticate(self.owner)
-        with patch("apps.documents.tasks.extract_manuscript_text.delay") as send, \
-                self.captureOnCommitCallbacks(execute=True):
+        # The commit is real here, so the send runs inside the request.
+        with patch("apps.documents.tasks.extract_manuscript_text.delay") as send:
             response = self.client.post(
                 reverse("record-retry-extraction", args=[record.pk]),
                 {"manuscript_revision": str(record.manuscript_revision)}, format="json",
