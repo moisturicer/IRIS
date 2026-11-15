@@ -19,6 +19,12 @@ pytestmark = pytest.mark.django_required
 NAME = "AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE"
 
 
+def _select(monkeypatch, backend):
+    from apps.ai.extraction import selection
+
+    monkeypatch.setattr(selection, "selected_backend", lambda: backend)
+
+
 def test_unstructured_is_one_credit_a_page_at_its_usd_price(settings):
     enforce(settings, **{NAME: "0.01"})
     price = read_extraction_price("unstructured")
@@ -35,13 +41,13 @@ def test_an_unset_unstructured_price_is_not_configured_and_never_defaulted(setti
     verify_admission_configuration()
 
 
-def test_the_selected_backend_picks_the_price(settings):
+def test_the_selected_backend_picks_the_price(settings, monkeypatch):
     enforce(settings, **{NAME: ""})
-    settings.EXTRACTION_BACKEND = "unstructured"
+    _select(monkeypatch, "unstructured")
     with pytest.raises(NotConfigured, match=NAME):
         read_extraction_price()
     assert extraction_settings() == (NAME,)
-    settings.EXTRACTION_BACKEND = "llamaparse"
+    _select(monkeypatch, "llamaparse")
     assert NAME not in extraction_settings()
 
 

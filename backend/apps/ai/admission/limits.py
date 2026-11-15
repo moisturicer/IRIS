@@ -268,7 +268,9 @@ def _decimal(name: str, *, allow_zero: bool = False) -> Decimal:
 
 
 def selected_extractor() -> str:
-    return str(getattr(settings, "EXTRACTION_BACKEND", "") or "").strip().lower()
+    from apps.ai.extraction import selection
+
+    return selection.selected_backend()
 
 
 def extraction_settings(extractor: Optional[str] = None) -> tuple[str, ...]:

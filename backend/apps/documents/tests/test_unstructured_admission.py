@@ -47,6 +47,12 @@ def _unstructured(usage):
     return adapter
 
 
+def _select(monkeypatch, backend):
+    from apps.ai.extraction import selection
+
+    monkeypatch.setattr(selection, "selected_backend", lambda: backend)
+
+
 def test_an_unstructured_read_reserves_and_settles_in_usd_per_page(settings):
     enforce(settings, **PRICES)
     record = _record()
@@ -89,9 +95,9 @@ def test_a_missing_unstructured_price_refuses_as_not_configured(settings):
     assert not _reservations().exists()
 
 
-def test_an_unnamed_adapter_is_priced_as_the_selected_backend(settings):
+def test_an_unnamed_adapter_is_priced_as_the_selected_backend(settings, monkeypatch):
     enforce(settings, **{**PRICES, UNSTRUCTURED_PRICE: ""})
-    settings.EXTRACTION_BACKEND = "unstructured"
+    _select(monkeypatch, "unstructured")
     adapter = InMemoryExtractor(DOCUMENT, leaves_campus=True, usage=Usage(pages=3))
 
     with pytest.raises(errors.AdmissionDenied) as refused:
@@ -100,9 +106,9 @@ def test_an_unnamed_adapter_is_priced_as_the_selected_backend(settings):
     assert refused.value.reason == errors.NOT_CONFIGURED
 
 
-def test_provider_campaign_names_the_selected_backends_missing_price(settings):
+def test_provider_campaign_names_the_selected_backends_missing_price(settings, monkeypatch):
     enforce(settings, **{**PRICES, UNSTRUCTURED_PRICE: ""})
-    settings.EXTRACTION_BACKEND = "unstructured"
+    _select(monkeypatch, "unstructured")
     out = StringIO()
 
     call_command("provider_campaign", stdout=out)

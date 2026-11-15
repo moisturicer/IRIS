@@ -129,6 +129,11 @@ class UnconfiguredExtractor:
         raise ExtractorUnavailable(self.reason)
 
 
+def selected_backend() -> str:
+    """The configured backend's name, for admission's price (IR-983)."""
+    return str(settings.EXTRACTION_BACKEND or "").strip().lower()
+
+
 def _verify_backend() -> None:
     backend = settings.EXTRACTION_BACKEND
     if backend not in BACKENDS:
