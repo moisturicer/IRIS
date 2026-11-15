@@ -49,9 +49,13 @@ export default {
         // role and never picks a near-white by hand: `canvas` is the ground
         // every screen sits on, `surface` is content (a card, a panel, a
         // field), `overlay` is anything that floats over content (a toast, a
-        // menu, the reading toolbar). `surface` and `overlay` are both opaque
-        // white today; they are two names so that one can change alone.
-        canvas:  defaultColors.stone[50],
+        // menu, the reading toolbar). All three are opaque white today (IR-1132:
+        // the ground was stone-50 until every page moved onto white, as Discover
+        // is); they are three names so that one can change alone. Where white on
+        // white loses an edge, separate with the stone-200 rule or a stone-50
+        // section fill, never a shadow. The paper column in Paper View is the
+        // exception: it stays on Desk Stone (`stone-200`) so a page reads as paper.
+        canvas:  "#ffffff",
         surface: "#ffffff",
         overlay: "#ffffff",
 

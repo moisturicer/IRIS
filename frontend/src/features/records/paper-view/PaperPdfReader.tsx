@@ -796,7 +796,7 @@ function PaperPdfReaderSource({
               )
             : cn(
                 "reading-wide:flex-1 reading-wide:min-h-0 reading-wide:overflow-y-auto reading-wide:[scrollbar-gutter:stable]",
-                "reading-wide:rounded-none reading-wide:p-4 reading-wide:focus-visible:ring-inset",
+                "reading-wide:rounded-none reading-wide:bg-stone-200 reading-wide:p-4 reading-wide:focus-visible:ring-inset",
               ),
         )}
       >
