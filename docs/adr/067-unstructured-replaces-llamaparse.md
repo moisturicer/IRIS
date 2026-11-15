@@ -493,6 +493,24 @@ each Figure was built and then removed, because the partition endpoint never
 returns one. Using the enrichment would need a Jobs-API reader first, and the
 measurement in item 3 gives no reason to build one.
 
+## Amendment — 2026-11-15 (IR-989): the quality gate failed; LlamaParse stays
+
+This amendment records numbers, as decision 2 requires when a gate fails. It decides nothing new: the rule decided. Proxy tier only (ADR-023). Report: `docs/evaluation/runs/2026-11-15-ir989-extractor-gate/report.md`.
+
+| Rule (decision 2) | LlamaParse | Unstructured | Result |
+|---|---|---|---|
+| recall@10 with reranking, lower by at most 0.02 | 0.786 | 0.643 | **Fail** |
+| Wrongly nested numbered headings, at most LlamaParse's + 5 | 0 | 0 | Pass |
+| No paper loses all its LaTeX | — | — | Pass, through IR-1102's transcriptions |
+
+- **Outcome.** Unstructured is not eligible. LlamaParse stays the Extractor, IR-988 stays blocked, and IR-980 returns to its owner.
+- **How it was measured.**
+  - Six proxy papers; the six-paper question set (14 questions).
+  - Stored reads re-shaped with current code.
+  - The one production strategy at 700 tokens, built as trial chunk sets.
+- **Why the two questions were lost.** They share one label. Its quote cannot match Unstructured's text, because Unstructured keeps the PDF's line-end hyphen ("ex- plicit"). With that quote trimmed past the hyphen, both extractors score 0.786.
+- **What would change the outcome.** Rejoining those hyphens in shaping (IR-1054 found the same defect), followed by a new gate run. Whether to do that is IR-980's owner's call.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.

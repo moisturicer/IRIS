@@ -2,7 +2,7 @@
 
 **Run:** 2026-11-15, code at `ee90ff75` (`main`, after IR-1054). **Proxy tier (ADR-023):** six openly licensed arXiv papers ([corpus](../20261103-ir851-llamaparse-six/corpus.json)); no number here is a finding about CIT-U research.
 
-## Verdict: not eligible as measured, and the cause is a label-matching defect
+## Verdict: not eligible — LlamaParse stays
 
 ADR-067 decision 2's rule, applied by `manage.py extractor_gate verdict` ([verdict.json](verdict.json)):
 
@@ -12,7 +12,9 @@ ADR-067 decision 2's rule, applied by `manage.py extractor_gate verdict` ([verdi
 | Wrongly nested numbered headings at most LlamaParse's + 5 | 0 | 0 | Pass |
 | No paper with LaTeX under LlamaParse has none under Unstructured | 6 of 6 papers | 6 of 6 papers | Pass |
 
-**By the rule, Unstructured is not eligible and LlamaParse stays.**
+**By the rule, Unstructured is not eligible and LlamaParse stays.** The rule has no approval step, so this is the gate's outcome. IR-988 stays blocked, ADR-067 records the numbers (amendment of 2026-11-15, IR-989), and IR-980 returns to its owner with this report.
+
+**The LaTeX check passes because of a separate step.** Unstructured's own Formula text is OCR. Its LaTeX comes from IR-1102's Sonnet transcriptions, which were stored for these papers. Without them, every paper would fail this check.
 
 **Both lost questions are a label artifact, not a retrieval loss.** The two questions Unstructured loses, q42 and q77, share one label quote ("explicit Tsitouras 5(4) method for non-stiff systems…"). Unstructured keeps the PDF's line-end hyphen, so its chunk reads "the ex- plicit Tsitouras 5(4) method…". LlamaParse rejoins it, so its chunk reads "explicit". A label hits only when its quote is contained in the passage text (`apps/ai/evaluation/labels.py`), so this quote can never match Unstructured's text, however well the paragraph ranks.
 
@@ -24,7 +26,7 @@ A diagnostic copy of the question set trims that quote past the hyphen ([proxy_i
 | Diagnostic set (q42/q77 quote trimmed) | 0.786 | **0.786** |
 | Final-set recall, diagnostic | 0.714 | **0.786** |
 
-On the diagnostic set the arms tie. They differ in which question each misses: q76 for LlamaParse, q29 for Unstructured. The diagnostic is not the gate, and this report does not substitute it for the gate. It shows what the failure is: IR-1054 already recorded 13 main-set labels blocked by the same kept hyphens ("shaping fix, separate"). No Jira issue tracks that fix yet.
+On the diagnostic set the arms tie. They differ in which question each misses: q76 for LlamaParse, q29 for Unstructured. The diagnostic is information for IR-980's owner. It does not change the verdict. It shows where the gap comes from: IR-1054 already recorded 13 main-set labels blocked by the same kept hyphens ("shaping fix, separate"). No Jira issue tracks that fix yet. Running the gate again after such a fix would be a new gate run, not a correction of this one.
 
 ## How it was run
 
@@ -138,7 +140,15 @@ LlamaParse's shaping records no deciding signal (`unrecorded`).
 - **Unstructured latency was not recorded.** Trial reads do not time the call; IR-984 saw 43 s for one paper on retry.
 - **This gate's own spend was Voyage only:** 620 new chunks embedded (about 250k tokens), plus reranking for six runs. That is a few cents, not metered per run.
 
+## Departures from the ticket
+
+- **No paper was re-read, and the dev database was not used.**
+  - The ticket asks for Unstructured reads "on the dev database". `iris_db` holds only Docling reads. LlamaParse's six reads exist only in `iris_ir851_llama`.
+  - So the gate ran on a copy that already held IR-1054's Unstructured reads (`iris_ir1054`), and LlamaParse's stored raw results were brought into it.
+  - Both arms are re-shaped from stored raw results, which ADR-067 decision 4 provides for.
+- **The reads take turns rather than sitting "beside" each other.** `PdfExtraction` is one-to-one with its Record, so `extractor_gate install` swaps reads in and out. Trial chunk sets, which the ticket asks for, keep both arms' chunks side by side.
+
 ## Not done
 
-- **The hyphen artifact.** Rejoining line-end hyphens in Unstructured shaping, then re-running this gate, is the obvious next step. No Jira issue exists for it, and none is created here.
-- **ADR-067 is not amended.** Decision 2 says a failed gate amends ADR-067 with the numbers and returns IR-980 to its owner. Given the diagnostic, that is left to IR-980's owner (Jive Tyler Revalde).
+- **Rejoining Unstructured's line-end hyphens.** No Jira issue exists for it, and none is created here.
+- **Unstructured latency** and a billed Unstructured cost (see above).

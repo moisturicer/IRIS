@@ -78,6 +78,7 @@ class Command(BaseCommand):
     def _verdict(self, *, llamaparse, unstructured, out, **_):
         result = gate.verdict(llamaparse=gate.arm_from_files(*llamaparse),
                               unstructured=gate.arm_from_files(*unstructured))
+        out.parent.mkdir(parents=True, exist_ok=True)
         payload = {"eligible": result.eligible,
                    "checks": [{"name": c.name, "passed": c.passed, "detail": c.detail} for c in result.checks]}
         out.write_text(json.dumps(payload, indent=1), encoding="utf-8")

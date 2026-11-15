@@ -1,5 +1,13 @@
 """IR-989: the extractor quality gate's rule and measures."""
 
+import json
+import uuid
+from pathlib import Path
+
+import pytest
+from django.core.management import call_command
+from django.test import override_settings
+
 from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
 from apps.ai.evaluation.extractor_gate import Arm, measure_document, verdict
 
@@ -124,14 +132,6 @@ def test_a_paper_with_no_latex_under_llamaparse_cannot_fail_the_latex_rule():
 
 
 # -- swapping stored reads on a database copy --------------------------------
-
-import json  # noqa: E402
-import uuid  # noqa: E402
-from pathlib import Path  # noqa: E402
-
-import pytest  # noqa: E402
-from django.core.management import call_command  # noqa: E402
-from django.test import override_settings  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parents[2] / "extraction" / "tests" / "fixtures"
 UNSTRUCTURED_RAW = FIXTURES / "unstructured_platform" / "figures" / "result.json"

@@ -5,9 +5,11 @@ The rule is fixed in advance and needs no sign-off. Proxy tier only (ADR-023).
 
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from apps.ai.chunking.document import FORMULA, HEADING, NormalizedDocument
 
@@ -18,7 +20,7 @@ HEADING_MARGIN = 5
 _DECIMAL = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+[A-Za-z]")
 _ROMAN = re.compile(r"^(?=[IVX]+\.)(X{0,3})(IX|IV|V?I{0,3})\.\s+\S")
 _LETTER = re.compile(r"^[A-H]\.\s+\S")
-_FALSE = re.compile(r"^(table|fig\.?|figure)\s*[\dA-Z]|^a preprint$", re.I)
+_CAPTION_AS_HEADING = re.compile(r"^(table|fig\.?|figure)\s*[\dA-Z]|^a preprint$", re.I)
 _INLINE_MATH = re.compile(r"(?<!\$)\$[^$\n]+\$(?!\$)")
 
 
@@ -50,7 +52,7 @@ def measure_document(document: NormalizedDocument) -> dict:
         "numbered_headings": len(numbered),
         "off_level": len(off),
         "off_level_examples": off[:6],
-        "false_headings": [e.text for e in headings if _FALSE.match(e.text)],
+        "false_headings": [e.text for e in headings if _CAPTION_AS_HEADING.match(e.text)],
         "heading_signals": dict(Counter(e.level_source or "unrecorded" for e in headings)),
         "formulas": len(formulas),
         "latex_formulas": sum(1 for e in formulas if e.kind == FORMULA and e.text.strip()),
@@ -88,9 +90,6 @@ class Verdict:
 
 def arm_from_files(measures_path, run_path) -> Arm:
     """An arm from ``extractor_gate measure`` output and an ``eval_retrieval`` run file."""
-    import json
-    from pathlib import Path
-
     papers = json.loads(Path(measures_path).read_text(encoding="utf-8"))["papers"]
     runs = json.loads(Path(run_path).read_text(encoding="utf-8"))["runs"]
     reranked = [r for r in runs if r["config"].get("reranking")]
@@ -125,10 +124,14 @@ READ_FIELDS = ("extractor", "extractor_version", "extractor_options", "raw_resul
                "pdf_evidence", "pages_read", "credits")
 
 
+def _credits(value):
+    return str(value) if value is not None else None
+
+
 def export_read(extraction) -> dict:
     """The stored read of ``extraction``, keyed by its paper's title."""
     read = {name: getattr(extraction, name) for name in READ_FIELDS}
-    read["credits"] = str(read["credits"]) if read["credits"] is not None else None
+    read["credits"] = _credits(read["credits"])
     read["source_revision"] = str(extraction.source_revision) if extraction.source_revision else None
     return {"title": extraction.record.title, **read}
 
@@ -189,7 +192,7 @@ def measure_paper(extraction) -> dict:
         "extractor_options": extraction.extractor_options,
         "content_hash": extraction.content_hash,
         "pages_billed": extraction.pages_read,
-        "credits": str(extraction.credits) if extraction.credits is not None else None,
+        "credits": _credits(extraction.credits),
         "figures_stored": extraction.figures.filter(**revision).count(),
         "figures_described": extraction.figures.filter(**revision).exclude(description="").count(),
         "formula_crops": extraction.formulas.filter(**revision).count(),
