@@ -216,7 +216,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           {pinWords(thread)}{root.party_label ? `, ${root.party_label}` : ""}
         </h4>
         <span aria-hidden className={cn(
-          "inline-grid place-items-center min-w-5 h-5 px-1 rounded-full text-[11px] font-semibold",
+          "inline-grid place-items-center min-w-5 h-5 px-1 rounded-full text-label font-semibold",
           root.is_draft || root.state !== "open" ? "bg-white text-pen ring-1 ring-pen" : "bg-pen text-white",
         )}>{thread.pin}</span>
         {root.party_label && <span className="text-small font-semibold text-stone-900">{root.party_label}</span>}
@@ -227,7 +227,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
         {root.outdated_since != null && <Chip>Outdated since v{root.outdated_since}</Chip>}
         {root.severity && <Chip tone={root.severity === "must_fix" ? "brand" : "quiet"}>{SEVERITY_WORDS[root.severity]}</Chip>}
         {root.is_draft
-          ? <Chip><i className="fas fa-pen text-[9px]" aria-hidden />Draft</Chip>
+          ? <Chip><i className="fas fa-pen text-label" aria-hidden />Draft</Chip>
           : status && <Chip tone={root.state === "open" ? "quiet" : "ink"}>{status}</Chip>}
       </header>
 

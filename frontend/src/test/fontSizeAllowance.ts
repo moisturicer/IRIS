@@ -24,14 +24,6 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
   "src/features/ai/components/SourceContextPanel.tsx": 4,
   "src/features/ai/components/StreamStatusRow.tsx": 2,
   "src/features/ai/components/TokenUsageMeter.tsx": 4,
-  "src/features/records/paper-view/AddReviewerDialog.tsx": 1,
-  "src/features/records/paper-view/DecisionDialog.tsx": 4,
-  "src/features/records/paper-view/NewVersionDialog.tsx": 4,
-  "src/features/records/paper-view/OfficeReviewDialog.tsx": 2,
-  "src/features/records/paper-view/RequestRevisionDialog.tsx": 2,
-  "src/features/records/paper-view/RouteDialog.tsx": 7,
-  "src/features/records/paper-view/threads/FinishReviewDialog.tsx": 3,
-  "src/features/review/AssignReviewerDialog.tsx": 1,
 };
 
 /**
@@ -47,6 +39,4 @@ export const SUB_12PX_ALLOWANCE: Record<string, number> = {
   "src/features/ai/components/RuntimeReader.tsx": 1,
   "src/features/ai/components/SourceContextPanel.tsx": 1,
   "src/features/ai/components/StreamStatusRow.tsx": 1,
-  "src/features/records/paper-view/RouteDialog.tsx": 2,
-  "src/features/records/paper-view/threads/ReviewThreads.tsx": 2,
 };

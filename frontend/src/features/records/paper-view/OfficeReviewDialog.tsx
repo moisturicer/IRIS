@@ -95,7 +95,7 @@ export function OfficeReviewDialog({ record, outcome, onClose, onDone }: OfficeR
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-700 leading-relaxed">
           {finding
             ? `A finding records a concern for ${office}. It does not reject the record or send it back: RDCO sees it and decides.`
             : `You find nothing for ${office} to hold this record on.`}{" "}
@@ -116,7 +116,7 @@ export function OfficeReviewDialog({ record, outcome, onClose, onDone }: OfficeR
             aria-describedby={helpId}
             className={fieldClasses(false)}
           />
-          <p id={helpId} className="mt-1 text-[13px] text-stone-600">
+          <p id={helpId} className="mt-1 text-small text-stone-600">
             {finding
               ? "RDCO and the author see this with the record."
               : "If you add one, the author and the other reviewers see it with the record."}

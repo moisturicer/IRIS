@@ -204,7 +204,7 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
-        <p className="text-[14px] text-stone-700 leading-relaxed">{body}</p>
+        <p className="text-body text-stone-700 leading-relaxed">{body}</p>
 
         {flags.party === "rdco" && (stillReviewing.length > 0 || withdrawsRevisions) && (
           <p className={WARNING_CALLOUT}>
@@ -227,10 +227,10 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
         </section>}
         {closing.length > 0 && (
           <div>
-            <p id={closesId} className="text-[13px] font-semibold text-stone-900">
+            <p id={closesId} className="text-small font-semibold text-stone-900">
               This also closes
             </p>
-            <ul aria-labelledby={closesId} className="mt-1 list-disc pl-5 text-[13px] text-stone-700">
+            <ul aria-labelledby={closesId} className="mt-1 list-disc pl-5 text-small text-stone-700">
               {closing.map((line) => (
                 <li key={line}>{line}</li>
               ))}
@@ -251,7 +251,7 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
             aria-describedby={helpId}
             className={fieldClasses(false)}
           />
-          <p id={helpId} className="mt-1 text-[13px] text-stone-600">
+          <p id={helpId} className="mt-1 text-small text-stone-600">
             {reject
               ? "The owner reads this as written."
               : "If you add one, the owner and the reviewers see it with the record."}
