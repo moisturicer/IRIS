@@ -17,6 +17,8 @@ Unpublished research, IP disclosures before filing, ethics submissions, and pers
 
 Under RA 10173 (Data Privacy Act), personal data in submissions and consent records is in scope.
 
+**Every kind of sensitive data, where it lives, who reads it and where it goes** is listed in [`DATA_INVENTORY.md`](DATA_INVENTORY.md) ([IR-824](https://citiris.atlassian.net/browse/IR-824)).
+
 ---
 
 ## 2 · Authentication
