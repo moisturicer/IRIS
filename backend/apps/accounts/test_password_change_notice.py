@@ -5,7 +5,8 @@ sends (IR-820, ASVS 2.2.3 and 2.5.5).
 Before this, `ChangePasswordView` wrote an audit event and told no one, so a
 change made from a stolen session went unreported. The notice is written after
 the change commits and is best effort, exactly as after a reset: failing to
-record or send it can never undo the new password.
+record it, or a broker outage when it is handed to the mail worker, can never
+undo the new password.
 """
 
 from unittest.mock import patch
@@ -40,10 +41,11 @@ class PasswordChangeNoticeTests(APITestCase):
         return RecoveryIntent.objects.filter(purpose=RecoveryPurpose.PASSWORD_CHANGED, user=self.user)
 
     def test_a_change_emails_the_owner_the_reset_notice_after_it_commits(self):
-        with self.captureOnCommitCallbacks(execute=True):
+        with patch("apps.accounts.recovery.service.enqueue") as enqueue,                 self.captureOnCommitCallbacks(execute=True):
             response = self.change()
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(self.notices().count(), 1)
+        enqueue.assert_called_once_with(self.notices().get().pk)
 
         for intent_id in self.notices().values_list("id", flat=True):
             deliver_recovery_intent(str(intent_id))
@@ -52,6 +54,14 @@ class PasswordChangeNoticeTests(APITestCase):
         self.assertEqual(notice.to, [EMAIL])
         self.assertEqual(notice.subject, "Your IRIS password was changed")
         self.assertNotIn(NEW, notice.body)
+
+    def test_a_broker_outage_still_changes_the_password_and_keeps_the_notice_for_the_dispatcher(self):
+        with patch("apps.accounts.recovery.tasks.deliver_recovery_intent_task.apply_async",
+                   side_effect=ConnectionError("broker down")),                 self.captureOnCommitCallbacks(execute=True):
+            response = self.change()
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(User.objects.get(pk=self.user.pk).check_password(NEW))
+        self.assertEqual(self.notices().count(), 1)
 
     def test_nothing_is_sent_before_the_change_commits(self):
         with self.captureOnCommitCallbacks(execute=False) as callbacks:
