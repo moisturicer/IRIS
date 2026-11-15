@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
-from apps.records.models import Record, RecordOwner, RecordType
+from apps.records.models import Author, Record, RecordOwner, RecordType, RecordVersion
 from apps.reviews.models import (
     Holiday,
     RecordAssignment,
@@ -35,6 +35,7 @@ from core.enums import (
     RoleName,
     SeatSource,
     SeatState,
+    VersionCause,
 )
 
 from .test_routing import RoutingTestBase
@@ -73,6 +74,13 @@ class MyReviewsTestBase(RoutingTestBase):
         record = self.new_model(type_name)
         self.accepted_to(record, *parties)
         return record
+
+    def office_review(self, record, as_user, outcome, comment="A reason."):
+        response = self.post(
+            reverse("record-office-review", args=[record.pk]), as_user,
+            {"outcome": outcome, "comment": comment},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
     def assignment(self, record, party):
         return RecordAssignment.objects.get(record=record, party=party, state=AssignmentState.ACTIVE)
@@ -233,13 +241,6 @@ class InReviewTests(MyReviewsTestBase):
 # --- AC: Done -----------------------------------------------------------------------------
 
 class DoneTests(MyReviewsTestBase):
-
-    def office_review(self, record, as_user, outcome, comment="A reason."):
-        response = self.post(
-            reverse("record-office-review", args=[record.pk]), as_user,
-            {"outcome": outcome, "comment": comment},
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
     def legacy_review(self, record, by, stage, decision):
         """A decision from before IR-415: no assignment, so no seat behind it."""
@@ -433,13 +434,6 @@ class CoordinatorTests(MyReviewsTestBase):
         self.assertEqual(self.page(self.itso_coordinator)["outcome_counts"]["cleared"], 0)
         self.assertEqual(self.page(self.itso_coordinator, office="itso")["outcome_counts"]["cleared"], 1)
 
-    def office_review(self, record, as_user, outcome, comment="A reason."):
-        response = self.post(
-            reverse("record-office-review", args=[record.pk]), as_user,
-            {"outcome": outcome, "comment": comment},
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-
     def test_a_non_coordinator_is_refused_the_office_parameter(self):
         self.assertEqual(self.mine(self.itso, office="itso").status_code, status.HTTP_403_FORBIDDEN)
 
@@ -508,9 +502,6 @@ class ContractTests(MyReviewsTestBase):
 
     def test_a_row_names_its_authors_version_and_where_it_opens(self):
         """IR-1135: the prototype's kicker line, read from the server on every tab."""
-        from apps.records.models import Author, RecordVersion
-        from core.enums import VersionCause
-
         record = self.routed(Party.ITSO)
         self.seat(record, Party.ITSO, self.itso)
         Author.objects.create(record=record, name="Maria Clara Santos")

@@ -254,7 +254,7 @@ export default function MyReviewsPage() {
           {tab === "done" ? (
             <div role="group" aria-label="Filter by outcome" className="flex flex-wrap gap-2">
               {[{ key: null, label: "All" }, ...OUTCOME_FILTERS].map((f) => {
-                const count = page?.outcome_counts[f.key ?? "all"];
+                const count = page?.outcome_counts?.[f.key ?? "all"];
                 return (
                   <button
                     key={f.label}
@@ -425,7 +425,7 @@ function emptyCopy(
   }
   return {
     title: "Nothing here",
-    message: scopedToMine && office
+    message: scopedToMine && office != null
       ? `Switch to “All of ${office}” to see the office's reviews.`
       : "Reviews move here as they progress.",
   };
