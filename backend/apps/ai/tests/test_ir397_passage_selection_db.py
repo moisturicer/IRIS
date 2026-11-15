@@ -37,7 +37,11 @@ def test_a_paper_that_outranks_the_rest_still_leaves_room_for_another(research, 
         await tools.hybrid_search("flooding", 5)
         await tools.search("flooding", 5)
 
-    (_, hybrid), (_, keyword) = run(research, reader, script, request="select-cap-1")
+    from ai.research.selection import Policy
+
+    # The share is off by default since IR-1150; this checks what it does when set.
+    (_, hybrid), (_, keyword) = run(research, reader, script, request="select-cap-1",
+                                    selection=Policy(paper_share=50))
     for found in (hybrid, keyword):
         per_paper = [p.record_id for p in found.passages]
         assert other.pk in per_paper

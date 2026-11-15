@@ -22,7 +22,8 @@ class Hit:
 @dataclass(frozen=True)
 class Policy:
     #: Percent of the budget one paper may fill outside Paper Chat, mates included; 0 is unlimited.
-    paper_share: int = 50
+    #: Off by default: every share below 75 lost recall in IR-1150's replay.
+    paper_share: int = 0
     #: Adjacent chunks of one source arrive together, linked.
     join: bool = True
     #: Budget per requested passage, in chunker tokens; 0 is unbudgeted.

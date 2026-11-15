@@ -231,6 +231,16 @@ Jive Tyler Revalde replaced the runtime's 3-per-paper count with a share of the 
 
 This supersedes the count cap described in the IR-397 and IR-1055 amendments above.
 
+## Amendment — 2026-11-16 (IR-1150): the paper share is off by default
+
+Jive Tyler Revalde set `RUNS_PAPER_SHARE`'s default to 0 (off) on 2026-11-16, on IR-1150's measurement. The share itself stays, and any value from 1 to 100 still turns it on.
+
+- **Measurement.** An offline replay (`scripts/eval_paper_share.py`, run files in `docs/evaluation/runs/2026-11-16-ir1150-paper-share/`; proxy tier). Each question's candidates are ranked once, as `hybrid_search` ranks them without rerank, and then selected under each share. Corpus: IR-1054's `g_structural` trial chunk sets, 43 papers.
+- **Result.** Every share below 75 lost labelled evidence, and none found any the share off missed. Against off, at limits 10 and 5: 50 lost 4 and 7 labels (of 94); 33 lost 11 and 10; 25 lost 14 and 11. 75 lost one. A share does put more papers in a search: at limit 10, searches mostly from one paper fall from 74% to 60% at 50. Tokens per search do not change.
+- **Not measured.** The multi-paper questions a share is meant to help. Only one of five two-paper questions has both papers among its candidates, and every arm finds both. A set with real multi-paper questions is what could turn the share back on.
+
+This supersedes the default of 50 in the amendment above.
+
 ## Alternatives Considered
 
 **Keyword search restricted to the vector candidates** — run the vector search, then keyword-match within its top *n*. Rejected. It cannot surface a passage the vector search missed, which is the entire failure hybrid retrieval addresses. It buys a smaller keyword query in exchange for the only benefit on offer.
