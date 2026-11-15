@@ -11,23 +11,30 @@ lockout callable, in place of the view's.
 """
 from __future__ import annotations
 
+from apps.audit.models import AuditEvent
 from apps.audit.services import create_audit_event
 
 from .client_address import client_address
-from .lockout import LOCKED_BY_ADMIN, TOO_MANY_ATTEMPTS  # noqa: F401  (the reasons, as the client is told them)
 
+#: The two reasons the client is told no code for. The other two are the codes it
+#: is told, `lockout.LOCKED_BY_ADMIN` and `lockout.TOO_MANY_ATTEMPTS`.
 INVALID_CREDENTIALS = "invalid_credentials"
 UNVERIFIED = "unverified"
 
 
+def _django(request):
+    """Django's request under DRF's wrapper: axes marks that one, and `client_address` reads its META."""
+    return getattr(request, "_request", request)
+
+
 def refused(request, email, reason, *, user=None) -> None:
-    """One `FAILED_LOGIN` for this request. `request` is Django's, not DRF's wrapper."""
+    """One `FAILED_LOGIN` for this request, Django's or DRF's."""
     create_audit_event(
-        "FAILED_LOGIN", user,
-        metadata={"email": email, "reason": reason, "ip": client_address(request)},
+        AuditEvent.FAILED_LOGIN, user,
+        metadata={"email": email, "reason": reason, "ip": client_address(_django(request))},
     )
 
 
 def axes_refused(request) -> bool:
     """Axes refused this request (it marks it, IR-555): its lockout callable writes the row."""
-    return bool(getattr(request, "axes_locked_out", False))
+    return bool(getattr(_django(request), "axes_locked_out", False))

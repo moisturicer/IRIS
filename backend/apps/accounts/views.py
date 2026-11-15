@@ -162,15 +162,15 @@ class LoginView(APIView):
                 user = None
         if not user:
             # Axes's lockout reply replaces this one, and its callable writes the row (IR-659).
-            if not sign_in_audit.axes_refused(request._request):
-                sign_in_audit.refused(request._request, email, sign_in_audit.INVALID_CREDENTIALS)
+            if not sign_in_audit.axes_refused(request):
+                sign_in_audit.refused(request, email, sign_in_audit.INVALID_CREDENTIALS)
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
         if not user.is_verified:
-            sign_in_audit.refused(request._request, email, sign_in_audit.UNVERIFIED, user=user)
+            sign_in_audit.refused(request, email, sign_in_audit.UNVERIFIED, user=user)
             return Response({"detail": "Email not verified."}, status=status.HTTP_403_FORBIDDEN)
         if user.is_locked:
             # RDCO's lock: it lifts only when RDCO unlocks, so no `unlock_at` (IR-555).
-            sign_in_audit.refused(request._request, email, sign_in_audit.LOCKED_BY_ADMIN, user=user)
+            sign_in_audit.refused(request, email, LOCKED_BY_ADMIN, user=user)
             return Response(
                 {"detail": "Account is locked.", "code": LOCKED_BY_ADMIN},
                 status=status.HTTP_403_FORBIDDEN,
@@ -185,7 +185,7 @@ class LoginView(APIView):
         with transaction.atomic():
             locked = User.objects.select_for_update().get(pk=user.pk)
             if locked.password != user.password:
-                sign_in_audit.refused(request._request, email, sign_in_audit.INVALID_CREDENTIALS)
+                sign_in_audit.refused(request, email, sign_in_audit.INVALID_CREDENTIALS)
                 return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
             refresh = start_session(locked)
         create_audit_event("LOGIN", user, metadata={"email": user.email})

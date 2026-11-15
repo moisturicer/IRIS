@@ -17,12 +17,15 @@ Decided 2026-11-15 (Hermoine Zozobrado):
 No event may hold a password, token or link (ASVS 7.1.1).
 """
 from django.conf import settings
+from django.core import mail
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.accounts.models import Role, User
+from apps.accounts.models import RecoveryIntent, Role, User
+from apps.accounts.recovery.delivery import deliver_recovery_intent
+from apps.accounts.test_email_verification import LINK
 from apps.accounts.test_password_policy import registration
 from apps.audit.models import AuditEvent
 
@@ -40,9 +43,10 @@ def make_user(email=ADDRESS, **extra):
 
 
 class SignInAuditCase(APITestCase):
-    def sign_in(self, email=ADDRESS, password=PASSWORD):
+    def sign_in(self, email=ADDRESS, password=PASSWORD, **headers):
+        headers.setdefault("REMOTE_ADDR", IP)
         return self.client.post(
-            reverse("auth-login"), {"email": email, "password": password}, format="json", REMOTE_ADDR=IP,
+            reverse("auth-login"), {"email": email, "password": password}, format="json", **headers,
         )
 
     def refusals(self):
@@ -90,20 +94,16 @@ class RefusalTests(SignInAuditCase):
 
     def test_a_successful_sign_in_records_no_refusal(self):
         make_user()
-        self.assertEqual(self.sign_in().status_code, status.HTTP_200_OK)
+        response = self.sign_in()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(self.refusals(), [])
-        self.assertHoldsNoSecret(PASSWORD)
-        login = AuditEvent.objects.get(event_type=AuditEvent.LOGIN)
-        for token in (self.sign_in().json()["access"], self.sign_in().json()["refresh"]):
-            self.assertNotIn(token, str(login.metadata))
+        self.assertTrue(AuditEvent.objects.filter(event_type=AuditEvent.LOGIN).exists())
+        self.assertHoldsNoSecret(PASSWORD, response.json()["access"], response.json()["refresh"])
 
     @override_settings(TRUSTED_PROXY_COUNT=1)
     def test_the_address_is_the_client_behind_the_proxy(self):
-        self.client.post(
-            reverse("auth-login"), {"email": ADDRESS, "password": "x"}, format="json",
-            REMOTE_ADDR="10.0.0.2", HTTP_X_FORWARDED_FOR=IP,
-        )
+        self.sign_in(password="x", REMOTE_ADDR="10.0.0.2", HTTP_X_FORWARDED_FOR=IP)
 
         [event] = self.refusals()
         self.assertEqual(event.metadata["ip"], IP)
@@ -155,6 +155,7 @@ class AsgiLockoutTests(APITestCase):
         last = await AuditEvent.objects.filter(event_type=AuditEvent.FAILED_LOGIN).alatest("pk")
         self.assertEqual(last.metadata["reason"], "too_many_attempts")
         self.assertEqual(last.metadata["email"], ADDRESS)
+        self.assertEqual(last.metadata["ip"], "127.0.0.1")  # the async client's own address
         self.assertEqual(
             await AuditEvent.objects.filter(event_type=AuditEvent.FAILED_LOGIN).acount(),
             settings.AXES_FAILURE_LIMIT,
@@ -177,8 +178,25 @@ class RegistrationTests(APITestCase):
         event = AuditEvent.objects.get(event_type=AuditEvent.ACCOUNT_REGISTERED)
         self.assertEqual(event.user, User.objects.get(email="newcomer@cit.edu"))
         self.assertEqual(event.metadata, {"requested_role": "Student"})
-        for other in AuditEvent.objects.all():
-            self.assertNotIn(PASSWORD, str(other.metadata))
+
+    def test_no_row_holds_the_password_or_the_activation_link_once_the_email_is_sent(self):
+        self.client.post(reverse("auth-register"), registration(PASSWORD), format="json")
+        for intent_id in RecoveryIntent.objects.values_list("id", flat=True):
+            deliver_recovery_intent(str(intent_id))  # as the worker does after commit
+        [message] = mail.outbox
+        link = LINK.search(message.body)
+        self.assertIsNotNone(link, message.body)
+
+        self.assertTrue(AuditEvent.objects.filter(event_type=AuditEvent.ACCOUNT_REGISTERED).exists())
+        for event in AuditEvent.objects.all():
+            for secret in (PASSWORD, link.group(1), link.group(0)):
+                self.assertNotIn(secret, str(event.metadata), event.event_type)
+
+    def test_registering_with_no_role_records_none_asked_for(self):
+        self.client.post(reverse("auth-register"), registration(PASSWORD), format="json")
+
+        event = AuditEvent.objects.get(event_type=AuditEvent.ACCOUNT_REGISTERED)
+        self.assertEqual(event.metadata, {"requested_role": None})
 
     def test_a_refused_registration_records_nothing(self):
         response = self.client.post(
