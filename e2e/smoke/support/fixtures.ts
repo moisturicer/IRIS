@@ -44,6 +44,8 @@ export function account(role: SmokeRole = "Student") {
     department_name: "",
     course_name: "",
     review_access: { my_reviews: office, offices: office ? ["rdco"] : [], is_coordinator: office },
+    // What the server says (IR-1096): Student and Adviser author, nobody else.
+    can_author: role === "Student",
   };
 }
 

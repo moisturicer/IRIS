@@ -153,9 +153,10 @@ vi.mock("@/api/notifications", () => ({
   },
 }));
 
-function signInAs(roleName: string) {
+/** `canAuthor` is the server's flag (IR-1096); a test says what the server said. */
+function signInAs(roleName: string, canAuthor = roleName === "Student" || roleName === "Adviser") {
   useAuthStore.setState({
-    user: { id: 9, email: "reader@cit.edu", role_name: roleName } as unknown as User,
+    user: { id: 9, email: "reader@cit.edu", role_name: roleName, can_author: canAuthor } as unknown as User,
     isAuthenticated: true,
     authReady: true,
   });
@@ -258,6 +259,20 @@ describe("the page head", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
+  });
+
+  // IR-1096: the server's capability decides, not the role name.
+  it("follows the server's can_author, not the role: a Student the server refuses sees no Publish", async () => {
+    signInAs("Student", false);
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
+  });
+
+  it("shows Publish to anyone the server says can author, whatever their role", async () => {
+    signInAs("ITSO", true);
+    renderDiscover();
+    expect(await screen.findByRole("button", { name: "Publish" })).toBeInTheDocument();
   });
 });
 

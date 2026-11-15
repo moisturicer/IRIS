@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { canAccess, hasReviewWork } from "@/lib/access";
+import { canAccess, canAuthor, hasReviewWork } from "@/lib/access";
 import type { RoleName } from "@/lib/constants";
 import type { ReviewAccess } from "@/types/auth";
 
@@ -8,6 +8,8 @@ import type { ReviewAccess } from "@/types/auth";
 export interface HelpReader {
   role:          RoleName | null | undefined;
   reviewAccess?: ReviewAccess | null;
+  /** `can_author` from `/users/me/` (IR-1096): Publishing help follows it. */
+  canAuthor?:    boolean;
 }
 
 export interface HelpSection {
@@ -127,7 +129,7 @@ export const HELP_SECTIONS: HelpSection[] = [
   {
     id: "publishing",
     title: "Publishing your research",
-    shownTo: (r) => canAccess(r.role, "submit"),
+    shownTo: (r) => canAuthor({ can_author: r.canAuthor }),
     body: (
       <>
         <p>

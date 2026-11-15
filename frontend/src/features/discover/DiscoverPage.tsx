@@ -16,9 +16,9 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
 import type { SavedFeed } from "@/api/library";
-import { useRole } from "@/hooks/useRole";
-import { canAccess } from "@/lib/access";
+import { canAuthor } from "@/lib/access";
 import { ASK_PATH, askHandoffState } from "@/lib/askHandoff";
+import { useAuthStore } from "@/store/auth.store";
 import { useFeedsStore } from "@/store/feeds.store";
 import { cn } from "@/lib/utils";
 import { IP_TYPE_LABELS } from "@/types/records";
@@ -115,9 +115,8 @@ export default function DiscoverPage() {
   // writes back a URL that predates anything set since (IR-554).
   const latestSetSearchParams = useRef(setSearchParams);
   latestSetSearchParams.current = setSearchParams;
-  const { roleName } = useRole();
-  // The access map is the one place that says who authors (Student, Adviser).
-  const canPublish = canAccess(roleName as never, "submit");
+  // The server says who authors (`can_author`, IR-1096), never the role name.
+  const canPublish = useAuthStore((s) => canAuthor(s.user));
 
   const [records, setRecords] = useState<RecordListItem[]>([]);
   const [feedRecords, setFeedRecords] = useState<ForYouItem[]>([]);

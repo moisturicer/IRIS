@@ -145,7 +145,7 @@ beforeEach(() => {
   vi.mocked(recordsApi.duplicateMatches).mockResolvedValue({ data: { exact: [], likely: [], acknowledged: false } } as never);
   vi.mocked(recordsApi.acknowledgeDuplicates).mockResolvedValue({ data: { acknowledged: true, matches: [] } } as never);
   useAuthStore.setState({
-    user: makeUser({ id: SELF_ID, first_name: "Ada", last_name: "Reyes", role_name: ROLES.ADVISER }),
+    user: makeUser({ id: SELF_ID, first_name: "Ada", last_name: "Reyes", role_name: ROLES.ADVISER, can_author: true }),
   });
 });
 
@@ -251,11 +251,41 @@ describe("opening", () => {
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
   });
 
-  it("does not open for someone who cannot author a record", async () => {
-    useAuthStore.setState({ user: makeUser({ role_name: ROLES.KTTO }) });
+  // IR-1096: the server's `can_author` decides, and a link that reaches Publish
+  // without it says why instead of showing nothing.
+  it("explains why Publish isn't available to someone the server says cannot author, and starts nothing", async () => {
+    useAuthStore.setState({ user: makeUser({ role_name: ROLES.KTTO, can_author: false }) });
     openPublish();
 
+    const dialog = await screen.findByRole("dialog", { name: "Publishing isn't available to your account" });
+    expect(within(dialog).getByText(/Only Students and Advisers publish research/)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Publish your research" })).not.toBeInTheDocument();
+    expect(recordsApi.recordTypes).not.toHaveBeenCalled();
+    expect(recordsApi.create).not.toHaveBeenCalled();
+  });
+
+  it("treats a payload with no can_author as unable to author, whatever the role", async () => {
+    useAuthStore.setState({ user: makeUser({ role_name: ROLES.STUDENT }) });
+    openPublish();
+
+    expect(await screen.findByRole("dialog", { name: "Publishing isn't available to your account" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /Proposal/ })).not.toBeInTheDocument();
+  });
+
+  it("closes that explanation, which clears the Publish link and returns the person to where they were", async () => {
+    const user = userEvent.setup();
+    useAuthStore.setState({ user: makeUser({ role_name: ROLES.ITSO, can_author: false }) });
+    openPublish();
+
+    const dialog = await screen.findByRole("dialog", { name: "Publishing isn't available to your account" });
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("opens for anyone the server says can author, whatever their role", async () => {
+    useAuthStore.setState({ user: makeUser({ role_name: ROLES.RDCO, can_author: true }) });
+    await openNew();
+    expect(screen.getByRole("dialog", { name: "Publish your research" })).toBeInTheDocument();
   });
 
   it("passes axe on the first step", async () => {

@@ -6,8 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import type { ReadingStatus } from "@/api/library";
-import { canAccess } from "@/lib/access";
-import type { RoleName } from "@/lib/constants";
+import { canAuthor as mayAuthor } from "@/lib/access";
 import {
   addCollection,
   clearReadingHistory,
@@ -73,8 +72,8 @@ function tabFromSection(section: string | null, canAuthor: boolean): Tab {
  * pick a tab.
  */
 export default function MyLibraryPage() {
-  const role = useAuthStore((state) => state.user?.role_name);
-  const canAuthor = canAccess(role as RoleName | undefined, "submit");
+  // The server's `can_author` (IR-1096), not the role name.
+  const canAuthor = useAuthStore((state) => mayAuthor(state.user));
   const [searchParams, setSearchParams] = useSearchParams();
   const section = searchParams.get("section");
 
