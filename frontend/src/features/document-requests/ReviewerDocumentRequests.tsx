@@ -106,7 +106,7 @@ export function ReviewerDocumentRequests({
 
       {mine.length > 0 && (
         <section aria-labelledby={headingId} className="space-y-2">
-          <h2 id={headingId} className="text-2xs font-bold uppercase tracking-wider text-stone-500">
+          <h2 id={headingId} className="text-2xs font-bold text-stone-500">
             Documents you requested
           </h2>
           {mine.map((r) => (

@@ -248,7 +248,7 @@ describe("the Change role dialog", () => {
     renderScreen(<UserListPage />);
 
     await choose("ierc.coordinator@cit.edu", "Change role");
-    const dialog = screen.getByRole("dialog", { name: "Change Role" });
+    const dialog = screen.getByRole("dialog", { name: "Change role" });
 
     expect(within(dialog).getByRole("combobox", { name: "New role" })).toHaveValue("IERC");
     expect(dialog).toHaveTextContent("removes their coordinator status");
@@ -259,7 +259,7 @@ describe("the Change role dialog", () => {
 
     await choose("itso@cit.edu", "Change role");
 
-    expect(screen.getByRole("dialog", { name: "Change Role" })).not.toHaveTextContent(/coordinator/i);
+    expect(screen.getByRole("dialog", { name: "Change role" })).not.toHaveTextContent(/coordinator/i);
   });
 });
 

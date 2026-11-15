@@ -157,7 +157,7 @@ function NavGroup({
       <p
         id={`nav-${section}`}
         className={cn(
-          "px-3 pb-2 text-3xs font-semibold uppercase tracking-wider text-stone-500",
+          "px-3 pb-2 text-3xs font-semibold text-stone-500",
           collapsed && "md:sr-only",
         )}
       >

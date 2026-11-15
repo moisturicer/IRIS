@@ -67,7 +67,7 @@ export function StatusScreen({
         </div>
         <h1 className="font-display text-title font-semibold text-stone-900">{title}</h1>
         {message && <div className="mt-2 text-body text-stone-600">{message}</div>}
-        {code && <p className="mt-3 text-label font-medium uppercase tracking-wide text-stone-500">{code}</p>}
+        {code && <p className="mt-3 text-label font-medium text-stone-500">{code}</p>}
         {actions && (
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">{actions}</div>
         )}

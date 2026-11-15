@@ -128,7 +128,7 @@ export function RelatedWorks({ recordId }: { recordId: number }) {
             to={`/records/${item.id}`}
             className="group bg-white ring-1 ring-stone-200 rounded-card p-4 hover:ring-stone-300 hover:shadow-card-md transition-all duration-200"
           >
-            <p className="text-2xs font-semibold tracking-wider text-stone-500 mb-2">
+            <p className="text-2xs font-semibold text-stone-500 mb-2">
               Record #{item.id}
             </p>
             <p className="font-display text-lg font-semibold text-stone-900 leading-snug line-clamp-3 group-hover:text-brand transition-colors duration-200">
