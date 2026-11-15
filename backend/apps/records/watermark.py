@@ -14,11 +14,11 @@ from reportlab.pdfgen import canvas
 
 logger = logging.getLogger(__name__)
 
-BACKGROUND_TEXT = "CIT-U"
-BACKGROUND_FONT = "Helvetica-Bold"
-BACKGROUND_ANGLE_DEGREES = 45
-BACKGROUND_GREY = 0.88  # 0 is black and 1 is white
-BACKGROUND_WIDTH_OF_SHORT_SIDE = 1.0
+MARK_ANGLE_DEGREES = 45
+MARK_GREY = 0.45  # 0 is black and 1 is white
+MARK_OPACITY = 0.18  # Over white paper this prints about as light as grey 0.9
+MARK_WIDTH_OF_SHORT_SIDE = 1.0
+MARK_STROKE = 0.16  # Of a letter's height
 
 FOOTER_FONT = "Helvetica"
 FOOTER_GREY = 0.2
@@ -70,17 +70,57 @@ def _single_page(draw, width: float, height: float):
     return PdfReader(buffer).pages[0]
 
 
-def _background(width: float, height: float):
+def _cit_u(pdf) -> float:
+    """
+    "CIT-U" as stroked lines and arcs, one unit tall, from the origin rightwards.
+
+    Shapes rather than a font, so the mark adds no "CIT-U" to the copy's text:
+    copying or searching the copy finds only the paper and its footer. Returns
+    the drawing's width, strokes included.
+    """
+    path = pdf.beginPath()
+    # C: an open ellipse
+    path.arc(0, 0, 0.7, 1, startAng=50, extent=260)
+    # I
+    path.moveTo(1.0, 0)
+    path.lineTo(1.0, 1)
+    # T
+    path.moveTo(1.3, 1)
+    path.lineTo(2.0, 1)
+    path.moveTo(1.65, 1)
+    path.lineTo(1.65, 0)
+    # -
+    path.moveTo(2.3, 0.45)
+    path.lineTo(2.7, 0.45)
+    # U: two sides joined by a half ellipse
+    path.moveTo(3.0, 1)
+    path.lineTo(3.0, 0.35)
+    path.arcTo(3.0, 0, 3.7, 0.7, startAng=180, extent=180)
+    path.lineTo(3.7, 1)
+    pdf.drawPath(path, stroke=1, fill=0)
+    return 3.7 + MARK_STROKE
+
+
+def _mark_overlay(width: float, height: float):
+    """
+    A faint diagonal "CIT-U" across the page, drawn over the content.
+
+    Over, not beneath (ADR-048 decision 10, amended for IR-1127): many exported
+    papers paint each page white edge to edge, and scanned pages are one opaque
+    image, and either hides a mark beneath. Translucent, so the text stays readable.
+    """
     def draw(pdf):
-        size = (
-            BACKGROUND_WIDTH_OF_SHORT_SIDE * min(width, height)
-            / stringWidth(BACKGROUND_TEXT, BACKGROUND_FONT, 1)
-        )
-        pdf.setFillGray(BACKGROUND_GREY)
-        pdf.setFont(BACKGROUND_FONT, size)
+        letter = MARK_WIDTH_OF_SHORT_SIDE * min(width, height) / (3.7 + MARK_STROKE)
+        pdf.setStrokeGray(MARK_GREY)
+        pdf.setStrokeAlpha(MARK_OPACITY)
+        pdf.setLineWidth(MARK_STROKE)
+        pdf.setLineCap(1)  # Round
+        pdf.setLineJoin(1)
         pdf.translate(width / 2, height / 2)
-        pdf.rotate(BACKGROUND_ANGLE_DEGREES)
-        pdf.drawCentredString(0, -size / 3, BACKGROUND_TEXT)
+        pdf.rotate(MARK_ANGLE_DEGREES)
+        pdf.scale(letter, letter)
+        pdf.translate(-(3.7 + MARK_STROKE) / 2 + MARK_STROKE / 2, -0.5)
+        _cit_u(pdf)
 
     return _single_page(draw, width, height)
 
@@ -115,11 +155,11 @@ def _mark(source: bytes, identity: CopyIdentity) -> BytesIO:
         box = page.cropbox
         size = (float(box.width), float(box.height))
         if size not in overlays:
-            overlays[size] = (_background(*size), _footer(identity.footer, *size))
-        background, footer = overlays[size]
+            overlays[size] = (_mark_overlay(*size), _footer(identity.footer, *size))
+        mark, footer = overlays[size]
         to_visible_area = Transformation().translate(float(box.left), float(box.bottom))
-        page.merge_transformed_page(background, to_visible_area, over=False)
-        page.merge_transformed_page(footer, to_visible_area, over=True)
+        page.merge_transformed_page(mark, to_visible_area, over=True)
+        page.merge_transformed_page(footer, to_visible_area, over=True)  # Last, so nothing covers it
     writer.add_metadata(identity.metadata)
 
     marked = BytesIO()

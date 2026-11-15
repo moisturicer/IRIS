@@ -120,6 +120,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-674** | RDCO alone decides a download request, cannot decide their own, and only RDCO is notified of a new one | [details](traceability/IR-674.md) | **IMPLEMENTED** |
 | **IR-675** | An approved download request is a time-limited grant used while signed in; no bearer link is issued | [details](traceability/IR-675.md) | **PARTIAL** |
 | **IR-676** | Every copy saved through the download route names who downloaded it, or is not served | [details](traceability/IR-676.md) | **PARTIAL** |
+| **IR-1127** | A downloaded copy's "CIT-U" mark is visible on every page, whatever the paper paints first | [details](traceability/IR-1127.md) | **PARTIAL** |
 | **IR-677** | The paper page shows where the reader's own download stands, and saves a copy only through the download route | [details](traceability/IR-677.md) | **PARTIAL** |
 | **IR-688** | A download request carries the reader's note, a decline or revocation carries RDCO's, the reader may cancel a pending request, and RDCO may … | [details](traceability/IR-688.md) | **PARTIAL** |
 | **IR-743** | The reader may cancel a pending download request on the paper page, sees RDCO's note beside Request again, and has a My Library view of … | [details](traceability/IR-743.md) | **PARTIAL** |
