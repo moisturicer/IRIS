@@ -2,7 +2,7 @@
 
 **Run:** 2026-11-15, code at `ee90ff75` (`main`, after IR-1054). **Proxy tier (ADR-023):** six openly licensed arXiv papers ([corpus](../20261103-ir851-llamaparse-six/corpus.json)); no number here is a finding about CIT-U research.
 
-## Verdict: not eligible — LlamaParse stays
+## Verdict: passed by the owner's decision; the rule as measured failed
 
 ADR-067 decision 2's rule, applied by `manage.py extractor_gate verdict` ([verdict.json](verdict.json)):
 
@@ -12,7 +12,13 @@ ADR-067 decision 2's rule, applied by `manage.py extractor_gate verdict` ([verdi
 | Wrongly nested numbered headings at most LlamaParse's + 5 | 0 | 0 | Pass |
 | No paper with LaTeX under LlamaParse has none under Unstructured | 6 of 6 papers | 6 of 6 papers | Pass |
 
-**By the rule, Unstructured is not eligible and LlamaParse stays.** The rule has no approval step, so this is the gate's outcome. IR-988 stays blocked, ADR-067 records the numbers (amendment of 2026-11-15, IR-989), and IR-980 returns to its owner with this report.
+**As measured, the rule fails on recall.** The other two checks pass. The measured verdict in [verdict.json](verdict.json) is left as computed.
+
+**Decision: the gate passes.** Decided by Jive Tyler Revalde, IR-980's owner, on 2026-11-15. The reason given: the sample is too small for the gap to count.
+- **The margin is smaller than one question.** The set has 14 questions, so one question moves recall by 0.071. The rule's 0.02 margin can therefore only be met by losing no questions at all.
+- **Both lost questions are the hyphen artifact below.** With that one quote trimmed past the hyphen, the arms tie at 0.786.
+
+**Effect.** Unstructured is eligible, IR-988 is unblocked, and ADR-067 records the numbers and the decision (amendment of 2026-11-15, IR-989).
 
 **The LaTeX check passes because of a separate step.** Unstructured's own Formula text is OCR. Its LaTeX comes from IR-1102's Sonnet transcriptions, which were stored for these papers. Without them, every paper would fail this check.
 
@@ -26,7 +32,7 @@ A diagnostic copy of the question set trims that quote past the hyphen ([proxy_i
 | Diagnostic set (q42/q77 quote trimmed) | 0.786 | **0.786** |
 | Final-set recall, diagnostic | 0.714 | **0.786** |
 
-On the diagnostic set the arms tie. They differ in which question each misses: q76 for LlamaParse, q29 for Unstructured. The diagnostic is information for IR-980's owner. It does not change the verdict. It shows where the gap comes from: IR-1054 already recorded 13 main-set labels blocked by the same kept hyphens ("shaping fix, separate"). No Jira issue tracks that fix yet. Running the gate again after such a fix would be a new gate run, not a correction of this one.
+On the diagnostic set the arms tie. They differ in which question each misses: q76 for LlamaParse, q29 for Unstructured. The diagnostic does not change the measured verdict; it is the evidence behind the owner's decision. It shows where the gap comes from: IR-1054 already recorded 13 main-set labels blocked by the same kept hyphens ("shaping fix, separate"). No Jira issue tracks that fix yet. Running the gate again after such a fix would be a new gate run, not a correction of this one.
 
 ## How it was run
 
