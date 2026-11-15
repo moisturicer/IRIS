@@ -155,6 +155,8 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
 /** The footer's "More review actions" menu, opening upward from the bottom of the pane. */
 function MoreMenu({ choices }: { choices: readonly Choice[] }) {
   const [open, setOpen] = useState(false);
+  // Fixed to the viewport: the footer scrolls (`overflow-y: auto`), which would clip a menu opening upward from inside it.
+  const [anchor, setAnchor] = useState<{ right: number; bottom: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -165,8 +167,13 @@ function MoreMenu({ choices }: { choices: readonly Choice[] }) {
     const outside = (e: MouseEvent) => {
       if (!menu.current?.contains(e.target as Node) && !button.current?.contains(e.target as Node)) setOpen(false);
     };
+    const close = () => setOpen(false);
     document.addEventListener("click", outside);
-    return () => document.removeEventListener("click", outside);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("click", outside);
+      window.removeEventListener("resize", close);
+    };
   }, [open]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -189,13 +196,18 @@ function MoreMenu({ choices }: { choices: readonly Choice[] }) {
   return (
     <div className="relative">
       <button ref={button} type="button" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined}
-        aria-label="More review actions" title="More review actions" onClick={() => setOpen((o) => !o)}
+        aria-label="More review actions" title="More review actions" onClick={() => {
+          const r = button.current?.getBoundingClientRect();
+          if (r) setAnchor({ right: window.innerWidth - r.right, bottom: window.innerHeight - r.top + 4 });
+          setOpen((o) => !o);
+        }}
         className={cn("review-control text-stone-600 hover:text-brand", FOCUS_RING)}>
         <i className="fas fa-ellipsis" aria-hidden />
       </button>
-      {open && (
+      {open && anchor && createPortal(
         <div ref={menu} id={id} role="menu" aria-label="More review actions" onKeyDown={onKeyDown}
-          className="absolute bottom-full right-0 z-30 mb-1 min-w-56 rounded-control border border-stone-300 bg-overlay p-1 shadow-sm">
+          style={{ position: "fixed", right: anchor.right, bottom: anchor.bottom }}
+          className="z-50 min-w-56 rounded-control border border-stone-300 bg-overlay p-1 shadow-sm">
           {choices.map((c) => (
             <button key={c.key} type="button" role="menuitem" tabIndex={-1}
               aria-disabled={c.blocked != null || undefined}
@@ -209,7 +221,8 @@ function MoreMenu({ choices }: { choices: readonly Choice[] }) {
               </span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
