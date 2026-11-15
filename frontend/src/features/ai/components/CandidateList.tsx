@@ -79,7 +79,7 @@ export function CandidateList({ listing }: { listing: AnswerListing }) {
       )}
       {others.length > 0 && (
         <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-medium text-stone-500 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 rounded">
+          <summary className="cursor-pointer text-xs font-medium text-stone-500 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 rounded-control">
             {`Other candidates (${others.length})`}
           </summary>
           <ul aria-label="Other candidates" className="mt-1.5 space-y-1">

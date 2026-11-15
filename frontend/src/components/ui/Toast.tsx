@@ -38,7 +38,7 @@ export function ToastContainer() {
           <div
             key={t.id}
             role={t.type === "error" ? "alert" : undefined}
-            className={`pointer-events-auto flex items-start gap-3 w-80 rounded-xl px-4 py-3 shadow-lg
+            className={`pointer-events-auto flex items-start gap-3 w-80 rounded-card px-4 py-3 shadow-lg
               text-body ${kind.tone}`}
           >
             <i className={`fa ${kind.icon} mt-0.5 shrink-0`} aria-hidden />

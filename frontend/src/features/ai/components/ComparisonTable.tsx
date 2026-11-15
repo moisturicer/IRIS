@@ -45,7 +45,7 @@ function PageCitation({ source, record }: {
   return (
     <Link to={to} state={state}
       aria-label={label} title={label}
-      className="inline-flex rounded px-1.5 py-0.5 text-xs font-medium text-brand bg-surface ring-1 ring-stone-300 hover:bg-brand hover:text-white hover:ring-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
+      className="inline-flex rounded-control px-1.5 py-0.5 text-xs font-medium text-brand bg-surface ring-1 ring-stone-300 hover:bg-brand hover:text-white hover:ring-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
       {source.page === null ? "Source" : `p. ${source.page}`}
     </Link>
   );
@@ -87,7 +87,7 @@ export function ComparisonTable({ comparison }: { comparison: AnswerComparison }
     <div className="mb-5">
       {records.length > 0 && (
         <div role="region" aria-labelledby={captionId} tabIndex={0}
-          className="max-w-full overflow-x-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
+          className="max-w-full overflow-x-auto rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
           <table className="w-full border-collapse text-left text-sm text-stone-800">
             <caption id={captionId} className="pb-3 text-left font-semibold text-stone-800">Paper comparison</caption>
             <thead className="bg-stone-50">

@@ -55,7 +55,7 @@ function PersonResult({ person }: { person: PeopleSearchResult }) {
   const paperLabel = `${person.published_paper_count} published paper${person.published_paper_count === 1 ? "" : "s"}`;
 
   return (
-    <article className="flex min-w-0 items-center gap-3 rounded-xl border border-stone-200 bg-white p-3 sm:p-4">
+    <article className="flex min-w-0 items-center gap-3 rounded-card border border-stone-200 bg-white p-3 sm:p-4">
       <PersonAvatar photoUrl={person.photo_url} initials={initialsOf(person)} alt={name} size="sm" />
       <div className="min-w-0 flex-1">
         <Link to={personPath(person.id)} className={cn("font-semibold text-stone-900 underline-offset-2 hover:text-brand hover:underline", FOCUS_RING)}>
@@ -164,21 +164,21 @@ export function DiscoverPeopleResults({ query }: DiscoverPeopleResultsProps) {
       <div className="mb-4 flex flex-wrap gap-3">
         <label className="grid gap-1 text-small font-medium text-stone-700">
           College
-          <select value={college} onChange={(event) => { setCollege(event.target.value); setDepartment(""); }} className="h-11 min-w-44 rounded-lg border border-field bg-white px-3 text-body">
+          <select value={college} onChange={(event) => { setCollege(event.target.value); setDepartment(""); }} className="h-11 min-w-44 rounded-control border border-field bg-white px-3 text-body">
             <option value="">All colleges</option>
             {colleges.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-small font-medium text-stone-700">
           Department
-          <select value={department} onChange={(event) => setDepartment(event.target.value)} disabled={!college} className="h-11 min-w-44 rounded-lg border border-field bg-white px-3 text-body disabled:bg-stone-100">
+          <select value={department} onChange={(event) => setDepartment(event.target.value)} disabled={!college} className="h-11 min-w-44 rounded-control border border-field bg-white px-3 text-body disabled:bg-stone-100">
             <option value="">All departments</option>
             {departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-small font-medium text-stone-700">
           Role
-          <select value={role} onChange={(event) => setRole(event.target.value)} className="h-11 min-w-36 rounded-lg border border-field bg-white px-3 text-body">
+          <select value={role} onChange={(event) => setRole(event.target.value)} className="h-11 min-w-36 rounded-control border border-field bg-white px-3 text-body">
             <option value="">All roles</option>
             {ROLE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
@@ -194,7 +194,7 @@ export function DiscoverPeopleResults({ query }: DiscoverPeopleResultsProps) {
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {results.map((person) => <PersonResult key={person.id} person={person} />)}
               </div>
-              {(nextPage || failure) && <button type="button" onClick={() => failure ? setRetry((value) => value + 1) : setPage((value) => value + 1)} className={cn("mt-6 rounded-lg border border-stone-300 bg-white px-4 py-2 text-small font-semibold text-stone-800 hover:border-brand hover:text-brand", FOCUS_RING)}>{failure ? "Try again" : "Load more people"}</button>}
+              {(nextPage || failure) && <button type="button" onClick={() => failure ? setRetry((value) => value + 1) : setPage((value) => value + 1)} className={cn("mt-6 rounded-control border border-stone-300 bg-white px-4 py-2 text-small font-semibold text-stone-800 hover:border-brand hover:text-brand", FOCUS_RING)}>{failure ? "Try again" : "Load more people"}</button>}
             </>}
     </section>
   );

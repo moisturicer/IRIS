@@ -10,6 +10,7 @@ import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
+import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { Spinner } from "@/components/ui/Spinner";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -60,9 +61,9 @@ type ColumnCount = 1 | 2 | 3;
 
 /** Both segmented controls share one track and one height (IR-1082): the chosen
  *  segment is white and raised (the Selected role), never maroon. */
-const SEGMENT_TRACK = "inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 sm:h-11 sm:p-0.5";
+const SEGMENT_TRACK = "inline-flex shrink-0 items-center rounded-control border border-stone-200 bg-stone-100 p-0 sm:h-11 sm:p-0.5";
 const segmentClass = (chosen: boolean, padding: "px-3" | "px-4" = "px-3") =>
-  cn("h-full min-h-11 rounded-md text-small font-semibold sm:min-h-0", padding, COLOUR_TRANSITION, FOCUS_RING,
+  cn("h-full min-h-11 rounded-control text-small font-semibold sm:min-h-0", padding, COLOUR_TRANSITION, FOCUS_RING,
     chosen ? SELECTED_SEGMENT : "text-stone-700 hover:bg-stone-200");
 
 function readColumns(): ColumnCount {
@@ -678,7 +679,7 @@ export default function DiscoverPage() {
         {hasAreas && (
           <button type="button" onClick={() => setInterestOpen(true)}
             aria-label={interests.classifications.length || interests.psced.length ? "Edit Areas" : "Choose Areas"}
-            className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+            className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-control border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
             <i className="fas fa-compass text-label" aria-hidden />
             <span>Areas</span>
           </button>
@@ -694,7 +695,7 @@ export default function DiscoverPage() {
         <button type="button" onClick={() => chooseColumns(nextColumns)}
           aria-label={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
           title={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
-          className={cn("ml-auto hidden xl:inline-flex h-11 w-11 items-center justify-center rounded-lg border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+          className={cn("ml-auto hidden xl:inline-flex h-11 w-11 items-center justify-center rounded-control border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
           <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
             <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" />
             {columns === 2 && <path d="M8 2.75v10.5" />}
@@ -718,7 +719,7 @@ export default function DiscoverPage() {
         )}
       </div>
       {feedUnchecked && (
-        <section aria-label="Saved feed" className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3">
+        <section aria-label="Saved feed" className="mt-3 rounded-control border border-stone-200 bg-white px-4 py-3">
           <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-small text-stone-700">
             <p>This feed could not be checked right now, so its list is not shown.</p>
             <button type="button" onClick={() => void ensureFeeds(true)}
@@ -733,7 +734,7 @@ export default function DiscoverPage() {
         </section>
       )}
       {activeFeed && (
-        <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3">
+        <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-control border border-stone-200 bg-white px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <p className="text-small font-semibold text-stone-900">Feed: {activeFeed.name}</p>
             {!correctionPending && feedHasCriteria && !sameFeedQuery(activeFeed.query, query) && (
@@ -983,7 +984,7 @@ function InterestChoices({ title, options, selected, onChange }: {
     {options.length ? <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
       {options.map((option) => {
         const checked = selected.includes(option.id);
-        return <label key={option.id} className="flex items-start gap-2 rounded-lg border border-stone-200 p-2.5 text-small text-stone-700">
+        return <label key={option.id} className="flex items-start gap-2 rounded-control border border-stone-200 p-2.5 text-small text-stone-700">
           <input type="checkbox" checked={checked} onChange={() => onChange(checked ? selected.filter((id) => id !== option.id) : [...selected, option.id])} className={cn("mt-0.5 accent-brand", FOCUS_RING)} />
           <span>{option.name}</span>
         </label>;
@@ -997,12 +998,12 @@ function ResultsSkeleton({ columns, onRetry }: { columns: string; onRetry: () =>
   return (
     <LoadingRegion label="Loading research…" onRetry={onRetry} className={cn("grid gap-4", columns)}>
       {Array.from({ length: 4 }, (_, i) => (
-        <div key={i} className="bg-white rounded-xl border border-stone-200 p-card-compact md:p-card">
-          <div className="h-3 w-1/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="mt-3 h-5 w-5/6 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="mt-2 h-5 w-2/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="mt-4 h-3 w-full rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="mt-2 h-3 w-11/12 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+        <div key={i} className="bg-white rounded-card border border-stone-200 p-card-compact md:p-card">
+          <SkeletonBlock className="h-3 w-1/3" />
+          <SkeletonBlock className="mt-3 h-5 w-5/6" />
+          <SkeletonBlock className="mt-2 h-5 w-2/3" />
+          <SkeletonBlock className="mt-4 h-3 w-full" />
+          <SkeletonBlock className="mt-2 h-3 w-11/12" />
         </div>
       ))}
     </LoadingRegion>

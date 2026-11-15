@@ -91,7 +91,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               aria-invalid={invalid ? true : undefined}
               aria-describedby={describedByIds || undefined}
               aria-required={required || undefined}
-              className={`w-full appearance-none border rounded-lg bg-surface outline-none transition-colors
+              className={`w-full appearance-none border rounded-control bg-surface outline-none transition-colors
                 text-stone-900 cursor-pointer
                 ${SIZES[size].control}
                 ${invalid

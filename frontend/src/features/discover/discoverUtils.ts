@@ -61,7 +61,7 @@ export function highlightMatch(
             "mark",
             {
               key: i,
-              className: `${MATCH} rounded-sm px-px`,
+              className: `${MATCH} rounded-none px-px`,
             },
             part,
           )

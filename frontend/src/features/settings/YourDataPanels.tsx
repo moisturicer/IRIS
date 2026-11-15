@@ -188,7 +188,7 @@ export function DeleteAccountPanel() {
       {phase === "ready" && (
         <div className="space-y-5">
           {pending && request ? (
-            <div className="rounded-lg border border-stone-200 p-4 space-y-3" role="group" aria-label="Your deletion request">
+            <div className="rounded-control border border-stone-200 p-4 space-y-3" role="group" aria-label="Your deletion request">
               <p className="text-body font-semibold text-stone-900">
                 Request sent on {formatDate(request.created_at)}, waiting for the System Admin
               </p>
@@ -215,7 +215,7 @@ export function DeleteAccountPanel() {
           ) : (
             <>
               {request?.status === "declined" && (
-                <div className="rounded-lg border border-stone-200 p-4" role="group" aria-label="Your last deletion request">
+                <div className="rounded-control border border-stone-200 p-4" role="group" aria-label="Your last deletion request">
                   <p className="text-body font-semibold text-stone-900">
                     Your last request was rejected{request.decided_at ? ` on ${formatDate(request.decided_at)}` : ""}
                   </p>
@@ -237,7 +237,7 @@ export function DeleteAccountPanel() {
                   </Button>
                 </div>
               ) : (
-                <div className="rounded-lg border border-stone-200 p-4" role="group" aria-label="Delete my account">
+                <div className="rounded-control border border-stone-200 p-4" role="group" aria-label="Delete my account">
                   <p className="text-small text-stone-700">
                     The System Admin deletes your account once they confirm it, and that can't be undone. Until
                     then you can cancel. Send the request?

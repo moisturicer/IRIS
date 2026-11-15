@@ -1,13 +1,30 @@
 import { useId, useRef, type ReactNode } from "react";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 
+/**
+ * The dialog widths (IR-1043; 01-design-system.md "Dialog sizes"). A name, not a
+ * width class, so an unknown size fails type-checking and every dialog is one
+ * of four. `sm` asks a question, `md` is the default form, `lg` is a task with
+ * room for two columns of fields, `xl` is Publish's two-pane step only.
+ * A sheet is full width below `md`, so its width starts there. Both strings
+ * are written out whole so Tailwind finds them.
+ */
+const SIZE_CLASS = {
+  sm: { dialog: "max-w-dialog-sm", sheet: "md:max-w-dialog-sm" },
+  md: { dialog: "max-w-dialog-md", sheet: "md:max-w-dialog-md" },
+  lg: { dialog: "max-w-dialog-lg", sheet: "md:max-w-dialog-lg" },
+  xl: { dialog: "max-w-dialog-xl", sheet: "md:max-w-dialog-xl" },
+} as const;
+
+export type ModalSize = keyof typeof SIZE_CLASS;
+
 interface ModalProps {
   open:     boolean;
   onClose:  () => void;
   title?:   string;
   children: ReactNode;
-  /** px width class, e.g. "max-w-lg". Defaults to "max-w-lg". */
-  size?:    string;
+  /** A named width: "sm", "md", "lg" or "xl". Defaults to "md". */
+  size?:    ModalSize;
   /**
    * Full screen below `md`, a centred dialog above it (spec §4.13). For a
    * dialog that is a task rather than a question, such as Publish.
@@ -24,7 +41,7 @@ export function Modal({
   onClose,
   title,
   children,
-  size = "max-w-lg",
+  size = "md",
   sheet = false,
   footer,
   displayTitle = false,
@@ -54,8 +71,8 @@ export function Modal({
         tabIndex={-1}
         className={
           sheet
-            ? `relative bg-overlay shadow-xl w-full h-full md:h-auto md:rounded-xl ${size} md:max-h-[90vh] flex flex-col outline-none`
-            : `relative bg-overlay rounded-xl shadow-xl w-full ${size} max-h-[90vh] flex flex-col outline-none`
+            ? `relative bg-overlay shadow-xl w-full h-full md:h-auto md:rounded-dialog ${SIZE_CLASS[size].sheet} md:max-h-[90vh] flex flex-col outline-none`
+            : `relative bg-overlay rounded-dialog shadow-xl w-full ${SIZE_CLASS[size].dialog} max-h-[90vh] flex flex-col outline-none`
         }
         role="dialog"
         aria-modal="true"
@@ -72,7 +89,7 @@ export function Modal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center p-1 rounded-md text-stone-500 hover:text-stone-700 hover:bg-stone-100"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center p-1 rounded-control text-stone-500 hover:text-stone-700 hover:bg-stone-100"
               aria-label="Close"
             >
               <i className="fa fa-times text-body" aria-hidden />

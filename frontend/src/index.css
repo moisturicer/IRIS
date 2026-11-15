@@ -54,11 +54,11 @@
   }
 
   .entry-label::after {
-    @apply rounded-bl-xl border-b border-l border-stone-200 bg-canvas;
+    @apply rounded-bl-card border-b border-l border-stone-200 bg-canvas;
   }
 
   .chat-markdown pre {
-    @apply rounded-lg overflow-x-auto text-[12px] p-3;
+    @apply rounded-control overflow-x-auto text-[12px] p-3;
   }
   .chat-markdown pre code {
     @apply bg-transparent text-inherit p-0;
@@ -127,7 +127,7 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: #e5e7eb;
-    border-radius: 3px;
+    border-radius: theme("borderRadius.control");
   }
 }
 
@@ -195,7 +195,7 @@
   color: transparent;
   background-color: #f7e08f;
   mix-blend-mode: multiply;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .textLayer mark.find-hit-current {

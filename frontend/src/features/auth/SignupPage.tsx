@@ -583,7 +583,7 @@ export default function SignupPage() {
                         to={pathname}
                         onClick={(e) => { e.preventDefault(); goTo(owner); }}
                         className={cn(
-                          "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded text-small font-semibold text-brand hover:underline",
+                          "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control text-small font-semibold text-brand hover:underline",
                           FOCUS_RING,
                         )}
                       >
@@ -629,7 +629,7 @@ export default function SignupPage() {
                   {ROLES.map((value) => (
                     <label
                       key={value}
-                      className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-4 py-2.5
+                      className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-control border px-4 py-2.5
                         text-sm font-semibold transition-colors
                         ${role === value
                           ? SELECTED
@@ -670,7 +670,7 @@ export default function SignupPage() {
           {step === 1 && (
             <>
               {roleChangedTo && (
-                <div role="status" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-stone-800">
+                <div role="status" className="rounded-control border border-stone-200 bg-stone-50 px-4 py-3 text-stone-800">
                   <p className="font-semibold">Your role changed to {roleChangedTo}</p>
                   <p className="mt-1 text-small">
                     Your college is kept. Choose a {roleChangedTo === "Adviser" ? "department" : "program"} instead
@@ -763,7 +763,7 @@ export default function SignupPage() {
                   aria-controls={noticeId}
                   onClick={() => setNoticeOpen((v) => !v)}
                   // 44px tall, as sign-in's "Forgot password?" is (2.5.5).
-                  className={`inline-flex min-h-11 items-center gap-1.5 rounded text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
+                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-control text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
                 >
                   <i className={`fas ${noticeOpen ? "fa-chevron-up" : "fa-chevron-down"} text-label`} aria-hidden />
                   Read the data notice
@@ -776,7 +776,7 @@ export default function SignupPage() {
                     // It scrolls, so the keyboard must be able to reach it (axe
                     // scrollable-region-focusable).
                     tabIndex={0}
-                    className="mb-4 max-h-80 overflow-y-auto rounded-lg border border-stone-200 bg-stone-50 px-4 py-3"
+                    className="mb-4 max-h-80 overflow-y-auto rounded-control border border-stone-200 bg-stone-50 px-4 py-3"
                   >
                     <NoticeText notice={notice} headingLevel={3} />
                   </div>
@@ -843,7 +843,7 @@ export default function SignupPage() {
           <Link
             to="/login"
             className={cn(
-              "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand hover:underline",
+              "inline-flex min-h-11 min-w-11 items-center justify-center rounded-control font-semibold text-brand hover:underline",
               FOCUS_RING,
             )}
           >

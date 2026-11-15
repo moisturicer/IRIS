@@ -109,7 +109,7 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
 
       <div className="min-w-0">
         {deleted ? (
-          <div className="inline-block max-w-full rounded-2xl border border-dashed border-stone-300 px-3.5 py-2">
+          <div className="inline-block max-w-full rounded-card border border-dashed border-stone-300 px-3.5 py-2">
             <p className="text-sm italic text-stone-600">{comment.deletion_kind === "writer" ? "[deleted]" : "[removed]"}</p>
           </div>
         ) : editing ? (
@@ -119,7 +119,7 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
             <div className="group flex max-w-full items-center gap-0.5">
               <div
                 className={cn(
-                  "min-w-0 max-w-full rounded-2xl px-3.5 py-2 transition-colors duration-300 motion-reduce:transition-none",
+                  "min-w-0 max-w-full rounded-card px-3.5 py-2 transition-colors duration-300 motion-reduce:transition-none",
                   ctx.highlightId === comment.id ? "bg-stone-200" : "bg-stone-100",
                 )}
               >
@@ -179,7 +179,7 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
                     </svg>
                   </button>
                   {menuOpen && (
-                    <div className="absolute left-0 top-full z-20 mt-1 min-w-40 rounded-xl border border-stone-200 bg-overlay p-1 shadow-card-md">
+                    <div className="absolute left-0 top-full z-20 mt-1 min-w-40 rounded-card border border-stone-200 bg-overlay p-1 shadow-card-md">
                       {own && (
                         <>
                           <MenuItem innerRef={firstItemRef} onClick={() => ctx.startEdit(comment)}>Edit</MenuItem>
@@ -201,7 +201,7 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
                     type="button"
                     aria-label={`Reply to ${name}`}
                     onClick={() => ctx.startReply(comment)}
-                    className="inline-flex min-h-11 items-center rounded-lg px-1.5 text-2xs font-semibold text-stone-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-8"
+                    className="inline-flex min-h-11 items-center rounded-control px-1.5 text-2xs font-semibold text-stone-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-8"
                   >
                     Reply
                   </button>
@@ -242,7 +242,7 @@ function MenuItem({
       type="button"
       onClick={onClick}
       className={cn(
-        "block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-9",
+        "block min-h-11 w-full rounded-control px-3 text-left text-sm hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-9",
         tone === "danger" ? "text-brand" : "text-stone-800",
       )}
     >
@@ -287,7 +287,7 @@ function EditForm({ ctx }: { ctx: CommentContext }) {
         onKeyDown={keyDown}
         maxLength={ctx.maxLength}
         rows={2}
-        className="block max-h-64 w-full resize-none overflow-y-auto rounded-2xl border border-field bg-surface px-3.5 py-2.5 text-sm text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+        className="block max-h-64 w-full resize-none overflow-y-auto rounded-card border border-field bg-surface px-3.5 py-2.5 text-sm text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
       />
       {remaining <= 300 && <p className="mt-1 text-right text-2xs text-stone-600">{remaining} characters remaining</p>}
       <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 pl-1">
@@ -301,7 +301,7 @@ function EditForm({ ctx }: { ctx: CommentContext }) {
         <button
           type="button"
           onClick={ctx.cancelEdit}
-          className="inline-flex min-h-11 items-center rounded-lg text-small text-stone-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-9"
+          className="inline-flex min-h-11 items-center rounded-control text-small text-stone-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand reading-split:min-h-9"
         >
           Cancel edit
         </button>

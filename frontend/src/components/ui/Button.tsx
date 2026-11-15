@@ -81,7 +81,7 @@ const SIZE_CLASSES: Record<Size, string> = {
   // beside a desktop pointer: the height of every other control (IR-569). It
   // keeps the 0.75rem radius: DESIGN.md gives reading controls that shape, and
   // a label-less glyph is a different role from a labelled action.
-  icon: "rounded-lg font-medium w-11 h-11 lg:w-9 lg:h-9 touch:w-11 touch:h-11 justify-center text-xs",
+  icon: "rounded-control font-medium w-11 h-11 lg:w-9 lg:h-9 touch:w-11 touch:h-11 justify-center text-xs",
 };
 
 /** The one place a button's look is assembled, for `Button` and `ButtonLink` alike. */

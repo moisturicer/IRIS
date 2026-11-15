@@ -3,7 +3,7 @@ export { Input }          from "./Input";
 export { Select }         from "./Select";
 export { Badge }          from "./Badge";
 export { Spinner }        from "./Spinner";
-export { Skeleton }       from "./Skeleton";
+export { Skeleton, SkeletonBlock } from "./Skeleton";
 export { Modal }          from "./Modal";
 export { Tooltip }        from "./Tooltip";
 export { Card, CardHeader } from "./Card";

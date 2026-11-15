@@ -148,7 +148,7 @@ export function AdviserCombobox({
         role="listbox"
         aria-label="Advisers"
         hidden={!listShown}
-        className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
+        className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-control border border-stone-200 bg-white py-1 shadow-lg"
       >
         {options.map((adviser) => {
           const isSelf = adviser.id === selfId;
@@ -184,7 +184,7 @@ export function AdviserCombobox({
         })}
       </ul>
       {open && options.length === 0 && (
-        <p className="absolute z-10 mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-small text-stone-600 shadow-lg">
+        <p className="absolute z-10 mt-1 w-full rounded-control border border-stone-200 bg-white px-3 py-2 text-small text-stone-600 shadow-lg">
           {advisers.length === 0 ? "No advisers are registered yet. Contact RDCO." : "No adviser matches that name."}
         </p>
       )}

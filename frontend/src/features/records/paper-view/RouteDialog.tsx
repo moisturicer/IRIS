@@ -157,7 +157,7 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
                 // reviewer must be chosen -- and the dialog says so.
                 const needsNominee = choice.ticked && target.already_holds && !choice.nominees.length;
                 return (
-                  <li key={target.party} className="rounded-lg border border-stone-200 px-3 py-2.5">
+                  <li key={target.party} className="rounded-control border border-stone-200 px-3 py-2.5">
                     <div className="flex items-start gap-2.5">
                       <input
                         id={checkId}

@@ -60,7 +60,7 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
       aria-haspopup="dialog"
       onClick={(event) => { event.preventDefault(); setInformation(label); }}
       className={cn(
-        "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
+        "inline-flex min-h-11 min-w-11 items-center justify-center rounded-control font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
         FOCUS_RING,
       )}
     >
@@ -93,7 +93,7 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
             <p>Sign in with your registered email address and password.</p>
             <p>To join IRIS, choose Create an account, complete your details, and verify your email.
               An administrator reviews your role request before you can access the workspace.</p>
-            <Link to="/password/forgot" className={cn("inline-flex min-h-11 items-center rounded font-semibold text-brand underline", FOCUS_RING)}>
+            <Link to="/password/forgot" className={cn("inline-flex min-h-11 items-center rounded-control font-semibold text-brand underline", FOCUS_RING)}>
               Reset your password
             </Link>
           </div>
@@ -142,10 +142,10 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
         >
           <div className="relative z-10 flex gap-1">{tabs}</div>
           <div
-            className="absolute inset-x-0 bottom-0 top-11 -z-10 translate-x-2 translate-y-2 rounded-xl border border-stone-200 bg-stone-100"
+            className="absolute inset-x-0 bottom-0 top-11 -z-10 translate-x-2 translate-y-2 rounded-card border border-stone-200 bg-stone-100"
             aria-hidden
           />
-          <div className="rounded-b-xl rounded-tr-xl border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
+          <div className="rounded-b-card rounded-tr-card border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
             {children}
           </div>
         </div>
@@ -174,7 +174,7 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
  */
 export function EntryTab({ children }: { children: ReactNode }) {
   return (
-    <span className="entry-label -mb-px rounded-tl-xl rounded-tr-xl border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
+    <span className="entry-label -mb-px rounded-tl-card rounded-tr-card border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
       {children}
     </span>
   );

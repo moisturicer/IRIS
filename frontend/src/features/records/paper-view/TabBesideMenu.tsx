@@ -68,7 +68,7 @@ export function TabBesideMenu<Id extends string>({ choices, onChoose }: {
       {open && (
         <div
           ref={menu} id={id} role="menu" aria-label="Open a tab beside this one" onKeyDown={onKeyDown}
-          className="absolute right-0 top-full z-30 mt-1 min-w-44 rounded-lg border border-stone-300 bg-overlay p-1 shadow-sm"
+          className="absolute right-0 top-full z-30 mt-1 min-w-44 rounded-control border border-stone-300 bg-overlay p-1 shadow-sm"
         >
           {choices.map(({ id: choice, label }) => (
             <button

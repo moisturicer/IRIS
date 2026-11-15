@@ -120,7 +120,7 @@ function RequestCard({
       : null;
 
   return (
-    <li aria-labelledby={headingId} className="bg-white rounded-xl border border-stone-200 p-4">
+    <li aria-labelledby={headingId} className="bg-white rounded-card border border-stone-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id={headingId} className="text-body font-semibold text-stone-900 break-words">

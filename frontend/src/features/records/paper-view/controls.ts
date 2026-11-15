@@ -18,7 +18,7 @@ export const CONTROL_SIZE = "min-h-11 reading-split:min-h-9";
 /** The same, for a control with no label. */
 export const CONTROL_SQUARE = "w-11 h-11 reading-split:w-9 reading-split:h-9";
 
-export const CONTROL_SHAPE = "rounded-lg";
+export const CONTROL_SHAPE = "rounded-control";
 
 export const CONTROL_TEXT = "text-small font-semibold";
 

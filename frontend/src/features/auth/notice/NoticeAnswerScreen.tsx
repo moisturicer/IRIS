@@ -153,7 +153,7 @@ export function NoticeAnswerScreen() {
 
   return (
     <main className="min-h-screen bg-stone-50 px-4 py-8 sm:py-12">
-      <div className="mx-auto max-w-2xl rounded-xl border border-stone-200 bg-white p-5 sm:p-8">
+      <div className="mx-auto max-w-2xl rounded-card border border-stone-200 bg-white p-5 sm:p-8">
         <h1 ref={headingRef} tabIndex={-1} className="text-title font-bold text-stone-900 focus:outline-none">
           Read and answer the data notice
         </h1>
@@ -186,7 +186,7 @@ export function NoticeAnswerScreen() {
                 {alert.message}
               </AuthAlert>
             )}
-            <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-stone-200 bg-stone-50 px-4 py-3" tabIndex={0} role="region" aria-label="Data notice">
+            <div className="max-h-[50vh] overflow-y-auto rounded-control border border-stone-200 bg-stone-50 px-4 py-3" tabIndex={0} role="region" aria-label="Data notice">
               <NoticeText notice={notice} />
             </div>
             <NoticeAnswerFields value={answers} onChange={setAnswers} errors={errors} previousAi={previousAi} />
@@ -209,7 +209,7 @@ export function NoticeAnswerScreen() {
             )}
           </div>
           {(deletion === "confirming" || deletion === "sending") && (
-            <div className="mt-4 rounded-lg border border-stone-200 px-4 py-3" role="group" aria-label="Request account deletion">
+            <div className="mt-4 rounded-control border border-stone-200 px-4 py-3" role="group" aria-label="Request account deletion">
               <p className="text-small text-stone-700">
                 Your account is deleted once the System Admin confirms it, which they do only when nobody is waiting
                 on you. Send the request?

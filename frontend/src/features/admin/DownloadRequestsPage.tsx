@@ -161,7 +161,7 @@ export default function DownloadRequestsPage() {
           message={filterStatus === "pending" ? "No requests are currently pending." : "No requests match this filter."}
         />
       ) : (
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <div className="bg-white rounded-card border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
             <span className="text-small text-stone-500 font-medium">
               {requests.length} request{requests.length !== 1 ? "s" : ""}{read.hasMore ? " shown" : ""}

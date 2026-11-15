@@ -127,7 +127,7 @@ export function DownloadRequestsView() {
     return (
       <LoadingRegion label="Loading your download requests…" onRetry={reload} className="space-y-3">
         {[0, 1].map((i) => (
-          <div key={i} className="h-24 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" />
+          <div key={i} className="h-24 rounded-card border border-stone-200 bg-white motion-safe:animate-pulse" />
         ))}
       </LoadingRegion>
     );
@@ -161,7 +161,7 @@ export function DownloadRequestsView() {
       <p className="mb-3 text-small text-stone-600">
         Every copy you download carries your name. RDCO decides each request.
       </p>
-      <ul className="divide-y divide-stone-100 overflow-hidden rounded-2xl border border-stone-200 bg-white">
+      <ul className="divide-y divide-stone-100 overflow-hidden rounded-card border border-stone-200 bg-white">
         {requests.map((request) => (
           <RequestRow
             key={request.id}

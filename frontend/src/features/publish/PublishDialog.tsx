@@ -818,7 +818,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       title="Publish your research"
       displayTitle
       sheet
-      size={phase.kind === "form" && step === 2 ? "max-w-[1180px]" : "max-w-[720px]"}
+      size={phase.kind === "form" && step === 2 ? "xl" : "lg"}
       footer={footer}
     >
       <span role="status" className="sr-only">
@@ -830,7 +830,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           role="alertdialog"
           aria-labelledby="publish-close-title"
           aria-describedby="publish-close-body"
-          className="mb-section rounded-xl border border-stone-300 bg-stone-50 p-card-compact"
+          className="mb-section rounded-card border border-stone-300 bg-stone-50 p-card-compact"
         >
           <p id="publish-close-title" className="text-body font-medium text-stone-900">Stop the upload and close?</p>
           <p id="publish-close-body" className="mt-1 text-small text-stone-600">

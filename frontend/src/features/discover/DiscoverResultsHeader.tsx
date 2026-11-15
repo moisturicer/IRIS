@@ -35,7 +35,7 @@ export function DiscoverResultsHeader({ count, showSort, sort, onSort }: Discove
             id={sortId}
             value={sort}
             onChange={(event) => onSort(event.target.value as DiscoverSort)}
-            className={cn("h-11 rounded-lg border border-field bg-white px-3 text-small font-medium text-stone-800 hover:border-stone-500", COLOUR_TRANSITION, FOCUS_RING)}
+            className={cn("h-11 rounded-control border border-field bg-white px-3 text-small font-medium text-stone-800 hover:border-stone-500", COLOUR_TRANSITION, FOCUS_RING)}
           >
             {SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>

@@ -53,7 +53,7 @@ export function SelectionMenu({ actions, position, onChoose }: {
       role="group"
       aria-label="Selected text actions"
       className={cn(
-        "z-20 flex flex-wrap gap-1 rounded-xl border border-stone-300 bg-white p-1 shadow-card",
+        "z-20 flex flex-wrap gap-1 rounded-card border border-stone-300 bg-white p-1 shadow-card",
         // Beside the passage when it is placed; otherwise a plain row under the toolbar.
         position ? "fixed" : "sticky top-2 mx-auto w-fit",
       )}

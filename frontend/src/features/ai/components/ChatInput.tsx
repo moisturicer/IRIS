@@ -94,7 +94,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, beside, pl
           aria-label="Stop research"
           title="Stop"
         >
-          <span aria-hidden className="size-3 rounded-[3px] bg-current" />
+          <span aria-hidden className="size-3 rounded-none bg-current" />
         </button> : <button
           type="submit"
           disabled={disabled || sendDisabled || !text.trim()}

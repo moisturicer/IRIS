@@ -102,7 +102,7 @@ export default function SessionsPage() {
 
       {/* Sessions table */}
       {!loading && sessions.length > 0 && (
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <div className="bg-white rounded-card border border-stone-200 overflow-hidden">
           {/* Count badge */}
           <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
             <span className="text-small text-stone-500 font-medium">

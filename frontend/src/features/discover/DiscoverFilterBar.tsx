@@ -171,7 +171,7 @@ export function DiscoverFilterBar({
           aria-controls={open ? panelId : undefined}
           aria-label={count ? `Filters, ${count} active` : "Filters"}
           className={cn(
-            "relative inline-flex h-11 px-3 items-center justify-center gap-2 rounded-lg border text-small font-medium",
+            "relative inline-flex h-11 px-3 items-center justify-center gap-2 rounded-control border text-small font-medium",
             COLOUR_TRANSITION,
             FOCUS_RING,
             count > 0 ? SELECTED : "bg-white border-stone-300 text-stone-700",
@@ -192,11 +192,11 @@ export function DiscoverFilterBar({
         </button>
 
       {open && <div id={panelId} role="dialog" aria-label="Filters"
-        className="fixed inset-x-4 bottom-4 z-50 flex max-h-[min(80dvh,34rem)] flex-col rounded-xl border border-stone-200 bg-white shadow-card-md sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]">
+        className="fixed inset-x-4 bottom-4 z-50 flex max-h-[min(80dvh,34rem)] flex-col rounded-card border border-stone-200 bg-white shadow-card-md sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]">
         <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
           <h2 className="text-small font-semibold text-stone-900">Filters</h2>
           <button type="button" ref={closeRef} onClick={() => { setOpen(false); triggerRef.current?.focus(); }} aria-label="Close filters"
-            className={cn("flex h-9 w-9 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
+            className={cn("flex h-9 w-9 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
             <i className="fas fa-xmark text-small" aria-hidden />
           </button>
         </div>

@@ -257,7 +257,7 @@ export default function UserListPage() {
           action={<Button variant="outline" size="sm" onClick={() => load(page)}>Try again</Button>}
         />
       ) : (
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="bg-white rounded-card border border-stone-200 overflow-hidden">
         <DataTable
           caption="User accounts"
           data={users}

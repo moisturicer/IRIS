@@ -134,7 +134,7 @@ function RetentionItem({ type, saved, lastRun }: { type: RetentionType; saved: s
   };
 
   return (
-    <li aria-labelledby={headingId} className="bg-white rounded-xl border border-stone-200 p-4">
+    <li aria-labelledby={headingId} className="bg-white rounded-card border border-stone-200 p-4">
       <h2 id={headingId} className="text-body font-semibold text-stone-900">{type.label}</h2>
       <p className="mt-1 text-body text-stone-700 leading-relaxed">{type.description}</p>
 

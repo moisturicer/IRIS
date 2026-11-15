@@ -18,10 +18,10 @@ interface PaperDocumentsProps {
  */
 export function PaperDocuments({ files, manageHref }: PaperDocumentsProps) {
   return (
-    <section className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
+    <section className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card">
       <div className="flex items-center justify-between gap-3 mb-3">
         <RailHeading>Documents</RailHeading>
-        <span className="min-w-[1.25rem] px-1.5 h-5 rounded-md bg-stone-100 text-stone-700 text-2xs font-bold flex items-center justify-center">
+        <span className="min-w-[1.25rem] px-1.5 h-5 rounded-control bg-stone-100 text-stone-700 text-2xs font-bold flex items-center justify-center">
           {files.length}
         </span>
       </div>
@@ -35,7 +35,7 @@ export function PaperDocuments({ files, manageHref }: PaperDocumentsProps) {
           {files.map((file) => {
             const inner = (
               <>
-                <span className="w-8 h-8 rounded-lg bg-stone-100 text-brand flex items-center justify-center shrink-0">
+                <span className="w-8 h-8 rounded-control bg-stone-100 text-brand flex items-center justify-center shrink-0">
                   <i className="fas fa-file-lines text-xs" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -63,12 +63,12 @@ export function PaperDocuments({ files, manageHref }: PaperDocumentsProps) {
                     href={file.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-2.5 py-2 hover:border-stone-300 hover:shadow-card-md transition-colors"
+                    className="flex items-center gap-2.5 rounded-card border border-stone-200 px-2.5 py-2 hover:border-stone-300 hover:shadow-card-md transition-colors"
                   >
                     {inner}
                   </a>
                 ) : (
-                  <div className="flex items-center gap-2.5 rounded-xl border border-stone-200 px-2.5 py-2 opacity-70">
+                  <div className="flex items-center gap-2.5 rounded-card border border-stone-200 px-2.5 py-2 opacity-70">
                     {inner}
                   </div>
                 )}

@@ -63,7 +63,7 @@ function MethodDisclosure({ children }: { children: ReactNode }) {
         aria-controls={open ? bodyId : undefined}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
         className={cn(
-          "-ml-1.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1",
+          "-ml-1.5 inline-flex items-center gap-1.5 rounded-control px-1.5 py-1",
           "text-sm font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900",
           COLOUR_TRANSITION,
           FOCUS_RING,
@@ -80,7 +80,7 @@ function MethodDisclosure({ children }: { children: ReactNode }) {
       </button>
       {open && (
         <div id={bodyId} role="region" aria-label="How these numbers are counted"
-             className="mt-2 max-w-3xl space-y-3 rounded-md bg-stone-50 p-4 text-sm text-stone-700">
+             className="mt-2 max-w-3xl space-y-3 rounded-control bg-stone-50 p-4 text-sm text-stone-700">
           {children}
         </div>
       )}
@@ -200,7 +200,7 @@ export default function ReviewAnalyticsPage() {
       ) : data && (
         <div aria-busy={loading}>
           {loading && <p role="status" className="mb-3 text-sm text-stone-600">Updating…</p>}
-          <p className="mb-6 max-w-3xl rounded-md bg-stone-50 p-3 text-sm text-stone-700">
+          <p className="mb-6 max-w-3xl rounded-control bg-stone-50 p-3 text-sm text-stone-700">
             {data.data_since
               ? <>Figures start on {formatDate(data.data_since)}, the first workflow event recorded for {data.parties.length > 1 ? "these offices" : "this office"}. Work before then was never logged, so it is absent from these figures, not counted as zero.</>
               : <>No workflow events have been recorded yet, so there is nothing to measure.</>}

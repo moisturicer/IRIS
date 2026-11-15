@@ -176,7 +176,7 @@ function Choice({
 }) {
   const id = useId();
   return (
-    <div className="flex items-start gap-2.5 rounded-lg border border-stone-200 px-3 py-2">
+    <div className="flex items-start gap-2.5 rounded-control border border-stone-200 px-3 py-2">
       <input
         type="radio"
         id={id}
