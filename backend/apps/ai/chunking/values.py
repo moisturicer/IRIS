@@ -71,6 +71,8 @@ class ChunkingOptions:
     exclude_sections: tuple[str, ...] = ()
     # Transcribed formulas in the embedded and keyword text (IR-1102).
     index_formulas: bool = False
+    # Figures as passages of their own, out of the text flow (IR-1054).
+    figure_passages: bool = False
 
     def __post_init__(self) -> None:
         if self.max_tokens < 1:

@@ -35,7 +35,7 @@ from apps.records.models import Classification, DeleteRequest, DownloadRequest, 
 from apps.reviews import revisions, seats
 from apps.reviews.models import ReviewComment, ReviewerSeat, SavedReply
 from apps.reviews.routing import accept_and_route, enter_at_adviser, route
-from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName, ThreadSeverity
+from core.enums import CallStatus, Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName, ThreadSeverity
 
 #: The matrix's columns, in the order every table row lists them.
 ROLES = (
@@ -351,6 +351,7 @@ def build_world() -> World:
         title="Matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
         posted_by=users["rdco"], opportunity_type="conference", location="Cebu City",
         external_url="https://example.org/call", description="A matrix call.",
+        status=CallStatus.CONFIRMED,
     )
     # A complete Call, so an allowed edit is answered 200, not 400 (IR-760).
     matrix_area = Classification.objects.get_or_create(name="Matrix Area")[0]
@@ -368,6 +369,15 @@ def build_world() -> World:
         title="Adviser's matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
         posted_by=users["adviser"], opportunity_type="conference", location="Cebu City",
         external_url="https://example.org/call", description="A matrix call.",
+        status=CallStatus.CONFIRMED,
     )
     o["adviser_opportunity"].areas.set([matrix_area])
+    # IR-762: an Adviser's Call waiting for RDCO, seen only by its Adviser and RDCO.
+    o["pending_opportunity"] = Opportunity.objects.create(
+        title="Adviser's waiting call", due_date=timezone.now().date()+timedelta(days=10),
+        posted_by=users["adviser"], opportunity_type="conference", location="Cebu City",
+        external_url="https://example.org/call", description="A matrix call.",
+        status=CallStatus.PENDING,
+    )
+    o["pending_opportunity"].areas.set([matrix_area])
     return world

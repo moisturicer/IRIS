@@ -63,7 +63,21 @@ function call(overrides: Partial<Opportunity> = {}): Opportunity {
     updated_at: "2026-10-01T00:00:00Z",
     days_left: 20,
     is_closed: false,
+    papers_state: "accepting",
+    papers_label: "Accepting papers",
+    event_state: null,
+    event_label: null,
+    status: "confirmed",
+    status_label: "Confirmed",
+    review_reason: "",
+    reviewed_at: null,
     can_edit: false,
+    can_delete: false,
+    can_remove: false,
+    can_confirm: false,
+    can_reject: false,
+    can_feature: false,
+    edit_returns_to_pending: false,
     ...overrides,
   };
 }
@@ -71,7 +85,7 @@ function call(overrides: Partial<Opportunity> = {}): Opportunity {
 const soon    = () => call({ id: 101, title: "Workshop on Edge AI", opportunity_type: "workshop", type_display: "Workshop", days_left: 3, due_date: "2026-10-14" });
 const month   = () => call({ id: 102, title: "ICACSIS 2026 paper deadline", days_left: 19, due_date: "2026-10-30" });
 const later   = () => call({ id: 103, title: "Energy Letters special issue", opportunity_type: "journal", type_display: "Journal", days_left: 60, due_date: "2026-12-10", location: "Online", area_names: ["Clean Energy"] });
-const closed  = () => call({ id: 104, title: "Last term's symposium", opportunity_type: "symposium", type_display: "Symposium", days_left: -4, is_closed: true, due_date: "2026-10-07" });
+const closed  = () => call({ id: 104, title: "Last term's symposium", opportunity_type: "symposium", type_display: "Symposium", days_left: -4, is_closed: true, papers_state: "closed", papers_label: "Submissions closed", due_date: "2026-10-07" });
 
 function serve(items: Opportunity[], canPost = false) {
   board.mockResolvedValue({ items, can_post: canPost });

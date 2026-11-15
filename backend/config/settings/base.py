@@ -387,6 +387,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.accounts.tasks.expire_unverified_registrations",
         "schedule": crontab(hour=3, minute=0),
     },
+    # ADR-050 decision 9, amended (IR-762): delete Call requests whose paper
+    # deadline has passed, daily at 00:15 Manila, just after the deadline day ends.
+    "lapsed-call-requests": {
+        "task": "apps.opportunities.tasks.remove_lapsed_requests",
+        "schedule": crontab(hour=0, minute=15),
+    },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due
     # retries, expires stale intents and purges terminal records. Its interval
@@ -674,6 +680,10 @@ AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
 AI_ADMISSION_EXTRACTION_CREDIT_USD = config("AI_ADMISSION_EXTRACTION_CREDIT_USD", default="")
 AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", default="")
 AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", default="")
+# IR-983: Unstructured's flat US$ per page; required only when it reads. No default.
+AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE = config(
+    "AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE", default=""
+)
 # IR-846: LlamaExtract's credits per page, on the same credit price. Required
 # for Publish's LlamaExtract reading only; unset refuses it and Publish falls back.
 AI_ADMISSION_METADATA_CREDITS_PER_PAGE = config("AI_ADMISSION_METADATA_CREDITS_PER_PAGE", default="")
@@ -845,6 +855,12 @@ AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False,
 # also enter the chunk's embedded and keyword-indexed text. Read at chunking,
 # so moving it needs a re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
 AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
+
+# Figures as passages of their own in the structural strategy (IR-1054): each
+# captioned or described Figure leaves the text flow and is citable alone.
+# Read at chunking, so moving it needs a re-chunk. On since measured
+# (docs/evaluation/runs/2026-11-15-ir1054-hybrid/, ADR-067 IR-1054 amendment).
+AI_CHUNK_FIGURE_PASSAGES = config("AI_CHUNK_FIGURE_PASSAGES", default=True, cast=bool)
 
 # ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
 # Modes in apps/ai/retrieval/reranker_input.py. fallback since IR-1125 (ADR-033).

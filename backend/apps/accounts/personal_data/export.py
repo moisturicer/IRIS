@@ -593,6 +593,10 @@ def opportunities_posted(user) -> list[dict]:
             "start_date": row.start_date,
             "end_date": row.end_date,
             "registration_fee": row.registration_fee,
+            # Where it stands with RDCO, and RDCO's reason while rejected (IR-762):
+            # both are already shown to the poster in the app.
+            "status": row.status,
+            "review_reason": row.review_reason,
             "posted_at": row.created_at,
             "updated_at": row.updated_at,
         }

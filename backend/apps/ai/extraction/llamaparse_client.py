@@ -111,6 +111,7 @@ def _first_timeout(key: str) -> bool:
 
 class LlamaParseExtractor:
     leaves_campus = True
+    extractor_name = EXTRACTOR_NAME
 
     def __init__(
         self,

@@ -57,6 +57,12 @@ EXTRACTION_SETTINGS = (
     "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE",
 )
 
+#: Unstructured's flat price per page (IR-983), held as one credit a page.
+#: IR-988 deletes the LlamaParse keys above and this branch with them.
+LLAMAPARSE = "llamaparse"
+UNSTRUCTURED = "unstructured"
+UNSTRUCTURED_EXTRACTION_SETTINGS = ("AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE",)
+
 #: What a LlamaExtract reading of a parsed Manuscript costs per page (IR-846).
 #: Its credit is priced by ``AI_ADMISSION_EXTRACTION_CREDIT_USD``, the same
 #: account's. Unset refuses the reading, and Publish falls back.
@@ -240,6 +246,8 @@ class ExtractionPrice:
     credit_usd: Decimal
     credits_per_page: Decimal
     addon_credits_per_page: Decimal
+    #: Billed by the page, so reported pages settle a read without credits.
+    billed_per_page: bool = False
 
     def micros(self, credits: Decimal) -> int:
         return math.ceil(credits * self.credit_usd * 1_000_000)
@@ -259,11 +267,32 @@ def _decimal(name: str, *, allow_zero: bool = False) -> Decimal:
     return value
 
 
-def read_extraction_price() -> ExtractionPrice:
-    """The extraction price, or `NotConfigured` naming the unset settings."""
-    missing = [name for name in EXTRACTION_SETTINGS if not _raw(name)]
+def selected_extractor() -> str:
+    from apps.ai.extraction import selection
+
+    return selection.selected_backend()
+
+
+def extraction_settings(extractor: Optional[str] = None) -> tuple[str, ...]:
+    """The price settings the named (or selected) Extractor needs."""
+    if (extractor or selected_extractor()) == UNSTRUCTURED:
+        return UNSTRUCTURED_EXTRACTION_SETTINGS
+    return EXTRACTION_SETTINGS
+
+
+def read_extraction_price(extractor: Optional[str] = None) -> ExtractionPrice:
+    """The named (or selected) Extractor's price, or `NotConfigured` naming the unset settings."""
+    names = extraction_settings(extractor)
+    missing = [name for name in names if not _raw(name)]
     if missing:
         raise NotConfigured(", ".join(missing))
+    if names == UNSTRUCTURED_EXTRACTION_SETTINGS:
+        return ExtractionPrice(
+            credit_usd=_decimal(names[0]),
+            credits_per_page=Decimal(1),
+            addon_credits_per_page=Decimal(0),
+            billed_per_page=True,
+        )
     return ExtractionPrice(
         credit_usd=_decimal("AI_ADMISSION_EXTRACTION_CREDIT_USD"),
         credits_per_page=_decimal("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE"),
@@ -305,7 +334,13 @@ def verify_admission_configuration() -> None:
             f"AI_PROVIDER_ADMISSION must be one of {', '.join(MODES)}, not {mode()!r}"
         )
     if enforcing():
-        for read in (read_limits, read_extraction_price, read_metadata_price):
+        reads = (
+            read_limits,
+            lambda: read_extraction_price(LLAMAPARSE),
+            lambda: read_extraction_price(UNSTRUCTURED),
+            read_metadata_price,
+        )
+        for read in reads:
             try:
                 read()
             except NotConfigured:

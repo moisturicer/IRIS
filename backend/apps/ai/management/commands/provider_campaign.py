@@ -13,7 +13,12 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Count
 
 from apps.ai.admission.ledger import ALIAS
-from apps.ai.admission.limits import NotConfigured, read_limits
+from apps.ai.admission.limits import (
+    NotConfigured,
+    read_extraction_price,
+    read_limits,
+    selected_extractor,
+)
 from apps.ai.models import ProviderCampaign, ProviderReservation
 from apps.ai.models.admission import OPEN
 
@@ -29,6 +34,10 @@ class Command(BaseCommand):
         campaign = ProviderCampaign.objects.using(ALIAS).filter(key=limits.campaign_key).first()
         out = self.stdout
         out.write(f"campaign {limits.campaign_key}")
+        try:
+            read_extraction_price()
+        except NotConfigured as unset:
+            out.write(f"  extraction price ({selected_extractor()}) not configured: {unset}")
         if campaign is None:
             out.write("  nothing charged yet")
             return

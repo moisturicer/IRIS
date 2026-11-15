@@ -10,15 +10,15 @@ A window is labelled with the trail of its first piece that is not a heading
 headings. The trail is counted inside the target (IR-1050).
 """
 
-from ..assembly import Draft, body_budget, finalize
-from ..document import DocumentElement, NormalizedDocument
-from ..outline import HeadingStack, bounded_trail, embedded_text
-from ..packing import JOIN, reader_content
-from ..regions import regions_for
-from ..registry import register_chunker
-from ..text_splitting import grapheme_safe_split, split_into_token_groups
-from ..tokens import count_tokens
-from ..values import ChunkingOptions, ChunkSet
+from apps.ai.chunking.assembly import Draft, body_budget, finalize
+from apps.ai.chunking.document import DocumentElement, NormalizedDocument
+from apps.ai.chunking.outline import HeadingStack, bounded_trail, embedded_text
+from apps.ai.chunking.packing import JOIN, reader_content
+from apps.ai.chunking.regions import regions_for
+from apps.ai.chunking.registry import register_chunker
+from apps.ai.chunking.text_splitting import grapheme_safe_split, split_into_token_groups
+from apps.ai.chunking.tokens import count_tokens
+from apps.ai.chunking.values import ChunkingOptions, ChunkSet
 
 STRATEGY_ID = "fixed-window"
 
@@ -26,7 +26,7 @@ STRATEGY_ID = "fixed-window"
 _Piece = tuple[str, DocumentElement, tuple[str, ...], tuple[str, ...]]
 
 
-@register_chunker(STRATEGY_ID)
+@register_chunker(STRATEGY_ID, evaluation_only=True)
 class FixedWindowChunker:
     """Packs consecutive elements into windows under the target size."""
 

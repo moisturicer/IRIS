@@ -35,6 +35,8 @@ class TaskKind(models.TextChoices):
     ROLE_REQUEST = "role_request", "A role request"
     #: The id is the reported Comment's: its reports, not one of them (IR-691).
     COMMENT_REPORT = "comment_report", "A reported comment"
+    # IR-762: an Adviser's Call waiting for RDCO (ADR-050 decision 8).
+    CALL_REQUEST = "call_request", "A Call waiting for RDCO"
 
 
 class NotificationQuerySet(models.QuerySet):

@@ -45,7 +45,8 @@ Tuning the number against IR-133's recall@10 evidence remains open.
 import pytest
 
 from apps.ai.chunking import assembly, outline, packing, text_splitting, tokens
-from apps.ai.chunking.strategies import fixed_window, structural
+from apps.ai.chunking.strategies import structural
+from apps.ai.evaluation import fixed_window
 from apps.ai.chunking.strategies.structural import STRATEGY_ID, StructuralCascadeChunker
 from apps.ai.chunking.tests.fixtures.prose_document import prose_document
 from apps.ai.chunking.values import ChunkingOptions
