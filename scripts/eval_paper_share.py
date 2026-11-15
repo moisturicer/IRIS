@@ -32,7 +32,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.development")
 django.setup()
 
 from ai.research.selection import Hit, Policy, choose, neighbour_positions, select  # noqa: E402
-from ai.research.tools import CANDIDATES, CONFIG  # noqa: E402
+from ai.research.tools import CANDIDATES, CONFIG, PAPER_FIRST_RECORDS, fuse_by_rank  # noqa: E402
 from apps.ai.evaluation.labels import load_question_set  # noqa: E402
 
 SHARES = (0, 25, 33, 50, 75, 100)
@@ -48,6 +48,14 @@ KEYWORD = (f"""WITH q AS (SELECT replace(plainto_tsquery('{CONFIG}', %(query)s):
     SELECT {COLUMNS}, ts_rank(c.search_vector, q.q) AS rank {SETS} AND c.search_vector @@ q.q
      ORDER BY rank DESC, c.id LIMIT %(n)s""").replace("FROM ai_documentchunk c", "FROM q, ai_documentchunk c")
 NEIGHBOURS = f"SELECT {COLUMNS} {SETS} AND (c.chunk_set_id, c.sequence) IN %(positions)s"
+# hybrid_search's two vector reads (IR-886), over the same chunk sets and their stored vectors.
+_VECTORS = "JOIN ai_chunkembedding v ON v.chunk_id = c.id AND v.space_id = %(space)s WHERE"
+FLAT = (f"SELECT {COLUMNS} {SETS.replace('WHERE', _VECTORS)}"
+        " ORDER BY v.embedding <=> %(vector)s::vector, c.id LIMIT %(n)s")
+PAPER_FIRST = (
+    "WITH papers AS (SELECT e.record_id FROM ai_recordspaceembedding e WHERE e.space_id = %(space)s"
+    "  ORDER BY e.embedding <=> %(vector)s::vector, e.record_id LIMIT %(papers)s) "
+    + FLAT.replace("WHERE c.deleted_at", "JOIN papers p ON p.record_id = c.record_id WHERE c.deleted_at"))
 
 
 class Passage:
@@ -80,9 +88,18 @@ def connect(db: str):
                             password=env["DB_PASSWORD"], dbname=db)
 
 
-def candidates(cur, query: str, variant, limit: int):
+def candidates(cur, query: str, variant, limit: int, vector=None, space=None):
     cur.execute(KEYWORD, {"query": query, "variant": variant, "n": max(limit, CANDIDATES)})
     rows = cur.fetchall()
+    if vector is not None:
+        args = {"variant": variant, "space": space, "vector": json.dumps(vector), "n": CANDIDATES,
+                "papers": PAPER_FIRST_RECORDS}
+        cur.execute(PAPER_FIRST, args)
+        paper_first = cur.fetchall()
+        cur.execute(FLAT, args)
+        flat = cur.fetchall()
+        # The runtime's keyword list in hybrid_search is CANDIDATES long whatever the limit.
+        rows = fuse_by_rank([rows[:CANDIDATES], paper_first, flat], key=lambda r: r["id"])
     hits = [hit(r) for r in rows]
     # Every position a section-mate could take under any arm, read once.
     positions = set()
@@ -149,6 +166,33 @@ def summarize(rows: list[dict]) -> dict:
     }
 
 
+def query(question) -> str:
+    return question.resolved_question or question.question
+
+
+def query_vectors(question_set, cache_path):
+    """One query vector per distinct query, embedded only when not cached."""
+    cache = {}
+    if cache_path and Path(cache_path).exists():
+        cache = json.loads(Path(cache_path).read_text(encoding="utf-8"))
+    missing = sorted({query(q) for q in question_set.questions} - set(cache))
+    billed = 0
+    if missing:
+        from apps.ai.providers.voyage import VoyageEmbeddingProvider, _post
+
+        def counted(path, payload):
+            nonlocal billed
+            body = _post(path, payload)
+            billed += (body.get("usage") or {}).get("total_tokens", 0)
+            return body
+        provider = VoyageEmbeddingProvider(transport=counted)
+        for text in missing:
+            cache[text] = provider.embed_query(text)
+        if cache_path:
+            Path(cache_path).write_text(json.dumps(cache), encoding="utf-8")
+    return cache, billed
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--db", default="iris_ir1054")
@@ -156,6 +200,9 @@ def main(argv=None) -> int:
                         help="chunk_set.trial_variant to search; 'active' for the active sets")
     parser.add_argument("--questions", default=str(ROOT / "docs/evaluation/proxy_starter.json"))
     parser.add_argument("--limits", default="10,5", help="search limits to replay, comma-separated")
+    parser.add_argument("--candidates", choices=("keyword", "hybrid"), default="keyword")
+    parser.add_argument("--space", type=int, default=2, help="embedding space of the stored vectors")
+    parser.add_argument("--vectors", help="JSON cache of query vectors; missing ones are embedded (PAID, Voyage)")
     parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)
     variant = None if args.variant == "active" else args.variant
@@ -168,12 +215,16 @@ def main(argv=None) -> int:
                 f" count(DISTINCT c.record_id) AS papers {SETS}", {"variant": variant})
     corpus = dict(cur.fetchone())
 
+    vectors, billed = {}, 0
+    if args.candidates == "hybrid":
+        vectors, billed = query_vectors(question_set, args.vectors)
+
     runs = []
     for limit in limits:
         per_question = []
         for question in question_set.questions:
-            query = question.resolved_question or question.question
-            rows, neighbours = candidates(cur, query, variant, limit)
+            rows, neighbours = candidates(cur, query(question), variant, limit,
+                                          vectors.get(query(question)), args.space)
             per_question.append({
                 "id": question.id, "kind": question.kind, "type": kind_of(question),
                 "candidates": len(rows), "ceiling": ceiling(question, rows, neighbours),
@@ -207,7 +258,11 @@ def main(argv=None) -> int:
         "chunk_set_variant": args.variant,
         "corpus": corpus,
         "question_set": {"name": question_set.name, "questions": len(question_set.questions)},
-        "candidates": f"runtime keyword search, top max(limit, {CANDIDATES}) by ts_rank; no vector, no rerank",
+        "candidates": (f"runtime keyword search, top max(limit, {CANDIDATES}) by ts_rank; no vector, no rerank"
+                       if args.candidates == "keyword" else
+                       f"hybrid_search: keyword, paper-first (top {PAPER_FIRST_RECORDS} papers) and flat vector,"
+                       f" {CANDIDATES} each, fused by rank; space {args.space}; no rerank"),
+        "voyage_tokens_billed_this_run": billed,
         "query": "resolved_question when present, else the question text",
         "policy": {"tokens_per_passage": Policy().tokens_per_passage, "join": True, "section_mates": True,
                    "paper_share": list(SHARES)},
