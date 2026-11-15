@@ -77,7 +77,7 @@ export function ModelPill<T extends string>({ name, value, options, onChange, no
       >
         <i className={cn(current.icon, "text-xs")} aria-hidden />
         {current.short}
-        <i className={cn("fas fa-chevron-up text-[10px] transition-transform duration-150 motion-reduce:transition-none", open || "rotate-180")} aria-hidden />
+        <i className={cn("fas fa-chevron-up text-label transition-transform duration-150 motion-reduce:transition-none", open || "rotate-180")} aria-hidden />
       </button>
 
       {open && (
