@@ -1,0 +1,38 @@
+{
+  "f_labeled/proxy_starter": {
+    "/contextualizedembeddings": 870762,
+    "/contextualizedembeddings calls": 244,
+    "/rerank": 3001318,
+    "/rerank calls": 99
+  },
+  "f_labeled/proxy_record_scoped": {
+    "/contextualizedembeddings": 114406,
+    "/contextualizedembeddings calls": 79,
+    "/rerank": 915236,
+    "/rerank calls": 37
+  },
+  "f_structural/proxy_starter": {
+    "/contextualizedembeddings": 682523,
+    "/contextualizedembeddings calls": 240,
+    "/rerank": 3582242,
+    "/rerank calls": 99
+  },
+  "f_structural/proxy_record_scoped": {
+    "/contextualizedembeddings": 51657,
+    "/contextualizedembeddings calls": 79,
+    "/rerank": 829774,
+    "/rerank calls": 37
+  },
+  "f_fixed/proxy_starter": {
+    "/contextualizedembeddings": 613772,
+    "/contextualizedembeddings calls": 236,
+    "/rerank": 1725010,
+    "/rerank calls": 98
+  },
+  "f_fixed/proxy_record_scoped": {
+    "/contextualizedembeddings": 27943,
+    "/contextualizedembeddings calls": 75,
+    "/rerank": 912489,
+    "/rerank calls": 37
+  }
+}

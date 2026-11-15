@@ -44,7 +44,7 @@ is a schema decision ADR-013 has not taken. Until it does, ingestion is
 sound only for records whose substantive document is the one being uploaded.
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 from apps.ai.chunking import (
@@ -55,7 +55,7 @@ from apps.ai.chunking import (
     normalize,
 )
 from apps.ai.chunking.document import NormalizedDocument
-from apps.ai.chunking.strategies.labeled import STRATEGY_ID as LABELED_STRATEGY
+from apps.ai.chunking.registry import require_ingestion_strategy
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from apps.ai.repositories import ChunkRepository
@@ -114,6 +114,7 @@ def default_chunking_options() -> ChunkingOptions:
         context_path_max_tokens=settings.AI_CHUNK_CONTEXT_PATH_MAX_TOKENS,
         exclude_sections=tuple(settings.AI_CHUNK_EXCLUDE_SECTIONS),
         index_formulas=settings.AI_FORMULA_TEXT_INDEXED,
+        figure_passages=settings.AI_CHUNK_FIGURE_PASSAGES,
     )
 
 
@@ -130,9 +131,10 @@ def build_chunk_set(
 
 
 def _options_for_document(document, options):
-    """Authoritative structure is chunked at its declared levels (IR-840)."""
-    if document.structure_is_authoritative:
-        return replace(options, strategy=LABELED_STRATEGY)
+    """One strategy for every extractor (IR-1054). The labeled override for
+    authoritative structure (IR-840) is gone with the labeled strategy, and an
+    evaluation baseline is refused rather than allowed to index papers."""
+    require_ingestion_strategy(options.strategy)
     return options
 
 

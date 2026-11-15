@@ -24,7 +24,6 @@ from apps.ai.chunking import (
 from apps.ai.chunking.document import HEADING, PARAGRAPH
 from apps.ai.chunking.tokens import count_tokens
 
-LABELED = "labeled-structure-v1"
 STRUCTURAL = "structural-markdown-v1"
 ALL_STRATEGIES = sorted(registered_strategies())
 
@@ -48,17 +47,29 @@ def _chunk(document, **options):
     return build_chunker(opts).chunk(document, opts)
 
 
-def test_the_production_strategy_is_registered():
-    assert LABELED in ALL_STRATEGIES
+def test_one_strategy_remains_for_ingestion():
+    # IR-1054: labeled is deleted; fixed-window is a baseline for measurement only.
+    from apps.ai.chunking.registry import ingestion_strategies
+
+    assert ingestion_strategies() == [STRUCTURAL]
+    assert "labeled-structure-v1" not in ALL_STRATEGIES
 
 
-def test_the_pipeline_chooses_labeled_through_the_registry():
+def test_authoritative_structure_is_chunked_by_the_one_strategy():
     from apps.ai.ingestion.pipeline import build_chunk_set
 
     document = replace(
         _document([("1 Intro", 1, ["alpha beta"])]), structure_is_authoritative=True
     )
-    assert build_chunk_set(document, ChunkingOptions()).strategy_id == LABELED
+    assert build_chunk_set(document, ChunkingOptions()).strategy_id == STRUCTURAL
+
+
+def test_ingestion_refuses_the_evaluation_baseline():
+    from apps.ai.chunking.ports import EvaluationOnlyStrategy
+    from apps.ai.ingestion.pipeline import build_chunk_set
+
+    with pytest.raises(EvaluationOnlyStrategy):
+        build_chunk_set(_document([("1 Intro", 1, ["alpha"])]), ChunkingOptions(strategy="fixed-window"))
 
 
 @pytest.mark.parametrize("strategy", ALL_STRATEGIES)
@@ -112,7 +123,7 @@ def test_property_kept_whole_content_never_passes_the_ceiling(strategy, elements
 def test_the_trail_is_counted_inside_the_target():
     paragraph = " ".join(f"word{i}" for i in range(400)) + "."
     document = _document([("3 Methodology", 1, [paragraph])])
-    for strategy in (STRUCTURAL, LABELED):
+    for strategy in (STRUCTURAL,):
         result = _chunk(document, strategy=strategy, target_tokens=60, max_tokens=60)
         assert len(result.chunks) > 1
         for chunk in result.chunks:
@@ -120,7 +131,7 @@ def test_the_trail_is_counted_inside_the_target():
             assert chunk.token_count <= 60
 
 
-@pytest.mark.parametrize("strategy", [STRUCTURAL, LABELED])
+@pytest.mark.parametrize("strategy", [STRUCTURAL])
 @settings(max_examples=40, deadline=None)
 @given(sections=_sections)
 def test_property_every_chunk_holds_one_sections_content(strategy, sections):
@@ -143,7 +154,7 @@ def test_section_key_is_the_full_heading_path_even_when_the_trail_is_cut():
     document = _document(
         [("1 Chapter With A Long Name", 1, []), ("1.1 Section", 2, []), ("1.1.1 Deep", 3, ["alpha beta"])]
     )
-    for strategy in (STRUCTURAL, LABELED):
+    for strategy in (STRUCTURAL,):
         chunk = _chunk(document, strategy=strategy, target_tokens=200, context_path_max_tokens=12).chunks[-1]
         assert chunk.section_key == (
             "A Thesis With A Fairly Long Title",
@@ -160,40 +171,24 @@ def test_section_key_is_not_hashed():
     assert chunkset_hash([a]) == chunkset_hash([b])
 
 
-def test_labeled_folds_a_heading_only_section_forward():
+def test_structural_folds_a_heading_only_section_forward():
     document = _document([("3 Methodology", 1, []), ("3.2 Sampling", 2, ["Samples were collected weekly."])])
-    chunks = _chunk(document, strategy=LABELED, target_tokens=200).chunks
+    chunks = _chunk(document, strategy=STRUCTURAL, target_tokens=200).chunks
     assert len(chunks) == 1
     assert "3 Methodology" in chunks[0].content
     assert chunks[0].section_key[-1] == "3.2 Sampling"
 
 
-def test_labeled_merges_short_chunks_within_a_section():
-    table = DocumentElement(kind="table", text="a | b\n1 | 2", rows=(("a", "b"), ("1", "2")))
-    document = NormalizedDocument(
-        title="T",
-        elements=(
-            DocumentElement(kind=HEADING, text="1 Results", level=1),
-            DocumentElement(kind=PARAGRAPH, text="Short."),
-            table,
-        ),
-    )
-    merged = _chunk(document, strategy=LABELED, target_tokens=200)
-    unmerged = _chunk(document, strategy=LABELED, target_tokens=200, merge_short_siblings=False)
-    assert len(merged.chunks) == 1
-    assert len(unmerged.chunks) == 2
-
-
-def test_labeled_keeps_a_figure_whole_up_to_the_ceiling_and_splits_past_it():
+def test_a_figure_passage_is_kept_whole_up_to_the_ceiling_and_split_past_it():
     description = " ".join(f"detail{i}" for i in range(80))
     figure = DocumentElement(kind="image", text="Figure 1.", description=description)
     document = NormalizedDocument(title="T", elements=(figure,))
     size = count_tokens(f"T\n\nFigure 1.\n{description}")
 
-    whole = _chunk(document, strategy=LABELED, target_tokens=20, max_tokens=size + 10)
+    whole = _chunk(document, strategy=STRUCTURAL, figure_passages=True, target_tokens=20, max_tokens=size + 10)
     assert len(whole.chunks) == 1 and whole.chunks[0].token_count > 20
 
-    split = _chunk(document, strategy=LABELED, target_tokens=20, max_tokens=size // 2)
+    split = _chunk(document, strategy=STRUCTURAL, figure_passages=True, target_tokens=20, max_tokens=size // 2)
     assert len(split.chunks) > 1
     assert all(c.token_count <= size // 2 for c in split.chunks)
 

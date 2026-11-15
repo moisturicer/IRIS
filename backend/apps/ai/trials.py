@@ -30,6 +30,7 @@ from apps.ai.chunking import ChunkingOptions, ChunkSet, chunk_text_hash
 from apps.ai.chunking.hashing import chunkset_hash
 from apps.ai.chunking.outline import PATH_SEPARATOR, TRAIL_JOIN, embedded_text
 from apps.ai.chunking.registry import registered_strategies
+import apps.ai.evaluation.fixed_window  # noqa: F401,E402  (registers the baseline, IR-1054)
 from apps.ai.chunking.tokens import TOKENIZER_ID, count_tokens
 from apps.ai.providers import batching
 
@@ -37,7 +38,7 @@ TRAIL_MODES = ("on", "off", "shuffled")
 
 _NAME = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 _INT_OPTIONS = ("max_tokens", "target_tokens", "min_tokens", "context_path_max_tokens")
-_BOOL_OPTIONS = ("merge_short_siblings", "index_formulas")
+_BOOL_OPTIONS = ("merge_short_siblings", "index_formulas", "figure_passages")
 _OPTION_KEYS = (*_INT_OPTIONS, *_BOOL_OPTIONS, "exclude_sections", "trail", "windows")
 
 
