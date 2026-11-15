@@ -26,9 +26,17 @@ def flooding(n):
     return ("Results", f"flooding observation number {n} in the lower catchment")
 
 
-def test_a_paper_that_outranks_the_rest_still_leaves_room_for_another(research, space):
+def test_a_paper_that_outranks_the_rest_still_leaves_room_for_another(research, space, monkeypatch):
+    # The share is off by default (IR-1150); this checks it when switched on.
     from ai.research.selection import Policy
+    from ai.research.tools import ResearchTools
+    from ai.runs import service
 
+    class Shared(ResearchTools):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **{**kwargs, "selection": Policy(paper_share=50)})
+
+    monkeypatch.setattr(service, "ResearchTools", Shared)
     reader = make_user("select-cap@cit.edu")
     verbose = paper("Verbose flood study", {p: [flooding(p)] for p in range(1, 7)})
     other = paper("Short flood note", {1: [("Results", "flooding seen once")]})
@@ -39,9 +47,7 @@ def test_a_paper_that_outranks_the_rest_still_leaves_room_for_another(research, 
         await tools.hybrid_search("flooding", 5)
         await tools.search("flooding", 5)
 
-    # The share is off by default (IR-1150); the run's config switches it on here.
-    (_, hybrid), (_, keyword) = run(research, reader, script, request="select-cap-1",
-                                    selection=Policy(paper_share=50))
+    (_, hybrid), (_, keyword) = run(research, reader, script, request="select-cap-1")
     for found in (hybrid, keyword):
         per_paper = [p.record_id for p in found.passages]
         assert other.pk in per_paper
