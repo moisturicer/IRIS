@@ -517,7 +517,24 @@ The rule failed one check as measured. Jive Tyler Revalde, IR-980's owner, decid
 
 Figure descriptions need no change. A described Figure's description already enters its chunk's embedded text (IR-852), and none is written unless `LLM_DESCRIBE_FIGURE_MODEL` is set, because each description is a paid call.
 
-## Related Requirements
+## Amendment — 2026-11-16 (IR-1147): short sections merge with a sibling, floor 450
+
+**Decision.** `AI_CHUNK_SIBLING_MERGE_FLOOR` defaults to **450**. A structural passage under 450 tokens merges with a neighbouring section under the same parent heading, up to the 700-token target, and carries the parent's path. The merge goes forward first, then back for a short last section. It never merges two chapters, a chapter's introduction with its first subsection, or a Figure passage; a merge passes over a Figure. The option is `ChunkingOptions.sibling_merge_floor`, where 0 is off. Jive Tyler Revalde asked for it on by default after the run below. It is read at chunking, so existing chunk sets change only after a re-chunk.
+
+**Why.** On IR-1054's rerun the evaluation-only `fixed-window` baseline led structural on the main set, 0.618 to 0.551. In each question it won, structural's passage was a short section (80–450 tokens), because structural never merged across a heading.
+
+**Measurement.** The run files are in `docs/evaluation/runs/2026-11-16-ir1147-sibling-merge/` (proxy tier, ADR-023; never a finding about CIT-U research). They were run on `iris_ir1054` with reranking, against `g_hybrid` (structural with Figure passages, IR-1054's choice), and are Voyage only. Search was exact (`enable_indexscan=off`). A first pass on the shared HNSW index starved `g_hybrid` and the lower floors of results: about 20 trial sets hold near-identical vectors, and `ef_search` stops at 1,000. Those files are kept in `hnsw-starved/` and are not used. Under exact search `g_hybrid` reproduces IR-1054's 0.551 / 0.649 / 0.931.
+
+| Floor | Main set | One-paper slice | Figure set |
+|---|---|---|---|
+| off (`g_hybrid`) | 0.551 | 0.649 | 0.931 |
+| 150 | 0.539 | 0.649 | 0.931 |
+| 300 | 0.556 | 0.649 | 0.931 |
+| 450 | 0.567 | 0.649 | 0.931 |
+| 600 | 0.567 | 0.649 | 0.931 |
+
+The decision rule was fixed before the run: adopt only if the main set rises by at least 0.01 and neither the slice nor the Figure set falls by more than 0.01. Floor 450 meets it, with +0.017 on the main set and the other two sets unchanged. Paired against `g_hybrid`, it won q25, q34 and q100 and lost q03, so p = 0.625 on a two-sided exact sign test: **the gain is not statistically significant**. Floor 600 gives the same wins and losses, so the smaller floor was chosen. Several floors were tried at the owner's request, so the 450 result is the best of four, which makes it more optimistic. Of the baseline's seven wins over structural in IR-1054, three are recovered (q25, q34, q100); q08, q38, q101 and q102 are not.
+
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 
@@ -541,3 +558,4 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-982: vendor registry, closed as won't do
 - IR-1102: formulas as exact LaTeX, behind a flag
 - IR-1126: Unstructured's image-description enrichment, measured and not adopted
+- IR-1147: short sections merge with a sibling, floor 450

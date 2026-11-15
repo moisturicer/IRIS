@@ -73,6 +73,9 @@ class ChunkingOptions:
     index_formulas: bool = False
     # Figures as passages of their own, out of the text flow (IR-1054).
     figure_passages: bool = False
+    # Below this many tokens a passage merges with the next section under the
+    # same parent heading; 0 is off (IR-1147).
+    sibling_merge_floor: int = 0
 
     def __post_init__(self) -> None:
         if self.max_tokens < 1:
@@ -87,12 +90,19 @@ class ChunkingOptions:
                 raise ValueError("min_tokens must not be negative")
             if self.min_tokens > self.effective_target_tokens:
                 raise ValueError("min_tokens must not exceed the target size")
+        if self.sibling_merge_floor < 0:
+            raise ValueError("sibling_merge_floor must not be negative")
 
     @property
     def effective_target_tokens(self) -> int:
         if self.target_tokens is not None:
             return self.target_tokens
         return min(DEFAULT_TARGET_TOKENS, self.max_tokens)
+
+    @property
+    def effective_sibling_merge_floor(self) -> int:
+        """The merge floor, capped at the target so a small target still chunks."""
+        return min(self.sibling_merge_floor, self.effective_target_tokens)
 
     @property
     def effective_min_tokens(self) -> int:
