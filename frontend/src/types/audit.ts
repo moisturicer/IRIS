@@ -1,6 +1,6 @@
 export const AUDIT_EVENT_GROUPS = {
   Account: {
-    LOGIN: "Login", LOGOUT: "Logout", FAILED_LOGIN: "Failed Login",
+    LOGIN: "Login", LOGOUT: "Logout", FAILED_LOGIN: "Failed Login", ACCOUNT_REGISTERED: "Account Registered",
     PIN_GENERATED: "PIN Generated", PIN_VERIFIED: "PIN Verified", ROLE_CHANGE: "Role Change",
     ACCOUNT_LOCKED: "Account Locked", ACCOUNT_UNLOCKED: "Account Unlocked", SESSION_REVOKE: "Session Revoked",
     PASSWORD_CHANGED: "Password Changed",

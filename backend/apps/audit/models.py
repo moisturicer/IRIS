@@ -14,6 +14,7 @@ class AuditEvent(models.Model):
     LOGIN            = "LOGIN"
     LOGOUT           = "LOGOUT"
     FAILED_LOGIN     = "FAILED_LOGIN"
+    ACCOUNT_REGISTERED = "ACCOUNT_REGISTERED"  # IR-659
     ACCESS           = "ACCESS"
     UPLOAD           = "UPLOAD"
     DOWNLOAD         = "DOWNLOAD"
@@ -156,6 +157,7 @@ class AuditEvent(models.Model):
         (LOGIN,            "Login"),
         (LOGOUT,           "Logout"),
         (FAILED_LOGIN,     "Failed Login"),
+        (ACCOUNT_REGISTERED, "Account Registered"),
         (ACCESS,           "Record Access"),
         (UPLOAD,           "File Upload"),
         (DOWNLOAD,         "File Download"),
