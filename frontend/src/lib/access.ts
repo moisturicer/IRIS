@@ -184,6 +184,10 @@ export const SCREEN_ACCESS = {
                  nav: { label: "Download Requests", icon: "fa-download", section: "RDCO" } },
   deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
                  nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "RDCO" } },
+  // One page for RDCO and the System Admin (IR-693, decision 2026-11-15), each
+  // reaching it from their own section, as with Notices below.
+  reportedComments: { path: "/moderation/comments", roles: COORDINATOR,
+                 nav: { label: "Reported Comments", icon: "fa-flag", section: "RDCO" } },
   // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): one
   // Notices page at one address. RDCO publishes there; the System Admin reads
   // it from `adminNotices`, the same page, in its own sidebar section.
@@ -198,6 +202,9 @@ export const SCREEN_ACCESS = {
   // ADR-051 §8: the System Admin confirms or rejects account deletions (IR-788).
   accountDeletionRequests: { path: "/admin/account-deletion-requests", roles: SYSTEM_ADMIN,
                  nav: { label: "Account Deletions", icon: "fa-user-slash", section: "Administration" } },
+  // The Reported comments page above, shared (IR-693).
+  adminReportedComments: { path: "/moderation/comments", roles: SYSTEM_ADMIN,
+                 nav: { label: "Reported Comments", icon: "fa-flag", section: "Administration" } },
   // ADR-051 §3 and §19: the System Admin sets retention periods (IR-795).
   retention:     { path: "/admin/retention", roles: SYSTEM_ADMIN,
                  nav: { label: "Retention", icon: "fa-clock-rotate-left", section: "Administration" } },

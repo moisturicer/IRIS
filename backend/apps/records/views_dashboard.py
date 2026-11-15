@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from core.permissions import IsAdmin
+from core.permissions import ADMIN_ROLES, IsCommentModerator, get_role_name
 from .models import DeleteRequest, DownloadRequest, Record
 from apps.reviews.models import ResubmissionRequest
 from core.enums import (
@@ -80,18 +80,25 @@ class DashboardStatsView(APIView):
 
 class QueueCountsView(APIView):
     """
-    GET /dashboard/queue-counts/ -- RDCO only (IR-1138).
+    GET /dashboard/queue-counts/ -- RDCO and the System Admin (IR-1138, IR-691).
 
-    How many requests wait in each of RDCO's queues, for the sidebar's counts.
-    Role requests are counted as the Role Requests queue lists them: verified
-    accounts only (ADR-051 decision 22).
+    How many requests wait in each queue the caller works, for the sidebar's
+    counts. Role requests are counted as the Role Requests queue lists them:
+    verified accounts only (ADR-051 decision 22). `reported_comments` counts
+    the comments with an open report, the queue both roles share (decision
+    2026-11-15); it is all the System Admin is told.
     """
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsCommentModerator]
 
     def get(self, request):
         from apps.accounts.models import RoleRequest
+        from .comment_moderation import reported as reported_comments
 
+        reported = reported_comments(request.user).count()
+        if get_role_name(request.user) not in ADMIN_ROLES:
+            return Response({"reported_comments": reported})
         return Response({
+            "reported_comments": reported,
             "download_requests": DownloadRequest.objects.filter(status=RequestStatus.PENDING).count(),
             "delete_requests": DeleteRequest.objects.filter(status=RequestStatus.PENDING).count(),
             "role_change_requests": RoleRequest.objects.filter(

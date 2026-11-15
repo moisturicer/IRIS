@@ -407,6 +407,15 @@ The review discussion remains one record-level timeline, with the same readers, 
 - *Who sees what.* A paper that is not published answers the same 404 as a missing paper, to its owners too. A reply may answer a reply; the thread stays flat.
 - *A deleted account.* Its comments stay, shown as "Former user", like a Call's poster. Its personal-data export lists the comments it wrote: a deleted or removed one without its text, since no response carries that text.
 
+**Build decisions for reports and removal, 2026-11-15 (Hermoine Zozobrado; Accepted; IR-691, IR-693).** Asked before building and answered; transcribed by an agent. The first replaces "Reports go to RDCO alone" in the amendment above, which the tickets already contradicted.
+
+1. **RDCO and the System Admin share the Reported comments queue**, one page at `/moderation/comments`, each reaching it from their own sidebar section. Only RDCO is notified of a comment's first report; the notice settles when its reports are handled (ADR-069).
+2. **Either removes any comment from the paper too.** A comment's menu offers *Remove* (reason required) to RDCO and the System Admin on every comment still standing, reported or not, besides *Remove* in the queue.
+3. **A writer's own delete closes its open reports**: nothing is left to judge. **An edit changes nothing**: the report keeps the text as reported and the queue shows both wordings.
+4. **Reporting spends the posting budget** (`public_comment_burst`, `public_comment`), and **the sidebar counts the queue** beside *Reported comments*, as it does RDCO's other queues (IR-1138).
+
+Found in code review the same day and settled by the agent within the amendment's words, open for the owner to change: "first report" is read as the first *open* report, so a comment reported again after its reports were dismissed is announced again, being back in the queue; the notice has no sender, because a notice shows its sender to everyone it reaches and a report never names its reader; and the queue, its count and both acts cover only comments on a paper the moderator may read that is public now, by "a paper that stops being public takes its comments with it".
+
 **Amendment, 2026-11-04 (Hermoine Zozobrado, design session; Accepted): review threads.** This replaces the IR-679 note's "Changes and Threads are later phases" and the review-workspace roadmap's Phases 3–5 (`../review_workspace_roadmap.md`). The review discussion keeps its readers and writers (`may_read_review` reads, participants write, IR-419). What follows is how a discussion becomes a review.
 
 **IRIS never edits the manuscript.** "Like Google Docs" means comments on a passage, suggested wording, replies and resolving. A revision is always a new PDF the author makes elsewhere, submitted as a Version. *Rejected: editing in the browser.* It would turn the manuscript from a PDF into stored text, against extraction (ADR-056), chunking (ADR-013) and citation anchors (ADR-031), and it would need a document model nobody has budgeted.

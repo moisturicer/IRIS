@@ -30,9 +30,10 @@ class QueueCountsTests(APITestCase):
     def test_an_empty_queue_counts_zero(self):
         response = self.get(self.rdco)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # IR-691 added the Reported comments queue's count.
         self.assertEqual(
             response.data,
-            {"download_requests": 0, "delete_requests": 0, "role_change_requests": 0},
+            {"download_requests": 0, "delete_requests": 0, "role_change_requests": 0, "reported_comments": 0},
         )
 
     def test_rdco_sees_only_what_is_pending(self):
