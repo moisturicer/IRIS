@@ -158,7 +158,7 @@ export function EmailRequestForm({ id, copy, request, initialEmail = "" }: Email
         <Input
           id={id}
           ref={emailRef}
-          label="Email Address"
+          label="Email address"
           size="lg"
           type="email"
           autoComplete="email"

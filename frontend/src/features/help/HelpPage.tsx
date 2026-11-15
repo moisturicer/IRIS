@@ -32,7 +32,7 @@ export default function HelpPage() {
 
       <div className="lg:grid lg:grid-cols-[13.75rem_minmax(0,68ch)] lg:gap-10">
         <nav aria-label="Help contents" className="mb-section-lg lg:sticky lg:top-6 lg:mb-0 lg:self-start">
-          <h2 className="px-3 text-label font-semibold uppercase tracking-wide text-stone-500">On this page</h2>
+          <h2 className="px-3 text-label font-semibold text-stone-500">On this page</h2>
           <ul className="mt-1 flex flex-wrap gap-x-1 lg:grid lg:gap-0.5">
             {sections.map((s) => (
               <li key={s.id}>

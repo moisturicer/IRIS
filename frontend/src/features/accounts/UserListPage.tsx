@@ -310,7 +310,7 @@ export default function UserListPage() {
       <Modal
         open={!!roleTarget}
         onClose={() => { setRoleTarget(null); setNewRole(""); }}
-        title="Change Role"
+        title="Change role"
       >
         <div className="flex flex-col gap-4">
           <p className="text-body text-stone-600">

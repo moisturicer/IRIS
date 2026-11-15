@@ -82,7 +82,7 @@ export default function RoleRequestsPage() {
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50">
                 <th className="text-left px-5 py-3 font-semibold text-stone-600">User</th>
-                <th className="text-left px-5 py-3 font-semibold text-stone-600">Requested Role</th>
+                <th className="text-left px-5 py-3 font-semibold text-stone-600">Requested role</th>
                 <th className="text-left px-5 py-3 font-semibold text-stone-600">Submitted</th>
                 <th className="text-left px-5 py-3 font-semibold text-stone-600">Status</th>
                 <th className="px-5 py-3" />

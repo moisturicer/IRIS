@@ -181,7 +181,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
         <div>
           <h3
             id="tracker-document-requests-label"
-            className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
+            className="text-2xs font-semibold text-stone-600 mb-1.5"
           >
             Document requests
           </h3>
@@ -214,7 +214,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
         <div>
           <h3
             id="tracker-resubmissions-label"
-            className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
+            className="text-2xs font-semibold text-stone-600 mb-1.5"
           >
             Resubmission history
           </h3>
@@ -355,7 +355,7 @@ function RoutingHistory({
     <div>
       <h3
         id="tracker-routing-label"
-        className="text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600 mb-1.5"
+        className="text-2xs font-semibold text-stone-600 mb-1.5"
       >
         Routing history
       </h3>

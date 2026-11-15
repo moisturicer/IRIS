@@ -173,7 +173,7 @@ export default function DownloadRequestsPage() {
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
-                  <th className="px-4 py-3 font-semibold text-stone-600">Requested By</th>
+                  <th className="px-4 py-3 font-semibold text-stone-600">Requested by</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Reader's note</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Date</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Status</th>

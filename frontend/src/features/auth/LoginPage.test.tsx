@@ -33,8 +33,8 @@ describe("the login screen", () => {
 
     // `getByRole` resolves the name the way an assistive technology would --
     // through the <label for>, not the visible text's position on screen.
-    expect(screen.getByRole("textbox", { name: "Email Address" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign In" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Email address" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
 
     // A password input has no implicit ARIA role, so it is unreachable by role
     // and is queried by its label instead. Still the accessible tree.
@@ -49,7 +49,7 @@ describe("the login screen", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     expect(screen.getByLabelText("Password")).not.toHaveAttribute("placeholder");
-    const placeholder = screen.getByRole("textbox", { name: "Email Address" }).getAttribute("placeholder") ?? "";
+    const placeholder = screen.getByRole("textbox", { name: "Email address" }).getAttribute("placeholder") ?? "";
     expect(placeholder).not.toMatch(/cit|cebu|institute/i);
   });
 
@@ -69,14 +69,14 @@ describe("the login screen", () => {
     const user = userEvent.setup();
     renderScreen(<LoginPage />, { route: "/login" });
 
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     // The assertion that matters: not "the text appears somewhere on screen",
     // but "the text is announced *for this field*". A message rendered next to
     // an input it is not associated with reads, to a screen reader user, as an
     // unexplained error on a field they cannot identify.
     await waitFor(() => {
-      expect(screen.getByRole("textbox", { name: "Email Address" })).toHaveAccessibleDescription(
+      expect(screen.getByRole("textbox", { name: "Email address" })).toHaveAccessibleDescription(
         "Email is required.",
       );
     });
@@ -88,10 +88,10 @@ describe("the login screen", () => {
     const user = userEvent.setup();
     renderScreen(<LoginPage />, { route: "/login" });
 
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("textbox", { name: "Email Address" })).toBeInvalid();
+      expect(screen.getByRole("textbox", { name: "Email address" })).toBeInvalid();
     });
     expect(screen.getByLabelText("Password")).toBeInvalid();
   });
@@ -147,7 +147,8 @@ describe("the frame sign in opens in", () => {
   it("labels the sheet with one Sign in tab that is not a control", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
-    expect(screen.getByText("Sign in")).toBeInTheDocument();
+    const tab = screen.getAllByText("Sign in").find((el) => el.tagName === "SPAN" && el.className.includes("entry-label"));
+    expect(tab).toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
   });
@@ -167,7 +168,7 @@ describe("the frame sign in opens in", () => {
     const footer = screen.getByRole("contentinfo");
     expect(footer).toHaveTextContent("© 2026 IRIS · Research and IP disclosure");
     expect(footer).not.toHaveTextContent(/Pilot institution/);
-    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "reader@example.edu");
+    await user.type(screen.getByRole("textbox", { name: "Email address" }), "reader@example.edu");
     // The server's current notice, not text kept in the frontend (IR-800).
     vi.spyOn(noticeApi, "current").mockResolvedValue({
       data: { version: 4, text: "What IRIS keeps\nYour name.", published_at: "2026-11-02T08:00:00Z" },
@@ -181,7 +182,7 @@ describe("the frame sign in opens in", () => {
     await user.click(within(footer).getByRole("link", { name: "Terms" }));
     expect(screen.getByRole("dialog", { name: "Terms" })).toHaveTextContent(/pending institutional review/i);
     await user.click(screen.getByRole("button", { name: "Close dialog" }));
-    expect(screen.getByRole("textbox", { name: "Email Address" })).toHaveValue("reader@example.edu");
+    expect(screen.getByRole("textbox", { name: "Email address" })).toHaveValue("reader@example.edu");
   });
 
   it("announces a failed sign-in once, by the banner, and only marks the fields", async () => {
@@ -194,16 +195,16 @@ describe("the frame sign in opens in", () => {
     const user = userEvent.setup();
     const { container } = renderScreen(<LoginPage />, { route: "/login" });
 
-    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "student@cit.edu");
+    await user.type(screen.getByRole("textbox", { name: "Email address" }), "student@cit.edu");
     await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
     // One live region in the whole page: the banner. The fields say nothing.
     // `aria-live` has no role to query by, so the live-region semantics are
     // read as attributes -- still the accessible tree, never a class or test id.
     expect(container.ownerDocument.querySelectorAll('[role="alert"], [role="status"], [aria-live]')).toHaveLength(1);
-    const email = screen.getByRole("textbox", { name: "Email Address" });
+    const email = screen.getByRole("textbox", { name: "Email address" });
     expect(email).toBeInvalid();
     expect(email).not.toHaveAccessibleDescription();
     expect(screen.getByLabelText("Password")).toBeInvalid();
@@ -254,9 +255,9 @@ describe("where the login screen sends you", () => {
 
   async function signIn() {
     const user = userEvent.setup();
-    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "ktto@cit.edu");
+    await user.type(screen.getByRole("textbox", { name: "Email address" }), "ktto@cit.edu");
     await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
   }
 
   afterEach(() => {
@@ -425,9 +426,9 @@ describe("what a failed sign-in says", () => {
   }
 
   async function signIn(user = userEvent.setup()) {
-    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "student@cit.edu");
+    await user.type(screen.getByRole("textbox", { name: "Email address" }), "student@cit.edu");
     await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
     return user;
   }
 
@@ -443,7 +444,7 @@ describe("what a failed sign-in says", () => {
     await signIn();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
-    expect(screen.getByRole("textbox", { name: "Email Address" })).toBeInvalid();
+    expect(screen.getByRole("textbox", { name: "Email address" })).toBeInvalid();
   });
 
   it("says the credentials did not match when the server's detail says so", async () => {
@@ -468,7 +469,7 @@ describe("what a failed sign-in says", () => {
       "2 more failed attempts will lock your account.",
     );
 
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
         "One more failed attempt will lock your account.",
@@ -534,7 +535,7 @@ describe("what a failed sign-in says", () => {
       expect(alert).toHaveTextContent("IRIS can't be reached right now");
       expect(alert).not.toHaveTextContent(/email|password|credential/i);
       // The fields were never judged, so they are not marked wrong either.
-      expect(screen.getByRole("textbox", { name: "Email Address" })).not.toBeInvalid();
+      expect(screen.getByRole("textbox", { name: "Email address" })).not.toBeInvalid();
       expect(screen.getByLabelText("Password")).not.toBeInvalid();
     });
   });
@@ -546,8 +547,8 @@ describe("what a failed sign-in says", () => {
 
     const user = await signIn();
     await screen.findByRole("alert");
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => {
       expect(authApi.login).toHaveBeenCalledTimes(3);
@@ -589,8 +590,8 @@ describe("what a failed sign-in says", () => {
 
     const user = await signIn();
     await screen.findByRole("alert");
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
-    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => {
       expect(authApi.login).toHaveBeenCalledTimes(3);
@@ -632,7 +633,7 @@ describe("what a failed sign-in says", () => {
       expect(close).toHaveFocus();
       await user.keyboard("{Escape}");
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Sign In" })).toHaveFocus();
+      expect(screen.getByRole("button", { name: "Sign in" })).toHaveFocus();
     });
 
     it("counts down to the server's unlock_at for an axes lockout", async () => {
@@ -684,9 +685,9 @@ describe("what a failed sign-in says", () => {
 
       const user = await signIn();
       await screen.findByRole("alert");
-      await user.click(screen.getByRole("button", { name: "Sign In" }));
+      await user.click(screen.getByRole("button", { name: "Sign in" }));
       await screen.findByText(/2 of 3/);
-      await user.click(screen.getByRole("button", { name: "Sign In" }));
+      await user.click(screen.getByRole("button", { name: "Sign in" }));
 
       const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
       expect(dialog).toHaveTextContent(/try again in (15:00|14:59)/i);

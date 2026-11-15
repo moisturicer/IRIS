@@ -107,7 +107,7 @@ export function ChangeItem({ change, from, to, view, sectionName, onShow }: Prop
         <div className="grid grid-cols-2 gap-3">
           {(["from", "to"] as const).map((side) => (
             <div key={side} className="min-w-0">
-              <p className="mb-1 text-2xs font-semibold uppercase tracking-wider text-stone-600">v{side === "from" ? from : to}</p>
+              <p className="mb-1 text-2xs font-semibold text-stone-600">v{side === "from" ? from : to}</p>
               {sideText(change, side)}
             </div>
           ))}

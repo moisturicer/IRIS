@@ -30,7 +30,7 @@ export function RailHeading({
   className?: string;
 }) {
   return (
-    <h2 id={id} className={cn("text-2xs font-semibold uppercase tracking-[0.14em] text-stone-600", className)}>
+    <h2 id={id} className={cn("text-2xs font-semibold text-stone-600", className)}>
       {children}
     </h2>
   );
