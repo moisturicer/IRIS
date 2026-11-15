@@ -522,6 +522,8 @@ jobs:
           echo '<!doctype html><title>IRIS</title>' > "$RUNNER_TEMP/html/index.html"
           echo 'export {};' > "$RUNNER_TEMP/html/assets/app.js"
           echo 'export {};' > "$RUNNER_TEMP/html/assets/pdf.worker.min-x.mjs"
+          echo 'body{}' > "$RUNNER_TEMP/html/assets/app.css"
+          echo '<svg xmlns="http://www.w3.org/2000/svg"/>' > "$RUNNER_TEMP/html/favicon.svg"
           image=nginxinc/nginx-unprivileged:1.25-alpine
           mounts="-v $PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
                   -v $PWD/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
@@ -554,8 +556,9 @@ jobs:
             application/javascript*|text/javascript*) ;;
             *) echo "::error::the pdf.js worker (.mjs) is served as '$type'"; status=1 ;;
           esac
-          # IR-924: every text response nginx answers itself names its charset.
-          for path in / /discover /assets/app.js /assets/missing.js /activate/x /django-admin/; do
+          # IR-924: every text, script, style and SVG response nginx answers
+          # itself names its charset.
+          for path in / /discover /assets/app.js /assets/app.css /favicon.svg /assets/missing.js /activate/x /django-admin/; do
             type=$(curl -s -o /dev/null -w '%{content_type}' "localhost:8080$path" || true)
             echo "== $path Content-Type: $type"
             case "$type" in
