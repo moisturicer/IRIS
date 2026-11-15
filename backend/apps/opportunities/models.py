@@ -123,7 +123,7 @@ class Opportunity(models.Model):
     )
     # RDCO's reason for rejecting it; cleared when the Adviser resubmits.
     review_reason    = models.TextField(blank=True)
-    # When RDCO last confirmed or rejected it. Who did is IR-763's audit event.
+    # When RDCO last confirmed or rejected it. Who did is in its CALL_CONFIRMED or CALL_REJECTED audit event (IR-763).
     reviewed_at      = models.DateTimeField(null=True, blank=True)
     posted_by        = models.ForeignKey(
         settings.AUTH_USER_MODEL,

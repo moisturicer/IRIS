@@ -116,10 +116,22 @@ class AuditEvent(models.Model):
     # A person downloaded their own data (ADR-051 decision 13, IR-786). Metadata
     # is `sections` and `format` only: never a byte of what was downloaded.
     PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
-    # A Call was deleted (ADR-050 decisions 15-16). Metadata: `reason` and
-    # `call`, a copy of the Call as it was. Migration opportunities/0002 writes
-    # one per retired-type Call with no actor; IR-763 writes one per deletion.
-    CALL_DELETED = "CALL_DELETED"
+    # Calls for papers (ADR-050 decision 15, IR-763), written by
+    # `apps.opportunities.audit` inside each act's transaction. `call` is a
+    # copy of every field, Areas as ids and names; the other events name the
+    # Call by `call_id` and `title`. Keys: docs/evaluation/AUDIT_EXPORT.md.
+    # DELETED: `reason` and `call`. Migration opportunities/0002 writes one per
+    # retired-type Call with no actor and a reason; a person's delete has the
+    # deleter as actor and `reason` null.
+    CALL_POSTED    = "CALL_POSTED"
+    CALL_EDITED    = "CALL_EDITED"
+    CALL_DELETED   = "CALL_DELETED"
+    CALL_CONFIRMED = "CALL_CONFIRMED"
+    CALL_REJECTED  = "CALL_REJECTED"
+    CALL_REMOVED   = "CALL_REMOVED"
+    # The daily job deleted a request whose paper deadline passed while it
+    # waited or stood rejected (amendment of 2026-11-15, point 2). No actor.
+    CALL_LAPSED    = "CALL_LAPSED"
     # Comment moderation (ADR-032 §7, amendment 2026-10-31; IR-691). `user` is
     # RDCO or the System Admin; the record is the comment's paper. Metadata:
     # `comment`, its id, and `reports_closed`; REMOVED adds the moderator's
@@ -218,7 +230,13 @@ class AuditEvent(models.Model):
         (NOTICE_PUBLISHED,             "Data Notice Published"),
         (AI_ANSWER_CHANGED,            "AI Answer Changed"),
         (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
+        (CALL_POSTED,                  "Call Posted"),
+        (CALL_EDITED,                  "Call Edited"),
         (CALL_DELETED,                 "Call Deleted"),
+        (CALL_CONFIRMED,               "Call Confirmed"),
+        (CALL_REJECTED,                "Call Rejected"),
+        (CALL_REMOVED,                 "Call Removed"),
+        (CALL_LAPSED,                  "Call Request Lapsed"),
         (COMMENT_REMOVED,              "Comment Removed"),
         (COMMENT_REPORTS_DISMISSED,    "Comment Reports Dismissed"),
     ]
