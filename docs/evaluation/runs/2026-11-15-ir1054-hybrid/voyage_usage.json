@@ -1,0 +1,14 @@
+{
+  "f_structural/figure_reranker_ir1125": {
+    "/contextualizedembeddings": 61822,
+    "/contextualizedembeddings calls": 83,
+    "/rerank": 1123820,
+    "/rerank calls": 29
+  },
+  "f_hybrid/figure_reranker_ir1125": {
+    "/contextualizedembeddings": 151006,
+    "/contextualizedembeddings calls": 96,
+    "/rerank": 387666,
+    "/rerank calls": 29
+  }
+}

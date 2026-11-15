@@ -367,6 +367,67 @@ Also built:
   report there for transcription against `latex_truth.py` and the retrieval
   comparison.
 
+## Amendment — 2026-11-15 (IR-1054): one strategy, with Figure passages, at 700 tokens
+
+Resolves decisions 11, 12 and 14. Proxy tier only (ADR-023): an engineering
+gate, never a finding about CIT-U research. Measured on a copy of the dev
+database whose 43 papers were read with Unstructured `hi_res` (IR-1054's
+`trial_read_unstructured`). Every number is reranked final-set recall, with
+`AI_RERANKER_READS=fallback` and formulas indexed; run files under
+`docs/evaluation/runs/2026-11-15-ir1054-*`.
+
+**1. Labeled and structural tie; structural stays and labeled is deleted.**
+
+| Strategy | Main set (129 questions) | One-paper slice (37) |
+|---|---|---|
+| `structural-markdown-v1` | 0.573 | 0.649 |
+| `labeled-structure-v1` | 0.567 | 0.622 |
+| `fixed-window` | 0.500 | 0.622 |
+
+The 0.006 gap is under decision 11's 0.01 tie margin; paired, each strategy
+wins two main-set questions the other misses. Jive Tyler Revalde broke the
+tie for structural (2026-11-15): it relies less on the heading levels IRIS
+rebuilds for Unstructured (IR-1057), and where labeled lost, its separate
+Figure chunks had cut the paragraph they sat in short. The override that sent
+authoritative structure (LlamaParse, then Unstructured) to labeled (IR-840)
+is removed with it, so every extractor chunks with structural.
+
+**2. Figures keep their own passages inside structural** (`AI_CHUNK_FIGURE_PASSAGES`, on).
+What labeled offered and structural lacked: structural read only an element's
+text, so a Figure's description was never indexed and an uncaptioned Figure
+vanished. Now each captioned or described Figure leaves the text flow (the
+paragraph around it stays whole) for a passage of its own that embeds caption
+and description, shows only the caption and carries the Figure's box. A
+Figure with neither is skipped until it is described. A transcribed formula
+stays in its paragraph, shown as LaTeX and embedded with its description per
+`AI_FORMULA_TEXT_INDEXED`; an untranscribed one stays as its box, never its
+OCR text.
+
+| | Main set | One-paper slice | Figure set (IR-1125, 29) |
+|---|---|---|---|
+| structural | 0.573 | 0.649 | 0.345 |
+| structural + Figure passages | 0.562 | 0.649 | **0.759** |
+
+One text question is the price of a large gain on Figure questions.
+Structural's set hash now also covers shown and keyword text whenever a set
+has Figure passages or transcribed formulas, so a change only readers see
+(a new transcription) is still saved; text vectors are reused as before.
+
+**3. `fixed-window` moves into the evaluation code** (`apps.ai.evaluation.fixed_window`),
+registered for measurement only. Ingestion refuses it (`EvaluationOnlyStrategy`);
+trial chunk sets and the contract suites still run it.
+
+**4. The target size stays 700 tokens.** Structural, main set: 300 → 0.489,
+400 → 0.517, 550 → 0.539, 700 → 0.573, 1,000 → 0.579. 1,000 leads by 0.006,
+short of decision 14's 0.01, so the default is unchanged. Embedding the whole
+corpus costs about the same at every size (~0.9M tokens).
+
+**Caveats.** When these ran, 286 of 1,355 formulas and 163 of 474 Figures were
+transcribed or described. 36 of the main set's 94 labels do not match
+Unstructured's text as-is (13 only for line-end hyphens Unstructured keeps,
+22 for papers or labels that miss on Docling too), which caps every strategy
+near 0.62 and narrows every gap. Voyage spend for all runs was about $2.20.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
