@@ -24,6 +24,8 @@ from typing import Any, Iterable, Iterator, Optional
 from django.conf import settings
 from django.test import override_settings
 
+from apps.ai.retrieval.reranker_input import READS
+
 
 class TechniqueError(Exception):
     """A run asked for a technique that is unknown, unbuilt, or misspelled."""
@@ -140,6 +142,16 @@ TECHNIQUES: tuple[Technique, ...] = (
         note="transcribed formulas' LaTeX and description in the embedded and keyword-indexed "
              "text (readers see the LaTeX either way); set at indexing, so re-chunk to move it",
         index_time=True,
+    ),
+    Technique(
+        name="reranker_reads",
+        setting="AI_RERANKER_READS",
+        kind="choice",
+        choices=READS,
+        adr="ADR-033 §5",
+        ticket="IR-1125",
+        note="what the reranker reads: shown text (today), embedded text, shown text with a "
+             "Figure's labelled AI description, or embedded text only where shown is blank",
     ),
 )
 

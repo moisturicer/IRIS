@@ -1,0 +1,504 @@
+{
+  "name": "figure_reranker_ir1125",
+  "corpus": "IR-1054 six Unstructured papers, trial chunk set u2_labeled (iris_ir1054)",
+  "tier": "proxy",
+  "review": {
+    "drafted_by": "agent (Claude), 2026-11-15",
+    "reviewed_by": "Jive Tyler Revalde, 2026-11-15"
+  },
+  "questions": [
+    {
+      "id": "fig28",
+      "kind": "figure-captioned",
+      "question": "How is the hypervolume dominated by a set of points and bounded by a reference point illustrated?",
+      "expected": [
+        {
+          "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+          "page": 4,
+          "region": {
+            "left": 0.344,
+            "top": 0.089,
+            "right": 0.655,
+            "bottom": 0.248
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig29",
+      "kind": "figure-uncaptioned",
+      "question": "Which diagram shows the staircase-shaped region dominated by three points in two-objective space?",
+      "expected": [
+        {
+          "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+          "page": 5,
+          "region": {
+            "left": 0.382,
+            "top": 0.089,
+            "right": 0.617,
+            "bottom": 0.211
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig23",
+      "kind": "figure-uncaptioned",
+      "question": "What is the redshift distribution of [O III] emitters compared with g-dropouts in the DEEP2-3_ID1 field?",
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 6,
+          "region": {
+            "left": 0.499,
+            "top": 0.07,
+            "right": 0.881,
+            "bottom": 0.26
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig24",
+      "kind": "figure-captioned",
+      "question": "Where on the sky do the g-dropout galaxies with high protocluster membership probability lie?",
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 9,
+          "region": {
+            "left": 0.104,
+            "top": 0.065,
+            "right": 0.888,
+            "bottom": 0.657
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig25",
+      "kind": "figure-uncaptioned",
+      "question": "How does the star formation rate density of the protoclusters compare with the cosmic star formation history?",
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 10,
+          "region": {
+            "left": 0.511,
+            "top": 0.066,
+            "right": 0.919,
+            "bottom": 0.325
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig26",
+      "kind": "figure-captioned",
+      "question": "What do the stacked Hbeta and [O III] emission line spectra of the protocluster members look like?",
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 12,
+          "region": {
+            "left": 0.076,
+            "top": 0.065,
+            "right": 0.912,
+            "bottom": 0.384
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig27",
+      "kind": "figure-uncaptioned",
+      "question": "How do follow-up outcomes of the candidates relate to their predicted significance and i-band magnitude?",
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 17,
+          "region": {
+            "left": 0.513,
+            "top": 0.069,
+            "right": 0.883,
+            "bottom": 0.303
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig19",
+      "kind": "figure-uncaptioned",
+      "question": "Which circuit applies a controlled-U gate to the q-qubit register between repeated T'0 blocks?",
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": 2,
+          "region": {
+            "left": 0.527,
+            "top": 0.088,
+            "right": 0.904,
+            "bottom": 0.135
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig20",
+      "kind": "figure-uncaptioned",
+      "question": "How is the delay gate Lambda^d built from a T_k block acting on the b and q qubit bundles?",
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": 3,
+          "region": {
+            "left": 0.158,
+            "top": 0.089,
+            "right": 0.422,
+            "bottom": 0.137
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig21",
+      "kind": "figure-captioned",
+      "question": "What does one rotation-and-delay lattice section look like as a signal-flow diagram?",
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": 3,
+          "region": {
+            "left": 0.587,
+            "top": 0.092,
+            "right": 0.837,
+            "bottom": 0.185
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig22",
+      "kind": "figure-captioned",
+      "question": "How is the FIR filter circuit realized once the delay and projection gates are expanded?",
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": 3,
+          "region": {
+            "left": 0.528,
+            "top": 0.242,
+            "right": 0.9,
+            "bottom": 0.389
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig04",
+      "kind": "figure-uncaptioned",
+      "question": "How are warps of trajectories scheduled into a fixed number of warp slots as they finish?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 5,
+          "region": {
+            "left": 0.527,
+            "top": 0.067,
+            "right": 0.895,
+            "bottom": 0.198
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig05",
+      "kind": "figure-uncaptioned",
+      "question": "What are the steps of the adaptive step-size explicit Runge-Kutta solver loop that uses FSAL?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 7,
+          "region": {
+            "left": 0.065,
+            "top": 0.065,
+            "right": 0.92,
+            "bottom": 0.373
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig06",
+      "kind": "figure-uncaptioned",
+      "question": "How does the Rosenbrock solver loop use Jacobian sweeps, sparse LU factorisation and a PID step-size controller?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 9,
+          "region": {
+            "left": 0.063,
+            "top": 0.069,
+            "right": 0.922,
+            "bottom": 0.377
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig07",
+      "kind": "figure-captioned",
+      "question": "How does solve time grow with ensemble size for Lorenz trajectories with the Tsit5 solver?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 10,
+          "region": {
+            "left": 0.071,
+            "top": 0.068,
+            "right": 0.479,
+            "bottom": 0.288
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig08",
+      "kind": "figure-captioned",
+      "question": "How sensitive are the explicit ODE solvers to divergence between trajectories?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 10,
+          "region": {
+            "left": 0.513,
+            "top": 0.068,
+            "right": 0.921,
+            "bottom": 0.278
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig09",
+      "kind": "figure-uncaptioned",
+      "question": "How does Rodas5P solve time scale with ensemble size compared with the other stiff solvers?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 11,
+          "region": {
+            "left": 0.071,
+            "top": 0.068,
+            "right": 0.479,
+            "bottom": 0.288
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig10",
+      "kind": "figure-captioned",
+      "question": "How does the solve time of explicit solvers change with ODE dimension?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 11,
+          "region": {
+            "left": 0.513,
+            "top": 0.068,
+            "right": 0.921,
+            "bottom": 0.288
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig11",
+      "kind": "figure-uncaptioned",
+      "question": "Does sorting trajectories help the Rodas5P GPU solver when the number of attempted steps varies?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 11,
+          "region": {
+            "left": 0.071,
+            "top": 0.397,
+            "right": 0.479,
+            "bottom": 0.609
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig12",
+      "kind": "figure-uncaptioned",
+      "question": "How does Rodas5P solve time scale with ODE dimension with and without a sparse Jacobian?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 12,
+          "region": {
+            "left": 0.071,
+            "top": 0.068,
+            "right": 0.479,
+            "bottom": 0.288
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig13",
+      "kind": "figure-captioned",
+      "question": "How does Rodas5P solve time change as the Jacobian becomes denser?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 12,
+          "region": {
+            "left": 0.513,
+            "top": 0.068,
+            "right": 0.921,
+            "bottom": 0.288
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig14",
+      "kind": "figure-captioned",
+      "question": "What does computing the value and gradient of the final state cost as the ODE dimension grows?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 12,
+          "region": {
+            "left": 0.513,
+            "top": 0.44,
+            "right": 0.921,
+            "bottom": 0.661
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig15",
+      "kind": "figure-uncaptioned",
+      "question": "What do the posterior samples look like in the eta10 and N_eff plane?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 14,
+          "region": {
+            "left": 0.074,
+            "top": 0.07,
+            "right": 0.364,
+            "bottom": 0.273
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig16",
+      "kind": "figure-uncaptioned",
+      "question": "What is the marginal posterior distribution of eta10 in the toy BBN fit?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 14,
+          "region": {
+            "left": 0.372,
+            "top": 0.07,
+            "right": 0.627,
+            "bottom": 0.273
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig17",
+      "kind": "figure-captioned",
+      "question": "Where does the posterior on N_eff from nested slice sampling peak?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 14,
+          "region": {
+            "left": 0.66,
+            "top": 0.07,
+            "right": 0.917,
+            "bottom": 0.275
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig18",
+      "kind": "figure-uncaptioned",
+      "question": "What range does the prior on the global 21-cm brightness temperature signal span across observed frequency?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 14,
+          "region": {
+            "left": 0.513,
+            "top": 0.38,
+            "right": 0.921,
+            "bottom": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig03",
+      "kind": "figure-uncaptioned",
+      "question": "How does the expected false turnover per network size grow with the number of nodes?",
+      "expected": [
+        {
+          "record": "Noise-adjusted turnover in estimated networks",
+          "page": 7,
+          "region": {
+            "left": 0.224,
+            "top": 0.136,
+            "right": 0.746,
+            "bottom": 0.368
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig01",
+      "kind": "figure-uncaptioned",
+      "question": "How are the MAC arrays, KV SRAM, scratchpads and routers laid out on the 4x4 tiled accelerator mesh?",
+      "expected": [
+        {
+          "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+          "page": 2,
+          "region": {
+            "left": 0.509,
+            "top": 0.064,
+            "right": 0.915,
+            "bottom": 0.414
+          }
+        }
+      ]
+    },
+    {
+      "id": "fig02",
+      "kind": "figure-uncaptioned",
+      "question": "How do the three pipeline stages overlap across key/value segments over time?",
+      "expected": [
+        {
+          "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+          "page": 3,
+          "region": {
+            "left": 0.533,
+            "top": 0.223,
+            "right": 0.895,
+            "bottom": 0.453
+          }
+        }
+      ]
+    }
+  ]
+}

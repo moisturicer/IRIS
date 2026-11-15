@@ -96,7 +96,7 @@ export default function ImportRecordsPage() {
           aria-label="Import log"
           rows={8}
           value={log}
-          className="w-full font-mono text-small bg-stone-50 border border-stone-200 rounded-lg p-3 text-stone-600 resize-y"
+          className="w-full font-mono text-small bg-stone-50 border border-field rounded-lg p-3 text-stone-600 resize-y"
         />
       </div>
     </div>

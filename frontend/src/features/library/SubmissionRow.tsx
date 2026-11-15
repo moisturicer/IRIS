@@ -78,7 +78,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
   return (
     <li className={cn("group relative flex gap-4 px-4 py-4 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>
       <span
-        className="mt-0.5 hidden h-10 w-10 shrink-0 place-items-center rounded-lg bg-stone-100 text-stone-500 sm:grid"
+        className="mt-0.5 hidden h-10 w-10 shrink-0 place-items-center rounded-lg bg-stone-100 text-stone-600 sm:grid"
         aria-hidden
       >
         <i className="fas fa-file-lines text-small" />

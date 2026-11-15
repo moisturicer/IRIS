@@ -251,7 +251,7 @@ function ManagedItem({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-stone-200 p-2 text-sm focus:outline-none focus:border-brand"
+            className="w-full rounded-lg border border-field p-2 text-sm focus:outline-none focus:border-brand"
           />
           <div className="flex gap-2">
             <button

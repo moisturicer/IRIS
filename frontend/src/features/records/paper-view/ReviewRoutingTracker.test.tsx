@@ -176,6 +176,24 @@ async function partyRow(name: RegExp) {
 }
 
 describe("ReviewRoutingTracker", () => {
+  it("announces its loading once, by role and name, and then the table replaces it (IR-939)", async () => {
+    tracker.mockReturnValue(new Promise(() => {}));
+    renderTracker();
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Loading the review tracker…");
+    // One announcement for the panel, not one per skeleton row.
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  it("drops the loading status when the tracker arrives (IR-939)", async () => {
+    tracker.mockResolvedValue({ data: thesisAtIntake });
+    renderTracker();
+
+    await screen.findByRole("table", { name: /parties/i });
+    expect(screen.queryByText("Loading the review tracker…")).not.toBeInTheDocument();
+  });
+
   it("never shows the retired Intake as a party or as who holds the record (ADR-032 §13)", async () => {
     // A legacy record still stored at Intake: the server sends an active Intake
     // row and an Intake holder. Intake is history, never a step (spec §0, inv. 1).

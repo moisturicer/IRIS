@@ -183,6 +183,23 @@ run and stronger than a guess, and is labelled as the middle thing it is. The
 cut-off remains **absent in degraded mode** (§3), and the score remains **never
 shown to a reader**.
 
+## Amendment — 2026-11-15 (IR-1125): the reranker reads embedded text where nothing is printed
+
+**What changes.** A new §5 switch, `AI_RERANKER_READS`, sets what the reranker reads. Its default moves from `today` (shown text only, and a passage with blank shown text is dropped) to `fallback`: shown text, or the embedded text when the shown text is blank. Readers still see only the shown text.
+
+**Why.** A Figure printed with no caption has blank shown text, so the reranker dropped it and it could never be cited. The decision rule was fixed before the paid run (IR-1125). The run, `docs/evaluation/runs/20261114-194023-reranker-input-paid.json` ($0.48 billed), measured four arms over shared candidates on `iris_ir1054`:
+
+| Arm | Text recall@10 (67) | Figure recall@10 (29) |
+|---|---|---|
+| today | 0.754 | 0.310 |
+| A, embedded text for every chunk | 0.724 | 1.000 |
+| B, shown text plus the labelled AI description | 0.754 | 1.000 |
+| C, `fallback` | 0.754 | 0.931 |
+
+A lost two text questions to C and won none, so C stands against A (rule 2). B led C by two figure questions, so rule 3 left B against C to a person. Jive Tyler Revalde chose C on 2026-11-15. Both of B's extra wins (fig10 and fig13) were Figures given their neighbour's caption: Unstructured shaping pairs a caption with whichever Image is next to it in reading order, which on a two-column page is the wrong one. Fixing that pairing is the remedy, not showing readers AI-written text.
+
+**Scope.** The gap matters only to chunking strategies that keep a Figure as its own chunk (labeled). Structural and fixed-window fold Figures into prose. The text set ran on `iris_ir1054`, which holds 67 of the proxy set's 89 scored questions.
+
 ## Alternatives Considered
 
 **Keyword search restricted to the vector candidates** — run the vector search, then keyword-match within its top *n*. Rejected. It cannot surface a passage the vector search missed, which is the entire failure hybrid retrieval addresses. It buys a smaller keyword query in exchange for the only benefit on offer.

@@ -45,6 +45,8 @@ const ROLES: Record<string, [number, number]> = {
   body:    [15, 24],
   small:   [13, 20],
   label:   [12, 16],
+  // Form fields and page buttons only (IR-1074, D1).
+  control: [14, 20],
 };
 
 function px(value: string): number {

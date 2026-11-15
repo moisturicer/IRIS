@@ -224,7 +224,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                   }}
                   placeholder="New folder…"
                   aria-label="New folder name"
-                  className="flex-1 min-w-0 px-2 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs outline-none focus:border-brand"
+                  className="flex-1 min-w-0 px-2 py-1.5 bg-stone-50 border border-field rounded-lg text-xs outline-none focus:border-brand"
                 />
                 <button
                   type="button"

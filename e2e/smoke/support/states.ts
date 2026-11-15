@@ -133,7 +133,7 @@ export const STATES: UiState[] = [
     error: "We couldn't load this record",
     revoked: "Record not available",
   }, {
-    loading: (page) => page.locator(".animate-pulse").first(),
+    loading: announced("Loading this record"),
     ok: PAPER_DETAIL, recovered: (page) => page.getByRole("heading", { name: PAPER.title }),
     revokedNext: (page) => page.getByRole("link", { name: "Go to Discover" }),
   }),
@@ -145,7 +145,7 @@ export const STATES: UiState[] = [
   }, {
     variant: "review tracker", also: asParticipant, interrupted: "The review tracker took too long to load.",
     ok: TRACKER, recovered: text("Currently with"),
-    loading: (page) => page.getByRole("region", { name: /Review & Routing/ }).locator(".animate-pulse").first(),
+    loading: announced("Loading the review tracker"),
   }),
   ...reads("paper-view", "GET", "/records/101/tracker/", {
     error: "Could not load the review timeline.",
@@ -153,7 +153,7 @@ export const STATES: UiState[] = [
     variant: "review timeline", path: "/records/101?section=review", also: asParticipant,
     interrupted: "The review timeline took too long to load.",
     ok: TRACKER, recovered: text("Nothing has happened in this review yet."),
-    loading: (page) => page.getByRole("region", { name: "Timeline" }).locator(".animate-pulse").first(),
+    loading: announced("Loading the review timeline"),
   }),
 
   // My Library's views.

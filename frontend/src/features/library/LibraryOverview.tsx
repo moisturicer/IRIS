@@ -175,7 +175,7 @@ export function LibraryOverview({
             <ul className="mt-2 space-y-3">
               {reading.map(({ record }) => record && (
                 <li key={record.id} className="flex gap-3">
-                  <span className="grid h-14 w-11 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-500 ring-1 ring-stone-200" aria-hidden>
+                  <span className="grid h-14 w-11 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-600 ring-1 ring-stone-200" aria-hidden>
                     <i className="fas fa-book-open text-small" />
                   </span>
                   <div className="min-w-0">

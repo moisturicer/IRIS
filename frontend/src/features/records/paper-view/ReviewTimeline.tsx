@@ -145,10 +145,13 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
             </button>
           </div>
         ) : !data ? (
-          <div aria-hidden className="space-y-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-10 rounded-lg bg-stone-100 animate-pulse motion-reduce:animate-none" />
-            ))}
+          <div role="status">
+            <span className="sr-only">Loading the review timeline…</span>
+            <div aria-hidden className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-10 rounded-lg bg-stone-100 animate-pulse motion-reduce:animate-none" />
+              ))}
+            </div>
           </div>
         ) : (
           <>

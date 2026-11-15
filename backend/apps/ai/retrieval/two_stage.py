@@ -161,6 +161,8 @@ class TwoStageRetriever(Retriever):
                     record_id=row.chunk.record_id,
                     record_title=row.chunk.record.title,
                     content=row.chunk.content,
+                    embedded=row.chunk.text,
+                    element_kinds=tuple(row.chunk.element_kinds or ()),
                     context_path=tuple(row.chunk.context_path or ()),
                     source_page=row.chunk.source_page,
                     # Cosine distance runs 0 (identical) to 2; similarity is

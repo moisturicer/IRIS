@@ -795,7 +795,9 @@ class RoleRequestListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsAdmin]
     # Verified accounts only (ADR-051 decision 22, IR-705).
     queryset           = (RoleRequest.objects.filter(status=RequestStatus.PENDING, user__is_verified=True)
-                          .select_related("user", "requested_role"))
+                          .select_related("user", "requested_role")
+                          # A fixed order, so "Load more" pages never skip or repeat a row (IR-1100).
+                          .order_by("created_at", "pk"))
 
 
 class RoleRequestDetailView(APIView):

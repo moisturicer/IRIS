@@ -121,6 +121,92 @@ describe("the queue", () => {
   });
 });
 
+describe("paging (IR-1100)", () => {
+  const first = request({ id: 1, record_title: "First page paper" });
+  const second = request({ id: 2, record_title: "Second page paper" });
+
+  /** A server with more than one page of requests. */
+  function twoPages() {
+    listDownloadRequests.mockImplementation((params: { page?: number }) =>
+      Promise.resolve({
+        data: params.page === 2
+          ? { results: [second], next: null }
+          : { results: [first], next: "http://api/records/download-requests/?page=2" },
+      }),
+    );
+  }
+
+  it("offers Load more when the server has another page, and appends it", async () => {
+    twoPages();
+    renderScreen(<DownloadRequestsPage />);
+    await screen.findByRole("link", { name: "First page paper" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByRole("link", { name: "Second page paper" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "First page paper" })).toBeInTheDocument();
+    expect(listDownloadRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "pending", page: 2 });
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(screen.getByText("2 requests")).toBeInTheDocument();
+  });
+
+  it("shows no Load more when everything fits on one page", async () => {
+    listDownloadRequests.mockResolvedValue({ data: { results: [first], next: null } });
+    renderScreen(<DownloadRequestsPage />);
+    await screen.findByRole("link", { name: "First page paper" });
+
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(screen.getByText("1 request")).toBeInTheDocument();
+  });
+
+  it("starts again from the first page when the filter changes", async () => {
+    twoPages();
+    renderScreen(<DownloadRequestsPage />);
+    await screen.findByRole("link", { name: "First page paper" });
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByRole("link", { name: "Second page paper" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Approved" }));
+
+    await waitFor(() => expect(listDownloadRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "approved" }));
+    expect(await screen.findByRole("button", { name: "Load more" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Second page paper" })).not.toBeInTheDocument();
+  });
+
+  it("cancels the read in flight when the filter changes, so a stale page never replaces a newer one", async () => {
+    const signals: AbortSignal[] = [];
+    listDownloadRequests.mockImplementation((_params: unknown, options?: { signal?: AbortSignal }) => {
+      if (!options?.signal) throw new Error("a read was made without an abort signal");
+      signals.push(options.signal);
+      return new Promise(() => undefined);
+    });
+    renderScreen(<DownloadRequestsPage />);
+    await waitFor(() => expect(signals).toHaveLength(1));
+
+    await userEvent.click(screen.getByRole("button", { name: "Declined" }));
+
+    await waitFor(() => expect(signals).toHaveLength(2));
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(false);
+  });
+
+  it("says so when the next page cannot be read, and keeps what is shown", async () => {
+    listDownloadRequests.mockImplementation((params: { page?: number }) =>
+      params.page === 2
+        ? Promise.reject(new Error("boom"))
+        : Promise.resolve({ data: { results: [first], next: "http://api/?page=2" } }),
+    );
+    renderScreen(<DownloadRequestsPage />);
+    await screen.findByRole("link", { name: "First page paper" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load more/i);
+    expect(screen.getByRole("link", { name: "First page paper" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
+  });
+});
+
 describe("declining and revoking", () => {
   it("asks for a note before declining, and sends it", async () => {
     serve(request({ id: 4 }));

@@ -8,7 +8,8 @@ sees it. Only ``CompositionRoot.for_trial`` retrieves from it, and only
 A variant is ``<extractor>:<strategy>:<options>``. A blank extractor or
 strategy means "what production uses". Options are comma-separated
 ``key=value`` pairs: the ChunkingOptions fields, plus ``trail=on|off|shuffled``
-for the heading-trail test (Kuehlkamp et al. 2026, arXiv 2610.10170).
+for the heading-trail test (Kuehlkamp et al. 2026, arXiv 2610.10170), and
+``windows=count|section`` for how long papers are cut for embedding (IR-1056).
 
 Trial sets are built from the stored extraction, so there is no vendor
 re-read. A chunk whose text already has a vector for that record in the
@@ -30,13 +31,14 @@ from apps.ai.chunking.hashing import chunkset_hash
 from apps.ai.chunking.outline import PATH_SEPARATOR, TRAIL_JOIN, embedded_text
 from apps.ai.chunking.registry import registered_strategies
 from apps.ai.chunking.tokens import TOKENIZER_ID, count_tokens
+from apps.ai.providers import batching
 
 TRAIL_MODES = ("on", "off", "shuffled")
 
 _NAME = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 _INT_OPTIONS = ("max_tokens", "target_tokens", "min_tokens", "context_path_max_tokens")
 _BOOL_OPTIONS = ("merge_short_siblings", "index_formulas")
-_OPTION_KEYS = (*_INT_OPTIONS, *_BOOL_OPTIONS, "exclude_sections", "trail")
+_OPTION_KEYS = (*_INT_OPTIONS, *_BOOL_OPTIONS, "exclude_sections", "trail", "windows")
 
 
 class VariantError(ValueError):
@@ -53,6 +55,13 @@ class Variant:
     @property
     def trail(self) -> str:
         return dict(self.options).get("trail", "on")
+
+    @property
+    def windows(self) -> str:
+        """How long papers are cut into embedding windows (IR-1056)."""
+        from apps.ai.indexing import windows_mode
+
+        return dict(self.options).get("windows") or windows_mode()
 
     @property
     def spec(self) -> str:
@@ -105,6 +114,8 @@ def parse_variant(text: str) -> Variant:
             raise VariantError(f"{key} is true or false")
         if key == "trail" and value not in TRAIL_MODES:
             raise VariantError(f"trail is one of {', '.join(TRAIL_MODES)}")
+        if key == "windows" and value not in batching.WINDOW_MODES:
+            raise VariantError(f"windows is one of {', '.join(batching.WINDOW_MODES)}")
         options.append((key, value))
     return Variant(name, extractor, strategy, tuple(sorted(options)))
 
@@ -191,11 +202,34 @@ class TrialPlan:
         return bool(ceiling) and self.new_tokens > ceiling
 
 
-def _vectored_hashes(record_id: int, space_id: int, hashes) -> set[str]:
+def _is_long(texts) -> bool:
+    """More than one embedding window, so windowing changes its vectors."""
+    return sum(batching.estimate_tokens(t) for t in texts) > batching.EMBED_WINDOW_TOKENS
+
+
+def _reusable_embeddings(record_id: int, space_id: int, *, windows: str, long: bool):
+    """Vectors a trial may reuse by text; a long paper only from the same windowing."""
+    from django.db.models import Q
+
+    from apps.ai.indexing import windows_mode
     from apps.ai.models.chunk import ChunkEmbedding
 
-    return set(ChunkEmbedding.objects.filter(
-        space_id=space_id, chunk__record_id=record_id, chunk__text_hash__in=list(hashes),
+    rows = ChunkEmbedding.objects.filter(space_id=space_id, chunk__record_id=record_id)
+    if not long:
+        return rows
+    recorded = Q(chunk__chunk_set__options__windows=windows)
+    if windows == "count":
+        recorded |= ~Q(chunk__chunk_set__options__has_key="windows")
+    same = Q(chunk__chunk_set__trial_variant__isnull=False) & recorded
+    if windows == windows_mode():
+        same |= Q(chunk__chunk_set__trial_variant__isnull=True)
+    return rows.filter(same)
+
+
+def _vectored_hashes(record_id: int, space_id: int, hashes, *, windows: str,
+                     long: bool) -> set[str]:
+    return set(_reusable_embeddings(record_id, space_id, windows=windows, long=long).filter(
+        chunk__text_hash__in=list(hashes),
     ).values_list("chunk__text_hash", flat=True))
 
 
@@ -261,7 +295,8 @@ def plan_trial(variant: Variant, *, space_id: int,
         record_plan.chunk_set = built
         record_plan.extraction_hash = extraction.content_hash
         hashes = [chunk_text_hash(c) for c in built.chunks]
-        have = _vectored_hashes(active["record_id"], space_id, hashes)
+        have = _vectored_hashes(active["record_id"], space_id, hashes, windows=variant.windows,
+                                long=_is_long(c.text for c in built.chunks))
         owed = [c for c, h in zip(built.chunks, hashes) if h not in have]
         record_plan.new_chunks = len(owed)
         record_plan.new_tokens = sum(estimate_tokens(c.text) for c in owed)
@@ -280,10 +315,11 @@ class TrialBuild:
     refused: dict[int, str] = field(default_factory=dict)
 
 
-def _options_json(chunk_set: ChunkSet, trail: str) -> dict:
+def _options_json(chunk_set: ChunkSet, variant: Variant) -> dict:
     from apps.ai.repositories import _serialize_options
 
-    return {**_serialize_options(chunk_set.options), "trail": trail}
+    return {**_serialize_options(chunk_set.options), "trail": variant.trail,
+            "windows": variant.windows}
 
 
 def _write_set(record_plan: RecordPlan, variant: Variant):
@@ -299,7 +335,8 @@ def _write_set(record_plan: RecordPlan, variant: Variant):
         existing = ChunkSetModel.objects.select_for_update().filter(
             record_id=record_plan.record_id, trial_variant=variant.name
         ).first()
-        if existing is not None and existing.content_hash == built.content_hash:
+        if (existing is not None and existing.content_hash == built.content_hash
+                and existing.options.get("windows", "count") == variant.windows):
             return existing, False
         if existing is not None:
             existing.delete()
@@ -307,7 +344,7 @@ def _write_set(record_plan: RecordPlan, variant: Variant):
             record_id=record_plan.record_id,
             extraction_hash=record_plan.extraction_hash,
             strategy_id=built.strategy_id,
-            options=_options_json(built, variant.trail),
+            options=_options_json(built, variant),
             content_hash=built.content_hash,
             page_sizes=_serialize_page_sizes(built.page_sizes),
             is_active=False,
@@ -318,7 +355,7 @@ def _write_set(record_plan: RecordPlan, variant: Variant):
     return row, True
 
 
-def _carry_over(row, space_id: int) -> int:
+def _carry_over(row, space_id: int, windows: str) -> int:
     """Copy this record's existing vectors onto trial chunks with the same text."""
     from apps.ai.models.chunk import ChunkEmbedding, DocumentChunk
 
@@ -326,9 +363,11 @@ def _carry_over(row, space_id: int) -> int:
                    .exclude(embeddings__space_id=space_id))
     if not missing:
         return 0
+    long = _is_long(DocumentChunk.objects.filter(chunk_set=row).values_list("text", flat=True))
     vectors: dict[str, object] = {}
-    for text_hash, vector in ChunkEmbedding.objects.filter(
-        space_id=space_id, chunk__record_id=row.record_id,
+    for text_hash, vector in _reusable_embeddings(
+        row.record_id, space_id, windows=windows, long=long,
+    ).filter(
         chunk__text_hash__in={c.text_hash for c in missing},
     ).values_list("chunk__text_hash", "embedding"):
         vectors.setdefault(text_hash, vector)
@@ -338,7 +377,7 @@ def _carry_over(row, space_id: int) -> int:
     return len(rows)
 
 
-def _embed_rest(row, space, provider, active_hash: str) -> tuple[int, str]:
+def _embed_rest(row, space, provider, active_hash: str, windows: str) -> tuple[int, str]:
     """Embed the trial chunks still without a vector. Returns (count, refusal)."""
     from django.db import transaction
 
@@ -347,12 +386,11 @@ def _embed_rest(row, space, provider, active_hash: str) -> tuple[int, str]:
         EmbeddingRefused,
         _hold_space,
         _require_disclosure,
-        chunk_texts,
         default_permits,
+        embedding_windows,
     )
     from apps.ai.models.chunk import ChunkEmbedding, DocumentChunk
     from apps.ai.policy.outbound import Dependency, OutboundGuard, Withheld
-    from apps.ai.providers.batching import window_for_embedding
     from apps.records.models import Record
 
     chunks = list(DocumentChunk.objects.filter(chunk_set=row)
@@ -371,7 +409,7 @@ def _embed_rest(row, space, provider, active_hash: str) -> tuple[int, str]:
             vectors = [
                 vector
                 for group in provider.embed_document_chunks(
-                    window_for_embedding(chunk_texts(chunks)))
+                    embedding_windows(chunks, windows))
                 for vector in group
             ]
     except Withheld:
@@ -408,8 +446,9 @@ def build_trial(plan: TrialPlan, *, provider=None) -> TrialBuild:
                 outcome.written += 1
             else:
                 outcome.reused_sets += 1
-            outcome.carried += _carry_over(row, space.pk)
-            embedded, refused = _embed_rest(row, space, provider, record_plan.active_hash)
+            windows = plan.variant.windows
+            outcome.carried += _carry_over(row, space.pk, windows)
+            embedded, refused = _embed_rest(row, space, provider, record_plan.active_hash, windows)
             outcome.embedded += embedded
             if refused:
                 outcome.refused[record_plan.record_id] = refused

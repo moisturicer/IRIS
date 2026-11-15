@@ -281,17 +281,27 @@ class CompositionRoot:
         ``records`` narrows to a set of Record ids (IR-500), on every path
         including the outage fallback, intersected with ``visible_to``.
         """
+        from django.conf import settings
+
         return DegradableRetriever(
-            RerankingRetriever(
-                self._candidates(record, records),
-                reranker=self.reranker(),
-                policy_enabled=self._policy_enabled,
-                permits=self._permits,
+            self.reranking_over(
+                self._candidates(record, records), self.reranker(), settings.AI_RERANKER_READS
             ),
             fallback=FullTextRetriever(
                 record=record, records=records, trial_variant=self._trial_variant
             ),
             degrade_on=_vendor_failures(),
+        )
+
+    def recall_stage(self) -> Retriever:
+        """What reranking is handed, unwrapped; IR-1125 shares it across arms."""
+        return self._candidates(None)
+
+    def reranking_over(self, inner: Retriever, reranker: Reranker, reads: str) -> Retriever:
+        """This root's reranking decorator over ``inner`` (IR-1125)."""
+        return RerankingRetriever(
+            inner, reranker=reranker, policy_enabled=self._policy_enabled,
+            permits=self._permits, reads=reads,
         )
 
     def vendor_permits(self) -> Callable[[Record], bool]:

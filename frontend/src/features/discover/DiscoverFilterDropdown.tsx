@@ -119,7 +119,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
           block ? "w-full justify-between" : "max-w-[18rem]",
           isActive
             ? SELECTED
-            : "bg-white text-stone-700 border-stone-300 hover:border-stone-500",
+            : "bg-white text-stone-700 border-field hover:border-stone-500",
         )}
       >
         <span id={valueId} className="truncate">{valueText}</span>

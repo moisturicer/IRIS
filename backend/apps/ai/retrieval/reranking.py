@@ -30,6 +30,7 @@ from .diagnostics import (
     chunk_ids,
 )
 from .ports import RetrievalResult, RetrievedChunk, Retriever
+from .reranker_input import READS, TODAY, reranker_text
 
 #: How many candidates to recall before reranking. Retrieving a handful and
 #: reranking that handful achieves nothing: recall is cheap in Postgres and
@@ -58,7 +59,10 @@ class RerankingRetriever(Retriever):
         policy_enabled: bool = True,
         cache: Optional[dict] = None,
         permits: Callable[[Record], bool] = disclosure_permits,
+        reads: str = TODAY,
     ) -> None:
+        if reads not in READS:
+            raise ValueError(f"reranker reads one of {', '.join(READS)}, not {reads!r}")
         self._inner = inner
         self._reranker = reranker or NoOpReranker()
         self._recall_limit = recall_limit
@@ -68,6 +72,7 @@ class RerankingRetriever(Retriever):
         # IR-132's; this keeps the shape honest until then.
         self._cache = cache
         self._permits = permits
+        self._reads = reads
 
     # -- the disclosure gate ------------------------------------------------
 
@@ -116,7 +121,7 @@ class RerankingRetriever(Retriever):
         changed corpus is a different reranking, and serving the previous one
         would rank passages that are no longer there.
         """
-        return (question, tuple(sorted(c.chunk_id for c in candidates)))
+        return (question, self._reads, tuple(sorted(c.chunk_id for c in candidates)))
 
     # -- what the recall stage saw ------------------------------------------
 
@@ -176,9 +181,10 @@ class RerankingRetriever(Retriever):
         # was told -- that the vendor was out, which path ran, which space --
         # is not its to restate (IR-279).
         inner = self._inner.retrieve(question, user, limit=self._recall_limit)
-        # A passage with nothing to show cannot be cited, and the vendor
-        # refuses an empty document (an uncaptioned Figure's chunk, IR-1102).
-        candidates = [c for c in self._permitted(inner.passages) if c.content.strip()]
+        # Nothing to read is dropped: the vendor refuses an empty document (IR-1102, IR-1125).
+        permitted = self._permitted(inner.passages)
+        texts = {c.chunk_id: reranker_text(c, self._reads) for c in permitted}
+        candidates = [c for c in permitted if texts[c.chunk_id].strip()]
         if not candidates:
             return inner.with_passages(
                 (),
@@ -191,7 +197,9 @@ class RerankingRetriever(Retriever):
         else:
             try:
                 with self._fence(user, candidates):
-                    ranked = self._reranker.rerank(question, [c.content for c in candidates])
+                    ranked = self._reranker.rerank(
+                        question, [texts[c.chunk_id] for c in candidates]
+                    )
                 order = [(item.index, item.score) for item in ranked]
                 if self._cache is not None:
                     self._cache[key] = order

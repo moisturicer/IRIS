@@ -836,11 +836,24 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
     "AI_RETRIEVAL_FUSION_ENABLED", default=False, cast=bool
 )
 
+# ---- Section-aligned embedding windows (IR-1056) ----------------------
+# Off until a trial run shows it helps; re-embed with `backfill_embeddings --force` after.
+AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False, cast=bool)
+
 # ---- Formulas in the indexed text (IR-1102, ADR-067 §Amendment) ----------
 # Readers always see a transcribed formula's LaTeX. On, it and its description
 # also enter the chunk's embedded and keyword-indexed text. Read at chunking,
 # so moving it needs a re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
 AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
+
+# ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
+# Modes in apps/ai/retrieval/reranker_input.py. fallback since IR-1125 (ADR-033).
+AI_RERANKER_READS = config("AI_RERANKER_READS", default="fallback")
+if AI_RERANKER_READS not in ("today", "embedded", "described", "fallback"):
+    raise ImproperlyConfigured(
+        "AI_RERANKER_READS must be today, embedded, described or fallback, "
+        f"not {AI_RERANKER_READS!r}"
+    )
 
 # ---- Vector scan depth (IR-440) ---------------------------------------
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.

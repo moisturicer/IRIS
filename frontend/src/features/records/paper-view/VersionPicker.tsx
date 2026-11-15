@@ -62,7 +62,7 @@ export function VersionPicker({
         value={viewing != null ? String(viewing) : currentValue}
         onChange={(e) => onChoose(e.target.value === currentValue ? null : Number(e.target.value))}
         className={cn(
-          "min-h-11 reading-split:min-h-9 rounded-lg border border-stone-300 px-2 text-sm text-stone-800",
+          "min-h-11 reading-split:min-h-9 rounded-lg border border-field px-2 text-sm text-stone-800",
           compact ? "w-32 bg-transparent" : "min-w-0 max-w-full bg-white",
           FOCUS_RING,
         )}

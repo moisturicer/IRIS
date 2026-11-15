@@ -287,7 +287,7 @@ function EditForm({ ctx }: { ctx: CommentContext }) {
         onKeyDown={keyDown}
         maxLength={ctx.maxLength}
         rows={2}
-        className="block max-h-64 w-full resize-none overflow-y-auto rounded-2xl border border-stone-300 bg-surface px-3.5 py-2.5 text-sm text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+        className="block max-h-64 w-full resize-none overflow-y-auto rounded-2xl border border-field bg-surface px-3.5 py-2.5 text-sm text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
       />
       {remaining <= 300 && <p className="mt-1 text-right text-2xs text-stone-600">{remaining} characters remaining</p>}
       <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 pl-1">

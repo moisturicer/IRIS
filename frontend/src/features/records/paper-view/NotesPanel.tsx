@@ -99,7 +99,7 @@ export function NotesPanel({ record, note, highlights, onOpenHighlight, canOpenV
               <textarea id={editorId} value={note.text} onChange={(e) => note.setText(e.target.value)}
                 maxLength={MAX_NOTE_LENGTH} aria-describedby={hintId}
                 placeholder="What do you want to remember about this paper? A question, a page, a thought."
-                className="min-h-40 w-full flex-1 resize-none rounded-lg border border-stone-300 bg-white p-3 text-body leading-relaxed text-stone-900 placeholder:text-stone-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" />
+                className="min-h-40 w-full flex-1 resize-none rounded-lg border border-field bg-white p-3 text-body leading-relaxed text-stone-900 placeholder:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" />
             </div>
             <SaveStatus note={note} />
           </>
