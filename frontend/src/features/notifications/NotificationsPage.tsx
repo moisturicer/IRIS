@@ -137,7 +137,7 @@ export default function NotificationsPage() {
     <div>
       <PageHeader
         title="Notifications"
-        description="Updates on your records and reviews. Select one to open its record."
+        description="Updates on your records and reviews. Use Open to go to the record."
         actions={
           unreadCount > 0 ? (
             <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
