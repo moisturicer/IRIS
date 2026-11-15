@@ -177,7 +177,7 @@ export function DiscoverFilterBar({
             count > 0 ? SELECTED : "bg-white border-stone-300 text-stone-700",
           )}
         >
-          <i className="fas fa-sliders text-[12px]" aria-hidden />
+          <i className="fas fa-sliders text-label" aria-hidden />
           <span>Filters</span>
           {/* A real space: the button is a flex row, which draws none, but the
               visible text a checker compares with the name reads "Filters1"
@@ -197,7 +197,7 @@ export function DiscoverFilterBar({
           <h2 className="text-small font-semibold text-stone-900">Filters</h2>
           <button type="button" ref={closeRef} onClick={() => { setOpen(false); triggerRef.current?.focus(); }} aria-label="Close filters"
             className={cn("flex h-9 w-9 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
-            <i className="fas fa-xmark text-[13px]" aria-hidden />
+            <i className="fas fa-xmark text-small" aria-hidden />
           </button>
         </div>
         <div className="flex flex-col gap-3 overflow-y-auto px-4 py-4">

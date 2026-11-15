@@ -87,7 +87,7 @@ export function MyFeeds({ query, matchCount, options, activeFeedId, onOpen, onDe
         aria-controls={open ? menuId : undefined}
         className={cn("inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
       >
-        <i className="fas fa-rss text-[12px]" aria-hidden />
+        <i className="fas fa-rss text-label" aria-hidden />
         <span>My feeds</span>
         {feeds.length > 0 && <span className="text-stone-500" aria-hidden>{feeds.length}</span>}
       </button>
@@ -125,11 +125,11 @@ export function MyFeeds({ query, matchCount, options, activeFeedId, onOpen, onDe
                   </button>
                   <button type="button" aria-label={`Rename ${feed.name}`} onClick={() => choose({ kind: "rename", feed })}
                     className={cn("flex h-11 w-9 items-center justify-center rounded-md text-stone-600 hover:text-brand", FOCUS_RING)}>
-                    <i className="fas fa-pen text-[11px]" aria-hidden />
+                    <i className="fas fa-pen text-label" aria-hidden />
                   </button>
                   <button type="button" aria-label={`Delete ${feed.name}`} onClick={() => choose({ kind: "delete", feed })}
                     className={cn("flex h-11 w-9 items-center justify-center rounded-md text-stone-600 hover:text-brand", FOCUS_RING)}>
-                    <i className="fas fa-trash-can text-[11px]" aria-hidden />
+                    <i className="fas fa-trash-can text-label" aria-hidden />
                   </button>
                 </li>
               ))}
