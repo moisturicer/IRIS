@@ -352,14 +352,23 @@ def overlap(previous: str, text: str) -> int:
     return 0
 
 
+#: Characters per token, for a chunk with no stored count.
+CHARS_PER_TOKEN = 4
+
+
+def _retrieved(passages) -> int:
+    """Passages search found; section context is not a match."""
+    return sum(not p.section_mate for p in passages)
+
+
 def _hit(row) -> Hit:
-    """A row as selection sees it; a chunk with no stored count is estimated at 4 chars a token."""
+    """A row as selection sees it."""
     key = row["section_key"]
     if isinstance(key, str):
         key = json.loads(key)
     tokens = row["token_count"]
     return Hit(row["id"], row["record_id"], row["chunk_set_id"], row["sequence"],
-               tuple(key) if key else None, tokens if tokens is not None else len(row["content"]) // 4 + 1)
+               tuple(key) if key else None, tokens if tokens is not None else len(row["content"]) // CHARS_PER_TOKEN + 1)
 
 
 def shown_bytes(text: str) -> int:
@@ -594,12 +603,7 @@ class ResearchTools:
                 # non-matching rows, which ts_rank scores 1e-20.
                 f"""WITH q AS (SELECT replace(plainto_tsquery('{CONFIG}', $1)::text, '&', '|')::tsquery AS q),
                     hits AS (
-                        SELECT c.id, c.record_id, c.chunk_set_id, cs.extraction_hash, c.source_page,
-                               c.content, c.context_path, r.title, c.sequence, c.token_count,
-                               c.section_key, ts_rank(c.search_vector, q.q) AS rank
-                          FROM q, iris_ai.research_chunks() c
-                          JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active
-                          JOIN public.records_record r ON r.id = c.record_id
+                        SELECT {_COLUMNS}, ts_rank(c.search_vector, q.q) AS rank {_CHUNKS}, q
                          WHERE c.deleted_at IS NULL AND c.search_vector @@ q.q
                            AND ($2::bigint IS NULL OR c.record_id = $2))
                     SELECT *, count(*) OVER () AS total FROM hits
@@ -611,10 +615,10 @@ class ResearchTools:
                 return ToolResult(NO_MATCH, coverage=Coverage(total=0, inspected_records=inspected))
             records, passages = await self._found(conn, rows, limit)
             total = rows[0]["total"]
-            hits = sum(not p.section_mate for p in passages)
+            hits = _retrieved(passages)
             return ToolResult(
                 OK, records=records, passages=passages,
-                coverage=Coverage(len(passages), total, total > hits, inspected),
+                coverage=Coverage(hits, total, total > hits, inspected),
                 dependencies=frozenset(p.source for p in passages),
             )
 
@@ -1223,7 +1227,7 @@ class ResearchTools:
                 return ToolResult(NO_MATCH, coverage=Coverage(0, None, truncated, found["inspected"]),
                                   signals=signals)
             records, passages = await self._found(conn, rows, limit)
-            coverage = Coverage(len(passages), None, truncated, found["inspected"])
+            coverage = Coverage(_retrieved(passages), None, truncated, found["inspected"])
             return ToolResult(OK, records=records, passages=passages, coverage=coverage,
                               dependencies=frozenset(p.source for p in passages), signals=signals)
 

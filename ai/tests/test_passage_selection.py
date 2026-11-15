@@ -136,3 +136,10 @@ def test_every_hit_gets_its_nearest_mate_before_any_hit_gets_a_second():
 def test_section_mates_switch_off():
     off = Policy(per_paper=3, join=True, tokens_per_passage=700, section_mates=False)
     assert ids(select([hit(5)], limit=1, policy=off, neighbours=[hit(6)])) == [5]
+
+
+def test_with_joining_off_a_mate_never_links_a_hit_from_another_section():
+    no_join = Policy(per_paper=3, join=False, tokens_per_passage=700, section_mates=True)
+    ranked = [hit(5), hit(7, section=("T", "Box 1"))]
+    placed = select(ranked, limit=2, policy=no_join, neighbours=[hit(6)])
+    assert [(p.hit.id, p.continues) for p in placed] == [(5, None), (6, 5), (7, None)]

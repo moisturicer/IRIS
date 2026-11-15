@@ -109,7 +109,8 @@ def _arrange(items, mates: set[int], join: bool) -> list[Placed]:
     by_position = {(h.chunk_set_id, h.sequence): h for h in items}
 
     def linked(a, b):
-        return join or a.id in mates or b.id in mates
+        # A mate sits only with its own section.
+        return join or ((a.id in mates or b.id in mates) and a.section_key == b.section_key)
 
     runs, placed = [], set()
     for h in items:
