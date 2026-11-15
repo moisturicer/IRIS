@@ -136,6 +136,7 @@ def _serialize_options(options: ChunkingOptions) -> dict:
         "exclude_sections": list(options.exclude_sections),
         "index_formulas": options.index_formulas,
         "figure_passages": options.figure_passages,
+        "sibling_merge_floor": options.sibling_merge_floor,
     }
 
 
@@ -151,6 +152,7 @@ def _deserialize_options(data: dict) -> ChunkingOptions:
         exclude_sections=tuple(data.get("exclude_sections", ())),
         index_formulas=data.get("index_formulas", False),
         figure_passages=data.get("figure_passages", False),
+        sibling_merge_floor=data.get("sibling_merge_floor", 0),
     )
 
 

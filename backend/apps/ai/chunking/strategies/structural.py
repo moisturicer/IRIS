@@ -26,6 +26,11 @@ A transcribed formula (IR-1102) is shown as LaTeX and embedded, with its
 description, only when ``index_formulas`` is on. With ``figure_passages``
 (IR-1054) each Figure leaves the text flow for a passage of its own that
 embeds its caption and description and shows only the caption.
+
+With ``sibling_merge_floor`` (IR-1147) a passage under the floor merges
+forward with the next section under the same parent heading (3.1 with 3.2,
+never 3 with 4), up to the target, and carries the parent's path. A Figure
+passage is never merged and is never merged across.
 """
 
 import hashlib
@@ -36,6 +41,7 @@ from ..assembly import (
     Draft,
     Joiners,
     body_budget,
+    combine,
     finalize,
     fold_heading_only,
     merge_short_siblings,
@@ -85,10 +91,42 @@ class StructuralCascadeChunker:
 
         # Across sections, so it cannot live in _chunk_section (IR-241).
         drafts = fold_heading_only(drafts, options, fits, _JOINERS)
+        drafts = _merge_sibling_sections(drafts, document.title, options, fits)
         return finalize(
             drafts, strategy_id=STRATEGY_ID, options=options, page_sizes=document.page_sizes,
             content_hash=lambda chunks: _set_hash(chunks, options),
         )
+
+
+def _merge_sibling_sections(drafts: list[Draft], title: str, options: ChunkingOptions, fits) -> list[Draft]:
+    """Fold a passage under the floor into the next section sharing its parent."""
+    floor = options.sibling_merge_floor
+    if not floor or len(drafts) <= 1:
+        return list(drafts)
+
+    def parent(draft: Draft) -> tuple[str, ...] | None:
+        if draft.element_kinds == {"image"}:
+            return None
+        group = draft.section_key[:-1]
+        # The document title is not a parent heading: 3 never merges with 4.
+        return group if group and group != (title.strip(),) else None
+
+    result: list[Draft] = []
+    pending, pending_parent = drafts[0], parent(drafts[0])
+    for nxt in drafts[1:]:
+        if (pending_parent is not None and pending_parent == parent(nxt)
+                and pending.section_key != nxt.section_key
+                and count_tokens(pending.body) < floor):
+            candidate = replace(combine([pending, nxt], _JOINERS),
+                                trail=bounded_trail(pending_parent, options), section_key=pending_parent)
+            if fits(candidate):
+                # Its key is now the parent, so the next sibling is compared by group.
+                pending = candidate
+                continue
+        result.append(pending)
+        pending, pending_parent = nxt, parent(nxt)
+    result.append(pending)
+    return result
 
 
 def _set_hash(chunks, options: ChunkingOptions) -> str:
