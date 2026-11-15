@@ -414,3 +414,17 @@ def review_threads_closed(record, actor, *, decision, threads, must_fix):
         AuditEvent.REVIEW_THREADS_CLOSED, actor, record,
         decision=decision.pk, threads=list(threads), must_fix=int(must_fix),
     )
+
+
+# --- comment moderation (ADR-032 §7, amendment 2026-10-31; IR-691) ----------
+
+def comment_removed(comment, actor, *, reason, reports_closed) -> None:
+    """RDCO or the System Admin removed a Comment. Its text is never copied."""
+    _write(AuditEvent.COMMENT_REMOVED, actor, comment.record,
+           comment=comment.pk, reason=reason, reports_closed=reports_closed)
+
+
+def comment_reports_dismissed(comment, actor, *, reports_closed) -> None:
+    """RDCO or the System Admin dismissed a Comment's open reports."""
+    _write(AuditEvent.COMMENT_REPORTS_DISMISSED, actor, comment.record,
+           comment=comment.pk, reports_closed=reports_closed)

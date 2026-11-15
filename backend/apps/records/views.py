@@ -981,6 +981,24 @@ class RecordViewSet(viewsets.ModelViewSet):
             lambda c: c.edit(record, request.user, comment_id, body=request.data.get("body")),
         )
 
+    @action(
+        detail=True, methods=["post"], url_path=r"comments/(?P<comment_id>[0-9]+)/reports",
+        url_name="comment-reports",
+        throttle_classes=[*api_settings.DEFAULT_THROTTLE_CLASSES, CommentPostBurstThrottle, CommentPostThrottle],
+    )
+    def comment_reports(self, request, pk=None, comment_id=None):
+        """
+        POST /records/<id>/comments/<comment_id>/reports/ `{"reason": str, "note"?: str}`
+        -- a reader reports someone else's comment (IR-691). 204, a repeat too.
+        Spends the posting budget (decision 2026-11-15).
+        """
+        record = self.get_object()
+        return self._public_comment_response(
+            lambda c: c.report(record, request.user, comment_id,
+                               reason=request.data.get("reason"), note=request.data.get("note")),
+            success=status.HTTP_204_NO_CONTENT,
+        )
+
     def _comment_response(self, act, success=status.HTTP_200_OK):
         """
         Run a review-discussion act and answer with its result (IR-419,

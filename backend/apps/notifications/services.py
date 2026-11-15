@@ -597,6 +597,40 @@ def notify_comment_replied(record, comment, *, actor):
         _log_failure("notify_comment_replied", record=record)
 
 
+def notify_comment_reported(record, comment, *, actor):
+    """
+    A comment entered the Reported comments queue (IR-691): RDCO hears once,
+    on its first open report, bound to the comment so the notice settles when
+    its reports are handled (ADR-069). Never who reported, and never the
+    writer or the paper's owners. In-app only.
+    """
+    try:
+        rdco_role = _role(RoleName.RDCO)
+        if rdco_role:
+            Notification.objects.create(
+                sender=actor, broadcast_to_role=rdco_role, record=record,
+                notif_type=NotificationType.objects.get_or_create(name="Comment Reported")[0],
+                message=f'A comment on "{record.title}" was reported. Review it in Reported comments.',
+                **_task_id(TaskKind.COMMENT_REPORT, comment.pk),
+            )
+    except Exception:
+        _log_failure("notify_comment_reported", record=record)
+
+
+def notify_comment_removed(record, comment, *, actor, reason: str):
+    """A comment's writer hears it was removed, and why (IR-691). In-app only."""
+    try:
+        if comment.author is None:
+            return
+        Notification.objects.create(
+            sender=actor, recipient=comment.author, record=record,
+            notif_type=NotificationType.objects.get_or_create(name="Comment Removed")[0],
+            message=f'Your comment on "{record.title}" was removed: {reason}',
+        )
+    except Exception:
+        _log_failure("notify_comment_removed", record=record)
+
+
 def notify_document_requested(document_request, *, party_label: str):
     """
     Tell every owner that a party has asked for documents (ADR-022 §3.1).

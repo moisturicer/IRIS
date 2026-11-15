@@ -27,7 +27,19 @@ not deleted.
 **Notifications,** in-app only: the paper's owners on each new top-level
 comment by someone else, and a writer when someone else replies to them
 (IR-690 build note: owners are not told of replies). Ask IRIS never reads
-comments. Reporting is IR-691, so nothing offers it yet (`can_report`).
+comments.
+
+**Reports** (IR-691). Any signed-in reader reports someone else's comment, once:
+
+    POST   /records/<id>/comments/<comment_id>/reports/ {"reason": str, "note"?: str} → 204
+
+A repeat answers 204 and stores nothing. *Other* needs a note. The report keeps
+the comment's text as it was; RDCO hears of a comment's first open report, and
+nobody else ever learns of one. Reporting spends the posting budget (decision
+2026-11-15). The writer deleting their comment closes its open reports; an
+edit changes nothing (decision 2026-11-15). Removing and dismissing are
+`apps.records.comment_moderation`'s; `can_remove` offers removal to RDCO and
+the System Admin on every comment still standing.
 """
 
 from __future__ import annotations
@@ -36,9 +48,10 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.throttling import UserRateThrottle
 
-from core.enums import PUBLICLY_VISIBLE_STATUSES, CommentDeletion
+from core.enums import PUBLICLY_VISIBLE_STATUSES, CommentDeletion, CommentReportReason, CommentReportState
+from core.permissions import is_comment_moderator
 
-from .models import PUBLIC_COMMENT_MAX_LENGTH, PublicComment
+from .models import COMMENT_REPORT_NOTE_MAX_LENGTH, PUBLIC_COMMENT_MAX_LENGTH, CommentReport, PublicComment
 
 FORMER_USER = "Former user"
 #: An account with no name on file. Never its email: the page is public.
@@ -58,7 +71,7 @@ class CommentError(Exception):
 
 
 class _PostOnly:
-    """A budget spent only by posting: reading, editing and deleting are free."""
+    """A budget spent only by posting and reporting: reading, editing and deleting are free."""
 
     def allow_request(self, request, view):
         if request.method != "POST":
@@ -107,19 +120,20 @@ def comment_payload(comment: PublicComment, user, owners: set) -> dict:
         "created_at": comment.created_at.isoformat(),
         "reply_to": comment.reply_to_id,
         "deletion_kind": comment.deletion_kind,
-        # Reporting is IR-691's; nothing is offered before it exists.
-        "can_report": False,
     }
     if comment.deletion_kind:
         return {**shared, "author_name": None, "body": None, "edited_at": None,
-                "is_author": False, "can_edit": False}
+                "is_author": False, "can_edit": False, "can_report": False, "can_remove": False}
+    mine = comment.author_id is not None and comment.author_id == user.pk
     return {
         **shared,
         "author_name": _writer_name(comment),
         "body": comment.body,
         "edited_at": comment.edited_at.isoformat() if comment.edited_at else None,
         "is_author": comment.author_id is not None and comment.author_id in owners,
-        "can_edit": comment.author_id is not None and comment.author_id == user.pk,
+        "can_edit": mine,
+        "can_report": not mine,
+        "can_remove": is_comment_moderator(user),
     }
 
 
@@ -191,6 +205,48 @@ def delete(record, user, comment_id) -> None:
     comment.deleted_at = timezone.now()
     comment.deleted_by = user
     comment.save(update_fields=["deletion_kind", "deleted_at", "deleted_by"])
+    # Nothing is left to judge (decision 2026-11-15).
+    close_reports(comment, CommentReportState.WRITER_DELETED, by=user, at=comment.deleted_at)
+
+
+def close_reports(comment, state, *, by, at) -> int:
+    """Close `comment`'s open reports as `state`; how many closed."""
+    return comment.reports.filter(state=CommentReportState.OPEN).update(
+        state=state, resolved_by=by, resolved_at=at,
+    )
+
+
+def _reason(reason, note) -> tuple[str, str]:
+    if reason not in CommentReportReason.values:
+        raise CommentError("Choose a reason for reporting this comment.")
+    text = note.strip() if isinstance(note, str) else ""
+    if reason == CommentReportReason.OTHER and not text:
+        raise CommentError("Say what is wrong with this comment.")
+    if len(text) > COMMENT_REPORT_NOTE_MAX_LENGTH:
+        raise CommentError(f"A note is at most {COMMENT_REPORT_NOTE_MAX_LENGTH:,} characters.")
+    return reason, text if reason == CommentReportReason.OTHER else ""
+
+
+@transaction.atomic
+def report(record, user, comment_id, *, reason, note=None) -> None:
+    """`user` reports someone else's comment (module note). Nothing to answer with."""
+    _paper(record)
+    comment = _comment(record, comment_id)
+    if comment.deletion_kind:
+        raise CommentError("This comment was deleted.")
+    if comment.author_id == user.pk:
+        raise CommentRefused("You can't report your own comment.")
+    reason, note = _reason(reason, note)
+    if comment.reports.filter(reporter=user).exists():
+        return
+    waiting = comment.reports.filter(state=CommentReportState.OPEN).exists()
+    CommentReport.objects.create(
+        comment=comment, reporter=user, reason=reason, note=note, reported_text=comment.body,
+    )
+    if not waiting:
+        from apps.notifications.services import notify_comment_reported
+
+        transaction.on_commit(lambda: notify_comment_reported(record, comment, actor=user), robust=True)
 
 
 def _notify(record, comment, actor) -> None:

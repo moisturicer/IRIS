@@ -400,6 +400,21 @@ def comments(user) -> list[dict]:
     ]
 
 
+def comment_reports(user) -> list[dict]:
+    """The Comments the person reported (IR-691): the paper, their reason and
+    note, when, and whether it is still open. Never the reported words, which
+    are someone else's, nor who acted on it."""
+    from apps.records.models import CommentReport
+
+    rows = list(CommentReport.objects.filter(reporter=user).select_related("comment").order_by("id"))
+    titles = _readable_titles(user, [row.comment.record_id for row in rows])
+    return [
+        {"paper": _paper(row.comment.record_id, titles), "reason": row.reason, "note": row.note,
+         "at": row.created_at, "state": row.state}
+        for row in rows
+    ]
+
+
 def discovery(user) -> dict:
     from apps.records.models import DiscoveryDismissal, DiscoveryInterests
 
@@ -717,6 +732,7 @@ SECTIONS: dict[str, Callable] = {
     "viewed_marks": viewed_marks,
     "review_mentions": review_mentions,
     "comments": comments,
+    "comment_reports": comment_reports,
     "discovery": discovery,
     "conversations": conversations,
     "download_requests": download_requests,
