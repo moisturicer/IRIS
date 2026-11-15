@@ -480,7 +480,7 @@ export const DIALOGS: DialogCase[] = [
         ...PAPER_DETAIL, is_ip: action === "release_ip", embargo: { state: "held", until: "2026-12-01" },
         capabilities: ["cite", "set_embargo", "release_embargo", ...(action === "release_ip" ? ["release_ip"] : [])],
       });
-      api.on("GET", "/users/role-requests/", paginated([]));
+      api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
     },
     open: async (page) => {
       const label = action === "set" ? "Change date" : action === "release" ? "Release embargo" : "Release IP mark";

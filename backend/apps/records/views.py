@@ -2180,13 +2180,11 @@ class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
         by_status = dict(
             DeleteRequest.objects.values_list("status").annotate(n=Count("pk")).order_by()
         )
-        pending = by_status.get(RequestStatus.PENDING, 0)
-        approved = by_status.get(RequestStatus.APPROVED, 0)
-        declined = by_status.get(RequestStatus.DECLINED, 0)
-        return Response({
-            "pending": pending, "approved": approved, "declined": declined,
-            "all": sum(by_status.values()),
-        })
+        counts = {state.value: by_status.get(state, 0) for state in (
+            RequestStatus.PENDING, RequestStatus.APPROVED, RequestStatus.DECLINED,
+        )}
+        counts["all"] = sum(by_status.values())
+        return Response(counts)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsRDCO])
     def approve(self, request, pk=None):
