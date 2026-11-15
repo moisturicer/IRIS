@@ -157,7 +157,7 @@ IR-758 (spec, under IR-671), IR-759 (this ADR), IR-760, IR-761, IR-762, IR-763, 
 
 ## Amendment — 2026-11-16 (IR-649): only a confirmed Call is saved, and the account-data rules
 
-**Status of this amendment: Proposed** — decided by Hermoine Zozobrado, 2026-11-16, while building IR-649. It is accepted when IR-649's PR merges.
+**Status of this amendment: Accepted** — decided by Hermoine Zozobrado, 2026-11-16, while building IR-649. Accepted by Lee Jasmin Adolfo on 2026-11-16, as relayed by Hermoine Zozobrado, when IR-649's PR (#823) merged.
 
 1. **Only a confirmed Call can be saved, and a saved Call is available only while it is confirmed, for everyone** (decision 13). A waiting or rejected Call can't be saved, even by its Adviser or RDCO, who can open it; the refusal is the same 404 as for a missing Call. A saved Call that returns to waiting or is rejected is listed as unavailable for its poster and RDCO too, not only for other readers. One rule for every reader, so a Call never reads in full for one and as unavailable for another. A poster still sees their own requests under My Calls.
 2. **Point 4 of the 2026-11-12 (IR-758) amendment is confirmed.** Deleting an account deletes the person's saved Calls. The personal-data download lists them in a `saved_calls` section: each Call's id and when it was saved, and its title only while it is confirmed, as the saved list shows it.
