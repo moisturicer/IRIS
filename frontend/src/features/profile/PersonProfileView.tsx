@@ -202,7 +202,7 @@ function PaperSection({ title, list, onMore, empty }: {
               <ResearchCard
                 layout="list"
                 compact
-                thumbnail={<PaperThumbnail />}
+                thumbnail={<PaperThumbnail recordId={paper.id} available={false} />}
                 headingLevel={3}
                 href={`/records/${paper.id}`}
                 title={paper.title}
