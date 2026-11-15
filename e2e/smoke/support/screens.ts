@@ -11,7 +11,7 @@
 //   - for table-heavy screens, the small-screen behaviour (see TABLE_BEHAVIOUR).
 import type { Locator, Page } from "@playwright/test";
 import type { MockApi } from "./mock-api";
-import { PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
+import { mockReadingHistory, PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
 
 export interface Screen {
   /** Stable name in the results table. */
@@ -46,6 +46,8 @@ function shell(api: MockApi, role: SmokeRole) {
     total_mine: 0, pending_mine: 0, approved_mine: 0, declined_mine: 0, needs_action_mine: 0, total_published: 1,
   });
   api.on("GET", "/notifications/", paginated([]));
+  // Reading history (IR-756): My Library reads it, and the paper view records a visit.
+  mockReadingHistory(api);
   if (role === "RDCO") {
     api.on("GET", "/dashboard/queue-counts/", {
       download_requests: 0, delete_requests: 0, role_change_requests: 0, reported_comments: 0,

@@ -1,6 +1,6 @@
 // Data the smoke specs answer with. Shapes follow frontend/src/types; a field
 // the interface does not read is left out rather than invented.
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
 
 function b64url(value: unknown): string {
@@ -102,6 +102,20 @@ export function mockShell(
   api.on("GET", "/notifications/", paginated([]));
   api.on("GET", "/library/saves/", { results: [] });
   api.on("GET", "/library/feeds/", { results: [], limit: 10 });
+  mockReadingHistory(api);
+}
+
+/**
+ * Reading history on the account (IR-756): My Library lists it and reads the
+ * pause setting; the paper view asks the setting and records a visit to each
+ * paper it opens (the smoke papers are `PAPER` and the keyboard suite's 42).
+ */
+export function mockReadingHistory(api: MockApi) {
+  api.on("GET", "/library/history/", { results: [] });
+  api.on("GET", "/library/preferences/", { keep_history: true });
+  for (const id of [PAPER.id, 42]) {
+    api.on("PUT", `/library/history/${id}/`, (route: Route) => route.fulfill({ status: 204 }));
+  }
 }
 
 /**
