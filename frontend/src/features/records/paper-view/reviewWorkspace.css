@@ -4,22 +4,22 @@
  * right makes it three. The one row is `minmax(0, 1fr)`, so a column's content scrolls inside the column
  * and never stretches the row past the viewport -- the blank band under the columns (audit LAY-07).
  */
-.review-workspace { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--mid-w, 520px); grid-template-rows: minmax(0, 1fr); position: relative; min-height: 0; color: theme('colors.stone.700'); background: theme('colors.stone.50'); }
+.review-workspace { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--mid-w, 520px); grid-template-rows: minmax(0, 1fr); position: relative; min-height: 0; color: theme('colors.stone.700'); background: white; }
 .review-workspace.review-has-side { grid-template-columns: minmax(0, 1fr) var(--mid-w, 520px) var(--side-w, 320px); }
 .review-workspace.review-without-paper { grid-template-columns: minmax(0, 1fr); }
 .review-workspace.review-without-paper.review-has-side { grid-template-columns: minmax(0, 1fr) var(--side-w, 320px); }
 .review-paper { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: theme('colors.stone.200'); }
 .review-paper[inert] { position: relative; }
 .review-paper[inert]::after { content: ''; position: absolute; inset: 0; z-index: 10; background: rgb(41 37 36 / .2); }
-.review-pane { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid theme('colors.stone.300'); }
-.review-pane-head { flex: none; padding: 12px 16px 0; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); }
+.review-pane { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid theme('colors.stone.300'); background: white; }
+.review-pane-head { flex: none; display: grid; gap: 10px; padding: 16px 20px 0; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.50'); }
 .review-tab { position: relative; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 600; }
 .review-tab[aria-selected=true] { color: theme('colors.stone.900'); box-shadow: inset 0 -2px theme('colors.stone.900'); }
 .review-pane-body { flex: 1; min-height: 0; overflow-y: auto; }
 .review-pane-foot { flex: none; max-height: 50%; overflow-y: auto; padding: 12px 16px; border-top: 1px solid theme('colors.stone.300'); background: white; }
 /* A tab opened beside the pane: its own header, and only its body scrolls. */
-.review-side { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid theme('colors.stone.300'); background: theme('colors.stone.50'); }
-.review-side-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; padding: 0 16px; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); }
+.review-side { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid theme('colors.stone.300'); background: white; }
+.review-side-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; padding: 0 16px; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.50'); }
 .review-side-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
 .review-resize-edge { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; touch-action: none; }
 .review-resize-edge:hover, .review-resize-edge:focus-visible { background: theme('colors.brand.DEFAULT'); outline: 2px solid theme('colors.brand.DEFAULT'); outline-offset: 0; }
@@ -35,7 +35,7 @@
  */
 @container review-workspace (max-width: 899px) {
   .review-workspace, .review-workspace.review-has-side { grid-template-columns: minmax(0, 1fr); }
-  .review-workspace:not(.review-without-paper) > .review-pane { position: absolute; inset: 0 0 0 auto; width: min(440px, 100%); z-index: 20; visibility: hidden; transform: translateX(100%); background: theme('colors.stone.50'); }
+  .review-workspace:not(.review-without-paper) > .review-pane { position: absolute; inset: 0 0 0 auto; width: min(440px, 100%); z-index: 20; visibility: hidden; transform: translateX(100%); background: white; }
   .review-workspace:not(.review-without-paper) > .review-pane-open { visibility: visible; transform: none; }
   .review-resize-edge { display: none; }
   .review-paper-foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 16px; border-top: 1px solid theme('colors.stone.300'); background: theme('colors.stone.100'); }
@@ -47,3 +47,68 @@
 .review-kv dd { color: theme('colors.stone.900'); }
 .review-tag { display: inline-flex; align-items: center; padding: 2px 8px; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.full'); font-size: 12px; color: theme('colors.stone.700'); background: white; }
 .review-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: theme('borderRadius.full'); font-size: 10px; font-weight: 700; color: white; background: theme('colors.stone.700'); }
+
+/*
+ * The pane's look, after the prototype's GitHub-like pull request page (IR-1131; spec §4.8,
+ * iris-uiux-audit/prototype). White surfaces; the paper column alone stays on Desk Stone.
+ */
+.review-count { display: inline-block; min-width: 20px; margin-left: 6px; padding: 0 7px; border-radius: theme('borderRadius.full'); background: theme('colors.stone.200'); font-size: 12px; line-height: 20px; font-weight: 600; color: theme('colors.stone.700'); text-align: center; }
+.review-tab[aria-selected=true] .review-count { color: theme('colors.stone.900'); }
+.review-holder { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.full'); background: white; font-size: 12px; line-height: 18px; font-weight: 600; color: theme('colors.brand.DEFAULT'); }
+.review-holder::before { content: ''; width: 6px; height: 6px; border-radius: 9999px; background: currentColor; }
+.review-meta { font-size: 13px; line-height: 20px; color: theme('colors.stone.600'); }
+.review-meta b { font-weight: 600; color: theme('colors.stone.900'); }
+
+/* One rail: small round badges for events, boxes for comments. */
+.review-rail { position: relative; display: grid; gap: 16px; }
+.review-rail::before { content: ''; position: absolute; left: 51px; top: 8px; bottom: 0; border-left: 2px solid theme('colors.stone.200'); }
+.review-tl { position: relative; display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.review-tl > li { position: relative; }
+.review-tl-cmt, .review-composer { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; align-items: start; }
+.review-tl-ev { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; margin-left: 38px; font-size: 13px; line-height: 20px; }
+.review-badge { position: relative; width: 28px; height: 28px; margin: -2px; border-radius: 9999px; display: grid; place-items: center; box-sizing: content-box; border: 2px solid white; background: theme('colors.stone.100'); color: theme('colors.stone.600'); font-size: 12px; }
+.review-avatar-lg { width: 36px; height: 36px; font-size: 13px; }
+.review-box { min-width: 0; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.control'); background: white; font-size: 14px; line-height: 22px; overflow: hidden; }
+.review-box-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 14px; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); font-size: 13px; line-height: 20px; color: theme('colors.stone.600'); }
+.review-box-head > p { flex: 1 1 auto; min-width: 0; }
+.review-box-head b { font-weight: 600; color: theme('colors.stone.900'); }
+.review-box-body { padding: 12px 14px; }
+.review-abstract { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: theme('colors.stone.700'); }
+.review-label { padding: 0 8px; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.full'); background: white; font-size: 12px; line-height: 18px; font-weight: 600; color: theme('colors.stone.600'); white-space: nowrap; }
+.review-box-replies { margin: 0; padding: 0; list-style: none; }
+.review-box-rep { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; padding: 10px 14px; border-top: 1px solid theme('colors.stone.200'); }
+.review-box-foot { padding: 8px 14px; border-top: 1px solid theme('colors.stone.200'); background: theme('colors.stone.50'); }
+.review-box-foot > form { margin-top: 0; }
+.review-reply-field { display: block; width: 100%; min-height: 36px; padding: 0 12px; border: 1px solid theme('colors.stone.300'); border-radius: 8px; background: white; color: theme('colors.stone.600'); font-size: 14px; text-align: left; cursor: text; }
+.review-reply-field:hover { border-color: theme('colors.stone.500'); }
+@media (pointer: coarse) { .review-reply-field { min-height: 44px; } }
+
+/* Where the review stands, at the end of the timeline; and the footer's icon. */
+.review-mb-ic { flex: none; width: 32px; height: 32px; border-radius: 9999px; display: grid; place-items: center; border: 1px solid transparent; font-size: 14px; }
+.review-mb-ic.attention { background: theme('colors.brand.DEFAULT'); color: white; }
+.review-mb-ic.active { background: white; color: theme('colors.brand.DEFAULT'); border-color: theme('colors.stone.300'); }
+.review-mb-ic.settled { background: white; color: theme('colors.stone.900'); border-color: theme('colors.stone.900'); }
+.review-mb-ic.quiet { background: theme('colors.stone.100'); color: theme('colors.stone.600'); border-color: theme('colors.stone.300'); }
+.review-mbox { margin-left: 48px; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.control'); background: white; }
+.review-mbox-head { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; }
+.review-mbox-head h3 { font-size: 15px; line-height: 22px; font-weight: 600; color: theme('colors.stone.900'); }
+.review-mbox-list { border-top: 1px solid theme('colors.stone.200'); }
+.review-mbox-list > summary { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; font-size: 13px; font-weight: 600; color: theme('colors.stone.700'); cursor: pointer; list-style: none; }
+.review-mbox-list > summary::-webkit-details-marker { display: none; }
+.review-mbox-list > summary i { transition: transform .15s ease; }
+.review-mbox-list[open] > summary i { transform: rotate(90deg); }
+@media (pointer: coarse) { .review-mbox-list > summary { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .review-mbox-list > summary i { transition: none; } }
+
+/* A narrow pane drops the avatars and gives the boxes the whole width. */
+.review-pane-body, .review-side-body { container: review-pane / inline-size; }
+@container review-pane (max-width: 360px) {
+  .review-rail::before { left: 13px; }
+  .review-tl-ev { margin-left: 0; }
+  .review-mbox { margin-left: 0; }
+  .review-tl-cmt, .review-composer { grid-template-columns: minmax(0, 1fr); }
+  .review-tl-cmt > .review-avatar, .review-composer > .review-avatar { display: none; }
+}
+/* A draft thread: dashed, its head on the page's own colour (IR-1131). */
+.review-box-draft { border-style: dashed; border-color: theme('colors.stone.500'); }
+.review-box-draft > .review-box-head { background: theme('colors.stone.50'); }
