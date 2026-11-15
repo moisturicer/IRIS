@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { canAccess, canAuthor, hasReviewWork } from "@/lib/access";
+import { canAccess, hasReviewWork } from "@/lib/access";
 import type { RoleName } from "@/lib/constants";
 import type { ReviewAccess } from "@/types/auth";
 
@@ -129,7 +129,7 @@ export const HELP_SECTIONS: HelpSection[] = [
   {
     id: "publishing",
     title: "Publishing your research",
-    shownTo: (r) => canAuthor({ can_author: r.canAuthor }),
+    shownTo: (r) => r.canAuthor === true,
     body: (
       <>
         <p>

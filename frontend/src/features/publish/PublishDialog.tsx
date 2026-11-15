@@ -154,8 +154,7 @@ function PublishUnavailable({ onClose }: { onClose: () => void }) {
       }
     >
       <p className="text-body text-stone-700">
-        Only Students and Advisers publish research. Your account can read, save and request papers,
-        but it can&rsquo;t start a submission.
+        Your account can read, save and request papers, but it can&rsquo;t start a submission.
       </p>
     </Modal>
   );

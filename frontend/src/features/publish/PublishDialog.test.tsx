@@ -258,7 +258,7 @@ describe("opening", () => {
     openPublish();
 
     const dialog = await screen.findByRole("dialog", { name: "Publishing isn't available to your account" });
-    expect(within(dialog).getByText(/Only Students and Advisers publish research/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/can.t start a submission/)).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Publish your research" })).not.toBeInTheDocument();
     expect(recordsApi.recordTypes).not.toHaveBeenCalled();
     expect(recordsApi.create).not.toHaveBeenCalled();

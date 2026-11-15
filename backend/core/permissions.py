@@ -110,7 +110,7 @@ class IsIERC(BasePermission):
 
 def can_author(user) -> bool:
     """
-    May `user` author a record: Student or Adviser, the SRS's Record Owner.
+    May `user` author a record: a Record Owner, which is a Student or an Adviser.
 
     The one rule behind `IsAuthor` (the gate on creating a record) and
     `can_author` on `GET /users/me/` (IR-1096), which is what the client reads
