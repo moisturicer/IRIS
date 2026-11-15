@@ -13,15 +13,19 @@ import { cn } from "@/lib/utils";
  * - **standard**: centred, up to 1440px. Extra width goes to the layout --
  *   wider rails and cards -- while running text keeps its own reading measure
  *   (`max-w-prose`), so a wide page never means long lines.
+ * - **wide-left**: up to 1600px, flush left with no centring, for a page that pins
+ *   a rail to its right edge (the record Overview, IR-1144): the page keeps its
+ *   place when the rail folds away, and the gap stops growing past the cap.
  * - **full**: the whole width, for the PDF reader and wide tables.
  *
  * Not fluid scaling: that would cancel browser zoom (WCAG 1.4.4).
  */
-export type PageWidth = "standard" | "full";
+export type PageWidth = "standard" | "wide-left" | "full";
 
 /** Whole class strings, because Tailwind only generates what it finds written out. */
 export const PAGE_WIDTH: Record<PageWidth, string> = {
   standard: "w-full max-w-page mx-auto",
+  "wide-left": "w-full max-w-[100rem]",
   full: "w-full",
 };
 
