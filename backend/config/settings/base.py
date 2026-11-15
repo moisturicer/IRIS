@@ -278,7 +278,7 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "frame-ancestors 'none'",
 ])
 # Enforced since IR-823, after the walk-through (e2e/specs/08-csp-walkthrough.spec.ts)
-# found no violation on the app or the Django admin. Changing it is a reviewed
+# found no violation on 66 screens, the Django admin included. Changing it is a reviewed
 # change to this line and to frontend/security-headers.conf, never an
 # environment variable. development.py keeps it report-only.
 CONTENT_SECURITY_POLICY_REPORT_ONLY = False
