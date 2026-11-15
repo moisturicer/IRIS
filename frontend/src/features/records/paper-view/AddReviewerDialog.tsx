@@ -90,7 +90,7 @@ export function AddReviewerDialog({ assignmentId, onClose, onAdded }: AddReviewe
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-700 leading-relaxed">
           They review this record for {office} alongside you. {office} finishes once everyone reviewing
           for it has. To involve another office, route the record instead.
         </p>

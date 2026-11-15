@@ -10,14 +10,6 @@
 
 /** Sizes of 12 px or more, by file. */
 export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
-  "src/features/records/paper-view/AddReviewerDialog.tsx": 1,
-  "src/features/records/paper-view/DecisionDialog.tsx": 4,
-  "src/features/records/paper-view/NewVersionDialog.tsx": 4,
-  "src/features/records/paper-view/OfficeReviewDialog.tsx": 2,
-  "src/features/records/paper-view/RequestRevisionDialog.tsx": 2,
-  "src/features/records/paper-view/RouteDialog.tsx": 7,
-  "src/features/records/paper-view/threads/FinishReviewDialog.tsx": 3,
-  "src/features/review/AssignReviewerDialog.tsx": 1,
 };
 
 /**
@@ -25,6 +17,4 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
  * is empty the floor holds everywhere and the test needs no exceptions.
  */
 export const SUB_12PX_ALLOWANCE: Record<string, number> = {
-  "src/features/records/paper-view/RouteDialog.tsx": 2,
-  "src/features/records/paper-view/threads/ReviewThreads.tsx": 2,
 };

@@ -84,14 +84,7 @@ describe("controls in the reading surfaces", () => {
     ]);
   });
 
-  it("use the type scale's names, not a pixel size, for text", () => {
-    expect(offenders(/\btext-\[\d+px\]/)).toEqual([
-      "AddReviewerDialog.tsx",
-      "DecisionDialog.tsx",
-      "NewVersionDialog.tsx",
-      "OfficeReviewDialog.tsx",
-      "RequestRevisionDialog.tsx",
-      "RouteDialog.tsx",
-    ]);
-  });
+  // The no-pixel-text rule that lived here moved to the global font-size guard
+  // (`src/test/fontSize.test.ts`, IR-1037) when the last six dialogs were
+  // migrated (IR-1042).
 });
