@@ -35,7 +35,7 @@ export function RequestStatusChip({ state, expired = false }: RequestStatusChipP
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-semibold",
+        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-label font-semibold",
         lapsed ? TONES.quiet : tone,
       )}
     >

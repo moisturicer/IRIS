@@ -111,7 +111,7 @@ export interface MetaBadge {
 
 export const BADGE_TONE_CLASS: Record<BadgeTone, string> = {
   // Field of research — outlined, uppercase, the quietest but most frequent
-  topic:      "text-brand bg-white uppercase tracking-wider text-[11px]",
+  topic:      "text-brand bg-white uppercase tracking-wider text-label",
   // Kind of work (Thesis / Project / Proposal) — solid dark, high contrast
   type:       "bg-stone-900 text-white",
   // On the palette since IR-407 (IR-357): protection is the one flag that

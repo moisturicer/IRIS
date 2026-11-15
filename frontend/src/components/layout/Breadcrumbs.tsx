@@ -30,7 +30,7 @@ export function Breadcrumbs() {
 
   return (
     <nav aria-label="Breadcrumb" className="mb-4">
-      <ol className="flex flex-wrap items-center gap-1.5 text-[13px] text-stone-500">
+      <ol className="flex flex-wrap items-center gap-1.5 text-small text-stone-500">
         <li>
           {onDiscover ? (
             <span className="text-stone-800 font-semibold" aria-current="page">

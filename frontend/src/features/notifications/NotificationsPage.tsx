@@ -288,13 +288,13 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
               FOCUS_RING,
             )}
           >
-            <i className="fas fa-check text-[13px]" aria-hidden />
+            <i className="fas fa-check text-small" aria-hidden />
           </button>
         )}
         {opens && (
           <i
             aria-hidden
-            className="fas fa-chevron-right w-9 text-center text-[12px] text-stone-400 group-hover:text-brand pointer-events-none"
+            className="fas fa-chevron-right w-9 text-center text-label text-stone-400 group-hover:text-brand pointer-events-none"
           />
         )}
       </div>

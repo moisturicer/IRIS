@@ -10,9 +10,6 @@
 
 /** Sizes of 12 px or more, by file. */
 export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
-  "src/components/layout/Breadcrumbs.tsx": 1,
-  "src/components/layout/NotificationBell.tsx": 7,
-  "src/components/shared/RequestStatusChip.tsx": 1,
   "src/features/ai/AIHubPage.tsx": 6,
   "src/features/ai/components/AskIrisNotice.tsx": 1,
   "src/features/ai/components/AssistantMessageSkeleton.tsx": 1,
@@ -27,15 +24,6 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
   "src/features/ai/components/SourceContextPanel.tsx": 4,
   "src/features/ai/components/StreamStatusRow.tsx": 2,
   "src/features/ai/components/TokenUsageMeter.tsx": 4,
-  "src/features/discover/DiscoverFilterBar.tsx": 2,
-  "src/features/discover/DiscoverFilterDropdown.tsx": 1,
-  "src/features/discover/DiscoverPage.tsx": 2,
-  "src/features/discover/DiscoverResultCard.tsx": 3,
-  "src/features/discover/MyFeeds.tsx": 1,
-  "src/features/discover/PaperCiteModal.tsx": 1,
-  "src/features/library/LibraryRecordTable.tsx": 7,
-  "src/features/notifications/NotificationsPage.tsx": 2,
-  "src/features/profile/PersonProfileView.tsx": 1,
   "src/features/records/paper-view/AddReviewerDialog.tsx": 1,
   "src/features/records/paper-view/DecisionDialog.tsx": 4,
   "src/features/records/paper-view/NewVersionDialog.tsx": 4,
@@ -51,7 +39,6 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
  * is empty the floor holds everywhere and the test needs no exceptions.
  */
 export const SUB_12PX_ALLOWANCE: Record<string, number> = {
-  "src/components/layout/NotificationBell.tsx": 1,
   "src/features/ai/AIHubPage.tsx": 2,
   "src/features/ai/components/ChatMessageBubble.tsx": 2,
   "src/features/ai/components/ConversationSidebar.tsx": 2,
@@ -60,12 +47,6 @@ export const SUB_12PX_ALLOWANCE: Record<string, number> = {
   "src/features/ai/components/RuntimeReader.tsx": 1,
   "src/features/ai/components/SourceContextPanel.tsx": 1,
   "src/features/ai/components/StreamStatusRow.tsx": 1,
-  "src/features/discover/DiscoverFilterDropdown.tsx": 1,
-  "src/features/discover/DiscoverResultCard.tsx": 1,
-  "src/features/discover/MyFeeds.tsx": 2,
-  "src/features/discover/PaperCiteModal.tsx": 1,
-  "src/features/discover/discoverUtils.ts": 1,
-  "src/features/library/LibraryRecordTable.tsx": 6,
   "src/features/records/paper-view/RouteDialog.tsx": 2,
   "src/features/records/paper-view/threads/ReviewThreads.tsx": 2,
 };
