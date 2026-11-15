@@ -44,6 +44,13 @@ export interface User {
    */
   review_access?:  ReviewAccess;
   /**
+   * Whether the user may start a record (IR-1096): the server's answer, the
+   * rule `IsAuthor` enforces. Publish and My Library's research tabs read it
+   * through `canAuthor()`; nothing derives it from `role_name`. Own payload
+   * only.
+   */
+  can_author?:     boolean;
+  /**
    * The user's latest role request while they have no role (IR-537): what the
    * pending screen reads to tell waiting from declined. `null` once a role is
    * held, or when nothing was asked for. Own payload only, like

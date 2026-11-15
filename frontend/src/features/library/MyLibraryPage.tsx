@@ -6,8 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import type { ReadingStatus } from "@/api/library";
-import { canAccess } from "@/lib/access";
-import type { RoleName } from "@/lib/constants";
+import { canAuthor } from "@/lib/access";
 import {
   addCollection,
   clearReadingHistory,
@@ -73,13 +72,13 @@ function tabFromSection(section: string | null, canAuthor: boolean): Tab {
  * pick a tab.
  */
 export default function MyLibraryPage() {
-  const role = useAuthStore((state) => state.user?.role_name);
-  const canAuthor = canAccess(role as RoleName | undefined, "submit");
+  // The server's `can_author` (IR-1096), not the role name.
+  const mayAuthor = useAuthStore((state) => canAuthor(state.user));
   const [searchParams, setSearchParams] = useSearchParams();
   const section = searchParams.get("section");
 
-  const tab: Tab = tabFromSection(section, canAuthor);
-  const tabs = canAuthor ? AUTHOR_TABS : READER_TABS;
+  const tab: Tab = tabFromSection(section, mayAuthor);
+  const tabs = mayAuthor ? AUTHOR_TABS : READER_TABS;
   const [savedView, setSavedView] = useState<SavedViewKind>(ALL_SAVED);
   const [researchFilter, setResearchFilter] = useState<ResearchFilter>("all");
   const [collections, setCollections] = useState<Collection[]>(() => getCollections());
@@ -92,7 +91,7 @@ export default function MyLibraryPage() {
   const dismissFailure = useLibraryStore((s) => s.dismissFailure);
 
   const [research, setResearch] = useState<MyResearchItem[]>([]);
-  const [loading, setLoading] = useState(canAuthor);
+  const [loading, setLoading] = useState(mayAuthor);
   const [failed, setFailed] = useState(false);
   const [interrupted, setInterrupted] = useState(false);
 
@@ -112,8 +111,8 @@ export default function MyLibraryPage() {
   }, []);
 
   useEffect(() => {
-    if (canAuthor) void loadResearch();
-  }, [canAuthor, loadResearch]);
+    if (mayAuthor) void loadResearch();
+  }, [mayAuthor, loadResearch]);
 
   const selectTab = (next: Tab) => {
     const params = new URLSearchParams(searchParams);
@@ -219,8 +218,8 @@ export default function MyLibraryPage() {
     <div>
       <PageHeader
         title="My Library"
-        description={canAuthor ? "Keep your research moving, from submission to the shelf." : "Papers you saved and opened, and your download requests."}
-        actions={canAuthor && (
+        description={mayAuthor ? "Keep your research moving, from submission to the shelf." : "Papers you saved and opened, and your download requests."}
+        actions={mayAuthor && (
           <Link to="/?publish=new" className={cn(PILL_PRIMARY, FOCUS_RING)}>
             <i className="fas fa-plus text-label" aria-hidden />
             Publish
@@ -264,7 +263,7 @@ export default function MyLibraryPage() {
         aria-labelledby={`library-tab-${tab}`}
         className="motion-safe:animate-fade-in"
       >
-        {canAuthor && tab === "overview" && (
+        {mayAuthor && tab === "overview" && (
           <LibraryOverview
             research={research}
             loading={loading}
@@ -278,7 +277,7 @@ export default function MyLibraryPage() {
             onOpenSaved={openSaved}
           />
         )}
-        {canAuthor && tab === "research" && (
+        {mayAuthor && tab === "research" && (
           <MyResearchList
             items={research}
             loading={loading}
