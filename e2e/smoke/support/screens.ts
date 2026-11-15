@@ -46,7 +46,7 @@ function shell(api: MockApi, role: SmokeRole) {
     total_mine: 0, pending_mine: 0, approved_mine: 0, declined_mine: 0, needs_action_mine: 0, total_published: 1,
   });
   api.on("GET", "/notifications/", paginated([]));
-  if (role === "RDCO") api.on("GET", "/users/role-requests/", paginated([]));
+  if (role === "RDCO") api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
 }
 
 const wrap = (role: SmokeRole, extra?: (api: MockApi) => void) => (api: MockApi) => {
@@ -372,7 +372,10 @@ export const SCREENS: Screen[] = [
   },
   {
     id: "delete-requests", path: "/rdco/delete-requests", route: "/rdco/delete-requests", role: "RDCO",
-    mocks: wrap("RDCO", (api) => api.on("GET", "/records/delete-requests/", paginated([DELETE_REQUEST]))),
+    mocks: wrap("RDCO", (api) => {
+      api.on("GET", "/records/delete-requests/", paginated([DELETE_REQUEST]));
+      api.on("GET", "/records/delete-requests/counts/", { pending: 1, approved: 0, declined: 0, all: 1 });
+    }),
     heading: "Delete Requests",
     primary: (p) => p.getByRole("button", { name: "Refresh" }), primaryLabel: "Refresh",
     table: (p) => p.getByRole("table").first(),
@@ -407,10 +410,10 @@ export const SCREENS: Screen[] = [
   // publishes the next version of the data notice here.
   {
     id: "notices", path: "/notices", route: "/notices", role: "RDCO",
-    mocks: wrap("RDCO", (api) => api.on("GET", "/auth/notice/versions/", [{
+    mocks: wrap("RDCO", (api) => (api.on("GET", "/auth/notice/draft/", null), api.on("GET", "/auth/notice/versions/", [{
       version: 1, text: "IRIS data notice\n\nWhat IRIS keeps\nYour name and CIT-U email.",
       published_at: when("11-01"), published_by: { id: 4, name: "Rita Dela Cruz", email: "rdco@cit.edu" },
-    }])),
+    }]))),
     heading: "Notices",
     primary: (p) => p.getByRole("button", { name: "Preview" }), primaryLabel: "Preview",
   },

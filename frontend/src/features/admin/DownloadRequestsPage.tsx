@@ -29,6 +29,7 @@ import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { errorDetail } from "@/lib/errorDetail";
 import { formatDate }  from "@/lib/utils";
 import { useUIStore } from "@/store/ui.store";
+import { queueCountsChanged } from "@/lib/queueCounts";
 import type { DownloadRequest } from "@/types/records";
 
 import { NO_NOTE, RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
@@ -97,6 +98,7 @@ export default function DownloadRequestsPage() {
     try {
       await recordsApi.approveDownloadRequest(req.id);
       addToast({ type: "success", message: `Download request from ${readerName(req)} approved.` });
+      queueCountsChanged();
       read.retry();
       filterFocus.focusNext();
     } catch (err) {
@@ -111,7 +113,7 @@ export default function DownloadRequestsPage() {
     <div>
       <PageHeader
         title="Download Requests"
-        description="Approve or decline requests to download a paper, and revoke access granted earlier."
+        description="Requests for a PDF copy of a paper. Reading in IRIS needs no approval."
       />
 
       {/* Filter bar */}
@@ -220,7 +222,7 @@ export default function DownloadRequestsPage() {
                             <Button
                               type="button"
                               size="sm"
-                              variant="outline"
+                              variant="primary"
                               onClick={() => setApproveTarget(req)}
                             >
                               <i className="fas fa-check" aria-hidden /> Approve
@@ -228,7 +230,7 @@ export default function DownloadRequestsPage() {
                             <Button
                               type="button"
                               size="sm"
-                              variant="danger"
+                              variant="ghost"
                               onClick={() => setNoteAct({ kind: "decline", request: req })}
                             >
                               Decline
@@ -303,6 +305,7 @@ export default function DownloadRequestsPage() {
                 : `Download access for ${readerName(noteAct.request)} revoked.`,
             });
             setNoteAct(null);
+            queueCountsChanged();
             read.retry();
             filterFocus.focusNext();
           }}

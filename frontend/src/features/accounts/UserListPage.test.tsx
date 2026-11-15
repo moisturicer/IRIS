@@ -87,13 +87,44 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe("Unit, Last active and the role filter (IR-1138)", () => {
+  it("shows the department, else the college, and when each person last signed in", async () => {
+    userList.mockResolvedValue(listing([
+      user({ id: 6, email: "dept@cit.edu", department_name: "Computer Science", college_name: "CCS", last_login: "2026-11-10T08:00:00Z" }),
+      user({ id: 7, email: "college@cit.edu", college_name: "College of Engineering" }),
+      user({ id: 8, email: "none@cit.edu", last_login: null }),
+    ]));
+    renderScreen(<UserListPage />);
+
+    const dept = await rowFor("dept@cit.edu");
+    expect(within(dept).getByRole("cell", { name: "Computer Science" })).toBeInTheDocument();
+    expect(within(dept).getByRole("cell", { name: "Nov 10, 2026" })).toBeInTheDocument();
+    expect(within(await rowFor("college@cit.edu")).getByRole("cell", { name: "College of Engineering" })).toBeInTheDocument();
+    const none = within(await rowFor("none@cit.edu"));
+    expect(none.getByRole("cell", { name: "—" })).toBeInTheDocument();
+    expect(none.getByRole("cell", { name: "Never" })).toBeInTheDocument();
+  });
+
+  it("asks for one role at a time and back to everyone", async () => {
+    renderScreen(<UserListPage />);
+    await screen.findByRole("table", { name: "User accounts" });
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Role" }), "Office staff");
+    await waitFor(() => expect(userList).toHaveBeenLastCalledWith({ page: 1, search: "", role: "office" }));
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Role" }), "All roles");
+    await waitFor(() => expect(userList).toHaveBeenLastCalledWith({ page: 1, search: "" }));
+  });
+});
+
 describe("the users table", () => {
   it("names the table and every column for assistive technology", async () => {
     renderScreen(<UserListPage />);
 
     const table = await screen.findByRole("table", { name: "User accounts" });
     const headers = within(table).getAllByRole("columnheader");
-    expect(headers).toHaveLength(4);
+    // User, Role, Unit, Status, Last active and the actions (IR-1138).
+    expect(headers).toHaveLength(6);
     for (const header of headers) expect(header).toHaveAttribute("scope", "col");
     expect(within(table).getByRole("columnheader", { name: "Actions" })).toBeInTheDocument();
   });

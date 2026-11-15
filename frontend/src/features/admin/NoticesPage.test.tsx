@@ -28,6 +28,10 @@ function signInAs(role: RoleName) {
   });
 }
 
+function noDraft() {
+  return vi.spyOn(noticeApi, "draft").mockResolvedValue({ data: null } as never);
+}
+
 function versions(list: NoticeVersion[] = [V2, V1]) {
   return vi.spyOn(noticeApi, "versions").mockResolvedValue({ data: list } as never);
 }
@@ -41,8 +45,70 @@ async function openPage() {
 
 const field = () => screen.getByRole("textbox", { name: "Notice text" });
 
-beforeEach(() => signInAs(ROLES.RDCO));
+beforeEach(() => { signInAs(ROLES.RDCO); noDraft(); });
 afterEach(() => vi.restoreAllMocks());
+
+describe("Save draft (IR-1138)", () => {
+  it("keeps the paste as a draft without publishing it", async () => {
+    versions();
+    const save = vi.spyOn(noticeApi, "saveDraft").mockResolvedValue({
+      data: { text: "Next wording", based_on_version: 2, updated_at: "2026-11-15T02:00:00Z", updated_by: "Rita Dela Cruz" },
+    } as never);
+    const publish = vi.spyOn(noticeApi, "publish");
+    const { user } = await openPage();
+
+    await user.clear(field());
+    await user.type(field(), "Next wording");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    expect(save).toHaveBeenCalledWith({ based_on_version: 2, text: "Next wording" });
+    expect(await screen.findByRole("status")).toHaveTextContent("Draft saved.");
+    expect(screen.getByText(/Draft saved Nov 15, 2026 by Rita Dela Cruz/)).toBeInTheDocument();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("puts a saved draft back in the field, and says when a newer version is live", async () => {
+    versions();
+    vi.spyOn(noticeApi, "draft").mockResolvedValue({
+      data: { text: "Half-written notice", based_on_version: 1, updated_at: "2026-11-10T02:00:00Z", updated_by: null },
+    } as never);
+    await openPage();
+
+    await waitFor(() => expect(field()).toHaveValue("Half-written notice"));
+    expect(screen.getByText(/It started from version 1; version 2 is live now/)).toBeInTheDocument();
+  });
+
+  it("will not save a blank draft", async () => {
+    versions();
+    const save = vi.spyOn(noticeApi, "saveDraft");
+    const { user } = await openPage();
+
+    await user.clear(field());
+
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("shows why a draft was not saved, and keeps the paste", async () => {
+    versions();
+    vi.spyOn(noticeApi, "saveDraft").mockRejectedValue({ response: { status: 500, data: { detail: "Try later." } } });
+    const { user } = await openPage();
+
+    await user.type(field(), " more");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Try later.");
+    expect(field()).toHaveValue(`${V2.text} more`);
+  });
+
+  it("is not offered to the System Admin, who only reads", async () => {
+    signInAs(ROLES.SYSTEM_ADMIN);
+    versions();
+    await openPage();
+
+    expect(screen.queryByRole("button", { name: "Save draft" })).not.toBeInTheDocument();
+  });
+});
 
 describe("RDCO publishes the next version", () => {
   it("opens on the current version, who published it, and its text ready to replace", async () => {

@@ -1,12 +1,14 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Record
+from core.permissions import IsAdmin
+from .models import DeleteRequest, DownloadRequest, Record
 from apps.reviews.models import ResubmissionRequest
 from core.enums import (
     DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
     PipelineStatus,
+    RequestStatus,
     ResubmissionRequestState,
     WorkflowState,
 )
@@ -73,4 +75,26 @@ class DashboardStatsView(APIView):
             "needs_action_mine": needs_action_count(user),
             # Staff-only totals -- return 0 for students
             "total_published":  Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).count() if request.user.role else 0,
+        })
+
+
+class QueueCountsView(APIView):
+    """
+    GET /dashboard/queue-counts/ -- RDCO only (IR-1138).
+
+    How many requests wait in each of RDCO's queues, for the sidebar's counts.
+    Role requests are counted as the Role Requests queue lists them: verified
+    accounts only (ADR-051 decision 22).
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from apps.accounts.models import RoleRequest
+
+        return Response({
+            "download_requests": DownloadRequest.objects.filter(status=RequestStatus.PENDING).count(),
+            "delete_requests": DeleteRequest.objects.filter(status=RequestStatus.PENDING).count(),
+            "role_change_requests": RoleRequest.objects.filter(
+                status=RequestStatus.PENDING, user__is_verified=True
+            ).count(),
         })

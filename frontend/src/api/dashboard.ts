@@ -10,6 +10,14 @@ export interface DashboardStats {
   total_published: number;
 }
 
+/** What waits in RDCO's three queues (IR-1138). RDCO only: anyone else is refused. */
+export interface QueueCounts {
+  download_requests: number;
+  delete_requests:   number;
+  role_change_requests:     number;
+}
+
 export const dashboardApi = {
+  queueCounts: () => apiClient.get<QueueCounts>("/dashboard/queue-counts/"),
   stats: () => apiClient.get<DashboardStats>("/dashboard/stats/"),
 };

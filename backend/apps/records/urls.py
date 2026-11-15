@@ -20,6 +20,7 @@ urlpatterns = [
     path("delete-requests/", include([
         # Read and decided only: a request is raised by DELETE /records/<id>/ (IR-496).
         path("", DeleteRequestViewSet.as_view({"get": "list"}), name="delete-requests"),
+        path("counts/", DeleteRequestViewSet.as_view({"get": "counts"}), name="delete-requests-counts"),
         path("<int:pk>/", DeleteRequestViewSet.as_view({"get": "retrieve"}), name="delete-request-detail"),
         path("<int:pk>/approve/", DeleteRequestViewSet.as_view({"post": "approve"}), name="delete-request-approve"),
         path("<int:pk>/decline/", DeleteRequestViewSet.as_view({"post": "decline"}), name="delete-request-decline"),
