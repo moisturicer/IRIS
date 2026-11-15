@@ -55,6 +55,7 @@ from core.enums import (
     ReviewDecision,
     SeatState,
 )
+from core.text_limits import too_long, too_long_message
 
 from . import routing, seats
 from .models import ResubmissionRequest, Review, ReviewerSeat
@@ -218,6 +219,8 @@ def request_revision(record, actor, *, reason, threads=0) -> ResubmissionRequest
     reason = reason.strip() if isinstance(reason, str) else ""
     if not reason:
         raise RevisionError("Say what needs revising, so the author can act on it.")
+    if too_long(reason):
+        raise RevisionError(too_long_message("A revision request"))
     if seat.state == SeatState.ASSIGNED:
         raise RevisionError("Open the review first.")
     party = seat.assignment.party

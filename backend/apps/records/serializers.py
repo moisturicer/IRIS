@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from core.enums import PipelineStatus, ReviewDecision
+from core.text_limits import FREE_TEXT_MAX_LENGTH, too_long_message
 
 from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, record_versions, resubmission_payload
@@ -673,6 +674,11 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             "metadata_sources", "expected_details_revision", "details_revision",
         ]
         read_only_fields = ["id", "pipeline_status", "added_by", "details_revision"]
+        # IR-926: an abstract is stored, shown, embedded and sent to AI vendors.
+        extra_kwargs = {"abstract": {
+            "max_length": FREE_TEXT_MAX_LENGTH,
+            "error_messages": {"max_length": too_long_message("An abstract")},
+        }}
 
     def validate_metadata_sources(self, value):
         """The author's decisions, in the one shape Publish writes (IR-833).
