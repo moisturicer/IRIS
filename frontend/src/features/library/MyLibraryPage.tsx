@@ -7,14 +7,6 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import type { ReadingStatus } from "@/api/library";
 import { canAuthor } from "@/lib/access";
-import {
-  addCollection,
-  deleteCollection,
-  getCollections,
-  removeFromCollections,
-  renameCollection,
-  type Collection,
-} from "@/lib/recordLibrary";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { useHistoryStore } from "@/store/history.store";
@@ -63,10 +55,9 @@ function tabFromSection(section: string | null, canAuthor: boolean): Tab {
  * papers and Download requests. A reader who cannot author sees Saved papers
  * and Download requests (IR-743).
  *
- * Owned research comes from `/records/mine/`, and saves and Reading status
- * from the account library (IR-566, ADR-044), and reading history from the
- * account too (IR-756). The reader's own folders still live in this browser
- * and say so. `?section=research` (where
+ * Owned research comes from `/records/mine/`; saves, Reading status (IR-566,
+ * ADR-044), the reader's own folders (IR-572, ADR-070) and reading history
+ * (IR-756) from the account. `?section=research` (where
  * the retired `/workspace` lands), `?section=saved` and `?section=downloads`
  * pick a tab.
  */
@@ -80,14 +71,19 @@ export default function MyLibraryPage() {
   const tabs = mayAuthor ? AUTHOR_TABS : READER_TABS;
   const [savedView, setSavedView] = useState<SavedViewKind>(ALL_SAVED);
   const [researchFilter, setResearchFilter] = useState<ResearchFilter>("all");
-  const [collections, setCollections] = useState<Collection[]>(() => getCollections());
   useReadingHistory();
   const history = useHistoryStore((s) => s.items);
 
   const { load: libraryLoad, interrupted: libraryInterrupted, retry: retryLibrary } = useLibrary();
   const library = useLibraryStore((s) => s.items);
+  const folders = useLibraryStore((s) => s.folders);
+  const folderLimit = useLibraryStore((s) => s.folderLimit);
   const failure = useLibraryStore((s) => s.failure);
   const unsave = useLibraryStore((s) => s.unsave);
+  const createFolder = useLibraryStore((s) => s.createFolder);
+  const renameFolder = useLibraryStore((s) => s.renameFolder);
+  const deleteFolder = useLibraryStore((s) => s.deleteFolder);
+  const removeFromFolder = useLibraryStore((s) => s.removeFromFolder);
   const dismissFailure = useLibraryStore((s) => s.dismissFailure);
 
   const [research, setResearch] = useState<MyResearchItem[]>([]);
@@ -133,10 +129,11 @@ export default function MyLibraryPage() {
 
   const removeFromView = (ids: number[]) => {
     if (savedView.kind === "folder") {
-      setCollections(removeFromCollections(collections, ids, savedView.id));
+      // Out of this folder only: the paper stays saved (IR-572).
+      const folderId = savedView.id;
+      ids.forEach((id) => void removeFromFolder(folderId, id));
     } else if (savedView.kind === "saved" || savedView.kind === "status") {
       // Unsaving takes a paper out of the library, folders included.
-      setCollections(removeFromCollections(collections, ids));
       ids.forEach((id) => void unsave(id));
     }
   };
@@ -170,27 +167,27 @@ export default function MyLibraryPage() {
       <div key={viewKey(savedView)} className="motion-safe:animate-fade-in">
         <SavedView
           view={savedView}
-          collections={collections}
+          folders={folders}
           library={library}
           libraryLoad={libraryLoad}
           libraryInterrupted={libraryInterrupted}
           onRetryLibrary={retryLibrary}
           onRemove={removeFromView}
-          onRename={(id, name) => setCollections(renameCollection(collections, id, name))}
+          onRename={(id, name) => void renameFolder(id, name)}
           onDelete={(id) => {
-            setCollections(deleteCollection(collections, id));
+            void deleteFolder(id);
             if (isSameView(savedView, { kind: "folder", id })) setSavedView(ALL_SAVED);
           }}
           folderControl={
             <FolderPicker
-              collections={collections}
+              folders={folders}
+              limit={folderLimit}
               view={savedView}
               onViewChange={(view) => { if (view.kind !== "research") setSavedView(view); }}
               onCreate={(name) => {
-                const next = addCollection(collections, name);
-                setCollections(next);
-                const made = next.find((c) => !collections.some((old) => old.id === c.id));
-                if (made) setSavedView({ kind: "folder", id: made.id });
+                void createFolder(name).then((made) => {
+                  if (made) setSavedView({ kind: "folder", id: made.id });
+                });
               }}
             />
           }
@@ -203,7 +200,7 @@ export default function MyLibraryPage() {
                 onChange={(value) => setSavedView(value === "all" ? ALL_SAVED : { kind: "status", status: value })}
               />
               <p className="text-label text-stone-500">
-                Saves follow your account. Folders stay in this browser.
+                Saves and folders follow your account.
               </p>
             </div>
           }
@@ -270,7 +267,7 @@ export default function MyLibraryPage() {
             onRetry={() => void loadResearch()}
             library={library}
             history={history}
-            collections={collections}
+            folders={folders}
             onOpenSubmissions={openSubmissions}
             onOpenSaved={openSaved}
           />

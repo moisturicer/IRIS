@@ -246,6 +246,13 @@ vi.mock("@/api/library", () => ({
     saves: vi.fn(() => Promise.resolve({ data: { results: [] } })),
     save: vi.fn(),
     unsave: vi.fn(),
+    // The reader's own folders (IR-572): read with the saves by the Save menu.
+    folders: vi.fn(() => Promise.resolve({ data: { results: [], limit: 10 } })),
+    createFolder: vi.fn(),
+    renameFolder: vi.fn(),
+    deleteFolder: vi.fn(),
+    fileInFolder: vi.fn(),
+    removeFromFolder: vi.fn(),
     // Private notes (IR-580): read only once Notes is first opened.
     note: vi.fn(() => Promise.resolve({ data: { body: "", revision: 0, updated_at: null } })),
     saveNote: vi.fn(),

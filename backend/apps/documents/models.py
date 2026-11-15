@@ -238,10 +238,7 @@ class PdfExtraction(models.Model):
         """
         from apps.ai.extraction import read_document
 
-        return read_document(
-            extractor=self.extractor, structure=self.structure,
-            raw_result=getattr(self, "raw_result", None),  # Storage belongs to IR-841.
-        )
+        return read_document(self.structure)
 
     def as_search_text(self):
         """Search text derived from the same current structure chunking reads."""
@@ -319,6 +316,9 @@ class ExtractionFormula(models.Model):
 
 class ManuscriptMetadata(models.Model):
     """LlamaExtract's reading of one parsed Manuscript revision (IR-846).
+
+    No longer written or read: LlamaExtract went with LlamaParse (IR-988,
+    ADR-067). Rows already stored are kept, as LlamaParse raw results are.
 
     One row per extraction and source revision, so a replaced Manuscript's
     reading can never be mistaken for the current one: the suggestions read

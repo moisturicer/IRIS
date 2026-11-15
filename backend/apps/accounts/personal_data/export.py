@@ -368,6 +368,34 @@ def saved_feeds(user) -> list[dict]:
     ]
 
 
+def folders(user) -> list[dict]:
+    """
+    The person's own folders (IR-572, ADR-070 §6): the name they gave and the
+    papers they filed, newest filing first. A paper's title is given only while
+    they may still read it; that they filed it is theirs either way.
+    """
+    from apps.library.models import FolderMembership, LibraryFolder
+
+    own = list(LibraryFolder.objects.filter(owner=user).order_by("id"))
+    filed: dict[int, list[int]] = {folder.pk: [] for folder in own}
+    for folder_id, record_id in (
+        FolderMembership.objects.filter(folder__owner=user)
+        .order_by("-added_at", "-pk")
+        .values_list("folder_id", "saved_record__record_id")
+    ):
+        filed[folder_id].append(record_id)
+    titles = _readable_titles(user, [pk for ids in filed.values() for pk in ids])
+    return [
+        {
+            "name": folder.name,
+            "papers": [_paper(record_id, titles) for record_id in filed[folder.pk]],
+            "created_at": folder.created_at,
+            "updated_at": folder.updated_at,
+        }
+        for folder in own
+    ]
+
+
 def saved_replies(user) -> list[dict]:
     """The person's own reusable review texts (IR-877): the title and the text."""
     from apps.reviews.models import SavedReply
@@ -773,6 +801,7 @@ SECTIONS: dict[str, Callable] = {
     "reading_history": reading_history,
     "library_preferences": library_preferences,
     "saved_feeds": saved_feeds,
+    "folders": folders,
     "reading_notes": reading_notes,
     "reading_highlights": reading_highlights,
     "saved_replies": saved_replies,

@@ -24,7 +24,7 @@ class SavedRecord(models.Model):
     Unique on `(owner, record)`, so a Record is saved at most once per reader;
     the single nullable `reading_status` gives "at most one status" with no
     extra check. Setting a status saves the Record, and unsaving deletes the
-    row, which clears its status with it.
+    row, which clears its status and takes it out of every folder (IR-572).
 
     Both foreign keys cascade: removing an account removes its library, and a
     deleted Record vanishes from every library. A withdrawn or restricted one
@@ -51,6 +51,71 @@ class SavedRecord(models.Model):
 
     def __str__(self):
         return f"SavedRecord(owner={self.owner_id}, record={self.record_id})"
+
+
+#: How many folders one account may hold, and how long a folder's name may be
+#: (IR-572, ADR-070 §3). The interface reads the limit from the API; the name
+#: bound is mirrored as `MAX_FOLDER_NAME` in `store/library.store.ts`, so change
+#: both together.
+MAX_FOLDERS = 10
+MAX_FOLDER_NAME = 60
+
+
+class LibraryFolder(models.Model):
+    """
+    One of a reader's own folders (IR-572, ADR-070).
+
+    Owner-only: every queryset starts from `owner=request.user`, so another
+    reader's folder cannot be addressed and reads exactly like a missing one.
+    The name is unique per account ignoring case, which the database enforces;
+    that is also what makes creating a folder idempotent -- creating a name the
+    reader already has returns that folder rather than a second one.
+
+    Not in Django admin, no `AuditEvent`, and never a discovery signal.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="library_folders"
+    )
+    name = models.CharField(max_length=MAX_FOLDER_NAME)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("name"), "owner", name="unique_library_folder_name"),
+        ]
+
+    def __str__(self):
+        return f"LibraryFolder(owner={self.owner_id}, name={self.name!r})"
+
+
+class FolderMembership(models.Model):
+    """
+    One saved Record filed in one folder (IR-572, ADR-070 §2).
+
+    **It points at the save, not at the Record.** A folder holds saved papers,
+    so filing a Record saves it first, and unsaving it removes it from every
+    folder by cascade. The reverse never happens: deleting a membership, or
+    the whole folder, leaves the save and its Reading status as they were.
+
+    Unique on `(folder, saved_record)`, which is unique per folder and Record
+    because a save is unique per owner and Record. Both sides belong to one
+    owner: the views take the folder and the save from the authenticated user
+    alone.
+    """
+
+    folder = models.ForeignKey(LibraryFolder, on_delete=models.CASCADE, related_name="memberships")
+    saved_record = models.ForeignKey(SavedRecord, on_delete=models.CASCADE, related_name="memberships")
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["folder", "saved_record"], name="unique_folder_membership"),
+        ]
+
+    def __str__(self):
+        return f"FolderMembership(folder={self.folder_id}, saved_record={self.saved_record_id})"
 
 
 #: The longest note body, in characters (ADR-064 §4). The editor's own copy is

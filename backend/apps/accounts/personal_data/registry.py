@@ -51,6 +51,8 @@ INCLUDED: dict[str, str] = {
     "records.RecordView": "papers_viewed",
     "library.SavedRecord": "saved_papers",
     "library.SavedFeed": "saved_feeds",
+    "library.LibraryFolder": "folders",
+    "library.FolderMembership": "folders",
     "library.ReadingNote": "reading_notes",
     "library.ReadingHighlight": "reading_highlights",
     "library.ReadingVisit": "reading_history",

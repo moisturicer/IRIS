@@ -1,44 +1,42 @@
-"""Stored Extraction reads use today's shaping, never yesterday's derived copy."""
-
-from apps.ai.extraction.tests.llamaparse_fixtures import result_with
-from apps.ai.extraction import document_to_json, shape_llamaparse
-from apps.documents.models import PdfExtraction
+"""A stored Extraction is read from its stored structure (IR-988, ADR-067)."""
 
 import json
 
+from apps.ai.chunking.document import DocumentElement, NormalizedDocument
+from apps.ai.extraction import document_to_json
+from apps.documents.models import PdfExtraction
 
-def test_raw_llamaparse_result_is_reshaped_for_document_and_search_reads():
-    extraction = PdfExtraction(extractor="llamaparse", structure={
-        "elements": [{"kind": "paragraph", "text": "Stale cached structure"}],
-    })
-    # IR-841 owns this additive storage field. IR-840 consumes its contract.
-    extraction.raw_result = result_with([
-        {"type": "header", "value": "Running chrome"},
-        {"type": "text", "value": "123"},
-        {"type": "text", "value": "Original prose."},
-    ])
-    document = extraction.as_normalized_document()
-    assert document.structure_is_authoritative
-    assert extraction.as_search_text() == "123 Original prose."
-    extraction.raw_result["items"]["pages"][0]["items"][2]["value"] = "Revised prose."
-    assert extraction.as_search_text() == "123 Revised prose."
-    assert extraction.as_normalized_document().elements[-1].text == "Revised prose."
+STRUCTURE = {"elements": [{"kind": "paragraph", "text": "Stored structure"}]}
 
 
-def test_llamaparse_without_raw_result_refuses_a_stale_structure():
-    extraction = PdfExtraction(extractor="llamaparse", structure={
-        "elements": [{"kind": "paragraph", "text": "Stale cached structure"}],
-    })
+def test_a_llamaparse_read_is_read_from_its_stored_structure_not_reshaped():
+    extraction = PdfExtraction(extractor="llamaparse", structure=STRUCTURE)
+    extraction.raw_result = {"items": {"pages": [{"page_number": 1, "items": [{"type": "text", "value": "Raw"}]}]}}
+
+    assert extraction.as_search_text() == "Stored structure"
+    assert [e.text for e in extraction.as_normalized_document().elements] == ["Stored structure"]
+
+
+def test_an_extraction_with_no_structure_reads_as_nothing():
+    extraction = PdfExtraction(extractor="unstructured", structure={})
+
     assert extraction.as_normalized_document() is None
     assert extraction.as_search_text() == ""
 
 
 def test_serialized_document_keeps_authoritative_structure_and_evidence():
-    document = shape_llamaparse(result_with([
-        {"type": "list", "ordered": True, "items": [{"type": "text", "value": "Nested item"}]},
-        {"type": "table", "rows": [["Name"], ["A"]], "html": "<table>kept</table>"},
-        {"type": "other_label", "value": "Unknown label stays"},
-    ]))
+    document = NormalizedDocument(
+        title="A paper",
+        elements=(
+            DocumentElement(kind="list", text="1. Nested item", page=1, ordered=True,
+                            children=(DocumentElement(kind="text", text="Nested item", page=1),)),
+            DocumentElement(kind="table", text="Name\nA", page=1, rows=(("Name",), ("A",)),
+                            html="<table>kept</table>"),
+        ),
+        page_sizes={1: (612.0, 792.0)},
+        structure_is_authoritative=True,
+    )
     structure = json.loads(json.dumps(document_to_json(document)))
-    extraction = PdfExtraction(extractor="in_memory", structure=structure)
+    extraction = PdfExtraction(extractor="unstructured", structure=structure)
+
     assert extraction.as_normalized_document() == document

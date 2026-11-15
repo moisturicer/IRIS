@@ -32,11 +32,14 @@ from apps.records.serializers import RecordListSerializer
 from apps.records.versions import served_manuscript_identity
 from core.enums import ReadingStatus
 
-from . import feeds, highlights
+from . import feeds, folders, highlights
 from .models import (
-    MAX_NOTE_LENGTH,
+    MAX_FOLDERS,
     MAX_HISTORY_ENTRIES,
+    MAX_NOTE_LENGTH,
     MAX_SAVED_FEEDS,
+    FolderMembership,
+    LibraryFolder,
     LibraryPreferences,
     ReadingHighlight,
     ReadingNote,
@@ -98,7 +101,8 @@ class SavedRecordDetailView(APIView):
     """
     PUT /library/saves/<record_id>/ saves the Record, optionally with a
     `reading_status` (one of `ReadingStatus`, or null to clear it).
-    DELETE unsaves it; deleting what is not saved is still a 204.
+    DELETE unsaves it, which takes it out of every folder too (IR-572);
+    deleting what is not saved is still a 204.
     """
 
     permission_classes = [IsAuthenticated]
@@ -373,8 +377,8 @@ def _feed_entry(feed, stale):
 
 
 def _locked(user):
-    """Serialise one account's feed writes: the limit and the name check both
-    count rows, so two simultaneous saves must not both pass them."""
+    """Serialise one account's feed or folder writes: the limit and the name
+    check both count rows, so two simultaneous saves must not both pass them."""
     return get_user_model().objects.select_for_update().get(pk=user.pk)
 
 
@@ -467,6 +471,132 @@ class SavedFeedDetailView(APIView):
         deleted, _ = SavedFeed.objects.filter(owner=request.user, pk=feed_id).delete()
         if not deleted:
             raise NotFound()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# -- IR-572: the reader's own folders (ADR-070) ----------------------------------
+#
+# The owner is the authenticated user, and every queryset starts from
+# `LibraryFolder.objects.filter(owner=request.user)`: another reader's folder
+# cannot be addressed, and answers the same 404 as one that does not exist.
+# Filing a Record rechecks `Record.objects.visible_to()` and saves it, because a
+# folder holds saved papers. Nothing here is a discovery signal: no folder write
+# invalidates For you or touches "Not interested".
+
+
+class FolderListView(APIView):
+    """
+    GET  /library/folders/ -- the reader's folders, oldest first, each with the
+         ids of the Records filed in it (newest first), and the account limit.
+    POST /library/folders/ -- create one by name. Creating a name the reader
+         already has, ignoring case, returns that folder with a 200, so a retry
+         or a second click never makes two.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        own = LibraryFolder.objects.filter(owner=request.user).order_by("created_at", "pk")
+        return Response({"results": folders.entries(own), "limit": MAX_FOLDERS})
+
+    def post(self, request):
+        name = folders.clean_name(_body(request).get("name"))
+
+        with transaction.atomic():
+            _locked(request.user)
+            existing = folders.folder_named(request.user, name)
+            if existing is not None:
+                return Response(folders.entry(existing), status=status.HTTP_200_OK)
+            if LibraryFolder.objects.filter(owner=request.user).count() >= MAX_FOLDERS:
+                return Response(
+                    {
+                        "code": "folder_limit",
+                        "detail": f"You have {MAX_FOLDERS} folders. Delete one to make another.",
+                        "limit": MAX_FOLDERS,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            folder = LibraryFolder.objects.create(owner=request.user, name=name)
+
+        return Response(folders.entry(folder), status=status.HTTP_201_CREATED)
+
+
+class FolderDetailView(APIView):
+    """
+    PATCH  /library/folders/<id>/ -- rename it. Renaming to its own name, in
+           any case, is a 200; to another of the reader's folders' names, a 400.
+    DELETE /library/folders/<id>/ -- remove it and its filings, never a save.
+           Deleting what is not there, or is not the caller's, is still a 204:
+           it removes nothing and discloses nothing.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, folder_id):
+        name = folders.clean_name(_body(request).get("name"))
+
+        with transaction.atomic():
+            _locked(request.user)
+            folder = LibraryFolder.objects.filter(owner=request.user, pk=folder_id).first()
+            if folder is None:
+                raise NotFound()
+            if folders.folder_named(request.user, name, excluding=folder.pk) is not None:
+                raise folders.duplicate_name()
+            if folder.name != name:
+                folder.name = name
+                folder.save(update_fields=["name", "updated_at"])
+
+        return Response(folders.entry(folder))
+
+    def delete(self, request, folder_id):
+        LibraryFolder.objects.filter(owner=request.user, pk=folder_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FolderRecordView(APIView):
+    """
+    PUT    /library/folders/<id>/records/<record_id>/ -- file a Record in one
+           of the reader's folders. A folder holds saved papers, so an unsaved
+           Record is saved first, with no Reading status. Repeating it changes
+           nothing. Answers the folder and the save.
+    DELETE -- take it out of that folder. The save, its status and every other
+           folder are untouched, and it is not "Not interested". Removing what
+           is not there is still a 204, with no visibility check, so a reader
+           can tidy away a Record they can no longer read.
+
+    A folder that is not the caller's, and a Record they cannot read, are each
+    the same 404 as a missing one, and nothing is written.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, folder_id, record_id):
+        with transaction.atomic():
+            folder = LibraryFolder.objects.select_for_update().filter(owner=request.user, pk=folder_id).first()
+            if folder is None:
+                raise NotFound()
+            record = _readable(request.user).filter(pk=record_id).first()
+            if record is None:
+                raise NotFound()
+            # Locked, so an unsave arriving now waits for this filing and then
+            # cascades it away, rather than leaving a filing with no save.
+            save, saved_now = SavedRecord.objects.select_for_update().get_or_create(
+                owner=request.user, record_id=record.pk,
+            )
+            if saved_now:
+                # A new save is a For you signal (IR-575); the filing is not.
+                invalidate_feed(request.user)
+            _, filed = FolderMembership.objects.get_or_create(folder=folder, saved_record=save)
+
+        return Response(
+            {"folder": folders.entry(folder), "save": _entry(save, record, {"request": request})},
+            status=status.HTTP_201_CREATED if filed else status.HTTP_200_OK,
+        )
+
+    def delete(self, request, folder_id, record_id):
+        FolderMembership.objects.filter(
+            folder__owner=request.user, folder_id=folder_id, saved_record__record_id=record_id,
+        ).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

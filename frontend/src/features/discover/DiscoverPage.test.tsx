@@ -125,6 +125,13 @@ vi.mock("@/api/library", () => ({
       saved_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z", record: { id: recordId, title: "Saved" },
     } })),
     unsave: vi.fn(() => Promise.resolve({ status: 204 })),
+    // The reader's own folders (IR-572): read with the saves.
+    folders: vi.fn(() => Promise.resolve({ data: { results: [], limit: 10 } })),
+    createFolder: vi.fn(),
+    renameFolder: vi.fn(),
+    deleteFolder: vi.fn(),
+    fileInFolder: vi.fn(),
+    removeFromFolder: vi.fn(() => Promise.resolve({ status: 204 })),
     // Saved feeds (IR-577): the menu reads them when Discover mounts.
     feeds: vi.fn(() => Promise.resolve({ data: { results: [], limit: 10 } })),
     createFeed: vi.fn(),
@@ -202,7 +209,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
   localStorage.clear();
-  useLibraryStore.setState({ load: "idle", items: {}, failure: null });
+  useLibraryStore.setState({ load: "idle", items: {}, folders: [], folderLimit: null, failure: null });
   listed = [publishedThesis];
   people = [];
   vi.mocked(peopleApi.search).mockImplementation(() => peoplePage({ results: people, count: people.length, next: null }));
@@ -949,6 +956,83 @@ describe("Not interested, Undo and reset (IR-576)", () => {
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(/couldn.t be reset/i);
     expect(recordsApi.forYou).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("folders in the Save menu follow the account (IR-572)", () => {
+  type Folders = Awaited<ReturnType<typeof libraryApi.folders>>;
+  const folder = (id: number, name: string, record_ids: number[] = []) => ({
+    id, name, record_ids, created_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z",
+  });
+  const filed = (folderId: number, name: string, recordId: number) => ({
+    data: {
+      folder: folder(folderId, name, [recordId]),
+      save: {
+        record_id: recordId, available: true, reading_status: null,
+        saved_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z", record: publishedThesis,
+      },
+    },
+  }) as Awaited<ReturnType<typeof libraryApi.fileInFolder>>;
+  const menuOf = async (label: "Save" | "Saved" = "Save") => {
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    await userEvent.click(await within(card).findByRole("button", { name: label }));
+    return card;
+  };
+
+  it("files an unsaved paper in one of the account's folders, which saves it", async () => {
+    vi.mocked(libraryApi.folders).mockResolvedValueOnce({ data: { results: [folder(3, "Methods")], limit: 10 } } as Folders);
+    vi.mocked(libraryApi.fileInFolder).mockResolvedValueOnce(filed(3, "Methods", publishedThesis.id));
+    renderDiscover();
+    const card = await menuOf();
+
+    expect(within(card).getByText("Saves, reading status and folders follow your account.")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Methods" }));
+
+    expect(libraryApi.fileInFolder).toHaveBeenCalledWith(3, publishedThesis.id);
+    await waitFor(() => expect(within(card).getByRole("button", { name: "Methods" })).toHaveAttribute("aria-pressed", "true"));
+    expect(within(card).getByRole("button", { name: "Remove from My Library" })).toBeInTheDocument();
+    expect(libraryApi.save).not.toHaveBeenCalled();
+  });
+
+  it("takes a paper out of a folder without unsaving it or counting it as Not interested", async () => {
+    vi.mocked(libraryApi.saves).mockResolvedValueOnce({ data: { results: [{
+      record_id: publishedThesis.id, available: true, reading_status: "reading",
+      saved_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z", record: publishedThesis,
+    }] } } as Awaited<ReturnType<typeof libraryApi.saves>>);
+    vi.mocked(libraryApi.folders).mockResolvedValueOnce({ data: { results: [folder(3, "Methods", [publishedThesis.id])], limit: 10 } } as Folders);
+    renderDiscover("/?feed=for_you");
+    const card = await menuOf("Saved");
+
+    await userEvent.click(await within(card).findByRole("button", { name: "Methods", pressed: true }));
+
+    expect(libraryApi.removeFromFolder).toHaveBeenCalledWith(3, publishedThesis.id);
+    expect(within(card).getByRole("button", { name: "Methods" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(card).getByRole("button", { name: "Reading" })).toHaveAttribute("aria-pressed", "true");
+    expect(libraryApi.unsave).not.toHaveBeenCalled();
+    expect(recordsApi.notInterested).not.toHaveBeenCalled();
+  });
+
+  it("creates a folder on the server from the menu and files the paper in it", async () => {
+    vi.mocked(libraryApi.createFolder).mockResolvedValueOnce({ data: folder(5, "Field work") } as Awaited<ReturnType<typeof libraryApi.createFolder>>);
+    vi.mocked(libraryApi.fileInFolder).mockResolvedValueOnce(filed(5, "Field work", publishedThesis.id));
+    renderDiscover();
+    const card = await menuOf();
+
+    await userEvent.type(within(card).getByRole("textbox", { name: "New folder name" }), "Field work{Enter}");
+
+    await waitFor(() => expect(libraryApi.fileInFolder).toHaveBeenCalledWith(5, publishedThesis.id));
+    expect(libraryApi.createFolder).toHaveBeenCalledWith("Field work");
+    expect(await within(card).findByRole("button", { name: "Field work", pressed: true })).toBeInTheDocument();
+  });
+
+  it("says when the account has no room for another folder, and offers none", async () => {
+    vi.mocked(libraryApi.folders).mockResolvedValueOnce({ data: { results: [folder(3, "Methods")], limit: 1 } } as Folders);
+    renderDiscover();
+    const card = await menuOf();
+
+    expect(await within(card).findByText(/You have 1 folders, the most an account holds/)).toBeInTheDocument();
+    expect(within(card).getByRole("textbox", { name: "New folder name" })).toBeDisabled();
+    expect(within(card).getByRole("button", { name: "Create folder" })).toBeDisabled();
   });
 });
 

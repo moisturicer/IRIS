@@ -297,6 +297,32 @@ class ExportContentTests(APITestCase):
         feeds = self.export()["saved_feeds"]
         self.assertEqual([(f["name"], f["query"]) for f in feeds], [("Water", {"q": "water"})])
 
+    def test_folders_are_the_persons_own_and_name_a_paper_only_while_readable(self):
+        from apps.library.models import FolderMembership, LibraryFolder
+
+        published = _paper("Public work", self.stranger, status=PipelineStatus.PUBLISHED)
+        hidden = _paper("Someone's draft", self.stranger)
+        mine = LibraryFolder.objects.create(owner=self.me, name="Methods")
+        for record in (published, hidden):
+            save = SavedRecord.objects.create(owner=self.me, record=record)
+            FolderMembership.objects.create(folder=mine, saved_record=save)
+        theirs = LibraryFolder.objects.create(owner=self.stranger, name="Not my folder")
+        FolderMembership.objects.create(
+            folder=theirs, saved_record=SavedRecord.objects.create(owner=self.stranger, record=published),
+        )
+
+        folders = self.export()["folders"]
+
+        self.assertEqual([f["name"] for f in folders], ["Methods"])
+        papers = {p["record_id"]: p for p in folders[0]["papers"]}
+        self.assertEqual(set(papers), {published.pk, hidden.pk})
+        self.assertEqual(papers[published.pk]["title"], "Public work")
+        self.assertIsNone(papers[hidden.pk]["title"])
+        self.assertFalse(papers[hidden.pk]["available"])
+        text = _text(self.client.get(URL))
+        self.assertNotIn("Someone's draft", text)
+        self.assertNotIn("Not my folder", text)
+
     def test_reading_notes_are_the_persons_own_and_keep_their_text_without_the_title(self):
         from apps.library.models import ReadingNote
 

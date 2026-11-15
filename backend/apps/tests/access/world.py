@@ -29,7 +29,7 @@ from apps.documents.models import (
 )
 from apps.documents.testing import real_pdf_bytes
 from apps.documents.requests import ItemSpec, create_request, requesting_party
-from apps.library.models import SavedFeed
+from apps.library.models import LibraryFolder, SavedFeed
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
 from apps.records.models import Classification, DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
@@ -125,7 +125,7 @@ class World:
         from apps.opportunities.models import Opportunity
         if isinstance(obj, Opportunity):
             return user is not None
-        if isinstance(obj, (SavedFeed, SavedReply)):
+        if isinstance(obj, (LibraryFolder, SavedFeed, SavedReply)):
             return user is not None and obj.owner_id == user.pk
         return Record.objects.visible_to(user).filter(pk=self.record_of(name).pk).exists()
 
@@ -361,6 +361,8 @@ def build_world() -> World:
     o["feed"] = SavedFeed.objects.create(
         owner=owner, name="Owner fixture feed", query={"q": "flood"},
     )
+    # IR-572: a reader's folder is private to its owner in the same way.
+    o["folder"] = LibraryFolder.objects.create(owner=owner, name="Owner fixture folder")
     # IR-877: a saved reply is private to its owner in the same way.
     o["saved_reply"] = SavedReply.objects.create(
         owner=owner, title="Owner fixture reply", body="Thank you, this reads well.",

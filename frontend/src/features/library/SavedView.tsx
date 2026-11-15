@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { recordsApi } from "@/api/records";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
-import { isRequestTimeout } from "@/api/requestPolicy";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { Select } from "@/components/ui/Select";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
-import type { Collection } from "@/lib/recordLibrary";
 import { useHistoryStore } from "@/store/history.store";
-import { readingStatusLabel, sortedItems, type LibraryItem } from "@/store/library.store";
+import { MAX_FOLDER_NAME, readingStatusLabel, sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
 import { cn } from "@/lib/utils";
 import type { RecordListItem } from "@/types/records";
 
@@ -22,6 +19,12 @@ import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 
 type SortKey = "added" | "title" | "year";
 
+const SORT_LABELS: Record<SortKey, string> = {
+  added: "Date added",
+  title: "Title A–Z",
+  year:  "Year published",
+};
+
 /** What a saved paper and a history entry share: an unavailable one has no record. */
 interface AccountEntry {
   recordId:  number;
@@ -29,24 +32,10 @@ interface AccountEntry {
   record?:   RecordListItem;
 }
 
-const SORT_LABELS: Record<SortKey, string> = {
-  added: "Date added",
-  title: "Title A–Z",
-  year:  "Year published",
-};
-
-/** The list endpoint caps `page_size` at 100, so large folders resolve in chunks. */
-const ID_CHUNK = 100;
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
-
 interface SavedViewProps {
   view:        Exclude<LibraryView, { kind: "research" }>;
-  collections: Collection[];
+  /** The reader's own folders (IR-572); every Record in one is also a save. */
+  folders:     LibraryFolder[];
   /** The account's saves (IR-566), keyed by Record id. */
   library:     Record<number, LibraryItem>;
   libraryLoad: "idle" | "loading" | "ready" | "error";
@@ -54,8 +43,8 @@ interface SavedViewProps {
   libraryInterrupted?: boolean;
   onRetryLibrary: () => void;
   onRemove:    (ids: number[]) => void;
-  onRename:    (id: string, name: string) => void;
-  onDelete:    (id: string) => void;
+  onRename:    (id: number, name: string) => void;
+  onDelete:    (id: number) => void;
   /** The Reading status filters, set under the search in the toolbar. */
   filters?:       ReactNode;
   /** The Folder picker, set beside Sort in the toolbar. */
@@ -65,30 +54,19 @@ interface SavedViewProps {
 /**
  * One view of the reader's saved reading.
  *
- * **Account views** (All saved, a Reading status, History) read the library
- * and history stores, whose server responses already went through
- * `visible_to()`: an unavailable entry arrives as its id and nothing else
- * (ADR-044 §4, and its IR-756 amendment for History).
- *
- * **Browser views** (own folders) still hold bare ids. Those resolve
- * through the *list* endpoint (`?id=1,2,3`), which applies the visibility
- * predicate, never through detail one id at a time: a stale localStorage id
- * must not become a way to learn about a record the viewer may not read.
- *
- * Either way, ids the predicate drops are reported as no longer available
- * rather than silently hidden.
+ * Every view reads the account. All saved, a Reading status and one of the
+ * reader's own folders read the library store; History reads the history store
+ * (IR-756). Both server responses already went through `visible_to()`: an
+ * unavailable entry arrives as its id and nothing else (ADR-044 §4), and is
+ * reported as no longer available rather than silently hidden. A folder holds
+ * saves, so its papers are the saves it lists, in the order they were filed
+ * (IR-572).
  */
 export function SavedView({
-  view, collections, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, filters, folderControl,
+  view, folders, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, filters, folderControl,
 }: SavedViewProps) {
-  const savesView = view.kind === "saved" || view.kind === "status";
   const historyView = view.kind === "history";
-  const accountView = savesView || historyView;
   const historyStore = useHistoryStore();
-  const [records, setRecords] = useState<RecordListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
-  const [interrupted, setInterrupted] = useState(false);
   const [layout, setLayout] = useState<LibraryLayout>("grid");
   const [sort, setSort] = useState<SortKey>("added");
   const [query, setQuery] = useState("");
@@ -96,58 +74,26 @@ export function SavedView({
   const [citing, setCiting] = useState<RecordListItem | null>(null);
   const [renaming, setRenaming] = useState(false);
 
-  const folder = view.kind === "folder" ? collections.find((c) => c.id === view.id) : undefined;
+  const folder = view.kind === "folder" ? folders.find((f) => f.id === view.id) : undefined;
   const statusFilter = view.kind === "status" ? view.status : null;
   const title = view.kind === "saved"
     ? "All saved"
     : view.kind === "status"
       ? readingStatusLabel(view.status)
-      : view.kind === "history" ? "History" : folder?.name ?? "Folder";
+      : historyView ? "History" : folder?.name ?? "Folder";
 
-  /* The account's saves or history this view shows, newest first. */
-  const accountItems = useMemo<AccountEntry[]>(
-    () => (savesView
-      ? sortedItems(library).filter((i) => statusFilter === null || i.readingStatus === statusFilter)
-      : historyView ? historyStore.items : []),
-    [savesView, historyView, library, historyStore.items, statusFilter],
-  );
-
-  /* The ids this view asks for, newest first. */
-  const viewIds = useMemo<number[]>(() => {
-    if (accountView) return accountItems.map((i) => i.recordId);
-    return folder ? [...folder.recordIds].reverse() : [];
-  }, [accountView, accountItems, folder]);
-  const idKey = accountView ? "" : viewIds.join(",");
-
-  const load = useCallback(async () => {
-    if (accountView) return;
-    const ids = idKey ? idKey.split(",").map(Number) : [];
-    if (ids.length === 0) {
-      setRecords([]);
-      setLoading(false);
-      setFailed(false);
-      return;
+  /* The entries this view shows: History's most recent first, a folder's in
+     filing order, newest first, and every other view's newest saved first. */
+  const accountItems = useMemo<AccountEntry[]>(() => {
+    if (historyView) return historyStore.items;
+    if (view.kind === "folder") {
+      return (folder?.recordIds ?? []).flatMap((id) => (library[id] ? [library[id]] : []));
     }
-    setLoading(true);
-    setFailed(false);
-    setInterrupted(false);
-    try {
-      const pages = await Promise.all(
-        chunk(ids, ID_CHUNK).map((part) => recordsApi.list({ id: part.join(","), page_size: ID_CHUNK })),
-      );
-      setRecords(pages.flatMap((p) => p.data.results ?? []));
-    } catch (error) {
-      setFailed(true);
-      setInterrupted(isRequestTimeout(error));
-      setRecords([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [idKey, accountView]);
+    return sortedItems(library).filter((i) => statusFilter === null || i.readingStatus === statusFilter);
+  }, [historyView, historyStore.items, view.kind, folder, library, statusFilter]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  /* The ids this view shows, in its order. */
+  const viewIds = useMemo(() => accountItems.map((i) => i.recordId), [accountItems]);
 
   useEffect(() => {
     setSelected(new Set());
@@ -156,20 +102,16 @@ export function SavedView({
   }, [view.kind, folder?.id, statusFilter]);
 
   const shownRecords = useMemo(
-    () => (accountView
-      ? accountItems.flatMap((i) => (i.available && i.record ? [i.record] : []))
-      : records),
-    [accountView, accountItems, records],
+    () => accountItems.flatMap((i) => (i.available && i.record ? [i.record] : [])),
+    [accountItems],
   );
   // History has no per-paper removal, only Clear history, so it offers none here.
-  const unavailableIds = savesView
-    ? accountItems.filter((i) => !i.available).map((i) => i.recordId)
-    : [];
-  const accountLoad = historyView ? historyStore.load : libraryLoad;
-  const accountInterrupted = historyView ? historyStore.interrupted : libraryInterrupted;
-  const isLoading = accountView ? accountLoad === "idle" || accountLoad === "loading" : loading;
-  const isFailed = accountView ? accountLoad === "error" : failed;
-  const retry = historyView ? () => void historyStore.refresh() : accountView ? onRetryLibrary : () => void load();
+  const unavailableIds = historyView ? [] : accountItems.filter((i) => !i.available).map((i) => i.recordId);
+  const load = historyView ? historyStore.load : libraryLoad;
+  const isLoading = load === "idle" || load === "loading";
+  const isFailed = load === "error";
+  const interrupted = historyView ? historyStore.interrupted : libraryInterrupted;
+  const retry = historyView ? () => void historyStore.refresh() : onRetryLibrary;
 
   const visible = useMemo(() => {
     const order = new Map(viewIds.map((id, i) => [id, i]));
@@ -207,7 +149,9 @@ export function SavedView({
       : { title: "No reading history yet", message: "Papers you open are listed here, newest first, on every device you sign in on." }
     : view.kind === "saved"
       ? { title: "No saved papers yet", message: "Save a paper from Discover or a paper's page and it follows your account." }
-      : { title: `Nothing in ${title} yet`, message: "Save a paper from Discover or a paper's page to file it here." };
+      : view.kind === "folder"
+        ? { title: `Nothing in ${title} yet`, message: "File a paper here from its Save menu on Discover or its page." }
+        : { title: `Nothing in ${title} yet`, message: "Save a paper from Discover or a paper's page to file it here." };
   const removeLabel = view.kind === "folder" ? "Remove from folder" : "Remove from library";
 
   const textButton = cn("min-h-10 rounded-control px-3 text-small font-semibold text-stone-700 hover:bg-stone-100", COLOUR_TRANSITION, FOCUS_RING);
@@ -260,8 +204,13 @@ export function SavedView({
           <input
             autoFocus
             defaultValue={folder.name}
+            maxLength={MAX_FOLDER_NAME}
             aria-label={`Rename ${folder.name}`}
-            onBlur={(e) => { if (e.target.value.trim()) onRename(folder.id, e.target.value.trim()); setRenaming(false); }}
+            onBlur={(e) => {
+              const name = e.target.value.trim();
+              if (name && name !== folder.name) onRename(folder.id, name);
+              setRenaming(false);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
               if (e.key === "Escape") setRenaming(false);
@@ -346,14 +295,12 @@ export function SavedView({
         </LoadingRegion>
       ) : isFailed ? (
         <ReadFailedState
-          interrupted={accountView ? accountInterrupted : interrupted}
+          interrupted={interrupted}
           what={historyView ? "reading history" : "saved papers"}
           title="Could not load these papers"
           message={historyView
             ? "Your history is safe in your account; only loading it failed."
-            : accountView
-              ? "Your saved papers are safe in your account; only loading them failed."
-              : "This list is still stored in this browser; only fetching the papers failed."}
+            : "Your saved papers and folders are safe in your account; only loading them failed."}
           onRetry={retry}
         />
       ) : visible.length === 0 ? (
