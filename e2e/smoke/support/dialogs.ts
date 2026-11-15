@@ -250,6 +250,17 @@ export const DIALOGS: DialogCase[] = [
     open: press("Decline"), dialog: anyDialog,
   },
   {
+    // The approvals ask in ConfirmDialog (IR-1028), naming the paper and the person.
+    id: "approve a download request", screen: "download-requests",
+    sources: ["features/admin/DownloadRequestsPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: press("Approve"), dialog: anyDialog,
+  },
+  {
+    id: "approve a delete request", screen: "delete-requests",
+    sources: ["features/admin/DeleteRequestsPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: press("Approve Deletion"), dialog: anyDialog,
+  },
+  {
     id: "account locked after failed sign-ins", screen: "login", sources: ["components/auth/AccountLockedModal.tsx", "components/auth/EntryFrame.tsx"],
     override: (api) => api.on("POST", "/auth/login/", { code: "too_many_attempts", unlock_at: "2099-01-01T00:00:00Z" }, 429),
     open: async (page) => {
@@ -497,6 +508,8 @@ export const DIALOGS: DialogCase[] = [
  * not an omission: the reason is what would have to be built to scan it.
  */
 export const UNSCANNED: Record<string, string> = {
+  "features/admin/SessionsPage.tsx":
+    "SessionsPage has no route, so no smoke screen reaches its revoke dialog (IR-1028); the dialog is axe-checked in SessionsPage.test.tsx. It becomes a case here if the page is routed, and goes if the dead-code ticket removes it.",
   "features/records/paper-view/NotesPanel.tsx":
     "Notes is a reader panel that becomes a dialog only after an authenticated reader opens it; its focused editor is covered by NotesPanel tests.",
 };
