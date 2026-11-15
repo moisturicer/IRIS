@@ -981,6 +981,11 @@ LLAMAPARSE_API_KEY = config("LLAMAPARSE_API_KEY", default="")
 LLAMAPARSE_TIER = config("LLAMAPARSE_TIER", default="agentic")
 LLAMAPARSE_VERSION = config("LLAMAPARSE_VERSION", default="")
 LLAMAPARSE_BASE_URL = config("LLAMAPARSE_BASE_URL", default="https://api.cloud.llamaindex.ai")
+# Exact hostnames, besides Amazon S3, that LlamaParse's presigned results may be
+# downloaded from (IR-929). Empty is right while the vendor serves them from S3.
+LLAMAPARSE_DOWNLOAD_HOSTS = tuple(
+    host.strip().lower() for host in config("LLAMAPARSE_DOWNLOAD_HOSTS", default="").split(",") if host.strip()
+)
 # One job's budget is base + per page x its page count.
 LLAMAPARSE_TIMEOUT_BASE_SECONDS = config("LLAMAPARSE_TIMEOUT_BASE_SECONDS", default=300, cast=int)
 LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS = config("LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS", default=30, cast=int)

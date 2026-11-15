@@ -19,7 +19,7 @@ from apps.ai.extraction.llamaparse_client import LlamaParseExtractor
 
 from .contract import ExtractorContract
 from .fixtures import FIXTURES, pdf_bytes
-from .llamaparse_vendor import RECORDINGS, Vendor, no_sleep, recording
+from .llamaparse_vendor import DOWNLOAD_HOST, RECORDINGS, Vendor, no_sleep, recording
 
 VERSION = "2026-09-28"
 
@@ -280,7 +280,7 @@ def test_a_layout_figure_is_downloaded_with_its_page_and_caption():
     shaped = shape_llamaparse({**extracted.raw, "grounded_items": []})
     assert figure.name in {e.figure for e in shaped.elements}
     assert figure.bbox == {"x": 72, "y": 300, "w": 200, "h": 100}
-    downloads = [r for r in vendor.requests if r.url.host == "downloads.vendor.test"]
+    downloads = [r for r in vendor.requests if r.url.host == DOWNLOAD_HOST]
     assert "/images/page_1.jpg" not in [r.url.path for r in downloads]
     assert all("authorization" not in r.headers for r in downloads)
     order = [(r.method, r.url.host) for r in vendor.requests]

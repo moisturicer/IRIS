@@ -56,6 +56,17 @@ _USAGE_ATTEMPTS = 3
 _REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 _TIMEOUT_MEMORY_SECONDS = 24 * 60 * 60
 
+# Where a presigned result may be fetched from (IR-929, ASVS 5.2.6). The URLs
+# come in the vendor's response, not from settings, so each is checked before
+# any request: https on the default port, to Amazon S3, which is where
+# LlamaParse's v2 guide shows them (`https://s3.amazonaws.com/...`). The pattern
+# takes S3's path-style, virtual-hosted, regional and dual-stack names, and no
+# other AWS service. LLAMAPARSE_DOWNLOAD_HOSTS adds exact hostnames if the
+# vendor ever serves them elsewhere.
+_S3_HOST = re.compile(
+    r"^(?:[a-z0-9][a-z0-9.-]*\.)?s3(?:-[a-z0-9-]+)?(?:\.dualstack)?(?:\.[a-z]{2}(?:-[a-z]+)+-\d+)?\.amazonaws\.com$"
+)
+
 _TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
 _REJECTED = {
     "DOCUMENT_TOO_LARGE", "PROCESSING_SIZE_LIMIT_EXCEEDED", "CONTENT_POLICY_REFUSAL",
@@ -125,6 +136,7 @@ class LlamaParseExtractor:
         max_pages: int = 1000,
         api: Optional[httpx.Client] = None,
         downloads: Optional[httpx.Client] = None,
+        download_hosts: tuple = (),
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
         remember_timeout: Callable[[str], bool] = _first_timeout,
@@ -139,6 +151,7 @@ class LlamaParseExtractor:
         self._max_pages = max_pages
         self._api = api
         self._downloads = downloads
+        self._download_hosts = frozenset(host.lower() for host in download_hosts)
         self._sleep = sleep
         self._clock = clock
         self._remember_timeout = remember_timeout
@@ -202,8 +215,8 @@ class LlamaParseExtractor:
             job_id = created.json()["id"]
             self._wait(api, job_id, pdf_bytes, pages)
             result = self._result(api, job_id)
-            grounded = _grounded_items(downloads, result)
-            figures = tuple(_figures(downloads, result))
+            grounded = _grounded_items(downloads, result, self._download_hosts)
+            figures = tuple(_figures(downloads, result, self._download_hosts))
             raw = {**_without_presigned_urls(result), "grounded_items": grounded}
             return raw, figures
         finally:
@@ -275,19 +288,36 @@ def _delete(api: httpx.Client, file_id: str) -> None:
         logger.error("LlamaParse uploaded file %s may remain: %s", file_id, error)
 
 
-def _download(downloads: httpx.Client, url: str) -> bytes:
+def allowed_download(url: str, extra_hosts=frozenset()) -> bool:
+    """True when ``url`` is https, on the default port, to S3 or a listed host."""
+    try:
+        parts = urlparse(url)
+        port = parts.port
+    except ValueError:
+        return False
+    host = (parts.hostname or "").lower()
+    if parts.scheme != "https" or port not in (None, 443) or parts.username or parts.password:
+        return False
+    return bool(_S3_HOST.match(host)) or host in extra_hosts
+
+
+def _download(downloads: httpx.Client, url: str, extra_hosts=frozenset()) -> bytes:
+    if not allowed_download(url, extra_hosts):
+        # Only the host is named: the query string is a credential.
+        host = urlparse(url).hostname if isinstance(url, str) else None
+        raise ExtractorUnavailable(f"LlamaParse download refused: {host or 'no host'} is not an allowed result host")
     return _send(downloads, "GET", url, "download").content
 
 
-def _grounded_items(downloads: httpx.Client, result: Mapping[str, Any]) -> list:
+def _grounded_items(downloads: httpx.Client, result: Mapping[str, Any], extra_hosts=frozenset()) -> list:
     meta = ((result.get("result_content_metadata") or {}).get("grounded_items") or {})
     if not meta.get("presigned_url"):
         return []
-    text = _download(downloads, meta["presigned_url"]).decode("utf-8")
+    text = _download(downloads, meta["presigned_url"], extra_hosts).decode("utf-8")
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
-def _figures(downloads: httpx.Client, result: Mapping[str, Any]) -> Iterator[FigureImage]:
+def _figures(downloads: httpx.Client, result: Mapping[str, Any], extra_hosts=frozenset()) -> Iterator[FigureImage]:
     items = {name: (page, item) for page, item in _image_items(result) for name in [_basename(item.get("url"))] if name}
     for image in (result.get("images_content_metadata") or {}).get("images", []):
         if image.get("category") != "layout" or not image.get("presigned_url"):
@@ -299,7 +329,7 @@ def _figures(downloads: httpx.Client, result: Mapping[str, Any]) -> Iterator[Fig
             continue
         page, item = found
         yield FigureImage(
-            page=page, bbox=image.get("bbox") or {}, data=_download(downloads, image["presigned_url"]),
+            page=page, bbox=image.get("bbox") or {}, data=_download(downloads, image["presigned_url"], extra_hosts),
             media_type=image.get("content_type") or "application/octet-stream",
             caption=item.get("caption"), name=image["filename"],
         )

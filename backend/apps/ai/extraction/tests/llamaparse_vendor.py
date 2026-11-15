@@ -16,7 +16,8 @@ from .fixtures import DIRECTORY
 
 RECORDINGS = DIRECTORY / "llamaparse"
 BASE_URL = "https://api.vendor.test"
-DOWNLOADS = "https://downloads.vendor.test"
+DOWNLOAD_HOST = "iris-results.s3.us-east-1.amazonaws.com"
+DOWNLOADS = f"https://{DOWNLOAD_HOST}"
 FILE_ID = "dfl-recorded"
 
 
@@ -85,7 +86,7 @@ class Vendor:
     def _handle(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         path, method = request.url.path, request.method
-        if request.url.host == "downloads.vendor.test":
+        if request.url.host == DOWNLOAD_HOST:
             return self._fail("download") or self._download(path)
         if method == "POST" and path == "/api/v1/beta/files":
             return self._fail("upload") or httpx.Response(200, json={"id": FILE_ID})

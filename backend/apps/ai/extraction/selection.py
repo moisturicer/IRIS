@@ -33,6 +33,7 @@ def _llamaparse() -> StructuredExtractor:
         shape=_llamaparse_shape(),
         api_key=settings.LLAMAPARSE_API_KEY,
         base_url=settings.LLAMAPARSE_BASE_URL,
+        download_hosts=settings.LLAMAPARSE_DOWNLOAD_HOSTS,
         tier=settings.LLAMAPARSE_TIER,
         version=settings.LLAMAPARSE_VERSION,
         timeout_base_seconds=settings.LLAMAPARSE_TIMEOUT_BASE_SECONDS,
