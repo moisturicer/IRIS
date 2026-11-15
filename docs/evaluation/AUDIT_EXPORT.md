@@ -175,9 +175,27 @@ It has no `record`. There is no backfill: accounts that existed before IR-789 st
 
 | Type | Written when | `metadata` |
 |---|---|---|
-| `CALL_DELETED` | A Call is deleted. Today only migration `opportunities/0002` (IR-760) writes it, once per Internal Call, Funding Window or Institutional Grant it deletes (decision 16), with no `user`. IR-763 will write one per deletion from the board, with the deleter as `user` | `reason`, a sentence (from 0002: "Internal Call is no longer a type of Call (ADR-050 decision 16)."), and `call`, a copy of every field the Call had, with `posted_by` as an account id |
+Written by `backend/apps/opportunities/audit.py` inside each act's transaction (IR-763), so a refused or rolled-back act writes nothing. `user` is whoever acted.
 
-It has no `record`. A Call is not a paper.
+**A snapshot** (`call`) holds every field the Call had: Areas as `[{"id", "name"}]`, `posted_by` as an account id, dates and times as ISO strings. Migration 0002's snapshots hold the fields a Call had then, with no Areas.
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `CALL_POSTED` | RDCO or an Adviser posts a Call | `call`, a snapshot. RDCO's is `confirmed`, an Adviser's `pending` |
+| `CALL_EDITED` | A saved edit changes at least one field. A save that changes nothing writes nothing. An Adviser's edit that sends a Call back to RDCO is this one event, with `status` (and a cleared `review_reason`) among the changes | `call_id`, `title` (after the edit), and `changes`: `{field: {"old", "new"}}` for each changed field, Featured (`is_featured`) and Areas included, `updated_at` never |
+| `CALL_DELETED` | A Call is deleted by a person through `DELETE /opportunities/<id>/`, or by migration `opportunities/0002` (IR-760), once per Internal Call, Funding Window or Institutional Grant (decision 16), with no `user` | `reason`: `null` for a person's delete; from 0002 a sentence such as "Internal Call is no longer a type of Call (ADR-050 decision 16)." `call`: a snapshot |
+| `CALL_CONFIRMED` | RDCO confirms a waiting Call | `call_id`, `title` |
+| `CALL_REJECTED` | RDCO rejects a waiting Call | `call_id`, `title`, `reason`, RDCO's reason as the Adviser received it |
+| `CALL_REMOVED` | RDCO removes an Adviser's Call through `POST /opportunities/<id>/remove/` | `reason`, as the Adviser received it, and `call`, a snapshot |
+| `CALL_LAPSED` | The daily job deletes a pending or rejected Call whose paper deadline passed (ADR-050 amendment of 2026-11-15, point 2). No `user`. A seventh type, the owner's choice of 2026-11-15, so the job's deletions are told apart from a person's | `call`, a snapshot |
+
+None has a `record`. A Call is not a paper. A reader saving a Call to their own list (ADR-050 decision 13) isn't audited.
+
+**Following a Call through the log:** its `CALL_POSTED` snapshot, then each `CALL_EDITED`'s new values in order. Some changes write no event:
+- A confirmation or rejection also sets `status`, `review_reason` and `reviewed_at`, which those events don't repeat.
+- A deleted poster's account sets `posted_by` to null.
+- A deleted Classification drops out of the Call's Areas.
+- A Call posted before IR-763 has no `CALL_POSTED`.
 
 ### Withdrawal
 
