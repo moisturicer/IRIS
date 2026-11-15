@@ -24,6 +24,7 @@ from apps.reviews.models import ResubmissionRequest, Review, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from apps.reviews.test_office_review import OfficeReviewTestBase
 from apps.reviews.test_revisions import RevisionTestBase
+from apps.reviews.test_review_threads import ThreadTestBase
 from apps.reviews.test_routing import RoutingTestBase
 from apps.reviews.test_seats import SeatTestBase, reassign_url
 from core.enums import Party, PipelineStatus, RequestStatus, SeatState
@@ -191,3 +192,87 @@ class UploadReviewCommentLimitTests(RoutingTestBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn(LIMIT_MESSAGE, message_of(response))
         self.assertFalse(UploadReview.objects.exists())
+
+    def test_a_comment_that_is_not_text_is_refused(self):
+        self.client.force_authenticate(self.rdco)
+        for comment in (None, 42, ["x"]):
+            with self.subTest(comment=comment):
+                response = self.client.post(reverse("upload-reviews"), {"upload": 1, "status": 1,
+                                                                         "comment": comment}, format="json")
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+
+
+class OpportunityDescriptionPatchLimitTests(APITestCase):
+
+    def test_a_patched_description_over_the_limit_is_refused_and_the_old_one_kept(self):
+        from apps.opportunities.tests import make_opportunity
+
+        rdco = make_opportunity_user("limits-rdco-patch@cit.edu", "RDCO")
+        opportunity = make_opportunity(posted_by=rdco)
+        self.client.force_authenticate(rdco)
+        response = self.client.patch(reverse("opportunity-detail", args=[opportunity.pk]),
+                                     {"description": TOO_LONG}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn(LIMIT_MESSAGE, message_of(response))
+        opportunity.refresh_from_db()
+        self.assertEqual(opportunity.description, "Competitive institutional seed funding.")
+
+
+class FinishReviewSummaryLimitTests(ThreadTestBase):
+
+    def test_a_comment_only_summary_over_the_limit_is_refused_and_no_round_written(self):
+        from apps.reviews.models import ReviewRound
+
+        record = self.itso_open()
+        response = self.finish(record, self.itso, summary=TOO_LONG)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("A summary can be at most", message_of(response))
+        self.assertFalse(ReviewRound.objects.filter(record=record).exists())
+
+
+class ExtensionReasonLimitTests(SeatTestBase):
+
+    def test_an_extension_reason_over_the_limit_is_refused_and_the_deadline_kept(self):
+        from apps.reviews.models import RecordAssignment, Turnaround
+        from apps.reviews.test_deadlines import at
+
+        Turnaround.objects.create(party=Party.ITSO, working_days=1)
+        record = self.make_record(adviser=self.adviser)
+        assignment = RecordAssignment.objects.create(record=record, party=Party.ITSO, opened_at=at(25))
+        before = assignment.due_at
+        response = self.post(f"/api/v1/assignments/{assignment.pk}/extend/", self.itso_coordinator,
+                             {"due_at": at(30, 23, 59).isoformat(), "reason": TOO_LONG})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn(LIMIT_MESSAGE, message_of(response))
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.due_at, before)
+
+
+class SystemSettingValueLimitTests(APITestCase):
+
+    def test_a_setting_over_the_limit_is_refused_and_the_old_value_kept(self):
+        from apps.accounts.models import SystemSetting
+        from apps.accounts.test_system_settings import _url, _user
+        from core.enums import RoleName
+
+        setting = SystemSetting.objects.create(key="announcement", value="old text")
+        self.client.force_authenticate(_user("limits-sysadmin@cit.edu", RoleName.SYSTEM_ADMIN))
+        response = self.client.patch(_url("announcement"), {"value": TOO_LONG}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn(LIMIT_MESSAGE, message_of(response))
+        setting.refresh_from_db()
+        self.assertEqual(setting.value, "old text")
+
+
+class ExcelImportAbstractLimitTests(APITestCase):
+
+    def test_a_row_whose_abstract_is_over_the_limit_is_skipped_and_named(self):
+        from apps.records.models import Record
+        from apps.records.test_excel_import import ImportTestCase, row, workbook
+
+        ImportTestCase.setUp(self)
+        response = ImportTestCase.post(self, workbook(row("Too Long", TOO_LONG), row("Fine", "A short abstract.")))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1))
+        self.assertIn("Row 2: skipped — Abstract can be at most 10,000 characters.", response.data["log"])
+        self.assertEqual(set(Record.objects.filter(added_by=self.rdco).values_list("title", flat=True)), {"Fine"})

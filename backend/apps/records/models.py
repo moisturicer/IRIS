@@ -187,6 +187,7 @@ class Record(models.Model):
     publication_year   = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(9999)])
     year_accomplished  = models.PositiveIntegerField(null=True, blank=True)
     year_completed     = models.PositiveIntegerField(null=True, blank=True)
+    # At most 10,000 characters, checked where it is written (IR-926, core/text_limits.py).
     abstract           = models.TextField(blank=True)
     abstract_file      = models.FileField(
         upload_to=abstract_file_path, max_length=255, null=True, blank=True

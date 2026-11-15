@@ -17,8 +17,8 @@ from django.utils import timezone
 from apps.audit.models import AuditEvent
 from apps.audit.services import create_audit_event
 from core.enums import PipelineStatus, RequestStatus, SessionEndReason
-from core.utils import send_email_async
 from core.text_limits import too_long, too_long_message
+from core.utils import send_email_async
 
 from ..models import AccountDeletionRequest, ResearchInterest, User
 from . import registry
