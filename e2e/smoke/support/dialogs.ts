@@ -107,6 +107,13 @@ const reviewAction = (
   override: (api) => { reviewing(capability)(api); api.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER); more?.(api); },
   open: async (page) => {
     if (inDetails) await page.getByRole("tab", { name: "Details" }).click();
+    // The footer shows one secondary and one primary action; the rest sit in its "More review actions" menu.
+    const onBar = page.getByRole("button", { name: label, exact: true });
+    if (await onBar.count() === 0) {
+      await page.getByRole("button", { name: "More review actions" }).click();
+      await page.getByRole("menuitem", { name: label, exact: true }).click();
+      return;
+    }
     await press(label)(page);
   },
   dialog: anyDialog,

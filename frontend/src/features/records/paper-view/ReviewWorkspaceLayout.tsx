@@ -13,7 +13,8 @@ import type { RecordTracker, RecordVersion } from "@/types/records";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
-import { REVIEW_ACTIONS, VERDICT_CAPABILITIES, type DialogReviewAction } from "./reviewActions";
+import { REVIEW_ACTIONS, type DialogReviewAction } from "./reviewActions";
+import { ReviewFooterActions } from "./ReviewFooterActions";
 import type { ShowPlace } from "./changes/ChangeItem";
 import { ChangesTab } from "./changes/ChangesTab";
 import { TabBesideMenu } from "./TabBesideMenu";
@@ -39,13 +40,17 @@ const SIDE_TAB_KEY = "iris-review-side-tab";
 const ADD_COLLEAGUE = REVIEW_ACTIONS.filter((a) => a.capability === "add_reviewer")
   .map((a) => ({ ...a, label: "Add a colleague…" }));
 const ROUTE = REVIEW_ACTIONS.find((a): a is DialogReviewAction => a.capability === "route" && a.kind === "dialog");
-const FOOTER_ACTIONS = REVIEW_ACTIONS.filter((a) => a.capability !== "route" && a.capability !== "add_reviewer");
 /**
- * With *Finish review* granted every verdict goes through it, so the drafts
- * go with it (ADR-032 §7, IR-875): the footer keeps only the acts that are
- * not verdicts -- requesting documents, withdrawing a revision request.
+ * What the footer may offer. With *Finish review* granted every verdict goes
+ * through it, so the drafts go with it (ADR-032 §7, IR-875);
+ * `ReviewFooterActions` turns those into buttons that open it. *Add a
+ * colleague* is in the footer's menu too, as the prototype has it (IR-1139),
+ * besides the Reviewers list in Details.
  */
-const FINISH_FOOTER_ACTIONS = FOOTER_ACTIONS.filter((a) => !VERDICT_CAPABILITIES.includes(a.capability));
+const FOOTER_ACTIONS = [
+  ...REVIEW_ACTIONS.filter((a) => a.capability !== "route" && a.capability !== "add_reviewer"),
+  ...ADD_COLLEAGUE,
+];
 type Tab = TourTab;
 
 const TAB_NAMES: Record<Tab, string> = {
@@ -164,7 +169,9 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   // Details is a tab at every width: the third column that repeated it is gone
   // (IR-1094). One tab may sit in a right column on a workspace wide enough;
   // narrower, it returns to the row, and the choice is kept for next time.
-  const allTabs: Tab[] = ["conversation", "threads", ...(comparable ? ["changes" as const] : []), "details"];
+  // Changes is always a tab, as in the prototype (IR-1139): on the first
+  // version it says there is nothing to compare yet, instead of vanishing.
+  const allTabs: Tab[] = ["conversation", "threads", "changes", "details"];
   const sideTab = roomy && sideChoice !== null && allTabs.includes(sideChoice) ? sideChoice : null;
   const tabs = allTabs.filter((t) => t !== sideTab);
   const shown: Tab = tabs.includes(tab) ? tab : tabs[0]!;
@@ -205,8 +212,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const changesVisible = shown === "changes" || sideTab === "changes";
   useEffect(() => {
     if (changesVisible) setChangesOpened(true);
-    if (tab === "changes" && !comparable) setTab("conversation");
-  }, [changesVisible, tab, comparable]);
+  }, [changesVisible]);
   const showChange = ({ version, page, regions }: ShowPlace) => {
     onShowVersion?.(version === latest ? null : version);
     tw.showPlace(page, regions);
@@ -341,13 +347,20 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
         onLoaded={(data) => setCommentCount((data.review_comments ?? []).filter((c) => !c.is_draft).length)} />
     ),
     threads: <ReviewThreads {...tw.panel} />,
-    changes: comparable && changesOpened ? (
+    changes: !comparable ? (
+      <div className="rounded-card border border-stone-200 px-4 py-6 text-center">
+        <p className="text-small font-semibold text-stone-900">Nothing to compare yet</p>
+        <p className="mt-1 text-small text-stone-600">
+          {latest !== null ? `v${latest} is the only version.` : "There is one version."} When the authors send the next one, what changed shows here.
+        </p>
+      </div>
+    ) : changesOpened ? (
       <ChangesTab recordId={record.id} versions={versions} threads={tw.threads.sent}
         onShowInPaper={showChange} onOpenThread={tw.openThread} />
     ) : null,
     details,
   };
-  const panel = (name: Tab) => name === sideTab || (name === "changes" && !comparable) ? null : (
+  const panel = (name: Tab) => name === sideTab ? null : (
     <div key={name} role="tabpanel" id={`${ids}-${name}`} aria-labelledby={`${ids}-tab-${name}`} hidden={shown !== name} className="p-4">
       {body[name]}
     </div>
@@ -429,17 +442,12 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             {allTabs.map(panel)}
           </div>
           <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {record.review_claim
+            <ReviewFooterActions record={record} can={can} actions={FOOTER_ACTIONS} onChanged={onChanged}
+              finishing={finishing && !record.review_claim && !unopened} onFinish={tw.finish}
+              lead={record.review_claim
                 ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
-                : unopened && <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button>}
-              {finishing && !record.review_claim && !unopened && (
-                <button type="button" onClick={tw.finish} className={cn(PILL_PRIMARY, FOCUS_RING)}>Finish review…</button>
-              )}
-              <ReviewActionBar record={record} can={can} actions={finishing ? FINISH_FOOTER_ACTIONS : FOOTER_ACTIONS} onChanged={onChanged}
-                primary={!finishing && !unopened && !record.review_claim} className="contents" />
-            </div>
-            {claimError && <p role="alert" className="mt-2 text-small text-brand">{claimError}</p>}
+                : unopened ? <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button> : undefined} />
+            {claimError && <p role="alert" className="basis-full text-small text-brand">{claimError}</p>}
           </YourPartFooter>
         </section>
         {sideTab && (

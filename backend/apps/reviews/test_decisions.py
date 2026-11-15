@@ -672,14 +672,30 @@ class EmbargoAtDecisionTests(DecisionTestBase):
 
         self.assertIsNone(self.detail(record, self.itso)["decision"]["embargo"])
 
-    def test_an_embargoed_paper_offers_no_publish(self):
-        for name, prepare in {"undated": lambda r: r, "dated": self.dated}.items():
+    def test_an_embargoed_paper_offers_publish_held_with_the_reason(self):
+        # IR-1139: shown so RDCO sees why it waits, held with the refusal's
+        # own words. Publishing it is still refused (the next test).
+        cases = {"undated": (lambda r: r, "Under embargo. Release the embargo, then publish."),
+                 "dated": (self.dated, "Under embargo until 01 Jan 2099. Release the embargo, then publish.")}
+        for name, (prepare, words) in cases.items():
             with self.subTest(name):
                 record = prepare(self.at_rdco())
 
-                flag = self.detail(record, self.rdco)["decision"]
+                detail = self.detail(record, self.rdco)
+                flag = detail["decision"]
 
-                self.assertEqual(flag["outcomes"], ["keep_unlisted", "reject"])
+                self.assertEqual(flag["outcomes"], ["publish", "keep_unlisted", "reject"])
+                self.assertEqual(flag["blocked_outcomes"], {"publish": words})
+                self.assertIn("accept_publish", detail["capabilities"])
+
+    def test_a_released_paper_holds_nothing_back(self):
+        record = self.at_rdco()
+        released_embargo(record.pk)
+
+        flag = self.detail(record, self.rdco)["decision"]
+
+        self.assertEqual(flag["outcomes"], ["publish", "keep_unlisted", "reject"])
+        self.assertEqual(flag["blocked_outcomes"], {})
 
     def test_publishing_an_embargoed_paper_is_refused_and_says_why(self):
         cases = {"undated": (lambda r: r, "Under embargo. Release"),

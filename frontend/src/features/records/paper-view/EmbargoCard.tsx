@@ -121,10 +121,7 @@ export function EmbargoCard({ record, onChanged, today = manilaToday() }: Embarg
       <ReleaseDialog
         open={dialog === "release"}
         title="Release this embargo?"
-        message={
-          `Its text can then be sent to outside AI companies, unless an IP mark or missing consent ` +
-          `still holds it back, and this ${CANNOT_BE_UNDONE}.`
-        }
+        message={RELEASE_EMBARGO_MESSAGE}
         act={() => recordsApi.releaseEmbargo(record.id)}
         onCancel={() => setDialog(null)}
         onReleased={() => done()}
@@ -152,6 +149,11 @@ function setLabel(embargo: RecordEmbargo): string {
   return embargo.until ? "Change date" : "Add review date";
 }
 
+/** What releasing an embargo does, as the Overview card and the review footer ask it (IR-1139). */
+export const RELEASE_EMBARGO_MESSAGE =
+  `Its text can then be sent to outside AI companies, unless an IP mark or missing consent ` +
+  `still holds it back, and this ${CANNOT_BE_UNDONE}.`;
+
 interface ReleaseDialogProps {
   open: boolean;
   title: string;
@@ -163,7 +165,7 @@ interface ReleaseDialogProps {
   onRefused: () => void;
 }
 
-function ReleaseDialog({ open, title, message, act, onCancel, onReleased, onRefused }: ReleaseDialogProps) {
+export function ReleaseDialog({ open, title, message, act, onCancel, onReleased, onRefused }: ReleaseDialogProps) {
   const [releasing, setReleasing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

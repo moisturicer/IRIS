@@ -39,11 +39,13 @@ export function YourPartFooter({ id, part, hasFacts, onShowFacts, footerRef, chi
 }) {
   return (
     <footer ref={footerRef} id={id} className="review-pane-foot" aria-label="Your part">
-      <div className="flex items-start gap-3">
-        <span aria-hidden className={cn("review-mb-ic", (CIRCLE[part.icon] ?? CIRCLE["fa-circle-info"]).tone)}>
+      {/* One row, as the prototype's merge box: who-and-what on the left, the
+          actions on the right, wrapping under it in a narrow pane (IR-1139). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span aria-hidden className={cn("review-mb-ic self-start", (CIRCLE[part.icon] ?? CIRCLE["fa-circle-info"]).tone)}>
           <i className={cn("fas", (CIRCLE[part.icon] ?? { glyph: part.icon }).glyph)} />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           <p className="text-small font-semibold text-stone-900">{part.heading}</p>
           {part.line && <p className="text-2xs text-stone-600">{part.line}</p>}
           {hasFacts && (
@@ -53,8 +55,8 @@ export function YourPartFooter({ id, part, hasFacts, onShowFacts, footerRef, chi
             </button>
           )}
         </div>
+        {children}
       </div>
-      {children}
     </footer>
   );
 }
