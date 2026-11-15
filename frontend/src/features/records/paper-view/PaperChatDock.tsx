@@ -510,7 +510,15 @@ function LegacyPaperChatPanel({
         <CitationOriginContext.Provider value="paper-chat">
         <CitationConversationContext.Provider value={conversationId}>
           {messages.map((m) => (
-            <ChatMessageBubble key={m.id} message={m} compact retryDisabled={busy || !ready} />
+            <ChatMessageBubble
+              key={m.id}
+              message={m}
+              compact
+              retryDisabled={busy || !ready}
+              controlsDisabled={busy || !ready}
+              onAskAgain={(question) => void sendQuestion(question, widen)}
+              onEdit={chooseStarter}
+            />
           ))}
 
           {busy && streaming && <StreamingMessageBubble state={streaming} compact onStop={() => void cancel()} />}

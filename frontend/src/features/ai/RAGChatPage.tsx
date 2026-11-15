@@ -356,6 +356,13 @@ function LegacyRAGChatPage() {
     addToast({ type: "info", message: "Chat removed." });
   };
 
+  // Edit fills the composer; nothing is sent until the reader submits (IR-1162).
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const handleEditQuestion = (question: string) => {
+    client.setDraft(question);
+    composerRef.current?.focus();
+  };
+
   const handleRetry = async (message: ChatMessage) => {
     try {
       await client.retry(message);
@@ -469,6 +476,8 @@ function LegacyRAGChatPage() {
               onSuggestion={client.send}
               indexedRecords={status?.indexed_records ?? null}
               onRetry={handleRetry}
+              onAskAgain={client.send}
+              onEdit={handleEditQuestion}
               onStop={() => void client.stop()}
               selectedId={selected?.id ?? null}
               anchorTurn={returnTurn}
@@ -481,6 +490,7 @@ function LegacyRAGChatPage() {
           )}
           <ChatInput
             onSend={client.send}
+            textareaRef={composerRef}
             draft={client.draft}
             onDraftChange={client.setDraft}
             disabled={loading || !activeId}

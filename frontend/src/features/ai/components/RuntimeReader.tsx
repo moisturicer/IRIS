@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { activeRun, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import { ChatInput } from "./ChatInput";
+import { QuestionControls } from "./ChatMessageBubble";
 
 const STATES: Record<ReaderRun["state"], string> = {
   queued: "Queued", running: "Research in progress", completed: "Answer ready", cancelled: "Stopped",
@@ -49,6 +50,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
   const generation = useRef(0);
   const pending = useRef<{ question: string; depth: Depth; key: string; conversation?: ReaderConversation }>();
   const sending = useRef(false);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const fail = useCallback(() => setError("IRIS could not connect or is busy. Reconnect to try again."), []);
   const reopen = useCallback(async (id: string, version = generation.current) => {
@@ -143,6 +145,8 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     finally { setBusy(false); }
   };
 
+  const blocked = busy || !!error || !!(run && activeRun(run));
+
   return <div className="flex h-full min-h-0 min-w-0 flex-col bg-canvas">
     <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -152,6 +156,13 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
           const current = item.id === run?.id ? run : item;
           return <article key={item.id} aria-label="Research question" className="min-w-0 space-y-4">
             <p className="font-medium text-stone-900 [overflow-wrap:anywhere]">{item.question}</p>
+            <QuestionControls
+              question={item.question}
+              disabled={blocked}
+              onAskAgain={question => void send(question)}
+              onEdit={question => { setDraft(question); composerRef.current?.focus(); }}
+              className="-ml-2"
+            />
             <ResearchProgress run={current} />
             {turn && <div className="space-y-3">
               <p className="whitespace-pre-wrap leading-relaxed text-stone-800 [overflow-wrap:anywhere]">{turn.answer}</p>
@@ -179,7 +190,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
         className="h-4 w-4 accent-brand" /> Be more thorough
     </label>
     <ChatInput onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
-      maxLength={4000}
+      maxLength={4000} textareaRef={composerRef}
       placeholder={recordId ? "Ask about this paper…" : "Ask about the research corpus…"}
       disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"} />
   </div>;

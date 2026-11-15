@@ -35,6 +35,10 @@ interface ChatMessageListProps {
    * where it is, instead of the transcript's end.
    */
   anchorTurn?:        number | null;
+  /** Send a question again as a new Turn (IR-1162). */
+  onAskAgain?:        (question: string) => void;
+  /** Put a question in the input to change and send (IR-1162). */
+  onEdit?:            (question: string) => void;
 }
 
 export function ChatMessageList({
@@ -49,6 +53,8 @@ export function ChatMessageList({
   selectedId = null,
   onSelectSources,
   anchorTurn = null,
+  onAskAgain,
+  onEdit,
 }: ChatMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
@@ -116,6 +122,9 @@ export function ChatMessageList({
             onRetry={onRetry}
             sourcesSelected={m.id === selectedId}
             onSelectSources={onSelectSources}
+            onAskAgain={onAskAgain}
+            onEdit={onEdit}
+            controlsDisabled={isLoading}
           />
         ))}
         {isLoading && (streaming ? <StreamingMessageBubble state={streaming} onStop={onStop} /> : <AssistantMessageSkeleton />)}

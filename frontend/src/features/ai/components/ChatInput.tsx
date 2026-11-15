@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent, type Ref } from "react";
 import { CHAT_COLUMN } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
 
@@ -16,9 +16,11 @@ interface ChatInputProps {
    */
   draft?: string;
   onDraftChange?: (text: string) => void;
+  /** The text box, for a page to move focus into it (IR-1162). */
+  textareaRef?: Ref<HTMLTextAreaElement>;
 }
 
-export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraftChange, maxLength }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraftChange, maxLength, textareaRef }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
   const text = draft ?? ownText;
   const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
@@ -49,6 +51,7 @@ export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraft
     >
       <div className={`flex gap-2 items-end ${CHAT_COLUMN}`}>
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
