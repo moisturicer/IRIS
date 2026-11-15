@@ -679,7 +679,7 @@ export default function DiscoverPage() {
           <button type="button" onClick={() => setInterestOpen(true)}
             aria-label={interests.classifications.length || interests.psced.length ? "Edit Areas" : "Choose Areas"}
             className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
-            <i className="fas fa-compass text-[12px]" aria-hidden />
+            <i className="fas fa-compass text-label" aria-hidden />
             <span>Areas</span>
           </button>
         )}
@@ -712,7 +712,7 @@ export default function DiscoverPage() {
         {canPublish && (
           <button type="button" onClick={openPublish} aria-label="Publish"
             className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 shrink-0 !px-4 sm:!px-5")}>
-            <i className="fas fa-plus text-[12px]" aria-hidden />
+            <i className="fas fa-plus text-label" aria-hidden />
             <span>Publish</span>
           </button>
         )}

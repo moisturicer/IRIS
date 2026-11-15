@@ -125,7 +125,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
         <span id={valueId} className="truncate">{valueText}</span>
         <i
           className={cn(
-            "fas fa-chevron-down text-[10px] text-stone-500 shrink-0 transition-transform motion-reduce:transition-none",
+            "fas fa-chevron-down text-label text-stone-500 shrink-0 transition-transform motion-reduce:transition-none",
             open && "rotate-180",
           )}
           aria-hidden
@@ -180,7 +180,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
                   )}
                 >
                   <span className="truncate">{option.label}</span>
-                  {selected && <i className="fas fa-check text-brand text-[12px] shrink-0" aria-hidden />}
+                  {selected && <i className="fas fa-check text-brand text-label shrink-0" aria-hidden />}
                 </button>
               );
             })

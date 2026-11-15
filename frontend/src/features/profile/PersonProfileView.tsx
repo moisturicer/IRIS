@@ -200,7 +200,7 @@ function PaperSection({ title, list, onMore }: { title: string; list: ListState<
                 byline={paper.authors.join(", ")}
                 footer={
                   <span className="inline-flex items-center gap-1.5 text-stone-700" title="Accounts that have opened this paper">
-                    <i className="fas fa-eye text-[12px] text-brand" aria-hidden />
+                    <i className="fas fa-eye text-label text-brand" aria-hidden />
                     {paper.views} {paper.views === 1 ? "view" : "views"}
                   </span>
                 }

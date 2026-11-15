@@ -63,7 +63,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
             <span aria-hidden="true" className="text-stone-400">·</span>
           )}
           {record.record_type_name && <span>{record.record_type_name}</span>}
-          {reason && <span aria-label="Why this was suggested" className="inline-flex rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-700">
+          {reason && <span aria-label="Why this was suggested" className="inline-flex rounded-md bg-stone-100 px-1.5 py-0.5 text-label font-medium text-stone-700">
             {reasonLabel(reason)}
           </span>}
         </span>
@@ -80,12 +80,12 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
         <>
           <ResearchOriginBadge origin={record.origin} />
           <span className="inline-flex items-center gap-1.5 text-stone-700" title="Times this record has been opened">
-            <i className="fas fa-eye text-[12px] text-brand" aria-hidden />
+            <i className="fas fa-eye text-label text-brand" aria-hidden />
             {record.access_count} {record.access_count === 1 ? "view" : "views"}
           </span>
           {flags.map((flag) => (
             <span key={flag.key} className="inline-flex items-center gap-1.5 text-stone-800">
-              <i className={cn("fas text-[12px] text-brand", flag.icon)} aria-hidden />
+              <i className={cn("fas text-label text-brand", flag.icon)} aria-hidden />
               <span>{flag.label}</span>
             </span>
           ))}
@@ -119,7 +119,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
                 FOCUS_RING,
               )}
             >
-              <i className="far fa-eye-slash text-[13px]" aria-hidden />
+              <i className="far fa-eye-slash text-small" aria-hidden />
             </button>
           )}
         </>

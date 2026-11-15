@@ -18,7 +18,8 @@ MARK_ANGLE_DEGREES = 45
 MARK_GREY = 0.45  # 0 is black and 1 is white
 MARK_OPACITY = 0.18  # Over white paper this prints about as light as grey 0.9
 MARK_WIDTH_OF_SHORT_SIDE = 1.0
-MARK_STROKE = 0.16  # Of a letter's height
+MARK_STROKE = 0.24  # Of a letter's height
+MARK_GAP = 0.2  # Clear space between letters, of a letter's height, so thick strokes never merge
 
 FOOTER_FONT = "Helvetica"
 FOOTER_GREY = 0.2
@@ -73,32 +74,46 @@ def _single_page(draw, width: float, height: float):
 def _cit_u(pdf) -> float:
     """
     "CIT-U" as stroked lines and arcs, one unit tall, from the origin rightwards.
+    The C and U curve; every stroke ends flat, with no rounded tips.
 
     Shapes rather than a font, so the mark adds no "CIT-U" to the copy's text:
-    copying or searching the copy finds only the paper and its footer. Returns
-    the drawing's width, strokes included.
+    copying or searching the copy finds only the paper and its footer. Letters
+    are spaced by their stroke as well as MARK_GAP, so a thicker stroke widens
+    the word instead of closing it up. Returns the width between the outer
+    edges of the first and last strokes.
     """
+    advance = MARK_STROKE + MARK_GAP  # Added to each letter's own width
     path = pdf.beginPath()
+    x = 0.0
     # C: an open ellipse
-    path.arc(0, 0, 0.7, 1, startAng=50, extent=260)
+    path.arc(x, 0, x + 0.7, 1, startAng=50, extent=260)
+    x += 0.7 + advance
     # I
-    path.moveTo(1.0, 0)
-    path.lineTo(1.0, 1)
+    path.moveTo(x, 0)
+    path.lineTo(x, 1)
+    x += advance
     # T
-    path.moveTo(1.3, 1)
-    path.lineTo(2.0, 1)
-    path.moveTo(1.65, 1)
-    path.lineTo(1.65, 0)
+    path.moveTo(x, 1)
+    path.lineTo(x + 0.7, 1)
+    path.moveTo(x + 0.35, 1)
+    path.lineTo(x + 0.35, 0)
+    x += 0.7 + advance
     # -
-    path.moveTo(2.3, 0.45)
-    path.lineTo(2.7, 0.45)
+    path.moveTo(x, 0.45)
+    path.lineTo(x + 0.4, 0.45)
+    x += 0.4 + advance
     # U: two sides joined by a half ellipse
-    path.moveTo(3.0, 1)
-    path.lineTo(3.0, 0.35)
-    path.arcTo(3.0, 0, 3.7, 0.7, startAng=180, extent=180)
-    path.lineTo(3.7, 1)
+    path.moveTo(x, 1)
+    path.lineTo(x, 0.35)
+    path.arcTo(x, 0, x + 0.7, 0.7, startAng=180, extent=180)
+    path.lineTo(x + 0.7, 1)
     pdf.drawPath(path, stroke=1, fill=0)
-    return 3.7 + MARK_STROKE
+    return x + 0.7 + MARK_STROKE
+
+
+def _cit_u_width() -> float:
+    """What `_cit_u` returns, without drawing: four letters' widths and gaps."""
+    return 0.7 + 0.7 + 0.4 + 0.7 + 4 * (MARK_STROKE + MARK_GAP) + MARK_STROKE
 
 
 def _mark_overlay(width: float, height: float):
@@ -110,16 +125,17 @@ def _mark_overlay(width: float, height: float):
     image, and either hides a mark beneath. Translucent, so the text stays readable.
     """
     def draw(pdf):
-        letter = MARK_WIDTH_OF_SHORT_SIDE * min(width, height) / (3.7 + MARK_STROKE)
+        word = _cit_u_width()
+        letter = MARK_WIDTH_OF_SHORT_SIDE * min(width, height) / word
         pdf.setStrokeGray(MARK_GREY)
         pdf.setStrokeAlpha(MARK_OPACITY)
         pdf.setLineWidth(MARK_STROKE)
-        pdf.setLineCap(1)  # Round
-        pdf.setLineJoin(1)
+        pdf.setLineCap(0)  # Flat ends: strokes stop square where they end
+        pdf.setLineJoin(0)
         pdf.translate(width / 2, height / 2)
         pdf.rotate(MARK_ANGLE_DEGREES)
         pdf.scale(letter, letter)
-        pdf.translate(-(3.7 + MARK_STROKE) / 2 + MARK_STROKE / 2, -0.5)
+        pdf.translate(-word / 2 + MARK_STROKE / 2, -0.5)
         _cit_u(pdf)
 
     return _single_page(draw, width, height)
