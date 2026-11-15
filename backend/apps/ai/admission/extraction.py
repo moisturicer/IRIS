@@ -20,7 +20,13 @@ from apps.ai.extraction.ports import ExtractedDocument
 
 from . import errors, scope
 from .ledger import Request, provider_attempt
-from .limits import NotConfigured, enforcing, read_extraction_price, read_metadata_price
+from .limits import (
+    NotConfigured,
+    enforcing,
+    read_extraction_price,
+    read_metadata_price,
+    selected_extractor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +71,15 @@ class AdmittedExtractor:
             raise _refuse(errors.NOT_CONFIGURED)
         return int(pages)
 
+    @property
+    def extractor_name(self) -> str:
+        return getattr(self._adapter, "extractor_name", None) or selected_extractor()
+
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument:
         if not enforcing():
             raise _refuse(errors.ADMISSION_OFF)
         try:
-            price = read_extraction_price()
+            price = read_extraction_price(self.extractor_name)
         except (NotConfigured, ImproperlyConfigured):
             raise _refuse(errors.NOT_CONFIGURED) from None
         adapter = self._adapter
@@ -88,10 +98,13 @@ class AdmittedExtractor:
             scope.mark_sent(model=adapter.model)
             extracted = adapter.extract(pdf_bytes, filename=filename)
             usage = extracted.usage
-            if usage is not None and usage.credits is not None:
+            credits = None if usage is None else usage.credits
+            if credits is None and usage is not None and usage.pages and price.billed_per_page:
+                credits = usage.pages * price.credits_per_page
+            if credits is not None:
                 scope.report_usage(
                     input_tokens=0, output_tokens=0, model=adapter.model,
-                    cost_usd=price.micros(usage.credits) / 1_000_000,
+                    cost_usd=price.micros(credits) / 1_000_000,
                 )
             return extracted
 

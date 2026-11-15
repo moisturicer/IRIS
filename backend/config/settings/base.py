@@ -674,6 +674,10 @@ AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
 AI_ADMISSION_EXTRACTION_CREDIT_USD = config("AI_ADMISSION_EXTRACTION_CREDIT_USD", default="")
 AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", default="")
 AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", default="")
+# IR-983: Unstructured's flat US$ per page; required only when it reads. No default.
+AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE = config(
+    "AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE", default=""
+)
 # IR-846: LlamaExtract's credits per page, on the same credit price. Required
 # for Publish's LlamaExtract reading only; unset refuses it and Publish falls back.
 AI_ADMISSION_METADATA_CREDITS_PER_PAGE = config("AI_ADMISSION_METADATA_CREDITS_PER_PAGE", default="")
