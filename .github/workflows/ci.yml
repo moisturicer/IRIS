@@ -554,6 +554,15 @@ jobs:
             application/javascript*|text/javascript*) ;;
             *) echo "::error::the pdf.js worker (.mjs) is served as '$type'"; status=1 ;;
           esac
+          # IR-924: every text response nginx answers itself names its charset.
+          for path in / /discover /assets/app.js /assets/missing.js /activate/x /django-admin/; do
+            type=$(curl -s -o /dev/null -w '%{content_type}' "localhost:8080$path" || true)
+            echo "== $path Content-Type: $type"
+            case "$type" in
+              *charset=utf-8*) ;;
+              *) echo "::error::$path is served as '$type', with no charset"; status=1 ;;
+            esac
+          done
           exit $status
 
       # IR-668: the default is deny and the allowlist reads the real client.
