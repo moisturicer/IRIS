@@ -18,6 +18,11 @@ text unseen, closes its open reports, tells the writer in-app with the reason,
 and is audited. **Dismiss** closes the open reports and leaves the comment.
 Whoever acts second on a comment is told it is already handled (409), and
 nothing changes. Who may act is the view's (`IsCommentModerator`).
+
+**Only comments on a paper the moderator can read and that is public now**:
+"a paper that stops being public takes its comments with it", so its comments
+leave the queue and the count, and acting on one is a 404 like a missing one.
+They come back with the paper (review, 2026-11-15).
 """
 
 from __future__ import annotations
@@ -28,10 +33,10 @@ from django.db import transaction
 from django.db.models import Max, Min
 from django.utils import timezone
 
-from core.enums import CommentDeletion, CommentReportReason, CommentReportState
+from core.enums import PUBLICLY_VISIBLE_STATUSES, CommentDeletion, CommentReportReason, CommentReportState
 
-from .models import PublicComment
-from .public_comments import _writer_name, close_reports
+from .models import PublicComment, Record
+from .public_comments import close_reports, writer_name
 
 #: A moderator's reason, like a comment, is plain text.
 REMOVAL_REASON_MAX_LENGTH = 500
@@ -49,14 +54,25 @@ class AlreadyHandled(Exception):
     """409: someone else acted on this comment first."""
 
 
-def queue() -> dict:
+def moderated(user):
+    """Every comment `user` may act on: on a paper they can read that is public now (module note)."""
+    return PublicComment.objects.filter(
+        record__in=Record.objects.visible_to(user).filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES),
+    )
+
+
+def reported(user):
+    """The comments in `user`'s queue: those they may act on with an open report. Also the sidebar's count."""
+    return moderated(user).filter(reports__state=CommentReportState.OPEN).distinct()
+
+
+def queue(user) -> dict:
     """Every comment with an open report, the most recently reported first (module note)."""
     comments = (
-        PublicComment.objects.filter(reports__state=CommentReportState.OPEN)
+        reported(user)
         .annotate(first_reported=Min("reports__created_at"), last_reported=Max("reports__created_at"))
         .select_related("author", "record")
         .order_by("-last_reported", "-pk")
-        .distinct()
     )
     return {"comments": [_row(comment) for comment in comments]}
 
@@ -68,7 +84,7 @@ def _row(comment) -> dict:
     return {
         "id": comment.pk,
         "record": {"id": comment.record_id, "title": comment.record.title},
-        "author_name": _writer_name(comment),
+        "author_name": writer_name(comment),
         "reported_texts": list(dict.fromkeys(r.reported_text for r in reports)),
         "current_text": None if comment.deletion_kind else comment.body,
         "deletion_kind": comment.deletion_kind,
@@ -80,9 +96,9 @@ def _row(comment) -> dict:
     }
 
 
-def _locked(comment_id) -> PublicComment:
+def _locked(user, comment_id) -> PublicComment:
     try:
-        return PublicComment.objects.select_for_update().select_related("record").get(pk=int(comment_id))
+        return moderated(user).select_for_update().select_related("record").get(pk=int(comment_id))
     except (TypeError, ValueError, PublicComment.DoesNotExist):
         raise CommentNotFound from None
 
@@ -94,7 +110,7 @@ def remove(user, comment_id, *, reason) -> None:
         raise CommentError("Say why this comment is removed. The writer is told.")
     if len(text) > REMOVAL_REASON_MAX_LENGTH:
         raise CommentError(f"A reason is at most {REMOVAL_REASON_MAX_LENGTH:,} characters.")
-    comment = _locked(comment_id)
+    comment = _locked(user, comment_id)
     if comment.deletion_kind:
         raise AlreadyHandled("This comment was already removed or deleted.")
     now = timezone.now()
@@ -116,7 +132,7 @@ def remove(user, comment_id, *, reason) -> None:
 
 @transaction.atomic
 def dismiss(user, comment_id) -> None:
-    comment = _locked(comment_id)
+    comment = _locked(user, comment_id)
     closed = close_reports(comment, CommentReportState.DISMISSED, by=user, at=timezone.now())
     if not closed:
         raise AlreadyHandled("This comment's reports were already handled.")

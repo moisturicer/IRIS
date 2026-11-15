@@ -107,14 +107,17 @@ def _owner_ids(record) -> set:
     return set(record.owners.values_list("user_id", flat=True))
 
 
-def _writer_name(comment: PublicComment) -> str:
+def writer_name(comment: PublicComment) -> str:
     if comment.author is None:
         return FORMER_USER
     return comment.author.get_full_name().strip() or UNNAMED_USER
 
 
-def comment_payload(comment: PublicComment, user, owners: set) -> dict:
-    """One comment as `user` reads it. A deleted one is a marker: no name, no text."""
+def comment_payload(comment: PublicComment, user, owners: set, reported: frozenset = frozenset()) -> dict:
+    """
+    One comment as `user` reads it. A deleted one is a marker: no name, no text.
+    `reported` holds the ids of the comments `user` has reported, once each.
+    """
     shared = {
         "id": comment.pk,
         "created_at": comment.created_at.isoformat(),
@@ -127,12 +130,12 @@ def comment_payload(comment: PublicComment, user, owners: set) -> dict:
     mine = comment.author_id is not None and comment.author_id == user.pk
     return {
         **shared,
-        "author_name": _writer_name(comment),
+        "author_name": writer_name(comment),
         "body": comment.body,
         "edited_at": comment.edited_at.isoformat() if comment.edited_at else None,
         "is_author": comment.author_id is not None and comment.author_id in owners,
         "can_edit": mine,
-        "can_report": not mine,
+        "can_report": not mine and comment.pk not in reported,
         "can_remove": is_comment_moderator(user),
     }
 
@@ -147,8 +150,11 @@ def thread(record, user) -> dict:
     _paper(record)
     comments = list(record.public_comments.select_related("author"))
     owners = _owner_ids(record)
+    reported = frozenset(
+        CommentReport.objects.filter(reporter_id=user.pk, comment__record=record).values_list("comment_id", flat=True)
+    )
     return {
-        "comments": [comment_payload(c, user, owners) for c in _shown(comments)],
+        "comments": [comment_payload(c, user, owners, reported) for c in _shown(comments)],
         "count": sum(1 for c in comments if not c.deletion_kind),
     }
 
@@ -246,7 +252,7 @@ def report(record, user, comment_id, *, reason, note=None) -> None:
     if not waiting:
         from apps.notifications.services import notify_comment_reported
 
-        transaction.on_commit(lambda: notify_comment_reported(record, comment, actor=user), robust=True)
+        transaction.on_commit(lambda: notify_comment_reported(record, comment), robust=True)
 
 
 def _notify(record, comment, actor) -> None:

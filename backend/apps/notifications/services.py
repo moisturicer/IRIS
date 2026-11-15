@@ -597,7 +597,7 @@ def notify_comment_replied(record, comment, *, actor):
         _log_failure("notify_comment_replied", record=record)
 
 
-def notify_comment_reported(record, comment, *, actor):
+def notify_comment_reported(record, comment):
     """
     A comment entered the Reported comments queue (IR-691): RDCO hears once,
     on its first open report, bound to the comment so the notice settles when
@@ -607,8 +607,9 @@ def notify_comment_reported(record, comment, *, actor):
     try:
         rdco_role = _role(RoleName.RDCO)
         if rdco_role:
+            # No sender: a notice shows its sender to everyone it reaches, and a report never names its reader.
             Notification.objects.create(
-                sender=actor, broadcast_to_role=rdco_role, record=record,
+                sender=None, broadcast_to_role=rdco_role, record=record,
                 notif_type=NotificationType.objects.get_or_create(name="Comment Reported")[0],
                 message=f'A comment on "{record.title}" was reported. Review it in Reported comments.',
                 **_task_id(TaskKind.COMMENT_REPORT, comment.pk),

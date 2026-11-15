@@ -33,6 +33,14 @@ type Read =
   | { status: "failed"; error: unknown }
   | { status: "ready"; comments: ReportedComment[] };
 
+/** A row the page can draw; anything else is a malformed reply, not a queue (CODING_STANDARDS F1). */
+function isRow(row: unknown): row is ReportedComment {
+  const r = row as ReportedComment | null;
+  return typeof r?.id === "number" && typeof r.record?.title === "string" && typeof r.author_name === "string"
+    && Array.isArray(r.reported_texts) && Array.isArray(r.reasons) && Array.isArray(r.notes)
+    && typeof r.report_count === "number";
+}
+
 const QUOTE = "whitespace-pre-wrap break-words rounded-control border-l-2 border-stone-300 bg-stone-50 px-3 py-2 text-body text-stone-800";
 
 export default function ReportedCommentsPage() {
@@ -49,7 +57,9 @@ export default function ReportedCommentsPage() {
     moderationApi
       .reportedComments({ signal: controller.signal })
       .then(({ data }) => {
-        if (!Array.isArray(data?.comments)) throw new Error("Unexpected reported comments response");
+        if (!Array.isArray(data?.comments) || !data.comments.every(isRow)) {
+          throw new Error("Unexpected reported comments response");
+        }
         setRead({ status: "ready", comments: data.comments });
       })
       .catch((error) => {
@@ -59,7 +69,7 @@ export default function ReportedCommentsPage() {
   }, [attempt]);
 
   /** After any act, success or not: the count and the queue are read again. */
-  const settled = () => {
+  const readAgain = () => {
     queueCountsChanged();
     reload();
   };
@@ -73,7 +83,7 @@ export default function ReportedCommentsPage() {
       addToast({ type: "error", message: errorDetail(err, "The reports could not be dismissed. Please try again.") });
     } finally {
       setDismissing(null);
-      settled();
+      readAgain();
     }
   };
 
@@ -119,12 +129,12 @@ export default function ReportedCommentsPage() {
           send={(reason) => moderationApi.removeComment(removing.id, reason)}
           onClose={() => {
             setRemoving(null);
-            settled();
+            readAgain();
           }}
           onDone={() => {
             setRemoving(null);
             addToast({ type: "success", message: "Comment removed. Its writer was told why." });
-            settled();
+            readAgain();
           }}
         />
       )}
@@ -169,11 +179,6 @@ function ReportedItem({ comment, busy, onRemove, onDismiss }: {
             <p className={QUOTE}>{comment.current_text}</p>
           </>
         )}
-        {comment.deletion_kind && (
-          <p className="text-small italic text-stone-600">
-            {comment.deletion_kind === "writer" ? "Deleted by its writer" : "Removed"}
-          </p>
-        )}
       </div>
 
       <ul className="flex flex-wrap gap-2" aria-label="Reasons">
@@ -190,11 +195,9 @@ function ReportedItem({ comment, busy, onRemove, onDismiss }: {
       )}
 
       <div className="flex flex-wrap justify-end gap-2">
-        {!comment.deletion_kind && (
-          <Button type="button" size="sm" variant="danger" onClick={onRemove} aria-label={`Remove ${who}`}>
-            Remove
-          </Button>
-        )}
+        <Button type="button" size="sm" variant="danger" onClick={onRemove} aria-label={`Remove ${who}`}>
+          Remove
+        </Button>
         <Button
           type="button"
           size="sm"

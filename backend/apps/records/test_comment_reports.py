@@ -104,6 +104,13 @@ class ReportingTests(ReportTestBase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertFalse(CommentReport.objects.exists())
 
+    def test_report_is_no_longer_offered_once_you_have_reported(self):
+        made = self.posted(self.ana)
+        self.reported(self.ben, made["id"])
+
+        self.assertFalse(self.shown(made["id"], self.ben)["can_report"])
+        self.assertTrue(self.shown(made["id"], self.owner)["can_report"])
+
     def test_reporting_twice_succeeds_and_keeps_one_report(self):
         made = self.posted(self.ana)
 
@@ -149,6 +156,8 @@ class ReportingTests(ReportTestBase):
         self.assertEqual(notice.broadcast_to_role.name, RoleName.RDCO)
         self.assertEqual((notice.task_kind, notice.task_id), ("comment_report", made["id"]))
         self.assertIn("Solar dryers for rural farms", notice.message)
+        # A notice names its sender to every RDCO account; a report's must not (review, 2026-11-15).
+        self.assertIsNone(notice.sender)
 
     def test_the_thread_never_says_a_comment_was_reported(self):
         made = self.posted(self.ana)
@@ -413,3 +422,35 @@ class OnAnotherPaperTests(ReportTestBase):
         other = make_paper(self.owner, title="Another paper")
 
         self.assertEqual(self.report(self.ben, made["id"], record=other).status_code, status.HTTP_404_NOT_FOUND)
+
+
+# --- "A paper that stops being public takes its comments with it" -----------------
+
+class PaperLeavesPublicTests(ReportTestBase):
+
+    def setUp(self):
+        super().setUp()
+        self.made = self.posted(self.ana)
+        self.reported(self.ben, self.made["id"])
+        self.paper.pipeline_status = PipelineStatus.IN_REVIEW
+        self.paper.save(update_fields=["pipeline_status"])
+
+    def test_its_reported_comments_leave_the_queue_and_the_count(self):
+        for user in (self.rdco, self.sysadmin):
+            with self.subTest(user=user.email):
+                self.assertEqual(self.rows(user), [])
+                counts = self.as_(user).get(reverse("dashboard-queue-counts")).data
+                self.assertEqual(counts["reported_comments"], 0)
+
+    def test_its_comments_cannot_be_removed_or_dismissed(self):
+        for user in (self.rdco, self.sysadmin):
+            with self.subTest(user=user.email):
+                self.assertEqual(self.remove(user, self.made["id"]).status_code, status.HTTP_404_NOT_FOUND)
+                self.assertEqual(self.dismiss(user, self.made["id"]).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(CommentReport.objects.get().state, CommentReportState.OPEN)
+
+    def test_they_come_back_when_the_paper_is_public_again(self):
+        self.paper.pipeline_status = PipelineStatus.PUBLISHED
+        self.paper.save(update_fields=["pipeline_status"])
+
+        self.assertEqual([row["id"] for row in self.rows()], [self.made["id"]])

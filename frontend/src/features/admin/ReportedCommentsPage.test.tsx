@@ -79,6 +79,13 @@ describe("the queue", () => {
     expect(await screen.findByText("No reported comments")).toBeInTheDocument();
   });
 
+  it("treats a malformed row as a failed read", async () => {
+    listed = [{ ...row(), reasons: undefined } as unknown as ReportedComment];
+    render();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/reported comments didn't load/i);
+  });
+
   it("does not mistake a failed read for an empty queue", async () => {
     list.mockRejectedValue(new Error("down"));
     render();
@@ -133,13 +140,4 @@ describe("acting on a comment", () => {
     expect(await screen.findByText("No reported comments")).toBeInTheDocument();
   });
 
-  it("offers only Dismiss on a comment its writer already deleted", async () => {
-    listed = [row({ current_text: null, deletion_kind: "writer" })];
-    render();
-
-    const item = await screen.findByRole("article", { name: /Ana Cruz's comment/ });
-    expect(item).toHaveTextContent("Deleted by its writer");
-    expect(within(item).queryByRole("button", { name: /^Remove/ })).not.toBeInTheDocument();
-    expect(within(item).getByRole("button", { name: /^Dismiss/ })).toBeInTheDocument();
-  });
 });

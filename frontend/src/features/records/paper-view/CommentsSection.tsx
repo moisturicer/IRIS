@@ -7,7 +7,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { errorDetail } from "@/lib/errorDetail";
-import type { PublicComment, PublicCommentReportReason } from "@/types/records";
+import { queueCountsChanged } from "@/lib/queueCounts";
+import { REPORT_REASON_LABELS, type PublicComment, type PublicCommentReportReason } from "@/types/records";
 
 import { CommentComposer } from "./CommentComposer";
 import { CommentItem, type CommentContext } from "./CommentItem";
@@ -19,12 +20,8 @@ const MAX_COMMENT_LENGTH = 2000;
 
 type ReportReason = PublicCommentReportReason;
 
-const REPORT_REASONS: { value: ReportReason; label: string }[] = [
-  { value: "spam", label: "Spam" },
-  { value: "harassment", label: "Harassment" },
-  { value: "off_topic", label: "Off-topic" },
-  { value: "other", label: "Other" },
-];
+const REPORT_REASONS = (Object.entries(REPORT_REASON_LABELS) as [ReportReason, string][])
+  .map(([value, label]) => ({ value, label }));
 
 /**
  * A reply in a thread, joined to the line that runs down from its parent's
@@ -215,6 +212,8 @@ export function CommentsSection({
       setReportNote("");
       setReportMessage("Comment reported");
       window.setTimeout(() => setReportMessage(null), 3500);
+      // A reader reports a comment once: the thread is read again, so Report leaves its menu.
+      void refresh(true);
     } catch (err) {
       setError(commentError(err, "The comment could not be reported. Please try again."));
     } finally {
@@ -454,11 +453,17 @@ export function CommentsSection({
           recordTitle="Comment on this paper"
           intro="It shows as [removed], and its writer is told in-app, with your reason."
           send={(reason) => moderationApi.removeComment(removing.id, reason)}
-          onClose={() => setRemoving(null)}
+          onClose={() => {
+            // Closed after a refusal too (someone else acted first): the thread and the count are read again.
+            setRemoving(null);
+            queueCountsChanged();
+            void refresh(true);
+          }}
           onDone={() => {
             setRemoving(null);
             setReportMessage("Comment removed");
             window.setTimeout(() => setReportMessage(null), 3500);
+            queueCountsChanged();
             void refresh(true);
           }}
         />

@@ -33,7 +33,7 @@ class ReportedCommentsView(APIView):
     permission_classes = [IsAuthenticated, IsCommentModerator]
 
     def get(self, request):
-        return Response(moderation.queue())
+        return Response(moderation.queue(request.user))
 
 
 class RemoveCommentView(APIView):

@@ -7,7 +7,6 @@ from apps.reviews.models import ResubmissionRequest
 from core.enums import (
     DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
-    CommentReportState,
     PipelineStatus,
     RequestStatus,
     ResubmissionRequestState,
@@ -93,9 +92,9 @@ class QueueCountsView(APIView):
 
     def get(self, request):
         from apps.accounts.models import RoleRequest
-        from .models import PublicComment
+        from .comment_moderation import reported as reported_comments
 
-        reported = PublicComment.objects.filter(reports__state=CommentReportState.OPEN).distinct().count()
+        reported = reported_comments(request.user).count()
         if get_role_name(request.user) not in ADMIN_ROLES:
             return Response({"reported_comments": reported})
         return Response({
