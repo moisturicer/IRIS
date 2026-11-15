@@ -225,9 +225,9 @@ The cap (3) applies outside Paper Chat only. When it removes a hit, the next-ran
 
 Jive Tyler Revalde replaced the runtime's 3-per-paper count with a share of the search's token budget, on 2026-11-15. The goal: a search should be bounded by how much context it is given, not by a fixed number of passages.
 
-- Outside Paper Chat, one paper may fill at most `RUNS_PAPER_SHARE` percent of the budget (default 50, provisional; 0 turns it off). **A paper's section-mates count toward its share.** Its first hit always enters.
+- Outside Paper Chat, one paper may fill at most `RUNS_PAPER_SHARE` percent of the budget (0, off, by default; see below). **A paper's section-mates count toward its share.** Its first hit always enters.
 - **The limit is soft.** Each paper fills up to its share first. Any budget no other paper could use then goes back, in rank order: hits first, then section-mates. A search with only one relevant paper therefore still gets the whole budget.
-- Which percentage is best is being evaluated separately; 50 is a placeholder, not a measurement.
+- **Default off, by measurement (IR-1150).** Replaying selection on hybrid candidates over the proxy tier, every share below 75% lost recall and none gained any; 50% traded about 0.05 single-paper recall for fewer one-paper searches (74% to 60%). Multi-paper questions were too few to measure. Jive Tyler Revalde set the default to 0 (off) on 2026-11-16; the budget alone now bounds a search. Run: `docs/evaluation/runs/2026-11-16-ir1150-paper-share/`.
 
 This supersedes the count cap described in the IR-397 and IR-1055 amendments above.
 

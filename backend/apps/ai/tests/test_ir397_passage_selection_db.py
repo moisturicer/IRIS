@@ -26,7 +26,10 @@ def flooding(n):
     return ("Results", f"flooding observation number {n} in the lower catchment")
 
 
-def test_a_paper_that_outranks_the_rest_still_leaves_room_for_another(research, space):
+def test_a_paper_that_outranks_the_rest_still_leaves_room_for_another(research, space, monkeypatch):
+    # The share is off by default (IR-1150); this checks it when switched on.
+    from ai.research import selection, tools
+    monkeypatch.setattr(tools, "Policy", lambda: selection.Policy(paper_share=50))
     reader = make_user("select-cap@cit.edu")
     verbose = paper("Verbose flood study", {p: [flooding(p)] for p in range(1, 7)})
     other = paper("Short flood note", {1: [("Results", "flooding seen once")]})

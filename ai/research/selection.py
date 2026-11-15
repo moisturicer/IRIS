@@ -22,7 +22,7 @@ class Hit:
 @dataclass(frozen=True)
 class Policy:
     #: Percent of the budget one paper may fill outside Paper Chat, mates included; 0 is unlimited.
-    paper_share: int = 50
+    paper_share: int = 0
     #: Adjacent chunks of one source arrive together, linked.
     join: bool = True
     #: Budget per requested passage, in chunker tokens; 0 is unbudgeted.
