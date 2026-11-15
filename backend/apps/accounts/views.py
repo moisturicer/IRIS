@@ -390,6 +390,11 @@ class ChangePasswordView(APIView):
             serializer.is_valid(raise_exception=True)
             set_password_and_invalidate(user, serializer.validated_data["new_password"], timezone.now())
             create_audit_event(AuditEvent.PASSWORD_CHANGED, user)
+            # The same non-secret notice a reset sends (IR-820, ASVS 2.2.3 and
+            # 2.5.5), so a change made from a stolen session reaches the owner.
+            # After commit, and best effort: it can never undo the change.
+            user_id = user.pk
+            transaction.on_commit(lambda: recovery_service.notify_password_changed(user_id))
         return Response({"detail": "Password changed. Sign in again with your new password.",
                          "code": SessionEndReason.PASSWORD_CHANGED})
 
