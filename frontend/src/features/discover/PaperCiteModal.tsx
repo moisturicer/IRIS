@@ -37,7 +37,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
   };
 
   return (
-    <Modal open={isOpen} onClose={onClose} title="Cite this paper" size="max-w-2xl">
+    <Modal open={isOpen} onClose={onClose} title="Cite this paper" size="lg">
       <div className="space-y-4">
         <p className="text-xs text-stone-500 leading-relaxed line-clamp-2">
           <span className="font-semibold text-stone-700">{record.title}</span>
@@ -51,7 +51,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
               type="button"
               onClick={() => setStyle(option)}
               className={cn(
-                "px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer",
+                "px-3 py-1.5 rounded-card text-xs font-bold transition cursor-pointer",
                 style === option
                   ? "bg-brand text-white"
                   : "bg-stone-100 text-stone-600 hover:bg-stone-200/70",
@@ -63,7 +63,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
         </div>
 
         {/* Citation body */}
-        <pre className="bg-stone-50 border border-stone-200 rounded-lg p-4 text-xs text-stone-800 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-64 overflow-y-auto">
+        <pre className="bg-stone-50 border border-stone-200 rounded-control p-4 text-xs text-stone-800 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-64 overflow-y-auto">
           {citation}
         </pre>
 
@@ -74,7 +74,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
           <button
             type="button"
             onClick={handleCopy}
-            className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-light text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0"
+            className="px-4 py-2 rounded-card bg-brand hover:bg-brand-light text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0"
           >
             <i className={cn("fas text-label", copied ? "fa-check" : "fa-copy")} aria-hidden />
             <span>{copied ? "Copied" : "Copy citation"}</span>

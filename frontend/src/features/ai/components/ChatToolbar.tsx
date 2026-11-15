@@ -30,7 +30,7 @@ export function ChatToolbar({
       {(asDrawers || !historyOpen) && <button
         type="button"
         onClick={onToggleHistory}
-        className={`inline-flex items-center p-2 rounded-lg text-small transition-colors ${touch}
+        className={`inline-flex items-center p-2 rounded-control text-small transition-colors ${touch}
           ${historyOpen
             ? "bg-stone-100 text-stone-800"
             : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"

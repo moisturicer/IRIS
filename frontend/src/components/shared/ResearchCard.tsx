@@ -109,10 +109,10 @@ export function ResearchCard({
       <Link
         to={href}
         className={cn(
-          "rounded-sm hover:text-brand",
+          "rounded-control hover:text-brand",
           COLOUR_TRANSITION,
           STRETCHED_FOCUS_RING,
-          "after:absolute after:inset-0 after:rounded-xl after:content-['']",
+          "after:absolute after:inset-0 after:rounded-card after:content-['']",
         )}
       >
         {titleContent ?? title}
@@ -146,7 +146,7 @@ export function ResearchCard({
     <article
       aria-labelledby={titleId}
       className={cn(
-        "group relative flex flex-col bg-surface rounded-xl border border-stone-200",
+        "group relative flex flex-col bg-surface rounded-card border border-stone-200",
         COLOUR_TRANSITION,
         "hover:border-stone-300 hover:shadow-card-md",
         "focus-within:border-stone-400",

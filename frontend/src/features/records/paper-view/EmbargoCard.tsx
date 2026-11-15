@@ -68,7 +68,7 @@ export function EmbargoCard({ record, onChanged, today = manilaToday() }: Embarg
   return (
     <section
       aria-labelledby={headingId}
-      className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card space-y-3"
+      className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card space-y-3"
     >
       <RailHeading id={headingId}>Embargo</RailHeading>
 
@@ -245,7 +245,7 @@ function SetEmbargoDialog({ open, recordId, embargo, today, onCancel, onSaved }:
       open={open}
       onClose={saving ? STAY_OPEN : close}
       title={dated ? "Change the review date" : active ? "Add a review date" : "Embargo this paper again"}
-      size="max-w-sm"
+      size="sm"
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" className="min-h-11" onClick={close} disabled={saving}>

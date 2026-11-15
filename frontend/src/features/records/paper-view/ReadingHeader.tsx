@@ -103,7 +103,7 @@ export function ReadingHeader({
           `contents` keeps the heading in the tree without a box of its own. */}
       <div className="contents reading-split:flex reading-split:items-center reading-split:gap-2.5 reading-split:min-w-0 reading-split:flex-1">
         {title === null ? (
-          <span aria-hidden className="hidden reading-split:block h-4 w-48 max-w-full rounded bg-stone-200 animate-pulse motion-reduce:animate-none" />
+          <span aria-hidden className="hidden reading-split:block h-4 w-48 max-w-full rounded-control bg-stone-200 animate-pulse motion-reduce:animate-none" />
         ) : title === undefined ? null : (
           <h1
             title={title}
@@ -123,8 +123,7 @@ export function ReadingHeader({
         className={cn(
           // A phone gives it every pixel Back leaves; from reading-split it is
           // as wide as its labels.
-          "relative grid grid-flow-col auto-cols-fr flex-1 min-w-0 p-0.5 rounded-lg bg-stone-200",
-          "shadow-[inset_0_1px_3px_rgb(41_37_36/0.28),inset_0_0_0_1px_rgb(41_37_36/0.07)]",
+          "relative grid grid-flow-col auto-cols-fr flex-1 min-w-0 p-0.5 rounded-control bg-stone-200",
           "reading-split:flex-none reading-split:shrink-0",
         )}
       >
@@ -132,7 +131,7 @@ export function ReadingHeader({
           aria-hidden
           className={cn(
             // One step in from the track's radius, so the two are concentric.
-            "absolute inset-y-0.5 left-0.5 rounded-md bg-brand",
+            "absolute inset-y-0.5 left-0.5 rounded-control bg-brand",
             "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
           )}
           style={{
@@ -151,7 +150,7 @@ export function ReadingHeader({
             tabIndex={section === s ? 0 : -1}
             onClick={() => onSelect(s)}
             className={cn(
-              "relative z-10 min-w-0 truncate px-1.5 reading-split:px-5 rounded-md",
+              "relative z-10 min-w-0 truncate px-1.5 reading-split:px-5 rounded-control",
               CONTROL_SIZE,
               CONTROL_TEXT,
               "transition-colors duration-300",

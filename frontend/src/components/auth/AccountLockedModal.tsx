@@ -56,7 +56,7 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="relative max-h-screen overflow-y-auto bg-white rounded-xl shadow-xl w-full max-w-sm px-8 py-8 text-center"
+        className="relative max-h-screen overflow-y-auto bg-white rounded-dialog shadow-xl w-full max-w-sm px-8 py-8 text-center"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

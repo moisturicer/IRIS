@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
+import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { Input } from "@/components/ui/Input";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
@@ -356,7 +358,7 @@ export function CallsAndConferencesPage() {
               </h2>
               <ol
                 className={cn(
-                  "bg-white rounded-xl border border-stone-200 divide-y divide-stone-200",
+                  "bg-white rounded-card border border-stone-200 divide-y divide-stone-200",
                   group.id === "closed" && "bg-stone-50",
                 )}
               >
@@ -410,30 +412,23 @@ export function CallsAndConferencesPage() {
 
 /** Rows shaped like the board's own, so the page does not jump when it loads. */
 function BoardSkeleton() {
-  const [announce, setAnnounce] = useState(false);
-  // Filled on the next tick so screen readers hear the change (see Skeleton).
-  useEffect(() => setAnnounce(true), []);
-
   return (
-    <div role="status" aria-live="polite" aria-busy="true">
-      <span className="sr-only">{announce ? "Loading calls and conferences…" : ""}</span>
-      <div aria-hidden="true">
-        <div className="h-5 w-48 rounded bg-stone-200 mb-3 animate-pulse motion-reduce:animate-none" />
-        <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-200">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex gap-4 p-card-compact md:p-card">
-              <div className="w-14 sm:w-16 h-20 shrink-0 rounded-lg bg-stone-100 animate-pulse motion-reduce:animate-none" />
-              <div className="flex-1 space-y-2.5 pt-1">
-                <div className="h-3 w-28 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-                <div className="h-5 w-3/4 rounded bg-stone-200 animate-pulse motion-reduce:animate-none" />
-                <div className="h-3 w-1/2 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-                <div className="h-3 w-5/6 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-              </div>
-              <div className="hidden sm:block w-28 h-7 rounded-full bg-stone-100 animate-pulse motion-reduce:animate-none" />
+    <LoadingRegion label="Loading calls and conferences…">
+      <SkeletonBlock tone="strong" className="h-5 w-48 mb-3" />
+      <div className="bg-white rounded-card border border-stone-200 divide-y divide-stone-200">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex gap-4 p-card-compact md:p-card">
+            <SkeletonBlock className="w-14 sm:w-16 h-20 shrink-0" />
+            <div className="flex-1 space-y-2.5 pt-1">
+              <SkeletonBlock className="h-3 w-28" />
+              <SkeletonBlock tone="strong" className="h-5 w-3/4" />
+              <SkeletonBlock className="h-3 w-1/2" />
+              <SkeletonBlock className="h-3 w-5/6" />
             </div>
-          ))}
-        </div>
+            <SkeletonBlock shape="pill" className="hidden sm:block w-28 h-7" />
+          </div>
+        ))}
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

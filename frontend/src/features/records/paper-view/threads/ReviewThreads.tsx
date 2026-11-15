@@ -135,9 +135,9 @@ export function ReviewThreads(props: ReviewThreadsProps) {
 
       {threads.drafts.length > 0 && (
         <section aria-label="Your drafts" className="space-y-2">
-          <p className="flex justify-between gap-2 text-2xs font-semibold uppercase tracking-wider text-stone-600">
-            <span>Your drafts</span>
-            <span className="normal-case tracking-normal font-normal">Only you see these until you finish</span>
+          <p className="flex flex-wrap items-baseline gap-x-2 text-small">
+            <span className="font-semibold text-stone-900">Your drafts</span>
+            <span className="text-2xs text-stone-600">Only you see these until you finish</span>
           </p>
           {threads.drafts.map((t) => <ThreadItem key={t.root.id} thread={t} {...props} />)}
         </section>
@@ -148,7 +148,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
           {filter === "resolved" ? "Resolved threads stay here, in the record's history." : "No threads here."}
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {shown.map((t) => <ThreadItem key={t.root.id} thread={t} {...props} />)}
         </div>
       ))}
@@ -204,14 +204,21 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
   const now = props.focus?.id === root.id;
   const otherSeverity: ThreadSeverity = root.severity === "must_fix" ? "suggestion" : "must_fix";
 
+  // Whether the foot has anything to hold: the box draws no empty foot.
+  const anyAction = root.can_answer || root.can_resolve || root.can_reopen
+    || (root.can_change_severity && Boolean(root.severity)) || canReply || root.can_delete;
+
+  // The same box as the Conversation's comments (IR-1131): who and which
+  // party in its head, the passage and what was said in its body, and the
+  // actions in its foot. A draft's box is dashed.
   return (
     <article
       id={threadDomId(root.id)}
       tabIndex={-1}
       aria-labelledby={`${ids}-h`}
-      className={cn("rounded-lg border border-stone-200 bg-white px-3 py-3 space-y-2", FOCUS_RING)}
+      className={cn("review-box", root.is_draft && "review-box-draft", FOCUS_RING)}
     >
-      <header className="flex flex-wrap items-center gap-2">
+      <header className="review-box-head">
         <h4 id={`${ids}-h`} className="sr-only">
           {pinWords(thread)}{root.party_label ? `, ${root.party_label}` : ""}
         </h4>
@@ -219,17 +226,24 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           "inline-grid place-items-center min-w-5 h-5 px-1 rounded-full text-label font-semibold",
           root.is_draft || root.state !== "open" ? "bg-white text-pen ring-1 ring-pen" : "bg-pen text-white",
         )}>{thread.pin}</span>
-        {root.party_label && <span className="text-small font-semibold text-stone-900">{root.party_label}</span>}
+        <p>
+          <b>{root.author_name ?? "Someone"}</b>
+          {root.party_label && <> · {root.party_label}</>}
+          {" · "}{formatDate(root.created_at)}{root.edited_at ? " · edited" : ""}
+        </p>
         {root.anchor && (
-          <span className="text-2xs text-stone-600">p.{root.anchor.page} · v{root.anchor.version}</span>
+          <span className="whitespace-nowrap font-semibold text-stone-700">p.{root.anchor.page} · v{root.anchor.version}</span>
         )}
-        <span className="flex-1" />
-        {root.outdated_since != null && <Chip>Outdated since v{root.outdated_since}</Chip>}
+      </header>
+
+      <div className="review-box-body space-y-2">
+      <p className="flex flex-wrap items-center gap-1.5">
         {root.severity && <Chip tone={root.severity === "must_fix" ? "brand" : "quiet"}>{SEVERITY_WORDS[root.severity]}</Chip>}
         {root.is_draft
           ? <Chip><i className="fas fa-pen text-label" aria-hidden />Draft</Chip>
           : status && <Chip tone={root.state === "open" ? "quiet" : "ink"}>{status}</Chip>}
-      </header>
+        {root.outdated_since != null && <Chip>Outdated since v{root.outdated_since}</Chip>}
+      </p>
 
       {root.anchor && (
         <button
@@ -248,15 +262,12 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       {root.suggestion && <SuggestedWording root={root} />}
 
       <div className="text-small text-stone-800">
-        <p className="text-2xs text-stone-600">
-          {root.author_name ?? "Someone"} · {formatDate(root.created_at)}{root.edited_at ? " · edited" : ""}
-        </p>
         <p className="whitespace-pre-wrap break-words">{root.body}</p>
         <MentionedPeople people={root.mentions} />
       </div>
 
       {root.answer && (
-        <p className="rounded bg-stone-50 px-2 py-1.5 text-small text-stone-800">
+        <p className="rounded-control bg-stone-50 px-2 py-1.5 text-small text-stone-800">
           <span className="font-semibold">
             {root.answer.by ?? "The authors"} {root.answer.kind === "addressed" ? "marked it addressed" : "declined it"}:
           </span>{" "}
@@ -294,9 +305,11 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           onSubmit={(note) => act(() => recordsApi.answerThread(id, root.id, { answer: form, note }), "Your answer could not be saved.")}
         />
       )}
+      {error && <p role="alert" className="text-small text-brand">{error}</p>}
+      </div>
 
-      {form === null && (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label={`${pinWords(thread)} actions`}>
+      {form === null && anyAction && (
+        <div className="review-box-foot flex flex-wrap gap-1.5" role="group" aria-label={`${pinWords(thread)} actions`}>
           {root.can_answer && <>
             {root.suggestion && (
               <Button size="sm" variant="outline" disabled={busy}
@@ -334,7 +347,6 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           )}
         </div>
       )}
-      {error && <p role="alert" className="text-small text-brand">{error}</p>}
     </article>
   );
 }
@@ -372,7 +384,7 @@ function SuggestedWording({ root }: { root: ReviewComment }) {
   const ids = useId();
   const check = root.wording_check;
   return (
-    <section aria-labelledby={`${ids}-wording`} className="rounded bg-stone-50 px-2 py-1.5 space-y-0.5">
+    <section aria-labelledby={`${ids}-wording`} className="rounded-control bg-stone-50 px-2 py-1.5 space-y-0.5">
       <p id={`${ids}-wording`} className="text-2xs font-semibold text-stone-600">Suggested wording</p>
       <p className="text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
       {check && (
@@ -508,7 +520,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   };
 
   return (
-    <form onSubmit={submit} aria-label="New comment" className="rounded-lg border border-stone-300 bg-white p-3 space-y-2">
+    <form onSubmit={submit} aria-label="New comment" className="rounded-control border border-stone-300 bg-white p-3 space-y-2">
       <p className="text-2xs text-stone-600">
         {target.kind === "passage"
           ? <>Comment on <b className="text-stone-800">p.{target.passage.page}</b> of v{target.version}</>

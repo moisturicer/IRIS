@@ -65,7 +65,7 @@ export function MentionPicker({ recordId, value, onChange }: {
         {value.length > 0 && (
           <ul aria-label="Mentioning" className="flex flex-wrap gap-1.5">
             {value.map((p) => (
-              <li key={p.id} className="inline-flex items-center gap-1 rounded-lg bg-stone-100 pl-2 text-small text-stone-800">
+              <li key={p.id} className="inline-flex items-center gap-1 rounded-control bg-stone-100 pl-2 text-small text-stone-800">
                 @{p.name}
                 <Button type="button" size="sm" variant="ghost" onClick={() => flip(p)}
                   aria-label={`Stop mentioning ${p.name}`}>
@@ -77,7 +77,7 @@ export function MentionPicker({ recordId, value, onChange }: {
         )}
       </div>
       {open && (
-        <div id={listId} className="rounded-lg border border-stone-200 bg-white p-2 space-y-1.5">
+        <div id={listId} className="rounded-control border border-stone-200 bg-white p-2 space-y-1.5">
           {loaded.state === "loading" && <p className="text-2xs text-stone-600">Loading who you can mention…</p>}
           {loaded.state === "failed" && <p className="text-2xs text-stone-600">The people you can mention couldn&rsquo;t be loaded.</p>}
           {loaded.state === "ready" && loaded.people.length === 0 && (

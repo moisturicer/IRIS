@@ -27,6 +27,22 @@ export default {
   ],
 
   theme: {
+    // Three corner radii (IR-1043; 01-design-system.md "Radius, shadow, spacing").
+    // Named for what the shape is, so a reviewer can say a card has the wrong
+    // one. This REPLACES Tailwind's scale rather than extending it, so `rounded`,
+    // `rounded-lg` and the rest emit no CSS at all; `src/test/radius.test.ts`
+    // names any that come back. `full` is for pills and avatars only.
+    borderRadius: {
+      none:    "0",
+      // Inputs and buttons that are not pills, chips, rows and small controls.
+      control: "0.75rem",
+      // Cards and panels.
+      card:    "1rem",
+      // Modals, sheets and the dialogs' bottom sheet.
+      dialog:  "1.25rem",
+      full:    "9999px",
+    },
+
     extend: {
       // A phone too narrow for register's three folder tabs to carry their
       // names (IR-711): below 390px they overran a 320 or 360px screen, so
@@ -42,6 +58,12 @@ export default {
       // The one cap for an app page (IR-519): PageContainer's "standard" width.
       maxWidth: {
         page: "90rem",
+        // The four dialog widths (IR-1043): `Modal`'s `size` names one of these,
+        // so a width is a word and not a class. `xl` is Publish's two-pane step.
+        "dialog-sm": "24rem",
+        "dialog-md": "32rem",
+        "dialog-lg": "45rem",
+        "dialog-xl": "1180px",
       },
       colors: {
         // Surface roles (IR-558; 01-design-system.md section 0). Three
@@ -154,13 +176,6 @@ export default {
         "card-compact": "1rem",
         // The sidebar's icon rail (IR-1086): `w-rail`, `md:ml-rail`.
         rail:           "76px",
-      },
-
-      borderRadius: {
-        DEFAULT: "0.5rem",
-        lg:      "0.75rem",
-        xl:      "1rem",
-        "2xl":   "1.25rem",
       },
 
       boxShadow: {

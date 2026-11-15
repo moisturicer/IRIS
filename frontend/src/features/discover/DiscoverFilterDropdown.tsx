@@ -113,7 +113,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "inline-flex h-11 items-center gap-1.5 px-3.5 rounded-lg border text-small font-medium",
+          "inline-flex h-11 items-center gap-1.5 px-3.5 rounded-control border text-small font-medium",
           COLOUR_TRANSITION,
           FOCUS_RING,
           block ? "w-full justify-between" : "max-w-[18rem]",
@@ -140,7 +140,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
           aria-label={name}
           aria-multiselectable={props.multi || undefined}
           className={cn(
-            "max-h-64 overflow-y-auto bg-white rounded-xl border border-stone-200 py-1.5",
+            "max-h-64 overflow-y-auto bg-white rounded-card border border-stone-200 py-1.5",
             inline ? "mt-2 w-full" : "absolute left-0 top-full mt-2 w-64 shadow-card-md z-50",
           )}
         >

@@ -7,8 +7,8 @@ import { seatsApi } from "@/api/reviews";
 import { errorDetail } from "@/lib/errorDetail";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { seatToOpen } from "@/features/records/capabilities";
-import { cn } from "@/lib/utils";
-import type { RecordTracker } from "@/types/records";
+import { cn, formatDate } from "@/lib/utils";
+import type { RecordTracker, RecordVersion } from "@/types/records";
 
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
@@ -71,6 +71,22 @@ function readSideTab(): Tab | null {
   }
 }
 
+/**
+ * Who sent the Version under review, and when, as a pull request says who
+ * opened it (IR-1131): "Ana Cruz sent v2 · Nov 3, 2026". The name and date
+ * are the server's; with no name, the Version alone.
+ */
+function SentBy({ version }: { version: RecordVersion }) {
+  const verb = version.cause === "submission" ? "submitted" : "sent";
+  return (
+    <>
+      {version.created_by_name ? <><b>{version.created_by_name}</b> {verb} v{version.number}</> : <>v{version.number} {verb}</>}
+      {" · "}
+      <time dateTime={version.created_at}>{formatDate(version.created_at)}</time>
+    </>
+  );
+}
+
 export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, onChanged, onDocuments, onOpenReview, onShowVersion }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
@@ -84,6 +100,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const [claimError, setClaimError] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [routed, setRouted] = useState("");
+  // The Conversation tab's count (IR-1131): comments and replies sent, from the timeline's own read.
+  const [commentCount, setCommentCount] = useState(0);
   const pane = useRef<HTMLElement>(null);
   const launcher = useRef<HTMLButtonElement>(null);
   const ids = useId();
@@ -168,7 +186,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   };
   // Shows a tab wherever it is: its own button, or already in the right column.
   const reveal = (name: Tab) => { if (name !== sideTab) setTab(name); };
-  const latest = versions[versions.length - 1]?.number ?? null;
+  const latestVersion = versions[versions.length - 1] ?? null;
+  const latest = latestVersion?.number ?? null;
   // A reviewer looking again at a new Version reads the response it was
   // submitted with first (ADR-032 §7, IR-876): once per letter, so a later
   // tab choice is the reviewer's own.
@@ -247,7 +266,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   // Shown in the pane's header, and beside the launcher while a narrow window
   // keeps the pane closed, so a first visit sees it either way.
   const offer = (
-    <div role="group" aria-label="Guided tour" className="w-full rounded-lg border border-stone-300 bg-white p-3">
+    <div role="group" aria-label="Guided tour" className="w-full rounded-control border border-stone-300 bg-white p-3">
       <p className="text-small text-stone-800">New to the Review workspace? Take a short tour of its main parts.</p>
       <div className="mt-2 flex gap-2">
         <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} onClick={() => startTour(tourOpener())}>Start tour</button>
@@ -312,10 +331,14 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   };
   // What each tab holds. A tab is mounted wherever it is shown -- its place in
   // the pane, or the right column -- so choosing it there moves it (IR-1094).
+  // The first Version opens the timeline as its own box, as a pull request opens with its description.
+  const first = versions[0];
+  const submission = first ? { author: first.created_by_name, at: first.created_at, abstract: record.abstract ?? "" } : undefined;
   const body: Record<Tab, ReactNode> = {
     conversation: (
       <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
-        onCommented={tw.threads.reload} renderStatus={renderDetails} />
+        onCommented={tw.threads.reload} renderStatus={renderDetails} submission={submission} statusBox
+        onLoaded={(data) => setCommentCount((data.review_comments ?? []).filter((c) => !c.is_draft).length)} />
     ),
     threads: <ReviewThreads {...tw.panel} />,
     changes: comparable && changesOpened ? (
@@ -346,24 +369,26 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           className={cn("review-pane", open && "review-pane-open")}>
           {!drawer && reader && edge("mid", "Resize the review pane")}
           <header className="review-pane-head">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                {record.current_holders.length > 0 && (
-                  <p className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-surface px-2 py-0.5 text-2xs font-semibold text-brand">
-                    <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
-                    With {record.current_holders.map((h) => h.label).join(", ")}
-                  </p>
-                )}
-                <h2 className="font-display text-xl font-semibold text-stone-900 mt-1">Review</h2>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <button ref={tourButton} type="button" className={cn("review-control whitespace-nowrap text-brand", FOCUS_RING)}
-                  onClick={(e) => startTour(e.currentTarget)}>Take a tour</button>
-                {drawer && <button type="button" className={cn("review-control whitespace-nowrap text-brand", FOCUS_RING)}
-                  onClick={closeDrawer}>Back to paper</button>}
-              </div>
+            <div className="-mr-2 flex items-center gap-1">
+              <h2 className="mr-auto font-display text-xl font-semibold text-stone-900">Review</h2>
+              <button ref={tourButton} type="button"
+                className={cn("review-control inline-flex items-center gap-1.5 whitespace-nowrap font-semibold text-stone-700 hover:text-brand", FOCUS_RING)}
+                onClick={(e) => startTour(e.currentTarget)}>
+                <i className="fas fa-circle-question text-xs" aria-hidden />Take a tour
+              </button>
+              {drawer && <button type="button"
+                className={cn("review-control inline-flex items-center gap-1.5 whitespace-nowrap font-semibold text-stone-700 hover:text-brand", FOCUS_RING)}
+                onClick={closeDrawer}><i className="fas fa-arrow-left text-xs" aria-hidden />Back to paper</button>}
             </div>
-            {offered && <div className="mt-3">{offer}</div>}
+            {(record.current_holders.length > 0 || latestVersion) && (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                {record.current_holders.length > 0 && (
+                  <p className="review-holder">With {record.current_holders.map((h) => h.label).join(", ")}</p>
+                )}
+                {latestVersion && <p className="review-meta"><SentBy version={latestVersion} /></p>}
+              </div>
+            )}
+            {offered && offer}
             <div className="flex items-center justify-between gap-2">
               <div role="tablist" id={target.tabs} aria-label="Review pane sections" onKeyDown={(e) => {
                 if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
@@ -377,12 +402,20 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
                 {tabs.map((name) => (
                   <button key={name} type="button" role="tab" id={`${ids}-tab-${name}`}
                     aria-selected={shown === name} aria-controls={`${ids}-${name}`} tabIndex={shown === name ? 0 : -1}
+                    aria-describedby={name === "conversation" && commentCount > 0 ? `${ids}-comment-count` : undefined}
                     onClick={() => setTab(name)} className={cn("review-tab", FOCUS_RING)}>
                     {TAB_NAMES[name]}
-                    {name === "threads" && tw.count && <>{" "}<span className="ml-1 text-2xs font-normal text-stone-600">{tw.count}</span></>}
+                    {name === "threads" && tw.count && <>{" "}<span className="review-count">{tw.count}</span></>}
+                    {/* The number shows; the tab's name stays "Conversation" and the count is its description. */}
+                    {name === "conversation" && commentCount > 0 && <span aria-hidden className="review-count">{commentCount}</span>}
                   </button>
                 ))}
               </div>
+              {commentCount > 0 && (
+                <span id={`${ids}-comment-count`} className="sr-only">
+                  {commentCount} comment{commentCount === 1 ? "" : "s"}
+                </span>
+              )}
               {roomy && <TabBesideMenu choices={tabs.map((t) => ({ id: t, label: TAB_NAMES[t] }))}
                 onChoose={chooseSide} />}
             </div>

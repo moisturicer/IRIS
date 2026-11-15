@@ -105,7 +105,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
               <label
                 key={type.id}
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-xl border p-card-compact transition-colors duration-150 motion-reduce:transition-none",
+                  "flex cursor-pointer items-start gap-3 rounded-card border p-card-compact transition-colors duration-150 motion-reduce:transition-none",
                   "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand has-[:focus-visible]:ring-offset-2",
                   checked ? SELECTED : "border-stone-200 bg-white hover:border-stone-400",
                   uploading && "cursor-not-allowed opacity-60",
@@ -142,7 +142,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
 
       <section aria-labelledby="publish-manuscript-heading">
         {exactMatches.length > 0 && (
-          <div role="alert" className="rounded-lg border border-stone-300 bg-surface p-4">
+          <div role="alert" className="rounded-card border border-stone-300 bg-surface p-4">
             <p className="font-semibold">This manuscript is already attached to a record you can read.</p>
             <ul className="mt-2 space-y-2">
               {exactMatches.map((match) => <li key={match.id}>
@@ -172,7 +172,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
         </span>
 
         {accepted && (
-          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3">
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-card border border-stone-200 bg-white px-4 py-3">
             <i className="fas fa-file-pdf text-xl text-stone-600" aria-hidden />
             <p className="min-w-0 flex-1 text-body text-stone-800">
               <i className="fas fa-circle-check mr-1.5 text-stone-900" aria-hidden />

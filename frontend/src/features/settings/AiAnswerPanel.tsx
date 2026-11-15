@@ -125,7 +125,7 @@ export function AiAnswerPanel() {
 
       {phase === "ready" && (
         <div className="space-y-4">
-          <div className="rounded-lg border border-stone-200 p-4" role="group" aria-label="Your answer">
+          <div className="rounded-control border border-stone-200 p-4" role="group" aria-label="Your answer">
             <p className="text-body font-semibold text-stone-900">
               {current === true && "Yes, AI may use your papers"}
               {current === false && "No, AI doesn't use your papers"}
@@ -149,7 +149,7 @@ export function AiAnswerPanel() {
             </div>
           ) : (
             <div
-              className="rounded-lg border border-stone-200 p-4 space-y-4"
+              className="rounded-control border border-stone-200 p-4 space-y-4"
               role="group"
               aria-label={next ? "Change your answer to Yes" : "Change your answer to No"}
             >

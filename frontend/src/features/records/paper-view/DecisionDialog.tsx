@@ -27,7 +27,7 @@ const CONFIRM: Record<DecisionOutcome, { label: string; done: string }> = {
 };
 
 /** RDCO's warnings: the executive Decision, and an embargo (ADR-047, ADR-052 §14). */
-const WARNING_CALLOUT = "rounded-lg border border-stone-300 bg-surface p-3 text-small text-brand";
+const WARNING_CALLOUT = "rounded-control border border-stone-300 bg-surface p-3 text-small text-brand";
 
 /**
  * Why RDCO isn't offered *Publish* (ADR-052 §14 as amended, IR-882): an

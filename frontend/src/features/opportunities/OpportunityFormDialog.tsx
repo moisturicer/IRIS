@@ -138,7 +138,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
       open
       sheet
       displayTitle
-      size="md:max-w-2xl"
+      size="lg"
       title={editing ? "Edit call" : "Post a call"}
       onClose={saving ? STAY_OPEN : onClose}
       footer={

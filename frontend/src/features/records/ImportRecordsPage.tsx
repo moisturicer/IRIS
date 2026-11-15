@@ -34,7 +34,7 @@ export default function ImportRecordsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Instructions */}
-        <div className="bg-white rounded-xl border border-stone-200 p-6">
+        <div className="bg-white rounded-card border border-stone-200 p-6">
           <p className="text-body font-semibold text-stone-800 mb-3 flex items-center gap-2">
             <i className="fas fa-info-circle text-brand" aria-hidden /> Instructions
           </p>
@@ -51,12 +51,12 @@ export default function ImportRecordsPage() {
         </div>
 
         {/* Upload */}
-        <div className="bg-white rounded-xl border border-stone-200 p-6">
+        <div className="bg-white rounded-card border border-stone-200 p-6">
           <p className="text-body font-semibold text-stone-800 mb-3 flex items-center gap-2">
             <i className="fas fa-file-upload text-brand" aria-hidden /> Upload Spreadsheet
           </p>
           <label
-            className="block border-2 border-dashed border-stone-200 rounded-xl p-6 text-center cursor-pointer hover:border-brand transition-colors"
+            className="block border-2 border-dashed border-stone-200 rounded-card p-6 text-center cursor-pointer hover:border-brand transition-colors"
           >
             <i className="fas fa-cloud-upload-alt text-3xl text-stone-300 mb-2" aria-hidden />
             <p className="text-body font-semibold text-stone-600">
@@ -87,7 +87,7 @@ export default function ImportRecordsPage() {
       </div>
 
       {/* Log */}
-      <div className="bg-white rounded-xl border border-stone-200 p-6">
+      <div className="bg-white rounded-card border border-stone-200 p-6">
         <p className="text-body font-semibold text-stone-800 mb-3 flex items-center gap-2">
           <i className="fas fa-terminal text-brand" aria-hidden /> Import Log
         </p>
@@ -96,7 +96,7 @@ export default function ImportRecordsPage() {
           aria-label="Import log"
           rows={8}
           value={log}
-          className="w-full font-mono text-small bg-stone-50 border border-field rounded-lg p-3 text-stone-600 resize-y"
+          className="w-full font-mono text-small bg-stone-50 border border-field rounded-control p-3 text-stone-600 resize-y"
         />
       </div>
     </div>

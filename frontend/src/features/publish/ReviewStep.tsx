@@ -108,7 +108,7 @@ export function ReviewStep({
         </Row>
       </Group>
 
-      {exactMatches.length > 0 && <section role="alert" className="rounded-lg border border-stone-300 bg-surface p-4">
+      {exactMatches.length > 0 && <section role="alert" className="rounded-card border border-stone-300 bg-surface p-4">
         <h3 className="font-semibold">Identical manuscript</h3>
         <p>Choose another file or open the matching record.</p>
         <ul>{exactMatches.map((match) => <li key={match.id}>
@@ -117,7 +117,7 @@ export function ReviewStep({
           </Link>
         </li>)}</ul>
       </section>}
-      {likelyMatches.length > 0 && <section aria-labelledby="publish-likely-heading" className="rounded-lg border border-stone-200 p-4">
+      {likelyMatches.length > 0 && <section aria-labelledby="publish-likely-heading" className="rounded-control border border-stone-200 p-4">
         <h3 id="publish-likely-heading" className="font-semibold">Likely manuscript matches</h3>
         <p>Review these readable records before submitting. A match is a warning, not a plagiarism finding.</p>
         <ul className="mt-2 list-disc pl-5">{likelyMatches.map((match) => <li key={match.id}>
@@ -128,13 +128,13 @@ export function ReviewStep({
           {matchesAcknowledged ? "Matches acknowledged" : "Acknowledge matches"}
         </button>
       </section>}
-      {matchFailure && <div role="alert" className="rounded-lg border border-stone-300 bg-surface p-4">
+      {matchFailure && <div role="alert" className="rounded-card border border-stone-300 bg-surface p-4">
         <p>{matchFailure}</p>
         <button type="button" onClick={onCheckAgain} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-2 min-h-9 px-4")}>Check again</button>
       </div>}
 
       {failure && (
-        <div role="alert" className="rounded-lg border border-stone-300 bg-surface px-4 py-3 text-body text-brand">
+        <div role="alert" className="rounded-card border border-stone-300 bg-surface px-4 py-3 text-body text-brand">
           <p className="flex items-start gap-2">
             <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
             <span>{failure.message}</span>
@@ -184,14 +184,14 @@ function Group({
 }) {
   const id = `publish-review-${title.toLowerCase()}`;
   return (
-    <section aria-labelledby={id} className="rounded-xl border border-stone-200 p-card-compact">
+    <section aria-labelledby={id} className="rounded-card border border-stone-200 p-card-compact">
       <div className="flex items-center justify-between gap-3">
         <h3 id={id} className="text-heading font-semibold text-stone-900">{title}</h3>
         <button
           type="button"
           onClick={onEdit}
           aria-label={editLabel}
-          className={cn("rounded px-1 text-body font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}
+          className={cn("rounded-control px-1 text-body font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}
         >
           Edit
         </button>

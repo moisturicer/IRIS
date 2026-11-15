@@ -16,7 +16,7 @@ interface AccountMenuProps {
 }
 
 const ITEM =
-  `flex min-h-11 md:min-h-0 touch:min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100 hover:text-stone-900 ${COLOUR_TRANSITION} ${FOCUS_RING}`;
+  `flex min-h-11 md:min-h-0 touch:min-h-11 w-full items-center gap-3 rounded-control px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-100 hover:text-stone-900 ${COLOUR_TRANSITION} ${FOCUS_RING}`;
 
 /**
  * The account menu in the sidebar's user block (IR-413, spec §4.2).
@@ -95,7 +95,7 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         // it always begins with what a speech-input user sees (WCAG 2.5.3).
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-stone-100",
+          "flex w-full items-center gap-3 rounded-control p-2 text-left hover:bg-stone-100",
           open && "bg-stone-100",
           collapsed && "md:justify-center md:p-1",
           COLOUR_TRANSITION,
@@ -135,7 +135,7 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         <div
           id={menuId}
           className={cn(
-            "absolute bottom-full left-0 right-0 z-50 mb-2 rounded-lg border border-stone-200 bg-overlay p-1.5 shadow-card-md animate-fade-in motion-reduce:animate-none",
+            "absolute bottom-full left-0 right-0 z-50 mb-2 rounded-control border border-stone-200 bg-overlay p-1.5 shadow-card-md animate-fade-in motion-reduce:animate-none",
             collapsed && "md:bottom-0 md:left-full md:right-auto md:mb-0 md:ml-3 md:w-60",
           )}
         >

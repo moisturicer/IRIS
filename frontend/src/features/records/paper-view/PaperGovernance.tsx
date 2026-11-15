@@ -47,7 +47,7 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
   ];
 
   return (
-    <section aria-labelledby={headingId} className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
+    <section aria-labelledby={headingId} className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card">
       <RailHeading id={headingId} className="mb-3">Institutional Governance</RailHeading>
       <dl className="space-y-2">
         {rows.map((row) => (

@@ -234,7 +234,7 @@ function CollaboratorRail({ list, onMore }: { list: ListState<Collaborator>; onM
             <li
               key={person.id}
               className={cn(
-                "relative flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-stone-100 focus-within:bg-stone-100",
+                "relative flex min-h-11 items-center gap-3 rounded-control px-2 py-1.5 hover:bg-stone-100 focus-within:bg-stone-100",
                 COLOUR_TRANSITION,
               )}
             >
@@ -243,7 +243,7 @@ function CollaboratorRail({ list, onMore }: { list: ListState<Collaborator>; onM
                 <Link
                   to={personPath(person.id)}
                   className={cn(
-                    "block truncate rounded-sm text-body font-semibold text-stone-900 hover:text-brand",
+                    "block truncate rounded-control text-body font-semibold text-stone-900 hover:text-brand",
                     COLOUR_TRANSITION,
                     FOCUS_RING,
                     "after:absolute after:inset-0 after:content-['']",

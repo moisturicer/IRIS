@@ -49,7 +49,7 @@ export function ReasoningBar({ activity, runStartedAt, compact = false }: {
         {elapsed && <span className="font-mono text-label tabular-nums text-stone-400">{elapsed}</span>}
       </div>
       {step && <div key={`${step.kind}:${step.label}`} className="mt-1.5 motion-safe:animate-fade-in-up">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-surface px-2 py-0.5 text-label font-medium text-brand ring-1 ring-stone-300">
+        <span className="inline-flex items-center gap-1.5 rounded-control bg-surface px-2 py-0.5 text-label font-medium text-brand ring-1 ring-stone-300">
           <i className={cn(STEP_ICONS[step.kind], "text-label")} aria-hidden />{step.label}
         </span>
         {step.detail.length > 0 && <ul className="mt-1 space-y-0.5 text-label text-stone-500">

@@ -63,7 +63,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
             <span aria-hidden="true" className="text-stone-400">·</span>
           )}
           {record.record_type_name && <span>{record.record_type_name}</span>}
-          {reason && <span aria-label="Why this was suggested" className="inline-flex rounded-md bg-stone-100 px-1.5 py-0.5 text-label font-medium text-stone-700">
+          {reason && <span aria-label="Why this was suggested" className="inline-flex rounded-control bg-stone-100 px-1.5 py-0.5 text-label font-medium text-stone-700">
             {reasonLabel(reason)}
           </span>}
         </span>
@@ -75,7 +75,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
       summary={abstract ? highlightTerms(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
       summaryClassName={row ? "line-clamp-2" : undefined}
       thumbnail={row && <PaperThumbnail />}
-      footerClassName={row ? undefined : "rounded-b-xl border-stone-200 bg-white"}
+      footerClassName={row ? undefined : "rounded-b-card border-stone-200 bg-white"}
       footer={
         <>
           <ResearchOriginBadge origin={record.origin} />
@@ -100,7 +100,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
             aria-label="Cite this paper"
             title="Cite this paper"
             className={cn(
-              "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50 flex items-center justify-center",
+              "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-control border border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50 flex items-center justify-center",
               COLOUR_TRANSITION,
               FOCUS_RING,
             )}
@@ -114,7 +114,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
               aria-label="Not interested"
               title="Not interested"
               className={cn(
-                "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50 flex items-center justify-center",
+                "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-control border border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50 flex items-center justify-center",
                 COLOUR_TRANSITION,
                 FOCUS_RING,
               )}

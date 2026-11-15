@@ -74,7 +74,7 @@ export function LibraryRecordTable({
         onClick={() => onCite(record)}
         aria-label={`Cite ${record.title}`}
         title="Cite"
-        className="p-1.5 rounded-md text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
+        className="p-1.5 rounded-control text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
       >
         <i className="fas fa-quote-right text-label" aria-hidden />
       </button>
@@ -84,7 +84,7 @@ export function LibraryRecordTable({
           onClick={() => onRemove(record.id)}
           aria-label={`${removeLabel}: ${record.title}`}
           title={removeLabel}
-          className="p-1.5 rounded-md text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
+          className="p-1.5 rounded-control text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
         >
           <i className="fas fa-bookmark text-label" aria-hidden />
         </button>
@@ -103,7 +103,7 @@ export function LibraryRecordTable({
           <span
             key={badge.label}
             className={cn(
-              "px-1.5 py-0.5 rounded text-label font-semibold whitespace-nowrap",
+              "px-1.5 py-0.5 rounded-control text-label font-semibold whitespace-nowrap",
               BADGE_TONE_CLASS[badge.tone],
             )}
           >
@@ -124,7 +124,7 @@ export function LibraryRecordTable({
             <li
               key={record.id}
               className={cn(
-                "group relative flex flex-col rounded-2xl border bg-white p-card-compact transition-[border-color,box-shadow] duration-200 hover:shadow-card-md md:p-card",
+                "group relative flex flex-col rounded-card border bg-white p-card-compact transition-[border-color,box-shadow] duration-200 hover:shadow-card-md md:p-card",
                 selected.has(record.id) ? "border-stone-900" : "border-stone-200",
               )}
             >
@@ -144,7 +144,7 @@ export function LibraryRecordTable({
               <h3 className="mt-2 font-display text-title font-semibold leading-snug text-stone-900">
                 <Link
                   to={`/records/${record.id}`}
-                  className="line-clamp-3 rounded-sm transition-colors group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 after:absolute after:inset-0 after:rounded-2xl after:content-['']"
+                  className="line-clamp-3 rounded-control transition-colors group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 after:absolute after:inset-0 after:rounded-card after:content-['']"
                 >
                   {highlightMatch(record.title, query)}
                 </Link>
@@ -170,7 +170,7 @@ export function LibraryRecordTable({
   }
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+    <div className="bg-white border border-stone-200 rounded-card overflow-hidden">
       {/* Column headings only make sense once the row is actually columnar. */}
       <div
         className={cn(
