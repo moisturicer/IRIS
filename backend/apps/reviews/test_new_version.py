@@ -16,7 +16,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
+from kombu.exceptions import OperationalError
 from rest_framework import status
+from rest_framework.test import APITransactionTestCase
 
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.notifications.models import Notification
@@ -39,6 +41,7 @@ from core.enums import (
     Party,
     PipelineStatus,
     RecordTypeName,
+    RoleName,
     ResubmissionRequestState,
     SeatState,
     VersionCause,
@@ -48,6 +51,7 @@ from core.enums import (
 from .test_decisions import decide_url
 from .test_office_review import detail_url
 from .test_revisions import RevisionTestBase
+from .workflow_test_helpers import make_user
 
 RESTART_ALL = {"RESUBMISSION_POLICY": lifecycle.ResubmissionPolicy.RESTART_ALL}
 
@@ -750,3 +754,92 @@ class WhoMaySubmitTests(NewVersionTestBase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("not in review", response.data["detail"])
+
+
+# --- AC: a saved version is never reported as a failure (IR-1049) ---------------------
+
+class SavedVersionIsReportedSavedTests(APITransactionTestCase):
+    """
+    IR-1049: on the deployed site an owner's v2 was saved, and then the request
+    answered with an error, so the page said it "could not be submitted".
+
+    `submit_new_version` commits, and then its follow-up work runs in the same
+    request: queueing the manuscript's read and its review text, placing the
+    review threads, and telling the reviewers. A `TestCase` never commits, so
+    there that work only runs after the response; here the commit is real, as
+    in production, and a step that fails fails inside the request.
+
+    The helpers are `NewVersionTestBase`'s, borrowed because a `TestCase`
+    subclass cannot commit.
+    """
+
+    make_record = NewVersionTestBase.make_record
+    new_model = NewVersionTestBase.new_model
+    post = NewVersionTestBase.post
+    accept = NewVersionTestBase.accept
+    route = NewVersionTestBase.route
+    seat = NewVersionTestBase.seat
+    accepted_to = NewVersionTestBase.accepted_to
+    opened_seat = NewVersionTestBase.opened_seat
+    ask = NewVersionTestBase.ask
+    asked = NewVersionTestBase.asked
+    thesis = NewVersionTestBase.thesis
+    upload_manuscript = NewVersionTestBase.upload_manuscript
+    submit_version = NewVersionTestBase.submit_version
+    versions = NewVersionTestBase.versions
+
+    def setUp(self):
+        self.owner = make_user("commit-owner@cit.edu", RoleName.STUDENT)
+        self.adviser = make_user("commit-adviser@cit.edu", RoleName.ADVISER)
+        self.rdco = make_user("commit-rdco@cit.edu", RoleName.RDCO)
+        self.ierc = make_user("commit-ierc@cit.edu", RoleName.IERC)
+
+    def ierc_asked_and_revised(self):
+        """IERC asked for a revision and the owner uploaded a revised manuscript."""
+        record = self.thesis(Party.IERC)
+        self.opened_seat(record, Party.IERC, self.ierc)
+        self.asked(record, self.ierc)
+        self.assertEqual(self.upload_manuscript(record).status_code, status.HTTP_200_OK)
+        return record
+
+    def test_with_the_task_queue_down_the_saved_version_is_still_reported_saved(self):
+        record = self.ierc_asked_and_revised()
+
+        down = OperationalError("Error 111 connecting to redis:6379. Connection refused.")
+        with patch("celery.app.task.Task.apply_async", side_effect=down), \
+                self.assertLogs("django.db.backends.base", level="ERROR") as logged:
+            response = self.submit_version(record)
+
+        # The owner is told what happened: v2 went in, with the tracker.
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIn("parties", response.data)
+        self.assertEqual([v.number for v in self.versions(record)], [1, 2])
+        self.assertFalse(ResubmissionRequest.objects.filter(
+            record=record, state=ResubmissionRequestState.OPEN,
+        ).exists())
+        # Each step that could not be queued is logged, and none stopped the rest.
+        self.assertTrue(any("Connection refused" in line for line in logged.output))
+
+    def test_the_reviewers_are_still_told_and_the_lost_work_can_be_sent_again(self):
+        from apps.documents.models import PdfExtraction
+        from apps.records.models import ReviewText
+
+        record = self.ierc_asked_and_revised()
+        before = set(Notification.objects.values_list("pk", flat=True))
+
+        down = OperationalError("Error 111 connecting to redis:6379. Connection refused.")
+        with patch("celery.app.task.Task.apply_async", side_effect=down), \
+                self.assertLogs("django.db.backends.base", level="ERROR"):
+            self.submit_version(record)
+
+        # Telling IERC needs no queue: it still happens.
+        told = Notification.objects.exclude(pk__in=before)
+        self.assertEqual({n.recipient for n in told}, {self.ierc})
+        # The manuscript read and the review text wait as queued rows, which
+        # `reextract_manuscripts --record N` and the next comparison send again.
+        record.refresh_from_db()
+        extraction = PdfExtraction.objects.get(record=record)
+        self.assertEqual(extraction.status, "queued")
+        self.assertEqual(extraction.source_revision, record.manuscript_revision)
+        v2 = RecordVersion.objects.get(record=record, number=2)
+        self.assertEqual(ReviewText.objects.get(pk=v2.review_text_id).state, "pending")

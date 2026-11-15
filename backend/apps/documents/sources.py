@@ -57,7 +57,10 @@ def reset_manuscript(record, *, defer=False, retry=False):
         extraction.formulas.exclude(source_revision=revision).delete()
     if not defer and not held:
         pinned = str(revision) if revision else None
-        transaction.on_commit(lambda: extract_manuscript_text.delay(record.pk, pinned))
+        # Robust (IR-1049): the write that asked is saved whatever the queue
+        # does. A lost send leaves this row `queued`; `reextract_manuscripts
+        # --record N` sends it again.
+        transaction.on_commit(lambda: extract_manuscript_text.delay(record.pk, pinned), robust=True)
 
 
 def queue_upload_read(upload) -> PdfExtraction:
@@ -72,7 +75,7 @@ def queue_upload_read(upload) -> PdfExtraction:
         upload=upload, kind=DocumentKind.SUPPLEMENTARY, **(HELD if held else {}),
     )
     if not held:
-        transaction.on_commit(lambda: extract_pdf_text.delay(upload.id))
+        transaction.on_commit(lambda: extract_pdf_text.delay(upload.id), robust=True)
     return extraction
 
 
@@ -99,7 +102,9 @@ def read_awaiting(record_id) -> None:
             extraction.phase = ExtractionPhase.QUEUED
             extraction.error = ""
             extraction.save(update_fields=["phase", "error"])
-            transaction.on_commit(lambda upload_id=extraction.upload_id: extract_pdf_text.delay(upload_id))
+            transaction.on_commit(
+                lambda upload_id=extraction.upload_id: extract_pdf_text.delay(upload_id), robust=True,
+            )
 
 
 def current_source(extraction, record):
