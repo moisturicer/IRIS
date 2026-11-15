@@ -29,12 +29,15 @@ import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
 import { Button }      from "@/components/ui/Button";
-import { LOAD_ERROR, WARNING_NOTICE }  from "@/components/ui/fieldClasses";
+import { WARNING_NOTICE }  from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
+import { useUIStore } from "@/store/ui.store";
 import { LoadMore } from "@/components/shared/LoadMore";
 import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
@@ -43,10 +46,15 @@ import type { DeleteRequest } from "@/types/records";
 
 import { RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
 
+const requesterName = (req: DeleteRequest) =>
+  req.requested_by_name ?? req.requested_by_email ?? "the requester";
+
 export default function DeleteRequestsPage() {
-  const [approving,    setApproving]    = useState<number | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
+  // The request the approval dialog is asking about, and whether it is in flight.
+  const [approveTarget, setApproveTarget] = useState<DeleteRequest | null>(null);
+  const [approving,     setApproving]     = useState(false);
   const [declining,    setDeclining]    = useState<DeleteRequest | null>(null);
-  const [error,        setError]        = useState<string | null>(null);
   const [tab, setTab] = useState<"pending" | "decided">("pending");
 
   // Cancelled when the filter changes or the page closes, so a slow earlier
@@ -62,26 +70,26 @@ export default function DeleteRequestsPage() {
   const loading = read.status === "loading";
   const requests = read.rows;
 
-  // Reading again also clears an earlier failed approval, as it always has.
-  const reload = () => {
-    setError(null);
-    read.retry();
-  };
+  const reload = () => read.retry();
 
-  const handleApprove = async (req: DeleteRequest) => {
-    if (!confirm(
-      `Approve deletion of "${req.record_title}"? This will permanently remove the record and cannot be undone.`
-    )) return;
-
-    setApproving(req.id);
-    setError(null);
+  // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
+  // the server's own reason on a refusal.
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    const req = approveTarget;
+    setApproving(true);
     try {
       await recordsApi.approveDeleteRequest(req.id);
+      addToast({ type: "success", message: `Deletion of "${req.record_title}" approved.` });
       reload();
-    } catch {
-      setError("Failed to approve deletion. You may need admin privileges.");
+    } catch (err) {
+      addToast({
+        type: "error",
+        message: errorDetail(err, "Failed to approve deletion. You may need admin privileges."),
+      });
     } finally {
-      setApproving(null);
+      setApproving(false);
+      setApproveTarget(null);
     }
   };
 
@@ -129,13 +137,7 @@ export default function DeleteRequestsPage() {
         </Button>
       </div>
 
-      {error && (
-        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
-        </div>
-      )}
-      {!error && read.status === "failed" && (
+      {read.status === "failed" && (
         <LoadFailedAlert
           message={failureMessage(read.error, { lead: "The delete requests didn't load." })}
           onRetry={reload}
@@ -212,17 +214,15 @@ export default function DeleteRequestsPage() {
                             type="button"
                             size="sm"
                             variant="danger"
-                            onClick={() => handleApprove(req)}
-                            loading={approving === req.id}
+                            onClick={() => setApproveTarget(req)}
                           >
-                            {approving === req.id ? "Deleting…" : "Approve Deletion"}
+                            Approve Deletion
                           </Button>
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
                             onClick={() => setDeclining(req)}
-                            disabled={approving === req.id}
                           >
                             Decline
                           </Button>
@@ -248,12 +248,30 @@ export default function DeleteRequestsPage() {
         </div>
       )}
 
+      {/* Names the paper and the requester, so a slip on the wrong row is seen. */}
+      <ConfirmDialog
+        open={!!approveTarget}
+        title={approveTarget ? `Approve deletion of "${approveTarget.record_title}"?` : ""}
+        message={
+          approveTarget
+            ? `"${approveTarget.record_title}", requested by ${requesterName(approveTarget)}, ` +
+              "will be permanently removed. This cannot be undone."
+            : ""
+        }
+        confirmLabel="Approve deletion"
+        danger
+        focusCancel
+        confirming={approving}
+        onConfirm={() => void handleApprove()}
+        onCancel={() => setApproveTarget(null)}
+      />
+
       {declining && (
         <RdcoNoteDialog
           title="Decline delete request"
           submitLabel="Decline"
           audience="requester"
-          requester={declining.requested_by_name ?? declining.requested_by_email ?? "The requester"}
+          requester={requesterName(declining)}
           recordTitle={declining.record_title}
           intro="The record is restored. The requester is told in-app and by email, with your note."
           send={(note) => recordsApi.declineDeleteRequest(declining.id, note)}

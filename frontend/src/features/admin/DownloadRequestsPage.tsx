@@ -21,12 +21,13 @@ import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { LoadMore } from "@/components/shared/LoadMore";
 import { failureMessage } from "@/lib/readFailure";
 import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
-import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { errorDetail } from "@/lib/errorDetail";
 import { formatDate }  from "@/lib/utils";
+import { useUIStore } from "@/store/ui.store";
 import type { DownloadRequest } from "@/types/records";
 
 import { NO_NOTE, RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
@@ -60,10 +61,15 @@ function grantLine(req: DownloadRequest): string | null {
   return req.grant_live ? `Until ${date}` : `Expired ${date}`;
 }
 
+const readerName = (req: DownloadRequest) =>
+  req.requested_by_name ?? req.requested_by_email ?? "the reader";
+
 export default function DownloadRequestsPage() {
-  const [approving, setApproving] = useState<number | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
+  // The request the approval dialog is asking about, and whether it is in flight.
+  const [approveTarget, setApproveTarget] = useState<DownloadRequest | null>(null);
+  const [approving,     setApproving]     = useState(false);
   const [noteAct,  setNoteAct]  = useState<NoteAct | null>(null);
-  const [error,    setError]    = useState<string | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<Filter>("pending");
 
@@ -79,22 +85,23 @@ export default function DownloadRequestsPage() {
   const requests = read.rows;
   const loading = read.status === "loading";
 
-  // Reading again also clears an earlier failed action, as it always has.
-  const load = () => {
-    setError(null);
-    read.retry();
-  };
+  const load = () => read.retry();
 
-  const handleApprove = async (id: number) => {
-    if (!confirm("Approve this download request? The requester is told in-app and by email.")) return;
-    setApproving(id);
+  // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
+  // the server's own reason on a refusal.
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    const req = approveTarget;
+    setApproving(true);
     try {
-      await recordsApi.approveDownloadRequest(id);
+      await recordsApi.approveDownloadRequest(req.id);
+      addToast({ type: "success", message: `Download request from ${readerName(req)} approved.` });
       load();
     } catch (err) {
-      setError(errorDetail(err, "Action failed. Please try again."));
+      addToast({ type: "error", message: errorDetail(err, "Action failed. Please try again.") });
     } finally {
-      setApproving(null);
+      setApproving(false);
+      setApproveTarget(null);
     }
   };
 
@@ -132,12 +139,6 @@ export default function DownloadRequestsPage() {
         </Button>
       </div>
 
-      {error && (
-        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
-        </div>
-      )}
       {read.status === "failed" && (
         <LoadFailedAlert
           message={failureMessage(read.error, { lead: "The download requests didn't load." })}
@@ -217,19 +218,15 @@ export default function DownloadRequestsPage() {
                               type="button"
                               size="sm"
                               variant="outline"
-                              onClick={() => handleApprove(req.id)}
-                              loading={approving === req.id}
+                              onClick={() => setApproveTarget(req)}
                             >
-                              {approving === req.id
-                                ? "Approving…"
-                                : <><i className="fas fa-check" aria-hidden /> Approve</>}
+                              <i className="fas fa-check" aria-hidden /> Approve
                             </Button>
                             <Button
                               type="button"
                               size="sm"
                               variant="danger"
                               onClick={() => setNoteAct({ kind: "decline", request: req })}
-                              disabled={approving === req.id}
                             >
                               Decline
                             </Button>
@@ -266,6 +263,23 @@ export default function DownloadRequestsPage() {
           />
         </div>
       )}
+
+      {/* Names the reader and the paper, so a slip on the wrong row is seen. */}
+      <ConfirmDialog
+        open={!!approveTarget}
+        title={approveTarget ? `Approve ${readerName(approveTarget)}'s download request?` : ""}
+        message={
+          approveTarget
+            ? `${readerName(approveTarget)} will be able to download "${approveTarget.record_title}" ` +
+              "for a limited time, and is told in-app and by email."
+            : ""
+        }
+        confirmLabel="Approve request"
+        focusCancel
+        confirming={approving}
+        onConfirm={() => void handleApprove()}
+        onCancel={() => setApproveTarget(null)}
+      />
 
       {noteAct && (
         <RdcoNoteDialog

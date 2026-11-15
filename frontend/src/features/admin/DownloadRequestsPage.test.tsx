@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { useUIStore } from "@/store/ui.store";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { DownloadRequest } from "@/types/records";
 
@@ -60,6 +61,7 @@ beforeEach(() => {
   approveDownloadRequest.mockReset();
   declineDownloadRequest.mockReset();
   revokeDownloadRequest.mockReset();
+  useUIStore.setState({ toasts: [] });
 });
 
 describe("the queue", () => {
@@ -204,6 +206,95 @@ describe("paging (IR-1100)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not load more/i);
     expect(screen.getByRole("link", { name: "First page paper" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
+  });
+});
+
+describe("approving (IR-1028)", () => {
+  const toasts = () => useUIStore.getState().toasts;
+
+  async function openApprove() {
+    const trigger = within(await rowFor("A published thesis")).getByRole("button", { name: "Approve" });
+    await userEvent.click(trigger);
+    return { trigger, dialog: await screen.findByRole("dialog", { name: /Approve .*download/i }) };
+  }
+
+  it("asks in a dialog that names the reader and the paper, never the browser's confirm", async () => {
+    const nativeConfirm = vi.spyOn(window, "confirm");
+    serve(request({ id: 6 }));
+    renderScreen(<DownloadRequestsPage />);
+
+    const { dialog } = await openApprove();
+
+    expect(dialog).toHaveTextContent("Ana Reyes");
+    expect(dialog).toHaveTextContent("A published thesis");
+    expect(dialog).toHaveTextContent(/in-app and by email/i);
+    await expectNoBlockingA11yViolations(dialog);
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    expect(approveDownloadRequest).not.toHaveBeenCalled();
+    nativeConfirm.mockRestore();
+  });
+
+  it("does nothing on Cancel, and returns focus to the button that opened it", async () => {
+    serve(request({ id: 6 }));
+    renderScreen(<DownloadRequestsPage />);
+
+    const { trigger, dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(approveDownloadRequest).not.toHaveBeenCalled();
+    expect(listDownloadRequests).toHaveBeenCalledTimes(1);
+    expect(toasts()).toHaveLength(0);
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("approves once on confirm, says so in a toast and reads the queue again", async () => {
+    serve(request({ id: 6 }));
+    approveDownloadRequest.mockResolvedValue({});
+    renderScreen(<DownloadRequestsPage />);
+
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve request" }));
+
+    await waitFor(() => expect(approveDownloadRequest).toHaveBeenCalledTimes(1));
+    expect(approveDownloadRequest).toHaveBeenCalledWith(6);
+    await waitFor(() => expect(toasts()).toEqual([
+      expect.objectContaining({ type: "success", message: expect.stringContaining("Ana Reyes") }),
+    ]));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(listDownloadRequests).toHaveBeenCalledTimes(2));
+  });
+
+  it("disables the buttons and labels the confirm while the approval is in flight", async () => {
+    serve(request({ id: 6 }));
+    let finish: () => void = () => undefined;
+    approveDownloadRequest.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
+    renderScreen(<DownloadRequestsPage />);
+
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve request" }));
+
+    expect(await within(dialog).findByRole("button", { name: "Please wait…" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(approveDownloadRequest).toHaveBeenCalledTimes(1);
+    finish();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("shows the server's reason in an error toast when the approval is refused", async () => {
+    serve(request({ id: 6 }));
+    approveDownloadRequest.mockRejectedValue({
+      response: { status: 409, data: { detail: "This request was already decided." } },
+    });
+    renderScreen(<DownloadRequestsPage />);
+
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve request" }));
+
+    await waitFor(() => expect(toasts()).toEqual([
+      expect.objectContaining({ type: "error", message: "This request was already decided." }),
+    ]));
+    expect(listDownloadRequests).toHaveBeenCalledTimes(1);
   });
 });
 
