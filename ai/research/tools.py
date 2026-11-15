@@ -533,7 +533,7 @@ class ResearchTools:
         return current["title"], source, bound["chunk_id"]
 
     def _passages(self, title, rows, handles, source=None, overlaps=None, placed=None):
-        handle_of = {row["id"]: h for row, h in zip(rows, handles)}
+        handle_of = {row["id"]: h for row, h in zip(rows, handles)} if placed else {}
         return tuple(
             PassageRef(
                 handle=h, record_id=row["record_id"], page=row["source_page"],
