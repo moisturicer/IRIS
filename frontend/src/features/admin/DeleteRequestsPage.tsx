@@ -39,6 +39,7 @@ import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
 import { useUIStore } from "@/store/ui.store";
 import { LoadMore } from "@/components/shared/LoadMore";
+import { useFocusAfterCommit } from "@/hooks/useFocusAfterCommit";
 import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { formatDate }  from "@/lib/utils";
@@ -56,6 +57,8 @@ export default function DeleteRequestsPage() {
   const [approving,     setApproving]     = useState(false);
   const [declining,    setDeclining]    = useState<DeleteRequest | null>(null);
   const [tab, setTab] = useState<"pending" | "decided">("pending");
+  // The row an approval came from is gone after the reload, so focus goes to the tab.
+  const tabFocus = useFocusAfterCommit<HTMLButtonElement>();
 
   // Cancelled when the filter changes or the page closes, so a slow earlier
   // answer cannot replace the one the reader is waiting for (IR-914). The API
@@ -70,8 +73,6 @@ export default function DeleteRequestsPage() {
   const loading = read.status === "loading";
   const requests = read.rows;
 
-  const reload = () => read.retry();
-
   // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
   // the server's own reason on a refusal.
   const handleApprove = async () => {
@@ -81,7 +82,8 @@ export default function DeleteRequestsPage() {
     try {
       await recordsApi.approveDeleteRequest(req.id);
       addToast({ type: "success", message: `Deletion of "${req.record_title}" approved.` });
-      reload();
+      read.retry();
+      tabFocus.focusNext();
     } catch (err) {
       addToast({
         type: "error",
@@ -115,6 +117,7 @@ export default function DeleteRequestsPage() {
         {(["pending", "decided"] as const).map((s) => (
           <Button
             key={s}
+            ref={tab === s ? tabFocus.ref : undefined}
             type="button"
             onClick={() => setTab(s)}
             aria-pressed={tab === s}
@@ -126,7 +129,7 @@ export default function DeleteRequestsPage() {
         ))}
         <Button
           type="button"
-          onClick={reload}
+          onClick={read.retry}
           disabled={loading}
           variant="outline"
           size="sm"
@@ -140,15 +143,15 @@ export default function DeleteRequestsPage() {
       {read.status === "failed" && (
         <LoadFailedAlert
           message={failureMessage(read.error, { lead: "The delete requests didn't load." })}
-          onRetry={reload}
+          onRetry={read.retry}
           className="mb-4"
         />
       )}
 
       {read.status === "interrupted" ? (
-        <InterruptedState what="delete requests" onRetry={reload} />
+        <InterruptedState what="delete requests" onRetry={read.retry} />
       ) : loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" onRetry={reload} /></div>
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" onRetry={read.retry} /></div>
       ) : read.status === "failed" ? null : requests.length === 0 ? (
         <EmptyState
           icon="fa-trash-alt"
@@ -276,7 +279,13 @@ export default function DeleteRequestsPage() {
           intro="The record is restored. The requester is told in-app and by email, with your note."
           send={(note) => recordsApi.declineDeleteRequest(declining.id, note)}
           onClose={() => setDeclining(null)}
-          onDone={() => { setDeclining(null); reload(); }}
+          onDone={() => {
+            // A refusal stays inside the dialog with the note; only success is a toast.
+            addToast({ type: "success", message: `Deletion of "${declining.record_title}" declined.` });
+            setDeclining(null);
+            read.retry();
+            tabFocus.focusNext();
+          }}
         />
       )}
     </div>

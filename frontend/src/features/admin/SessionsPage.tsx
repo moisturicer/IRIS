@@ -5,6 +5,7 @@ import { Button }     from "@/components/ui/Button";
 import { Spinner }    from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { useFocusAfterCommit } from "@/hooks/useFocusAfterCommit";
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
 import { formatDate } from "@/lib/utils";
@@ -20,6 +21,8 @@ export default function SessionsPage() {
   const [revokeTarget, setRevokeTarget] = useState<ActiveSession | null>(null);
   const [revoking,     setRevoking]     = useState(false);
   const addToast = useUIStore((s) => s.addToast);
+  // The revoked row is gone, so focus goes to Refresh, which stays on the page.
+  const refreshFocus = useFocusAfterCommit<HTMLButtonElement>();
 
   const load = async () => {
     setLoading(true);
@@ -46,6 +49,7 @@ export default function SessionsPage() {
       await accountsApi.revokeSession(target.jti);
       setSessions(prev => prev.filter(s => s.jti !== target.jti));
       addToast({ type: "success", message: `Session for ${whose(target)} revoked.` });
+      refreshFocus.focusNext();
     } catch (err) {
       addToast({ type: "error", message: errorDetail(err, "Failed to revoke session. Please try again.") });
     } finally {
@@ -64,6 +68,7 @@ export default function SessionsPage() {
       {/* Refresh button */}
       <div className="flex justify-end mb-4">
         <Button
+          ref={refreshFocus.ref}
           type="button"
           variant="outline"
           onClick={load}

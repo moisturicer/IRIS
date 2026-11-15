@@ -250,6 +250,35 @@ describe("DeleteRequestsPage decline with a note (IR-1099)", () => {
     expect(listDeleteRequests).toHaveBeenCalledTimes(1);
   });
 
+  it("says so in a toast once the decline goes through (IR-1028)", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    declineDeleteRequest.mockResolvedValue({});
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Note to the requester" }), "Cited.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Decline" }));
+
+    await waitFor(() => expect(useUIStore.getState().toasts).toEqual([
+      expect.objectContaining({ type: "success", message: expect.stringContaining("Still waiting") }),
+    ]));
+  });
+
+  it("keeps a refused decline inside the dialog, with no toast (IR-1028)", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    declineDeleteRequest.mockRejectedValue({ response: { data: { detail: "Already decided." } } });
+
+    renderScreen(<DeleteRequestsPage />);
+    await userEvent.click(within(await rowFor("Still waiting")).getByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline delete request" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Note to the requester" }), "Cited.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Decline" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Already decided.");
+    expect(useUIStore.getState().toasts).toHaveLength(0);
+  });
+
   it("sends nothing when the dialog is cancelled", async () => {
     listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
 
@@ -349,6 +378,18 @@ describe("DeleteRequestsPage approve confirmation (IR-1028)", () => {
     ]));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     await waitFor(() => expect(listDeleteRequests).toHaveBeenCalledTimes(2));
+  });
+
+  it("puts focus on the Pending tab after an approval, since the row it came from is gone", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+    approveDeleteRequest.mockResolvedValue({});
+
+    renderScreen(<DeleteRequestsPage />);
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve deletion" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Pending" })).toHaveFocus());
   });
 
   it("disables the buttons while the approval is in flight", async () => {

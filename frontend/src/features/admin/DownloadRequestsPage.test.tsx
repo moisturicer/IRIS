@@ -265,6 +265,18 @@ describe("approving (IR-1028)", () => {
     await waitFor(() => expect(listDownloadRequests).toHaveBeenCalledTimes(2));
   });
 
+  it("puts focus on the active filter after an approval, since the row it came from is gone", async () => {
+    serve(request({ id: 6 }));
+    approveDownloadRequest.mockResolvedValue({});
+    renderScreen(<DownloadRequestsPage />);
+
+    const { dialog } = await openApprove();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve request" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Pending" })).toHaveFocus());
+  });
+
   it("disables the buttons and labels the confirm while the approval is in flight", async () => {
     serve(request({ id: 6 }));
     let finish: () => void = () => undefined;
@@ -299,6 +311,8 @@ describe("approving (IR-1028)", () => {
 });
 
 describe("declining and revoking", () => {
+  const toasts = () => useUIStore.getState().toasts;
+
   it("asks for a note before declining, and sends it", async () => {
     serve(request({ id: 4 }));
     declineDownloadRequest.mockResolvedValue({});
@@ -315,6 +329,37 @@ describe("declining and revoking", () => {
 
     await waitFor(() => expect(declineDownloadRequest).toHaveBeenCalledWith(4, "Ask your adviser."));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("says so in a toast once a decline or a revoke goes through (IR-1028)", async () => {
+    serve(
+      request({ id: 4 }),
+      request({
+        id: 5, record_title: "A granted thesis", requested_by_name: "Ben Cruz",
+        status: "approved", grant_expires_at: "2026-11-29T08:00:00Z", grant_live: true,
+      }),
+    );
+    declineDownloadRequest.mockResolvedValue({});
+    revokeDownloadRequest.mockResolvedValue({});
+    renderScreen(<DownloadRequestsPage />);
+
+    await userEvent.click(within(await rowFor("A published thesis")).getByRole("button", { name: "Decline" }));
+    let dialog = await screen.findByRole("dialog", { name: "Decline download request" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Note to the reader" }), "Ask your adviser.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Decline" }));
+    await waitFor(() => expect(toasts()).toEqual([
+      expect.objectContaining({ type: "success", message: expect.stringMatching(/Ana Reyes.*declined/) }),
+    ]));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await userEvent.click(within(await rowFor("A granted thesis")).getByRole("button", { name: "Revoke" }));
+    dialog = await screen.findByRole("dialog", { name: "Revoke download access" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Note to the reader" }), "Shared outside CIT-U.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
+    await waitFor(() => expect(toasts()).toHaveLength(2));
+    expect(toasts()[1]).toEqual(
+      expect.objectContaining({ type: "success", message: expect.stringMatching(/Ben Cruz.*revoked/) }),
+    );
   });
 
   it("asks for a note before revoking, and keeps it when the server refuses", async () => {

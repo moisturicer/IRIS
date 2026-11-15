@@ -20,6 +20,7 @@ import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { LoadMore } from "@/components/shared/LoadMore";
 import { failureMessage } from "@/lib/readFailure";
+import { useFocusAfterCommit } from "@/hooks/useFocusAfterCommit";
 import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { Spinner }     from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -72,6 +73,8 @@ export default function DownloadRequestsPage() {
   const [noteAct,  setNoteAct]  = useState<NoteAct | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<Filter>("pending");
+  // The row an action came from is gone after the reload, so focus goes to the filter.
+  const filterFocus = useFocusAfterCommit<HTMLButtonElement>();
 
   // The API pages at 20; "Load more" reads the next page. Changing the filter
   // cancels the read in flight and starts again from the first page (IR-914).
@@ -85,8 +88,6 @@ export default function DownloadRequestsPage() {
   const requests = read.rows;
   const loading = read.status === "loading";
 
-  const load = () => read.retry();
-
   // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
   // the server's own reason on a refusal.
   const handleApprove = async () => {
@@ -96,7 +97,8 @@ export default function DownloadRequestsPage() {
     try {
       await recordsApi.approveDownloadRequest(req.id);
       addToast({ type: "success", message: `Download request from ${readerName(req)} approved.` });
-      load();
+      read.retry();
+      filterFocus.focusNext();
     } catch (err) {
       addToast({ type: "error", message: errorDetail(err, "Action failed. Please try again.") });
     } finally {
@@ -117,6 +119,7 @@ export default function DownloadRequestsPage() {
         {FILTERS.map((s) => (
           <Button
             key={s}
+            ref={filterStatus === s ? filterFocus.ref : undefined}
             type="button"
             onClick={() => setFilterStatus(s)}
             aria-pressed={filterStatus === s}
@@ -128,7 +131,7 @@ export default function DownloadRequestsPage() {
         ))}
         <Button
           type="button"
-          onClick={load}
+          onClick={read.retry}
           disabled={loading}
           variant="outline"
           size="sm"
@@ -142,15 +145,15 @@ export default function DownloadRequestsPage() {
       {read.status === "failed" && (
         <LoadFailedAlert
           message={failureMessage(read.error, { lead: "The download requests didn't load." })}
-          onRetry={load}
+          onRetry={read.retry}
           className="mb-4"
         />
       )}
 
       {read.status === "interrupted" ? (
-        <InterruptedState what="download requests" onRetry={load} />
+        <InterruptedState what="download requests" onRetry={read.retry} />
       ) : loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" onRetry={load} /></div>
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" onRetry={read.retry} /></div>
       ) : read.status === "failed" ? null : requests.length === 0 ? (
         <EmptyState
           icon="fa-download"
@@ -291,7 +294,18 @@ export default function DownloadRequestsPage() {
           intro={NOTE_ACTS[noteAct.kind].intro}
           send={(note) => NOTE_ACTS[noteAct.kind].send(noteAct.request.id, note)}
           onClose={() => setNoteAct(null)}
-          onDone={() => { setNoteAct(null); load(); }}
+          onDone={() => {
+            // A refusal stays inside the dialog with the note; only success is a toast.
+            addToast({
+              type: "success",
+              message: noteAct.kind === "decline"
+                ? `Download request from ${readerName(noteAct.request)} declined.`
+                : `Download access for ${readerName(noteAct.request)} revoked.`,
+            });
+            setNoteAct(null);
+            read.retry();
+            filterFocus.focusNext();
+          }}
         />
       )}
     </div>

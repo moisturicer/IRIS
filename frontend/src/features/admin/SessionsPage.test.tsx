@@ -115,6 +115,18 @@ describe("SessionsPage revoke confirmation (IR-1028)", () => {
     expect(screen.getByText("Ben Cruz")).toBeInTheDocument();
   });
 
+  it("puts focus on Refresh after a revoke, since the row it came from is gone", async () => {
+    sessions.mockResolvedValue({ data: [session()] });
+    revokeSession.mockResolvedValue({});
+    renderScreen(<SessionsPage />);
+
+    const { dialog } = await openRevoke();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Revoke session" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh" })).toHaveFocus());
+  });
+
   it("disables the buttons and labels the confirm while the revoke is in flight", async () => {
     sessions.mockResolvedValue({ data: [session()] });
     let finish: () => void = () => undefined;
