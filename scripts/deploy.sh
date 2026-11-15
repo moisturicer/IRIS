@@ -224,7 +224,9 @@ Keep them with git stash, or undo them with git checkout -- <file>."
     local home="https://$domain/" api="https://$domain/api/v1/colleges/" restarted=false
     wait_until_ready
     if $rebuild; then
-        # nginx looks up the backend's address once, when it starts (IR-200).
+        # Belt and braces: since IR-200 nginx looks the backend up again every
+        # 10s, so this restart should no longer be needed. It stays until a
+        # deploy on the server has shown it isn't.
         "${COMPOSE[@]}" restart frontend || fail "couldn't restart frontend"
         restarted=true
         wait_until_ready
@@ -235,7 +237,7 @@ Keep them with git stash, or undo them with git checkout -- <file>."
     fi
     if ! $restarted && ! site_answers "$api"; then
         # The page loads but the API doesn't: after a restart with nothing to
-        # rebuild, that is usually nginx holding an old backend address (IR-200).
+        # rebuild, that was nginx holding an old backend address before IR-200.
         say "step 4/5 health: the API didn't answer; restarted frontend (IR-200)"
         "${COMPOSE[@]}" restart frontend || fail "couldn't restart frontend"
         wait_until_ready

@@ -511,8 +511,9 @@ jobs:
       # IR-663: the real nginx, with the real config and snippet mounted where
       # the frontend image puts them, answers with the security headers on the
       # SPA route, an asset, a 404 and the legacy activation path. A stand-in
-      # index.html replaces the build; `backend` resolves to the runner so the
-      # proxy locations load, and nothing here is proxied. `nginx -t` first, so
+      # index.html replaces the build. Nothing here is proxied: since IR-200 the
+      # backend is looked up per request, so nginx starts without one, and the
+      # --add-host below is no longer read. `nginx -t` first, so
       # a config error fails with nginx's own message. No `ai-gateway` host on
       # purpose (IR-892): nginx must start without the gateway, as the Core
       # journeys stack runs it.
@@ -560,6 +561,12 @@ jobs:
       # IR-782: IRIS's own /admin/... and /rdco/... pages load the app, not Django.
       - name: nginx closes /django-admin/ unless allowlisted
         run: sh scripts/check_django_admin_allowlist.sh
+
+      # IR-200: nginx looks the backend up per request. A recreated backend at a
+      # new address is reached with no nginx restart, and two containers
+      # answering to `backend` both get requests.
+      - name: nginx follows a recreated backend and shares requests between two
+        run: sh scripts/check_nginx_backend_resolution.sh
 
       # IR-620: beat's only job is ADR-043's hourly deadline task. Booting it
       # proves the service starts and loads that entry; validating the file

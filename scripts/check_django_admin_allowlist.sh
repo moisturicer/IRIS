@@ -1,7 +1,8 @@
 #!/bin/sh
 # Proves IR-668 and IR-782 against the real nginx, the real config and the real
 # entrypoint script. Nothing listens behind nginx, so a request nginx proxies
-# ends in 502, one it refuses ends in 403, and an app page answers 200 with the
+# ends in 502 (since IR-200 nginx asks Docker's DNS for `backend`, which this
+# default network can't answer, so the 502 is a failed lookup), one it refuses ends in 403, and an app page answers 200 with the
 # stand-in index.html. Run from the repository root; needs Docker.
 set -u
 export MSYS_NO_PATHCONV=1
