@@ -1,8 +1,9 @@
 """
 IR-676: every copy saved through the download route is marked, or not served.
 
-The footer names the downloader on every page, a grey "CIT-U" lies beneath the
-content, and the PDF's metadata says the same (ADR-048, decisions 10 and 11).
+The footer names the downloader on every page, a faint "CIT-U" is drawn over the
+content (IR-1127), and the PDF's metadata says the same (ADR-048, decisions 10
+and 11).
 
 **Seam: the API.** Pages are read back out of the response with pypdf.
 """
@@ -55,6 +56,33 @@ def _opaque_scan_pdf() -> bytes:
     return buffer.getvalue()
 
 
+def _filled_pdf(gray: float, size=(612, 792)) -> bytes:
+    """A page that first fills itself edge to edge, then writes near the top."""
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=size)
+    pdf.setFillGray(gray)
+    pdf.rect(0, 0, *size, stroke=0, fill=1)
+    pdf.setFillGray(1 - gray)
+    pdf.drawString(72, size[1] - 72, "Body of page 1")
+    pdf.showPage()
+    pdf.save()
+    return buffer.getvalue()
+
+
+def _middle_of(copy: PdfReader) -> tuple[int, int]:
+    """The darkest and lightest grey in the middle of page 1, as printed."""
+    import pypdfium2  # pdfplumber's renderer, so no new dependency
+
+    buffer = BytesIO()
+    writer = PdfWriter(clone_from=copy)
+    writer.write(buffer)
+    page = pypdfium2.PdfDocument(buffer.getvalue())[0]
+    image = page.render(scale=0.5).to_pil().convert("L")
+    width, height = image.size
+    middle = image.crop((width * 3 // 10, height * 3 // 10, width * 7 // 10, height * 7 // 10))
+    return middle.getextrema()
+
+
 class WatermarkFixtures(Fixtures):
 
     def use_manuscript(self, content: bytes):
@@ -86,16 +114,52 @@ class MarkedCopyTests(WatermarkFixtures):
                     text,
                 )
 
-    def test_every_page_carries_the_diagonal_beneath_the_content(self):
+    def test_the_footer_is_drawn_last_so_nothing_covers_it(self):
         self.use_manuscript(_text_pdf(pages=2))
         self.request_by()
 
         for page in self.copy().pages:
             content = page.get_contents().get_data().decode("latin-1")
-            # The diagonal is drawn first, so the page's own content covers it,
-            # and the footer last, so nothing covers it.
-            self.assertLess(content.index("(CIT"), content.index("(Body of page"))
-            self.assertLess(content.index("(Body of page"), content.index("(Downloaded by"))
+            # The page's own text, then the mark (the only part with a transparency
+            # state), then the footer, so neither the page nor the mark covers it.
+            self.assertLess(content.index("(Body of page"), content.index(" gs"))
+            self.assertLess(content.rindex(" gs"), content.index("(Downloaded by"))
+
+    def test_the_mark_shows_on_a_page_that_paints_an_opaque_background(self):
+        # Word and Google Docs exports often start each page with a white
+        # rectangle over the whole page, which hid a mark drawn beneath (IR-1127).
+        self.use_manuscript(_filled_pdf(gray=1.0))
+        self.request_by()
+
+        darkest, _ = _middle_of(self.copy())
+
+        self.assertLess(darkest, 245)
+
+    def test_the_mark_shows_on_a_scanned_page(self):
+        self.use_manuscript(_opaque_scan_pdf())
+        self.request_by()
+
+        darkest, _ = _middle_of(self.copy())
+
+        self.assertLess(darkest, 245)
+
+    def test_the_mark_is_faint_so_the_text_beneath_stays_readable(self):
+        self.use_manuscript(_filled_pdf(gray=1.0))
+        self.request_by()
+        darkest, _ = _middle_of(self.copy())
+        self.assertGreater(darkest, 200)  # A light mark on white paper
+
+        self.use_manuscript(_filled_pdf(gray=0.0))
+        _, lightest = _middle_of(self.copy())
+        self.assertLess(lightest, 60)  # Black stays nearly black beneath it
+
+    def test_the_mark_adds_no_text_to_the_copy(self):
+        self.use_manuscript(_text_pdf(pages=2))
+        self.request_by()
+
+        for page in self.copy().pages:
+            # Once, in the footer's "via CIT-U IRIS"; the mark itself is drawn as shapes.
+            self.assertEqual(page.extract_text().count("CIT-U"), 1)
 
     def test_an_exempt_copy_says_why_in_place_of_a_request(self):
         self.use_manuscript(_text_pdf(pages=1))
