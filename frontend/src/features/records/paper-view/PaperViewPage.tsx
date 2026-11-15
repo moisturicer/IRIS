@@ -1002,9 +1002,10 @@ export default function PaperViewPage() {
                   authors, then the adviser when the record names one (IR-472),
                   then the date the work was completed. Published and views are
                   governance facts, in Record details. */}
-              <div className="space-y-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
                 {authorNames.length > 0 ? (
-                  <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
+                  <ul className="flex items-center gap-x-1 gap-y-1 flex-wrap" aria-label="Authors">
                     {authorNames.map((name) => {
                       const owner = record.owners.find((candidate) => candidate.full_name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
                       return (
@@ -1027,9 +1028,12 @@ export default function PaperViewPage() {
                     </li>
                   </ul>
                 )}
+                </div>
                 <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
-                  {record.origin === "institutional" && <span>{INSTITUTION.name}</span>}
+                  {record.origin === "institutional" && (
+                    <span>{[...(record.paper_details?.programs ?? []), INSTITUTION.name].join(" · ")}</span>
+                  )}
                   {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
                 </div>
               </div>
