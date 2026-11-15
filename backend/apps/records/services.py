@@ -105,9 +105,19 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     file_type = "xls" if ext == ".xls" else "xlsx"
 
     try:
-        all_rows = pyexcel.get_array(file_stream=file, file_type=file_type)
+        if ext == ".csv":
+            # A CSV is read here, not by pyexcel: it must be UTF-8 (a BOM from
+            # Excel is fine), and the cells are text like a sheet's (IR-1138).
+            import csv
+            import io
+
+            text = file.read()
+            text = text.decode("utf-8-sig") if isinstance(text, bytes) else text
+            all_rows = [tuple(r) for r in csv.reader(io.StringIO(text))]
+        else:
+            all_rows = pyexcel.get_array(file_stream=file, file_type=file_type)
     except Exception as exc:
-        return [], [f"Could not open file: {exc}. Make sure it is a valid .xls or .xlsx file."]
+        return [], [f"Could not open file: {exc}. Make sure it is a valid .xls, .xlsx or UTF-8 .csv file."]
 
     rows_iter = iter(all_rows)
 
@@ -149,7 +159,8 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
             continue
 
         authors_raw = get_col(row, "authors") or ""
-        authors = [a.strip() for a in authors_raw.split(",") if a.strip()]
+        # Commas as before, or semicolons, which a CSV can hold unquoted (IR-1138).
+        authors = [a.strip() for a in re.split(r"[;,]", authors_raw) if a.strip()]
 
         records.append({
             "row_num":               row_num,
@@ -166,6 +177,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
             "for_commercialization": parse_bool(get_col(row, "for commercialization")),
             "community_extension":   parse_bool(get_col(row, "community extension")),
             "authors":               authors,
+            "file_name":             get_col(row, "file name"),
         })
 
     return records, errors
@@ -277,6 +289,32 @@ def check_import_row(row: dict, choices: ImportChoices) -> tuple[dict, list[str]
         "for_commercialization": row["for_commercialization"],
         "community_extension":   row["community_extension"],
     }, problems
+
+
+def check_import_pdf(row: dict, pdfs: dict, taken: dict) -> tuple[object | None, list[str]]:
+    """
+    The PDF a row names in its File Name column, and every reason it cannot be
+    attached (IR-1138). `pdfs` maps a lower-cased file name to the uploaded
+    file; `taken` maps a file name to the row that already uses it, so one PDF
+    is never attached to two records. A blank File Name is fine: the row is
+    imported with no manuscript, as before.
+    """
+    from apps.documents.validators import pdf_upload_problem
+
+    name = row.get("file_name")
+    if not name:
+        return None, []
+    key = name.lower()
+    pdf = pdfs.get(key)
+    if pdf is None:
+        return None, [f'File Name "{name}" was not uploaded with the sheet']
+    if key in taken:
+        return None, [f'File Name "{name}" is already used by row {taken[key]}']
+    problem = pdf_upload_problem(pdf)
+    if problem:
+        return None, [f'File Name "{name}": {problem}']
+    taken[key] = row["row_num"]
+    return pdf, []
 
 
 def queue_manuscript_extraction(record: Record) -> None:

@@ -58,7 +58,7 @@ from .serializers import (
     DeleteRequestSerializer,
 )
 from .filters import RecordFilter, RecordOrderingFilter
-from .services import ImportChoices, check_import_row, soft_delete_record, parse_excel_import
+from .services import ImportChoices, check_import_pdf, check_import_row, soft_delete_record, parse_excel_import
 from apps.notifications.services import (
     notify_new_record,
     notify_download_request,
@@ -1741,7 +1741,16 @@ class RecordViewSet(viewsets.ModelViewSet):
     def import_excel(self, request):
         """
         POST /records/import_excel/
-        Accepts a multipart upload with key "file" (.xls or .xlsx).
+        Accepts a multipart upload with key "file" (.xls, .xlsx or UTF-8 .csv)
+        and, optionally, "pdfs": the manuscripts the rows name in their File
+        Name column (IR-1138). A row naming a PDF gets it as its manuscript,
+        which is sent to extraction as any upload is. A record starts
+        embargoed, and its owner's answer on AI is unset, so nothing reaches AI
+        until RDCO releases it.
+
+        With "check" set, nothing is written: the answer lists every row and
+        what is wrong with it, so RDCO sees it all before anything is added.
+
         Creates published records from each valid row and returns a plaintext log.
         Legacy imports bypass the review pipeline — staff is the implicit reviewer.
 
@@ -1776,9 +1785,21 @@ class RecordViewSet(viewsets.ModelViewSet):
         created = 0
         failed  = len(parse_errors)
         choices = ImportChoices()
+        check   = str(request.data.get("check", "")).lower() in ("1", "true", "yes")
+        pdfs    = {f.name.lower(): f for f in request.FILES.getlist("pdfs")}
+        taken: dict[str, int] = {}
+        checked: list[dict] = []
 
         for row in rows:
             values, problems = check_import_row(row, choices)
+            pdf, pdf_problems = check_import_pdf(row, pdfs, taken)
+            problems = problems + pdf_problems
+            if check:
+                checked.append({
+                    "row": row["row_num"], "title": row["title"] or "",
+                    "file_name": row.get("file_name") or "", "problems": problems,
+                })
+                continue
             if problems:
                 log_lines.append(f"Row {row['row_num']}: skipped — {'; '.join(problems)}.")
                 failed += 1
@@ -1793,6 +1814,14 @@ class RecordViewSet(viewsets.ModelViewSet):
                     RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
                     for author_name in row["authors"]:
                         Author.objects.create(record=record, name=author_name)
+                    if pdf is not None:
+                        from apps.documents.sources import manuscript_changes, reset_manuscript
+
+                        pdf.seek(0)
+                        for field, value in manuscript_changes(None, pdf).items():
+                            setattr(record, field, value)
+                        record.abstract_file.save(pdf.name, pdf, save=True)
+                        reset_manuscript(record)
             except Exception as exc:
                 # One line, whatever the database said: its full text can run
                 # to several lines and name the schema.
@@ -1803,6 +1832,18 @@ class RecordViewSet(viewsets.ModelViewSet):
 
             log_lines.append(f"✓  Row {row['row_num']}: created — {record.title[:70]}")
             created += 1
+
+        if check:
+            clean = sum(1 for r in checked if not r["problems"])
+            unused = sorted(f.name for key, f in pdfs.items() if key not in taken)
+            return Response({
+                "check":   True,
+                "rows":    checked,
+                "ok":      clean,
+                "skipped": len(checked) - clean + len(parse_errors),
+                "errors":  parse_errors,
+                "unused_pdfs": unused,
+            })
 
         log_lines.append(f"\n{'─' * 50}")
         log_lines.append(f"Done — {created} record(s) created, {failed} skipped.")
@@ -1846,8 +1887,9 @@ class RecordViewSet(viewsets.ModelViewSet):
             "Authors",
             "Origin",
             "Publication Year",
+            "File Name",
         ]
-        WIDTHS = [55, 65, 18, 16, 22, 28, 36, 10, 22, 22, 45, 24, 20]
+        WIDTHS = [55, 65, 18, 16, 22, 28, 36, 10, 22, 22, 45, 24, 20, 30]
 
         # ---- Header row styling --------------------------------------------
         header_font  = Font(bold=True, color="FFFFFF", size=11)
@@ -1883,6 +1925,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "Juan Dela Cruz, Maria Santos",
             "unknown",
             None,
+            None,
         ])
 
         # ---- Notes row (light grey) ----------------------------------------
@@ -1902,6 +1945,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "Comma-separated names",
             "unknown / institutional / imported_reference / synthetic",
             "Optional; separate from completion year",
+            "Optional; the PDF's name, uploaded with the sheet",
         ]
         ws.append(note_row)
         note_row_idx = ws.max_row
