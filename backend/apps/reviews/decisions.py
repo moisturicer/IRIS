@@ -383,7 +383,10 @@ def decision_flags(record, user) -> dict:
     routable = type_name_of(record) in routing.ROUTABLE_TYPES
     return {
         "party": party,
-        "outcomes": list(outcomes_for(record, party)),
+        # RDCO's *publish* is offered while the paper is embargoed, so the
+        # screen can show it and say why it waits (IR-1139); `decide/` still
+        # refuses it through `outcomes_for` (ADR-052 decision 14).
+        "outcomes": list(_offered_outcomes(record, party)),
         "blocked": _blocked_reason(record, seat),
         # An outcome alone held back, when the rest are not (IR-874).
         "blocked_outcomes": _blocked_outcomes(record, party),
@@ -396,16 +399,39 @@ def decision_flags(record, user) -> dict:
     }
 
 
+def _embargo_holds_publish(record, party) -> bool:
+    """RDCO could publish this paper but for its embargo (ADR-052 decision 14)."""
+    return (
+        not _is_proposal(record)
+        and PUBLISH in OUTCOMES_FOR.get(str(party), ())
+        and record.embargo_state != EmbargoState.RELEASED
+    )
+
+
+def _offered_outcomes(record, party) -> tuple:
+    """
+    What record detail offers: `outcomes_for`, plus RDCO's *publish* while an
+    embargo holds it, which `_blocked_outcomes` then names (IR-1139). An offer
+    is a rendering hint; `decide/` checks `outcomes_for` alone.
+    """
+    if _embargo_holds_publish(record, party):
+        return OUTCOMES_FOR[str(party)]
+    return outcomes_for(record, party)
+
+
 def _blocked_outcomes(record, party) -> dict:
     """
     The outcomes held back while the rest are not: a Proposal's *Accept*, by
-    the Adviser's own open *Must fix* (ADR-032 §7, IR-874). *Reject* never is,
-    and RDCO's Decision never is.
+    the Adviser's own open *Must fix* (ADR-032 §7, IR-874), and RDCO's
+    *publish* on an embargoed paper, with the words `decide/` refuses it with
+    (IR-1139). *Reject* never is.
     """
     if party == Party.ADVISER and _is_proposal(record):
         reason = threads.approval_blocked_reason(record, Party.ADVISER)
         if reason:
             return {ACCEPT: reason}
+    if _embargo_holds_publish(record, party):
+        return {PUBLISH: embargo_refusal(record)}
     return {}
 
 

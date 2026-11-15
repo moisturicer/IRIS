@@ -100,11 +100,11 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
         aria-expanded={open}
         aria-haspopup="true"
         title={showTitle ? "Notifications" : undefined}
-        className="relative w-[34px] h-[34px] rounded-lg border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
+        className="relative w-11 h-11 md:w-[34px] md:h-[34px] touch:w-11 touch:h-11 rounded-control border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
       >
-        <i className="fas fa-bell text-[15px]" aria-hidden />
+        <i className="fas fa-bell text-body" aria-hidden />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-brand text-white text-label font-bold flex items-center justify-center">
             {unreadBadge}
           </span>
         )}
@@ -115,19 +115,19 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
           role="dialog"
           aria-label="Notifications"
           className={cn(
-            "absolute top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-overlay rounded-xl border border-stone-200 shadow-card-md z-50 overflow-hidden",
+            "absolute top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-overlay rounded-card border border-stone-200 shadow-card-md z-50 overflow-hidden",
             align === "start" ? "left-0" : "right-0",
           )}
         >
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-stone-100">
-            <p className="text-[13px] font-bold uppercase tracking-wider text-stone-600">
+            <p className="text-small font-bold uppercase tracking-wider text-stone-600">
               Notifications
             </p>
             {items.length > 0 && (
               <button
                 type="button"
                 onClick={handleMarkAllRead}
-                className="text-[12px] font-semibold text-brand hover:underline"
+                className="inline-flex items-center min-h-11 md:min-h-0 touch:min-h-11 text-label font-semibold text-brand hover:underline"
               >
                 Mark all read
               </button>
@@ -136,7 +136,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
 
           <div className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[13px] text-stone-600">
+              <p className="px-4 py-6 text-center text-small text-stone-600">
                 Nothing new. You&apos;re all caught up.
               </p>
             ) : (
@@ -144,8 +144,8 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
                 {items.slice(0, PREVIEW_LIMIT).map((n) => {
                   const body = (
                     <>
-                      <p className="text-[13px] text-stone-700 leading-snug">{n.message}</p>
-                      <p className="text-[12px] text-stone-600 mt-0.5">
+                      <p className="text-small text-stone-700 leading-snug">{n.message}</p>
+                      <p className="text-label text-stone-600 mt-0.5">
                         {n.record_title ? `${n.record_title} · ` : ""}
                         {formatDate(n.created_at)}
                       </p>
@@ -183,7 +183,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
             to="/notifications"
             onClick={() => setOpen(false)}
             className={cn(
-              "block px-4 py-2.5 border-t border-stone-100 text-center text-[13px] font-semibold",
+              "flex items-center justify-center min-h-11 md:min-h-0 touch:min-h-11 px-4 py-2.5 border-t border-stone-100 text-center text-small font-semibold",
               "text-brand hover:bg-stone-50 transition-colors",
             )}
           >

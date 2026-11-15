@@ -109,7 +109,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                 ? PILL_PRIMARY
                 : PILL_SECONDARY
             : cn(
-                "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border",
+                "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-control border",
                 isSaved
                   ? "border-stone-300 bg-stone-100 text-brand"
                   : "border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50",
@@ -121,7 +121,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
       </button>
 
       {failure && !open && (
-        <p role="alert" className="absolute top-full mt-1.5 right-0 w-60 z-40 rounded-lg border border-brand-200 bg-white px-3 py-2 text-2xs text-brand shadow-card-md">
+        <p role="alert" className="absolute top-full mt-1.5 right-0 w-60 z-40 rounded-control border border-stone-300 bg-white px-3 py-2 text-2xs text-brand shadow-card-md">
           {failure.message}
         </p>
       )}
@@ -130,10 +130,10 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
         <div
           // The card itself navigates on click; keep menu interaction local.
           onClick={(e) => e.stopPropagation()}
-          className={cn("absolute top-full mt-1.5 w-64", variant === "pill" ? "left-0" : "right-0", "bg-white rounded-lg shadow-card-md border border-stone-200/90 py-1.5 z-40")}
+          className={cn("absolute top-full mt-1.5 w-64", variant === "pill" ? "left-0" : "right-0", "bg-white rounded-control shadow-card-md border border-stone-200/90 py-1.5 z-40")}
         >
           {failure && (
-            <p role="alert" className="mx-3 mb-1.5 rounded-md bg-brand-50 px-2 py-1.5 text-2xs text-brand">
+            <p role="alert" className="mx-3 mb-1.5 rounded-control border border-stone-300 bg-surface px-2 py-1.5 text-2xs text-brand">
               {failure.message}
             </p>
           )}
@@ -224,13 +224,13 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                   }}
                   placeholder="New folder…"
                   aria-label="New folder name"
-                  className="flex-1 min-w-0 px-2 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs outline-none focus:border-brand"
+                  className="flex-1 min-w-0 px-2 py-1.5 bg-stone-50 border border-field rounded-control text-xs outline-none focus:border-brand"
                 />
                 <button
                   type="button"
                   onClick={handleCreate}
                   disabled={!newName.trim()}
-                  className="w-7 h-7 shrink-0 rounded-lg bg-brand text-white disabled:opacity-30 flex items-center justify-center transition"
+                  className="w-7 h-7 shrink-0 rounded-control bg-brand text-white disabled:opacity-30 flex items-center justify-center transition"
                   aria-label="Create folder"
                 >
                   <i className="fas fa-plus text-2xs" aria-hidden />

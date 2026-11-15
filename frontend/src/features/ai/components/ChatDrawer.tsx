@@ -45,8 +45,8 @@ export function ChatDrawer({ title, description, side, closeLabel, onClose, retu
         className={cn(
           "relative flex flex-col h-full w-[min(88%,320px)] bg-overlay focus:outline-none",
           side === "start"
-            ? "mr-auto motion-safe:animate-panel-in-start shadow-[12px_0_32px_rgb(41_37_36/0.12)]"
-            : "ml-auto motion-safe:animate-panel-in shadow-[-12px_0_32px_rgb(41_37_36/0.12)]",
+            ? "mr-auto motion-safe:animate-panel-in-start shadow-card-md"
+            : "ml-auto motion-safe:animate-panel-in shadow-card-md",
         )}
       >
         <div className="shrink-0 flex items-start gap-2 pl-4 pr-1.5 py-1.5 min-h-[56px] border-b border-stone-200">
@@ -58,7 +58,7 @@ export function ChatDrawer({ title, description, side, closeLabel, onClose, retu
             type="button"
             onClick={onClose}
             aria-label={closeLabel}
-            className="shrink-0 w-11 h-11 rounded-lg flex items-center justify-center text-stone-500
+            className="shrink-0 w-11 h-11 rounded-control flex items-center justify-center text-stone-500
               hover:bg-stone-100 hover:text-stone-800 transition-colors"
           >
             <i className="fas fa-xmark text-base" aria-hidden />

@@ -2,15 +2,27 @@ import { useEffect, useState } from "react";
 import { accountsApi, type ActiveSession } from "@/api/accounts";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button }     from "@/components/ui/Button";
-import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Spinner }    from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { useFocusAfterCommit } from "@/hooks/useFocusAfterCommit";
+import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { formatDate } from "@/lib/utils";
+import { useUIStore } from "@/store/ui.store";
+
+const whose = (s: ActiveSession) => s.user_name || s.user_email || "Unknown user";
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
-  const [revoking, setRevoking] = useState<string | null>(null);
+  // The session the revoke dialog is asking about, and whether it is in flight.
+  const [revokeTarget, setRevokeTarget] = useState<ActiveSession | null>(null);
+  const [revoking,     setRevoking]     = useState(false);
+  const addToast = useUIStore((s) => s.addToast);
+  // The revoked row is gone, so focus goes to Refresh, which stays on the page.
+  const refreshFocus = useFocusAfterCommit<HTMLButtonElement>();
 
   const load = async () => {
     setLoading(true);
@@ -18,8 +30,8 @@ export default function SessionsPage() {
     try {
       const { data } = await accountsApi.sessions();
       setSessions(data);
-    } catch {
-      setError("Failed to load sessions. Please try again.");
+    } catch (err) {
+      setError(failureMessage(err, { lead: "The sessions didn't load." }));
     } finally {
       setLoading(false);
     }
@@ -27,16 +39,22 @@ export default function SessionsPage() {
 
   useEffect(() => { load(); }, []);
 
-  const handleRevoke = async (jti: string) => {
-    if (!confirm("Revoke this session? The user will be logged out on their next request.")) return;
-    setRevoking(jti);
+  // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
+  // the server's own reason on a refusal.
+  const handleRevoke = async () => {
+    if (!revokeTarget) return;
+    const target = revokeTarget;
+    setRevoking(true);
     try {
-      await accountsApi.revokeSession(jti);
-      setSessions(prev => prev.filter(s => s.jti !== jti));
-    } catch {
-      alert("Failed to revoke session. Please try again.");
+      await accountsApi.revokeSession(target.jti);
+      setSessions(prev => prev.filter(s => s.jti !== target.jti));
+      addToast({ type: "success", message: `Session for ${whose(target)} revoked.` });
+      refreshFocus.focusNext();
+    } catch (err) {
+      addToast({ type: "error", message: errorDetail(err, "Failed to revoke session. Please try again.") });
     } finally {
-      setRevoking(null);
+      setRevoking(false);
+      setRevokeTarget(null);
     }
   };
 
@@ -50,28 +68,26 @@ export default function SessionsPage() {
       {/* Refresh button */}
       <div className="flex justify-end mb-4">
         <Button
+          ref={refreshFocus.ref}
           type="button"
           variant="outline"
           onClick={load}
           disabled={loading}
         >
-          <i className={`fas fa-sync-alt text-[13px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-small ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </Button>
       </div>
 
       {/* Error */}
       {error && (
-        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
-        </div>
+        <LoadFailedAlert message={error} onRetry={load} className="mb-4" />
       )}
 
       {/* Loading */}
       {loading && (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" label="Loading sessions" />
+          <Spinner size="lg" label="Loading sessions" onRetry={load} />
         </div>
       )}
 
@@ -79,23 +95,23 @@ export default function SessionsPage() {
       {!loading && !error && sessions.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-stone-500">
           <i className="fas fa-shield-alt text-4xl mb-3" aria-hidden />
-          <p className="text-[14px] font-medium">No active sessions</p>
-          <p className="text-[13px] mt-1">All users are currently logged out.</p>
+          <p className="text-body font-medium">No active sessions</p>
+          <p className="text-small mt-1">All users are currently logged out.</p>
         </div>
       )}
 
       {/* Sessions table */}
       {!loading && sessions.length > 0 && (
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <div className="bg-white rounded-card border border-stone-200 overflow-hidden">
           {/* Count badge */}
           <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-            <span className="text-[13px] text-stone-500 font-medium">
+            <span className="text-small text-stone-500 font-medium">
               {sessions.length} active session{sessions.length !== 1 ? "s" : ""}
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-[14px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">User</th>
@@ -123,10 +139,9 @@ export default function SessionsPage() {
                         type="button"
                         size="sm"
                         variant="danger"
-                        onClick={() => handleRevoke(s.jti)}
-                        loading={revoking === s.jti}
+                        onClick={() => setRevokeTarget(s)}
                       >
-                        {revoking === s.jti ? "Revoking…" : "Revoke"}
+                        Revoke
                       </Button>
                     </td>
                   </tr>
@@ -136,6 +151,23 @@ export default function SessionsPage() {
           </div>
         </div>
       )}
+
+      {/* Names whose session it is, so a slip on the wrong row is seen. */}
+      <ConfirmDialog
+        open={!!revokeTarget}
+        title={revokeTarget ? `Revoke ${whose(revokeTarget)}'s session?` : ""}
+        message={
+          revokeTarget
+            ? `${whose(revokeTarget)} will be logged out on their next request and will need to log in again.`
+            : ""
+        }
+        confirmLabel="Revoke session"
+        danger
+        focusCancel
+        confirming={revoking}
+        onConfirm={() => void handleRevoke()}
+        onCancel={() => setRevokeTarget(null)}
+      />
     </div>
   );
 }

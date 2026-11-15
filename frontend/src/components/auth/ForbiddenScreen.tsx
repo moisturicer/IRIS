@@ -39,7 +39,7 @@ export function ForbiddenScreen({ authenticatedRole, requiredRoles }: ForbiddenS
         </Link>
       }
     >
-      <dl className="space-y-2 rounded-xl border border-stone-200 bg-surface px-5 py-4 text-small">
+      <dl className="space-y-2 rounded-card border border-stone-200 bg-surface px-5 py-4 text-small">
         <div className="flex justify-between gap-4">
           <dt className="font-semibold text-stone-600">Your role</dt>
           <dd className="font-medium text-stone-900">{authenticatedRole ?? "None"}</dd>

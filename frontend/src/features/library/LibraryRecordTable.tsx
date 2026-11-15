@@ -74,9 +74,9 @@ export function LibraryRecordTable({
         onClick={() => onCite(record)}
         aria-label={`Cite ${record.title}`}
         title="Cite"
-        className="p-1.5 rounded-md text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
+        className="p-1.5 rounded-control text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
       >
-        <i className="fas fa-quote-right text-[12px]" aria-hidden />
+        <i className="fas fa-quote-right text-label" aria-hidden />
       </button>
       {onRemove && (
         <button
@@ -84,9 +84,9 @@ export function LibraryRecordTable({
           onClick={() => onRemove(record.id)}
           aria-label={`${removeLabel}: ${record.title}`}
           title={removeLabel}
-          className="p-1.5 rounded-md text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
+          className="p-1.5 rounded-control text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
         >
-          <i className="fas fa-bookmark text-[12px]" aria-hidden />
+          <i className="fas fa-bookmark text-label" aria-hidden />
         </button>
       )}
     </div>
@@ -95,7 +95,7 @@ export function LibraryRecordTable({
   const badges = (record: RecordListItem, dash = true) => {
     const list = statusBadges(record);
     if (list.length === 0) {
-      return dash ? <span className="text-[13px] text-stone-300">—</span> : null;
+      return dash ? <span className="text-small text-stone-300">—</span> : null;
     }
     return (
       <div className="flex flex-wrap gap-1">
@@ -103,7 +103,7 @@ export function LibraryRecordTable({
           <span
             key={badge.label}
             className={cn(
-              "px-1.5 py-0.5 rounded text-[11px] font-semibold whitespace-nowrap",
+              "px-1.5 py-0.5 rounded-control text-label font-semibold whitespace-nowrap",
               BADGE_TONE_CLASS[badge.tone],
             )}
           >
@@ -124,8 +124,8 @@ export function LibraryRecordTable({
             <li
               key={record.id}
               className={cn(
-                "group relative flex flex-col rounded-2xl border bg-white p-card-compact transition-[border-color,box-shadow] duration-200 hover:shadow-card-md md:p-card",
-                selected.has(record.id) ? "border-brand-200" : "border-stone-200",
+                "group relative flex flex-col rounded-card border bg-white p-card-compact transition-[border-color,box-shadow] duration-200 hover:shadow-card-md md:p-card",
+                selected.has(record.id) ? "border-stone-900" : "border-stone-200",
               )}
             >
               <div className="flex items-center gap-2">
@@ -144,7 +144,7 @@ export function LibraryRecordTable({
               <h3 className="mt-2 font-display text-title font-semibold leading-snug text-stone-900">
                 <Link
                   to={`/records/${record.id}`}
-                  className="line-clamp-3 rounded-sm transition-colors group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 after:absolute after:inset-0 after:rounded-2xl after:content-['']"
+                  className="line-clamp-3 rounded-control transition-colors group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 after:absolute after:inset-0 after:rounded-card after:content-['']"
                 >
                   {highlightMatch(record.title, query)}
                 </Link>
@@ -155,7 +155,7 @@ export function LibraryRecordTable({
               {viewed && <p className="mt-0.5 text-label text-stone-500">{viewed}</p>}
               <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">
                 {status && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-semibold text-brand ring-1 ring-brand-200">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-0.5 text-2xs font-semibold text-brand ring-1 ring-stone-300">
                     <i className={cn("fas", READING_STATUSES.find((s) => s.value === status)?.icon)} aria-hidden />
                     {readingStatusLabel(status)}
                   </span>
@@ -170,7 +170,7 @@ export function LibraryRecordTable({
   }
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+    <div className="bg-white border border-stone-200 rounded-card overflow-hidden">
       {/* Column headings only make sense once the row is actually columnar. */}
       <div
         className={cn(
@@ -185,11 +185,11 @@ export function LibraryRecordTable({
           aria-label="Select all records"
           className="accent-brand"
         />
-        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Title</span>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Authors</span>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Published</span>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Status / IP</span>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 text-right">
+        <span className="text-label font-bold uppercase tracking-wider text-stone-400">Title</span>
+        <span className="text-label font-bold uppercase tracking-wider text-stone-400">Authors</span>
+        <span className="text-label font-bold uppercase tracking-wider text-stone-400">Published</span>
+        <span className="text-label font-bold uppercase tracking-wider text-stone-400">Status / IP</span>
+        <span className="text-label font-bold uppercase tracking-wider text-stone-400 text-right">
           Actions
         </span>
       </div>
@@ -201,7 +201,7 @@ export function LibraryRecordTable({
             className={cn(
               "grid gap-x-3 gap-y-1.5 items-start md:items-center px-4 py-3 transition-colors",
               ROW_GRID,
-              selected.has(record.id) ? "bg-brand-50/40" : "hover:bg-stone-50",
+              selected.has(record.id) ? "bg-stone-100" : "hover:bg-stone-50",
             )}
           >
             <div className="flex items-center gap-2">
@@ -220,24 +220,24 @@ export function LibraryRecordTable({
                   to={`/records/${record.id}`}
                   // Two lines rather than one: recognising the paper is the whole
                   // point of the row, and a mid-phrase ellipsis defeats it.
-                  className="block text-[14px] font-semibold text-stone-900 hover:text-brand leading-snug line-clamp-2"
+                  className="block text-body font-semibold text-stone-900 hover:text-brand leading-snug line-clamp-2"
                 >
                   {highlightMatch(record.title, query)}
                 </Link>
                 {viewedLabel(viewedAt?.[record.id]) && (
-                  <p className="text-[12px] text-stone-400 mt-0.5">
+                  <p className="text-label text-stone-400 mt-0.5">
                     {viewedLabel(viewedAt?.[record.id])}
                   </p>
                 )}
               </div>
             </div>
 
-            <p className="text-[13px] text-stone-500 truncate">
+            <p className="text-small text-stone-500 truncate">
               <span className="md:hidden text-stone-400">By </span>
               <span className={formatAuthorList(record.authors, 2) === "Authors not recorded" ? "italic text-stone-500" : undefined}>{formatAuthorList(record.authors, 2)}</span>
             </p>
 
-            <p className="text-[13px] text-stone-500 tabular-nums">{recordYearLabel(record)}</p>
+            <p className="text-small text-stone-500 tabular-nums">{recordYearLabel(record)}</p>
 
             {badges(record)}
 

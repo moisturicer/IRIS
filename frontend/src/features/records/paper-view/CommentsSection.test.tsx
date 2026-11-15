@@ -83,7 +83,7 @@ describe("published paper comments", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Please wait before loading comments.");
     expect(screen.queryByText("No comments yet. Start the discussion.")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("shows replies under the comment they answer, with author and edited markers", async () => {

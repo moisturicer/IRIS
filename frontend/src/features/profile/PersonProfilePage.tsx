@@ -3,6 +3,8 @@ import { Navigate, useParams } from "react-router-dom";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
+import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useAuth } from "@/hooks/useAuth";
@@ -60,23 +62,20 @@ function PersonProfile({ id }: { id: number }) {
 /** The header and two sections in the page's own shape, announced once as loading. */
 function ProfileSkeleton() {
   return (
-    <div role="status" className="max-w-4xl">
-      <span className="sr-only">Loading profile…</span>
-      <div aria-hidden="true">
-        <div className="flex items-start gap-6">
-          <div className="h-20 w-20 shrink-0 rounded-full bg-stone-100 animate-pulse motion-reduce:animate-none sm:h-28 sm:w-28" />
-          <div className="mt-2 flex-1 space-y-3">
-            <div className="h-6 w-1/2 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-            <div className="h-4 w-1/4 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-            <div className="h-4 w-2/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          </div>
-        </div>
-        <div className="mt-8 space-y-3 border-t border-stone-200 pt-8">
-          <div className="h-3 w-full rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="h-3 w-11/12 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
-          <div className="h-3 w-2/3 rounded bg-stone-100 animate-pulse motion-reduce:animate-none" />
+    <LoadingRegion label="Loading profile…" className="max-w-4xl">
+      <div className="flex items-start gap-6">
+        <SkeletonBlock shape="pill" className="h-20 w-20 shrink-0 sm:h-28 sm:w-28" />
+        <div className="mt-2 flex-1 space-y-3">
+          <SkeletonBlock className="h-6 w-1/2" />
+          <SkeletonBlock className="h-4 w-1/4" />
+          <SkeletonBlock className="h-4 w-2/3" />
         </div>
       </div>
-    </div>
+      <div className="mt-8 space-y-3 border-t border-stone-200 pt-8">
+        <SkeletonBlock className="h-3 w-full" />
+        <SkeletonBlock className="h-3 w-11/12" />
+        <SkeletonBlock className="h-3 w-2/3" />
+      </div>
+    </LoadingRegion>
   );
 }

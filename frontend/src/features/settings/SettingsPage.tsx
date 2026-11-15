@@ -1,10 +1,10 @@
 import { INSTITUTION } from "@/config/institution";
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { TONES } from "@/components/ui/statusTones";
 import { useAuth } from "@/hooks/useAuth";
 import { pathFor } from "@/lib/access";
@@ -14,6 +14,7 @@ import { Panel } from "./settingsParts";
 import { AiAnswerPanel } from "./AiAnswerPanel";
 import { CurrentNoticePanel } from "./CurrentNoticePanel";
 import { DeleteAccountPanel, DownloadMyDataPanel } from "./YourDataPanels";
+import { HERE } from "@/components/ui/highlightRoles";
 
 /**
  * Settings: the account. Who you are on IRIS (name, photo, bio, interests)
@@ -72,12 +73,12 @@ export default function SettingsPage() {
       <PageHeader
         title="Settings"
         description="Your sign-in, your data and what your role lets you do."
-        actions={<Link to={pathFor("profile")} className={cn(PILL_SECONDARY, FOCUS_RING)}>Your profile</Link>}
+        actions={<ButtonLink to={pathFor("profile")} variant="outline" size="page">Your profile</ButtonLink>}
       />
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <nav
-          className="w-full lg:w-[260px] shrink-0 bg-white rounded-xl border border-stone-200 p-2
+          className="w-full lg:w-[260px] shrink-0 bg-white rounded-card border border-stone-200 p-2
             flex lg:flex-col gap-1 overflow-x-auto scrollbar-thin"
           aria-label="Settings sections"
         >
@@ -90,14 +91,14 @@ export default function SettingsPage() {
                 onClick={() => setTab(t.id)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[14px] font-medium",
+                  "flex items-center gap-2.5 px-3 py-2.5 rounded-control text-body font-medium",
                   "whitespace-nowrap transition-colors text-left",
                   active
-                    ? "bg-brand-50 text-brand font-semibold"
+                    ? HERE
                     : "text-stone-600 hover:bg-stone-50",
                 )}
               >
-                <i className={cn("fas", t.icon, "text-[13px] w-4 shrink-0")} aria-hidden />
+                <i className={cn("fas", t.icon, "text-small w-4 shrink-0", active && "text-brand")} aria-hidden />
                 {t.label}
               </button>
             );
@@ -123,28 +124,28 @@ function Field({
 }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[12px] font-bold uppercase tracking-wider text-stone-500 mb-1.5">
+      <span className="block text-label font-bold uppercase tracking-wider text-stone-500 mb-1.5">
         {label}
       </span>
       {children}
-      {hint && <span className="block text-[12px] text-stone-500 mt-1.5">{hint}</span>}
+      {hint && <span className="block text-label text-stone-600 mt-1.5">{hint}</span>}
     </label>
   );
 }
 
 const inputClass =
-  "w-full px-3 py-2 rounded-lg border border-stone-200 text-[14px] text-stone-900 " +
+  "w-full px-3 py-2 rounded-control border border-field text-control text-stone-900 " +
   FOCUS_RING;
 
 const readOnlyClass =
-  "w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-[14px] text-stone-500";
+  "w-full px-3 py-2 rounded-control border border-field bg-stone-50 text-control text-stone-600";
 
 function Notice({ tone, children }: { tone: "ok" | "error"; children: React.ReactNode }) {
   return (
     <p
       role="status"
       className={cn(
-        "text-[13px] rounded-lg px-3 py-2 flex items-start gap-2",
+        "text-small rounded-control px-3 py-2 flex items-start gap-2",
         tone === "ok" ? TONES.settled : TONES.active,
       )}
     >
@@ -234,14 +235,15 @@ function SecurityTab({ email, isVerified }: { email: string; isVerified: boolean
 
         <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-stone-100">
           {error && <Notice tone="error">{error}</Notice>}
-          <button
+          <Button
             type="submit"
-            disabled={saving || !oldPassword || !newPassword}
-            className="ml-auto px-4 py-2 rounded-lg text-[13px] font-bold uppercase tracking-wider
-              bg-brand text-white hover:bg-brand-light disabled:opacity-40"
+            className="ml-auto"
+            loading={saving}
+            disabled={!oldPassword || !newPassword}
+            disabledReason="Enter your current password and a new one."
           >
             {saving ? "Changing..." : "Change password"}
-          </button>
+          </Button>
         </div>
       </Panel>
     </form>
@@ -259,19 +261,19 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
         title="Data privacy & consent"
         caption="The consent recorded against your account under the Data Privacy Act of 2012 (RA 10173)."
       >
-        <div className="flex items-start gap-3 rounded-lg border border-stone-200 p-4">
+        <div className="flex items-start gap-3 rounded-control border border-stone-200 p-4">
           <i
             className={cn(
-              "fas text-[15px] mt-0.5",
+              "fas text-body mt-0.5",
               user.consent_given ? "fa-circle-check text-stone-900" : "fa-circle-exclamation text-stone-600",
             )}
             aria-hidden
           />
           <div className="min-w-0">
-            <p className="text-[14px] font-semibold text-stone-900">
+            <p className="text-body font-semibold text-stone-900">
               {user.consent_given ? "Consent on record" : "No consent recorded"}
             </p>
-            <p className="text-[13px] text-stone-600 mt-0.5">
+            <p className="text-small text-stone-600 mt-0.5">
               {user.consent_given
                 ? `Recorded when your account was created on ${formatDate(user.date_joined)}.`
                 : "This account has no consent recorded against it."}
@@ -282,7 +284,7 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
         {/* Read-only by design. `consent_given` is read-only server-side and
             FR-M6-06 records it at registration. Withdrawing it means deleting
             the account (ADR-051 decision 18), which the panel below offers. */}
-        <p className="text-[13px] text-stone-500 mt-3">
+        <p className="text-small text-stone-500 mt-3">
           Consent is recorded once, when your account is created. Withdrawing it means deleting your
           account, which you can ask for below.
         </p>
@@ -309,20 +311,20 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
     <div className="space-y-4">
       <Panel title="Role & access" caption="What your role lets you do in IRIS.">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="px-3 py-1.5 rounded-lg bg-brand text-white text-[13px] font-bold uppercase tracking-wider">
+          <span className="px-3 py-1.5 rounded-control bg-brand text-white text-small font-bold uppercase tracking-wider">
             {user.role_name ?? "No role assigned"}
           </span>
           {user.is_superuser && (
-            <span className="px-2.5 py-1 rounded-md border border-stone-200 text-[12px] font-semibold text-stone-600">
+            <span className="px-2.5 py-1 rounded-control border border-stone-200 text-label font-semibold text-stone-600">
               Superuser
             </span>
           )}
           {user.is_staff && !user.is_superuser && (
-            <span className="px-2.5 py-1 rounded-md border border-stone-200 text-[12px] font-semibold text-stone-600">
+            <span className="px-2.5 py-1 rounded-control border border-stone-200 text-label font-semibold text-stone-600">
               Django admin
             </span>
           )}
-          <span className="text-[13px] text-stone-500">
+          <span className="text-small text-stone-500">
             Member since {formatDate(user.date_joined)}
           </span>
         </div>
@@ -330,8 +332,8 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
         {capabilities.length > 0 && (
           <ul className="mt-5 space-y-2">
             {capabilities.map((c) => (
-              <li key={c} className="flex items-start gap-2.5 text-[13px] text-stone-700">
-                <i className="fas fa-check text-stone-900 text-[12px] mt-0.5 shrink-0" aria-hidden />
+              <li key={c} className="flex items-start gap-2.5 text-small text-stone-700">
+                <i className="fas fa-check text-stone-900 text-label mt-0.5 shrink-0" aria-hidden />
                 <span>{c}</span>
               </li>
             ))}
@@ -339,7 +341,7 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
         )}
 
         {/* Role changes are administrative acts, with no self-service request endpoint. */}
-        <p className="text-[13px] text-stone-500 mt-5 pt-4 border-t border-stone-100">
+        <p className="text-small text-stone-500 mt-5 pt-4 border-t border-stone-100">
           RDCO approves Student and Adviser roles. The System Admin assigns office roles and office
           coordinators. If your role is wrong, contact the Research and Development Coordinating
           Office. Your role cannot be changed from this screen.

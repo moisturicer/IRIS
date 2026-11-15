@@ -21,7 +21,7 @@ export function HighlightMarks({ highlights, page }: { highlights: ReaderHighlig
       {regions.map(({ key, r }) => (
         <span
           key={key}
-          className="reader-highlight absolute rounded-sm"
+          className="reader-highlight absolute rounded-none"
           style={{
             left: `${r.left * 100}%`, top: `${r.top * 100}%`,
             width: `${(r.right - r.left) * 100}%`, height: `${(r.bottom - r.top) * 100}%`,

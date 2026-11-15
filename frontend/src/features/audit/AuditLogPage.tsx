@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { auditApi, type AuditListParams } from "@/api/audit";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable } from "@/components/shared/DataTable";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { failureMessage } from "@/lib/readFailure";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -68,6 +70,9 @@ export default function AuditLogPage() {
   const [filters, setFilters] = useState<AuditListParams>(initialEventType ? { event_type: initialEventType } : {});
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
+  /** The list read failed (not an export or a form check): the banner offers Try again. */
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -93,13 +98,14 @@ export default function AuditLogPage() {
     let active = true;
     setLoading(true);
     setError("");
+    setLoadFailed(false);
     auditApi.list({ ...filters, page, page_size: 20 }).then(({ data }) => {
       if (active) { setEvents(data.results); setTotal(data.count); }
-    }).catch(() => {
-      if (active) { setEvents([]); setTotal(0); setError("Could not load the audit log. Try filtering again."); }
+    }).catch((err: unknown) => {
+      if (active) { setEvents([]); setTotal(0); setLoadFailed(true); setError(failureMessage(err, { lead: "The audit log didn't load." })); }
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [filters, page]);
+  }, [filters, page, attempt]);
 
   async function exportCsv() {
     setExporting(true);
@@ -142,7 +148,9 @@ export default function AuditLogPage() {
     </form>
     {typesFailed && <p id="audit-event-types-note" className="mb-3 text-sm text-stone-600">Event types could not be loaded, so the log cannot be filtered by type. Reload the page to try again.</p>}
     <p className="mb-3 text-sm text-stone-600">Filter applies the fields above. CSV exports every row matching the applied filters, across all pages.</p>
-    {error && <p role="alert" className="mb-4 text-danger">{error}</p>}
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden"><DataTable caption="Audit log events" data={events} columns={columns} loading={loading} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
+    {error && loadFailed
+      ? <LoadFailedAlert message={error} onRetry={() => setAttempt((n) => n + 1)} className="mb-4" />
+      : error && <p role="alert" className="mb-4 text-danger">{error}</p>}
+    <div className="bg-white rounded-card border border-stone-200 overflow-hidden"><DataTable caption="Audit log events" data={events} columns={columns} loading={loading} onRetry={() => setAttempt((n) => n + 1)} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
   </div>;
 }

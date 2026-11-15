@@ -12,7 +12,7 @@ import { CONTROL_BASE } from "./controls";
 
 /** A square icon control in the panel's header: quiet at rest, a grey wash on hover. */
 export const ICON_BUTTON =
-  "relative inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-stone-600 transition-colors " +
+  "relative inline-flex size-9 shrink-0 items-center justify-center rounded-control text-stone-600 transition-colors " +
   "hover:bg-stone-200 hover:text-stone-900 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent";
 
 export const PANEL_WIDTH_KEY = "iris_ask_iris_width";
@@ -226,7 +226,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
       <div className="flex items-center gap-2">
         <AskIrisMark className="h-5 w-5 shrink-0 text-brand" />
         <h2 id={headingId} className="font-display text-xl font-semibold leading-none text-stone-900">Ask IRIS</h2>
-        <span className="rounded border border-stone-300 px-1 text-3xs font-semibold uppercase tracking-wider text-stone-600">AI</span>
+        <span className="rounded-control border border-stone-300 px-1 text-3xs font-semibold uppercase tracking-wider text-stone-600">AI</span>
         <span className="flex-1" />
         <button type="button" onClick={() => setRecentOpen(v => !v)} aria-expanded={recentOpen} disabled={recent.length === 0}
           aria-label={recent.length > 0 ? `Recent chats (${recent.length})` : "Recent chats"}
@@ -321,7 +321,7 @@ export function ResizeEdge({
 export const PAPER_WORKSPACE_PANEL_CLASS =
   "absolute inset-0 z-40 " +
   "reading-split:left-auto reading-split:border-l reading-split:border-stone-300 " +
-  "reading-split:shadow-[-12px_0_32px_rgb(41_37_36/0.12)] " +
+  "reading-split:shadow-card-md " +
   "reading-wide:relative reading-wide:z-auto reading-wide:shadow-none reading-wide:shrink-0";
 
 /**
@@ -340,4 +340,4 @@ export const DOCKED_PANEL_CLASS =
  * the panel would cover the paper; a column beside it is never minimized.
  */
 export const MINIMIZED_SHEET_CLASS =
-  "fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-stone-200 shadow-card-md";
+  "fixed inset-x-0 bottom-0 z-40 rounded-t-dialog border border-stone-200 shadow-card-md";

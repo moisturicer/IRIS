@@ -117,4 +117,13 @@ describe("RouteDialog", () => {
     routeOptions.mockRejectedValue(new Error("offline")); open("route");
     expect(await screen.findByRole("alert")).toHaveTextContent("The offices could not be loaded.");
   });
+  it("offers Try again when the offices did not load, and reads them again (IR-1078)", async () => {
+    routeOptions.mockRejectedValueOnce(Object.assign(new Error("500"), { response: { status: 500 } }));
+    open("route");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("IRIS took too long to answer. Try again.");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("checkbox", { name: "RDCO" })).toBeInTheDocument();
+    expect(routeOptions).toHaveBeenCalledTimes(2);
+  });
 });

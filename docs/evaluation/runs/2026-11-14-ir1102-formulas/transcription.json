@@ -1,0 +1,383 @@
+{
+ "ticket": "IR-1102",
+ "tier": "proxy",
+ "models": [
+  "anthropic/claude-sonnet-5.5"
+ ],
+ "prompt_version": 1,
+ "dpi": 300,
+ "scorer": "docs/evaluation/runs/2026-11-13-unstructured-spike/formulas/latex_truth.py",
+ "formulas": 36,
+ "transcribed": 36,
+ "exact_after_normalization": 32,
+ "similarity_at_least_0_95": 34,
+ "mean_similarity": 0.988,
+ "rows": [
+  {
+   "paper": "25",
+   "page": 2,
+   "error": "",
+   "has_description": true,
+   "seconds": 6.0,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "25",
+   "page": 4,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.4,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "25",
+   "page": 8,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.4,
+   "exact": false,
+   "similarity": 0.974,
+   "hand": "typesets identically: bm versus boldsymbol, extra braces"
+  },
+  {
+   "paper": "25",
+   "page": 9,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.6,
+   "exact": false,
+   "similarity": 0.757,
+   "hand": "cosmetic: frac where the source has dfrac with displaystyle integrals; same mathematics"
+  },
+  {
+   "paper": "38",
+   "page": 2,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.0,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "38",
+   "page": 2,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.5,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "38",
+   "page": 2,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.7,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "38",
+   "page": 2,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.4,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "38",
+   "page": 3,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.7,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "38",
+   "page": 3,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.8,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "38",
+   "page": 3,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.8,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 1,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.4,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 3,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.6,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 4,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.1,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 4,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.5,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 6,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.7,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 6,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.0,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 7,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.5,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 7,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.3,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 7,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.5,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 8,
+   "error": "",
+   "has_description": true,
+   "seconds": 4.1,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 8,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.2,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 9,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.3,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 10,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.6,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 11,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.2,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 11,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.8,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "40",
+   "page": 13,
+   "error": "",
+   "has_description": true,
+   "seconds": 4.0,
+   "exact": false,
+   "similarity": 0.996,
+   "hand": "typesets identically: wrapped in aligned, {}^{4} versus ^4"
+  },
+  {
+   "paper": "40",
+   "page": 14,
+   "error": "",
+   "has_description": true,
+   "seconds": 5.4,
+   "exact": false,
+   "similarity": 0.836,
+   "hand": "typesets identically: wrapped in aligned"
+  },
+  {
+   "paper": "40",
+   "page": 14,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.6,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "58",
+   "page": 1,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.2,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "58",
+   "page": 1,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.4,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "58",
+   "page": 2,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.3,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "58",
+   "page": 2,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.7,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "58",
+   "page": 3,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.9,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "58",
+   "page": 3,
+   "error": "",
+   "has_description": true,
+   "seconds": 2.0,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  },
+  {
+   "paper": "58",
+   "page": 3,
+   "error": "",
+   "has_description": true,
+   "seconds": 3.5,
+   "exact": true,
+   "similarity": 1.0,
+   "hand": "exact after normalization"
+  }
+ ],
+ "hand_reading": {
+  "typesets_like_source": 35,
+  "cosmetic_difference": 1,
+  "mathematical_error": 0,
+  "read_by": "Claude (agent), 2026-11-14; for a person to confirm"
+ }
+}

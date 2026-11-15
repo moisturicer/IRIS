@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { Spinner } from "@/components/ui/Spinner";
 import { NoticeText } from "@/features/auth/notice/NoticeText";
 import { useApiRead } from "@/hooks/useApiRead";
+import { failureMessage } from "@/lib/readFailure";
 import { Message, Panel } from "./settingsParts";
 
 export function CurrentNoticePanel() {
@@ -24,7 +25,7 @@ export function CurrentNoticePanel() {
       ) : read.status !== "ready" || !notice || typeof notice.text !== "string" ? (
         // A wrong shape is treated as a failed read (CODING_STANDARDS F1).
         <div className="space-y-3">
-          <Message tone="error" role="alert">The notice didn&apos;t load. Check your connection, then try again.</Message>
+          <Message tone="error" role="alert">{failureMessage(read.error, { lead: "The notice didn't load." })}</Message>
           <div className="flex flex-wrap gap-3">
             <Button type="button" variant="secondary" onClick={read.retry}>Try again</Button>
           </div>

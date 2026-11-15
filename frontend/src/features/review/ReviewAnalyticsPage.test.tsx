@@ -68,7 +68,68 @@ describe("ReviewAnalyticsPage", () => {
   it("calls time in stage elapsed time, not effort", async () => {
     renderScreen(<ReviewAnalyticsPage />);
 
-    expect(await screen.findByText(/not hands-on effort/i)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "How these numbers are counted" }));
+
+    expect(screen.getByText(/not hands-on effort/i)).toBeInTheDocument();
+  });
+
+  it("opens on the figures, with the method in one disclosure that is closed", async () => {
+    renderScreen(<ReviewAnalyticsPage />);
+
+    const disclosure = await screen.findByRole("button", { name: "How these numbers are counted" });
+    expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/not hands-on effort/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/overdue counts only assignments/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "How these numbers are counted" })).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: /open now/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /how these numbers are counted/i })).toHaveLength(1);
+  });
+
+  it("opens the method with its definitions, and closes it again", async () => {
+    renderScreen(<ReviewAnalyticsPage />);
+    const disclosure = await screen.findByRole("button", { name: "How these numbers are counted" });
+
+    await userEvent.click(disclosure);
+
+    expect(disclosure).toHaveAttribute("aria-expanded", "true");
+    const method = screen.getByRole("region", { name: "How these numbers are counted" });
+    expect(within(method).getByText(/overdue counts only assignments/i)).toBeInTheDocument();
+    expect(within(method).getByText(/a cell needs 5 records for a median and 10 for a 90th percentile/i))
+      .toBeInTheDocument();
+    expect(within(method).getByText(/counts office visits/i)).toBeInTheDocument();
+    expect(within(method).getByText(/do not measure how much time clearance preservation saved/i))
+      .toBeInTheDocument();
+    expect(within(method).getByText(/times are asia\/manila; weeks start on monday/i)).toBeInTheDocument();
+
+    await userEvent.click(disclosure);
+    expect(screen.queryByRole("region", { name: "How these numbers are counted" })).not.toBeInTheDocument();
+  });
+
+  it("right-aligns every numeric column in tabular figures and leaves labels left", async () => {
+    renderScreen(<ReviewAnalyticsPage />);
+    await screen.findByRole("table", { name: /open now/i });
+
+    const check = (table: string, headers: string[], label: RegExp) => {
+      const t = screen.getByRole("table", { name: table });
+      const all = within(t).getAllByRole("columnheader");
+      for (const name of headers) {
+        const header = within(t).getByRole("columnheader", { name });
+        expect(header).toHaveClass("text-right");
+        const index = all.indexOf(header);
+        for (const row of within(t).getAllByRole("row").slice(1)) {
+          const cell = row.children[index];
+          expect(cell).toHaveClass("text-right", "tabular-nums");
+        }
+      }
+      expect(within(t).getByRole("columnheader", { name: label })).not.toHaveClass("text-right");
+    };
+
+    check("Open now",
+      ["Open", "In pool", "Open seats", "Overdue", "Overdue seats", "Paused", "No due date"], /^office$/i);
+    check("Time in stage", ["Records", "Median", "90th percentile"], /^office$/i);
+    check("Records entering and leaving, by week", ["Entered", "Left"], /^week of$/i);
+    check("New versions and preserved clearances",
+      ["New versions", "Kept a clearance", "Clearances kept"], /^policy$/i);
   });
 
   it("reports open and overdue work, and what could not be measured", async () => {

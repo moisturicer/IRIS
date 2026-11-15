@@ -366,6 +366,29 @@ it("names the configured institution on an institutional paper", async () => {
   expect(await screen.findByText("Example Research University")).toBeVisible();
 });
 
+describe("loading the record (IR-939)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+  });
+
+  it("announces the load once, by role and name, and says nothing more when the record draws", async () => {
+    signInAs(99, "Student");
+    vi.mocked(recordsApi.detail).mockReturnValueOnce(new Promise(() => {}) as never);
+    renderPaperView();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading this record…");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+
+  it("removes the status when the page replaces the skeleton", async () => {
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await screen.findByRole("heading", { name: record.title });
+    expect(screen.queryByText("Loading this record…")).not.toBeInTheDocument();
+  });
+});
+
 describe("arriving from a citation", () => {
   beforeEach(() => {
     shownRecord = record;
@@ -2002,7 +2025,8 @@ describe("the Review section (IR-412)", () => {
 
       await userEvent.click(await findColumns());
       expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
-        "Conversation on the right", "Threads on the right", "Details on the right",
+        // Changes is a tab on the first version too (IR-1139).
+        "Conversation on the right", "Threads on the right", "Changes on the right", "Details on the right",
       ]);
       await userEvent.click(screen.getByRole("menuitem", { name: "Conversation on the right" }));
 
@@ -2728,6 +2752,46 @@ describe("record versions (IR-416)", () => {
     expect(screen.getByRole("combobox", PICKER)).toHaveValue("2");
   });
 
+  // IR-1092: the one-row phone bar has no room for the picker, so below 640px
+  // of the workspace it sits in the reader's toolbar -- there once, in the
+  // tree, never drawn away -- and from 640px it stays in the bar.
+  describe("where the Paper tab keeps the picker (IR-1092)", () => {
+    const barOf = () => screen.getByRole("tablist", { name: "Paper view" }).parentElement as HTMLElement;
+    const readerOf = () => screen.getByText(/paper reader open/i).parentElement as HTMLElement;
+
+    it("is in the reader's toolbar, and not the bar, on a phone-width workspace", async () => {
+      shownRecord = { ...record, versions: twoVersions };
+      workspaceAt(360);
+      renderPaper(`/records/${RECORD_ID}?section=paper`);
+      await screen.findByText(/paper reader open/i);
+
+      const picker = screen.getByRole("combobox", PICKER);
+      expect(readerOf()).toContainElement(picker);
+      expect(barOf()).not.toContainElement(picker);
+    });
+
+    it("keeps a single version's label in the toolbar too, so a phone still says which it is reading", async () => {
+      shownRecord = { ...record, versions: [version(1, "submission")] };
+      workspaceAt(360);
+      renderPaper(`/records/${RECORD_ID}?section=paper`);
+      await screen.findByText(/paper reader open/i);
+
+      expect(readerOf()).toContainElement(screen.getByText("v1"));
+      expect(barOf()).not.toContainElement(screen.getByText("v1"));
+    });
+
+    it("stays in the bar from 640px", async () => {
+      shownRecord = { ...record, versions: twoVersions };
+      workspaceAt(1400);
+      renderPaper(`/records/${RECORD_ID}?section=paper`);
+      await screen.findByText(/paper reader open/i);
+
+      const picker = screen.getByRole("combobox", PICKER);
+      expect(barOf()).toContainElement(picker);
+      expect(readerOf()).not.toContainElement(picker);
+    });
+  });
+
   it("moves from Overview to the Paper tab when a version is chosen", async () => {
     shownRecord = { ...record, versions: twoVersions };
     renderPaperView();
@@ -2822,14 +2886,104 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.getByRole("button", { name: "Save" })).toHaveClass("bg-brand");
   });
 
-  it("lists the authors as chips, and says what the record is", async () => {
+  it("lists the authors as chips, and leaves what the record is to Record details (IR-1089)", async () => {
     renderPaperView();
     await waitForRecord(record.title);
 
     const authors = screen.getByRole("list", { name: "Authors" });
     expect(within(authors).getByText("R. Dela Cruz")).toBeInTheDocument();
-    expect(screen.getAllByText("Thesis/Research").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Applied Research").length).toBeGreaterThan(0);
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    expect(within(header).queryByText("Thesis/Research")).not.toBeInTheDocument();
+    expect(within(header).queryByText("Applied Research")).not.toBeInTheDocument();
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Thesis/Research")).toBeInTheDocument();
+    expect(within(details).getByText("Applied Research")).toBeInTheDocument();
+  });
+
+  it("sets the authors and the Adviser in one row, with the program line under them (IR-1142)", async () => {
+    shownRecord = {
+      ...record, origin: "institutional", adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos",
+      paper_details: { ...sidebarDetails, programs: ["BS Computer Science"] },
+    };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const authors = screen.getByRole("list", { name: "Authors" });
+    const adviser = screen.getByRole("list", { name: "Adviser" });
+    expect(authors.parentElement).toBe(adviser.parentElement);
+    // The Adviser is named once as a role; an author is a name, not a pill saying "Author".
+    expect(within(adviser).getByText("Adviser")).toBeInTheDocument();
+    expect(within(authors).queryByText("Author")).not.toBeInTheDocument();
+    expect(screen.getByText(/^BS Computer Science · /)).toBeInTheDocument();
+  });
+
+  it("names the authors once and dates the work once, above the abstract (IR-1089)", async () => {
+    shownRecord = { ...record, publication_year: 2025, access_count: 3 };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(screen.getAllByText("R. Dela Cruz")).toHaveLength(1);
+    expect(screen.getAllByText(/^Completed /)).toHaveLength(1);
+    expect(screen.queryByText(/^Added /)).not.toBeInTheDocument();
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    expect(within(header).getByText("Completed 2026")).toBeInTheDocument();
+    // Neither the publication year nor the view count is a second date or a stat in the header.
+    expect(within(header).queryByText(/Published \d{4}/)).not.toBeInTheDocument();
+    expect(within(header).queryByText(/\d+ views?$/)).not.toBeInTheDocument();
+  });
+
+  it("keeps governance fields in Record details and out of the header (IR-1089)", async () => {
+    shownRecord = {
+      ...record, is_ip: true, ip_type: "patent", for_commercialization: true, community_extension: true,
+      psced: "0613", publication_year: 2025, access_count: 3,
+    };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    for (const label of [/Intellectual Property/, /Commercialization/, /Community Extension/, /Patent/]) {
+      expect(within(header).queryByText(label)).not.toBeInTheDocument();
+    }
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    const row = (label: string) => within(details).getByText(label).parentElement as HTMLElement;
+    expect(row("Published")).toHaveTextContent("2025");
+    expect(row("Views")).toHaveTextContent("3");
+    expect(row("PSCED")).toHaveTextContent("0613");
+    expect(row("Community Extension")).toHaveTextContent("Yes");
+    expect(row("IP Status")).toHaveTextContent("Patent");
+    expect(row("Commercialization")).toHaveTextContent("Eligible");
+  });
+
+  it("reads its headings in order, none above its parent's size, inside the AI Overview (IR-1089)", async () => {
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.overview).mockResolvedValueOnce({
+      data: {
+        state: "ready", cached: false,
+        overview: { text: "## Methodology\n\nA network.\n\n### Data\n\nGauge records.", citations: [], degraded: false, model: "fake", generated_at: "2026-09-23T00:00:00Z" },
+      },
+    } as never);
+    renderPaperView();
+    await waitForRecord(record.title);
+    await screen.findByRole("heading", { name: "Methodology" });
+
+    const headings = screen.getAllByRole("heading").map((h) => ({
+      level: Number(h.tagName.slice(1)), name: h.textContent ?? "",
+    }));
+    expect(headings[0]).toMatchObject({ level: 1, name: record.title });
+    expect(headings.filter((h) => h.level === 1)).toHaveLength(1);
+    // Never a step down of more than one level (an h2 straight to an h4).
+    headings.slice(1).forEach((h, i) => expect(h.level, `"${h.name}" after "${headings[i].name}"`).toBeLessThanOrEqual(headings[i].level + 1));
+
+    const overviewAt = headings.findIndex((h) => h.name.trim() === "AI Overview");
+    const methodologyAt = headings.findIndex((h) => h.name === "Methodology");
+    const dataAt = headings.findIndex((h) => h.name === "Data");
+    expect(overviewAt).toBeGreaterThan(-1);
+    expect([methodologyAt, dataAt]).toEqual([overviewAt + 1, overviewAt + 2]);
+    // Inside the AI Overview no heading outranks the AI Overview's own.
+    for (const inside of [methodologyAt, dataAt]) {
+      expect(headings[inside].level).toBeGreaterThanOrEqual(headings[overviewAt].level);
+    }
+    expect(headings[dataAt].level).toBeGreaterThan(headings[methodologyAt].level);
   });
 
   it("never credits the submitting owner as an unrecorded author", async () => {
@@ -2850,7 +3004,9 @@ describe("the Overview's header (IR-569)", () => {
     const authors = screen.getByRole("list", { name: "Authors" });
     expect(within(authors).getAllByRole("listitem")).toHaveLength(8);
     expect(within(authors).getByText("Ashish Vaswani")).toBeInTheDocument();
-    expect(screen.getByText("Published 2017")).toBeInTheDocument();
+    // The publication year is a governance field now, in Record details (IR-1089).
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Published").parentElement).toHaveTextContent("2017");
     expect(screen.getByText("Completed 2020")).toBeInTheDocument();
     expect(screen.getByText("Imported reference")).toBeInTheDocument();
     expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
@@ -3025,8 +3181,9 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent("That citation points at another paper, so nothing is highlighted here.");
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    // Wait for the page: while the record loads, the skeleton is itself a status (IR-939).
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("That citation points at another paper, so nothing is highlighted here.");
   });
 
   it("highlights nothing from a citation the answer no longer has", async () => {
@@ -3034,8 +3191,8 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/no longer part of the answer/);
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/no longer part of the answer/);
     expect(screen.getByRole("button", { name: "Back to answer" })).toBeInTheDocument();
   });
 
@@ -3045,8 +3202,8 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     renderPaper(ADDRESS);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/answer this citation came from is no longer available/);
-    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/answer this citation came from is no longer available/);
     expect(screen.queryByRole("button", { name: "Back to answer" })).not.toBeInTheDocument();
   });
 

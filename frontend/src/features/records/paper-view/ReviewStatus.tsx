@@ -106,7 +106,7 @@ function PartyStatus({ row }: { row: TrackerPartyRow }) {
         )}
       </p>
       {row.carryover && row.carryover_label && (
-        <p className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-stone-300 bg-stone-100 font-bold text-stone-900">
+        <p className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-control border border-stone-300 bg-stone-100 font-bold text-stone-900">
           <i className={cn("fas text-2xs", CARRYOVER_ICON[row.carryover])} aria-hidden />
           {row.carryover_label}
         </p>

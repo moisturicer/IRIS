@@ -111,6 +111,12 @@ class MeSerializer(UserSerializer):
     `UserSerializer` -- so nobody learns
     who else reviews what.
 
+    `can_author` (IR-1096) says whether the user may start a record, so the
+    client shows Publish, and My Library's research tabs, only to someone the
+    server will let through. It is `core.permissions.can_author`, the same rule
+    `IsAuthor` enforces on `POST /records/`, and read-only. Own payload only,
+    like `review_access`.
+
     `role_request` (IR-537) is the user's latest role request while they have
     no role, so the pending screen can tell an applicant still waiting from
     one RDCO declined: `{status: "pending" | "declined", requested_role}`, or
@@ -118,6 +124,7 @@ class MeSerializer(UserSerializer):
     is read-only and needs no migration.
     """
     review_access = serializers.SerializerMethodField()
+    can_author    = serializers.SerializerMethodField()
     role_request  = serializers.SerializerMethodField()
 
     # The person's own optional profile (IR-695). Editable here and nowhere
@@ -134,7 +141,7 @@ class MeSerializer(UserSerializer):
 
     class Meta(UserSerializer.Meta):
         fields = [
-            *UserSerializer.Meta.fields, "review_access", "role_request",
+            *UserSerializer.Meta.fields, "review_access", "can_author", "role_request",
             "bio", "research_interests", "photo_url",
         ]
 
@@ -153,6 +160,11 @@ class MeSerializer(UserSerializer):
         from apps.reviews.seats import review_access
 
         return review_access(obj)
+
+    def get_can_author(self, obj):
+        from core.permissions import can_author
+
+        return can_author(obj)
 
     def get_role_request(self, obj):
         if obj.role_id is not None:

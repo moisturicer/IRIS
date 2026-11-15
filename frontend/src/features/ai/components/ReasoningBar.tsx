@@ -36,23 +36,23 @@ export function ReasoningBar({ activity, runStartedAt, compact = false }: {
   const elapsed = useSeconds(runStartedAt ?? activity.since);
   const step = activity.step;
   return (
-    <section aria-label="Research progress" className={cn("relative pl-4", compact ? "text-[13px]" : "text-sm")}>
+    <section aria-label="Research progress" className={cn("relative pl-4", compact ? "text-small" : "text-sm")}>
       {/* The thread: a quiet rule with a pulse travelling down it while IRIS works. */}
       <span aria-hidden className="absolute inset-y-0.5 left-0 w-[2px] overflow-hidden rounded-full bg-brand/15">
         <span className="absolute inset-x-0 h-1/2 bg-gradient-to-b from-transparent via-brand to-transparent motion-safe:animate-[iris-thread_1.6s_ease-in-out_infinite]" />
       </span>
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <span key={activity.label} role="status" aria-live="polite"
-          className={cn("font-display italic text-stone-900 motion-safe:animate-fade-in", compact ? "text-[15px]" : "text-[17px]")}>
+          className={cn("font-display italic text-stone-900 motion-safe:animate-fade-in", compact ? "text-body" : "text-heading")}>
           {activity.label}
         </span>
-        {elapsed && <span className="font-mono text-[11px] tabular-nums text-stone-400">{elapsed}</span>}
+        {elapsed && <span className="font-mono text-label tabular-nums text-stone-400">{elapsed}</span>}
       </div>
       {step && <div key={`${step.kind}:${step.label}`} className="mt-1.5 motion-safe:animate-fade-in-up">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-0.5 text-[12px] font-medium text-brand">
-          <i className={cn(STEP_ICONS[step.kind], "text-[10px]")} aria-hidden />{step.label}
+        <span className="inline-flex items-center gap-1.5 rounded-control bg-surface px-2 py-0.5 text-label font-medium text-brand ring-1 ring-stone-300">
+          <i className={cn(STEP_ICONS[step.kind], "text-label")} aria-hidden />{step.label}
         </span>
-        {step.detail.length > 0 && <ul className="mt-1 space-y-0.5 text-[12px] text-stone-500">
+        {step.detail.length > 0 && <ul className="mt-1 space-y-0.5 text-label text-stone-500">
           {step.detail.map(title => <li key={title} className="truncate">{title}</li>)}
         </ul>}
       </div>}

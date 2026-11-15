@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { formatAuthorList, recordYearLabel } from "@/features/discover/discoverUtils";
@@ -22,7 +23,7 @@ const RECENT_SHOWN = 4;
 const SHELF_SHOWN = 2;
 
 const LINK_TEXT = cn(
-  "inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-small font-semibold text-brand hover:bg-brand-50",
+  "inline-flex min-h-9 items-center gap-2 rounded-control px-2 text-small font-semibold text-brand hover:bg-stone-100",
   COLOUR_TRANSITION,
   FOCUS_RING,
 );
@@ -65,10 +66,10 @@ export function LibraryOverview({
   return (
     <div className="space-y-section-lg">
       {waiting.length > 0 && (
-        <section aria-labelledby="overview-waiting" className="rounded-2xl border border-brand-200 bg-brand-50 p-card-compact md:p-card">
+        <section aria-labelledby="overview-waiting" className="rounded-card border border-stone-300 bg-surface p-card-compact md:p-card">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-brand ring-1 ring-brand-200" aria-hidden>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-white" aria-hidden>
                 <i className="fas fa-hourglass-half text-small" />
               </span>
               <div>
@@ -89,13 +90,13 @@ export function LibraryOverview({
             )}
           </div>
 
-          <ul className="mt-4 divide-y divide-brand-100 border-t border-brand-100">
+          <ul className="mt-4 divide-y divide-stone-200 border-t border-stone-200">
             {waiting.slice(0, WAITING_SHOWN).map((item) => (
               <li key={item.id} className="flex flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <Link
                     to={`/records/${item.id}`}
-                    className={cn("rounded-sm font-display text-heading font-semibold text-stone-900 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
+                    className={cn("rounded-control font-display text-heading font-semibold text-stone-900 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
                   >
                     {item.title}
                   </Link>
@@ -135,15 +136,15 @@ export function LibraryOverview({
           </div>
 
           {loading ? (
-            <div className="h-64 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" role="status">
-              <span className="sr-only">Loading your research…</span>
-            </div>
+            <LoadingRegion label="Loading your research…" onRetry={onRetry}>
+              <div className="h-64 rounded-card border border-stone-200 bg-white motion-safe:animate-pulse" />
+            </LoadingRegion>
           ) : failed ? (
             <ReadFailedState
               interrupted={interrupted}
               what="research list"
               title="Could not load your research"
-              message="Nothing was changed. Check your connection and try again."
+              lead="Nothing was changed."
               onRetry={onRetry}
             />
           ) : recent.length === 0 ? (
@@ -161,7 +162,7 @@ export function LibraryOverview({
           )}
         </section>
 
-        <section aria-labelledby="overview-shelf" className="rounded-2xl border border-stone-200 bg-white p-card-compact md:p-card">
+        <section aria-labelledby="overview-shelf" className="rounded-card border border-stone-200 bg-white p-card-compact md:p-card">
           <h2 id="overview-shelf" className="font-display text-title font-semibold text-stone-900">Reading shelf</h2>
           <p className="text-small text-stone-600">Saved papers follow your account.</p>
 
@@ -174,13 +175,13 @@ export function LibraryOverview({
             <ul className="mt-2 space-y-3">
               {reading.map(({ record }) => record && (
                 <li key={record.id} className="flex gap-3">
-                  <span className="grid h-14 w-11 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-500 ring-1 ring-stone-200" aria-hidden>
+                  <span className="grid h-14 w-11 shrink-0 place-items-center rounded-control bg-stone-100 text-stone-600 ring-1 ring-stone-200" aria-hidden>
                     <i className="fas fa-book-open text-small" />
                   </span>
                   <div className="min-w-0">
                     <Link
                       to={`/records/${record.id}`}
-                      className={cn("line-clamp-2 rounded-sm font-display text-heading font-semibold leading-snug text-stone-900 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
+                      className={cn("line-clamp-2 rounded-control font-display text-heading font-semibold leading-snug text-stone-900 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
                     >
                       {record.title}
                     </Link>
@@ -201,7 +202,7 @@ export function LibraryOverview({
                   <li key={visit.recordId}>
                     <Link
                       to={`/records/${visit.recordId}`}
-                      className={cn("block truncate rounded-sm text-small font-semibold text-stone-800 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
+                      className={cn("block truncate rounded-control text-small font-semibold text-stone-800 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
                     >
                       {visit.title}
                     </Link>
@@ -221,7 +222,7 @@ export function LibraryOverview({
                     <button
                       type="button"
                       onClick={() => onOpenSaved({ kind: "folder", id: c.id })}
-                      className={cn("flex min-h-9 w-full items-center gap-3 rounded-lg px-2 text-left text-small text-stone-700 hover:bg-stone-50", COLOUR_TRANSITION, FOCUS_RING)}
+                      className={cn("flex min-h-9 w-full items-center gap-3 rounded-control px-2 text-left text-small text-stone-700 hover:bg-stone-50", COLOUR_TRANSITION, FOCUS_RING)}
                     >
                       <i className="fas fa-folder w-4 text-center text-stone-500" aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{c.name}</span>

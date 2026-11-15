@@ -41,8 +41,9 @@ ADR_033_TECHNIQUES = {
 }
 
 # ADR-035 §1's evidence decision was registered here too, until IR-957
-# retired the shadow it switched.
-REGISTERED = ADR_033_TECHNIQUES
+# retired the shadow it switched. IR-1102 adds ADR-067's formula switch,
+# IR-1125 what the reranker reads.
+REGISTERED = ADR_033_TECHNIQUES | {"formula_text", "reranker_reads"}
 
 
 # -- the registry -------------------------------------------------------------
@@ -66,6 +67,23 @@ def test_an_unknown_name_is_refused_and_the_known_ones_are_named():
         technique("hybrid")
 
     assert "fusion" in str(exc.value)
+
+
+def test_an_index_time_switch_is_recorded_but_cannot_be_moved_by_a_run():
+    """IR-1102: moving it would record a measurement the index never had."""
+    with pytest.raises(TechniqueError) as exc:
+        parse_override("formula_text=on")
+
+    assert "re-chunk" in str(exc.value)
+    assert resolve()["formula_text"]["setting"] == "AI_FORMULA_TEXT_INDEXED"
+
+
+def test_what_the_reranker_reads_is_a_run_time_choice_defaulting_to_fallback():
+    """IR-1125's run moved the default to fallback (ADR-033 amendment)."""
+    assert resolve()["reranker_reads"]["value"] == "fallback"
+    assert parse_override("reranker_reads=fallback") == ("reranker_reads", "fallback")
+    with pytest.raises(TechniqueError):
+        parse_override("reranker_reads=caption")
 
 
 def test_the_registry_renders_for_an_operator_choosing_a_run():

@@ -29,7 +29,7 @@ const STATE_WORDS: Record<EntryStepState, string> = {
 };
 
 const TAB =
-  "-mb-px flex min-h-11 items-center gap-2 rounded-t-lg border border-b-0 px-3 py-2.5 text-small font-semibold sm:px-4";
+  "-mb-px flex min-h-11 items-center gap-2 rounded-t-control border border-b-0 px-3 py-2.5 text-small font-semibold sm:px-4";
 
 /**
  * Register's folder tabs (IR-707): a stepper in a `nav` named "Registration
@@ -87,7 +87,7 @@ export function EntrySteps({ steps, onSelect }: EntryStepsProps) {
             return (
               <li key={step.name} aria-current="step" className="flex">
                 <span
-                  className={cn(TAB, "entry-label z-10 mr-3 rounded-tl-xl border-t-2 border-stone-200 border-t-brand bg-white text-brand")}
+                  className={cn(TAB, "entry-label z-10 mr-3 rounded-tl-card border-t-2 border-stone-200 border-t-brand bg-white text-brand")}
                 >
                   {label}
                 </span>

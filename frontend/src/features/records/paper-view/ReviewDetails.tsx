@@ -190,7 +190,7 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
           </p>
         )}
         {onAllDocuments && (
-          <button type="button" onClick={onAllDocuments} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}>
+          <button type="button" onClick={onAllDocuments} className={cn(PILL_SECONDARY, FOCUS_RING, "reading-split:min-h-9 px-3")}>
             <i className="fas fa-folder-open text-2xs" aria-hidden />
             All documents
           </button>
@@ -209,7 +209,8 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
 
 function Section({ id, title, action, children }: { id?: string; title: string; action?: ReactNode; children: ReactNode }) {
   const headingId = useId();
-  const heading = <h3 id={headingId} className="font-display text-base font-semibold text-stone-900">{title}</h3>;
+  // A pull request sidebar's small sans label (IR-1131), not a title: the rule above does the dividing.
+  const heading = <h3 id={headingId} className="text-small font-semibold text-stone-600">{title}</h3>;
   return (
     <section id={id} tabIndex={id ? -1 : undefined} aria-labelledby={headingId} className={cn("space-y-2 border-t border-stone-200 pt-4 first:border-0 first:pt-0", FOCUS_RING)}>
       {action ? <div className="flex items-center justify-between gap-2">{heading}{action}</div> : heading}
@@ -266,7 +267,7 @@ function PartyReviewers({ row, ids, readable, people }: { row: TrackerPartyRow; 
   const unasked = UNASKED.has(row.state);
   const showSeats = !row.in_pool && readable && seats.length > 0;
   return (
-    <li id={detailsTarget(ids, row.party)} tabIndex={-1} className={cn("rounded", FOCUS_RING)}>
+    <li id={detailsTarget(ids, row.party)} tabIndex={-1} className={cn("rounded-control", FOCUS_RING)}>
       <p className={cn("flex items-center gap-2 text-small font-semibold", unasked ? "text-stone-600" : "text-stone-900")}>
         <span>{row.label}</span>
         {!showSeats && !row.in_pool && (
@@ -365,7 +366,7 @@ function Person({ person, name = person?.name ?? "A reviewer", role = person?.ro
       {open && createPortal(
         <div ref={card} id={cardId} role="dialog" aria-label={name} tabIndex={-1}
           style={position}
-          className={cn("fixed z-50 w-56 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-stone-300 bg-overlay p-3 shadow-sm", FOCUS_RING)}>
+          className={cn("fixed z-50 w-56 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-control border border-stone-300 bg-overlay p-3 shadow-sm", FOCUS_RING)}>
           <p className="font-display text-base font-semibold text-stone-900">{name}</p>
           {role && <p className="text-small text-stone-600">{role} on this record</p>}
           {person && <dl className="mt-2 space-y-1 break-words text-small text-stone-700">

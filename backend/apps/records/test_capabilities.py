@@ -343,7 +343,9 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"} | NAMES_CONTACT
     OWNER_AFTER_REVIEW = {"cite", "request_deletion", "comment_review"} | NAMES_CONTACT
     # RDCO publishes only a released paper (ADR-052 §14 as amended), so while
-    # these are held it keeps them unlisted or rejects them.
+    # these are held it keeps them unlisted or rejects them. Record detail still
+    # offers *publish* to the seated RDCO, held with the embargo's reason, so the
+    # footer can say why it waits (IR-1139); `decide/` refuses it.
     RDCO_UNSEATED = OFFICE | EMBARGO_ACTS
     # IR-797: RDCO may add an owner to, or withdraw, any paper in review, and
     # replace the Adviser while the Adviser's review is still open.
@@ -351,7 +353,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     RDCO_ADVISER_OPEN = RDCO_UNSEATED | RDCO_ACTS | {"replace_adviser"}
     RDCO_SEATED = {"cite", "tag_ip", "attach_file", "request_document", "open_review",
                    "add_reviewer", "route", "comment_review", "request_revision",
-                   "keep_unlisted", "reject"} | EMBARGO_ACTS | SEATED | RDCO_ACTS
+                   "keep_unlisted", "reject", "accept_publish"} | EMBARGO_ACTS | SEATED | RDCO_ACTS
     EXPECTED = {
         "draft": {
             "owner": {"cite", "continue_draft", "edit_details", "delete_record"} | NAMES_CONTACT, "adviser": {"cite"},

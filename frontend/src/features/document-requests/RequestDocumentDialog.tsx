@@ -116,7 +116,7 @@ export function RequestDocumentDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto outline-none"
+        className="bg-white rounded-dialog shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto outline-none"
       >
         <form onSubmit={submit} noValidate className="p-6 space-y-4">
           <div>
@@ -153,7 +153,7 @@ export function RequestDocumentDialog({
             ) : slots === null ? (
               <div aria-hidden className="space-y-2">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-4 rounded bg-stone-100 animate-pulse" />
+                  <div key={i} className="h-4 rounded-control bg-stone-100 animate-pulse" />
                 ))}
               </div>
             ) : slots.length === 0 ? (
@@ -200,7 +200,7 @@ export function RequestDocumentDialog({
               rows={3}
               aria-required
               placeholder="Why you need these, and anything they should check first."
-              className="w-full border border-stone-200 rounded-lg p-3 text-sm resize-y focus:outline-none focus:border-brand"
+              className="w-full border border-field rounded-control p-3 text-sm resize-y focus:outline-none focus:border-brand"
             />
           </div>
 
@@ -215,14 +215,14 @@ export function RequestDocumentDialog({
               type="button"
               onClick={onClose}
               disabled={sending}
-              className="px-4 py-2 rounded-lg border border-stone-200 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+              className="px-4 py-2 rounded-control border border-stone-200 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={sending}
-              className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-bold hover:bg-brand-light disabled:opacity-60"
+              className="px-4 py-2 rounded-control bg-brand text-white text-sm font-bold hover:bg-brand-light disabled:opacity-60"
             >
               {sending ? "Sending…" : "Send request"}
             </button>

@@ -153,9 +153,10 @@ vi.mock("@/api/notifications", () => ({
   },
 }));
 
-function signInAs(roleName: string) {
+/** `canAuthor` is the server's flag (IR-1096); a test says what the server said. */
+function signInAs(roleName: string, canAuthor = roleName === "Student" || roleName === "Adviser") {
   useAuthStore.setState({
-    user: { id: 9, email: "reader@cit.edu", role_name: roleName } as unknown as User,
+    user: { id: 9, email: "reader@cit.edu", role_name: roleName, can_author: canAuthor } as unknown as User,
     isAuthenticated: true,
     authReady: true,
   });
@@ -259,23 +260,258 @@ describe("the page head", () => {
     await screen.findByText(publishedThesis.title);
     expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
   });
+
+  // IR-1096: the server's capability decides, not the role name.
+  it("follows the server's can_author, not the role: a Student the server refuses sees no Publish", async () => {
+    signInAs("Student", false);
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
+  });
+
+  it("shows Publish to anyone the server says can author, whatever their role", async () => {
+    signInAs("ITSO", true);
+    renderDiscover();
+    expect(await screen.findByRole("button", { name: "Publish" })).toBeInTheDocument();
+  });
+});
+
+// IR-1080 (spec §4.6, audit RES-01): on a phone Discover is search, then ONE row of
+// named controls. jsdom loads no Tailwind, so the 44 px and "no sideways page scroll"
+// criteria are checked as the class tokens that give them; the pixels are a manual
+// check at 390 and 360 px (see the traceability file).
+describe("the phone toolbar (IR-1080)", () => {
+  const TOUCH_HEIGHT = /(^|\s)(min-)?h-11(\s|$)/;
+
+  /** The 1/2/3 column toggle is `hidden xl:inline-flex`: out of the phone row, though jsdom still holds it. */
+  const phoneControls = (row: HTMLElement) => within(row).getAllByRole("button").filter((b) => !/column/.test(b.getAttribute("aria-label") ?? ""));
+
+  async function phoneToolbar() {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    return screen.getByRole("group", { name: "Discover controls" });
+  }
+
+  it("puts search first, then one row holding every control, found by role and name", async () => {
+    const row = await phoneToolbar();
+    const search = screen.getByRole("textbox", { name: "Search records" });
+    expect(search.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const feed = within(row).getByRole("group", { name: "Discover feed" });
+    for (const name of ["For you", "Latest", "Trending"]) {
+      expect(within(feed).getByRole("button", { name })).toBeInTheDocument();
+    }
+    for (const name of [/^Choose Areas|^Edit Areas/, /^My feeds/, /^Filters/, "Publish"]) {
+      expect(within(row).getByRole("button", { name })).toBeInTheDocument();
+    }
+    expect(phoneControls(row)).toHaveLength(7);
+  });
+
+  it("moves Papers and People out of the row and into the header", async () => {
+    const row = await phoneToolbar();
+    const results = screen.getByRole("group", { name: "Discover results" });
+    expect(row).not.toContainElement(results);
+    const heading = screen.getByRole("heading", { level: 1, name: "Discover" });
+    expect(heading.compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(results.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(results).getByRole("button", { name: "Papers", pressed: true })).toBeInTheDocument();
+    await userEvent.click(within(results).getByRole("button", { name: "People" }));
+    expect(within(results).getByRole("button", { name: "People", pressed: true })).toBeInTheDocument();
+  });
+
+  it("shows Filters, Areas and Publish as visible text, with the count beside Filters", async () => {
+    const row = await phoneToolbar();
+    for (const [name, text] of [[/^Choose Areas|^Edit Areas/, "Areas"], [/^Filters/, "Filters"], ["Publish", "Publish"]] as const) {
+      const button = within(row).getByRole("button", { name });
+      expect(within(button).getByText(text).className).not.toMatch(/(^|\s)hidden(\s|$)/);
+    }
+    await userEvent.click(within(row).getByRole("button", { name: /^Filters/ }));
+    await choose(/^Type/, /Thesis/);
+    const filters = within(row).getByRole("button", { name: "Filters, 1 active" });
+    expect(filters).toHaveTextContent(/Filters\s*1/);
+    expect(within(filters).getByText("1").className).not.toMatch(/absolute/);
+  });
+
+  it("makes every control at least 44 px tall and lets the row, not the page, scroll sideways", async () => {
+    const row = await phoneToolbar();
+    expect(row.className).toMatch(/(^|\s)overflow-x-auto(\s|$)/);
+    for (const button of phoneControls(row)) {
+      expect(button.className, button.textContent ?? "").toMatch(TOUCH_HEIGHT);
+    }
+    const results = screen.getByRole("group", { name: "Discover results" });
+    for (const button of within(results).getAllByRole("button")) {
+      expect(button.className, button.textContent ?? "").toMatch(TOUCH_HEIGHT);
+    }
+  });
+
+  it("keeps the office reviewer's row to the controls that reviewer has", async () => {
+    signInAs("RDCO");
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const row = screen.getByRole("group", { name: "Discover controls" });
+    expect(within(row).queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
+    expect(phoneControls(row)).toHaveLength(6);
+  });
+});
+
+// IR-1082 (spec §4.6, audit VIS-01, VIS-05, LAY-01, LAY-02, US-01 to US-04): one filled action, one
+// control height, labelled filters, Sort and a live count in the results header, list rows. jsdom
+// loads no Tailwind, so fill and height are asserted as the class tokens that give them; the
+// "three results at 1440 x 900" criterion is a measured one (see the traceability file).
+describe("the toolbar and the result rows (IR-1082)", () => {
+  const FILLED = /(^|\s)bg-brand(\s|$)/;
+  /** Every height token a control may carry: the one control height, or a segment filling its track. */
+  const HEIGHT_TOKENS = new Set(["h-11", "min-h-11", "sm:h-11", "sm:min-h-0", "h-full"]);
+
+  async function controls() {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const row = screen.getByRole("group", { name: "Discover controls" });
+    const switcher = screen.getByRole("group", { name: "Discover results" });
+    return { row, switcher, buttons: [...within(row).getAllByRole("button"), ...within(switcher).getAllByRole("button")] };
+  }
+
+  it("has exactly one filled control, Publish, and no selected segment is filled maroon", async () => {
+    const { buttons } = await controls();
+    expect(buttons.filter((b) => FILLED.test(b.className)).map((b) => b.textContent?.trim())).toEqual(["Publish"]);
+  });
+
+  it("draws the chosen segment white and raised, with no maroon, in both segmented controls", async () => {
+    const { row, switcher } = await controls();
+    for (const chosen of [within(row).getByRole("button", { name: "Latest", pressed: true }), within(switcher).getByRole("button", { name: "Papers", pressed: true })]) {
+      expect(chosen.className).toMatch(/(^|\s)bg-surface(\s|$)/);
+      expect(chosen.className).not.toMatch(/(^|\s)text-white(\s|$)/);
+    }
+  });
+
+  it("gives every control the one control height", async () => {
+    const { row, switcher, buttons } = await controls();
+    for (const button of buttons) {
+      const heights = button.className.split(/\s+/).filter((token) => /^(sm:)?(min-)?h-/.test(token));
+      expect(heights.length, button.textContent ?? "").toBeGreaterThan(0);
+      for (const token of heights) expect(HEIGHT_TOKENS.has(token), `${button.textContent}: ${token}`).toBe(true);
+    }
+    for (const track of [within(row).getByRole("group", { name: "Discover feed" }), switcher]) {
+      expect(track.className).toMatch(/(^|\s)sm:h-11(\s|$)/);
+    }
+    // The 1 / 2 / 3 column toggle is a control of the row, at the same height.
+    expect(within(row).getByRole("button", { name: /^1 column/ }).className).toMatch(/(^|\s)h-11(\s|$)/);
+  });
+
+  it("labels every filter with visible text, and its button names the label and the value", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const sheet = await filterSheet();
+    for (const [label, value] of [["Type", "Any type"], ["College", "Any"], ["Classification", "Any"], ["Year (completed)", "Any year"], ["IP & patents", "Any"]]) {
+      expect(within(sheet).getByText(label)).toBeVisible();
+      expect(within(sheet).getByRole("button", { name: `${label} ${value}` })).toBeInTheDocument();
+    }
+    await choose(/^Type/, /^Project$/, sheet);
+    expect(within(sheet).getByRole("button", { name: "Type Project" })).toBeInTheDocument();
+  });
+
+  it("keeps Sort out of the Filters panel and puts it in the results header beside a live count", async () => {
+    total = 3;
+    renderDiscover();
+    const header = await screen.findByRole("group", { name: "Results" });
+    expect(within(header).getByRole("status")).toHaveTextContent("3 papers");
+    expect(within(header).getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
+    expect(within(await filterSheet()).queryByText("Sort")).not.toBeInTheDocument();
+  });
+
+  it("says one paper in the singular, and keeps the count on For you, where there is no Sort", async () => {
+    renderDiscover();
+    const header = await screen.findByRole("group", { name: "Results" });
+    await waitFor(() => expect(within(header).getByRole("status")).toHaveTextContent("1 paper"));
+    expect(within(header).getByRole("status")).not.toHaveTextContent("1 papers");
+
+    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenCalled());
+    expect(within(await screen.findByRole("group", { name: "Results" })).getByRole("status")).toHaveTextContent("1 paper");
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+  });
+
+  it("offers no Sort over a failed read or an empty list, where there is nothing to order", async () => {
+    vi.mocked(recordsApi.list).mockImplementationOnce(() => Promise.reject(new Error("down")));
+    const first = renderDiscover();
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+    first.unmount();
+
+    listed = [];
+    renderDiscover();
+    await screen.findByText("Nothing has been published yet.");
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the count's live region in the page from the start, so a count that lands in it is announced", async () => {
+    renderDiscover();
+    // Present while the first read is still out, and empty until it lands.
+    const status = within(screen.getByRole("group", { name: "Results" })).getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    await waitFor(() => expect(status).toHaveTextContent("1 paper"));
+  });
+
+  it("opens a filter from its visible label too", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const sheet = await filterSheet();
+    await userEvent.click(within(sheet).getByText("Type"));
+    expect(await screen.findByRole("listbox", { name: "Type" })).toBeInTheDocument();
+  });
+
+  it("hides Areas until there are Areas to choose from", async () => {
+    const classifications = vi.mocked(recordsApi.classifications).getMockImplementation()!;
+    const pscedList = vi.mocked(recordsApi.pscedList).getMockImplementation()!;
+    vi.mocked(recordsApi.classifications).mockImplementation(() => page([]) as never);
+    vi.mocked(recordsApi.pscedList).mockImplementation(() => page([]) as never);
+    try {
+      renderDiscover();
+      await screen.findByText(publishedThesis.title);
+      await waitFor(() => expect(recordsApi.pscedList).toHaveBeenCalled());
+      expect(screen.queryByRole("button", { name: /Areas/ })).not.toBeInTheDocument();
+      // The rest of the row is still there.
+      expect(screen.getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
+    } finally {
+      vi.mocked(recordsApi.classifications).mockImplementation(classifications);
+      vi.mocked(recordsApi.pscedList).mockImplementation(pscedList);
+    }
+  });
+
+  it("draws one column as a list row with a single footer, and no abstract panel", async () => {
+    renderDiscover();
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    expect(within(card).getAllByRole("button", { name: "Cite this paper" })).toHaveLength(1);
+    expect(within(card).getAllByRole("button", { name: "Save" })).toHaveLength(1);
+    expect(within(card).queryByText("From the abstract")).not.toBeInTheDocument();
+    // The outline thumbnail is decoration: nothing for a screen reader to announce.
+    const thumbnail = card.querySelector(".w-24");
+    expect(thumbnail).not.toBeNull();
+    expect(thumbnail).toHaveAttribute("aria-hidden", "true");
+  });
 });
 
 describe("browsing", () => {
-  it("previews up to five matching people and opens filtered People results", async () => {
+  it("lists matching people only on the People tab, and filters them there", async () => {
     people = Array.from({ length: 6 }, (_, index) => discoverPerson(index + 1));
     const { container } = renderDiscover();
 
     await userEvent.type(screen.getByRole("textbox", { name: "Search records" }), "climate");
-    expect(await screen.findByRole("heading", { name: "People" })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: /Lena M\. Cruz 1/ })).toHaveAttribute("href", "/people/1");
-    expect(screen.getAllByRole("link", { name: /Lena M\. Cruz/ })).toHaveLength(5);
-    expect(screen.getAllByText("LC")[0]).toHaveClass("rounded-full");
-    expect(screen.getAllByText("College of Engineering · Computer Studies · BS Computer Science")).toHaveLength(5);
-    expect(screen.getAllByText(/3 published papers/)).toHaveLength(5);
+    await screen.findByText(publishedThesis.title);
+    // The Papers tab holds papers: no People section, no See all, no people request.
+    expect(screen.queryByRole("heading", { name: "People" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "See all people" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Lena M\. Cruz/ })).not.toBeInTheDocument();
+    expect(peopleApi.search).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: "See all people" }));
+    await userEvent.click(screen.getByRole("button", { name: "People" }));
     expect(screen.getByRole("button", { name: "People", pressed: true })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Lena M\. Cruz 1/ })).toHaveAttribute("href", "/people/1");
+    expect(screen.getAllByRole("link", { name: /Lena M\. Cruz/ })).toHaveLength(6);
+    expect(screen.getAllByText("LC")[0]).toHaveClass("rounded-full");
+    expect(screen.getAllByText("College of Engineering · Computer Studies · BS Computer Science")).toHaveLength(6);
+    expect(screen.getAllByText(/3 published papers/)).toHaveLength(6);
+
     const college = screen.getByRole("combobox", { name: "College" });
     await userEvent.selectOptions(college, "4");
     const department = await screen.findByRole("combobox", { name: "Department" });
@@ -288,14 +524,26 @@ describe("browsing", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("keeps Discover usable when the people-search response has a malformed person", async () => {
+  it("keeps Discover usable when the people-search response has a malformed person, and offers Try again on the People tab", async () => {
     vi.mocked(peopleApi.search).mockImplementation(() => Promise.resolve({ data: { count: 1, results: [{}] } } as never));
     renderDiscover();
     await userEvent.type(screen.getByRole("textbox", { name: "Search records" }), "climate");
+    await screen.findByText(publishedThesis.title);
+    // A People failure never reaches the Papers tab.
+    expect(screen.queryByText(/people could/i)).not.toBeInTheDocument();
 
-    expect(await screen.findByText("People could not be loaded.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "People" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("We couldn’t load people.");
     expect(screen.getByRole("heading", { level: 1, name: "Discover" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /undefined/ })).not.toBeInTheDocument();
+
+    const calls = vi.mocked(peopleApi.search).mock.calls.length;
+    people = [discoverPerson(1)];
+    vi.mocked(peopleApi.search).mockImplementation(() => peoplePage({ results: people, count: people.length, next: null }));
+    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("link", { name: /Lena M\. Cruz 1/ })).toBeInTheDocument();
+    expect(vi.mocked(peopleApi.search).mock.calls.length).toBeGreaterThan(calls);
   });
 
   it("offers For you, Latest, and Trending, opening on the latest catalogue", async () => {
@@ -325,14 +573,15 @@ describe("browsing", () => {
     expect(screen.getByRole("button", { name: "1 column; switch to 2" })).toBeInTheDocument();
     expect(card.parentElement).toHaveClass("grid-cols-1");
     expect(card.parentElement).not.toHaveClass("md:grid-cols-2");
-    const preview = within(card).getByRole("complementary", { name: "Manuscript and abstract preview" });
-    expect(preview).toHaveTextContent("From the abstract");
-    expect(preview).toHaveTextContent("An abstract.");
+    // One column is a list row with a 96 px outline thumbnail, not an abstract panel.
+    expect(card.querySelector(".w-24")).not.toBeNull();
+    expect(within(card).queryByRole("complementary")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "1 column; switch to 2" }));
     expect(card.parentElement).toHaveClass("md:grid-cols-2");
     expect(localStorage.getItem("iris.discover.columns")).toBe("2");
-    expect(within(card).queryByRole("complementary", { name: "Manuscript and abstract preview" })).not.toBeInTheDocument();
+    // Two and three columns are text only.
+    expect(card.querySelector(".w-24")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "2 columns; switch to 3" }));
     expect(card.parentElement).toHaveClass("xl:grid-cols-3");
@@ -349,13 +598,14 @@ describe("browsing", () => {
       record_type: "1", college: "4", year_from: "2026", year_to: "2026",
     })));
     const forYouFilters = await filterSheet();
-    expect(screen.queryByRole("button", { name: /Sort:/ })).not.toBeInTheDocument();
+    // Recommendations have their own order, so there is no Sort, though the count stays.
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
     await choose(/^Year/, /^2009$/, forYouFilters);
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2009" })));
     expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Latest" }));
     await waitFor(() => expect(lastListParams()).toMatchObject({ record_type: "1", college: "4", year_from: "2009" }));
-    expect(within(await filterSheet()).getByRole("button", { name: /^Sort/ })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
   });
 
   it("offers clearing active For you filters when they match no research", async () => {
@@ -455,17 +705,15 @@ describe("browsing", () => {
     expect(screen.queryByRole("tab", { name: /proposals/i })).not.toBeInTheDocument();
   });
 
-  it("sorts by most viewed through ordering, and back to newest", async () => {
+  it("sorts by most viewed through ordering, and back to newest, from the results header", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    const sheet = await filterSheet();
-    await userEvent.click(within(sheet).getByRole("button", { name: /^sort/i }));
-    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Most viewed" }));
+    const sort = screen.getByRole("combobox", { name: "Sort" });
+    await userEvent.selectOptions(sort, "Most viewed");
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-access_count" }));
 
-    await userEvent.click(within(sheet).getByRole("button", { name: /^sort/i }));
-    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Newest" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "Newest");
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at" }));
   });
 
@@ -945,8 +1193,7 @@ describe("continuity", () => {
     await screen.findByText(publishedThesis.title);
 
     await choose(/^type/i, /^project$/i);
-    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^sort/i }));
-    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Most viewed" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "Most viewed");
 
     const query = screen.getByRole("status", { name: "Current query" });
     await waitFor(() => expect(query).toHaveTextContent("type=2"));
@@ -1294,5 +1541,165 @@ describe("saved custom feeds (IR-577)", () => {
     await screen.findByRole("alert");
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+describe("the whole card opens the paper (IR-1095)", () => {
+  // Two columns: the one-column card repeats its footer for two layouts, and
+  // jsdom, which applies no CSS, would show both to a keyboard.
+  beforeEach(() => localStorage.setItem("iris.discover.columns", "2"));
+
+  it("gives each card one link, the title, and keeps Save and Cite as separate controls", async () => {
+    listed = [publishedThesis, listItem({ id: 5, title: "Rainfall and Dengue in Cebu" })];
+    renderDiscover();
+
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    expect(within(card).getAllByRole("link")).toHaveLength(1);
+    expect(within(card).getByRole("link", { name: publishedThesis.title })).toHaveAttribute("href", "/records/1");
+    expect(within(card).getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Cite this paper" })).toBeInTheDocument();
+  });
+
+  it("reaches the title once per card by keyboard, then that card's own controls", async () => {
+    listed = [publishedThesis, listItem({ id: 5, title: "Rainfall and Dengue in Cebu" })];
+    renderDiscover();
+    const first = await screen.findByRole("article", { name: publishedThesis.title });
+    const second = screen.getByRole("article", { name: "Rainfall and Dengue in Cebu" });
+
+    within(first).getByRole("link", { name: publishedThesis.title }).focus();
+    await userEvent.tab();
+    expect(within(first).getByRole("button", { name: "Save" })).toHaveFocus();
+    await userEvent.tab();
+    expect(within(first).getByRole("button", { name: "Cite this paper" })).toHaveFocus();
+    await userEvent.tab();
+    expect(within(second).getByRole("link", { name: "Rainfall and Dengue in Cebu" })).toHaveFocus();
+  });
+
+  it("saves from the card without opening the paper", async () => {
+    renderDiscover();
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+
+    await userEvent.click(within(card).getByRole("button", { name: "Save" }));
+
+    // The Save menu opens; the page did not navigate away from Discover.
+    expect(screen.getByRole("heading", { level: 1, name: "Discover" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Save", expanded: true })).toBeInTheDocument();
+  });
+});
+
+describe("a question is offered Ask IRIS (IR-1095)", () => {
+  const QUESTION = "Can weather data forecast dengue?";
+
+  function AskProbe() {
+    const { pathname, state } = useLocation();
+    return <output aria-label="Ask probe">{pathname === "/ai" ? `ask:${(state as { draft?: string } | null)?.draft ?? ""}` : pathname}</output>;
+  }
+
+  function renderWithAsk(route: string) {
+    return renderScreen(
+      <Routes>
+        <Route path="/" element={<DiscoverPage />} />
+        <Route path="/ai" element={<AskProbe />} />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it("shows one line above the results for a question, with a link that carries it over", async () => {
+    renderWithAsk(`/?q=${encodeURIComponent(QUESTION)}`);
+    await screen.findByText(publishedThesis.title);
+
+    const suggestion = screen.getByRole("link", { name: "Ask IRIS this question" });
+    expect(suggestion).toHaveAttribute("href", "/ai");
+    expect(screen.getAllByRole("link", { name: /Ask IRIS/ })).toHaveLength(1);
+
+    await userEvent.click(suggestion);
+    expect(screen.getByRole("status", { name: "Ask probe" })).toHaveTextContent(`ask:${QUESTION}`);
+  });
+
+  it("shows nothing for an ordinary search, and nothing when the box is empty", async () => {
+    const { unmount } = renderWithAsk("/?q=dengue+forecasting");
+    await screen.findByText(publishedThesis.title);
+    expect(screen.queryByRole("link", { name: /Ask IRIS/ })).not.toBeInTheDocument();
+    unmount();
+
+    renderWithAsk("/");
+    await screen.findByText(publishedThesis.title);
+    expect(screen.queryByRole("link", { name: /Ask IRIS/ })).not.toBeInTheDocument();
+  });
+
+  it("appears when the reader types a question, and goes when they change it back", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const box = screen.getByRole("textbox", { name: "Search records" });
+
+    await userEvent.type(box, QUESTION);
+    expect(await screen.findByRole("link", { name: "Ask IRIS this question" })).toBeInTheDocument();
+
+    await userEvent.clear(box);
+    await userEvent.type(box, "dengue forecasting");
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Ask IRIS this question" })).not.toBeInTheDocument());
+  });
+
+  it("asks the catalogue for the question's content words, not the whole sentence", async () => {
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+    await screen.findByText(publishedThesis.title);
+
+    expect(lastListParams()).toMatchObject({ search: "weather data forecast dengue" });
+  });
+
+  it("offers Ask IRIS instead when a search finds nothing", async () => {
+    listed = [];
+    renderWithAsk("/?q=flood");
+
+    await screen.findByRole("heading", { name: "No research matches these filters" });
+    await userEvent.click(screen.getByRole("link", { name: "Ask IRIS instead" }));
+    expect(screen.getByRole("status", { name: "Ask probe" })).toHaveTextContent("ask:flood");
+  });
+
+  it("offers one link, not two, when a question finds nothing", async () => {
+    listed = [];
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+
+    await screen.findByRole("heading", { name: "No research matches these filters" });
+    expect(screen.getAllByRole("link", { name: /Ask IRIS/ })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Ask IRIS this question" })).toBeInTheDocument();
+  });
+
+  it("does not offer it over the empty state of a filter-only view", async () => {
+    listed = [];
+    renderDiscover("/?type=2");
+
+    await screen.findByRole("heading", { name: "No research matches these filters" });
+    expect(screen.queryByRole("link", { name: /Ask IRIS/ })).not.toBeInTheDocument();
+  });
+
+  it("searches People by the same content words as papers", async () => {
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: "People" }));
+
+    await waitFor(() => expect(peopleApi.search).toHaveBeenCalledWith(expect.objectContaining({ q: "weather data forecast dengue" })));
+  });
+
+  it("highlights matched words in the title too, without changing the card's name", async () => {
+    localStorage.setItem("iris.discover.columns", "2");
+    listed = [listItem({ id: 9, title: "Rainfall and Dengue in Cebu", abstract: "No overlap here." })];
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+
+    const card = await screen.findByRole("article", { name: "Rainfall and Dengue in Cebu" });
+    const link = within(card).getByRole("link", { name: "Rainfall and Dengue in Cebu" });
+    expect([...link.querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["Dengue"]);
+  });
+
+  it("highlights each matched word in a card, not only the whole phrase", async () => {
+    localStorage.setItem("iris.discover.columns", "2");
+    listed = [listItem({ id: 8, title: "Rainfall and Dengue", abstract: "Dengue cases follow weather patterns in Cebu." })];
+    renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
+
+    const card = await screen.findByRole("article", { name: "Rainfall and Dengue" });
+    const marked = [...card.querySelectorAll("mark")].map((m) => m.textContent);
+    // The title, then the abstract.
+    expect(marked).toEqual(["Dengue", "Dengue", "weather"]);
   });
 });

@@ -110,9 +110,15 @@ describe("the AI overview on a paper", () => {
     const heading = await screen.findByRole("heading", { level: 2, name: "AI Overview" });
     const section = heading.closest("section");
     expect(section).not.toBeNull();
-    for (const card of ["bg-white", "ring-1", "rounded-2xl", "shadow-card", "border-t-2"]) {
+    for (const card of ["bg-white", "ring-1", "rounded-card", "shadow-card", "border-t-2"]) {
       expect(section).not.toHaveClass(card);
     }
+  });
+
+  it("heads itself at the section size, above the 17 px headings inside it (IR-1089)", async () => {
+    renderScreen(<PaperAiOverview record={record} />);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "AI Overview" })).toHaveClass("text-section");
   });
 
   it("carries no label about how it was made (IR-569)", async () => {

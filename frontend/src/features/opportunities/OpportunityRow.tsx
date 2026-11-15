@@ -70,9 +70,9 @@ export function OpportunityRow({
         className={cn(
           // A strip on a phone, so the title gets the full width; a block
           // beside the content from `sm`, where there is room for both.
-          "flex items-center justify-center self-start shrink-0 rounded-lg border px-2.5 py-1",
+          "flex items-center justify-center self-start shrink-0 rounded-control border px-2.5 py-1",
           "sm:w-16 sm:px-0 sm:py-2 sm:text-center",
-          urgent ? "border-brand-200 bg-brand-50" : "border-stone-200 bg-white",
+          urgent ? "border-stone-300 bg-surface" : "border-stone-200 bg-white",
         )}
       >
         {date ? (
@@ -144,7 +144,7 @@ export function OpportunityRow({
         {o.tags.length > 0 && (
           <ul className="flex flex-wrap gap-1.5 mt-2.5" aria-label="Tags">
             {o.tags.map((tag) => (
-              <li key={tag} className="px-2 py-0.5 rounded-md bg-stone-100 text-label text-stone-700">
+              <li key={tag} className="px-2 py-0.5 rounded-control bg-stone-100 text-label text-stone-700">
                 {tag}
               </li>
             ))}

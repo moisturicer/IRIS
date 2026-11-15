@@ -3,7 +3,7 @@
  * ProtectedRoute in router/index.tsx; the server refuses everyone else anyway.
  *
  * Backend endpoints:
- *   GET  /records/download-requests/                → list all requests
+ *   GET  /records/download-requests/                → the queue, 20 a page (?status=, ?page=)
  *   POST /records/download-requests/<id>/approve/   → approve (a time-limited grant)
  *   POST /records/download-requests/<id>/decline/   → decline, with a note
  *   POST /records/download-requests/<id>/revoke/    → end a live grant, with a note
@@ -11,23 +11,27 @@
  * Each row shows the reader's note and each grant's expiry. Declining and
  * revoking ask for a note the reader is sent (IR-688); approving takes none.
  */
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
-import { Button, Modal } from "@/components/ui";
-import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
+import { Button } from "@/components/ui";
+import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { LoadMore } from "@/components/shared/LoadMore";
+import { failureMessage } from "@/lib/readFailure";
+import { useFocusAfterCommit } from "@/hooks/useFocusAfterCommit";
+import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { Spinner }     from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
-import { errorDetail, fieldError } from "@/lib/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { formatDate }  from "@/lib/utils";
+import { useUIStore } from "@/store/ui.store";
 import type { DownloadRequest } from "@/types/records";
 
-/** The longest note RDCO may leave (IR-688; the server enforces it too). */
-const NOTE_MAX_LENGTH = 500;
-/** Shown where a request made before notes existed has none (IR-688). */
-const NO_NOTE = "No note recorded";
+import { NO_NOTE, RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
 
 type Filter = "" | "pending" | "approved" | "declined" | "revoked";
 const FILTERS: readonly Filter[] = ["pending", "approved", "declined", "revoked", ""];
@@ -51,84 +55,6 @@ const NOTE_ACTS = {
   },
 } as const;
 
-function NoteDialog({ act, onClose, onDone }: { act: NoteAct; onClose: () => void; onDone: () => void }) {
-  const ids = useId();
-  const copy = NOTE_ACTS[act.kind];
-  const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const ready = note.trim() !== "";
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!ready || sending) return;
-    setError(null);
-    setSending(true);
-    try {
-      await copy.send(act.request.id, note.trim());
-      onDone();
-    } catch (err) {
-      // The note stays in the box beside the server's reason.
-      setError(fieldError(err, "note") ?? errorDetail(err, "That did not go through. Please try again."));
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const formId = `${ids}-form`;
-  const noteId = `${ids}-note`;
-
-  return (
-    <Modal
-      open
-      onClose={sending ? () => {} : onClose}
-      title={copy.title}
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>
-            Cancel
-          </Button>
-          <Button type="submit" form={formId} variant="danger" disabled={!ready} loading={sending}>
-            {copy.submit}
-          </Button>
-        </div>
-      }
-    >
-      <form id={formId} onSubmit={submit} noValidate className="space-y-4">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
-          <span className="font-semibold text-stone-900">{act.request.requested_by_name ?? act.request.requested_by_email}</span>
-          {" · "}
-          {act.request.record_title}. {copy.intro}
-        </p>
-        <div>
-          <label htmlFor={noteId} className={LABEL}>
-            Note to the reader
-          </label>
-          <textarea
-            id={noteId}
-            required
-            rows={4}
-            maxLength={NOTE_MAX_LENGTH}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            aria-describedby={`${noteId}-help`}
-            className={fieldClasses(false)}
-          />
-          <p id={`${noteId}-help`} className="mt-1 text-[13px] text-stone-600">
-            The reader sees this as you write it. Up to {NOTE_MAX_LENGTH} characters.
-          </p>
-        </div>
-        {error && (
-          <p role="alert" className={LOAD_ERROR}>
-            <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-            {error}
-          </p>
-        )}
-      </form>
-    </Modal>
-  );
-}
-
 /** Under an approved request: until when, or since when it has expired. */
 function grantLine(req: DownloadRequest): string | null {
   if (req.status !== "approved" || !req.grant_expires_at) return null;
@@ -136,38 +62,48 @@ function grantLine(req: DownloadRequest): string | null {
   return req.grant_live ? `Until ${date}` : `Expired ${date}`;
 }
 
+const readerName = (req: DownloadRequest) =>
+  req.requested_by_name ?? req.requested_by_email ?? "the reader";
+
 export default function DownloadRequestsPage() {
-  const [requests, setRequests] = useState<DownloadRequest[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [approving, setApproving] = useState<number | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
+  // The request the approval dialog is asking about, and whether it is in flight.
+  const [approveTarget, setApproveTarget] = useState<DownloadRequest | null>(null);
+  const [approving,     setApproving]     = useState(false);
   const [noteAct,  setNoteAct]  = useState<NoteAct | null>(null);
-  const [error,    setError]    = useState<string | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<Filter>("pending");
+  // The row an action came from is gone after the reload, so focus goes to the filter.
+  const filterFocus = useFocusAfterCommit<HTMLButtonElement>();
 
-  const load = () => {
-    setLoading(true);
-    setError(null);
-    const params: Record<string, unknown> = {};
-    if (filterStatus) params.status = filterStatus;
-    recordsApi.listDownloadRequests(params)
-      .then(({ data }) => setRequests(data.results ?? []))
-      .catch(() => setError("Failed to load requests."))
-      .finally(() => setLoading(false));
-  };
+  // The API pages at 20; "Load more" reads the next page. Changing the filter
+  // cancels the read in flight and starts again from the first page (IR-914).
+  const read = usePagedRead(
+    (page, signal) =>
+      recordsApi
+        .listDownloadRequests({ ...(filterStatus ? { status: filterStatus } : {}), ...pageParam(page) }, { signal })
+        .then(({ data }) => toPage(data)),
+    [filterStatus],
+  );
+  const requests = read.rows;
+  const loading = read.status === "loading";
 
-  useEffect(load, [filterStatus]);
-
-  const handleApprove = async (id: number) => {
-    if (!confirm("Approve this download request? The requester is told in-app and by email.")) return;
-    setApproving(id);
+  // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
+  // the server's own reason on a refusal.
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    const req = approveTarget;
+    setApproving(true);
     try {
-      await recordsApi.approveDownloadRequest(id);
-      load();
+      await recordsApi.approveDownloadRequest(req.id);
+      addToast({ type: "success", message: `Download request from ${readerName(req)} approved.` });
+      read.retry();
+      filterFocus.focusNext();
     } catch (err) {
-      setError(errorDetail(err, "Action failed. Please try again."));
+      addToast({ type: "error", message: errorDetail(err, "Action failed. Please try again.") });
     } finally {
-      setApproving(null);
+      setApproving(false);
+      setApproveTarget(null);
     }
   };
 
@@ -183,6 +119,7 @@ export default function DownloadRequestsPage() {
         {FILTERS.map((s) => (
           <Button
             key={s}
+            ref={filterStatus === s ? filterFocus.ref : undefined}
             type="button"
             onClick={() => setFilterStatus(s)}
             aria-pressed={filterStatus === s}
@@ -194,42 +131,45 @@ export default function DownloadRequestsPage() {
         ))}
         <Button
           type="button"
-          onClick={load}
+          onClick={read.retry}
           disabled={loading}
           variant="outline"
           size="sm"
           className="w-full justify-center sm:ml-auto sm:w-auto"
         >
-          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-label ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </Button>
       </div>
 
-      {error && (
-        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
-        </div>
+      {read.status === "failed" && (
+        <LoadFailedAlert
+          message={failureMessage(read.error, { lead: "The download requests didn't load." })}
+          onRetry={read.retry}
+          className="mb-4"
+        />
       )}
 
-      {loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" /></div>
-      ) : requests.length === 0 ? (
+      {read.status === "interrupted" ? (
+        <InterruptedState what="download requests" onRetry={read.retry} />
+      ) : loading ? (
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" onRetry={read.retry} /></div>
+      ) : read.status === "failed" ? null : requests.length === 0 ? (
         <EmptyState
           icon="fa-download"
           title="No download requests"
           message={filterStatus === "pending" ? "No requests are currently pending." : "No requests match this filter."}
         />
       ) : (
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <div className="bg-white rounded-card border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
-            <span className="text-[13px] text-stone-500 font-medium">
-              {requests.length} request{requests.length !== 1 ? "s" : ""}
+            <span className="text-small text-stone-500 font-medium">
+              {requests.length} request{requests.length !== 1 ? "s" : ""}{read.hasMore ? " shown" : ""}
             </span>
           </div>
 
           <div className="relative overflow-x-auto">
-            <table className="w-full text-[14px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
@@ -256,7 +196,7 @@ export default function DownloadRequestsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
-                        <p className="text-[12px] text-stone-500">{req.requested_by_email}</p>
+                        <p className="text-label text-stone-500">{req.requested_by_email}</p>
                       </td>
                       <td className="px-4 py-3 max-w-xs">
                         {req.note
@@ -271,15 +211,8 @@ export default function DownloadRequestsPage() {
                           state={req.status}
                           expired={!req.grant_live && !!req.grant_expires_at}
                         />
-                        {grant && <p className="mt-1 text-[12px] text-stone-600 whitespace-nowrap">{grant}</p>}
-                        {endedByRdco && (
-                          <p className="mt-1 text-[12px] max-w-xs break-words">
-                            <span className="text-stone-500">RDCO's note: </span>
-                            {req.rdco_note
-                              ? <span className="text-stone-700">{req.rdco_note}</span>
-                              : <span className="text-stone-500 italic">{NO_NOTE}</span>}
-                          </p>
-                        )}
+                        {grant && <p className="mt-1 text-label text-stone-600 whitespace-nowrap">{grant}</p>}
+                        {endedByRdco && <RdcoNoteLine note={req.rdco_note} />}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {req.status === "pending" ? (
@@ -288,19 +221,15 @@ export default function DownloadRequestsPage() {
                               type="button"
                               size="sm"
                               variant="outline"
-                              onClick={() => handleApprove(req.id)}
-                              loading={approving === req.id}
+                              onClick={() => setApproveTarget(req)}
                             >
-                              {approving === req.id
-                                ? "Approving…"
-                                : <><i className="fas fa-check" aria-hidden /> Approve</>}
+                              <i className="fas fa-check" aria-hidden /> Approve
                             </Button>
                             <Button
                               type="button"
                               size="sm"
                               variant="danger"
                               onClick={() => setNoteAct({ kind: "decline", request: req })}
-                              disabled={approving === req.id}
                             >
                               Decline
                             </Button>
@@ -315,7 +244,7 @@ export default function DownloadRequestsPage() {
                             Revoke
                           </Button>
                         ) : (
-                          <span className="text-[13px] text-stone-500 italic">
+                          <span className="text-small text-stone-500 italic">
                             {req.revoked_at ? formatDate(req.revoked_at)
                               : req.cancelled_at ? `Cancelled ${formatDate(req.cancelled_at)}`
                               : req.reviewed_at ? formatDate(req.reviewed_at) : "Reviewed"}
@@ -328,14 +257,55 @@ export default function DownloadRequestsPage() {
               </tbody>
             </table>
           </div>
+          <LoadMore
+            hasMore={read.hasMore}
+            error={read.moreError}
+            loading={read.loadingMore}
+            onLoadMore={read.loadMore}
+            className="border-t border-stone-100 px-4 py-3"
+          />
         </div>
       )}
 
+      {/* Names the reader and the paper, so a slip on the wrong row is seen. */}
+      <ConfirmDialog
+        open={!!approveTarget}
+        title={approveTarget ? `Approve ${readerName(approveTarget)}'s download request?` : ""}
+        message={
+          approveTarget
+            ? `${readerName(approveTarget)} will be able to download "${approveTarget.record_title}" ` +
+              "for a limited time, and is told in-app and by email."
+            : ""
+        }
+        confirmLabel="Approve request"
+        focusCancel
+        confirming={approving}
+        onConfirm={() => void handleApprove()}
+        onCancel={() => setApproveTarget(null)}
+      />
+
       {noteAct && (
-        <NoteDialog
-          act={noteAct}
+        <RdcoNoteDialog
+          title={NOTE_ACTS[noteAct.kind].title}
+          submitLabel={NOTE_ACTS[noteAct.kind].submit}
+          audience="reader"
+          requester={noteAct.request.requested_by_name ?? noteAct.request.requested_by_email ?? "The reader"}
+          recordTitle={noteAct.request.record_title}
+          intro={NOTE_ACTS[noteAct.kind].intro}
+          send={(note) => NOTE_ACTS[noteAct.kind].send(noteAct.request.id, note)}
           onClose={() => setNoteAct(null)}
-          onDone={() => { setNoteAct(null); load(); }}
+          onDone={() => {
+            // A refusal stays inside the dialog with the note; only success is a toast.
+            addToast({
+              type: "success",
+              message: noteAct.kind === "decline"
+                ? `Download request from ${readerName(noteAct.request)} declined.`
+                : `Download access for ${readerName(noteAct.request)} revoked.`,
+            });
+            setNoteAct(null);
+            read.retry();
+            filterFocus.focusNext();
+          }}
         />
       )}
     </div>

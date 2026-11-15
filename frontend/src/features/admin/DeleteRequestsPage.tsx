@@ -1,15 +1,19 @@
 /**
- * RDCO's delete-request queue: approve what is pending, read what is decided.
+ * RDCO's delete-request queue: approve or decline what is pending, read what is decided.
  * Accessible to staff roles only (gated by ProtectedRoute in router/index.tsx).
  *
  * Two tabs, never mixed (IR-1076, audit WF-02):
  *   - Pending asks the server for `status=pending` and is the only place the
- *     approve action appears.
+ *     approve and decline actions appear.
  *   - Decided asks for `status=decided` (approved and declined) and shows each
- *     outcome with the requester's reason and the date it was decided.
+ *     outcome with the requester's reason, RDCO's note on a decline, and the
+ *     date it was decided.
  *   - The API pages at 20; "Load more" reads the next page and appends it.
  *   - The reason column is the requester's ("Requested because"). RDCO's own
- *     reason, and a Decline action, are IR-1099.
+ *     reason is its note, shown under the status of a declined row (IR-1099).
+ *   - Declining asks for a note, as Download Requests does (IR-688): required,
+ *     limited here and by the server, and sent to the requester in-app and by
+ *     email. Approving takes none.
  *
  * Notes:
  *   - Only admins can approve deletions (backend: IsAdmin permission).
@@ -18,97 +22,76 @@
  * Backend endpoints:
  *   GET  /records/delete-requests/?status=pending|decided → the queue, narrowed
  *   POST /records/delete-requests/<id>/approve/           → approve (soft-deletes record)
+ *   POST /records/delete-requests/<id>/decline/           → decline, with a note (restores record)
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
 import { Button }      from "@/components/ui/Button";
-import { LOAD_ERROR, WARNING_NOTICE }  from "@/components/ui/fieldClasses";
+import { WARNING_NOTICE }  from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
-import { useApiRead } from "@/hooks/useApiRead";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
+import { useUIStore } from "@/store/ui.store";
+import { LoadMore } from "@/components/shared/LoadMore";
+import { useFocusAfterCommit } from "@/hooks/useFocusAfterCommit";
+import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { formatDate }  from "@/lib/utils";
 import type { DeleteRequest } from "@/types/records";
 
-/** One page of the queue, and whether the server has another after it. */
-type QueuePage = { results: DeleteRequest[]; next: string | null };
+import { RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
 
-/**
- * The pages read after the first, kept with the first page they follow. When a
- * tab change or a reload brings a new first page, these no longer follow it and
- * are ignored, so nothing stale is ever shown beside a fresh read.
- */
-type LaterPages = { after: QueuePage; rows: DeleteRequest[]; page: number; next: string | null };
+const requesterName = (req: DeleteRequest) =>
+  req.requested_by_name ?? req.requested_by_email ?? "the requester";
 
 export default function DeleteRequestsPage() {
-  const [approving,    setApproving]    = useState<number | null>(null);
-  const [error,        setError]        = useState<string | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
+  // The request the approval dialog is asking about, and whether it is in flight.
+  const [approveTarget, setApproveTarget] = useState<DeleteRequest | null>(null);
+  const [approving,     setApproving]     = useState(false);
+  const [declining,    setDeclining]    = useState<DeleteRequest | null>(null);
   const [tab, setTab] = useState<"pending" | "decided">("pending");
-  const [later,        setLater]        = useState<LaterPages | null>(null);
-  const [loadingMore,  setLoadingMore]  = useState(false);
-  const [moreError,    setMoreError]    = useState<string | null>(null);
+  // The row an approval came from is gone after the reload, so focus goes to the tab.
+  const tabFocus = useFocusAfterCommit<HTMLButtonElement>();
 
   // Cancelled when the filter changes or the page closes, so a slow earlier
-  // answer cannot replace the one the reader is waiting for (IR-914).
-  const read = useApiRead(
-    (signal) =>
+  // answer cannot replace the one the reader is waiting for (IR-914). The API
+  // pages at 20; "Load more" reads the next page and appends it (IR-1076).
+  const read = usePagedRead(
+    (page, signal) =>
       recordsApi
-        .listDeleteRequests({ status: tab }, { signal })
-        .then(({ data }): QueuePage => ({ results: data.results ?? [], next: data.next ?? null })),
+        .listDeleteRequests({ status: tab, ...pageParam(page) }, { signal })
+        .then(({ data }) => toPage(data)),
     [tab],
   );
   const loading = read.status === "loading";
-  const firstPage = read.data;
-  const following = later && later.after === firstPage ? later : null;
-  const requests = [...(firstPage?.results ?? []), ...(following?.rows ?? [])];
-  const hasMore = (following ? following.next : firstPage?.next) != null;
+  const requests = read.rows;
 
-  // Reads the page after the last one shown (the API pages at 20). A tab change
-  // or reload while it is in flight leaves its answer ignored, as above.
-  const loadMore = async () => {
-    if (!firstPage) return;
-    const page = (following?.page ?? 1) + 1;
-    setLoadingMore(true);
-    setMoreError(null);
-    try {
-      const { data } = await recordsApi.listDeleteRequests({ status: tab, page });
-      setLater({
-        after: firstPage,
-        rows: [...(following?.rows ?? []), ...(data.results ?? [])],
-        page,
-        next: data.next ?? null,
-      });
-    } catch {
-      setMoreError("Could not load more requests. Please try again.");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  // Reading again also clears an earlier failed approval, as it always has.
-  const reload = () => {
-    setError(null);
-    setMoreError(null);
-    read.retry();
-  };
-
-  const handleApprove = async (req: DeleteRequest) => {
-    if (!confirm(
-      `Approve deletion of "${req.record_title}"? This will permanently remove the record and cannot be undone.`
-    )) return;
-
-    setApproving(req.id);
-    setError(null);
+  // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
+  // the server's own reason on a refusal.
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    const req = approveTarget;
+    setApproving(true);
     try {
       await recordsApi.approveDeleteRequest(req.id);
-      reload();
-    } catch {
-      setError("Failed to approve deletion. You may need admin privileges.");
+      addToast({ type: "success", message: `Deletion of "${req.record_title}" approved.` });
+      read.retry();
+      tabFocus.focusNext();
+    } catch (err) {
+      addToast({
+        type: "error",
+        message: errorDetail(err, "Failed to approve deletion. You may need admin privileges."),
+      });
     } finally {
-      setApproving(null);
+      setApproving(false);
+      setApproveTarget(null);
     }
   };
 
@@ -116,7 +99,7 @@ export default function DeleteRequestsPage() {
     <div>
       <PageHeader
         title="Delete Requests"
-        description="Review and approve requests to permanently remove records."
+        description="Review requests to permanently remove records: approve them, or decline with a note."
       />
 
       {/* Danger notice */}
@@ -134,8 +117,9 @@ export default function DeleteRequestsPage() {
         {(["pending", "decided"] as const).map((s) => (
           <Button
             key={s}
+            ref={tab === s ? tabFocus.ref : undefined}
             type="button"
-            onClick={() => { setTab(s); setMoreError(null); }}
+            onClick={() => setTab(s)}
             aria-pressed={tab === s}
             variant="ghost"
             size="sm"
@@ -145,28 +129,29 @@ export default function DeleteRequestsPage() {
         ))}
         <Button
           type="button"
-          onClick={reload}
+          onClick={read.retry}
           disabled={loading}
           variant="outline"
           size="sm"
           className="ml-auto"
         >
-          <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
+          <i className={`fas fa-sync-alt text-label ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </Button>
       </div>
 
-      {(error || read.status === "failed") && (
-        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error ?? "Failed to load delete requests."}
-        </div>
+      {read.status === "failed" && (
+        <LoadFailedAlert
+          message={failureMessage(read.error, { lead: "The delete requests didn't load." })}
+          onRetry={read.retry}
+          className="mb-4"
+        />
       )}
 
       {read.status === "interrupted" ? (
-        <InterruptedState what="delete requests" onRetry={reload} />
+        <InterruptedState what="delete requests" onRetry={read.retry} />
       ) : loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" /></div>
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" onRetry={read.retry} /></div>
       ) : read.status === "failed" ? null : requests.length === 0 ? (
         <EmptyState
           icon="fa-trash-alt"
@@ -174,15 +159,15 @@ export default function DeleteRequestsPage() {
           message={tab === "pending" ? "No deletions are pending approval." : "No requests have been decided yet."}
         />
       ) : (
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <div className="bg-white rounded-card border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
-            <span className="text-[13px] text-stone-500 font-medium">
-              {requests.length} request{requests.length !== 1 ? "s" : ""}{hasMore ? " shown" : ""}
+            <span className="text-small text-stone-500 font-medium">
+              {requests.length} request{requests.length !== 1 ? "s" : ""}{read.hasMore ? " shown" : ""}
             </span>
           </div>
 
           <div className="relative overflow-x-auto">
-            <table className="w-full text-[14px]">
+            <table className="w-full text-body">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">
                   <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
@@ -209,13 +194,13 @@ export default function DeleteRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
-                      <p className="text-[12px] text-stone-500">{req.requested_by_email}</p>
+                      <p className="text-label text-stone-500">{req.requested_by_email}</p>
                     </td>
                     <td className="px-4 py-3 max-w-[180px]">
                       {req.reason ? (
-                        <p className="text-stone-600 line-clamp-2 text-[13px]">{req.reason}</p>
+                        <p className="text-stone-600 line-clamp-2 text-small">{req.reason}</p>
                       ) : (
-                        <span className="text-stone-500 italic text-[13px]">No reason given</span>
+                        <span className="text-stone-500 italic text-small">No reason given</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-stone-500 whitespace-nowrap">
@@ -223,20 +208,30 @@ export default function DeleteRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <RequestStatusChip state={req.status} />
+                      {req.status === "declined" && <RdcoNoteLine note={req.rdco_note} />}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {req.status === "pending" ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleApprove(req)}
-                          loading={approving === req.id}
-                        >
-                          {approving === req.id ? "Deleting…" : "Approve Deletion"}
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="danger"
+                            onClick={() => setApproveTarget(req)}
+                          >
+                            Approve Deletion
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDeclining(req)}
+                          >
+                            Decline
+                          </Button>
+                        </div>
                       ) : (
-                        <span className="text-[13px] text-stone-500 italic">
+                        <span className="text-small text-stone-500 italic">
                           {req.reviewed_at ? formatDate(req.reviewed_at) : "—"}
                         </span>
                       )}
@@ -246,23 +241,52 @@ export default function DeleteRequestsPage() {
               </tbody>
             </table>
           </div>
-          {(hasMore || moreError) && (
-            <div className="flex flex-col items-center gap-2 border-t border-stone-100 px-4 py-3">
-              {moreError && (
-                <p role="alert" className="text-small text-stone-700">{moreError}</p>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={loadMore}
-                loading={loadingMore}
-              >
-                Load more
-              </Button>
-            </div>
-          )}
+          <LoadMore
+            hasMore={read.hasMore}
+            error={read.moreError}
+            loading={read.loadingMore}
+            onLoadMore={read.loadMore}
+            className="border-t border-stone-100 px-4 py-3"
+          />
         </div>
+      )}
+
+      {/* Names the paper and the requester, so a slip on the wrong row is seen. */}
+      <ConfirmDialog
+        open={!!approveTarget}
+        title={approveTarget ? `Approve deletion of "${approveTarget.record_title}"?` : ""}
+        message={
+          approveTarget
+            ? `"${approveTarget.record_title}", requested by ${requesterName(approveTarget)}, ` +
+              "will be permanently removed. This cannot be undone."
+            : ""
+        }
+        confirmLabel="Approve deletion"
+        danger
+        focusCancel
+        confirming={approving}
+        onConfirm={() => void handleApprove()}
+        onCancel={() => setApproveTarget(null)}
+      />
+
+      {declining && (
+        <RdcoNoteDialog
+          title="Decline delete request"
+          submitLabel="Decline"
+          audience="requester"
+          requester={requesterName(declining)}
+          recordTitle={declining.record_title}
+          intro="The record is restored. The requester is told in-app and by email, with your note."
+          send={(note) => recordsApi.declineDeleteRequest(declining.id, note)}
+          onClose={() => setDeclining(null)}
+          onDone={() => {
+            // A refusal stays inside the dialog with the note; only success is a toast.
+            addToast({ type: "success", message: `Deletion of "${declining.record_title}" declined.` });
+            setDeclining(null);
+            read.retry();
+            tabFocus.focusNext();
+          }}
+        />
       )}
     </div>
   );

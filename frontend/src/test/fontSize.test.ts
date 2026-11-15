@@ -11,9 +11,9 @@
  * now and the number only goes down. Unlike the palette guard it counts, because
  * a file is migrated over several changes and each one must be locked in.
  *
- * `features/records/paper-view/readingStandards.test.ts` holds an older, coarser
- * version of this rule for six dialog files (name only, no count). The two agree
- * today. When those dialogs are migrated (IR-1042), remove them from both.
+ * `features/records/paper-view/readingStandards.test.ts` once held an older, coarser
+ * version of this rule for six dialog files; IR-1042 migrated them and moved the
+ * rule here.
  */
 import { describe, expect, it } from "vitest";
 

@@ -18,6 +18,12 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
     { label: "Classification", value: record.classification_name ?? "—" },
     { label: "Record Type", value: record.record_type_name ?? "—" },
     { label: "Year Accomplished", value: record.year_accomplished ? String(record.year_accomplished) : "—" },
+    // The facts the header used to carry as chips and counters (IR-1089, audit
+    // LAY-03): they are held here, once. A field the record lacks gets no row.
+    ...(record.psced ? [{ label: "PSCED", value: record.psced }] : []),
+    ...(record.publication_year ? [{ label: "Published", value: String(record.publication_year) }] : []),
+    ...(record.community_extension ? [{ label: "Community Extension", value: "Yes" }] : []),
+    { label: "Views", value: String(record.access_count) },
     {
       label: "IP Status",
       value: record.is_ip
@@ -41,7 +47,7 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
   ];
 
   return (
-    <section aria-labelledby={headingId} className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
+    <section aria-labelledby={headingId} className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card">
       <RailHeading id={headingId} className="mb-3">Institutional Governance</RailHeading>
       <dl className="space-y-2">
         {rows.map((row) => (

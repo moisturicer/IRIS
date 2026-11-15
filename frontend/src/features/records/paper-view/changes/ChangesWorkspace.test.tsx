@@ -81,10 +81,13 @@ beforeEach(() => {
 });
 
 describe("the Changes tab in the review workspace", () => {
-  it("is offered only when there are two Versions to compare", async () => {
+  it("is a tab on the first Version too, saying there is nothing to compare yet (IR-1139)", async () => {
+    const user = userEvent.setup();
     openWorkspace(1);
-    await screen.findByRole("tab", { name: /Threads/ });
-    expect(screen.queryByRole("tab", { name: "Changes" })).toBeNull();
+    await user.click(await screen.findByRole("tab", { name: "Changes" }));
+    expect(screen.getByRole("tabpanel", { name: "Changes" })).toHaveTextContent(
+      "Nothing to compare yetv1 is the only version. When the authors send the next one, what changed shows here.",
+    );
     expect(api.compareVersions).not.toHaveBeenCalled();
   });
 

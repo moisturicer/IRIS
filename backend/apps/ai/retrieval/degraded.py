@@ -117,6 +117,8 @@ class FullTextRetriever(Retriever):
                     record_id=row.record_id,
                     record_title=row.record.title,
                     content=row.content,
+                    embedded=row.text,
+                    element_kinds=tuple(row.element_kinds or ()),
                     context_path=tuple(row.context_path or ()),
                     source_page=row.source_page,
                     score=float(row.rank),

@@ -78,7 +78,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
   return (
     <li className={cn("group relative flex gap-4 px-4 py-4 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>
       <span
-        className="mt-0.5 hidden h-10 w-10 shrink-0 place-items-center rounded-lg bg-stone-100 text-stone-500 sm:grid"
+        className="mt-0.5 hidden h-10 w-10 shrink-0 place-items-center rounded-control bg-stone-100 text-stone-600 sm:grid"
         aria-hidden
       >
         <i className="fas fa-file-lines text-small" />
@@ -92,7 +92,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
               <Link
                 to={`/records/${item.id}`}
                 className={cn(
-                  "rounded-sm group-hover:text-brand",
+                  "rounded-control group-hover:text-brand",
                   COLOUR_TRANSITION,
                   FOCUS_RING,
                   "after:absolute after:inset-0 after:content-['']",
@@ -128,8 +128,8 @@ export function SubmissionPanel({ children, tone = "plain" }: { children: ReactN
   return (
     <ul
       className={cn(
-        "divide-y overflow-hidden rounded-2xl border bg-white",
-        tone === "waiting" ? "divide-brand-100 border-brand-200" : "divide-stone-100 border-stone-200",
+        "divide-y overflow-hidden rounded-card border bg-white",
+        tone === "waiting" ? "divide-stone-200 border-stone-300" : "divide-stone-100 border-stone-200",
       )}
     >
       {children}

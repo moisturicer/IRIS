@@ -1,0 +1,23 @@
+{
+  "fixture": "paper_columns.pdf",
+  "pdf_sha256": "c0a96590657a27efd6d0ea87d8d7cb118a5ef233b8c148132825d24a92185812",
+  "endpoint": "POST https://api.unstructuredapp.io/general/v0/general",
+  "options": {
+    "strategy": "hi_res",
+    "coordinates": "true",
+    "pdf_infer_table_structure": "true",
+    "include_page_breaks": "true",
+    "extract_image_block_types": "[\"Image\", \"Table\"]"
+  },
+  "http_status": 200,
+  "latency_seconds": 3.9,
+  "response_headers": {
+    "content-length": "7263",
+    "content-type": "application/json",
+    "date": "Sat, 14 Nov 2026 09:56:55 GMT",
+    "server": "istio-envoy",
+    "x-envoy-upstream-service-time": "3305",
+    "x-num-pages": "1"
+  },
+  "recorded_at": "2026-11-14T09:57:00+00:00"
+}

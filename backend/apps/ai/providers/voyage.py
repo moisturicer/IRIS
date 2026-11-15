@@ -279,6 +279,8 @@ class VoyageReranker(Reranker):
     ) -> None:
         self._model = model or getattr(settings, "VOYAGE_RERANK_MODEL", "rerank-3")
         self._post = transport or _post
+        #: Tokens Voyage billed for the last rerank, as it reported them.
+        self.last_usage: Optional[int] = None
 
     def rerank(
         self, query: str, candidates: Sequence[str]
@@ -289,6 +291,7 @@ class VoyageReranker(Reranker):
             "/rerank",
             {"model": self._model, "query": query, "documents": list(candidates)},
         )
+        self.last_usage = (body.get("usage") or {}).get("total_tokens")
         results = body.get("data") or []
         if len(results) != len(candidates):
             raise VoyageError(

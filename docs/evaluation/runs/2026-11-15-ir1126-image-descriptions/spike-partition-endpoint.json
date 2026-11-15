@@ -1,0 +1,162 @@
+{
+ "request": "POST https://api.unstructuredapp.io/general/v0/general with advanced_options={\"enrichments\": {\"image_description\": {}}}",
+ "response": {
+  "record": 38,
+  "status": 200,
+  "seconds": 15.4,
+  "headers": {
+   "x-envoy-upstream-service-time": "12703",
+   "x-num-pages": "5"
+  }
+ },
+ "image_elements": [
+  {
+   "type": "Image",
+   "element_id": "3a3e58e31d5745ce64597c5dc2c125a0",
+   "text": "|0⟩  |Ax⟩  q  T′  0  U  T′  0  ...  ...  T′  N−1  U  T′  N−1 ",
+   "metadata": {
+    "coordinates": {
+     "points": [
+      [
+       1120.655029296875,
+       241.8684539794922
+      ],
+      [
+       1120.655029296875,
+       371.44696044921875
+      ],
+      [
+       1921.6793212890625,
+       371.44696044921875
+      ],
+      [
+       1921.6793212890625,
+       241.8684539794922
+      ]
+     ],
+     "system": "PixelSpace",
+     "layout_width": 2125,
+     "layout_height": 2750
+    },
+    "filetype": "application/pdf",
+    "languages": [
+     "eng"
+    ],
+    "page_number": 2,
+    "image_mime_type": "image/jpeg",
+    "filename": "38.pdf"
+   }
+  },
+  {
+   "type": "Image",
+   "element_id": "2dc1c369aea188de5e8ba917e1dbb2f5",
+   "text": "b  k  Λd  ≡  q  Tk  +1 mod d ",
+   "metadata": {
+    "coordinates": {
+     "points": [
+      [
+       334.69873046875,
+       243.54910278320312
+      ],
+      [
+       334.69873046875,
+       376.0588073730469
+      ],
+      [
+       896.140380859375,
+       376.0588073730469
+      ],
+      [
+       896.140380859375,
+       243.54910278320312
+      ]
+     ],
+     "system": "PixelSpace",
+     "layout_width": 2125,
+     "layout_height": 2750
+    },
+    "filetype": "application/pdf",
+    "languages": [
+     "eng"
+    ],
+    "page_number": 3,
+    "image_mime_type": "image/jpeg",
+    "filename": "38.pdf"
+   }
+  },
+  {
+   "type": "Image",
+   "element_id": "fc8e8d204ceca33eb34a97c9055c6d15",
+   "text": "cos(θk/2)  +  sin(θk/2)  − sin(θk/2)  +  z−1  cos(θk/2) ",
+   "metadata": {
+    "coordinates": {
+     "points": [
+      [
+       1247.1026611328125,
+       254.01751708984375
+      ],
+      [
+       1247.1026611328125,
+       509.3736877441406
+      ],
+      [
+       1778.0181884765625,
+       509.3736877441406
+      ],
+      [
+       1778.0181884765625,
+       254.01751708984375
+      ]
+     ],
+     "system": "PixelSpace",
+     "layout_width": 2125,
+     "layout_height": 2750
+    },
+    "filetype": "application/pdf",
+    "languages": [
+     "eng"
+    ],
+    "page_number": 3,
+    "image_mime_type": "image/jpeg",
+    "filename": "38.pdf"
+   }
+  },
+  {
+   "type": "Image",
+   "element_id": "a9f8dd2f1ebeb93a5d8dbf45092f8852",
+   "text": "R0 Λ R1 Λ  ...  Λ RM  |0⟩⟨0|  (a)  b  0  ...  0  M+1  ...  T1  ...  TM  TM+1  +1  R0  ...  RM  (b)  ... ",
+   "metadata": {
+    "coordinates": {
+     "points": [
+      [
+       1121.5372314453125,
+       666.0633544921875
+      ],
+      [
+       1121.5372314453125,
+       1071.0771484375
+      ],
+      [
+       1912.9552001953125,
+       1071.0771484375
+      ],
+      [
+       1912.9552001953125,
+       666.0633544921875
+      ]
+     ],
+     "system": "PixelSpace",
+     "layout_width": 2125,
+     "layout_height": 2750
+    },
+    "filetype": "application/pdf",
+    "languages": [
+     "eng"
+    ],
+    "page_number": 3,
+    "image_mime_type": "image/jpeg",
+    "filename": "38.pdf"
+   }
+  }
+ ]
+}

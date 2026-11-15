@@ -395,6 +395,39 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
+  // IR-1048: the manuscript goes up as a PATCH of the record, so DRF refuses it
+  // keyed by field, with no `detail`. That reason used to fall through to
+  // "Please try again", which no retry can fix.
+  it("shows the server's reason when it refuses the manuscript, not Please try again", async () => {
+    uploadManuscript.mockReset().mockRejectedValueOnce({
+      response: { status: 400, data: { abstract_file: ["This PDF contains unsupported active content."] } },
+    });
+    renderScreen(
+      <FilesSection record={revising} owner editable reviewing={false} attach={false} replaceManuscript />,
+    );
+
+    fireEvent.drop(await screen.findByRole("button", { name: /^Upload revised manuscript/ }), {
+      dataTransfer: { files: [pdf("revised.pdf")] },
+    });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("This PDF contains unsupported active content.");
+    expect(alert).not.toHaveTextContent("Please try again");
+  });
+
+  it("still says Please try again when the upload fails with no reason, as a dropped connection does", async () => {
+    uploadManuscript.mockReset().mockRejectedValueOnce(new Error("Network Error"));
+    renderScreen(
+      <FilesSection record={revising} owner editable reviewing={false} attach={false} replaceManuscript />,
+    );
+
+    fireEvent.drop(await screen.findByRole("button", { name: /^Upload revised manuscript/ }), {
+      dataTransfer: { files: [pdf("revised.pdf")] },
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Please try again.");
+  });
+
   it("labels an uploaded manuscript that is not yet submitted", async () => {
     const { container } = renderFiles(
       { editable: true, replaceManuscript: true },

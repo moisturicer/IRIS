@@ -56,13 +56,13 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="relative max-h-screen overflow-y-auto bg-white rounded-xl shadow-xl w-full max-w-sm px-8 py-8 text-center"
+        className="relative max-h-screen overflow-y-auto bg-white rounded-dialog shadow-xl w-full max-w-sm px-8 py-8 text-center"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >
-        <div className="mx-auto w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center mb-5">
+        <div className="mx-auto w-14 h-14 rounded-full bg-stone-100 flex items-center justify-center mb-5">
           <svg className="w-7 h-7 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
             <path
               strokeLinecap="round"

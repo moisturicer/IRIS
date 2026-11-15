@@ -443,6 +443,24 @@ describe("citation highlights", () => {
   });
 });
 
+describe("the toolbar's start slot (IR-1092)", () => {
+  it("holds what the caller puts there, among the paper tools", async () => {
+    render(
+      <PaperPdfReader
+        recordId={7}
+        scrollToPage={null}
+        highlightRegions={[]}
+        navKey="a"
+        contained
+        fill
+        toolbarStart={<span>Reading v2</span>}
+      />,
+    );
+
+    expect(within(await screen.findByRole("toolbar", { name: "Paper tools" })).getByText("Reading v2")).toBeInTheDocument();
+  });
+});
+
 describe("keeping clear of the corner buttons (IR-1079)", () => {
   it("leaves room under the last page for Notes and Ask IRIS when the caller asks", async () => {
     render(
@@ -505,6 +523,59 @@ describe("saving a copy (IR-677)", () => {
 
     expect(screen.queryByRole("button", { name: /download/i })).not.toBeInTheDocument();
     expect(downloadBlob).not.toHaveBeenCalled();
+  });
+});
+
+// IR-1128: a screenshot or a print from the reader carries a mark naming who
+// was reading, drawn over the page in the browser (ADR-048 decision 1, amended).
+describe("the reader's watermark", () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { first_name: "Sam", last_name: "Student", email: "student@cit.edu" } as never,
+    });
+  });
+  afterEach(() => {
+    useAuthStore.setState({ user: null });
+  });
+
+  it("names the signed-in reader on every page", async () => {
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 3");
+
+    for (const number of [1, 2, 3]) {
+      const page = screen.getByRole("group", { name: `Page ${number}` });
+      expect(within(page).getByText("Viewed by Sam Student (student@cit.edu) via CIT-U IRIS"))
+        .toBeInTheDocument();
+    }
+  });
+
+  it("is hidden from assistive technology, takes no pointer events and cannot be selected", async () => {
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 3");
+
+    const line = within(screen.getByRole("group", { name: "Page 1" }))
+      .getByText(/^Viewed by Sam Student/);
+    const layer = line.closest("[aria-hidden]");
+    expect(layer).not.toBeNull();
+    expect(layer).toHaveStyle({ pointerEvents: "none", userSelect: "none" });
+  });
+
+  it("stays out of the text layer, so selecting, finding and highlighting see only the paper", async () => {
+    paperText = [[line("Results of the survey", 0.3)], [], []];
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 3");
+
+    const paperSpan = await screen.findByText("Results of the survey");
+    expect(paperSpan.parentElement).not.toHaveTextContent(/Viewed by|CIT-U/);
+  });
+
+  it("has no serious or critical violations with the mark drawn", async () => {
+    const { container } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+    await screen.findByText("Page 1 / 3");
+
+    await expectNoBlockingA11yViolations(container);
   });
 });
 

@@ -115,7 +115,7 @@ export function PublishDetailsPreview({
             aria-label="Manuscript preview"
             tabIndex={-1}
             className={cn(
-              "min-w-0 flex-col overflow-hidden rounded-xl border border-stone-200 bg-surface outline-none",
+              "min-w-0 flex-col overflow-hidden rounded-card border border-stone-200 bg-surface outline-none",
               "focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2",
               "h-[calc(100dvh-13rem)] min-h-[20rem] max-h-[44rem]",
               pane === "preview" ? "flex" : "hidden",

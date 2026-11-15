@@ -22,6 +22,7 @@ import {
   ALL_SCREENS,
   SCREEN_ACCESS,
   canAccess,
+  canAuthor,
   hasReviewWork,
   navFor,
   type ScreenKey,
@@ -83,6 +84,17 @@ test("no role sees Submit Disclosure in the sidebar; /records/add stays open to 
   }
   assertEqual(canAccess(ROLES.STUDENT, "submit"), true, "Student may still open /records/add");
   assertEqual(canAccess(ROLES.ADVISER, "submit"), true, "Adviser may still open /records/add");
+});
+
+test("whether someone authors is the server's flag, never their role (IR-1096)", () => {
+  assertEqual(canAuthor({ can_author: true }), true, "the server says yes");
+  assertEqual(canAuthor({ can_author: false }), false, "the server says no");
+  assertEqual(canAuthor({}), false, "a payload with no flag is not an author");
+  assertEqual(canAuthor(null), false, "no user");
+  assertEqual(canAuthor(undefined), false, "not yet loaded");
+  // A role name is not consulted: a Student whose flag says no is not offered Publish.
+  assertEqual(canAuthor({ role_name: ROLES.STUDENT, can_author: false } as never), false, "Student, flag false");
+  assertEqual(canAuthor({ role_name: ROLES.ITSO, can_author: true } as never), true, "ITSO, flag true");
 });
 
 test("Notifications is the bell, not a sidebar link, and its page stays open (IR-519)", () => {

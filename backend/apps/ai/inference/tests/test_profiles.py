@@ -53,6 +53,7 @@ class ClosedTaskSetTests:
             "screen",
             "summary",
             "describe_figure",
+            "transcribe_formula",
         ]
 
     def test_a_name_outside_the_set_is_an_error_not_a_default(self):
@@ -69,6 +70,13 @@ class ClosedTaskSetTests:
         no-image-leaves-the-deployment clause and is not this ticket."""
         settings.LLM_DESCRIBE_FIGURE_MODEL = ""
         assert profile_for(InferenceTask.DESCRIBE_FIGURE).is_configured is False
+
+    def test_transcribe_formula_is_off_and_never_trained_on(self, settings):
+        """IR-1102: off until a model is set; retention is accepted, training is not."""
+        settings.LLM_TRANSCRIBE_FORMULA_MODEL = ""
+        profile = profile_for(InferenceTask.TRANSCRIBE_FORMULA)
+        assert profile.is_configured is False
+        assert profile.data_policy is DataPolicy.NO_TRAINING
 
 
 class ProfileResolutionTests:

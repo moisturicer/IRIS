@@ -115,14 +115,14 @@ export function RouteErrorScreen({ standalone = false }: RouteErrorScreenProps) 
         </>
       }
     >
-      <details className="rounded-xl border border-stone-200 bg-surface px-4 py-3 text-small text-stone-700">
-        <summary className={cn("cursor-pointer font-semibold text-stone-800 rounded", FOCUS_RING)}>
+      <details className="rounded-card border border-stone-200 bg-surface px-4 py-3 text-small text-stone-700">
+        <summary className={cn("cursor-pointer font-semibold text-stone-800 rounded-control", FOCUS_RING)}>
           Details for RDCO
         </summary>
         <p className="mt-2 text-stone-600">
           If this keeps happening, send these details to the Research and Development Coordinating Office.
         </p>
-        <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-stone-100 p-3 font-mono text-label text-stone-800">
+        <pre className="mt-2 whitespace-pre-wrap break-words rounded-control bg-stone-100 p-3 font-mono text-label text-stone-800">
           {details}
         </pre>
         <div className="mt-3 flex items-center gap-3">

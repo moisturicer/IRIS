@@ -10,7 +10,7 @@
  * compares no role names. A decision the server refuses (someone else got
  * there first, or a blocker appeared) shows the server's own reason.
  *
- *   GET  /users/deletion-requests/
+ *   GET  /users/deletion-requests/               (paged; ?page=N)
  *   POST /users/deletion-requests/<id>/confirm/
  *   POST /users/deletion-requests/<id>/reject/   {reason}
  */
@@ -24,7 +24,10 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
-import { useApiRead } from "@/hooks/useApiRead";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { LoadMore } from "@/components/shared/LoadMore";
+import { failureMessage } from "@/lib/readFailure";
+import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
 
@@ -74,7 +77,7 @@ function RejectDialog({
       }
     >
       <form id={formId} onSubmit={submit} noValidate className="space-y-4">
-        <p className="text-[14px] text-stone-700 leading-relaxed">
+        <p className="text-body text-stone-700 leading-relaxed">
           <span className="font-semibold text-stone-900">{request.user.name}</span> keeps their account.
           They receive your reason in IRIS and by email.
         </p>
@@ -89,7 +92,7 @@ function RejectDialog({
             aria-describedby={`${reasonId}-help`}
             className={fieldClasses(false)}
           />
-          <p id={`${reasonId}-help`} className="mt-1 text-[13px] text-stone-600">
+          <p id={`${reasonId}-help`} className="mt-1 text-small text-stone-600">
             The person sees this as you write it.
           </p>
         </div>
@@ -117,17 +120,17 @@ function RequestCard({
       : null;
 
   return (
-    <li aria-labelledby={headingId} className="bg-white rounded-xl border border-stone-200 p-4">
+    <li aria-labelledby={headingId} className="bg-white rounded-card border border-stone-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id={headingId} className="text-[15px] font-semibold text-stone-900 break-words">
+          <h2 id={headingId} className="text-body font-semibold text-stone-900 break-words">
             {request.user.name}
           </h2>
-          <p className="text-[13px] text-stone-600 break-all">
+          <p className="text-small text-stone-600 break-all">
             {request.user.email}
             {request.user.role ? ` · ${request.user.role}` : ""}
           </p>
-          <p className="text-[13px] text-stone-600">Asked {formatDate(request.created_at)}</p>
+          <p className="text-small text-stone-600">Asked {formatDate(request.created_at)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" variant="secondary" onClick={onReject} disabled={!canReject}>
@@ -148,29 +151,30 @@ function RequestCard({
 
       {blocked ? (
         <div className="mt-3">
-          <h3 className="text-[13px] font-semibold text-stone-800">What's blocking it</h3>
-          <ul className="mt-1 list-disc pl-5 space-y-1 text-[14px] text-stone-700">
+          <h3 className="text-small font-semibold text-stone-800">What's blocking it</h3>
+          <ul className="mt-1 list-disc pl-5 space-y-1 text-body text-stone-700">
             {request.blockers.map((b) => (
               <li key={`${b.kind}-${b.record}-${b.message}`}>{b.message}</li>
             ))}
           </ul>
         </div>
       ) : (
-        <p className="mt-3 text-[14px] text-stone-700">Nothing is blocking it.</p>
+        <p className="mt-3 text-body text-stone-700">Nothing is blocking it.</p>
       )}
       {whyNot && (
-        <p id={`${headingId}-why`} className="mt-2 text-[13px] text-stone-600">{whyNot}</p>
+        <p id={`${headingId}-why`} className="mt-2 text-small text-stone-600">{whyNot}</p>
       )}
     </li>
   );
 }
 
 export default function AccountDeletionRequestsPage() {
-  const read = useApiRead(
-    (signal) => accountsApi.deletionRequests({ signal }).then(({ data }) => data.results ?? []),
+  // The API pages; "Load more" reads the next page and appends it (IR-1100).
+  const read = usePagedRead(
+    (page, signal) => accountsApi.deletionRequests({ signal, ...pageParam(page) }).then(({ data }) => toPage(data)),
     [],
   );
-  const requests = read.data ?? [];
+  const requests = read.rows;
   const loading = read.status === "loading";
 
   const [confirming, setConfirming] = useState<AccountDeletionRequest | null>(null);
@@ -215,20 +219,20 @@ export default function AccountDeletionRequestsPage() {
       </div>
 
       {done && (
-        <p role="status" className="mb-4 text-[14px] text-stone-700">{done}</p>
+        <p role="status" className="mb-4 text-body text-stone-700">{done}</p>
       )}
 
       {read.status === "interrupted" ? (
         <InterruptedState what="account deletion requests" onRetry={read.retry} />
       ) : loading && requests.length === 0 ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" label="Loading account deletion requests" />
+          <Spinner size="lg" label="Loading account deletion requests" onRetry={read.retry} />
         </div>
       ) : read.status === "failed" ? (
-        <div role="alert" className={LOAD_ERROR}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          Failed to load account deletion requests.
-        </div>
+        <LoadFailedAlert
+          message={failureMessage(read.error, { lead: "The account deletion requests didn't load." })}
+          onRetry={read.retry}
+        />
       ) : requests.length === 0 ? (
         <EmptyState icon="fa-user-slash" title="No deletion requests" message="Nobody is waiting on a decision." />
       ) : (
@@ -242,6 +246,15 @@ export default function AccountDeletionRequestsPage() {
             />
           ))}
         </ul>
+      )}
+      {requests.length > 0 && (
+        <LoadMore
+          hasMore={read.hasMore}
+          error={read.moreError}
+          loading={read.loadingMore}
+          onLoadMore={read.loadMore}
+          className="mt-4"
+        />
       )}
 
       <ConfirmDialog

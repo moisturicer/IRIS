@@ -77,7 +77,7 @@ export function ContactPersonCard({ record, onChanged }: ContactPersonCardProps)
   return (
     <section
       aria-labelledby={headingId}
-      className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card space-y-3"
+      className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card space-y-3"
     >
       <RailHeading id={headingId}>Contact person</RailHeading>
       {choices.length < 2 ? (

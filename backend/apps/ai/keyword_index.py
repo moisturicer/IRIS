@@ -17,6 +17,7 @@ CONFIG = "english"
 FUNCTION = "ai_documentchunk_search_vector"
 TRIGGER = "ai_documentchunk_search_vector_trg"
 
+# Migration 0015's trigger, over `content` alone. Kept as 0015 ran it.
 CREATE_TRIGGER_SQL = f"""
 CREATE OR REPLACE FUNCTION {FUNCTION}() RETURNS trigger AS $$
 BEGIN
@@ -27,6 +28,22 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER {TRIGGER}
 BEFORE INSERT OR UPDATE OF content ON {TABLE}
+FOR EACH ROW EXECUTE FUNCTION {FUNCTION}();
+"""
+
+# The current trigger (IR-1102): `keyword_text` where a chunk sets one.
+INDEXED = "COALESCE(keyword_text, content, '')"
+CREATE_KEYWORD_TEXT_TRIGGER_SQL = f"""
+CREATE OR REPLACE FUNCTION {FUNCTION}() RETURNS trigger AS $$
+BEGIN
+    NEW.search_vector := to_tsvector('{CONFIG}', COALESCE(NEW.keyword_text, NEW.content, ''));
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS {TRIGGER} ON {TABLE};
+CREATE TRIGGER {TRIGGER}
+BEFORE INSERT OR UPDATE OF content, keyword_text ON {TABLE}
 FOR EACH ROW EXECUTE FUNCTION {FUNCTION}();
 """
 
@@ -44,6 +61,7 @@ UPDATE {TABLE}
      SELECT id FROM {TABLE} WHERE search_vector IS NULL LIMIT %s
  )
 """
+_KEYWORD_TEXT_BACKFILL_BATCH_SQL = _BACKFILL_BATCH_SQL.replace("COALESCE(content, '')", INDEXED)
 
 DEFAULT_BATCH_SIZE = 1000
 
@@ -56,12 +74,16 @@ def chunks_awaiting_backfill() -> int:
 
 
 def backfill_chunk_keyword_index(
-    *, batch_size: int = DEFAULT_BATCH_SIZE, limit: int = 0, on_batch=None
+    *, batch_size: int = DEFAULT_BATCH_SIZE, limit: int = 0, on_batch=None,
+    keyword_text: bool = False,
 ) -> int:
     """Fill the keyword index for chunks that have none. Returns the count.
 
     `limit` of 0 means the whole table. `on_batch` receives the running total.
+    `keyword_text` reads that column first; off only for migration 0015,
+    which ran before it existed.
     """
+    sql = _KEYWORD_TEXT_BACKFILL_BATCH_SQL if keyword_text else _BACKFILL_BATCH_SQL
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1")
 
@@ -73,7 +95,7 @@ def backfill_chunk_keyword_index(
                 size = min(size, limit - filled)
                 if size < 1:
                     break
-            cursor.execute(_BACKFILL_BATCH_SQL, [size])
+            cursor.execute(sql, [size])
             if not cursor.rowcount:
                 break
             filled += cursor.rowcount
