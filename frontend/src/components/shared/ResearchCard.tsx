@@ -35,12 +35,14 @@ interface ResearchCardProps {
   byline?:   ReactNode;
   /** The abstract or a summary, clamped. */
   summary?:  ReactNode;
+  /** Replaces the default clamp (4 lines in a tile, 3 in a row), since `cn` does not merge two clamps. */
   summaryClassName?: string;
-  /** A companion reading pane for a full-width card. */
-  preview?:  ReactNode;
-  previewLabel?: string;
-  /** Keep the facts and actions below the left half of a full-width card. */
-  splitFooter?: boolean;
+  /**
+   * A small picture beside a full-width row (Discover's 96 px page outline, IR-1082).
+   * The facts and actions then sit under the text, not in a strip across the
+   * picture, so the row is as short as its text. It is under the title's link.
+   */
+  thumbnail?: ReactNode;
   /** The status line: typically a `StatusBadge` and where the record is. */
   status?:   ReactNode;
   /** What happens next, for whoever is looking. Prefixed "Next step:". */
@@ -71,9 +73,7 @@ export function ResearchCard({
   byline,
   summary,
   summaryClassName,
-  preview,
-  previewLabel = "Abstract preview",
-  splitFooter = false,
+  thumbnail,
   status,
   nextStep,
   footer,
@@ -104,7 +104,6 @@ export function ResearchCard({
       className={cn(
         "font-display font-semibold text-stone-900",
         grid ? "text-title line-clamp-3" : compact ? "text-title" : "text-title md:text-display",
-        preview && "xl:text-[1.75rem] xl:leading-tight",
       )}
     >
       <Link
@@ -123,7 +122,7 @@ export function ResearchCard({
     {byline && <p className="mt-1 text-small font-medium text-brand truncate">{byline}</p>}
 
     {summary && (
-      <p className={cn("mt-2 text-body text-stone-600", grid ? "line-clamp-4" : "line-clamp-3", summaryClassName)}>
+      <p className={cn(thumbnail ? "mt-1" : "mt-2", "text-body text-stone-600", summaryClassName ?? (grid ? "line-clamp-4" : "line-clamp-3"))}>
         {summary}
       </p>
     )}
@@ -154,22 +153,18 @@ export function ResearchCard({
         grid && "h-full",
       )}
     >
-      <div className={cn("flex-1 p-card-compact", !compact && "md:p-card", grid && "flex flex-col", preview && "xl:grid xl:grid-cols-2 xl:min-h-[22rem]", preview && !splitFooter && "xl:gap-6", preview && splitFooter && "xl:p-0")}>
-        {preview ? <div className={cn("flex min-w-0 flex-col", splitFooter && "xl:p-card")}>
-          {content}
-          {splitFooter && hasFooter && (
-            <div className="hidden xl:flex mt-auto flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-4">
-              {footerContent}
-            </div>
-          )}
-        </div> : content}
-        {preview && <aside aria-label={previewLabel} className={cn("hidden border-l border-stone-200 xl:flex xl:flex-col", splitFooter ? "xl:pl-0" : "pl-6")}>
-          {preview}
-        </aside>}
+      <div className={cn("flex-1", thumbnail ? "flex items-start gap-4 px-card-compact py-3" : cn("p-card-compact", !compact && "md:p-card"), grid && "flex flex-col")}>
+        {thumbnail ? <>
+          <div className="min-w-0 flex-1">
+            {content}
+            {hasFooter && <div className="mt-2 flex flex-wrap items-center justify-between gap-3">{footerContent}</div>}
+          </div>
+          {thumbnail}
+        </> : content}
       </div>
 
-      {hasFooter && (
-        <div className={cn("flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-card-compact py-3", !compact && "md:px-card", splitFooter && preview && "xl:hidden", footerClassName)}>
+      {hasFooter && !thumbnail && (
+        <div className={cn("flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-card-compact py-3", !compact && "md:px-card", footerClassName)}>
           {footerContent}
         </div>
       )}

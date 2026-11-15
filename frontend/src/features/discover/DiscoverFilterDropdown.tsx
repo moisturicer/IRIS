@@ -16,9 +16,10 @@ export interface FilterOption {
 
 interface BaseProps {
   /**
-   * What the control filters, e.g. "Type". It is always the start of the
-   * button's text, so the button keeps its name whatever is chosen, and the
-   * visible text and the accessible name are the same words.
+   * What the control filters, e.g. "Type". It is drawn above the button as a
+   * visible label (IR-1082), and the button's accessible name is that label
+   * followed by what is chosen ("Type Project"), so the visible words and the
+   * name agree and the name always starts with the label.
    */
   name: string;
   options: FilterOption[];
@@ -31,8 +32,6 @@ interface BaseProps {
    * page. For the filter sheet, whose scrolling body would clip a popover.
    */
   inline?: boolean;
-  /** Never drawn as "active": for Sort, which always has a value. */
-  neutral?: boolean;
   /** Stretch to the container's width, for the stacked sheet layout. */
   block?: boolean;
 }
@@ -55,9 +54,11 @@ type DiscoverFilterDropdownProps = SingleProps | MultiProps;
 export const ALL_VALUE = "all";
 
 export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
-  const { name, options, loading = false, emptyHint, inline = false, neutral = false, block = false } = props;
+  const { name, options, loading = false, emptyHint, inline = false, block = false } = props;
   const [open, setOpen] = useState(false);
   const listId = useId();
+  const labelId = useId();
+  const valueId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -87,25 +88,30 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
     };
   }, [open]);
 
-  const isActive =
-    !neutral &&
-    (props.multi ? props.selected.length > 0 : props.selected !== ALL_VALUE && props.selected !== "");
+  const isActive = props.multi ? props.selected.length > 0 : props.selected !== ALL_VALUE && props.selected !== "";
 
-  const chosenLabel = !props.multi
-    ? options.find((o) => o.value === props.selected && o.value !== ALL_VALUE)?.label
-    : undefined;
+  /** What the button shows under its label: the choice, or "Any" when nothing narrows. */
+  const valueText = props.multi
+    ? props.selected.length === 0
+      ? "Any"
+      : props.selected.length === 1
+        ? options.find((o) => o.value === props.selected[0])?.label ?? "1 selected"
+        : `${props.selected.length} selected`
+    : options.find((o) => o.value === props.selected)?.label ?? "Any";
 
   return (
     <div className={cn("relative", block && "w-full")} ref={containerRef}>
+      <span id={labelId} className="mb-1 block text-small font-medium text-stone-700">{name}</span>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         ref={triggerRef}
+        aria-labelledby={`${labelId} ${valueId}`}
         aria-controls={open ? listId : undefined}
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "inline-flex items-center gap-1.5 min-h-11 px-3.5 py-1.5 rounded-lg border text-small font-medium",
+          "inline-flex h-11 items-center gap-1.5 px-3.5 rounded-lg border text-small font-medium",
           COLOUR_TRANSITION,
           FOCUS_RING,
           block ? "w-full justify-between" : "max-w-[18rem]",
@@ -114,13 +120,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
             : "bg-white text-stone-700 border-stone-300 hover:border-stone-500",
         )}
       >
-        <span className="truncate">{chosenLabel ? `${name}: ${chosenLabel}` : name}</span>
-
-        {props.multi && props.selected.length > 0 && (
-          <span className="min-w-[18px] h-[18px] px-1 shrink-0 rounded-full bg-brand text-white text-label font-semibold flex items-center justify-center">
-            {props.selected.length}
-          </span>
-        )}
+        <span id={valueId} className="truncate">{valueText}</span>
         <i
           className={cn(
             "fas fa-chevron-down text-[10px] text-stone-500 shrink-0 transition-transform motion-reduce:transition-none",

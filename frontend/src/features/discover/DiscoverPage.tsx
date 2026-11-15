@@ -13,6 +13,7 @@ import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { Spinner } from "@/components/ui/Spinner";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
 import type { SavedFeed } from "@/api/library";
@@ -32,6 +33,7 @@ import {
   type DiscoverSort,
 } from "./DiscoverFilterBar";
 import { DiscoverResultCard } from "./DiscoverResultCard";
+import { DiscoverResultsHeader } from "./DiscoverResultsHeader";
 import { DiscoverPeopleResults } from "./DiscoverPeopleResults";
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
 import { DiscoverTabs } from "./DiscoverTabs";
@@ -55,6 +57,13 @@ const PAGE_SIZE = 12;
 const COLUMNS_KEY = "iris.discover.columns";
 
 type ColumnCount = 1 | 2 | 3;
+
+/** Both segmented controls share one track and one height (IR-1082): the chosen
+ *  segment is white and raised (the Selected role), never maroon. */
+const SEGMENT_TRACK = "inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 sm:h-11 sm:p-0.5";
+const segment = (chosen: boolean) =>
+  cn("h-full min-h-11 rounded-md px-3 text-small font-semibold sm:min-h-0", COLOUR_TRANSITION, FOCUS_RING,
+    chosen ? SELECTED_SEGMENT : "text-stone-700 hover:bg-surface");
 
 function readColumns(): ColumnCount {
   try {
@@ -525,6 +534,11 @@ export default function DiscoverPage() {
     [recordTypes, colleges, classifications, years, filters.year],
   );
 
+  /** Areas shape For you. Until there are Areas to choose (or the reader already holds some),
+   *  the button would open a dialog with nothing in it, so it is not drawn (IR-1082). */
+  const hasAreas = interestOptions.classifications.length > 0 || interestOptions.psced.length > 0
+    || interests.classifications.length > 0 || interests.psced.length > 0;
+
   const openPublish = () =>
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -632,10 +646,10 @@ export default function DiscoverPage() {
   /* Papers / People sit in the page header, so on a phone the toolbar row below
      search holds only what narrows the feed (IR-1080, audit RES-01). */
   const resultsSwitch = (
-    <div role="group" aria-label="Discover results" className="inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 sm:h-10 sm:p-0.5">
+    <div role="group" aria-label="Discover results" className={SEGMENT_TRACK}>
       {([ ["papers", "Papers"], ["people", "People"] ] as const).map(([value, label]) => (
         <button key={value} type="button" aria-pressed={discoverView === value} onClick={() => setDiscoverView(value)}
-          className={cn("h-full min-h-11 rounded-md px-4 text-small font-semibold sm:min-h-0", COLOUR_TRANSITION, FOCUS_RING, discoverView === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-white")}>
+          className={cn(segment(discoverView === value), "px-4")}>
           {label}
         </button>
       ))}
@@ -648,7 +662,7 @@ export default function DiscoverPage() {
       <>
       <div role="group" aria-label="Discover controls"
         className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-        <div role="group" aria-label="Discover feed" className="inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 shadow-[inset_0_1px_2px_rgb(41_37_36/0.12)] sm:h-11 sm:p-0.5">
+        <div role="group" aria-label="Discover feed" className={SEGMENT_TRACK}>
           {([["for_you", "For you"], ["latest", "Latest"], ["trending", "Trending"]] as const).map(([value, label]) => (
             <button key={value} type="button" aria-pressed={feed === value}
               title={value === "trending" ? "Most viewed research" : undefined}
@@ -659,15 +673,17 @@ export default function DiscoverPage() {
                 updateQuery((current) => ({ ...current, feed: value, q: value === "for_you" ? "" : current.q }));
                 if (value === "for_you") setSearchInput("");
               }}
-               className={cn("h-full min-h-11 rounded-md px-3 text-small font-semibold sm:min-h-0", COLOUR_TRANSITION, FOCUS_RING, feed === value ? "bg-brand text-white shadow-sm" : "text-stone-700 hover:bg-surface")}>{label}</button>
+              className={segment(feed === value)}>{label}</button>
           ))}
         </div>
-        <button type="button" onClick={() => setInterestOpen(true)}
-          aria-label={interests.classifications.length || interests.psced.length ? "Edit Areas" : "Choose Areas"}
-          className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
-          <i className="fas fa-compass text-[12px]" aria-hidden />
-          <span>Areas</span>
-        </button>
+        {hasAreas && (
+          <button type="button" onClick={() => setInterestOpen(true)}
+            aria-label={interests.classifications.length || interests.psced.length ? "Edit Areas" : "Choose Areas"}
+            className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+            <i className="fas fa-compass text-[12px]" aria-hidden />
+            <span>Areas</span>
+          </button>
+        )}
         <MyFeeds
           query={query}
           matchCount={loading || holdQuietly ? null : totalCount}
@@ -690,9 +706,6 @@ export default function DiscoverPage() {
           className="shrink-0"
           filters={filters}
           onChange={setFilters}
-          showSort={feed === "latest"}
-          sort={sort}
-          onSort={setSort}
           options={filterOptions}
           loading={refLoading}
           resultCount={loading ? null : totalCount}
@@ -784,14 +797,17 @@ export default function DiscoverPage() {
         </p>
       )}
 
-      <DiscoverPeopleResults query={peopleQuery} preview onSeeAll={() => setDiscoverView("people")} />
+      {/* The count and Sort: the header stays mounted while a new sort loads, so focus stays on Sort. */}
+      {!holdQuietly && (
+        <DiscoverResultsHeader
+          count={loading || failed ? null : totalCount}
+          showSort={feed === "latest"}
+          sort={sort}
+          onSort={setSort}
+        />
+      )}
 
-      <p aria-live="polite" className="sr-only">
-        {/* No count over an empty state: its own message already says so. */}
-        {loading || !totalCount ? "" : `${totalCount} result${totalCount === 1 ? "" : "s"}`}
-      </p>
-
-      <div className="mt-4">
+      <div className="mt-3">
       {holdQuietly ? null : loading ? (
         <ResultsSkeleton columns={gridColumns} onRetry={() => setAttempt((n) => n + 1)} />
       ) : failed && interrupted ? (
@@ -856,13 +872,13 @@ export default function DiscoverPage() {
         )
       ) : (
         <>
-          <div className={cn("grid gap-4", gridColumns)}>
+          <div className={cn("grid", columns === 1 ? "gap-3" : "gap-4", gridColumns)}>
             {shownRecords.map((record) => (
               <DiscoverResultCard
                 key={record.id}
                 record={record}
                 reason={record.reason}
-                expanded={columns === 1}
+                row={columns === 1}
                 searchHighlight={activeQuery}
                 onCite={() => setCiteRecord(record)}
                 onNotInterested={feed === "for_you" ? () => notInterested(record as ForYouItem) : undefined}
