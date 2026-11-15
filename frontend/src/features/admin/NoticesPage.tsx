@@ -62,7 +62,7 @@ export default function NoticesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Notices"
-        description="The data notice everyone answers before using IRIS, and every version published so far."
+        description="The privacy notice every account answers. Publishing a new version asks everyone to read it again."
       />
 
       <div role="note" className={WARNING_NOTICE}>
@@ -89,14 +89,22 @@ export default function NoticesPage() {
         </div>
       ) : (
         <>
-          <div role="group" aria-label="Current version" className="rounded-card border border-stone-200 bg-white p-5">
-            <p className="text-small font-semibold text-stone-900">
-              Version {current.version}, {published(current)}
-            </p>
-            {!canPublish && <p className="mt-1 text-small text-stone-600">Only RDCO publishes a new version.</p>}
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="order-2 lg:order-1">
+              {canPublish && <PublishForm current={current} onPublished={read.retry} />}
+            </div>
+            <aside
+              role="group"
+              aria-label="Current version"
+              className="order-1 rounded-card border border-stone-200 bg-white p-5 lg:order-2"
+            >
+              <h2 className="text-heading font-semibold text-stone-900">Live now</h2>
+              <p className="mt-1 text-small font-semibold text-stone-900">
+                Version {current.version}, {published(current)}
+              </p>
+              {!canPublish && <p className="mt-1 text-small text-stone-600">Only RDCO publishes a new version.</p>}
+            </aside>
           </div>
-
-          {canPublish && <PublishForm current={current} onPublished={read.retry} />}
 
           <VersionHistory versions={list} />
         </>

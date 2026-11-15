@@ -1,8 +1,25 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { recordsApi } from "@/api/records";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { downloadBlob } from "@/lib/utils";
+
+function StepCard({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-card border border-stone-200 bg-white p-5">
+      <h2 className="flex items-center gap-2 text-body font-semibold text-stone-800">
+        <span
+          aria-hidden
+          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand text-label font-semibold text-white"
+        >
+          {n}
+        </span>
+        {title}
+      </h2>
+      <div className="mt-2 text-small text-stone-600">{children}</div>
+    </div>
+  );
+}
 
 export default function ImportRecordsPage() {
   const [file,   setFile]   = useState<File | null>(null);
@@ -30,51 +47,47 @@ export default function ImportRecordsPage() {
 
   return (
     <div>
-      <PageHeader title="Import Records" description="Migrate research records in bulk using a formatted spreadsheet." />
+      <PageHeader title="Import Records" description="Add papers that were finished before IRIS, in one batch, from a spreadsheet." />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Instructions */}
-        <div className="bg-white rounded-card border border-stone-200 p-6">
-          <p className="text-body font-semibold text-stone-800 mb-3 flex items-center gap-2">
-            <i className="fas fa-info-circle text-brand" aria-hidden /> Instructions
-          </p>
-          <ol className="list-decimal pl-4 space-y-2 text-body text-stone-600">
-            <li>Follow the data entry format in the template below.</li>
-            <li>To add a new entry, duplicate a row and replace the values.</li>
-            <li>The migration stops when it reads a merged cell containing <strong>END OF RECORDS</strong>.</li>
-            <li>Press <strong>Generate</strong> to import.</li>
-          </ol>
-          <Button type="button" variant="outline" size="sm" className="mt-4" onClick={handleDownloadTemplate}>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StepCard n={1} title="Get the template">
+          <p>One row per paper, in the format of the template.</p>
+          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={handleDownloadTemplate}>
             <i className="fas fa-download" aria-hidden />
             Download template
           </Button>
-        </div>
-
-        {/* Upload */}
-        <div className="bg-white rounded-card border border-stone-200 p-6">
-          <p className="text-body font-semibold text-stone-800 mb-3 flex items-center gap-2">
-            <i className="fas fa-file-upload text-brand" aria-hidden /> Upload Spreadsheet
+        </StepCard>
+        <StepCard n={2} title="Fill it in">
+          <p>
+            Duplicate a row for each paper and replace the values. The import stops at a merged cell
+            containing <strong>END OF RECORDS</strong>.
           </p>
-          <label
-            className="block border-2 border-dashed border-stone-200 rounded-card p-6 text-center cursor-pointer hover:border-brand transition-colors"
-          >
-            <i className="fas fa-cloud-upload-alt text-3xl text-stone-300 mb-2" aria-hidden />
-            <p className="text-body font-semibold text-stone-600">
-              {file ? file.name : "Click to choose a file"}
-            </p>
-            <p className="text-label text-stone-500 mt-1">Supports .xls and .xlsx</p>
-            <input
-              type="file"
-              accept=".xls,.xlsx"
-              className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
+        </StepCard>
+        <StepCard n={3} title="Upload">
+          <p>Upload the spreadsheet (.xls or .xlsx), then press Generate to import it.</p>
+        </StepCard>
+      </div>
 
+      <div className="mt-6 mb-4 rounded-card border border-stone-200 bg-white p-6">
+        <label
+          className="block cursor-pointer rounded-card border-2 border-dashed border-stone-200 p-6 text-center transition-colors hover:border-brand"
+        >
+          <i className="fas fa-cloud-upload-alt mb-2 text-3xl text-stone-300" aria-hidden />
+          <p className="text-body font-semibold text-stone-600">
+            {file ? file.name : "Click to choose a file"}
+          </p>
+          <p className="mt-1 text-label text-stone-500">Supports .xls and .xlsx</p>
+          <input
+            type="file"
+            accept=".xls,.xlsx"
+            className="hidden"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </label>
+
+        <div className="mt-4 flex justify-end">
           <Button
             type="button"
-            size="full"
-            className="mt-4"
             loading={loading}
             disabled={!file}
             disabledReason="Choose a spreadsheet to import."

@@ -38,6 +38,7 @@ import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
 import { useUIStore } from "@/store/ui.store";
+import { queueCountsChanged } from "@/lib/queueCounts";
 import { LoadMore } from "@/components/shared/LoadMore";
 import { useFocusAfterCommit } from "@/hooks/useFocusAfterCommit";
 import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
@@ -82,6 +83,7 @@ export default function DeleteRequestsPage() {
     try {
       await recordsApi.approveDeleteRequest(req.id);
       addToast({ type: "success", message: `Deletion of "${req.record_title}" approved.` });
+      queueCountsChanged();
       read.retry();
       tabFocus.focusNext();
     } catch (err) {
@@ -99,7 +101,7 @@ export default function DeleteRequestsPage() {
     <div>
       <PageHeader
         title="Delete Requests"
-        description="Review requests to permanently remove records: approve them, or decline with a note."
+        description="Authors asking RDCO to remove a published record. Approving removes it from Discover and Ask IRIS; the audit log keeps the decision."
       />
 
       {/* Danger notice */}
@@ -224,7 +226,7 @@ export default function DeleteRequestsPage() {
                           <Button
                             type="button"
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => setDeclining(req)}
                           >
                             Decline
@@ -283,6 +285,7 @@ export default function DeleteRequestsPage() {
             // A refusal stays inside the dialog with the note; only success is a toast.
             addToast({ type: "success", message: `Deletion of "${declining.record_title}" declined.` });
             setDeclining(null);
+            queueCountsChanged();
             read.retry();
             tabFocus.focusNext();
           }}

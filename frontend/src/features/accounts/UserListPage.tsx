@@ -232,12 +232,12 @@ export default function UserListPage() {
 
   return (
     <div>
-      <PageHeader title="Users" description="Manage user accounts, roles and office coordinators." />
+      <PageHeader title="Users" description="Everyone with an IRIS account." />
 
       <div className="flex gap-3 mb-4">
         <Input
           aria-label="Search users"
-          placeholder="Search email or name..."
+          placeholder="Search by name or email"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
