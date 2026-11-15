@@ -57,7 +57,7 @@ Decided by Ashlee Sean, 2026-11-15; awaiting the project lead's acceptance on th
 
 **The gap, decided rather than overlooked.** The PDF the browser holds is still unmarked, so a reader who saves it with browser tools gets a copy without the mark or their name (Consequences, first point). This amendment does not close it. Closing it means building a copy that names the reader on the server on every view, measured 2026-11-15 at 1.2 s and 625 KB → 2.1 MB for a 27-page paper with no caching possible, or sending page images instead of a PDF, which costs more and loses selection, find and highlights. Either is a later decision for a person to make. A pre-built "CIT-U" copy per version without a name is IR-1129, waiting on a team decision.
 
-**Alternatives.** *Mark the PDF on the server for each view* closes the gap but costs the server on every page opened, including Discover's covers, which fetch the whole manuscript per card (IR-1130). *Leave the reader unmarked* costs nothing, but screenshots and prints stay anonymous.
+**Alternatives.** *Mark the PDF on the server for each view* closes the gap but costs the server on every paper opened, with nothing shareable between readers to cache. *Leave the reader unmarked* costs nothing, but screenshots and prints stay anonymous.
 
 ## Alternatives Considered
 
