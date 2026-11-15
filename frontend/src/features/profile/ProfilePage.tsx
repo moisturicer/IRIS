@@ -54,11 +54,12 @@ export default function ProfilePage() {
         role="note"
         className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-stone-200 bg-stone-100 py-2 pl-4 pr-2 text-small text-stone-700"
       >
-        This is how other people signed in to IRIS see you.
+        <i className="fas fa-eye" aria-hidden />
+        <span className="flex-1">This is how other IRIS accounts see your profile.</span>
         <Link to={pathFor("profileEdit")} className={cn(PILL_PRIMARY, FOCUS_RING)}>Edit profile</Link>
       </p>
 
-      <PersonProfileView profile={profile} lists={lists} />
+      <PersonProfileView profile={profile} lists={lists} self />
     </div>
   );
 }
