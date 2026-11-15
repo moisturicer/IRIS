@@ -853,8 +853,8 @@ AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False,
 # ---- Formulas in the indexed text (IR-1102, ADR-067 §Amendment) ----------
 # Readers always see a transcribed formula's LaTeX. On, it and its description
 # also enter the chunk's embedded and keyword-indexed text. Read at chunking,
-# so moving it needs a re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
-AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
+# so moving it needs a re-chunk. On by owner decision (IR-1149, ADR-067 amendment 2026-11-15).
+AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=True, cast=bool)
 
 # Figures as passages of their own in the structural strategy (IR-1054): each
 # captioned or described Figure leaves the text flow and is citable alone.
