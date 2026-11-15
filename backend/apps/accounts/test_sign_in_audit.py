@@ -6,8 +6,9 @@ Decided 2026-11-15 (Hermoine Zozobrado):
 
 * A refusal is `FAILED_LOGIN` with a `reason`: `invalid_credentials`,
   `unverified`, `locked_by_admin`, or `too_many_attempts` for every attempt axes
-  refuses (one per 429, not one per lock). Each carries the email tried and the
-  client address.
+  refuses (one per 429, not one per lock). Each carries the email tried, and no
+  client address (decided 2026-11-16: an audit row is never erased, so an
+  address in one could never expire).
 * A refusal names the account only when the password was right (unverified,
   locked by RDCO): a guess must not add rows to someone else's history.
 * Registering writes `ACCOUNT_REGISTERED` against the new account.
@@ -65,7 +66,7 @@ class RefusalTests(SignInAuditCase):
 
         [event] = self.refusals()
         self.assertIsNone(event.user)
-        self.assertEqual(event.metadata, {"email": ADDRESS, "reason": "invalid_credentials", "ip": IP})
+        self.assertEqual(event.metadata, {"email": ADDRESS, "reason": "invalid_credentials"})
         self.assertHoldsNoSecret("Wrong-horse-1!")
 
     def test_an_unknown_email_is_recorded_the_same_way(self):
@@ -81,7 +82,7 @@ class RefusalTests(SignInAuditCase):
 
         [event] = self.refusals()
         self.assertEqual(event.user, user)
-        self.assertEqual(event.metadata, {"email": ADDRESS, "reason": "unverified", "ip": IP})
+        self.assertEqual(event.metadata, {"email": ADDRESS, "reason": "unverified"})
         self.assertHoldsNoSecret(PASSWORD)
 
     def test_an_account_locked_by_rdco_is_recorded_against_that_account(self):
@@ -90,7 +91,7 @@ class RefusalTests(SignInAuditCase):
 
         [event] = self.refusals()
         self.assertEqual(event.user, user)
-        self.assertEqual(event.metadata, {"email": ADDRESS, "reason": "locked_by_admin", "ip": IP})
+        self.assertEqual(event.metadata, {"email": ADDRESS, "reason": "locked_by_admin"})
 
     def test_a_successful_sign_in_records_no_refusal(self):
         make_user()
@@ -102,11 +103,15 @@ class RefusalTests(SignInAuditCase):
         self.assertHoldsNoSecret(PASSWORD, response.json()["access"], response.json()["refresh"])
 
     @override_settings(TRUSTED_PROXY_COUNT=1)
-    def test_the_address_is_the_client_behind_the_proxy(self):
+    def test_no_refusal_stores_the_client_address(self):
+        # Decided 2026-11-16: an audit row can never be erased, so an address in one
+        # could never expire. Neither the peer nor the forwarded client is kept.
+        make_user(is_verified=False)
         self.sign_in(password="x", REMOTE_ADDR="10.0.0.2", HTTP_X_FORWARDED_FOR=IP)
+        self.sign_in(REMOTE_ADDR="10.0.0.2", HTTP_X_FORWARDED_FOR=IP)
 
-        [event] = self.refusals()
-        self.assertEqual(event.metadata["ip"], IP)
+        self.assertEqual(len(self.refusals()), 2)
+        self.assertHoldsNoSecret(IP, "10.0.0.2")
 
 
 # The lockout is off by default for now (IR-865); these prove it is audited when on.
@@ -126,7 +131,7 @@ class LockoutTests(SignInAuditCase):
         self.assertEqual(reasons, ["invalid_credentials"] * (limit - 1) + ["too_many_attempts"])
         last = self.refusals()[-1]
         self.assertIsNone(last.user)
-        self.assertEqual(last.metadata, {"email": ADDRESS, "reason": "too_many_attempts", "ip": IP})
+        self.assertEqual(last.metadata, {"email": ADDRESS, "reason": "too_many_attempts"})
 
     def test_every_attempt_refused_during_the_lock_is_recorded_even_with_the_right_password(self):
         make_user()
@@ -155,7 +160,7 @@ class AsgiLockoutTests(APITestCase):
         last = await AuditEvent.objects.filter(event_type=AuditEvent.FAILED_LOGIN).alatest("pk")
         self.assertEqual(last.metadata["reason"], "too_many_attempts")
         self.assertEqual(last.metadata["email"], ADDRESS)
-        self.assertEqual(last.metadata["ip"], "127.0.0.1")  # the async client's own address
+        self.assertNotIn("ip", last.metadata)
         self.assertEqual(
             await AuditEvent.objects.filter(event_type=AuditEvent.FAILED_LOGIN).acount(),
             settings.AXES_FAILURE_LIMIT,
