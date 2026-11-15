@@ -142,7 +142,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
 
       <section aria-labelledby="publish-manuscript-heading">
         {exactMatches.length > 0 && (
-          <div role="alert" className="rounded-control border border-stone-300 bg-surface p-4">
+          <div role="alert" className="rounded-card border border-stone-300 bg-surface p-4">
             <p className="font-semibold">This manuscript is already attached to a record you can read.</p>
             <ul className="mt-2 space-y-2">
               {exactMatches.map((match) => <li key={match.id}>

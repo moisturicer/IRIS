@@ -670,7 +670,7 @@ export default function SignupPage() {
           {step === 1 && (
             <>
               {roleChangedTo && (
-                <div role="status" className="rounded-control border border-stone-200 bg-stone-50 px-4 py-3 text-stone-800">
+                <div role="status" className="rounded-card border border-stone-200 bg-stone-50 px-4 py-3 text-stone-800">
                   <p className="font-semibold">Your role changed to {roleChangedTo}</p>
                   <p className="mt-1 text-small">
                     Your college is kept. Choose a {roleChangedTo === "Adviser" ? "department" : "program"} instead

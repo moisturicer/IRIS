@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { arbitraryShadowClasses, offRadiusClasses } from "./radius";
 
-const THIS_FILES = new Set(["src/test/radius.test.ts", "src/test/radius.ts"]);
+const GUARD_FIXTURE_FILES = new Set(["src/test/radius.test.ts", "src/test/radius.ts"]);
 const TEST_FILE = /\.test\.tsx?$/;
 
 const SOURCES: Record<string, string> = Object.fromEntries(
@@ -90,7 +90,7 @@ describe("the radius guard", () => {
   it("finds no off-scale corner anywhere in frontend source", () => {
     const offenders = Object.fromEntries(
       Object.entries(SOURCES)
-        .filter(([path]) => !THIS_FILES.has(path) && !TEST_FILE.test(path))
+        .filter(([path]) => !GUARD_FIXTURE_FILES.has(path) && !TEST_FILE.test(path))
         .map(([path, source]) => [path, offRadiusClasses(source)])
         .filter(([, classes]) => classes.length > 0),
     );
@@ -106,7 +106,7 @@ describe("the radius guard", () => {
   it("finds no arbitrary shadow anywhere in frontend source", () => {
     const offenders = Object.fromEntries(
       Object.entries(SOURCES)
-        .filter(([path]) => !THIS_FILES.has(path) && !TEST_FILE.test(path))
+        .filter(([path]) => !GUARD_FIXTURE_FILES.has(path) && !TEST_FILE.test(path))
         .map(([path, source]) => [path, arbitraryShadowClasses(source)])
         .filter(([, classes]) => classes.length > 0),
     );

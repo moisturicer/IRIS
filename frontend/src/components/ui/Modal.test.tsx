@@ -32,7 +32,7 @@ describe("Modal sizes (IR-1043)", () => {
 
   it("refuses a width class or an unknown name at type-check time", () => {
     // These lines are checked by `tsc`, not run: an unknown size is an error.
-    const render_ = () => (
+    const typeChecked = () => (
       <>
         {/* @ts-expect-error a width class is not a size */}
         <Modal open onClose={() => {}} size="max-w-md">x</Modal>
@@ -40,6 +40,6 @@ describe("Modal sizes (IR-1043)", () => {
         <Modal open onClose={() => {}} size="huge">x</Modal>
       </>
     );
-    expect(typeof render_).toBe("function");
+    expect(typeof typeChecked).toBe("function");
   });
 });

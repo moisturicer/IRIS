@@ -719,7 +719,7 @@ export default function DiscoverPage() {
         )}
       </div>
       {feedUnchecked && (
-        <section aria-label="Saved feed" className="mt-3 rounded-control border border-stone-200 bg-white px-4 py-3">
+        <section aria-label="Saved feed" className="mt-3 rounded-card border border-stone-200 bg-white px-4 py-3">
           <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-small text-stone-700">
             <p>This feed could not be checked right now, so its list is not shown.</p>
             <button type="button" onClick={() => void ensureFeeds(true)}
@@ -734,7 +734,7 @@ export default function DiscoverPage() {
         </section>
       )}
       {activeFeed && (
-        <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-control border border-stone-200 bg-white px-4 py-3">
+        <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-card border border-stone-200 bg-white px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <p className="text-small font-semibold text-stone-900">Feed: {activeFeed.name}</p>
             {!correctionPending && feedHasCriteria && !sameFeedQuery(activeFeed.query, query) && (

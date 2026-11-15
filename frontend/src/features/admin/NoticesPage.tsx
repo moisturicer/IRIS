@@ -218,7 +218,7 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
       </div>
 
       {preview && (
-        <section aria-label="Preview" className="rounded-control border border-stone-200 bg-stone-50 px-4 py-3">
+        <section aria-label="Preview" className="rounded-card border border-stone-200 bg-stone-50 px-4 py-3">
           <NoticeText notice={{ version: next, text, published_at: null }} headingLevel={3} />
         </section>
       )}
@@ -274,7 +274,7 @@ function VersionHistory({ versions }: { versions: NoticeVersion[] }) {
                 </div>
               </div>
               {expanded && (
-                <div className="mt-3 rounded-control border border-stone-200 bg-stone-50 px-4 py-3">
+                <div className="mt-3 rounded-card border border-stone-200 bg-stone-50 px-4 py-3">
                   <NoticeText notice={v} headingLevel={3} />
                 </div>
               )}

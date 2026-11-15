@@ -186,7 +186,7 @@ export function NoticeAnswerScreen() {
                 {alert.message}
               </AuthAlert>
             )}
-            <div className="max-h-[50vh] overflow-y-auto rounded-control border border-stone-200 bg-stone-50 px-4 py-3" tabIndex={0} role="region" aria-label="Data notice">
+            <div className="max-h-[50vh] overflow-y-auto rounded-card border border-stone-200 bg-stone-50 px-4 py-3" tabIndex={0} role="region" aria-label="Data notice">
               <NoticeText notice={notice} />
             </div>
             <NoticeAnswerFields value={answers} onChange={setAnswers} errors={errors} previousAi={previousAi} />

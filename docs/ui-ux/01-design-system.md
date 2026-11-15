@@ -164,9 +164,9 @@ Also added: `--maroon-press` `#5a0c0f` for a pressed filled button, and `--field
 | Token | Size | For |
 |---|---|---|
 | `rounded-control` | 12 px (`0.75rem`) | Inputs, selects, buttons that are not pills, chips, rows, table cells and small marks: anything a hand or eye lands on inside a card |
-| `rounded-card` | 16 px (`1rem`) | Cards and panels, and a floating menu or popover |
+| `rounded-card` | 16 px (`1rem`) | Cards and panels: any bordered block with its own padding (a notice, a preview, a saved-feed strip, a match warning), and a floating popover. A menu or list row inside one is `control` |
 | `rounded-dialog` | 20 px (`1.25rem`) | `Modal` and its sheet, a bottom sheet, `AccountLockedModal`, `RequestDocumentDialog` |
-| `rounded-full` | pill | Pills, avatars, badges and a text line in a skeleton. **Never a card or a button that is not a pill** |
+| `rounded-full` | pill | Pills, avatars and badges, and the three lines of `AssistantMessageSkeleton`. **Never a card or a button that is not a pill** |
 | `rounded-none` | square | Where a shape must meet its neighbour: a text highlight laid over a PDF's own text boxes (`ReaderHighlights`, `CitationOverlay`, `readerAnnotations`), search-match marks, a deleted-text mark, the Stop square, one corner of a chat bubble |
 
 A corner takes the same names: `rounded-t-card`, `md:rounded-dialog`, `before:rounded-bl-card`. The values sit closest to what the code used (controls near the old `rounded-lg`, cards near `rounded-xl`/`rounded-2xl`, dialogs near `rounded-xl`); the three are one step apart so a reviewer can say a card has the control's radius. **Cost:** a small chip that was 2 to 8 px is now 12 px (on a short line that reads as a pill), cards that were `rounded-2xl` (20 px) are 16 px, and a dialog that was 16 px is 20 px. There is **no concentric inner radius**: the section thumb inside its track is `rounded-control` like the track (the old one-step-smaller `rounded-md` is retired).
@@ -190,10 +190,10 @@ A `sheet` is full screen below `md`, so its width starts at `md` (`md:max-w-dial
 
 ### Loading placeholders
 
-One shape, `SkeletonBlock` (`components/ui/Skeleton.tsx`): a `stone-100` (`tone="soft"`) or `stone-200` (`tone="strong"`) block that pulses and holds still under reduced motion, with `shape` `control` (default), `card` or `pill`. A screen shows it one of two ways, never with its own `animate-pulse` box:
+One shape, `SkeletonBlock` (`components/ui/Skeleton.tsx`): a `stone-100` (`tone="soft"`) or `stone-200` (`tone="strong"`) block that pulses and holds still under reduced motion, with `shape` `control` (default), `card` or `pill`. A screen shows it one of two ways. **Five screens are rebuilt on it** (below); the other hand-drawn pulse boxes (`PaperAiOverview`, `ReadingHeader`, `RelatedWorks`, `RelatedPublishedResearch`, `ReviewTimeline`, `ReviewRoutingTracker`, `RequestDocumentDialog`, and the pulse cards in `LibraryOverview`, `MyResearchList`, `SavedView` and `DownloadRequestsView`) move when next touched, and a new screen draws none:
 
 - **`Skeleton`**: rows of text lines in a `role="status"` region, for a surface with no shape of its own.
-- **`LoadingRegion`** (`components/ui/LoadingRegion.tsx`) wrapping `SkeletonBlock`s drawn in the screen's own layout, so nothing shifts when the content arrives. It announces its `label` once, says it is still working after 2 s and offers Try again after 10 s (IR-1078). Used by Discover, My Library, Calls and Conferences, a Person profile and Paper View.
+- **`LoadingRegion`** (`components/ui/LoadingRegion.tsx`) wrapping `SkeletonBlock`s drawn in the screen's own layout, so nothing shifts when the content arrives. It announces its `label` once and says it is still working after 2 s; given an `onRetry` it offers Try again after 10 s (IR-1078; Discover passes one, Calls, Profile and Paper View do not). Used by Discover, My Library, Calls and Conferences, a Person profile and Paper View.
 
 `AssistantMessageSkeleton` keeps its own wrapper (an `aria-busy` row with the "Searching the research repository…" line, which is its announcement) and draws its three lines with `SkeletonBlock`.
 

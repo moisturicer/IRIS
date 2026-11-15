@@ -40,7 +40,7 @@ export function LetterEntries({ entries }: { entries: ResponseLetterEntry[] }) {
 export function ResponseLetterPanel({ letter }: { letter: ResponseLetter }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className="rounded-control border border-stone-300 bg-stone-50 p-3 space-y-2">
+    <section aria-labelledby={headingId} className="rounded-card border border-stone-300 bg-stone-50 p-3 space-y-2">
       <h4 id={headingId} className="text-small font-semibold text-stone-900">
         Response to reviewers<span className="sr-only">,</span> <span className="font-normal text-stone-600">v{letter.version}</span>
       </h4>
