@@ -13,7 +13,7 @@ deletes the uploaded file.
 import pytest
 
 from apps.ai.extraction import ExtractorUnavailable
-from apps.ai.extraction.llamaparse_client import allowed_download
+from apps.ai.extraction.llamaparse_client import _download, allowed_download
 
 from . import llamaparse_vendor
 from .llamaparse_vendor import Vendor
@@ -26,6 +26,7 @@ S3_URLS = [
     "https://llamaparse-results.s3.eu-central-1.amazonaws.com/grounded.jsonl",
     "https://llamaparse-results.s3-us-west-2.amazonaws.com/grounded.jsonl",
     "https://llamaparse-results.s3.dualstack.us-east-1.amazonaws.com/x",
+    "https://llamaparse-results.s3-fips.us-east-1.amazonaws.com/x",
     "https://S3.AMAZONAWS.COM/bucket/x",
     "https://s3.amazonaws.com:443/bucket/x",
 ]
@@ -42,10 +43,19 @@ REFUSED_URLS = [
     "https://abc123.execute-api.us-east-1.amazonaws.com/x",      # another AWS service
     "https://s3-1234567890.us-west-2.elb.amazonaws.com/x",       # a load balancer named s3
     "https://user:pass@s3.amazonaws.com/x",                       # credentials in the URL
+    "https://s3-control.us-east-1.amazonaws.com/x",              # other S3-named services
+    "https://x.s3-object-lambda.us-east-1.amazonaws.com/x",
+    "https://x.s3-website-us-east-1.amazonaws.com/x",
+    "https://x.s3-anything.amazonaws.com/x",
+    "https://evil\n.s3.amazonaws.com/x",                         # a newline httpx won't accept
+    "https://[s3.amazonaws.com]/x",
+    "https://[::1/x",
     "file:///etc/passwd",
     "https://[::1]/x",
     "not a url",
     "",
+    None,
+    42,
 ]
 
 
@@ -57,6 +67,16 @@ def test_amazon_s3_over_https_is_fetched(url):
 @pytest.mark.parametrize("url", REFUSED_URLS)
 def test_anything_else_is_refused(url):
     assert not allowed_download(url)
+
+
+@pytest.mark.parametrize("url", REFUSED_URLS)
+def test_every_refusal_is_unavailable_and_sends_nothing(url):
+    class NeverCalled:
+        def request(self, *args, **kwargs):
+            raise AssertionError("a refused URL was requested")
+
+    with pytest.raises(ExtractorUnavailable, match="is not an allowed result host"):
+        _download(NeverCalled(), url)
 
 
 def test_a_listed_host_is_fetched_and_only_exactly():
@@ -89,3 +109,33 @@ def test_the_setting_lets_a_new_host_through(monkeypatch):
     fetched = [r.url.path for r in vendor.requests if r.url.host == "results.llamaindex.example"]
     assert fetched == ["/grounded_items.jsonl"]
     assert extracted.raw["grounded_items"]
+
+
+def test_a_figure_pointing_elsewhere_is_unavailable_too(monkeypatch):
+    """The grounded items pass; the figure crop's URL does not."""
+    from .test_llamaparse_client import recording
+
+    result = recording("figures")
+    result["items"]["pages"][0]["items"].append(
+        {"type": "image", "url": "image_0.png", "caption": "Figure 1.", "bbox": [{"x": 1, "y": 1, "w": 2, "h": 2}]})
+    result["images_content_metadata"] = {"total_count": 1, "images": [
+        {"index": 0, "filename": "image_0.png", "category": "layout", "content_type": "image/png",
+         "bbox": {"x": 1, "y": 1, "w": 2, "h": 2}},
+    ]}
+
+    class ElsewhereVendor(Vendor):
+        def _result(self):
+            response = super()._result()
+            body = response.json()
+            body["images_content_metadata"]["images"][0]["presigned_url"] = "https://10.0.0.5/image_0.png"
+            import httpx
+            return httpx.Response(200, json=body)
+
+    vendor = ElsewhereVendor("figures", result=result, images={"image_0.png": b"PNG crop"})
+
+    with pytest.raises(ExtractorUnavailable, match="10.0.0.5 is not an allowed result host"):
+        read(vendor, "figures")
+
+    assert not [r for r in vendor.requests if r.url.host == "10.0.0.5"]
+    assert [r.url.path for r in vendor.requests if r.url.host == llamaparse_vendor.DOWNLOAD_HOST] == [
+        "/grounded_items.jsonl"]

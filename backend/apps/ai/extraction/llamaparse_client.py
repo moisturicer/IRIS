@@ -60,11 +60,15 @@ _TIMEOUT_MEMORY_SECONDS = 24 * 60 * 60
 # come in the vendor's response, not from settings, so each is checked before
 # any request: https on the default port, to Amazon S3, which is where
 # LlamaParse's v2 guide shows them (`https://s3.amazonaws.com/...`). The pattern
-# takes S3's path-style, virtual-hosted, regional and dual-stack names, and no
-# other AWS service. LLAMAPARSE_DOWNLOAD_HOSTS adds exact hostnames if the
-# vendor ever serves them elsewhere.
+# takes S3's path-style and virtual-hosted names, with an optional `-fips`,
+# dual-stack and region (`s3.us-east-1`, legacy `s3-us-west-2`). Other S3-named
+# services (`s3-control`, `s3-object-lambda`, website endpoints), China
+# (`.amazonaws.com.cn`) and S3 Express are refused. Any S3 bucket passes, so this
+# keeps the worker off internal addresses; it does not tie it to LlamaParse's own
+# bucket. LLAMAPARSE_DOWNLOAD_HOSTS adds exact hostnames if the vendor ever
+# serves results elsewhere.
 _S3_HOST = re.compile(
-    r"^(?:[a-z0-9][a-z0-9.-]*\.)?s3(?:-[a-z0-9-]+)?(?:\.dualstack)?(?:\.[a-z]{2}(?:-[a-z]+)+-\d+)?\.amazonaws\.com$"
+    r"^(?:[a-z0-9][a-z0-9.-]*\.)?s3(?:-fips)?(?:[.-]dualstack)?(?:[.-][a-z]{2}(?:-gov)?-[a-z]+-\d+)?\.amazonaws\.com$"
 )
 
 _TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
@@ -288,24 +292,35 @@ def _delete(api: httpx.Client, file_id: str) -> None:
         logger.error("LlamaParse uploaded file %s may remain: %s", file_id, error)
 
 
-def allowed_download(url: str, extra_hosts=frozenset()) -> bool:
-    """True when ``url`` is https, on the default port, to S3 or a listed host."""
+def _result_host(url) -> Optional[str]:
+    """The host httpx would connect to, or None when httpx can't read the URL.
+
+    The same parser the download client uses, so the check and the request can
+    never disagree about where a URL points.
+    """
     try:
-        parts = urlparse(url)
-        port = parts.port
-    except ValueError:
-        return False
-    host = (parts.hostname or "").lower()
-    if parts.scheme != "https" or port not in (None, 443) or parts.username or parts.password:
-        return False
-    return bool(_S3_HOST.match(host)) or host in extra_hosts
+        parsed = httpx.URL(url)
+    except Exception:  # noqa: BLE001 -- any URL httpx can't read is refused
+        return None
+    if parsed.scheme != "https" or parsed.port not in (None, 443) or parsed.userinfo:
+        return None
+    return parsed.host.lower() or None
 
 
-def _download(downloads: httpx.Client, url: str, extra_hosts=frozenset()) -> bytes:
+def allowed_download(url, extra_hosts=frozenset()) -> bool:
+    """True when ``url`` is https, on the default port, to S3 or a listed host."""
+    host = _result_host(url) if isinstance(url, str) else None
+    return host is not None and (bool(_S3_HOST.match(host)) or host in extra_hosts)
+
+
+def _download(downloads: httpx.Client, url, extra_hosts=frozenset()) -> bytes:
     if not allowed_download(url, extra_hosts):
         # Only the host is named: the query string is a credential.
-        host = urlparse(url).hostname if isinstance(url, str) else None
-        raise ExtractorUnavailable(f"LlamaParse download refused: {host or 'no host'} is not an allowed result host")
+        try:
+            host = httpx.URL(url).host or "no host"
+        except Exception:  # noqa: BLE001
+            host = "an unreadable URL"
+        raise ExtractorUnavailable(f"LlamaParse download refused: {host} is not an allowed result host")
     return _send(downloads, "GET", url, "download").content
 
 

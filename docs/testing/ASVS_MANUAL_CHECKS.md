@@ -145,6 +145,8 @@ Trace where each outbound URL comes from. These files make direct HTTP calls: `a
 
 `Record` Result: **Fail** Date: 2026-11-05 Person: AI agent, at Ashlee Sean's direction (her confirmation pending) Evidence: Voyage, the LLM routes (`inference/profiles.py`), LlamaParse and LlamaExtract (`extraction/selection.py`) and the gateway's adapter all take their base URL from settings. Docling is retired (IR-843), and the eval drivers' `--base-url` is reachable only from management commands. But `llamaparse_client._download` fetches the `presigned_url`s in LlamaParse's response with no host, scheme or port check, and ASVS asks for allow lists. The vendor's authenticated response is the only source, and IR-825's egress limit is the backstop. [IR-929](https://citiris.atlassian.net/browse/IR-929).
 
+`Retest` Result: **Pass** Date: 2026-11-15 Person: AI agent (Claude Code), at Ashlee Sean's direction (her confirmation pending) Evidence: [IR-929](https://citiris.atlassian.net/browse/IR-929) closes the one gap. LlamaParse's `presigned_url`s, the only outbound URL taken from a response, are now parsed with httpx (the client's own parser) and fetched only over https on the default port to Amazon S3 or an exact host in `LLAMAPARSE_DOWNLOAD_HOSTS`. Anything else is `ExtractorUnavailable` before any request (`test_llamaparse_downloads.py`). Every other outbound base URL still comes from settings.
+
 ### 6.2.1 Crypto fails safely
 **Requirement:** crypto errors don't reveal anything useful, which rules out padding oracle attacks.
 
