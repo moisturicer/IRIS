@@ -29,6 +29,8 @@ import { notificationTypeLabel } from "./notificationLabels";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { isUnread, UnreadDot, UnreadWord } from "./unread";
 
+const FAILED_LEAD = "Couldn't update your notifications.";
+
 type Filter = "all" | "unread";
 
 /** The day a notification belongs to, in plain words, newest group first. */
@@ -58,7 +60,7 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<Filter>("all");
   // A failed mark-read or mark-all is said, not swallowed: the row would
   // otherwise look read while the server still holds it unread.
-  const [actionFailed, setActionFailed] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -83,9 +85,9 @@ export default function NotificationsPage() {
     try {
       await notificationsApi.markRead(id);
       setRead(id);
-      setActionFailed(false);
-    } catch {
-      setActionFailed(true);
+      setActionError(null);
+    } catch (error) {
+      setActionError(failureMessage(error, { lead: FAILED_LEAD }));
     }
   };
 
@@ -102,9 +104,9 @@ export default function NotificationsPage() {
       await notificationsApi.markAllRead();
       markAllRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-      setActionFailed(false);
-    } catch {
-      setActionFailed(true);
+      setActionError(null);
+    } catch (error) {
+      setActionError(failureMessage(error, { lead: FAILED_LEAD }));
     }
   };
 
@@ -158,9 +160,9 @@ export default function NotificationsPage() {
         }
       />
 
-      {actionFailed && (
+      {actionError && (
         <p role="alert" className="mb-section-sm text-small font-medium text-brand-dark">
-          Couldn&apos;t update your notifications. Check your connection and try again.
+          {actionError}
         </p>
       )}
 
