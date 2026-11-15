@@ -74,7 +74,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
         : highlightTerms(formatAuthorList(record.authors), searchHighlight)}
       summary={abstract ? highlightTerms(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
       summaryClassName={row ? "line-clamp-2" : undefined}
-      thumbnail={row && <PaperThumbnail />}
+      thumbnail={row && <PaperThumbnail recordId={record.id} available={record.has_manuscript ?? record.file_count > 0} />}
       footerClassName={row ? undefined : "rounded-b-card border-stone-200 bg-white"}
       footer={
         <>
