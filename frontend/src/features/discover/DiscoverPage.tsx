@@ -61,9 +61,9 @@ type ColumnCount = 1 | 2 | 3;
 /** Both segmented controls share one track and one height (IR-1082): the chosen
  *  segment is white and raised (the Selected role), never maroon. */
 const SEGMENT_TRACK = "inline-flex shrink-0 items-center rounded-lg border border-stone-200 bg-stone-100 p-0 sm:h-11 sm:p-0.5";
-const segment = (chosen: boolean) =>
-  cn("h-full min-h-11 rounded-md px-3 text-small font-semibold sm:min-h-0", COLOUR_TRANSITION, FOCUS_RING,
-    chosen ? SELECTED_SEGMENT : "text-stone-700 hover:bg-surface");
+const segmentClass = (chosen: boolean, padding: "px-3" | "px-4" = "px-3") =>
+  cn("h-full min-h-11 rounded-md text-small font-semibold sm:min-h-0", padding, COLOUR_TRANSITION, FOCUS_RING,
+    chosen ? SELECTED_SEGMENT : "text-stone-700 hover:bg-stone-200");
 
 function readColumns(): ColumnCount {
   try {
@@ -649,7 +649,7 @@ export default function DiscoverPage() {
     <div role="group" aria-label="Discover results" className={SEGMENT_TRACK}>
       {([ ["papers", "Papers"], ["people", "People"] ] as const).map(([value, label]) => (
         <button key={value} type="button" aria-pressed={discoverView === value} onClick={() => setDiscoverView(value)}
-          className={cn(segment(discoverView === value), "px-4")}>
+          className={segmentClass(discoverView === value, "px-4")}>
           {label}
         </button>
       ))}
@@ -673,7 +673,7 @@ export default function DiscoverPage() {
                 updateQuery((current) => ({ ...current, feed: value, q: value === "for_you" ? "" : current.q }));
                 if (value === "for_you") setSearchInput("");
               }}
-              className={segment(feed === value)}>{label}</button>
+              className={segmentClass(feed === value)}>{label}</button>
           ))}
         </div>
         {hasAreas && (
@@ -797,15 +797,15 @@ export default function DiscoverPage() {
         </p>
       )}
 
-      {/* The count and Sort: the header stays mounted while a new sort loads, so focus stays on Sort. */}
-      {!holdQuietly && (
-        <DiscoverResultsHeader
-          count={loading || failed ? null : totalCount}
-          showSort={feed === "latest"}
-          sort={sort}
-          onSort={setSort}
-        />
-      )}
+      {/* The count and Sort. Always mounted, so its live region exists before a count lands in it
+          and Sort keeps focus while a new sort loads; Sort itself is only offered over a list
+          that is loading or has papers to order, never over a failure or an empty page. */}
+      <DiscoverResultsHeader
+        count={holdQuietly || loading || failed ? null : totalCount}
+        showSort={feed === "latest" && !holdQuietly && !failed && (loading || shownRecords.length > 0)}
+        sort={sort}
+        onSort={setSort}
+      />
 
       <div className="mt-3">
       {holdQuietly ? null : loading ? (

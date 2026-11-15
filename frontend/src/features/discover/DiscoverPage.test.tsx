@@ -416,6 +416,35 @@ describe("the toolbar and the result rows (IR-1082)", () => {
     expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
   });
 
+  it("offers no Sort over a failed read or an empty list, where there is nothing to order", async () => {
+    vi.mocked(recordsApi.list).mockImplementationOnce(() => Promise.reject(new Error("down")));
+    const first = renderDiscover();
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+    first.unmount();
+
+    listed = [];
+    renderDiscover();
+    await screen.findByText("Nothing has been published yet.");
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the count's live region in the page from the start, so a count that lands in it is announced", async () => {
+    renderDiscover();
+    // Present while the first read is still out, and empty until it lands.
+    const status = within(screen.getByRole("group", { name: "Results" })).getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    await waitFor(() => expect(status).toHaveTextContent("1 paper"));
+  });
+
+  it("opens a filter from its visible label too", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const sheet = await filterSheet();
+    await userEvent.click(within(sheet).getByText("Type"));
+    expect(await screen.findByRole("listbox", { name: "Type" })).toBeInTheDocument();
+  });
+
   it("hides Areas until there are Areas to choose from", async () => {
     const classifications = vi.mocked(recordsApi.classifications).getMockImplementation()!;
     const pscedList = vi.mocked(recordsApi.pscedList).getMockImplementation()!;

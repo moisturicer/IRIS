@@ -58,6 +58,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
   const [open, setOpen] = useState(false);
   const listId = useId();
   const labelId = useId();
+  const buttonId = useId();
   const valueId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,11 +102,12 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
 
   return (
     <div className={cn("relative", block && "w-full")} ref={containerRef}>
-      <span id={labelId} className="mb-1 block text-small font-medium text-stone-700">{name}</span>
+      <label id={labelId} htmlFor={buttonId} className="mb-1 block text-small font-medium text-stone-700">{name}</label>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         ref={triggerRef}
+        id={buttonId}
         aria-labelledby={`${labelId} ${valueId}`}
         aria-controls={open ? listId : undefined}
         aria-expanded={open}

@@ -75,7 +75,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ro
       summary={abstract ? highlightTerms(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
       summaryClassName={row ? "line-clamp-2" : undefined}
       thumbnail={row && <PaperThumbnail />}
-      footerClassName="rounded-b-xl border-stone-200 bg-white"
+      footerClassName={row ? undefined : "rounded-b-xl border-stone-200 bg-white"}
       footer={
         <>
           <ResearchOriginBadge origin={record.origin} />
