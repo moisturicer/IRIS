@@ -112,7 +112,7 @@ It reports five steps, and the first that fails stops the run and names itself:
 | 1. pull | Fast-forwards the clone to GitHub's `main` | the clone isn't on `main`, has uncommitted changes, or has commits GitHub doesn't. Nothing is changed |
 | 2. check | Checks `.env`, `backend/.env` and `ai/.env` exist, the compose file is valid, and 5 GB is free | any is missing. Nothing is rebuilt |
 | 3. rebuild | `docker compose -f docker-compose.prod.yml up -d --build` | the build fails, or `migrate` (the database update) fails: its log is shown |
-| 4. health | Waits until every service is running, and healthy where it has a check, on three checks in a row, so a crash-looping one doesn't pass. After a rebuild it restarts `frontend`, a fallback kept from before IR-200's fix. Then it fetches the home page and `/api/v1/colleges/` over HTTPS | a service isn't ready, or the site doesn't answer, within 10 minutes for the whole step. The logs of what failed are shown |
+| 4. health | Waits until every service is running, and healthy where it has a check, on three checks in a row, so a crash-looping one doesn't pass. Then it fetches the home page and `/api/v1/colleges/` over HTTPS. If the page answers and the API doesn't, it restarts `frontend` once and says so, a fallback kept from before IR-200's fix | a service isn't ready, or the site doesn't answer, within 10 minutes for the whole step. The logs of what failed are shown |
 | 5. report | Prints `done, running <commit> (<title>)` | |
 
 **Nothing new?** It says "already up to date", skips the rebuild and only runs the health check. That makes it the check to run after a scheduled start too: when the page answers but the API doesn't, it restarts `frontend` once by itself (IR-200). It remembers the last commit it deployed, in `.git/iris-deployed`, so a run after a failed one rebuilds, even with nothing new to pull.
@@ -251,7 +251,7 @@ Docker starts at boot, and every IRIS service comes back by itself because each 
 
 At boot Docker doesn't wait for the database the way `docker compose up` does, so the backend and the workers may restart a few times until it is ready. The site is back a few minutes after the start time.
 
-**Check that you can sign in, not only that the page loads.** Before IR-200 the frontend looked up the backend's internal address once, when it started, so a backend that came up later at a new address left the page loading but sign-in failing. nginx now looks the address up again every 10 seconds, so this should not happen; if sign-in still fails while the page loads, the fix is one command:
+**Check that you can sign in, not only that the page loads.** Before IR-200 the frontend looked up the backend's internal address once, when it started, so a backend that came up later at a new address left the page loading but sign-in failing. nginx now reuses an address for at most 10 seconds before looking it up again, so this should not happen; if sign-in still fails while the page loads, the fix is one command:
 
 ```bash
 bash ~/IRIS/scripts/deploy.sh    # "already up to date", then the health check; restarts frontend if the API doesn't answer

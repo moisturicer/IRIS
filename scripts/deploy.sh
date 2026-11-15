@@ -221,23 +221,17 @@ Keep them with git stash, or undo them with git checkout -- <file>."
     # ---- 4. health ------------------------------------------------------
     begin 4 health
     DEADLINE=$((SECONDS + TIMEOUT))
-    local home="https://$domain/" api="https://$domain/api/v1/colleges/" restarted=false
+    local home="https://$domain/" api="https://$domain/api/v1/colleges/"
     wait_until_ready
-    if $rebuild; then
-        # Belt and braces: since IR-200 nginx looks the backend up again every
-        # 10s, so this restart should no longer be needed. It stays until a
-        # deploy on the server has shown it isn't.
-        "${COMPOSE[@]}" restart frontend || fail "couldn't restart frontend"
-        restarted=true
-        wait_until_ready
-    fi
     if ! site_answers "$home"; then
         show_logs caddy frontend
         fail "$home didn't answer. Check the domain's DNS points at this server, and Caddy's log above for its certificate."
     fi
-    if ! $restarted && ! site_answers "$api"; then
-        # The page loads but the API doesn't: after a restart with nothing to
-        # rebuild, that was nginx holding an old backend address before IR-200.
+    if ! site_answers "$api"; then
+        # The page loads but the API doesn't. Before IR-200 that was nginx
+        # holding an old backend address; nginx now reuses an answer for at
+        # most 10s, so this should not happen. The restart stays as a fallback,
+        # and says so, so a deploy shows whether it is still needed.
         say "step 4/5 health: the API didn't answer; restarted frontend (IR-200)"
         "${COMPOSE[@]}" restart frontend || fail "couldn't restart frontend"
         wait_until_ready

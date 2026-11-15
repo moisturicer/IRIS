@@ -1,9 +1,10 @@
 #!/bin/sh
 # Proves IR-668 and IR-782 against the real nginx, the real config and the real
-# entrypoint script. Nothing listens behind nginx, so a request nginx proxies
-# ends in 502 (since IR-200 nginx asks Docker's DNS for `backend`, which this
-# default network can't answer, so the 502 is a failed lookup), one it refuses ends in 403, and an app page answers 200 with the
-# stand-in index.html. Run from the repository root; needs Docker.
+# entrypoint script. Nothing answers behind nginx, so a request nginx proxies
+# ends in 502 (since IR-200 nginx asks Docker's DNS for `backend`, which the
+# default network can't answer, so the 502 is a failed lookup), one it refuses
+# ends in 403, and an app page answers 200 with the stand-in index.html. Run
+# from the repository root; needs Docker.
 set -u
 export MSYS_NO_PATHCONV=1
 
@@ -25,7 +26,7 @@ fail() {
 # run_nginx [docker run options]; $mode and $command say how it runs.
 run_nginx() {
     # shellcheck disable=SC2086
-    docker run --add-host backend:127.0.0.1 --add-host ai-gateway:127.0.0.1 $mode "$@" \
+    docker run $mode "$@" \
         -v "$root/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro" \
         -v "$root/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro" \
         -v "$root/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
@@ -52,9 +53,9 @@ start() {
 # expect <what> <status> <path> [X-Forwarded-For]
 expect() {
     if [ -n "${4:-}" ]; then
-        got=$(docker exec "$name" curl -s -o /dev/null -w '%{http_code}' -H "X-Forwarded-For: $4" "http://127.0.0.1:8080$3")
+        got=$(docker exec "$name" curl -s -m 10 -o /dev/null -w '%{http_code}' -H "X-Forwarded-For: $4" "http://127.0.0.1:8080$3")
     else
-        got=$(docker exec "$name" curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080$3")
+        got=$(docker exec "$name" curl -s -m 10 -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080$3")
     fi
     if [ "$got" = "$2" ]; then
         echo "ok: $1 ($got)"
