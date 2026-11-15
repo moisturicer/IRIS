@@ -48,10 +48,10 @@ The requesting parties' reviewers are told, after commit.
 **Nothing after the commit can report a saved version as failed** (IR-1049).
 Every step queued for after it -- the manuscript's read, its review text, the
 threads' placement and the notices -- runs with `robust=True`: a step that
-raises is logged and the rest still run. A lost send stays recoverable: the
-extraction waits `queued` for `reextract_manuscripts --record N`, a review
-text is sent again when the comparison is opened, and threads are placed
-again after each reading.
+raises is logged and the rest still run. A send that fails is not lost: the
+manuscript's read is marked failed for Publish's Retry or
+`reextract_manuscripts`, a review text is sent again when the comparison is
+opened, and the threads are placed here instead (`_place_threads`).
 """
 
 from __future__ import annotations
@@ -89,6 +89,18 @@ from .models import RecordAssignment, RecordClearance, ResubmissionRequest, Revi
 logger = logging.getLogger(__name__)
 
 _label = revisions._label
+
+
+def _place_threads(record_id):
+    """Queue the threads' placement; with the queue down, place them here (IR-1049).
+    Placing is idempotent, so a later reading placing them again is harmless."""
+    from .tasks import place_review_threads
+
+    try:
+        place_review_threads.delay(record_id)
+    except Exception:
+        logger.exception("record %s: placing review threads here, the queue is down", record_id)
+        place_review_threads(record_id)
 
 
 class NewVersionError(Exception):
@@ -283,11 +295,9 @@ def submit_new_version(record, actor):
     # Frozen before the requests resolve, from the same open threads the
     # owner was shown (ADR-032 §7, IR-876).
     response_letter.freeze(version, requests)
-    from .tasks import place_review_threads
-
     # A metadata-only Version shares its reading, so nothing will be read:
     # place the threads now too (ADR-032 §7, IR-876).
-    transaction.on_commit(lambda: place_review_threads.delay(record.pk), robust=True)
+    transaction.on_commit(lambda: _place_threads(record.pk), robust=True)
     if (version.manuscript.name or None) != (previous.manuscript.name or None):
         # The revised manuscript waited for this version to be extracted
         # (`versions.manuscript_awaits_submission`); now it is the one

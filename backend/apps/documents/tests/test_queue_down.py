@@ -3,8 +3,8 @@
 A read is sent to Celery after the write commits. If the send raises (Redis
 unreachable, say), the write is already saved, so raising would report a saved
 upload or version as failed: the owner of IR-1049's v2 saw exactly that. The
-send is logged instead, and the extraction row waits ``queued`` for
-``reextract_manuscripts --record N``, or for an upload's retry, to send it again.
+send is logged instead, and the extraction row is marked failed, so a retry
+sends it again; left ``queued`` it would pass for a read still on its way.
 
 ``django_capture_on_commit_callbacks(execute=True)`` runs the callbacks as a
 real commit does, robust ones included.
@@ -19,7 +19,7 @@ from kombu.exceptions import OperationalError
 from apps.ai.chunking.document import PARAGRAPH, DocumentElement, NormalizedDocument
 from apps.ai.extraction import InMemoryExtractor, use_extractor
 from apps.documents.models import PdfExtraction, RecordUpload, UploadSlot
-from apps.documents.sources import queue_upload_read
+from apps.documents.sources import COULD_NOT_QUEUE, queue_upload_read
 from apps.records.models import Record, RecordType
 from apps.records.services import queue_manuscript_extraction
 from apps.records.testing import released_embargo
@@ -61,7 +61,7 @@ def upload(record):
     )
 
 
-def test_a_manuscript_read_waits_queued_when_the_queue_is_down(
+def test_a_manuscript_read_is_marked_failed_when_the_queue_is_down(
     record, django_capture_on_commit_callbacks, caplog,
 ):
     with mock.patch("apps.documents.tasks.extract_manuscript_text.delay", side_effect=DOWN) as send, \
@@ -69,11 +69,12 @@ def test_a_manuscript_read_waits_queued_when_the_queue_is_down(
         queue_manuscript_extraction(record)
 
     send.assert_called_once()
-    assert PdfExtraction.objects.get(record=record).status == "queued"
+    extraction = PdfExtraction.objects.get(record=record)
+    assert (extraction.status, extraction.error) == ("failed", COULD_NOT_QUEUE)
     assert "Connection refused" in caplog.text
 
 
-def test_a_supporting_document_read_waits_queued_when_the_queue_is_down(
+def test_a_supporting_document_read_is_marked_failed_when_the_queue_is_down(
     upload, django_capture_on_commit_callbacks, caplog,
 ):
     with mock.patch("apps.documents.tasks.extract_pdf_text.delay", side_effect=DOWN) as send, \
@@ -81,5 +82,6 @@ def test_a_supporting_document_read_waits_queued_when_the_queue_is_down(
         extraction = queue_upload_read(upload)
 
     send.assert_called_once_with(upload.pk)
-    assert PdfExtraction.objects.get(pk=extraction.pk).status == "queued"
+    extraction.refresh_from_db()
+    assert (extraction.status, extraction.error) == ("failed", COULD_NOT_QUEUE)
     assert "Connection refused" in caplog.text

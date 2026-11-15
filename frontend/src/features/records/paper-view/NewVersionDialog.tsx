@@ -24,18 +24,18 @@ interface NewVersionDialogProps {
 const NOT_SUBMITTED = "The new version could not be submitted.";
 
 /** What the page announces once version `number` is in. */
-function submitted(number: number): string {
+function submittedMessage(number: number): string {
   return `v${number} submitted. The reviewers who asked for changes have been notified.`;
 }
 
 /**
  * After a failure the server gave no reason for (IR-1049), the record as it
  * now stands decides what to say: the version may have been saved before the
- * answer failed. `null` when it was saved.
+ * answer failed. The error to show, or `null` when version `number` was saved.
  */
-function afterReread(record: RecordDetail, number: number): string | null {
+function notSubmittedMessage(record: RecordDetail, number: number): string | null {
   if ((record.versions ?? []).some((version) => version.number >= number)) return null;
-  return record.revision.new_version
+  return record.revision?.new_version
     ? `${NOT_SUBMITTED} Please try again.`
     : `${NOT_SUBMITTED} The page now shows where the record stands.`;
 }
@@ -87,28 +87,33 @@ export function NewVersionDialog({
     setSending(true);
     try {
       await recordsApi.submitNewVersion(recordId);
-      onDone(submitted(hint.number));
+      onDone(submittedMessage(hint.number));
     } catch (err) {
       // A toast, not a line in the dialog, so the confirmation keeps its size.
       const refusal = errorDetail(err, "");
-      const message = refusal || (await checkAfterFailure());
+      const message = refusal || (await settleUnexplainedFailure());
       if (message) addToast({ type: "error", persist: true, message });
     } finally {
       setSending(false);
     }
   };
 
-  /** The error to show once the record has been read again, or `null` when the version went in. */
-  const checkAfterFailure = async (): Promise<string | null> => {
+  /**
+   * Read the record again and settle the outcome: report the version
+   * submitted, or hand the page the record as it stands. Returns the error to
+   * show, or `null` when the version went in.
+   */
+  const settleUnexplainedFailure = async (): Promise<string | null> => {
     let record: RecordDetail;
+    let message: string | null;
     try {
       ({ data: record } = await recordsApi.detail(recordId));
+      message = notSubmittedMessage(record, hint.number);
     } catch {
       return `The page couldn't confirm whether v${hint.number} was submitted. Reload the page to check before trying again.`;
     }
-    const message = afterReread(record, hint.number);
     if (message) onRefreshed(record);
-    else onDone(submitted(hint.number));
+    else onDone(submittedMessage(hint.number));
     return message;
   };
 

@@ -41,8 +41,9 @@ from core.enums import (
     Party,
     PipelineStatus,
     RecordTypeName,
-    RoleName,
     ResubmissionRequestState,
+    ReviewTextState,
+    RoleName,
     SeatState,
     VersionCause,
     WorkflowState,
@@ -758,6 +759,9 @@ class WhoMaySubmitTests(NewVersionTestBase):
 
 # --- AC: a saved version is never reported as a failure (IR-1049) ---------------------
 
+#: Redis refusing the connection: every Celery publish raises this.
+QUEUE_DOWN = OperationalError("Error 111 connecting to redis:6379. Connection refused.")
+
 class SavedVersionIsReportedSavedTests(APITransactionTestCase):
     """
     IR-1049: on the deployed site an owner's v2 was saved, and then the request
@@ -802,13 +806,17 @@ class SavedVersionIsReportedSavedTests(APITransactionTestCase):
         self.assertEqual(self.upload_manuscript(record).status_code, status.HTTP_200_OK)
         return record
 
+    def submit_with_queue_down(self, record):
+        """Submit with every Celery publish refused; the response and what was logged."""
+        with patch("celery.app.task.Task.apply_async", side_effect=QUEUE_DOWN), \
+                self.assertLogs("django.db.backends.base", level="ERROR") as logged:
+            response = self.submit_version(record)
+        return response, logged.output
+
     def test_with_the_task_queue_down_the_saved_version_is_still_reported_saved(self):
         record = self.ierc_asked_and_revised()
 
-        down = OperationalError("Error 111 connecting to redis:6379. Connection refused.")
-        with patch("celery.app.task.Task.apply_async", side_effect=down), \
-                self.assertLogs("django.db.backends.base", level="ERROR") as logged:
-            response = self.submit_version(record)
+        response, logged = self.submit_with_queue_down(record)
 
         # The owner is told what happened: v2 went in, with the tracker.
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
@@ -818,28 +826,54 @@ class SavedVersionIsReportedSavedTests(APITransactionTestCase):
             record=record, state=ResubmissionRequestState.OPEN,
         ).exists())
         # Each step that could not be queued is logged, and none stopped the rest.
-        self.assertTrue(any("Connection refused" in line for line in logged.output))
+        self.assertTrue(any("Connection refused" in line for line in logged))
 
-    def test_the_reviewers_are_still_told_and_the_lost_work_can_be_sent_again(self):
-        from apps.documents.models import PdfExtraction
-        from apps.records.models import ReviewText
-
+    def test_the_reviewers_are_still_told_and_the_threads_still_placed(self):
         record = self.ierc_asked_and_revised()
         before = set(Notification.objects.values_list("pk", flat=True))
 
-        down = OperationalError("Error 111 connecting to redis:6379. Connection refused.")
-        with patch("celery.app.task.Task.apply_async", side_effect=down), \
-                self.assertLogs("django.db.backends.base", level="ERROR"):
-            self.submit_version(record)
+        with patch("apps.reviews.thread_places.place_threads", return_value=0) as place:
+            self.submit_with_queue_down(record)
 
-        # Telling IERC needs no queue: it still happens.
+        # Neither needs the queue: telling IERC is a row, and the threads are
+        # placed in the request instead.
         told = Notification.objects.exclude(pk__in=before)
         self.assertEqual({n.recipient for n in told}, {self.ierc})
-        # The manuscript read and the review text wait as queued rows, which
-        # `reextract_manuscripts --record N` and the next comparison send again.
+        place.assert_called_once()
+        self.assertEqual(place.call_args.args[0].pk, record.pk)
+
+    def test_the_manuscript_read_that_was_not_sent_can_be_retried(self):
+        from apps.documents.models import PdfExtraction
+        from apps.documents.sources import COULD_NOT_QUEUE
+
+        record = self.ierc_asked_and_revised()
+
+        self.submit_with_queue_down(record)
+
+        # Marked failed, not left `queued`, so nothing takes it for a read on its way.
         record.refresh_from_db()
         extraction = PdfExtraction.objects.get(record=record)
-        self.assertEqual(extraction.status, "queued")
+        self.assertEqual((extraction.status, extraction.error), ("failed", COULD_NOT_QUEUE))
         self.assertEqual(extraction.source_revision, record.manuscript_revision)
+        # With the queue back, Retry sends it.
+        self.client.force_authenticate(self.owner)
+        with patch("apps.documents.tasks.extract_manuscript_text.delay") as send, \
+                self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("record-retry-extraction", args=[record.pk]),
+                {"manuscript_revision": str(record.manuscript_revision)}, format="json",
+            )
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED, response.data)
+        send.assert_called_once_with(record.pk, str(record.manuscript_revision))
+
+    def test_the_review_text_waits_pending_for_the_next_comparison(self):
+        from apps.records.models import ReviewText
+
+        record = self.ierc_asked_and_revised()
+
+        self.submit_with_queue_down(record)
+
+        # `readings._requeue_if_lost` sends it again once a comparison is opened
+        # after `STALE_PENDING`.
         v2 = RecordVersion.objects.get(record=record, number=2)
-        self.assertEqual(ReviewText.objects.get(pk=v2.review_text_id).state, "pending")
+        self.assertEqual(ReviewText.objects.get(pk=v2.review_text_id).state, ReviewTextState.PENDING)
