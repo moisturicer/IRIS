@@ -73,7 +73,8 @@ def _single_page(draw, width: float, height: float):
 
 def _cit_u(pdf) -> float:
     """
-    "CIT-U" as stroked lines and arcs, one unit tall, from the origin rightwards.
+    "CIT-U" as straight stroked lines, one unit tall, from the origin rightwards:
+    square block letters, no curves.
 
     Shapes rather than a font, so the mark adds no "CIT-U" to the copy's text:
     copying or searching the copy finds only the paper and its footer. Letters
@@ -84,8 +85,11 @@ def _cit_u(pdf) -> float:
     advance = MARK_STROKE + MARK_GAP  # Added to each letter's own width
     path = pdf.beginPath()
     x = 0.0
-    # C: an open ellipse
-    path.arc(x, 0, x + 0.7, 1, startAng=50, extent=260)
+    # C: three sides of a square
+    path.moveTo(x + 0.7, 1)
+    path.lineTo(x, 1)
+    path.lineTo(x, 0)
+    path.lineTo(x + 0.7, 0)
     x += 0.7 + advance
     # I
     path.moveTo(x, 0)
@@ -101,10 +105,10 @@ def _cit_u(pdf) -> float:
     path.moveTo(x, 0.45)
     path.lineTo(x + 0.4, 0.45)
     x += 0.4 + advance
-    # U: two sides joined by a half ellipse
+    # U: three sides of a square
     path.moveTo(x, 1)
-    path.lineTo(x, 0.35)
-    path.arcTo(x, 0, x + 0.7, 0.7, startAng=180, extent=180)
+    path.lineTo(x, 0)
+    path.lineTo(x + 0.7, 0)
     path.lineTo(x + 0.7, 1)
     pdf.drawPath(path, stroke=1, fill=0)
     return x + 0.7 + MARK_STROKE
@@ -129,8 +133,8 @@ def _mark_overlay(width: float, height: float):
         pdf.setStrokeGray(MARK_GREY)
         pdf.setStrokeAlpha(MARK_OPACITY)
         pdf.setLineWidth(MARK_STROKE)
-        pdf.setLineCap(1)  # Round
-        pdf.setLineJoin(1)
+        pdf.setLineCap(2)  # Square ends and sharp corners, for block letters
+        pdf.setLineJoin(0)
         pdf.translate(width / 2, height / 2)
         pdf.rotate(MARK_ANGLE_DEGREES)
         pdf.scale(letter, letter)
