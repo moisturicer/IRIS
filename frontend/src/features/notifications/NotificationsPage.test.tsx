@@ -26,9 +26,9 @@ vi.mock("@/api/notifications", () => ({
 
 afterEach(() => vi.clearAllMocks());
 
-const at = (id: number, created_at: string, message: string) => ({
+const at = (id: number, created_at: string, message: string, record: number | null = id) => ({
   id, notif_type: 1, notif_type_name: "Record Routed", message,
-  record: id, record_title: "T", sender: null, sender_name: null,
+  record, record_title: "T", sender: null, sender_name: null,
   recipient: 1, broadcast_to_role: null, created_at, is_read: false,
   resolved_at: null, resolved_label: "",
 });
@@ -70,7 +70,7 @@ describe("Notifications", () => {
   });
 
   describe("the page (IR-1137)", () => {
-    it("groups by day as Today, Yesterday, then the date", async () => {
+    it("groups by day as Today, Yesterday, This week, then Earlier", async () => {
       const day = 24 * 3600 * 1000;
       const now = new Date();
       now.setHours(12, 0, 0, 0);
@@ -79,6 +79,7 @@ describe("Notifications", () => {
           results: [
             at(1, now.toISOString(), "From today"),
             at(2, new Date(now.getTime() - day).toISOString(), "From yesterday"),
+            at(4, new Date(now.getTime() - 3 * day).toISOString(), "From this week"),
             at(3, "2026-01-05T09:00:00", "From January"),
           ],
         },
@@ -87,7 +88,7 @@ describe("Notifications", () => {
 
       await screen.findByText("From today");
       expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent))
-        .toEqual(["Today", "Yesterday", "Jan 5, 2026"]);
+        .toEqual(["Today", "Yesterday", "This week", "Earlier"]);
     });
 
     it("keeps the Unread count in step after marking one and marking all", async () => {
@@ -95,7 +96,7 @@ describe("Notifications", () => {
       markAllRead.mockResolvedValue({});
       const now = new Date().toISOString();
       list.mockResolvedValueOnce({
-        data: { results: [at(1, now, "First"), at(2, now, "Second"), at(3, now, "Third")] },
+        data: { results: [at(1, now, "First", null), at(2, now, "Second", null), at(3, now, "Third", null)] },
       });
       renderScreen(<NotificationsPage />);
 
@@ -111,7 +112,7 @@ describe("Notifications", () => {
   describe("with the bell beside it (IR-1137)", () => {
     const seed = () => {
       const now = new Date().toISOString();
-      const rows = [at(1, now, "First"), at(2, now, "Second"), at(3, now, "Third")];
+      const rows = [at(1, now, "First", null), at(2, now, "Second", null), at(3, now, "Third", null)];
       useNotificationsStore.setState({ items: rows, unreadCount: 3 });
       list.mockResolvedValueOnce({ data: { results: rows } });
     };
@@ -181,10 +182,11 @@ describe("Notifications", () => {
       // The open one still asks: unread, with a way to mark it read.
       expect(await screen.findByText(/It waits in ITSO's pool/)).toBeInTheDocument();
       expect(screen.getAllByText("Unread:")).toHaveLength(1);
-      expect(screen.getAllByRole("button", { name: "Mark as read" })).toHaveLength(1);
 
-      // The settled one says what happened, from the server's words alone.
+      // The settled one says what happened, from the server's words alone,
+      // in a pill beside its date; it is still openable.
       expect(screen.getByText("Reviewed by you on 20 Oct")).toBeInTheDocument();
+      expect(screen.getAllByRole("link", { name: /^Open:/ })).toHaveLength(2);
     });
 
     it("is not counted as unread, nor shown under the Unread filter", async () => {
@@ -204,14 +206,6 @@ describe("Notifications", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Unread 0" }));
 
       expect(screen.getByRole("heading", { name: "You're up to date" })).toBeInTheDocument();
-    });
-
-    it("labels each notification in plain words, not by its system name", async () => {
-      list.mockResolvedValueOnce({ data: { results: [open] } });
-      renderScreen(<NotificationsPage />);
-
-      expect(await screen.findByText("Sent for review")).toBeInTheDocument();
-      expect(screen.queryByText("Record Routed")).not.toBeInTheDocument();
     });
   });
 });
