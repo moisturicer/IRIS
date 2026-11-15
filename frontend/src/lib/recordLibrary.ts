@@ -5,8 +5,10 @@
  * see `store/library.store.ts`. What is left here is:
  *
  * - **The reader's own folders**, browser-only until IR-572, and labelled so.
- * - **Reading history**, browser-only and cleared on sign-out and on an
- *   account switch (ADR-044 Q2). IR-756 moves it to the account.
+ * - **The wipe of the old reading history.** History follows the account as
+ *   of IR-756 (`store/history.store.ts`). What an older build kept in
+ *   `iris_reading_history` is never read or uploaded; it is deleted at the next
+ *   sign-in, sign-out or session end.
  *
  * **Old browser data is left untouched for IR-579's import.** The three
  * reading-status folders inside `iris_record_collections`, and every star in
@@ -19,21 +21,10 @@
 const COLLECTIONS_KEY = "iris_record_collections";
 const HISTORY_KEY = "iris_reading_history";
 
-/** How many visits to keep. Old entries fall off the end. */
-const HISTORY_LIMIT = 50;
-
 export interface Collection {
   id: string;
   name: string;
   recordIds: number[];
-}
-
-export interface ReadingVisit {
-  recordId: number;
-  /** Denormalised so history renders before the records resolve. */
-  title: string;
-  /** ISO timestamp of the most recent visit. */
-  viewedAt: string;
 }
 
 /**
@@ -166,37 +157,15 @@ export function removeFromCollections(
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * Reading history (browser-only; cleared on sign-out and account switch)
- *
- * The server keeps no reading history: it notes only an account's first opening
- * of a published paper, to count views (IR-369), and never returns it. So this
- * is written when the paper view opens.
- * It is genuinely this browser's history, and is labelled as such.
+ * The old browser reading history (written before IR-756; never read now)
  * ──────────────────────────────────────────────────────────────────────────*/
 
-export function getReadingHistory(): ReadingVisit[] {
-  const value = readJSON<unknown>(HISTORY_KEY, []);
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (v): v is ReadingVisit =>
-      Boolean(v) && typeof v.recordId === "number" && typeof v.viewedAt === "string",
-  );
-}
-
-/** Record a visit, newest first, one entry per record. */
-export function recordVisit(recordId: number, title: string): ReadingVisit[] {
-  const next = [
-    { recordId, title, viewedAt: new Date().toISOString() },
-    ...getReadingHistory().filter((v) => v.recordId !== recordId),
-  ].slice(0, HISTORY_LIMIT);
-  writeJSON(HISTORY_KEY, next);
-  return next;
-}
-
 /**
- * Forget this browser's history. Called by Clear history, and by the auth
- * store on every sign-in, sign-out and session end (ADR-044 Q2), so the next
- * person on a shared PC never sees what the last one opened.
+ * Delete what an older build kept of this browser's reading history. The auth
+ * store calls it on every sign-in, sign-out and session end (ADR-044 Q2), so
+ * the last person's copy never greets the next one. Nothing writes the key any
+ * more: history is on the account (IR-756), and this copy is dropped, not
+ * imported (owner's decision, 2026-11-16).
  */
 export function clearReadingHistory(): void {
   try {

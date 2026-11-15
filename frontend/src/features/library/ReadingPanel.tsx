@@ -7,8 +7,8 @@ import type { Collection } from "@/lib/recordLibrary";
 /**
  * Which part of My Library the main column shows. `research` is the owner's
  * own records. `saved` and `status` are the account's saves (IR-566,
- * ADR-044); `folder` is one of the reader's own folders and `history` this
- * browser's history, both still browser-only.
+ * ADR-044) and `history` the account's reading history (IR-756); `folder` is
+ * one of the reader's own folders, still browser-only.
  */
 export type LibraryView =
   | { kind: "research" }
@@ -38,12 +38,15 @@ interface FolderPickerProps {
 }
 
 const NEW_FOLDER = "__new__";
+const HISTORY = "__history__";
 
 /**
  * The reader's own folders as one picker in the Saved papers toolbar,
  * beside Sort, rather than a second panel to navigate. Folders are still
  * this browser's until IR-572; the toolbar says so. "New folder…" swaps the picker for a name field in place.
- * Renaming and deleting a folder happen in the folder's own view.
+ * Renaming and deleting a folder happen in the folder's own view. History
+ * (IR-756) is here too, because its pause switch lives in its view and every
+ * reader, author or not, has this toolbar.
  */
 export function FolderPicker({ collections, view, onViewChange, onCreate }: FolderPickerProps) {
   const [creating, setCreating] = useState(false);
@@ -82,7 +85,7 @@ export function FolderPicker({ collections, view, onViewChange, onCreate }: Fold
     );
   }
 
-  const value = view.kind === "folder" ? `folder:${view.id}` : "";
+  const value = view.kind === "folder" ? `folder:${view.id}` : view.kind === "history" ? HISTORY : "";
 
   return (
     <Select
@@ -93,12 +96,14 @@ export function FolderPicker({ collections, view, onViewChange, onCreate }: Fold
       onChange={(e) => {
         const next = e.target.value;
         if (next === NEW_FOLDER) setCreating(true);
+        else if (next === HISTORY) onViewChange({ kind: "history" });
         else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: next.slice("folder:".length) });
         else onViewChange({ kind: "saved" });
       }}
       className="max-w-[12rem]"
     >
       <option value="">All saved papers</option>
+      <option value={HISTORY}>History</option>
       {collections.length > 0 && (
         <optgroup label="Your folders">
           {collections.map((c) => <option key={c.id} value={`folder:${c.id}`}>{c.name}</option>)}

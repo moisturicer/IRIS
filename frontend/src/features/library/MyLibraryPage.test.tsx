@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { libraryApi, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
+import { libraryApi, type ReadingHistoryEntry, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
 import { recordsApi } from "@/api/records";
 import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
+import { useHistoryStore } from "@/store/history.store";
 import { useLibraryStore } from "@/store/library.store";
 import type { User } from "@/types/auth";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -33,6 +34,10 @@ vi.mock("@/api/library", () => ({
     saves: vi.fn(),
     save: vi.fn(),
     unsave: vi.fn(),
+    history: vi.fn(),
+    clearHistory: vi.fn(),
+    preferences: vi.fn(),
+    updatePreferences: vi.fn(),
   },
 }));
 
@@ -51,6 +56,16 @@ const savedEntry = (record: RecordListItem, reading_status: ReadingStatus | null
 
 const saves = (entries: SavedRecordEntry[]) =>
   vi.mocked(libraryApi.saves).mockResolvedValue({ data: { results: entries } } as SavesResponse);
+
+/** What the account's history answers (IR-756). */
+const history = (entries: ReadingHistoryEntry[], keep_history = true) => {
+  vi.mocked(libraryApi.history).mockResolvedValue({ data: { results: entries } } as Awaited<ReturnType<typeof libraryApi.history>>);
+  vi.mocked(libraryApi.preferences).mockResolvedValue({ data: { keep_history } } as Awaited<ReturnType<typeof libraryApi.preferences>>);
+};
+
+const visitEntry = (record: RecordListItem, viewed_at = "2026-11-02T08:00:00Z"): ReadingHistoryEntry => ({
+  record_id: record.id, available: true, viewed_at, record,
+});
 
 /** A sign-in as `login` does it: a new session, so a new epoch. */
 function signIn(id: number, role = "Student", canAuthor = role === "Student" || role === "Adviser") {
@@ -121,6 +136,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mine([]);
   saves([]);
+  history([]);
   myDownloads([]);
   vi.mocked(libraryApi.unsave).mockResolvedValue({ status: 204 } as Awaited<ReturnType<typeof libraryApi.unsave>>);
   signIn(9);
@@ -426,7 +442,9 @@ describe("My Library: reading", () => {
     expect(screen.getByText("Saves follow your account. Folders stay in this browser.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Folders" })).not.toBeInTheDocument();
 
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "History" })).not.toBeInTheDocument();
+    // History is back in the picker (IR-756): it now follows the account, and
+    // its pause switch lives in the History view, which every reader must reach.
+    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "History" })).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "+ New folder…");
     await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Methods{Enter}");
     expect(await screen.findByRole("heading", { name: "Methods" })).toBeInTheDocument();
@@ -502,6 +520,8 @@ describe("My Library: saves follow the account (IR-566)", () => {
 
   it("never shows one account's saves or history to the next account on the same browser", async () => {
     saves([savedEntry(water, "want_to_read")]);
+    history([visitEntry(water)]);
+    // What an older build kept in this browser is wiped, never read (IR-756).
     localStorage.setItem("iris_reading_history", JSON.stringify([{ recordId: water.id, title: water.title, viewedAt: "2026-10-31T08:00:00Z" }]));
     const first = renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
     expect(await screen.findByRole("link", { name: water.title })).toBeInTheDocument();
@@ -509,15 +529,19 @@ describe("My Library: saves follow the account (IR-566)", () => {
 
     useAuthStore.getState().logout();
     expect(useLibraryStore.getState().items).toEqual({});
+    expect(useHistoryStore.getState().items).toEqual([]);
     expect(localStorage.getItem("iris_reading_history")).toBeNull();
 
     saves([savedEntry(rice)]);
+    history([]);
     signIn(11);
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
 
     expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
-    expect(screen.queryByText("Recently opened")).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "History");
+    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
   });
 
   it("leaves the old browser saves and stars untouched for the import (IR-579)", async () => {
@@ -532,6 +556,110 @@ describe("My Library: saves follow the account (IR-566)", () => {
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
     expect(localStorage.getItem("iris_record_collections")).toBe(legacy);
     expect(localStorage.getItem("iris_starred_records")).toBe(JSON.stringify([rice.id]));
+  });
+});
+
+describe("My Library: reading history follows the account (IR-756)", () => {
+  const water = paper(41, "Rainwater Harvesting Survey");
+  const rice = paper(42, "Rice Husk Insulation Panels");
+
+  async function openHistory() {
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Folder" }), "History");
+    return screen.findByRole("heading", { name: "History", level: 2 });
+  }
+
+  it("lists what the reader opened on another device, newest first, and says only they can see it", async () => {
+    history([visitEntry(rice, "2026-11-02T08:00:00Z"), visitEntry(water, "2026-11-01T08:00:00Z")]);
+    await openHistory();
+
+    const links = await screen.findAllByRole("link", { name: /Rainwater|Rice Husk/ });
+    expect(links.map((l) => l.textContent)).toEqual([rice.title, water.title]);
+    expect(recordsApi.list).not.toHaveBeenCalled();
+    expect(screen.getByText(/stored on your account.*only you can see it/i)).toBeInTheDocument();
+    expect(localStorage.getItem("iris_reading_history")).toBeNull();
+  });
+
+  it("shows a paper the reader can no longer read as unavailable and discloses nothing", async () => {
+    history([visitEntry(water), { record_id: 77, available: false }]);
+    await openHistory();
+
+    expect(await screen.findByText(/1 paper in your history is no longer available to you/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Rainwater/ })).toHaveLength(1);
+    expect(recordsApi.list).not.toHaveBeenCalled();
+  });
+
+  it("clears the history on the account", async () => {
+    history([visitEntry(water)]);
+    vi.mocked(libraryApi.clearHistory).mockResolvedValue({} as Awaited<ReturnType<typeof libraryApi.clearHistory>>);
+    await openHistory();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+
+    expect(libraryApi.clearHistory).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+  });
+
+  it("keeps the history and says so when clearing fails", async () => {
+    history([visitEntry(water)]);
+    vi.mocked(libraryApi.clearHistory).mockRejectedValue(new Error("offline"));
+    await openHistory();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not clear your history/i);
+    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+  });
+
+  it("pauses history on the account, keeping what is listed", async () => {
+    history([visitEntry(water)]);
+    vi.mocked(libraryApi.updatePreferences).mockImplementation(async (body) => ({ data: body }) as Awaited<ReturnType<typeof libraryApi.updatePreferences>>);
+    await openHistory();
+
+    const keep = await screen.findByRole("checkbox", { name: "Keep reading history" });
+    expect(keep).toBeChecked();
+    await userEvent.click(keep);
+
+    expect(libraryApi.updatePreferences).toHaveBeenCalledWith({ keep_history: false });
+    expect(keep).not.toBeChecked();
+    expect(screen.getByText(/history is paused/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+  });
+
+  it("opens with history paused when the account says so", async () => {
+    history([], false);
+    await openHistory();
+
+    expect(await screen.findByRole("checkbox", { name: "Keep reading history" })).not.toBeChecked();
+    expect(screen.getByRole("heading", { name: "History is paused" })).toBeInTheDocument();
+  });
+
+  it("says the history is safe when loading it fails, and Try again reads it again", async () => {
+    vi.mocked(libraryApi.history).mockRejectedValueOnce(new Error("offline"));
+    await openHistory();
+
+    expect(await screen.findByText("Your history is safe in your account; only loading it failed.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(libraryApi.history).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+  });
+
+  it("shows the most recent papers on an author's Overview, from the account", async () => {
+    history([visitEntry(rice), { record_id: 77, available: false }, visitEntry(water, "2026-11-01T08:00:00Z")]);
+    renderScreen(<MyLibraryPage />);
+
+    const recent = await screen.findByRole("heading", { name: "Recently opened" });
+    const block = recent.parentElement as HTMLElement;
+    expect(within(block).getAllByRole("link").map((l) => l.textContent)).toEqual([rice.title, water.title]);
+  });
+
+  it("has no blocking accessibility violations in the History view", async () => {
+    history([visitEntry(water)]);
+    await openHistory();
+    await screen.findByRole("link", { name: water.title });
+
+    await expectNoBlockingA11yViolations(document.body);
   });
 });
 

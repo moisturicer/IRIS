@@ -317,6 +317,37 @@ class ExportContentTests(APITestCase):
         self.assertNotIn("Someone's draft", text)
         self.assertNotIn("Not mine.", text)
 
+    def test_reading_history_is_the_persons_own_and_names_a_paper_only_while_readable(self):
+        from django.utils import timezone
+
+        from apps.library.models import ReadingVisit
+
+        published = _paper("Public work", self.stranger, status=PipelineStatus.PUBLISHED)
+        hidden = _paper("Someone's draft", self.stranger)
+        ReadingVisit.objects.create(owner=self.me, record=published, viewed_at=timezone.now())
+        ReadingVisit.objects.create(owner=self.me, record=hidden, viewed_at=timezone.now())
+        ReadingVisit.objects.create(owner=self.stranger, record=published, viewed_at=timezone.now())
+
+        history = {v["record_id"]: v for v in self.export()["reading_history"]}
+
+        self.assertEqual(set(history), {published.pk, hidden.pk})
+        self.assertEqual(history[published.pk]["title"], "Public work")
+        self.assertTrue(history[published.pk]["available"])
+        self.assertIsNotNone(history[published.pk]["viewed_at"])
+        self.assertIsNone(history[hidden.pk]["title"])
+        self.assertFalse(history[hidden.pk]["available"])
+        self.assertNotIn("Someone's draft", _text(self.client.get(URL)))
+
+    def test_library_preferences_say_whether_history_is_kept(self):
+        from apps.library.models import LibraryPreferences
+
+        self.assertEqual(self.export()["library_preferences"], {"keep_history": True})
+
+        LibraryPreferences.objects.create(owner=self.me, keep_history=False)
+        LibraryPreferences.objects.create(owner=self.stranger, keep_history=True)
+
+        self.assertEqual(self.export()["library_preferences"], {"keep_history": False})
+
     def test_highlights_are_the_persons_own_and_keep_their_quote_only_while_readable(self):
         import uuid
 

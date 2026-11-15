@@ -53,6 +53,8 @@ INCLUDED: dict[str, str] = {
     "library.SavedFeed": "saved_feeds",
     "library.ReadingNote": "reading_notes",
     "library.ReadingHighlight": "reading_highlights",
+    "library.ReadingVisit": "reading_history",
+    "library.LibraryPreferences": "library_preferences",
     "reviews.SavedReply": "saved_replies",
     "reviews.ViewedMark": "viewed_marks",
     "reviews.ReviewMention": "review_mentions",

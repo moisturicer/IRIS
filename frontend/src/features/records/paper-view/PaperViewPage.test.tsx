@@ -253,6 +253,9 @@ vi.mock("@/api/library", () => ({
     highlights: vi.fn(() => Promise.resolve({ data: { results: [] } })),
     saveHighlight: vi.fn(),
     deleteHighlight: vi.fn(),
+    // Reading history (IR-756): the page tells the account a paper was opened.
+    preferences: vi.fn(() => Promise.resolve({ data: { keep_history: true } })),
+    visit: vi.fn(() => Promise.resolve({})),
   },
 }));
 
@@ -3701,5 +3704,50 @@ describe("highlights on the paper (IR-583)", () => {
     await waitForRecord(record.title);
 
     expect(libraryApi.highlights).not.toHaveBeenCalled();
+  });
+});
+
+// Reading history follows the account (IR-756, ADR-044 Â§Amendment 2026-11-01):
+// the page sends an explicit visit once the paper has loaded, and nothing at all
+// while the reader has paused history.
+describe("Reading history (IR-756)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+    vi.mocked(libraryApi.visit).mockClear();
+    vi.mocked(libraryApi.preferences).mockClear();
+  });
+
+  /** A signed-in session: history belongs to an account, so a visitor sends nothing. */
+  function signIn() {
+    signInAs(99, "Student");
+    useAuthStore.setState({ isAuthenticated: true, sessionEpoch: useAuthStore.getState().sessionEpoch + 1 });
+  }
+
+  it("sends nothing for a visitor who is not signed in", async () => {
+    useAuthStore.setState({ user: null, isAuthenticated: false });
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(libraryApi.preferences).not.toHaveBeenCalled();
+    expect(libraryApi.visit).not.toHaveBeenCalled();
+  });
+
+  it("records the opened paper on the reader's account", async () => {
+    signIn();
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await waitFor(() => expect(libraryApi.visit).toHaveBeenCalledWith(RECORD_ID));
+    expect(localStorage.getItem("iris_reading_history")).toBeNull();
+  });
+
+  it("sends nothing while the reader has paused history", async () => {
+    vi.mocked(libraryApi.preferences).mockResolvedValueOnce({ data: { keep_history: false } } as never);
+    signIn();
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await waitFor(() => expect(libraryApi.preferences).toHaveBeenCalled());
+    expect(libraryApi.visit).not.toHaveBeenCalled();
   });
 });

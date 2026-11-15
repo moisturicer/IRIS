@@ -9,17 +9,15 @@ import type { ReadingStatus } from "@/api/library";
 import { canAuthor } from "@/lib/access";
 import {
   addCollection,
-  clearReadingHistory,
   deleteCollection,
   getCollections,
-  getReadingHistory,
   removeFromCollections,
   renameCollection,
   type Collection,
-  type ReadingVisit,
 } from "@/lib/recordLibrary";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
+import { useHistoryStore } from "@/store/history.store";
 import { READING_STATUSES, useLibraryStore } from "@/store/library.store";
 import type { MyResearchItem } from "@/types/records";
 
@@ -31,7 +29,7 @@ import { FolderPicker, isSameView, viewKey, type LibraryView } from "./ReadingPa
 import type { ResearchFilter } from "./researchSections";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { SavedView } from "./SavedView";
-import { useLibrary } from "./useLibrary";
+import { useLibrary, useReadingHistory } from "./useLibrary";
 
 type Tab = "overview" | "research" | "saved" | "downloads";
 type SavedViewKind = Exclude<LibraryView, { kind: "research" }>;
@@ -66,8 +64,9 @@ function tabFromSection(section: string | null, canAuthor: boolean): Tab {
  * and Download requests (IR-743).
  *
  * Owned research comes from `/records/mine/`, and saves and Reading status
- * from the account library (IR-566, ADR-044). The reader's own folders and
- * history still live in this browser and say so. `?section=research` (where
+ * from the account library (IR-566, ADR-044), and reading history from the
+ * account too (IR-756). The reader's own folders still live in this browser
+ * and say so. `?section=research` (where
  * the retired `/workspace` lands), `?section=saved` and `?section=downloads`
  * pick a tab.
  */
@@ -82,7 +81,8 @@ export default function MyLibraryPage() {
   const [savedView, setSavedView] = useState<SavedViewKind>(ALL_SAVED);
   const [researchFilter, setResearchFilter] = useState<ResearchFilter>("all");
   const [collections, setCollections] = useState<Collection[]>(() => getCollections());
-  const [history, setHistory] = useState<ReadingVisit[]>(() => getReadingHistory());
+  useReadingHistory();
+  const history = useHistoryStore((s) => s.items);
 
   const { load: libraryLoad, interrupted: libraryInterrupted, retry: retryLibrary } = useLibrary();
   const library = useLibraryStore((s) => s.items);
@@ -171,7 +171,6 @@ export default function MyLibraryPage() {
         <SavedView
           view={savedView}
           collections={collections}
-          history={history}
           library={library}
           libraryLoad={libraryLoad}
           libraryInterrupted={libraryInterrupted}
@@ -182,7 +181,6 @@ export default function MyLibraryPage() {
             setCollections(deleteCollection(collections, id));
             if (isSameView(savedView, { kind: "folder", id })) setSavedView(ALL_SAVED);
           }}
-          onClearHistory={() => { clearReadingHistory(); setHistory([]); }}
           folderControl={
             <FolderPicker
               collections={collections}

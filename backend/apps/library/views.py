@@ -19,6 +19,7 @@ double counting.
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Count
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -34,9 +35,12 @@ from core.enums import ReadingStatus
 from . import feeds, highlights
 from .models import (
     MAX_NOTE_LENGTH,
+    MAX_HISTORY_ENTRIES,
     MAX_SAVED_FEEDS,
+    LibraryPreferences,
     ReadingHighlight,
     ReadingNote,
+    ReadingVisit,
     SavedFeed,
     SavedRecord,
 )
@@ -464,3 +468,86 @@ class SavedFeedDetailView(APIView):
         if not deleted:
             raise NotFound()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# -- IR-756: reading history (ADR-044 §Amendment 2026-11-01) ---------------------
+#
+# The owner is the authenticated user and every queryset starts from
+# `ReadingVisit.objects.filter(owner=request.user)`; no staff route exists. A
+# visit is recorded only by the paper view's explicit PUT, never by reading a
+# Record, and every list rechecks `Record.objects.visible_to()`.
+
+
+def _visit_entry(visit, record, context):
+    if record is None:
+        return {"record_id": visit.record_id, "available": False}
+    return {
+        "record_id": visit.record_id,
+        "available": True,
+        "viewed_at": visit.viewed_at,
+        "record": RecordListSerializer(record, context=context).data,
+    }
+
+
+class ReadingHistoryView(APIView):
+    """
+    GET /library/history/ -- the papers the reader opened, most recent first.
+    DELETE clears it.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        visits = list(ReadingVisit.objects.filter(owner=request.user).order_by("-viewed_at", "-pk"))
+        records = {r.pk: r for r in _readable(request.user).filter(pk__in=[v.record_id for v in visits])}
+        context = {"request": request}
+        return Response({"results": [_visit_entry(v, records.get(v.record_id), context) for v in visits]})
+
+    def delete(self, request):
+        """Clear history: the rows are deleted, not hidden."""
+        ReadingVisit.objects.filter(owner=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ReadingVisitView(APIView):
+    """
+    PUT /library/history/<record_id>/ -- the paper view says the reader opened
+    this Record. Idempotent: a revisit moves it to the top. A Record the reader
+    cannot read is the same 404 as a missing one. While history is paused the
+    answer is the same 204 and nothing is written, not even `viewed_at`.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, record_id):
+        _readable_or_404(request.user, record_id)
+        if not LibraryPreferences.keeps_history(request.user):
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        with transaction.atomic():
+            ReadingVisit.objects.update_or_create(
+                owner=request.user, record_id=record_id, defaults={"viewed_at": timezone.now()},
+            )
+            stale = ReadingVisit.objects.filter(owner=request.user).order_by("-viewed_at", "-pk")[MAX_HISTORY_ENTRIES:]
+            ReadingVisit.objects.filter(pk__in=list(stale.values_list("pk", flat=True))).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class LibraryPreferencesView(APIView):
+    """
+    GET   /library/preferences/ -- the reader's settings; defaults when none is
+          stored, and reading creates nothing.
+    PATCH /library/preferences/ -- `{"keep_history": true|false}`. Off pauses
+          reading history (ADR-044 §Amendment 2026-11-01, point 7).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"keep_history": LibraryPreferences.keeps_history(request.user)})
+
+    def patch(self, request):
+        value = _body(request).get("keep_history")
+        if not isinstance(value, bool):
+            raise ValidationError({"keep_history": ["Send true to keep reading history or false to pause it."]})
+        LibraryPreferences.objects.update_or_create(owner=request.user, defaults={"keep_history": value})
+        return Response({"keep_history": value})

@@ -73,6 +73,19 @@ export type HighlightEntry =
     }
   | { id: number; record_id: number; available: false };
 
+/**
+ * One paper in the reader's history (IR-756). One they can no longer read
+ * carries only its id (ADR-044 §Amendment 2026-11-01, point 4).
+ */
+export type ReadingHistoryEntry =
+  | { record_id: number; available: true; viewed_at: string; record: RecordListItem }
+  | { record_id: number; available: false };
+
+/** The reader's library settings (IR-756). `keep_history` false pauses history. */
+export interface LibraryPreferences {
+  keep_history: boolean;
+}
+
 /** What a highlight is saved from: the passage, and the revision the paper was opened at. */
 export interface HighlightDraft {
   manuscript_revision: string;
@@ -125,4 +138,18 @@ export const libraryApi = {
   updateFeed: (id: number, body: { name?: string; query?: FeedQuery }) =>
     apiClient.patch<SavedFeed>(`/library/feeds/${id}/`, body),
   deleteFeed: (id: number) => apiClient.delete(`/library/feeds/${id}/`),
+
+  /** The papers the reader opened, most recent first, at most 50 (IR-756). */
+  history: () => apiClient.get<{ results: ReadingHistoryEntry[] }>("/library/history/"),
+  /**
+   * The paper view says the reader opened this Record. Idempotent; a 404 for a
+   * Record they cannot read. While history is paused it is a 204 that records nothing.
+   */
+  visit: (recordId: number) => apiClient.put(`/library/history/${recordId}/`, {}),
+  /** Clear history: the server deletes every entry. */
+  clearHistory: () => apiClient.delete("/library/history/"),
+  /** The reader's settings; the defaults when they never changed one. */
+  preferences: () => apiClient.get<LibraryPreferences>("/library/preferences/"),
+  updatePreferences: (body: LibraryPreferences) =>
+    apiClient.patch<LibraryPreferences>("/library/preferences/", body),
 };
