@@ -113,7 +113,7 @@ def plan_cutover(record_ids: Optional[Sequence[int]] = None) -> CutoverPlan:
     from apps.documents.models import PdfExtraction
     from apps.records.models import Record
 
-    price = read_extraction_price()  # NotConfigured names the unset setting
+    price = read_extraction_price()
     records = Record.objects.filter(is_deleted=False).exclude(abstract_file="").order_by("pk")
     if record_ids:
         records = records.filter(pk__in=list(record_ids))

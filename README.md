@@ -62,7 +62,7 @@ A web-based platform for Cebu Institute of Technology - University (CIT-U) that 
 |                    |                                                                |
 | ------------------ | -------------------------------------------------------------- |
 | AI runtime         | FastAPI service in `ai/` (gateway and run workers) that answers Ask IRIS and Paper Chat |
-| PDF extraction     | LlamaParse                                                     |
+| PDF extraction     | Unstructured                                                   |
 | Embedding, rerank  | Voyage (`voyage-context-4`)                                    |
 | Language model     | Any OpenAI-compatible chat-completions endpoint (OpenRouter by default) |
 
@@ -286,11 +286,11 @@ Main names in `backend/.env`:
 | Group | Variables |
 | ----- | --------- |
 | Required (Django will not start without them) | `SECRET_KEY`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, the `RECOVERY_*` secrets (`RECOVERY_COUNTER_HMAC_KEY`, `RECOVERY_MAIL_ENCRYPTION_KEY`) |
-| Required in production | `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXY_COUNT`, `REGISTRATION_EMAIL_DOMAINS`, `LLAMAPARSE_API_KEY`, `LLAMAPARSE_VERSION`, `LLAMAPARSE_TIER` |
+| Required in production | `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXY_COUNT`, `REGISTRATION_EMAIL_DOMAINS`, `UNSTRUCTURED_PLATFORM_API_KEY` |
 | Database and cache | `DB_HOST`, `DB_PORT`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, `REDIS_URL`, `REDIS_CACHE_URL` |
 | General | `DEBUG`, `FRONTEND_URL`, `SESSION_IDLE_TIMEOUT_MINUTES`, `AXES_ENABLED`, `AXES_FAILURE_LIMIT`, `AXES_COOLOFF_TIME_MINUTES`, `API_THROTTLE_*` |
 | Email | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` |
-| Extraction | `EXTRACTION_BACKEND`, `LLAMAPARSE_*` |
+| Extraction | `EXTRACTION_BACKEND`, `UNSTRUCTURED_*` |
 | Embedding and AI | `VOYAGE_API_KEY`, `VOYAGE_EMBED_MODEL`, `VOYAGE_RERANK_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, the per-task `LLM_<TASK>_*` settings, `AI_GATEWAY_SERVICE_SECRET`, `AI_RESEARCH_*`, `AI_PROVIDER_ADMISSION` and the `AI_ADMISSION_*` limits |
 
 ---

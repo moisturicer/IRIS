@@ -15,7 +15,7 @@ cryptography>=43.0
 # removed 2026-09-17 — two pins for one package is how they drift apart.
 pgvector>=0.3
 
-# Extraction is LlamaParse over HTTP (ADR-056). The extractor libraries the
+# Extraction is Unstructured over HTTP (ADR-067). The extractor libraries the
 # prototype chain imported — unstructured, pymupdf, pytesseract — were never
 # declared here and are gone with it.
 
@@ -25,7 +25,7 @@ pgvector>=0.3
 # that was false and broke the configured-LLM test path. Restored.
 openai>=1.30
 
-# httpx: LlamaParse extraction (ADR-056), Voyage embedding and reranking
+# httpx: Unstructured extraction (ADR-067), Voyage embedding and reranking
 # (ADR-015), and the OpenAI-compatible inference call (ADR-036). It no longer
 # proxies to the ai-gateway — ADR-024 took the embedding path off it, and nothing
 # else in Django called it.

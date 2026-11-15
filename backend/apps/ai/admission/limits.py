@@ -52,7 +52,6 @@ REQUIRED_SETTINGS = (
 #: What an off-campus read costs: Unstructured's flat price per page (IR-983),
 #: held as one credit a page. Required only for extraction, so an unset one
 #: refuses extraction and nothing else.
-UNSTRUCTURED = "unstructured"
 EXTRACTION_SETTINGS = ("AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE",)
 
 
