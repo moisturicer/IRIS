@@ -35,7 +35,7 @@ import { cn, downloadBlob, formatDate } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
-import { errorDetail } from "@/lib/errorDetail";
+import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { ItemStatusChip, itemStatus } from "@/features/document-requests/itemStatus";
 import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerDocumentRequests";
 
@@ -105,6 +105,17 @@ function askedFor(requests: DocumentRequest[]): { bySlot: Map<number, Asked>; ot
 async function saveBlob(fetch: () => Promise<{ data: unknown }>, filename: string) {
   const { data } = await fetch();
   downloadBlob(data as Blob, filename);
+}
+
+/**
+ * Why the server refused an upload, or "Please try again." when it gave no
+ * reason (a dropped connection, a 5xx). A document upload carries `detail`;
+ * the manuscript goes up as a PATCH of the record, so DRF refuses it keyed by
+ * field (`abstract_file`) with no `detail` (IR-1048). A fixed reason like
+ * "unsupported active content" must show: retrying the same file can't help.
+ */
+function uploadRefusal(err: unknown): string {
+  return errorDetail(err, "") || fieldError(err, "abstract_file", "file") || "Please try again.";
 }
 
 export function FilesSection({
@@ -195,7 +206,7 @@ export function FilesSection({
         [key]: {
           status: "failed",
           fileName: file.name,
-          error: errorDetail(err, "Please try again."),
+          error: uploadRefusal(err),
           onRetry: () => void send(key, file, post),
         },
       }));
