@@ -26,7 +26,7 @@ export function ConversationSidebar({
       // Collapses by width so the transition matches the main sidebar, and the
       // toggle stays in the toolbar rather than floating over the chat title.
       className={cn(
-        "shrink-0 flex flex-col bg-canvas overflow-hidden transition-[width] duration-200 ease-out",
+        "shrink-0 flex flex-col bg-stone-50 overflow-hidden transition-[width] duration-200 ease-out",
         // `invisible` also drops the collapsed panel out of the tab order.
         open
           ? "w-[min(100%,280px)] sm:w-[260px] border-r border-stone-200"

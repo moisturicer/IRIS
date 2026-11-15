@@ -686,7 +686,7 @@ This extends the IR-356 direction (in `ui-ux/01-design-system.md` §0) from Pape
   - **One scale:** display 28/34, title 20/28, heading 16/24, body 15/24, small 13/20, label 12/16 (sentence case, never all-caps tracking below 12 px);
   - it replaces the scattered 10–11 px uppercase labels.
 - **Spacing:** a 4-px base with a 16/24/32 section rhythm; card padding 20 (desktop) / 16 (mobile).
-- **Surfaces:** a `stone-50` canvas; white cards with a 1 px `stone-200` border and no resting shadow. Shadow is kept for things that float: dialogs, menus, the mobile sheet.
+- **Surfaces:** a white canvas (IR-1132); white cards with a 1 px `stone-200` border and no resting shadow. Shadow is kept for things that float: dialogs, menus, the mobile sheet.
 - **Action hierarchy:** one maroon primary pill per region (`pillStyles`), secondary as outline pills, tertiary as text buttons. Danger is `brand-dark` with its glyph (IR-359).
 - **Status:** IR-358's four tones only, and the wording always comes from the server.
 - **Focus:** a visible 2 px maroon ring with an offset on every interactive element.

@@ -17,8 +17,11 @@ import { TONES } from "./statusTones";
 const colors = resolveConfig(tailwindConfig).theme.colors as Record<string, unknown>;
 
 describe("surface roles", () => {
-  it("defines canvas as stone-50, and surface and overlay as opaque white, once", () => {
-    expect(colors.canvas).toBe((colors.stone as Record<string, string>)[50]);
+  // IR-1132: every page sits on white, as Discover does. The ground is still
+  // its own role, so a screen asks for `canvas` and the ground can change
+  // again in one place, but it is no longer a grey of its own.
+  it("defines canvas, surface and overlay as opaque white, once", () => {
+    expect(colors.canvas).toBe("#ffffff");
     expect(colors.surface).toBe("#ffffff");
     expect(colors.overlay).toBe("#ffffff");
   });
