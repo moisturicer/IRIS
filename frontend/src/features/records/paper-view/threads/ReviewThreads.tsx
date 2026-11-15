@@ -15,7 +15,6 @@ import type { Passage } from "./passage";
 import { ResponseLetterPanel } from "./ResponseLetter";
 import { SEVERITY_WORDS, filterThreads, isOpen, threadStatus, type Thread, type ThreadFilter, type ThreadViewer } from "./threadModel";
 import type { ReviewThreadsState } from "./useReviewThreads";
-import { SELECTED_RING } from "@/components/ui/highlightRoles";
 
 /** What the composer comments on: a passage of a Version, or the whole record. */
 export type CommentTarget = { kind: "general" } | { kind: "passage"; version: number; passage: Passage };
@@ -87,34 +86,43 @@ export function ReviewThreads(props: ReviewThreadsProps) {
     <section aria-labelledby={headingId} className="space-y-4">
       <h3 id={headingId} className="sr-only">Threads</h3>
       {props.letter && <ResponseLetterPanel letter={props.letter} />}
+      {/* The prototype's Threads head (IR-1139): the filter as one segmented
+          control with its counts, *New comment* on the right, and how to
+          comment on a passage under them. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div role="group" aria-label="Filter threads" className="inline-flex flex-wrap gap-0.5 rounded-control bg-stone-100 p-1">
+          {(Object.keys(FILTER_NAMES) as ThreadFilter[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={filter === f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                "min-h-11 reading-split:min-h-9 rounded-control px-3 text-small font-semibold",
+                filter === f ? "bg-surface text-stone-900 ring-1 ring-stone-300" : "text-stone-600 hover:text-stone-900",
+                FOCUS_RING,
+              )}
+            >
+              {FILTER_NAMES[f]} <span className="font-normal text-stone-500">{groups[f].length}</span>
+            </button>
+          ))}
+        </div>
+        {canComment && !props.composing && (
+          <Button variant="outline" size="sm" onClick={() => props.onCompose({ kind: "general" })}>
+            <i className="fas fa-comment-medical" aria-hidden />
+            New comment
+          </Button>
+        )}
+      </div>
       {props.composing
         ? <Composer {...props} target={props.composing} />
         : canComment && (
-          <p className="flex items-center justify-between gap-2 text-small text-stone-600">
-            <span>Select a passage in the paper and press C, or find one, to comment on it.</span>
-            <Button variant="outline" size="sm" onClick={() => props.onCompose({ kind: "general" })}>
-              New comment
-            </Button>
+          <p className="text-small text-stone-600">
+            Select a passage in the paper and press{" "}
+            <kbd className="rounded-control border border-stone-300 bg-surface px-1.5 font-mono text-2xs text-stone-700">C</kbd>
+            , or use New comment.
           </p>
         )}
-
-      <div role="group" aria-label="Filter threads" className="flex flex-wrap gap-1.5">
-        {(Object.keys(FILTER_NAMES) as ThreadFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            aria-pressed={filter === f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "min-h-11 reading-split:min-h-9 rounded-full px-3 text-small font-semibold ring-1",
-              filter === f ? SELECTED_RING : "text-stone-700 ring-stone-300 hover:text-brand",
-              FOCUS_RING,
-            )}
-          >
-            {FILTER_NAMES[f]} {groups[f].length}
-          </button>
-        ))}
-      </div>
       {party !== null && (
         <p className="text-small text-stone-700">
           Showing {party === "owner" ? "the authors'" : `${threads.sent.find((t) => t.root.party === party)?.root.party_label ?? party}'s`} threads.{" "}
@@ -232,7 +240,13 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           {" · "}{formatDate(root.created_at)}{root.edited_at ? " · edited" : ""}
         </p>
         {root.anchor && (
-          <span className="whitespace-nowrap font-semibold text-stone-700">p.{root.anchor.page} · v{root.anchor.version}</span>
+          // The place as a link, as the prototype's card has it (IR-1139): it
+          // goes to the passage, where the quote below does too.
+          <button type="button" onClick={() => props.onShowInPaper(thread)}
+            aria-label={`Go to page ${root.anchor.page} of v${root.anchor.version}`}
+            className={cn("whitespace-nowrap font-semibold text-brand underline underline-offset-2 hover:text-brand-dark", FOCUS_RING)}>
+            p. {root.anchor.page} · v{root.anchor.version}
+          </button>
         )}
       </header>
 
@@ -250,7 +264,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
           type="button"
           onClick={() => props.onShowInPaper(thread)}
           aria-label={`Show in paper: “${root.anchor.quote}”`}
-          className={cn("block w-full text-left border-l-2 border-brand/40 pl-2 text-small italic text-stone-700 hover:text-brand", now && "bg-pen-now", FOCUS_RING)}
+          className={cn("block w-full rounded-control bg-stone-100 px-3 py-2 text-left font-display text-small italic text-stone-800 hover:text-brand", now && "bg-pen-now", FOCUS_RING)}
         >
           “{root.anchor.quote}”
         </button>

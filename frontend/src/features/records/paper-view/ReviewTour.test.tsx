@@ -116,7 +116,7 @@ describe("walking through the tour (IR-997)", () => {
     expect(progress()).toBe("Step 1 of 3");
   });
 
-  it("names only the tabs this workspace has", async () => {
+  it("names Changes on the first version too, since it is always a tab (IR-1139)", async () => {
     const user = userEvent.setup();
     openWorkspace({ versions: 1 });
     await user.click(screen.getByRole("button", { name: "Start tour" }));
@@ -124,7 +124,7 @@ describe("walking through the tour (IR-997)", () => {
     const step = within(screen.getByRole("dialog", { name: "Review workspace tour" }));
     expect(step.getByText(/Conversation/)).toBeInTheDocument();
     expect(step.getByText(/Threads/)).toBeInTheDocument();
-    expect(step.queryByText(/Changes/)).toBeNull();
+    expect(step.getByText(/Changes/)).toBeInTheDocument();
   });
 
   it("describes Changes once there are two Versions to compare", async () => {

@@ -2025,7 +2025,8 @@ describe("the Review section (IR-412)", () => {
 
       await userEvent.click(await findColumns());
       expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
-        "Conversation on the right", "Threads on the right", "Details on the right",
+        // Changes is a tab on the first version too (IR-1139).
+        "Conversation on the right", "Threads on the right", "Changes on the right", "Details on the right",
       ]);
       await userEvent.click(screen.getByRole("menuitem", { name: "Conversation on the right" }));
 
