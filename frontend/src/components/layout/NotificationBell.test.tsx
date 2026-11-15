@@ -27,7 +27,7 @@ import { useUnreadNotificationsFetch } from "@/hooks/useNotifications";
 import { NotificationBell } from "./NotificationBell";
 
 vi.mock("@/api/notifications", () => ({
-  notificationsApi: { list: vi.fn(), markRead: vi.fn(), markAllRead: vi.fn() },
+  notificationsApi: { list: vi.fn(), latest: vi.fn(), markRead: vi.fn(), markAllRead: vi.fn() },
 }));
 
 const { notificationsApi } = await import("@/api/notifications");
@@ -187,6 +187,32 @@ describe("the bell's popover (IR-1137)", () => {
       expect.stringContaining("Update 3"),
       expect.stringContaining("Update 2"),
     ]);
+  });
+
+  it("shows read and settled items too, under day bands, and opening a settled one leaves the count alone", async () => {
+    vi.mocked(notificationsApi.markRead).mockClear();
+    const settled = {
+      ...notification(9, "Jonas Uy asked to delete the record Solar Dryer", 5),
+      is_read: true,
+      resolved_at: "2026-10-27T09:00:00Z",
+      resolved_label: "Declined by Rita Cruz on 27 Oct",
+    };
+    vi.mocked(notificationsApi.latest).mockResolvedValueOnce(
+      page([notification(1, "Update 1", 7), settled]),
+    );
+    useNotificationsStore.setState({ items: [notification(1, "Update 1", 7)], unreadCount: 1 });
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>,
+    );
+
+    const dialog = await openBell();
+    expect(await within(dialog).findByText("Declined by Rita Cruz on 27 Oct")).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("link", { name: /Solar Dryer/ }));
+    expect(notificationsApi.markRead).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Notifications, 1 unread" })).toBeInTheDocument();
   });
 
   it("closes on Escape and returns focus to the bell", async () => {
