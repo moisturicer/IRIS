@@ -953,7 +953,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
-              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", CORNER_CLEARANCE_CLASS, PAGE_WIDTH.standard),
+              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", CORNER_CLEARANCE_CLASS, showRail ? "w-full max-w-[100rem]" : PAGE_WIDTH.standard),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
@@ -962,8 +962,8 @@ export default function PaperViewPage() {
                 cn(
                   "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   railHidden
-                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,1fr)_0rem] overview-wide:gap-x-0"
-                    : "overview-wide:grid-cols-[minmax(0,1fr)_clamp(17rem,25cqw,22rem)] overview-wide:gap-x-8",
+                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-between overview-wide:gap-x-0"
+                    : "overview-wide:grid-cols-[minmax(0,60rem)_clamp(17rem,25cqw,22rem)] overview-wide:justify-between overview-wide:gap-x-8",
                 ),
             )}
           >
@@ -977,10 +977,10 @@ export default function PaperViewPage() {
             className={cn(
               "min-w-0",
               onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
-              // The Overview reads in one column, up to 60rem, set against
-              // what is beside it (Ask IRIS, or the rail) with the room left
-              // over on its left (IR-569).
-              showRail && "w-full max-w-[60rem] justify-self-end",
+              // The Overview reads in one column, up to 60rem, flush left with
+              // the rail beside it; spare room falls to the right, so the
+              // page keeps its place whether Ask IRIS is open or not.
+              showRail && "w-full max-w-[60rem]",
             )}
           >
             {/* Editorial header (IR-356): what it is, who wrote it, then
