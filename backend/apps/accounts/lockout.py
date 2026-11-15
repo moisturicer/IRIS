@@ -22,6 +22,8 @@ from axes.helpers import get_cool_off, get_failure_limit
 from django.conf import settings
 from django.http import JsonResponse
 
+from .sign_in_audit import refused
+
 TOO_MANY_ATTEMPTS = "too_many_attempts"
 LOCKED_BY_ADMIN = "locked_by_admin"
 
@@ -71,6 +73,8 @@ def lockout_response(request, original_response=None, credentials=None) -> JsonR
     """
     credentials = credentials or getattr(request, "axes_credentials", None)
     ends = unlock_at(request, credentials)
+    # Every attempt axes refuses is a sign-in decision (IR-659); the view leaves this row to us.
+    refused(request, (credentials or {}).get(settings.AXES_USERNAME_FORM_FIELD), TOO_MANY_ATTEMPTS)
     return JsonResponse(
         {
             "detail": "Account locked: too many failed sign-in attempts.",

@@ -6,7 +6,9 @@ Each act locks the Call's row and checks its status inside the same
 transaction, so two RDCO accounts deciding the same request at once cannot
 both succeed: the second sees a Call that is no longer pending and is refused.
 Notices are sent after the change is committed, so a rolled-back act never
-tells anyone it happened. IR-763 adds the audit events to these same acts.
+tells anyone it happened. Confirm, reject and remove write their audit
+event (IR-763) inside the same transaction, so a refused or rolled-back act
+records nothing; an edit's event, the resubmission included, is the view's.
 """
 from django.db import transaction
 from django.utils import timezone
@@ -15,6 +17,7 @@ from apps.notifications import services as notify
 from apps.notifications.settling import settle_call
 from core.enums import CallStatus
 
+from . import audit
 from .models import Opportunity
 
 
@@ -64,6 +67,7 @@ def confirm(call_id, *, by, seen):
         call.review_reason = ""
         call.reviewed_at = timezone.now()
         call.save(update_fields=["status", "review_reason", "reviewed_at", "updated_at"])
+        audit.confirmed(call, by=by)
         transaction.on_commit(lambda: notify.notify_call_confirmed(call, confirmed_by=by))
     return call
 
@@ -75,6 +79,7 @@ def reject(call_id, *, by, seen, reason):
         call.review_reason = reason
         call.reviewed_at = timezone.now()
         call.save(update_fields=["status", "review_reason", "reviewed_at", "updated_at"])
+        audit.rejected(call, by=by, reason=reason)
         transaction.on_commit(lambda: notify.notify_call_rejected(call, rejected_by=by, reason=reason))
     return call
 
@@ -89,7 +94,9 @@ def remove(call_id, *, by, reason):
     with transaction.atomic():
         call = _locked(call_id)
         tell = call.posted_by_adviser()
+        before = audit.snapshot(call)
         call.delete()
+        audit.removed(before, by=by, reason=reason)
         if tell:
             transaction.on_commit(lambda: notify.notify_call_removed(call, removed_by=by, reason=reason))
 

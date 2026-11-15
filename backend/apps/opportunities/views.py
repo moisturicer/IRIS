@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from core.enums import CallStatus
 from core.permissions import IsCallModerator, IsOpportunityPoster, is_call_moderator
 
-from . import review
+from . import audit, review
 from .models import Opportunity
 from .serializers import DecisionSerializer, OpportunitySerializer, ReasonSerializer, RejectionSerializer
 from .services import build_ics
@@ -49,8 +49,9 @@ class OpportunityViewSet(viewsets.ModelViewSet):
         )
         if self.action == "list":
             return calls.on_board()
-        if self.action in ("update", "partial_update"):
-            # An edit holds the row for its whole transaction (see `update`).
+        if self.action in ("update", "partial_update", "destroy"):
+            # An edit or delete holds the row for its whole transaction (see
+            # `update` and `destroy`).
             # Only the Call's own row: Postgres can't lock a missing poster.
             return calls.select_for_update(of=("self",))
         if self.action == "calendar":
@@ -156,10 +157,17 @@ class OpportunityViewSet(viewsets.ModelViewSet):
         own or a colleague's. An Adviser's Call, deleted by RDCO, needs a
         reason, so it goes through `remove` instead (decision 11).
         """
-        call = self.get_object()
-        if call.posted_by_id != request.user.pk and call.posted_by_adviser():
-            return Response({"detail": NEEDS_REASON}, status=status.HTTP_400_BAD_REQUEST)
-        return super().destroy(request, *args, **kwargs)
+        with transaction.atomic():
+            call = self.get_object()
+            if call.posted_by_id != request.user.pk and call.posted_by_adviser():
+                return Response({"detail": NEEDS_REASON}, status=status.HTTP_400_BAD_REQUEST)
+            return super().destroy(request, *args, **kwargs)
+
+    def perform_destroy(self, call):
+        # The snapshot is taken while the row exists: afterwards it is the only trace.
+        before = audit.snapshot(call)
+        call.delete()
+        audit.deleted(before, by=self.request.user)
 
     def update(self, request, *args, **kwargs):
         """
@@ -178,21 +186,30 @@ class OpportunityViewSet(viewsets.ModelViewSet):
         edit. RDCO's own edits never change a Call's status.
         """
         call = serializer.instance
+        before = audit.snapshot(call)
         if (
             not is_call_moderator(self.request.user)
             and call.status != CallStatus.PENDING
             and review.changes_anything(call, serializer.validated_data)
         ):
             review.returned_for_review(call)
-        serializer.save()
+        audit.edited(before, serializer.save(), by=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        # CALL_POSTED is written in the same transaction, so a post that fails
+        # leaves no event. (A failed audit insert alone doesn't fail the post:
+        # `create_audit_event` logs it and carries on, IR-144.)
+        with transaction.atomic():
+            return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         # RDCO's Calls go public at once; an Adviser's wait for RDCO (decision 8).
         if is_call_moderator(self.request.user):
-            serializer.save(posted_by=self.request.user, status=CallStatus.CONFIRMED)
-            return
-        call = serializer.save(posted_by=self.request.user, status=CallStatus.PENDING)
-        review.submitted(call)
+            call = serializer.save(posted_by=self.request.user, status=CallStatus.CONFIRMED)
+        else:
+            call = serializer.save(posted_by=self.request.user, status=CallStatus.PENDING)
+            review.submitted(call)
+        audit.posted(call, by=self.request.user)
 
     @action(detail=True, methods=["get"])
     def calendar(self, request, pk=None):

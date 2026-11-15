@@ -3,6 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.notifications import services as notify
+from . import audit
 from .models import Opportunity
 
 
@@ -13,8 +14,9 @@ def remove_lapsed_requests():
     telling its Adviser once (ADR-050 decision 9, as amended 2026-11-15;
     IR-762). Daily, just after midnight in Manila.
 
-    Each Call is deleted under its own row lock and its notice is queued on
-    that same commit, so a Call deleted is told exactly once: a second run, or
+    Each Call is deleted under its own row lock, with its CALL_LAPSED audit
+    event (IR-763) in the same transaction and its notice queued on that
+    commit, so a Call deleted is told exactly once: a second run, or
     one racing this, finds the row gone and sends nothing. `skip_locked` lets a
     run step past a Call another transaction is editing; the next run gets it.
     Returns how many it deleted.
@@ -33,7 +35,9 @@ def remove_lapsed_requests():
             )
             if call is None:
                 continue
+            before = audit.snapshot(call)
             call.delete()
+            audit.lapsed(before)
             transaction.on_commit(lambda call=call: notify.notify_call_lapsed(call))
             removed += 1
     return removed

@@ -100,7 +100,7 @@ def test_without_joining_hits_keep_their_rank_order():
     assert ids(placed) == [5, 4] and [p.continues for p in placed] == [None, None]
 
 
-def test_selection_is_on_by_default_without_a_paper_share():
+def test_selection_is_on_by_default_with_no_paper_share():
     assert config.read(settings()).selection == Policy(
         paper_share=0, join=True, tokens_per_passage=700, section_mates=True)
 

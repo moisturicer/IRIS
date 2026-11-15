@@ -225,21 +225,11 @@ The cap (3) applies outside Paper Chat only. When it removes a hit, the next-ran
 
 Jive Tyler Revalde replaced the runtime's 3-per-paper count with a share of the search's token budget, on 2026-11-15. The goal: a search should be bounded by how much context it is given, not by a fixed number of passages.
 
-- Outside Paper Chat, one paper may fill at most `RUNS_PAPER_SHARE` percent of the budget (default 50, provisional; 0 turns it off). **A paper's section-mates count toward its share.** Its first hit always enters.
+- Outside Paper Chat, one paper may fill at most `RUNS_PAPER_SHARE` percent of the budget (0, off, by default; see below). **A paper's section-mates count toward its share.** Its first hit always enters.
 - **The limit is soft.** Each paper fills up to its share first. Any budget no other paper could use then goes back, in rank order: hits first, then section-mates. A search with only one relevant paper therefore still gets the whole budget.
-- Which percentage is best is being evaluated separately; 50 is a placeholder, not a measurement.
+- **Default off, by measurement (IR-1150).** Replaying selection on hybrid candidates over the proxy tier, every share below 75% lost recall and none gained any; 50% traded about 0.05 single-paper recall for fewer one-paper searches (74% to 60%). Multi-paper questions were too few to measure. Jive Tyler Revalde set the default to 0 (off) on 2026-11-16; the budget alone now bounds a search. Run: `docs/evaluation/runs/2026-11-16-ir1150-paper-share/`.
 
 This supersedes the count cap described in the IR-397 and IR-1055 amendments above.
-
-## Amendment — 2026-11-16 (IR-1150): the paper share is off by default
-
-Jive Tyler Revalde set `RUNS_PAPER_SHARE`'s default to 0 (off) on 2026-11-16, on IR-1150's measurement. The share itself stays, and any value from 1 to 100 still turns it on.
-
-- **Measurement.** An offline replay (`scripts/eval_paper_share.py`, run files in `docs/evaluation/runs/2026-11-16-ir1150-paper-share/`; proxy tier). Each question's candidates are ranked once, as `hybrid_search` ranks them without rerank, and then selected under each share. Corpus: IR-1054's `g_structural` trial chunk sets, 43 papers.
-- **Result.** Every share below 75 lost labelled evidence, and none found any the share off missed. Against off, at limits 10 and 5: 50 lost 4 and 7 labels (of 94); 33 lost 11 and 10; 25 lost 14 and 11. 75 lost one. A share does put more papers in a search: at limit 10, searches mostly from one paper fall from 74% to 60% at 50. Tokens per search do not change.
-- **Not measured.** The multi-paper questions a share is meant to help. Only one of five two-paper questions has both papers among its candidates, and every arm finds both. A set with real multi-paper questions is what could turn the share back on.
-
-This supersedes the default of 50 in the amendment above.
 
 ## Alternatives Considered
 

@@ -493,6 +493,30 @@ each Figure was built and then removed, because the partition endpoint never
 returns one. Using the enrichment would need a Jobs-API reader first, and the
 measurement in item 3 gives no reason to build one.
 
+## Amendment — 2026-11-15 (IR-989): the quality gate passes by the owner's decision
+
+The rule failed one check as measured. Jive Tyler Revalde, IR-980's owner, decided on 2026-11-15 that the gate passes, because the sample is too small for the gap to count. Proxy tier only (ADR-023). Report: `docs/evaluation/runs/2026-11-15-ir989-extractor-gate/report.md`.
+
+| Rule (decision 2) | LlamaParse | Unstructured | As measured |
+|---|---|---|---|
+| recall@10 with reranking, lower by at most 0.02 | 0.786 | 0.643 | Fail |
+| Wrongly nested numbered headings, at most LlamaParse's + 5 | 0 | 0 | Pass |
+| No paper loses all its LaTeX | — | — | Pass, through IR-1102's transcriptions |
+
+**Why it passes.**
+- **The margin is below one question.** The six-paper set has 14 questions, so one question is worth 0.071 of recall, and the 0.02 margin can only be met by losing none.
+- **Both lost questions share one label.** Its quote cannot match Unstructured's text, because Unstructured keeps the PDF's line-end hyphen ("ex- plicit"). With that quote trimmed past the hyphen, both extractors score 0.786.
+
+**Effect.** Unstructured is eligible, and IR-988 (the cutover) is unblocked. This departs from decision 2's "no sign-off is needed; the measured rule decides" for this gate only. The rule itself is unchanged.
+
+**Carried to the cutover.** Unstructured shaping keeps line-end hyphens (IR-1054 found the same defect), which also blocks some evaluation labels from matching. No Jira issue tracks that fix yet.
+
+## Amendment — 2026-11-15 (IR-1149): formulas enter the indexed text by default
+
+`AI_FORMULA_TEXT_INDEXED` now defaults to on: a transcribed formula's LaTeX and one-line description enter its chunk's embedded and keyword-indexed text. Jive Tyler Revalde decided this on 2026-11-15. It is an exception to ADR-033 §5, made by a person: no `eval_retrieval` run has measured it. The setting is read at chunking, so existing chunk sets change only after a re-chunk. Readers saw the LaTeX before and still do.
+
+Figure descriptions need no change. A described Figure's description already enters its chunk's embedded text (IR-852), and none is written unless `LLM_DESCRIBE_FIGURE_MODEL` is set, because each description is a paid call.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.

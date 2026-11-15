@@ -10,7 +10,7 @@ This is the feature's first ADR. It replaces IR-121's decisions on types, postin
 
 An amendment of 2026-11-12 (IR-758, below) restates both in this ADR's own text and settles which list a Call's Areas come from.
 
-An amendment of 2026-11-15 (IR-762, below, Proposed) deletes a request whose paper deadline passes instead of expiring it, and stops an Adviser saving a past paper deadline.
+An amendment of 2026-11-15 (IR-762, below, accepted 2026-11-15) deletes a request whose paper deadline passes instead of expiring it, and stops an Adviser saving a past paper deadline.
 
 ## Context
 
@@ -134,7 +134,7 @@ IR-758 (spec, under IR-671), IR-759 (this ADR), IR-760, IR-761, IR-762, IR-763, 
 
 ## Amendment — 2026-11-15 (IR-762): a lapsed request is deleted, and an Adviser can't enter a past deadline
 
-**Status of this amendment: Proposed** — decided by Hermoine Zozobrado, 2026-11-15, while building IR-762. It is accepted when IR-762's PR merges.
+**Status of this amendment: Accepted** — decided by Hermoine Zozobrado, 2026-11-15, while building IR-762. Accepted by Lee Jasmin Adolfo on 2026-11-15, as relayed by Hermoine Zozobrado, when IR-762's PR (#808) merged.
 
 1. **An Adviser can't save a Call whose paper deadline has passed** (decision 5). The check uses Manila's date, and covers a new Call and an edit. RDCO's dates stay unchecked, so RDCO can still post a late-breaking deadline. A request can no longer be entered already expired, so decision 9's last sentence no longer applies.
    - Consequence: once its paper deadline has passed, an Adviser can still edit their Call, but only by moving the deadline to today or later. The edit returns it to waiting (decision 10). An edit that keeps the past deadline is refused, since point 2 would delete it. RDCO's edits stay unchecked.
@@ -147,3 +147,10 @@ IR-758 (spec, under IR-671), IR-759 (this ADR), IR-760, IR-761, IR-762, IR-763, 
 3. **Which removals need a reason** (decision 11): removing a Call posted by an account that isn't RDCO, and that still exists. RDCO removes its own Calls, a colleague's, or one whose poster's account is gone without a reason, since nobody would receive it. Each case has one way in: a Call needing a reason is removed with one, and one needing none is deleted.
 4. **RDCO decides the version it saw** (decision 8). A confirm or reject names the Call's last-changed time as RDCO read it. An Adviser may edit a waiting Call meanwhile, and a decision on a Call changed since is refused, so RDCO never confirms content it hasn't read.
 5. **Consequences, restated.** A slow review now costs an Adviser their post outright, not only its place in RDCO's list. The notice softens that but doesn't remove it.
+
+## Amendment — 2026-11-15 (IR-763): the daily job's deletions have their own audit type
+
+**Status of this amendment: Accepted** — decided by Hermoine Zozobrado, 2026-11-15, while building IR-763. Accepted by Lee Jasmin Adolfo on 2026-11-15, as relayed by Hermoine Zozobrado, when IR-763's PR (#812) merged.
+
+1. **A lapsed request's deletion is audited as `CALL_LAPSED`**, not `CALL_DELETED`. It has no actor and carries a snapshot of the Call. This refines the 2026-11-15 (IR-762) amendment's point 2: these are still deletions under decision 15, with a copy of the Call, but they get a type of their own so they can be told apart from a person's delete and counted.
+2. **Decision 15's acts are therefore seven event types:** `CALL_POSTED`, `CALL_EDITED`, `CALL_DELETED`, `CALL_CONFIRMED`, `CALL_REJECTED`, `CALL_REMOVED` and `CALL_LAPSED`. `CALL_POSTED` carries a full snapshot too, so the log alone can follow a Call's versions. Areas appear as ids and names. The keys are in `docs/evaluation/AUDIT_EXPORT.md`.
