@@ -46,7 +46,13 @@ function shell(api: MockApi, role: SmokeRole) {
     total_mine: 0, pending_mine: 0, approved_mine: 0, declined_mine: 0, needs_action_mine: 0, total_published: 1,
   });
   api.on("GET", "/notifications/", paginated([]));
-  if (role === "RDCO") api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
+  if (role === "RDCO") {
+    api.on("GET", "/dashboard/queue-counts/", {
+      download_requests: 0, delete_requests: 0, role_change_requests: 0, reported_comments: 0,
+    });
+  }
+  // IR-691: the System Admin shares the Reported comments queue, so its sidebar asks for that count alone.
+  if (role === "System Admin") api.on("GET", "/dashboard/queue-counts/", { reported_comments: 0 });
 }
 
 const wrap = (role: SmokeRole, extra?: (api: MockApi) => void) => (api: MockApi) => {
@@ -65,6 +71,16 @@ const USERS = Array.from({ length: 6 }, (_, i) => ({
   is_office_coordinator: i === 2,
   date_joined: when("01-05"),
 }));
+
+/** One reported comment with two reports, so the queue draws its reasons and a reader's note. */
+const REPORTED_COMMENT = {
+  id: 41, record: { id: 7, title: "Solar dryers for rural farms in the Visayas region" },
+  author_name: "Maria Cristina Dela Cruz-Santos",
+  reported_texts: ["Buy cheap followers at example.test"], current_text: "Buy cheap followers at example.test",
+  deletion_kind: null, report_count: 2,
+  reasons: [{ reason: "spam", count: 1 }, { reason: "other", count: 1 }],
+  notes: ["It names a student."], first_reported_at: when("11-14"),
+};
 
 /** One open call, so the board draws its filters as it does with data. */
 const OPPORTUNITY = {
@@ -380,6 +396,13 @@ export const SCREENS: Screen[] = [
     heading: "Delete Requests",
     primary: (p) => p.getByRole("button", { name: "Refresh" }), primaryLabel: "Refresh",
     table: (p) => p.getByRole("table").first(),
+  },
+  // IR-693: RDCO and the System Admin share this queue at one path, as Notices does.
+  {
+    id: "reported-comments", path: "/moderation/comments", route: "/moderation/comments", role: "RDCO",
+    mocks: wrap("RDCO", (api) => api.on("GET", "/moderation/comments/", { comments: [REPORTED_COMMENT] })),
+    heading: "Reported comments",
+    primary: (p) => p.getByRole("button", { name: /^Remove / }).first(), primaryLabel: "Remove",
   },
 
   // --- System Admin --------------------------------------------------------

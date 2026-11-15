@@ -248,6 +248,8 @@ export interface PublicComment {
   is_author: boolean;
   can_edit: boolean;
   can_report: boolean;
+  /** RDCO and the System Admin, on a comment still standing (IR-691). */
+  can_remove: boolean;
   reply_to: number | null;
   /** `writer` renders as [deleted], `moderator` as [removed]. */
   deletion_kind: "writer" | "moderator" | null;
@@ -260,6 +262,31 @@ export interface PublicCommentsResponse {
 }
 
 export type PublicCommentReportReason = "spam" | "harassment" | "off_topic" | "other";
+
+/** What a report's reason is called on screen. */
+export const REPORT_REASON_LABELS: Record<PublicCommentReportReason, string> = {
+  spam: "Spam", harassment: "Harassment", off_topic: "Off-topic", other: "Other",
+};
+
+/**
+ * One row of the Reported comments queue (IR-691, IR-693): a comment with an
+ * open report, for RDCO and the System Admin. It never names who reported.
+ */
+export interface ReportedComment {
+  id: number;
+  record: { id: number; title: string };
+  author_name: string;
+  /** Each distinct wording readers reported, oldest first. */
+  reported_texts: string[];
+  /** The wording now; null once deleted. */
+  current_text: string | null;
+  deletion_kind: "writer" | "moderator" | null;
+  report_count: number;
+  reasons: { reason: PublicCommentReportReason; count: number }[];
+  /** *Other*'s notes. */
+  notes: string[];
+  first_reported_at: string;
+}
 
 /**
  * ADR-032 §10's action keys, as spec §4.8 lists them, with the two its

@@ -29,6 +29,8 @@ export interface CommentContext {
   saveEdit: () => void;
   askDelete: (comment: PublicComment) => void;
   askReport: (comment: PublicComment) => void;
+  /** RDCO and the System Admin remove a comment with a reason (IR-691). */
+  askRemove: (comment: PublicComment) => void;
   showWholeBody: (id: number) => void;
   jumpTo: (id: number) => void;
 }
@@ -55,7 +57,9 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
   const deleted = comment.deletion_kind !== null;
   const own = comment.can_edit && !deleted;
   const canReport = ctx.signedIn && comment.can_report && !deleted;
-  const hasMenu = own || canReport;
+  // A moderator deletes their own comment instead (decision 2026-11-15).
+  const canRemove = ctx.signedIn && comment.can_remove && !deleted && !own;
+  const hasMenu = own || canReport || canRemove;
   const editing = ctx.editingId === comment.id;
   const menuOpen = ctx.menuFor === comment.id;
   const name = comment.author_name ?? "";
@@ -187,6 +191,11 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
                         </>
                       )}
                       {!own && canReport && <MenuItem innerRef={firstItemRef} onClick={() => ctx.askReport(comment)}>Report</MenuItem>}
+                      {canRemove && (
+                        <MenuItem innerRef={!own && !canReport ? firstItemRef : undefined} tone="danger" onClick={() => ctx.askRemove(comment)}>
+                          Remove
+                        </MenuItem>
+                      )}
                     </div>
                   )}
                 </div>

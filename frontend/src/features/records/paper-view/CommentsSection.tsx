@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 
+import { moderationApi } from "@/api/moderation";
 import { recordsApi } from "@/api/records";
+import { RdcoNoteDialog } from "@/features/admin/RdcoNoteDialog";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -80,6 +82,7 @@ export function CommentsSection({
   const [reportReason, setReportReason] = useState<ReportReason>("spam");
   const [reportNote, setReportNote] = useState("");
   const [reportMessage, setReportMessage] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<PublicComment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -259,6 +262,10 @@ export function CommentsSection({
       setReportReason("spam");
       setReportNote("");
     },
+    askRemove: (comment) => {
+      setMenuFor(null);
+      setRemoving(comment);
+    },
     showWholeBody: (commentId) => setExpandedBodies((current) => new Set(current).add(commentId)),
     jumpTo: (commentId) => setTarget({ id: commentId }),
   };
@@ -436,6 +443,25 @@ export function CommentsSection({
             </div>
           </form>
         </Modal>
+      )}
+
+      {removing && (
+        <RdcoNoteDialog
+          title="Remove comment"
+          submitLabel="Remove"
+          audience="writer"
+          requester={removing.author_name ?? "The writer"}
+          recordTitle="Comment on this paper"
+          intro="It shows as [removed], and its writer is told in-app, with your reason."
+          send={(reason) => moderationApi.removeComment(removing.id, reason)}
+          onClose={() => setRemoving(null)}
+          onDone={() => {
+            setRemoving(null);
+            setReportMessage("Comment removed");
+            window.setTimeout(() => setReportMessage(null), 3500);
+            void refresh(true);
+          }}
+        />
       )}
 
       <Modal open={confirmDelete !== null} onClose={() => setConfirmDelete(null)} title="Delete this comment?" size="sm">

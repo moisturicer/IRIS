@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { moderationApi } from "@/api/moderation";
 import { recordsApi } from "@/api/records";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
@@ -20,6 +21,7 @@ function comment(overrides: Partial<PublicComment> = {}): PublicComment {
     is_author: false,
     can_edit: false,
     can_report: true,
+    can_remove: false,
     reply_to: null,
     deletion_kind: null,
     ...overrides,
@@ -40,6 +42,7 @@ let postComment: ReturnType<typeof vi.spyOn>;
 let editComment: ReturnType<typeof vi.spyOn>;
 let deleteComment: ReturnType<typeof vi.spyOn>;
 let reportComment: ReturnType<typeof vi.spyOn>;
+let removeComment: ReturnType<typeof vi.spyOn>;
 
 function renderComments(viewerId: number | null = VIEWER_ID) {
   return renderScreen(<CommentsSection recordId={RECORD_ID} viewerId={viewerId} viewerName="Lee Reader" />);
@@ -65,6 +68,7 @@ beforeEach(() => {
   editComment = vi.spyOn(recordsApi, "editPublicComment").mockResolvedValue({ data: comment() } as never);
   deleteComment = vi.spyOn(recordsApi, "deletePublicComment").mockResolvedValue({ data: undefined } as never);
   reportComment = vi.spyOn(recordsApi, "reportPublicComment").mockResolvedValue({ data: undefined } as never);
+  removeComment = vi.spyOn(moderationApi, "removeComment").mockResolvedValue({ data: undefined } as never);
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -358,6 +362,45 @@ describe("published paper comments", () => {
     await waitFor(() => expect(reportComment).toHaveBeenCalledWith(RECORD_ID, 10, { reason: "other", note: "This does not belong here" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Comment reported");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  // IR-691/IR-693, decision 2026-11-15: RDCO and the System Admin remove any
+  // comment from the paper, with a reason the writer is told.
+  it("offers Remove only where the server does, and asks for a reason", async () => {
+    const user = userEvent.setup();
+    setComments([onDay(10, 10, { can_remove: true }), onDay(11, 11)]);
+    renderComments();
+
+    await user.click(await screen.findByRole("button", { name: "More actions for Reader 11's comment" }));
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "More actions for Reader 10's comment" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Remove comment" });
+    expect(dialog).toHaveTextContent("Reader 10");
+    expect(within(dialog).getByRole("button", { name: "Remove" })).toBeDisabled();
+    await user.type(within(dialog).getByRole("textbox", { name: "Note to the writer" }), "Shares a phone number.");
+    setComments([gone(10, 10, "moderator"), onDay(11, 11)]);
+    await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(removeComment).toHaveBeenCalledWith(10, "Shares a phone number."));
+    expect(await screen.findByRole("status")).toHaveTextContent("Comment removed");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps the dialog open with the server's reason when the comment was already handled", async () => {
+    const user = userEvent.setup();
+    removeComment.mockRejectedValue({ response: { status: 409, data: { detail: "This comment was already removed or deleted." } } });
+    setComments([onDay(10, 10, { can_remove: true })]);
+    renderComments();
+
+    await user.click(await screen.findByRole("button", { name: "More actions for Reader 10's comment" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove comment" });
+    await user.type(within(dialog).getByRole("textbox", { name: "Note to the writer" }), "Spam.");
+    await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("This comment was already removed or deleted.");
   });
 
   it("cuts a long comment and shows the rest on request", async () => {

@@ -14,6 +14,7 @@ function comment(id: number, overrides: Partial<PublicComment> = {}): PublicComm
     is_author: false,
     can_edit: false,
     can_report: true,
+    can_remove: false,
     reply_to: null,
     deletion_kind: null,
     ...overrides,
