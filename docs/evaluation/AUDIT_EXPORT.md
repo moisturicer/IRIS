@@ -171,6 +171,14 @@ There is no backfill: answers saved before this have no row. The Record holds on
 
 It has no `record`. There is no backfill: accounts that existed before IR-789 start unanswered and write their first row at next sign-in.
 
+### Calls for papers (ADR-050)
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `CALL_DELETED` | A Call is deleted. Today only migration `opportunities/0002` (IR-760) writes it, once per Internal Call, Funding Window or Institutional Grant it deletes (decision 16), with no `user`. IR-763 will write one per deletion from the board, with the deleter as `user` | `reason`, a sentence (from 0002: "Internal Call is no longer a type of Call (ADR-050 decision 16)."), and `call`, a copy of every field the Call had, with `posted_by` as an account id |
+
+It has no `record`. A Call is not a paper.
+
 ### Withdrawal
 
 | Type | Written when | `metadata` |

@@ -1,4 +1,4 @@
-import type { MyReviewsRow, MyReviewsSort, MyReviewsTab, ReviewOutcome } from "@/types/reviews";
+import type { MyReviewsRow, MyReviewsSort, MyReviewsTab, OutcomeFilter, ReviewOutcome } from "@/types/reviews";
 
 /**
  * My Reviews' own small rules (IR-268): the URL contract and how a row is
@@ -15,7 +15,7 @@ export const TABS: { key: MyReviewsTab; label: string }[] = [
  * Done's filters (ADR-032 §9). `revision_requested` is not one: it is the
  * old pipeline's decline, shown on its row and listed under All only.
  */
-export const OUTCOME_FILTERS: { key: ReviewOutcome; label: string }[] = [
+export const OUTCOME_FILTERS: { key: OutcomeFilter; label: string }[] = [
   { key: "cleared",   label: "Cleared" },
   { key: "finding",   label: "Finding recorded" },
   { key: "accepted",  label: "Accepted" },
@@ -109,6 +109,26 @@ export function dueLabel(dueAt: string): string {
 export function overdueLabel(days: number | null): string {
   if (!days) return "Overdue";
   return days === 1 ? "1 working day overdue" : `${days} working days overdue`;
+}
+
+/**
+ * The line under the page title, from the viewer's seat (IR-1135): an office's
+ * pool is claimed or assigned, an Adviser's list is the papers they advise.
+ * `office` is the viewer's own office, or undefined for someone with none.
+ */
+export function pageLine(office: string | undefined): string {
+  return office
+    ? `Papers routed to ${office.toUpperCase()}. Claim one, or let your coordinator assign it.`
+    : "Papers where you are named as adviser.";
+}
+
+/** A row's kicker: who wrote it, from which unit, and which version is under review. */
+export function kickerParts(row: Pick<MyReviewsRow, "authors" | "unit" | "version">): string[] {
+  return [
+    row.authors.join(", "),
+    row.unit,
+    row.version != null ? `v${row.version}` : "",
+  ].filter(Boolean);
 }
 
 /** Who holds a row: the office, then you, a colleague, or nobody yet. */

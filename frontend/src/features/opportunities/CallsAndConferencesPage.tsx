@@ -228,7 +228,7 @@ export function CallsAndConferencesPage() {
     <div>
       <PageHeader
         title="Calls & Conferences"
-        description="Internal research calls, conference deadlines and funding windows, posted by institutional offices and advisers. Soonest deadline first."
+        description="Calls for papers from conferences, journals and other venues, posted by RDCO and advisers. Soonest deadline first."
         actions={postButton || undefined}
       />
 
@@ -246,7 +246,7 @@ export function CallsAndConferencesPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search calls"
-              aria-label="Search calls by title, office or tag"
+              aria-label="Search calls by title, location or Area"
               disabled={loadFailed}
               leading={<SearchGlyph className="h-3 w-3" />}
             />

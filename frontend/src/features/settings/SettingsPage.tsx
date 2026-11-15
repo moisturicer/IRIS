@@ -124,7 +124,7 @@ function Field({
 }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-label font-bold uppercase tracking-wider text-stone-500 mb-1.5">
+      <span className="block text-label font-bold text-stone-500 mb-1.5">
         {label}
       </span>
       {children}
@@ -311,7 +311,7 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
     <div className="space-y-4">
       <Panel title="Role & access" caption="What your role lets you do in IRIS.">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="px-3 py-1.5 rounded-control bg-brand text-white text-small font-bold uppercase tracking-wider">
+          <span className="px-3 py-1.5 rounded-control bg-brand text-white text-small font-bold">
             {user.role_name ?? "No role assigned"}
           </span>
           {user.is_superuser && (

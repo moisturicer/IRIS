@@ -32,6 +32,34 @@ interface OwnersAnswer {
   owners: { id: number; name: string; is_primary: boolean }[];
 }
 
+/** The Delete requests tabs' counts (IR-1138). */
+export interface DeleteRequestCounts {
+  pending:  number;
+  approved: number;
+  declined: number;
+  all:      number;
+}
+
+/** One row of an import check (IR-1138). Empty `problems` means the row would be imported. */
+export interface ImportCheckRow {
+  row:       number;
+  title:     string;
+  file_name: string;
+  problems:  string[];
+}
+
+/** What `import_excel` answers: a log and counts, or, for a check, every row. */
+export interface ImportAnswer {
+  log?:         string;
+  created?:     number;
+  skipped?:     number;
+  check?:       true;
+  rows?:        ImportCheckRow[];
+  ok?:          number;
+  errors?:      string[];
+  unused_pdfs?: string[];
+}
+
 export const recordsApi = {
   // Published records (paginated, filterable)
   list:           (params?: Record<string, unknown>) =>
@@ -313,10 +341,16 @@ export const recordsApi = {
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),
-  importExcel:    (file: File) => {
+  /**
+   * The sheet (.xls, .xlsx or UTF-8 .csv) and the PDFs its File Name column names.
+   * With `check`, nothing is written and the answer lists every row (IR-1138).
+   */
+  importExcel:    (file: File, opts: { pdfs?: File[]; check?: boolean } = {}) => {
     const fd = new FormData();
     fd.append("file", file);
-    return apiClient.post("/records/import_excel/", fd, { headers: { "Content-Type": "multipart/form-data" } });
+    for (const pdf of opts.pdfs ?? []) fd.append("pdfs", pdf);
+    if (opts.check) fd.append("check", "1");
+    return apiClient.post<ImportAnswer>("/records/import_excel/", fd, { headers: { "Content-Type": "multipart/form-data" } });
   },
   downloadTemplate: () => apiClient.get("/records/download_template/", { responseType: "blob" }),
 
@@ -352,6 +386,9 @@ export const recordsApi = {
       params,
       signal: options.signal,
     }),
+  /** How many requests are in each state, for the count beside each tab (IR-1138). */
+  deleteRequestCounts:     () =>
+    apiClient.get<DeleteRequestCounts>("/records/delete-requests/counts/"),
   approveDeleteRequest:    (id: number) =>
     apiClient.post(`/records/delete-requests/${id}/approve/`),
   declineDeleteRequest:    (id: number, note: string) =>

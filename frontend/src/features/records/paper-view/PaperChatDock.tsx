@@ -226,7 +226,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
       <div className="flex items-center gap-2">
         <AskIrisMark className="h-5 w-5 shrink-0 text-brand" />
         <h2 id={headingId} className="font-display text-xl font-semibold leading-none text-stone-900">Ask IRIS</h2>
-        <span className="rounded-control border border-stone-300 px-1 text-3xs font-semibold uppercase tracking-wider text-stone-600">AI</span>
+        <span className="rounded-control border border-stone-300 px-1 text-3xs font-semibold text-stone-600">AI</span>
         <span className="flex-1" />
         <button type="button" onClick={() => setRecentOpen(v => !v)} aria-expanded={recentOpen} disabled={recent.length === 0}
           aria-label={recent.length > 0 ? `Recent chats (${recent.length})` : "Recent chats"}

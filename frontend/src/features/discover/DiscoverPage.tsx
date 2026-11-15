@@ -678,7 +678,7 @@ export default function DiscoverPage() {
         </div>
         {hasAreas && (
           <button type="button" onClick={() => setInterestOpen(true)}
-            aria-label={interests.classifications.length || interests.psced.length ? "Edit Areas" : "Choose Areas"}
+            aria-label={interests.classifications.length || interests.psced.length ? "Edit areas" : "Choose areas"}
             className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-control border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
             <i className="fas fa-compass text-label" aria-hidden />
             <span>Areas</span>
@@ -931,9 +931,9 @@ export default function DiscoverPage() {
         />
       </div>
 
-      <Modal open={interestOpen} onClose={() => { setInterestOpen(false); setResetConfirming(false); }} title="Choose Areas for your recommendations" sheet
+      <Modal open={interestOpen} onClose={() => { setInterestOpen(false); setResetConfirming(false); }} title="Choose areas for your recommendations" sheet
         footer={<div className="flex items-center justify-between gap-3">
-          <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setInterestSelection({ classification_ids: [], psced_ids: [] })}>Clear Areas</button>
+          <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setInterestSelection({ classification_ids: [], psced_ids: [] })}>Clear areas</button>
           <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={interestSaving || interestLoading || Boolean(interestLoadFailed)} onClick={() => void saveInterests()}>{interestLoading ? "Loading…" : interestSaving ? "Saving…" : "Save Areas"}</button>
         </div>}>
         <div className="space-y-5 p-5">

@@ -1,6 +1,7 @@
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { opportunitiesApi } from "@/api/opportunities";
+import { recordsApi } from "@/api/records";
 import { Button } from "@/components/ui/Button";
 import { FieldError } from "@/components/ui/FieldError";
 import { FieldLabel } from "@/components/ui/FieldLabel";
@@ -10,6 +11,7 @@ import { Select } from "@/components/ui/Select";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { failureMessage } from "@/lib/readFailure";
 import type { Opportunity } from "@/types/opportunities";
+import type { Classification } from "@/types/records";
 
 import {
   EMPTY_DRAFT,
@@ -36,8 +38,8 @@ const STAY_OPEN = () => {};
 
 /** The fields in the order they appear, so the first error can take focus. */
 const FIELD_ORDER: DraftField[] = [
-  "opportunity_type", "title", "posting_office", "due_date", "audience",
-  "description", "funding_ceiling", "external_url", "tags", "source", "is_featured",
+  "opportunity_type", "title", "description", "due_date", "location", "areas",
+  "external_url", "start_date", "end_date", "registration_fee", "is_featured",
 ];
 
 /**
@@ -47,10 +49,9 @@ const FIELD_ORDER: DraftField[] = [
  * the board should still be there, unchanged, when it is done. The same form
  * edits, opened on the call's saved values.
  *
- * The browser checks only what it can be sure of (the four required fields,
- * a number for the ceiling). The server decides; whatever it rejects comes
- * back against its field. Whether this viewer may post or edit at all is the
- * server's `can_post` / `can_edit`, read by the page before offering this.
+ * The browser checks only that the required fields are filled (IR-760). The
+ * server decides; whatever it rejects comes back against its field. Whether
+ * this viewer may post or edit at all is the server's `can_post` / `can_edit`, read by the page before offering this.
  */
 export function OpportunityFormDialog({ opportunity, onClose, onSaved }: OpportunityFormDialogProps) {
   const editing = opportunity !== null;
@@ -68,8 +69,20 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
     desc:  useId(),
     descHint: useId(),
     descError: useId(),
-    source: useId(),
+    areasHint: useId(),
+    areasError: useId(),
   };
+
+  // The Areas a Call can carry: Classifications only (ADR-050 amendment 1).
+  const [areas, setAreas] = useState<Classification[] | null | "failed">(null);
+  useEffect(() => {
+    let cancelled = false;
+    // A wrong-shaped answer reads as a failure, never as a form stuck loading.
+    recordsApi.classifications()
+      .then(({ data }) => { if (!cancelled) setAreas(data?.results ?? []); })
+      .catch(() => { if (!cancelled) setAreas("failed"); });
+    return () => { cancelled = true; };
+  }, []);
 
   const set = <K extends DraftField>(field: K, value: OpportunityDraft[K]) => {
     setDraft((d) => ({ ...d, [field]: value }));
@@ -192,50 +205,13 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           error={errors.title}
         />
 
-        <div className="grid gap-section-sm sm:grid-cols-3">
-          <div className="sm:col-span-2">
-            <Input
-              id={`${ids.form}-office`}
-              name="posting_office"
-              label="Posting office"
-              required
-              placeholder="e.g. Research & Development Coordinating Office (RDCO)"
-              value={draft.posting_office}
-              maxLength={200}
-              onChange={(e) => set("posting_office", e.target.value)}
-              error={errors.posting_office}
-            />
-          </div>
-          <Input
-            id={`${ids.form}-due`}
-            name="due_date"
-            type="date"
-            label="Deadline"
-            required
-            value={draft.due_date}
-            onChange={(e) => set("due_date", e.target.value)}
-            error={errors.due_date}
-          />
-        </div>
-
-        <Input
-          id={`${ids.form}-audience`}
-          name="audience"
-          label="Who can apply"
-          optional
-          placeholder="e.g. Faculty researchers and graduate students"
-          value={draft.audience}
-          maxLength={300}
-          onChange={(e) => set("audience", e.target.value)}
-          error={errors.audience}
-        />
-
         <div className="flex flex-col gap-1">
-          <FieldLabel htmlFor={ids.desc} label="Description" optional />
+          <FieldLabel htmlFor={ids.desc} label="About" />
           <textarea
             id={ids.desc}
             name="description"
             rows={4}
+            aria-required="true"
             value={draft.description}
             onChange={(e) => set("description", e.target.value)}
             aria-invalid={errors.description ? true : undefined}
@@ -247,68 +223,118 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
             : <p id={ids.descHint} className="text-small text-stone-600">The board shows the first two lines.</p>}
         </div>
 
+        <div className="grid gap-section-sm sm:grid-cols-3">
+          <Input
+            id={`${ids.form}-due`}
+            name="due_date"
+            type="date"
+            label="Paper deadline"
+            required
+            value={draft.due_date}
+            onChange={(e) => set("due_date", e.target.value)}
+            error={errors.due_date}
+          />
+          <div className="sm:col-span-2">
+            <Input
+              id={`${ids.form}-location`}
+              name="location"
+              label="Location"
+              required
+              placeholder="e.g. Cebu City, Philippines, or Online"
+              value={draft.location}
+              maxLength={300}
+              onChange={(e) => set("location", e.target.value)}
+              error={errors.location}
+            />
+          </div>
+        </div>
+
+        <fieldset aria-describedby={errors.areas ? ids.areasError : ids.areasHint}>
+          <legend className={LABEL}>Areas</legend>
+          <p id={ids.areasHint} className="text-small text-stone-600 mb-1">Choose at least one.</p>
+          {areas === "failed" ? (
+            <p className={LOAD_ERROR}>
+              <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+              The Areas could not be loaded. Close this and try again.
+            </p>
+          ) : areas === null ? (
+            <p className="text-small text-stone-600">Loading Areas…</p>
+          ) : (
+            <div className="grid gap-x-section gap-y-1 sm:grid-cols-2">
+              {areas.map((area, i) => (
+                <label key={area.id} className="flex items-center gap-2 min-h-11 sm:min-h-0 text-small text-stone-700">
+                  <input
+                    type="checkbox"
+                    // The first box carries the field's name, so a missing
+                    // Area can take focus like any other field.
+                    name={i === 0 ? "areas" : undefined}
+                    checked={draft.areas.includes(area.id)}
+                    onChange={(e) => set(
+                      "areas",
+                      e.target.checked
+                        ? [...draft.areas, area.id]
+                        : draft.areas.filter((id) => id !== area.id),
+                    )}
+                    aria-invalid={errors.areas ? true : undefined}
+                    className={CHECKBOX}
+                  />
+                  {area.name}
+                </label>
+              ))}
+            </div>
+          )}
+          {errors.areas && <FieldError id={ids.areasError}>{errors.areas}</FieldError>}
+        </fieldset>
+
+        <Input
+          id={`${ids.form}-url`}
+          name="external_url"
+          type="url"
+          label="Link"
+          required
+          placeholder="https://"
+          value={draft.external_url}
+          maxLength={500}
+          onChange={(e) => set("external_url", e.target.value)}
+          error={errors.external_url}
+          hint="Where to read the full call and submit."
+        />
+
         <div className="grid gap-section-sm sm:grid-cols-2">
           <Input
-            id={`${ids.form}-ceiling`}
-            name="funding_ceiling"
-            inputMode="decimal"
-            label="Funding ceiling in pesos"
+            id={`${ids.form}-start`}
+            name="start_date"
+            type="date"
+            label="Start date"
             optional
-            placeholder="e.g. 150000"
-            value={draft.funding_ceiling}
-            onChange={(e) => set("funding_ceiling", e.target.value)}
-            error={errors.funding_ceiling}
-            hint="Leave blank when there is no funding."
+            value={draft.start_date}
+            onChange={(e) => set("start_date", e.target.value)}
+            error={errors.start_date}
           />
           <Input
-            id={`${ids.form}-url`}
-            name="external_url"
-            type="url"
-            label="Link"
+            id={`${ids.form}-end`}
+            name="end_date"
+            type="date"
+            label="End date"
             optional
-            placeholder="https://"
-            value={draft.external_url}
-            maxLength={500}
-            onChange={(e) => set("external_url", e.target.value)}
-            error={errors.external_url}
-            hint="Where to read the full call and apply."
+            value={draft.end_date}
+            onChange={(e) => set("end_date", e.target.value)}
+            error={errors.end_date}
+            hint="A journal or book chapter keeps no dates."
           />
         </div>
 
         <Input
-          id={`${ids.form}-tags`}
-          name="tags"
-          label="Tags"
+          id={`${ids.form}-fee`}
+          name="registration_fee"
+          label="Registration fee"
           optional
-          placeholder="e.g. Seed grant, AI and robotics"
-          value={draft.tags}
-          onChange={(e) => set("tags", e.target.value)}
-          error={errors.tags}
-          hint="Separate tags with commas."
+          placeholder="e.g. PHP 5,000; students PHP 3,000"
+          value={draft.registration_fee}
+          maxLength={200}
+          onChange={(e) => set("registration_fee", e.target.value)}
+          error={errors.registration_fee}
         />
-
-        <fieldset aria-describedby={errors.source ? `${ids.source}-error` : undefined}>
-          <legend className={LABEL}>Source</legend>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-section">
-            {([
-              ["internal", "Posted by an institutional office"],
-              ["external", "Reposted from an outside body"],
-            ] as const).map(([value, label]) => (
-              <label key={value} className="flex items-center gap-2 min-h-11 sm:min-h-0 text-small text-stone-700">
-                <input
-                  type="radio"
-                  name="source"
-                  value={value}
-                  checked={draft.source === value}
-                  onChange={() => set("source", value)}
-                  className={CHECKBOX}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-          {errors.source && <FieldError id={`${ids.source}-error`}>{errors.source}</FieldError>}
-        </fieldset>
 
         <label className="flex items-start gap-2 min-h-11 sm:min-h-0 text-small text-stone-700">
           <input

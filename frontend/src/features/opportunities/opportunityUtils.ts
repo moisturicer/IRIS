@@ -1,17 +1,14 @@
 import { TONES, type Tone } from "@/components/ui/statusTones";
-import type {
-  Opportunity,
-  OpportunityInput,
-  OpportunitySource,
-  OpportunityType,
-} from "@/types/opportunities";
+import type { Opportunity, OpportunityInput, OpportunityType } from "@/types/opportunities";
 
 /** Every type, in the order the board and the form list them, with its glyph. */
 export const OPPORTUNITY_TYPES: { id: OpportunityType; label: string; icon: string }[] = [
-  { id: "internal_call",       label: "Internal call",       icon: "fa-building-columns"    },
-  { id: "conference_deadline", label: "Conference deadline", icon: "fa-microphone-lines"    },
-  { id: "funding_window",      label: "Funding window",      icon: "fa-hand-holding-dollar" },
-  { id: "institutional_grant", label: "Institutional grant", icon: "fa-award"               },
+  { id: "conference",   label: "Conference",   icon: "fa-microphone-lines"      },
+  { id: "congress",     label: "Congress",     icon: "fa-people-group"          },
+  { id: "symposium",    label: "Symposium",    icon: "fa-comments"              },
+  { id: "workshop",     label: "Workshop",     icon: "fa-screwdriver-wrench"    },
+  { id: "journal",      label: "Journal",      icon: "fa-book-open"             },
+  { id: "book_chapter", label: "Book chapter", icon: "fa-book"                  },
 ];
 
 export function typeMeta(type: OpportunityType) {
@@ -61,14 +58,6 @@ export function countdown(o: Opportunity): { label: string; tone: Tone; classNam
   return { label, tone, className: TONES[tone] };
 }
 
-/** Peso ceiling, or null when there is none. */
-export function formatCeiling(value: string | null): string | null {
-  if (value === null || value === "") return null;
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return null;
-  return `₱${amount.toLocaleString("en-PH", { maximumFractionDigits: 0 })}`;
-}
-
 function parseDay(iso: string): Date | null {
   const d = new Date(`${iso}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : d;
@@ -95,7 +84,7 @@ export function dateParts(iso: string): { month: string; day: string; weekday: s
 export function matchesQuery(o: Opportunity, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [o.title, o.posting_office, o.audience, o.description, o.type_display, ...o.tags]
+  return [o.title, o.location, o.description, o.type_display, ...(o.area_names ?? [])]
     .some((field) => (field ?? "").toLowerCase().includes(q));
 }
 
@@ -116,49 +105,48 @@ export function byBoardOrder(a: Opportunity, b: Opportunity): number {
 
 // ---- The post / edit form ------------------------------------------------
 
-/** The form's own state: every field a string or a flag, as inputs hold them. */
+/** The form's own state: every field a string, a flag or the chosen Area ids. */
 export interface OpportunityDraft {
   opportunity_type: OpportunityType | "";
   title:            string;
-  posting_office:   string;
-  audience:         string;
   description:      string;
-  funding_ceiling:  string;
-  external_url:     string;
   due_date:         string;
+  location:         string;
+  areas:            number[];
+  external_url:     string;
+  start_date:       string;
+  end_date:         string;
+  registration_fee: string;
   is_featured:      boolean;
-  tags:             string;
-  source:           OpportunitySource;
 }
 
 export const EMPTY_DRAFT: OpportunityDraft = {
   opportunity_type: "",
   title:            "",
-  posting_office:   "",
-  audience:         "",
   description:      "",
-  funding_ceiling:  "",
-  external_url:     "",
   due_date:         "",
+  location:         "",
+  areas:            [],
+  external_url:     "",
+  start_date:       "",
+  end_date:         "",
+  registration_fee: "",
   is_featured:      false,
-  tags:             "",
-  source:           "internal",
 };
 
 export function draftFrom(o: Opportunity): OpportunityDraft {
   return {
     opportunity_type: o.opportunity_type,
     title:            o.title,
-    posting_office:   o.posting_office,
-    audience:         o.audience,
     description:      o.description,
-    // DRF sends "150000.00"; a person typed 150000.
-    funding_ceiling:  o.funding_ceiling === null ? "" : String(Number(o.funding_ceiling)),
-    external_url:     o.external_url,
     due_date:         o.due_date,
+    location:         o.location,
+    areas:            o.areas,
+    external_url:     o.external_url,
+    start_date:       o.start_date ?? "",
+    end_date:         o.end_date ?? "",
+    registration_fee: o.registration_fee,
     is_featured:      o.is_featured,
-    tags:             o.tags.join(", "),
-    source:           o.source,
   };
 }
 
@@ -166,38 +154,35 @@ export type DraftField = keyof OpportunityDraft;
 export type DraftErrors = Partial<Record<DraftField, string>>;
 
 /**
- * What the browser can say before the server does. The server still decides:
- * anything it rejects comes back through `serverErrors` against its field.
+ * What the browser can say before the server does: that a required field is
+ * empty. It checks no date (ADR-050 decision 5) and leaves the link's form to
+ * the server, whose rejection comes back through `serverErrors` on its field.
  */
 export function checkDraft(d: OpportunityDraft): DraftErrors {
   const errors: DraftErrors = {};
   if (!d.opportunity_type) errors.opportunity_type = "Choose what kind of call this is.";
   if (!d.title.trim()) errors.title = "Give the call a title.";
-  if (!d.posting_office.trim()) errors.posting_office = "Name the office or body posting it.";
-  if (!d.due_date) errors.due_date = "Set the deadline.";
-  if (d.funding_ceiling.trim()) {
-    const amount = Number(d.funding_ceiling.replace(/,/g, ""));
-    if (!Number.isFinite(amount) || amount < 0) {
-      errors.funding_ceiling = "Enter an amount in pesos, digits only, or leave it blank.";
-    }
-  }
+  if (!d.description.trim()) errors.description = "Say what the call is about.";
+  if (!d.due_date) errors.due_date = "Set the paper deadline.";
+  if (!d.location.trim()) errors.location = "Say where it takes place, or Online.";
+  if (d.areas.length === 0) errors.areas = "Choose at least one Area.";
+  if (!d.external_url.trim()) errors.external_url = "Give the link to the full call.";
   return errors;
 }
 
 export function inputFrom(d: OpportunityDraft): OpportunityInput {
-  const ceiling = d.funding_ceiling.replace(/,/g, "").trim();
   return {
     opportunity_type: d.opportunity_type as OpportunityType,
     title:            d.title.trim(),
-    posting_office:   d.posting_office.trim(),
-    audience:         d.audience.trim(),
     description:      d.description.trim(),
-    funding_ceiling:  ceiling === "" ? null : ceiling,
-    external_url:     d.external_url.trim(),
     due_date:         d.due_date,
+    location:         d.location.trim(),
+    areas:            d.areas,
+    external_url:     d.external_url.trim(),
+    start_date:       d.start_date || null,
+    end_date:         d.end_date || null,
+    registration_fee: d.registration_fee.trim(),
     is_featured:      d.is_featured,
-    tags:             d.tags.split(",").map((t) => t.trim()).filter(Boolean),
-    source:           d.source,
   };
 }
 

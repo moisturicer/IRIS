@@ -1,8 +1,8 @@
 import { apiClient } from "./client";
-import type { NoticeAnswer, NoticeAnswerPayload, CurrentNotice, NoticeImpact, NoticeVersion } from "@/types/notice";
+import type { NoticeDraft, NoticeAnswer, NoticeAnswerPayload, CurrentNotice, NoticeImpact, NoticeVersion } from "@/types/notice";
 
 export type {
-  DataNotice, NoticeAnswer, NoticeAnswerPayload, CurrentNotice, NoticeImpact, NoticeSection, NoticeVersion,
+  NoticeDraft, DataNotice, NoticeAnswer, NoticeAnswerPayload, CurrentNotice, NoticeImpact, NoticeSection, NoticeVersion,
 } from "@/types/notice";
 export { ACCEPTANCE_REQUIRED_CODE, STALE_NOTICE_CODE, isAcceptanceRequired, staleNoticeFrom } from "@/lib/noticeErrors";
 
@@ -28,6 +28,10 @@ export const noticeApi = {
   versions: (opts?: { signal?: AbortSignal }) =>
     apiClient.get<NoticeVersion[]>("/auth/notice/versions/", { signal: opts?.signal }),
   impact: () => apiClient.get<NoticeImpact>("/auth/notice/versions/impact/"),
+  /** RDCO's saved draft of the next version, or null (IR-1138). Never a version; nobody else reads it. */
+  draft: () => apiClient.get<NoticeDraft | null>("/auth/notice/draft/"),
+  saveDraft: (data: { based_on_version: number; text: string }) =>
+    apiClient.put<NoticeDraft>("/auth/notice/draft/", data),
   /** 409 `notice_stale`, carrying the current notice, when a newer version exists than `based_on_version`. */
   publish: (data: { based_on_version: number; text: string }) =>
     apiClient.post<NoticeVersion>("/auth/notice/versions/", data),

@@ -29,7 +29,7 @@ export function useUnreadNotificationsFetch() {
       .list(true)
       .then(({ data }) => {
         if (useAuthStore.getState().sessionEpoch !== sessionEpoch) return;
-        setItems(data.results);
+        setItems(data.results, data.count);
       })
       .catch(() => {
         /* The store was emptied when the last session ended, so a failed

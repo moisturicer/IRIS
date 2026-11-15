@@ -27,7 +27,7 @@ export default function AIHubPage() {
         >
           <i className="fa fa-search" aria-hidden />
           Semantic Search
-          <span className={`px-1.5 py-0.5 text-label font-bold rounded-full uppercase tracking-wider leading-none ${TONES.attention}`}>
+          <span className={`px-1.5 py-0.5 text-label font-bold rounded-full leading-none ${TONES.attention}`}>
             soon
           </span>
         </button>
@@ -42,7 +42,7 @@ export default function AIHubPage() {
         >
           <i className="fa fa-robot" aria-hidden />
           Ask a Question
-          <span className={`px-1.5 py-0.5 text-label font-bold rounded-full uppercase tracking-wider leading-none ${TONES.attention}`}>
+          <span className={`px-1.5 py-0.5 text-label font-bold rounded-full leading-none ${TONES.attention}`}>
             soon
           </span>
         </button>
@@ -54,7 +54,7 @@ export default function AIHubPage() {
           <div className="w-14 h-14 rounded-full bg-stone-50 border border-stone-200 flex items-center justify-center mb-5">
             <i className="fas fa-robot text-2xl text-stone-600" aria-hidden />
           </div>
-          <span className={`px-3 py-1 text-label font-bold rounded-full uppercase tracking-wider mb-4 ${TONES.attention}`}>
+          <span className={`px-3 py-1 text-label font-bold rounded-full mb-4 ${TONES.attention}`}>
             Coming Soon
           </span>
           <p className="text-body text-stone-600 leading-relaxed max-w-sm">
@@ -70,7 +70,7 @@ export default function AIHubPage() {
           <div className="w-14 h-14 rounded-full bg-stone-50 border border-stone-200 flex items-center justify-center mb-5">
             <i className="fas fa-search text-2xl text-stone-600" aria-hidden />
           </div>
-          <span className={`px-3 py-1 text-label font-bold rounded-full uppercase tracking-wider mb-4 ${TONES.attention}`}>
+          <span className={`px-3 py-1 text-label font-bold rounded-full mb-4 ${TONES.attention}`}>
             Coming Soon
           </span>
           <p className="text-body text-stone-600 leading-relaxed max-w-sm">

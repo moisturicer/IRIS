@@ -5,7 +5,7 @@ import { useAuthStore } from "./auth.store";
 interface NotificationsState {
   items:       Notification[];
   unreadCount: number;
-  setItems:    (items: Notification[]) => void;
+  setItems:    (items: Notification[], total?: number) => void;
   markRead:    (id: number)           => void;
   markAllRead: ()                     => void;
 }
@@ -14,8 +14,10 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
   items:       [],
   unreadCount: 0,
 
-  setItems: (items) =>
-    set({ items, unreadCount: items.length }),  // caller passes only unread items for the count
+  // The caller passes only unread items. `total` is the server's count of all
+  // unread, which exceeds `items.length` when the list is paged.
+  setItems: (items, total) =>
+    set({ items, unreadCount: Math.max(total ?? 0, items.length) }),
 
   markRead: (id) =>
     set((s) => ({

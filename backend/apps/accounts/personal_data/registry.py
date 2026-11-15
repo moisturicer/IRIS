@@ -108,6 +108,10 @@ EXCLUDED: dict[str, str] = {
         "everyone. The person appears only as its publisher. What a person answered to each "
         "version is exported as their consent history."
     ),
+    "accounts.NoticeDraft": (
+        "RDCO's unpublished draft of the next data notice: one text for the whole system, "
+        "removed when a version is published. The person appears only as who last saved it."
+    ),
     "accounts.SystemSetting": (
         "System configuration. The person appears only as its last editor, which is a fact "
         "about the setting rather than about them."

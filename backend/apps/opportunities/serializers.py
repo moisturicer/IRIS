@@ -1,5 +1,7 @@
+from django.core.validators import URLValidator
 from rest_framework import serializers
 
+from apps.records.models import Classification
 from core.permissions import IsOpportunityPoster
 
 from .models import Opportunity
@@ -16,13 +18,23 @@ class OpportunitySerializer(serializers.ModelSerializer):
     # this field, so the client never re-derives the poster rule and cannot
     # drift from it. Decided by the same class that guards update and destroy.
     can_edit         = serializers.SerializerMethodField()
+    # At least one Area, always a Classification (ADR-050 amendment 1).
+    areas            = serializers.PrimaryKeyRelatedField(
+        many=True, allow_empty=False, queryset=Classification.objects.all(),
+    )
+    area_names       = serializers.SerializerMethodField()
+    # The link opens in a reader's browser, so only a web address is accepted:
+    # URLField's default also allows ftp:// and ftps://.
+    external_url     = serializers.CharField(
+        max_length=500, validators=[URLValidator(schemes=["http", "https"])],
+    )
 
     class Meta:
         model  = Opportunity
         fields = [
-            "id", "opportunity_type", "type_display", "title", "posting_office",
-            "audience", "description", "funding_ceiling", "external_url",
-            "due_date", "is_featured", "tags", "source",
+            "id", "opportunity_type", "type_display", "title", "description",
+            "external_url", "due_date", "location", "areas", "area_names",
+            "start_date", "end_date", "registration_fee", "is_featured",
             "posted_by", "posted_by_name", "created_at", "updated_at",
             "days_left", "is_closed", "can_edit",
         ]
@@ -30,12 +42,38 @@ class OpportunitySerializer(serializers.ModelSerializer):
         # from the client -- otherwise a poster could attribute a call to
         # somebody else.
         read_only_fields = ["posted_by", "created_at", "updated_at"]
+        extra_kwargs = {
+            "description": {"required": True, "allow_blank": False},
+            "location":    {"required": True, "allow_blank": False},
+        }
+
+    # Required on every save, including a PATCH that leaves them out: a Call
+    # migrated from a Conference Deadline may lack them, and must carry them
+    # by its next save (ADR-050 decision 16).
+    REQUIRED_ON_SAVE = ("description", "location", "external_url")
+
+    def validate(self, attrs):
+        if self.instance is None:
+            return attrs
+        missing = {
+            name: ["This field is required."]
+            for name in self.REQUIRED_ON_SAVE
+            if name not in attrs and not getattr(self.instance, name)
+        }
+        if "areas" not in attrs and not self.instance.areas.exists():
+            missing["areas"] = ["This field is required."]
+        if missing:
+            raise serializers.ValidationError(missing)
+        return attrs
 
     def get_days_left(self, obj):
         return obj.days_left()
 
     def get_is_closed(self, obj):
         return obj.is_closed()
+
+    def get_area_names(self, obj):
+        return sorted(area.name for area in obj.areas.all())
 
     def get_can_edit(self, obj):
         request = self.context.get("request")
@@ -49,11 +87,4 @@ class OpportunitySerializer(serializers.ModelSerializer):
         )
 
     def get_posted_by_name(self, obj):
-        if not obj.posted_by:
-            return ""
-        return obj.posted_by.get_full_name() or obj.posted_by.email
-
-    def validate_tags(self, value):
-        if not isinstance(value, list) or not all(isinstance(t, str) for t in value):
-            raise serializers.ValidationError("Tags must be a list of strings.")
-        return [t.strip() for t in value if t.strip()]
+        return obj.poster_name()

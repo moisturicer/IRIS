@@ -22,7 +22,7 @@ function setup(props: Partial<React.ComponentProps<typeof LoginForm>> = {}) {
 }
 
 describe("LoginForm", () => {
-  it("offers an email field, a password field, Sign In and a way to recover a password", () => {
+  it("offers an email field, a password field, Sign in and a way to recover a password", () => {
     const { email, password, signIn } = setup();
 
     expect(email()).toHaveValue("");
@@ -122,7 +122,7 @@ describe("LoginForm", () => {
   });
 
   describe("the page's states", () => {
-    it("disables both fields and Sign In when the page says the account is locked", () => {
+    it("disables both fields and Sign in when the page says the account is locked", () => {
       const { email, password, signIn } = setup({ disabled: true });
 
       expect(email()).toBeDisabled();
@@ -154,14 +154,14 @@ describe("LoginForm", () => {
 
       await user.type(email(), "kay@cit.edu");
       await user.type(password(), "pw");
-      await user.click(screen.getByRole("button", { name: "Sign In" }));
+      await user.click(screen.getByRole("button", { name: "Sign in" }));
 
       const busy = await screen.findByRole("button", { name: /signing in/i });
       await user.click(busy);
       expect(onSubmit).toHaveBeenCalledTimes(1);
 
       finish();
-      expect(await screen.findByRole("button", { name: "Sign In" })).toBeEnabled();
+      expect(await screen.findByRole("button", { name: "Sign in" })).toBeEnabled();
     });
 
     it("hands its submit button to the page, which focuses it after an unlock", () => {

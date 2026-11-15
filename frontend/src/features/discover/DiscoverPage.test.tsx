@@ -301,7 +301,7 @@ describe("the phone toolbar (IR-1080)", () => {
     for (const name of ["For you", "Latest", "Trending"]) {
       expect(within(feed).getByRole("button", { name })).toBeInTheDocument();
     }
-    for (const name of [/^Choose Areas|^Edit Areas/, /^My feeds/, /^Filters/, "Publish"]) {
+    for (const name of [/^Choose areas|^Edit areas/, /^My feeds/, /^Filters/, "Publish"]) {
       expect(within(row).getByRole("button", { name })).toBeInTheDocument();
     }
     expect(phoneControls(row)).toHaveLength(7);
@@ -321,7 +321,7 @@ describe("the phone toolbar (IR-1080)", () => {
 
   it("shows Filters, Areas and Publish as visible text, with the count beside Filters", async () => {
     const row = await phoneToolbar();
-    for (const [name, text] of [[/^Choose Areas|^Edit Areas/, "Areas"], [/^Filters/, "Filters"], ["Publish", "Publish"]] as const) {
+    for (const [name, text] of [[/^Choose areas|^Edit areas/, "Areas"], [/^Filters/, "Filters"], ["Publish", "Publish"]] as const) {
       const button = within(row).getByRole("button", { name });
       expect(within(button).getByText(text).className).not.toMatch(/(^|\s)hidden(\s|$)/);
     }
@@ -666,7 +666,7 @@ describe("browsing", () => {
   it("saves optional classification and PSCED Areas, then opens For you", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
-    await userEvent.click(screen.getByRole("button", { name: "Choose Areas" }));
+    await userEvent.click(screen.getByRole("button", { name: "Choose areas" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(within(dialog).getByLabelText("Applied Research"));
     await userEvent.click(within(dialog).getByLabelText("Engineering"));
@@ -907,7 +907,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Save" }));
     await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
     const saved = browserLibrary();
-    await userEvent.click(await screen.findByRole("button", { name: "Edit Areas" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Edit areas" }));
     const dialog = await screen.findByRole("dialog");
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
@@ -921,7 +921,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     expect(await screen.findByText(/interests were reset/i)).toBeInTheDocument();
     expect(browserLibrary()).toBe(saved);
     expect(libraryApi.unsave).not.toHaveBeenCalled();
-    expect(await screen.findByRole("button", { name: "Choose Areas" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Choose areas" })).toBeInTheDocument();
   });
 
   it("tells the reader a reset leaves saved papers shaping For you (IR-575)", async () => {
@@ -929,7 +929,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
       data: { classifications: [{ id: 7, name: "Applied Research" }], psced: [] },
     } as unknown as Awaited<ReturnType<typeof recordsApi.interests>>);
     renderDiscover("/?feed=for_you");
-    await userEvent.click(await screen.findByRole("button", { name: "Edit Areas" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Edit areas" }));
     const dialog = await screen.findByRole("dialog");
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
@@ -941,7 +941,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     vi.mocked(recordsApi.resetInterests).mockRejectedValueOnce(new Error("offline"));
     renderDiscover("/?feed=for_you");
     await screen.findByRole("article", { name: publishedThesis.title });
-    await userEvent.click(screen.getByRole("button", { name: "Choose Areas" }));
+    await userEvent.click(screen.getByRole("button", { name: "Choose areas" }));
     const dialog = await screen.findByRole("dialog");
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));

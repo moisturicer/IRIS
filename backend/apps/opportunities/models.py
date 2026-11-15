@@ -1,6 +1,6 @@
 """
-Research opportunities with deadlines -- internal calls, conference deadlines,
-funding windows and institutional grants.
+Calls for papers -- conferences, congresses, symposia, workshops, journals and
+book chapters (ADR-050).
 
 Deliberately a separate app rather than a home inside apps.records (IR-121):
 an Opportunity shares no workflow, clearance or ownership semantics with a
@@ -32,50 +32,53 @@ class OpportunityQuerySet(models.QuerySet):
 
 
 class Opportunity(models.Model):
-    """A dated, outbound-linked call published by a CIT-U office."""
+    """A call for papers, posted in IRIS by RDCO or an Adviser (ADR-050)."""
 
     # How long a closed opportunity stays greyed out on the board before it
-    # drops off entirely.
+    # drops off entirely. IR-761 replaces this with the Over rule (decision 7).
     HIDE_AFTER_CLOSE = timedelta(days=30)
 
-    TYPE_INTERNAL_CALL       = "internal_call"
-    TYPE_CONFERENCE_DEADLINE = "conference_deadline"
-    TYPE_FUNDING_WINDOW      = "funding_window"
-    TYPE_INSTITUTIONAL_GRANT = "institutional_grant"
+    # ADR-050 decision 2. Grants, funding windows and internal CIT-U calls are
+    # off the board (decision 1); migration 0002 deleted them, each with a copy
+    # in a CALL_DELETED audit event (decision 16).
+    TYPE_CONFERENCE   = "conference"
+    TYPE_CONGRESS     = "congress"
+    TYPE_SYMPOSIUM    = "symposium"
+    TYPE_WORKSHOP     = "workshop"
+    TYPE_JOURNAL      = "journal"
+    TYPE_BOOK_CHAPTER = "book_chapter"
     TYPE_CHOICES = [
-        (TYPE_INTERNAL_CALL,       "Internal Call"),
-        (TYPE_CONFERENCE_DEADLINE, "Conference Deadline"),
-        (TYPE_FUNDING_WINDOW,      "Funding Window"),
-        (TYPE_INSTITUTIONAL_GRANT, "Institutional Grant"),
+        (TYPE_CONFERENCE,   "Conference"),
+        (TYPE_CONGRESS,     "Congress"),
+        (TYPE_SYMPOSIUM,    "Symposium"),
+        (TYPE_WORKSHOP,     "Workshop"),
+        (TYPE_JOURNAL,      "Journal"),
+        (TYPE_BOOK_CHAPTER, "Book Chapter"),
     ]
-
-    # `source` exists so an externally-found call (DOST, CHED) is attributed as
-    # external rather than looking like CIT-U published it. Nothing in IRIS
-    # scrapes anything -- a staff member types these in. See IR-121.
-    SOURCE_INTERNAL = "internal"
-    SOURCE_EXTERNAL = "external"
-    SOURCE_CHOICES = [
-        (SOURCE_INTERNAL, "Internal"),
-        (SOURCE_EXTERNAL, "External"),
-    ]
+    # A journal issue or a book has no event (decision 4), so a Call of these
+    # types stores no start or end date: `save` clears both.
+    TYPES_WITHOUT_EVENT = frozenset({TYPE_JOURNAL, TYPE_BOOK_CHAPTER})
 
     opportunity_type = models.CharField(max_length=32, choices=TYPE_CHOICES)
     title            = models.CharField(max_length=300)
-    posting_office   = models.CharField(max_length=200)
-    # Free text, exactly as the mockup has it ("Engineering, Computing & Allied
-    # Sciences Faculty"). Deliberately NOT structured: reliable audience
-    # targeting needs data this system does not have, and half-targeting is
-    # worse than none. It is display copy, not a routing key.
-    audience         = models.CharField(max_length=300, blank=True)
+    # "About" on screen.
     description      = models.TextField(blank=True)
-    # Only meaningful for grants and funding windows; a conference deadline has
-    # no ceiling, so null is a real value here rather than a missing one.
-    funding_ceiling  = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    # "Link" on screen.
     external_url     = models.URLField(max_length=500, blank=True)
+    # The paper deadline.
     due_date         = models.DateField()
+    # About, location, Areas and link are required by the serializer, not
+    # here: a Conference Deadline migrated by 0002 may lack them until it is
+    # next saved (decision 16).
+    location         = models.CharField(max_length=300, blank=True)
+    areas            = models.ManyToManyField(
+        "records.Classification", blank=True, related_name="calls",
+    )
+    start_date       = models.DateField(null=True, blank=True)
+    end_date         = models.DateField(null=True, blank=True)
+    # Free text: fees are often tiered or in another currency (decision 3).
+    registration_fee = models.CharField(max_length=200, blank=True)
     is_featured      = models.BooleanField(default=False)
-    tags             = models.JSONField(default=list, blank=True)
-    source           = models.CharField(max_length=16, choices=SOURCE_CHOICES, default=SOURCE_INTERNAL)
     posted_by        = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, null=True, blank=True,
@@ -93,6 +96,12 @@ class Opportunity(models.Model):
         verbose_name_plural = "opportunities"
         indexes = [models.Index(fields=["due_date"])]
 
+    def save(self, *args, **kwargs):
+        if self.opportunity_type in self.TYPES_WITHOUT_EVENT:
+            self.start_date = None
+            self.end_date = None
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.get_opportunity_type_display()}: {self.title[:60]}"
 
@@ -102,3 +111,9 @@ class Opportunity(models.Model):
 
     def is_closed(self, today=None):
         return self.days_left(today) < 0
+
+    def poster_name(self):
+        """Posted by: the poster's account name (decision 3), or "" once they are gone."""
+        if not self.posted_by:
+            return ""
+        return self.posted_by.get_full_name() or self.posted_by.email

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { accountsApi }   from "@/api/accounts";
 import { failureMessage } from "@/lib/readFailure";
 import { useUIStore }    from "@/store/ui.store";
+import { queueCountsChanged } from "@/lib/queueCounts";
 import { PageHeader }    from "@/components/layout/PageHeader";
 import { Button }        from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -43,6 +44,7 @@ export default function RoleRequestsPage() {
         type:    "success",
         message: `Role request ${target.action === "approve" ? "approved" : "declined"}.`,
       });
+      queueCountsChanged();
       load();
     } catch {
       addToast({ type: "error", message: "Action failed. Please try again." });
@@ -56,7 +58,7 @@ export default function RoleRequestsPage() {
     <div>
       <PageHeader
         title="Role Requests"
-        description="Review and approve pending role requests from new users."
+        description="People asking for a different role, such as office reviewer."
       />
 
       {loading ? (
@@ -71,18 +73,19 @@ export default function RoleRequestsPage() {
           action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
         />
       ) : requests.length === 0 ? (
-        <div className="bg-white rounded-card border border-stone-200 py-16 text-center">
-          <i className="fas fa-check-circle text-display text-stone-500 mb-3 block" aria-hidden />
-          <p className="text-body font-medium text-stone-700">All caught up!</p>
-          <p className="text-small text-stone-500 mt-1">No pending role requests.</p>
-        </div>
+        <EmptyState
+          framed
+          icon="fa-user-plus"
+          title="No role requests"
+          message="When someone asks for a new role from their Settings, the request appears here for you to approve or decline."
+        />
       ) : (
         <div className="relative bg-white rounded-card border border-stone-200 overflow-x-auto">
           <table className="w-full text-body">
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50">
                 <th className="text-left px-5 py-3 font-semibold text-stone-600">User</th>
-                <th className="text-left px-5 py-3 font-semibold text-stone-600">Requested Role</th>
+                <th className="text-left px-5 py-3 font-semibold text-stone-600">Requested role</th>
                 <th className="text-left px-5 py-3 font-semibold text-stone-600">Submitted</th>
                 <th className="text-left px-5 py-3 font-semibold text-stone-600">Status</th>
                 <th className="px-5 py-3" />

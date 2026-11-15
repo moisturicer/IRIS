@@ -421,6 +421,8 @@ RECORDS: dict[str, Entry | Shadowed] = {
 
     # -- delete requests: raised by DELETE /records/<id>/, decided by RDCO ---
     "delete-requests": Entry({"GET": _case(RDCO_ONLY)}),
+    # IR-1138: the count beside each tab.
+    "delete-requests-counts": Entry({"GET": _case(RDCO_ONLY)}),
     "delete-request-detail": Entry({"GET": _case(RDCO_ONLY, kwargs={"pk": Ref("delete_request")})}),
     "delete-request-approve": Entry({
         "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("delete_request")}, data={}),
@@ -434,6 +436,8 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "psced": Entry({"GET": _case(SIGNED_IN)}),
     "record-types": Entry({"GET": _case(SIGNED_IN)}),
     "dashboard-stats": Entry({"GET": _case(SIGNED_IN)}),
+    # IR-1138: the sidebar's counts for RDCO's three queues.
+    "dashboard-queue-counts": Entry({"GET": _case(RDCO_ONLY)}),
 }
 
 
@@ -595,6 +599,12 @@ ACCOUNTS = {
         "POST": _case(RDCO_ONLY, data={}),
     }),
     "notice-impact": Entry({"GET": _case(RDCO_ONLY)}),
+    # IR-1138: RDCO's saved draft. A PUT body is checked after the role gate.
+    "notice-draft": Entry({
+        "GET": _case(RDCO_ONLY),
+        "PUT": _case(RDCO_ONLY, data={}),
+        "DELETE": _case(RDCO_ONLY),
+    }),
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),

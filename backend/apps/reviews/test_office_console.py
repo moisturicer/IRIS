@@ -17,7 +17,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.records.models import Record, RecordOwner, RecordType
+from apps.records.models import Author, Record, RecordOwner, RecordType
 from apps.reviews.models import RecordAssignment, ReviewerSeat
 from core.enums import (
     AssignmentState,
@@ -167,7 +167,59 @@ class OfficeConsoleTests(APITestCase):
             self.assignment(self.record(f"Pool {n}"), due_in_days=2)
         self.assertEqual(count(), baseline)
 
+    # -- what each row says, in the server's words ------------------------------
+
+    def test_each_row_carries_authors_version_status_and_the_actions_offered(self):
+        late_record = self.record("Late thesis")
+        Author.objects.create(record=late_record, name="Ada Lovelace")
+        Author.objects.create(record=late_record, name="Alan Turing")
+        late = self.assignment(late_record, due_in_days=-3)
+        self.seat(late, self.maria, SeatState.IN_REVIEW)
+        self.assignment(self.record("Pool thesis"), due_in_days=5)
+        soon = self.assignment(self.record("Soon thesis"), due_in_days=2)
+        self.seat(soon, self.juan)
+        self.assignment(self.record("Undated pool"))
+
+        rows = {r["title"]: r for r in self.get(self.coordinator, office="itso").data["rows"]}
+
+        self.assertEqual(rows["Late thesis"]["authors_line"], "Ada Lovelace, Alan Turing")
+        self.assertEqual(rows["Late thesis"]["status"]["kind"], "overdue")
+        self.assertRegex(rows["Late thesis"]["status"]["text"], r"^Overdue by [2-4] days$")
+        self.assertEqual(rows["Late thesis"]["actions"], ["reassign", "extend"])
+        self.assertEqual(rows["Pool thesis"]["status"], {"kind": "unassigned", "text": "Unassigned"})
+        self.assertEqual(rows["Pool thesis"]["actions"], ["assign", "extend"])
+        self.assertEqual(rows["Soon thesis"]["status"]["kind"], "due")
+        self.assertRegex(rows["Soon thesis"]["status"]["text"], r"^Due (in [1-3] days|today)$")
+        # No turnaround: nothing to extend, and nothing to word as a deadline.
+        self.assertEqual(rows["Undated pool"]["actions"], ["assign"])
+
     # -- who may read it -------------------------------------------------------
+
+    def test_a_coordinator_of_each_office_reaches_its_console(self):
+        for office, role in (
+            (Party.ITSO, RoleName.ITSO), (Party.IERC, RoleName.IERC),
+            (Party.KTTO, RoleName.KTTO), (Party.RDCO, RoleName.RDCO),
+        ):
+            user = make_user(f"coord-{office}@cit.edu", role)
+            user.is_office_coordinator = True
+            user.save(update_fields=["is_office_coordinator"])
+            with self.subTest(office=str(office)):
+                response = self.get(user)
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                self.assertEqual(response.data["office"], str(office))
+
+    def test_a_member_of_any_office_without_the_flag_is_refused(self):
+        for role in (RoleName.ITSO, RoleName.IERC, RoleName.KTTO, RoleName.RDCO, RoleName.ADVISER):
+            user = make_user(f"member-{role}@cit.edu", role)
+            with self.subTest(role=str(role)):
+                self.assertEqual(self.get(user).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_the_flag_does_nothing_for_a_user_with_no_office(self):
+        user = make_user("flagged-student@cit.edu", RoleName.STUDENT)
+        user.is_office_coordinator = True
+        user.save(update_fields=["is_office_coordinator"])
+        self.assertEqual(self.get(user).status_code, status.HTTP_403_FORBIDDEN)
+
 
     def test_only_a_coordinator_of_that_office_may_read_it(self):
         self.assignment(self.record("Unclaimed"))

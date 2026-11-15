@@ -260,6 +260,29 @@ class DataNotice(models.Model):
         return cls.objects.order_by("-number").first()
 
 
+class NoticeDraft(models.Model):
+    """
+    RDCO's unpublished next version of the data notice (IR-1138).
+
+    There is one notice for the whole system, so there is one draft: a row with
+    `pk=1`, replaced on every save. It is only a paste kept on the server so it
+    survives a closed tab or another device. It is never shown to anyone but
+    RDCO, never counted in the impact and never answered; publishing a version
+    removes it. `based_on_version` is the version the text started from, so
+    the page can say when a newer one has been published since.
+    """
+
+    text             = models.TextField(blank=True, default="")
+    based_on_version = models.PositiveIntegerField()
+    updated_by       = models.ForeignKey(
+        "accounts.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+    updated_at       = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Draft of the data notice, from v{self.based_on_version}"
+
+
 class NoticeAnswer(models.Model):
     """
     One answer to one notice version (ADR-054 decision 3). Append-only.
