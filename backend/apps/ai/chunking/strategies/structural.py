@@ -28,7 +28,9 @@ description, only when ``index_formulas`` is on. With ``figure_passages``
 embeds its caption and description and shows only the caption.
 """
 
-from dataclasses import dataclass
+import hashlib
+import json
+from dataclasses import dataclass, replace
 
 from ..assembly import (
     Draft,
@@ -46,6 +48,7 @@ from ..document import (
     DocumentElement,
     NormalizedDocument,
 )
+from ..hashing import chunkset_hash
 from ..outline import HeadingStack, bounded_trail
 from ..packing import JOIN, Piece, assembled_fits, pack_pieces, reader_form
 from ..regions import regions_for
@@ -77,14 +80,26 @@ class StructuralCascadeChunker:
 
         def fits(draft: Draft) -> bool:
             # A Figure passage is never folded into (IR-1054).
-            return "image" not in draft.element_kinds and _fits(
+            return draft.element_kinds != {"image"} and _fits(
                 draft.body, body_budget(draft.trail, options))
 
         # Across sections, so it cannot live in _chunk_section (IR-241).
         drafts = fold_heading_only(drafts, options, fits, _JOINERS)
         return finalize(
-            drafts, strategy_id=STRATEGY_ID, options=options, page_sizes=document.page_sizes
+            drafts, strategy_id=STRATEGY_ID, options=options, page_sizes=document.page_sizes,
+            content_hash=lambda chunks: _set_hash(chunks, options),
         )
+
+
+def _set_hash(chunks, options: ChunkingOptions) -> str:
+    """The set hash, covering shown text too once a set carries Figure passages
+    or transcribed formulas, so a change only readers see is still saved.
+    Every other set keeps the semantic hash, which ignores boxes and pages."""
+    semantic = chunkset_hash(chunks)
+    if not options.figure_passages and all(c.keyword_text is None for c in chunks):
+        return semantic
+    payload = {"semantic": semantic, "shown": [[c.content, c.keyword_text] for c in chunks]}
+    return hashlib.sha256(json.dumps(payload, ensure_ascii=False).encode()).hexdigest()
 
 
 def _fits(text: str, max_tokens: int) -> bool:
@@ -136,13 +151,15 @@ def _chunk_section(section: _Section, options: ChunkingOptions) -> list[Draft]:
     flow = section.elements
     figures: list[Draft] = []
     if options.figure_passages:
-        flow = tuple(e for e in section.elements if e.kind != "image")
-        figures = [_figure_draft(e, section) for e in section.elements if _citable_figure(e)]
+        flow = tuple(e for e in section.elements if e.kind != "image" or _formula_crop(e))
+        figures = [d for e in section.elements if _citable_figure(e)
+                   for d in _figure_drafts(e, section, options)]
 
     def text_of(element: DocumentElement) -> str:
         return _embedded(element, options)
 
-    elements = [e for e in flow if e.text.split()]
+    # An untranscribed formula stays in its paragraph as its crop: its box, never its text.
+    elements = [e for e in flow if e.text.split() or _formula_crop(e)]
     if not elements:
         return figures
 
@@ -163,7 +180,13 @@ def _transcribed(element: DocumentElement) -> bool:
     return element.kind == FORMULA and element.source_label == "Formula"
 
 
+def _formula_crop(element: DocumentElement) -> bool:
+    return element.kind == "image" and element.source_label == "Formula"
+
+
 def _embedded(element: DocumentElement, options: ChunkingOptions) -> str:
+    if _formula_crop(element):
+        return ""
     if not _transcribed(element):
         return element.text
     if not options.index_formulas:
@@ -172,6 +195,8 @@ def _embedded(element: DocumentElement, options: ChunkingOptions) -> str:
 
 
 def _shown(text: str, element: DocumentElement) -> str:
+    if _formula_crop(element):
+        return ""
     if _transcribed(element):
         return f"$$\n{element.text.strip()}\n$$"
     return reader_form(text, element)
@@ -181,6 +206,15 @@ def _citable_figure(element: DocumentElement) -> bool:
     # An untranscribed formula crop is an image too; it is never a Figure.
     return (element.kind == "image" and element.source_label != "Formula"
             and bool(element.text.strip() or element.description.strip()))
+
+
+def _figure_drafts(element: DocumentElement, section: _Section, options: ChunkingOptions) -> list[Draft]:
+    """A Figure kept whole up to the safety ceiling, split past it."""
+    draft = _figure_draft(element, section)
+    ceiling = body_budget(section.trail, options, options.max_tokens)
+    if _fits(draft.body, ceiling):
+        return [draft]
+    return [replace(draft, body=piece) for piece in _hard_split_text(draft.body, ceiling)]
 
 
 def _figure_draft(element: DocumentElement, section: _Section) -> Draft:
@@ -237,7 +271,7 @@ def _window_to_draft(window: list[Piece], section: _Section, options: ChunkingOp
     pages = [e.page for e in elements if e.page is not None]
     return Draft(
         body=" ".join(text for text, _ in window if text),
-        content=JOIN.join(_shown(text, element) for text, element in window).strip(),
+        content=JOIN.join(s for s in (_shown(t, e) for t, e in window) if s).strip(),
         keyword=_keyword(window, options),
         trail=section.trail,
         section_key=section.key,

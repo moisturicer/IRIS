@@ -208,6 +208,7 @@ def test_describing_re_embeds_only_the_figure_chunks():
     second = chunk(record, force=True)
 
     assert first["to_embed"] == first["chunk_count"]
-    assert second["chunk_count"] == first["chunk_count"]
+    # An uncaptioned Figure has no passage until it is described (IR-1054).
+    assert second["chunk_count"] == first["chunk_count"] + 1
     assert second["to_embed"] == 2
-    assert second["reused"] == first["chunk_count"] - 2
+    assert second["reused"] == first["chunk_count"] - 1

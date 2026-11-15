@@ -848,8 +848,9 @@ AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=
 
 # Figures as passages of their own in the structural strategy (IR-1054): each
 # captioned or described Figure leaves the text flow and is citable alone.
-# Read at chunking, so moving it needs a re-chunk. Off until measured.
-AI_CHUNK_FIGURE_PASSAGES = config("AI_CHUNK_FIGURE_PASSAGES", default=False, cast=bool)
+# Read at chunking, so moving it needs a re-chunk. On since measured
+# (docs/evaluation/runs/2026-11-15-ir1054-hybrid/, ADR-067 IR-1054 amendment).
+AI_CHUNK_FIGURE_PASSAGES = config("AI_CHUNK_FIGURE_PASSAGES", default=True, cast=bool)
 
 # ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
 # Modes in apps/ai/retrieval/reranker_input.py. fallback since IR-1125 (ADR-033).

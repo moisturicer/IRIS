@@ -79,7 +79,7 @@ def test_an_untranscribed_formula_crop_is_never_a_figure_passage():
     crop = DocumentElement(kind="image", text="", description="", page=2, source_label="Formula",
                            figure="eq-9", bboxes=(BOX,))
     chunks = chunk(build(*paragraphs(), crop), figure_passages=True).chunks
-    assert all("image" not in c.element_kinds for c in chunks)
+    assert all(c.element_kinds != frozenset({"image"}) for c in chunks)
 
 
 def test_off_a_figure_stays_in_the_text_flow_as_today():
@@ -102,3 +102,26 @@ def test_a_transcribed_formula_is_shown_but_not_embedded_when_not_indexed():
     assert "$$\nE = mc^2\n$$" in passage.content
     assert "mc^2" not in passage.text and "Energy" not in passage.text
     assert "mc^2" not in passage.keyword_text
+
+
+def test_a_change_only_readers_see_changes_the_set_hash():
+    # Index off: the LaTeX is shown, not embedded, so only the set hash can see a new transcription.
+    first = chunk(build(*paragraphs(), formula("E = mc^2")))
+    second = chunk(build(*paragraphs(), formula("E = mc^{2}")))
+    assert first.chunks[0].text == second.chunks[0].text
+    assert first.content_hash != second.content_hash
+
+
+def test_a_set_with_no_figures_or_transcriptions_keeps_the_semantic_hash():
+    from apps.ai.chunking.hashing import chunkset_hash
+
+    result = chunk(build(*paragraphs()))
+    assert result.content_hash == chunkset_hash(result.chunks)
+
+
+def test_an_untranscribed_formula_stays_in_its_paragraph_as_its_box():
+    crop = DocumentElement(kind="image", text="", page=2, source_label="Formula", figure="eq-9", bboxes=(BOX,))
+    for passages in (False, True):
+        (passage,) = chunk(build(*paragraphs(), crop), figure_passages=passages).chunks
+        assert BOX in passage.bboxes
+        assert passage.content == "3 Method The short paragraph before."

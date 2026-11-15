@@ -30,6 +30,7 @@ from apps.ai.chunking import ChunkingOptions, ChunkSet, chunk_text_hash
 from apps.ai.chunking.hashing import chunkset_hash
 from apps.ai.chunking.outline import PATH_SEPARATOR, TRAIL_JOIN, embedded_text
 from apps.ai.chunking.registry import registered_strategies
+import apps.ai.evaluation.fixed_window  # noqa: F401,E402  (registers the baseline, IR-1054)
 from apps.ai.chunking.tokens import TOKENIZER_ID, count_tokens
 from apps.ai.providers import batching
 
