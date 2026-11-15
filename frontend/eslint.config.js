@@ -18,6 +18,9 @@ export default [
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/**/*.test.{ts,tsx}', 'src/test/**'],
     rules: {
+      // IR-1028: confirm and failure go through ConfirmDialog and the toast
+      // store, which can be themed, focus-managed and tested. Tests are exempt.
+      'no-alert': 'error',
       // IR-207: inspect literals and template segments, including conditional
       // classes and hover/responsive variants. Borders and rings remain legal.
       'no-restricted-syntax': ['error',
