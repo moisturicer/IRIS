@@ -259,8 +259,8 @@ SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30
 # defaults, set here so a change to them is a visible decision.
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
-# Browsers ignore frame-ancestors in a report-only CSP, so this is what denies
-# framing until the CSP is enforced.
+# frame-ancestors denies framing in the enforced CSP; this covers browsers that
+# predate it.
 X_FRAME_OPTIONS = "DENY"
 
 # Django renders no page but the admin, which loads only its own static files.
@@ -277,10 +277,11 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "form-action 'self'",
     "frame-ancestors 'none'",
 ])
-# Report-only until the manual walk-through in docs/testing/traceability/
-# (IR-663) shows no violation. Enforcing is a reviewed change to this line,
-# and to frontend/security-headers.conf, never an environment variable.
-CONTENT_SECURITY_POLICY_REPORT_ONLY = True
+# Enforced since IR-823, after the walk-through (e2e/specs/08-csp-walkthrough.spec.ts)
+# found no violation on the app or the Django admin. Changing it is a reviewed
+# change to this line and to frontend/security-headers.conf, never an
+# environment variable. development.py keeps it report-only.
+CONTENT_SECURITY_POLICY_REPORT_ONLY = False
 
 # ---- CORS ---------------------------------------------------------------
 

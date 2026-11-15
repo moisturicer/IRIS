@@ -1,3 +1,5 @@
+// Before anything that validates with zod (IR-823).
+import "./lib/zodConfig";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

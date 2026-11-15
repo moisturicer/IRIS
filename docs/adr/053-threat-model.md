@@ -132,3 +132,6 @@ Decided by Ashlee Sean, at Jive Tyler Revalde's suggestion: the sign-in lockout 
 
 IR-781 built ADR-051's System Admin role, so it gets its own row under Actors. Nothing else changed.
 
+## Amendment — 2026-11-15 (IR-823): the CSP is enforced
+
+The script-injection row's gap is closed in production. nginx and Django now send `Content-Security-Policy`, not `-Report-Only`, after a recorded walk-through of every main screen, as every role, and the Django admin, found no violation (`e2e/specs/08-csp-walkthrough.spec.ts`). One fix came out of the walk-through: zod's `new Function` probe now runs `jitless`, so no page evaluates strings as code. Development still only reports. Awaiting acceptance by a named person, like the other amendments.
