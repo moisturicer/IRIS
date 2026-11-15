@@ -13,8 +13,6 @@
  * each timestamp in the browser's time zone (IR-1137).
  */
 import { useEffect, useMemo, useState } from "react";
-import { differenceInCalendarDays, formatDistanceToNowStrict, parseISO } from "date-fns";
-
 import { notificationsApi } from "@/api/notifications";
 import { failureMessage } from "@/lib/readFailure";
 import { useNotificationsStore } from "@/store/notifications.store";
@@ -23,31 +21,14 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
-import { notificationTypeLabel } from "./notificationLabels";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
-import { isUnread, UnreadDot, UnreadWord } from "./unread";
+import { GROUP_BAND, groupByDay, isUnread, ResolvedPill, UnreadDot, UnreadWord, when } from "./unread";
 
 const FAILED_LEAD = "Couldn't update your notifications.";
 
 type Filter = "all" | "unread";
-
-/** The day a notification belongs to, in plain words, newest group first. */
-function dayGroup(createdAt: string, now: Date): string {
-  const days = differenceInCalendarDays(now, parseISO(createdAt));
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  return formatDate(createdAt);
-}
-
-/** "3 hours ago" for today, otherwise the date. */
-function when(createdAt: string, now: Date): string {
-  const date = parseISO(createdAt);
-  return differenceInCalendarDays(now, date) <= 0
-    ? formatDistanceToNowStrict(date, { addSuffix: true })
-    : formatDate(createdAt);
-}
 
 export default function NotificationsPage() {
   const { markRead, markAllRead } = useNotificationsStore();
@@ -115,12 +96,7 @@ export default function NotificationsPage() {
   const groups = useMemo(() => {
     const now = new Date();
     const shown = filter === "unread" ? notifications.filter(isUnread) : notifications;
-    const byDay = new Map<string, Notification[]>();
-    for (const n of shown) {
-      const key = dayGroup(n.created_at, now);
-      byDay.set(key, [...(byDay.get(key) ?? []), n]);
-    }
-    return [...byDay.entries()].map(([label, items]) => ({ label, items, now }));
+    return groupByDay(shown, now).map((g) => ({ ...g, now }));
   }, [notifications, filter]);
 
   const filterButton = (value: Filter, label: string) => (
@@ -198,30 +174,26 @@ export default function NotificationsPage() {
             action={<Button variant="outline" size="sm" onClick={() => setFilter("all")}>Show all</Button>}
           />
         ) : (
-          groups.map(({ label, items, now }, i) => (
-            <section key={label} aria-labelledby={`notif-group-${i}`}>
-              <h2
-                id={`notif-group-${i}`}
-                className={cn(
-                  "px-5 py-2 bg-stone-100 text-small font-semibold text-stone-600 border-stone-200",
-                  i > 0 && "border-t",
-                )}
-              >
-                {label}
-              </h2>
-              <ul className="divide-y divide-stone-200 border-t border-stone-200">
-                {items.map((n) => (
-                  <NotificationRow
-                    key={n.id}
-                    n={n}
-                    time={when(n.created_at, now)}
-                    onOpen={() => handleOpen(n)}
-                    onMarkRead={() => handleMarkRead(n.id)}
-                  />
-                ))}
-              </ul>
-            </section>
-          ))
+          <div className="pb-1.5">
+            {groups.map(({ label, items, now }, i) => (
+              <section key={label} aria-labelledby={`notif-group-${i}`}>
+                <h2 id={`notif-group-${i}`} className={cn(GROUP_BAND, "mt-1.5")}>
+                  {label}
+                </h2>
+                <ul className="divide-y divide-stone-200">
+                  {items.map((n) => (
+                    <NotificationRow
+                      key={n.id}
+                      n={n}
+                      time={when(n.created_at, now)}
+                      onOpen={() => handleOpen(n)}
+                      onMarkRead={() => handleMarkRead(n.id)}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -254,27 +226,16 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
           <UnreadWord unread={unread} />
           {n.message}
         </span>
-        {resolved && (
-          // The server's own words, never worked out here (ADR-069): it says what
-          // happened and when, so nothing on the row still asks the reader to act.
-          <span className="mt-1 flex items-center gap-1.5 text-small font-medium text-stone-700">
-            <i className="fas fa-check text-stone-500" aria-hidden />
-            {n.resolved_label}
-          </span>
-        )}
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 text-small text-stone-500">
+        <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-stone-500">
           <time dateTime={n.created_at}>{time}</time>
-          {n.notif_type_name && (
-            <>
-              <span aria-hidden>·</span>
-              <span>{notificationTypeLabel(n.notif_type_name)}</span>
-            </>
-          )}
+          {/* The server's own words, never worked out here (ADR-069). */}
+          {resolved && <ResolvedPill label={n.resolved_label} />}
         </span>
       </div>
 
       <div className="flex items-center gap-1 shrink-0 self-center max-sm:ml-5">
-        {unread && (
+        {/* A notification with no record has no Open button; this is its way to be read. */}
+        {unread && n.record == null && (
           <button
             type="button"
             onClick={onMarkRead}

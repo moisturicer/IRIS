@@ -30,30 +30,38 @@ export default function HelpPage() {
     <div>
       <PageHeader title="Help" description="How to find, publish and review research in IRIS." />
 
-      <nav aria-label="Help contents" className="mb-section-lg rounded-card border border-stone-200 bg-surface p-card">
-        <h2 className="text-label font-semibold text-stone-500">Contents</h2>
-        <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-          {sections.map((s) => (
-            <li key={s.id}>
-              <a href={`#${s.id}`} className={cn("rounded-control text-small font-medium text-brand hover:underline", FOCUS_RING)}>
-                {s.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <div className="lg:grid lg:grid-cols-[13.75rem_minmax(0,68ch)] lg:gap-10">
+        <nav aria-label="Help contents" className="mb-section-lg lg:sticky lg:top-6 lg:mb-0 lg:self-start">
+          <h2 className="px-3 text-label font-semibold text-stone-500">On this page</h2>
+          <ul className="mt-1 flex flex-wrap gap-x-1 lg:grid lg:gap-0.5">
+            {sections.map((s) => (
+              <li key={s.id}>
+                <a
+                  href={`#${s.id}`}
+                  className={cn(
+                    "block rounded-control px-3 py-2 text-body text-stone-700 hover:bg-stone-100 hover:text-brand",
+                    FOCUS_RING,
+                  )}
+                >
+                  {s.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-      <div className="space-y-section-lg">
-        {sections.map((s) => (
-          <section key={s.id} id={s.id} aria-labelledby={`${s.id}-title`} className="scroll-mt-6">
-            <h2 id={`${s.id}-title`} className="font-display text-title font-semibold text-stone-900">
-              {s.title}
-            </h2>
-            <div className="mt-2 max-w-prose space-y-3 text-body text-stone-700 [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5">
-              {s.body}
-            </div>
-          </section>
-        ))}
+        <div>
+          {sections.map((s) => (
+            <section key={s.id} id={s.id} aria-labelledby={`${s.id}-title`} className="scroll-mt-6 pb-section-lg">
+              <h2 id={`${s.id}-title`} className="mb-3 font-display text-section font-semibold text-stone-900">
+                {s.title}
+              </h2>
+              <div className="text-body leading-[1.75] text-stone-700 [&_li]:mt-1 [&_li]:marker:text-brand [&_p+p]:mt-4 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5">
+                {s.body}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );

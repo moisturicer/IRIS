@@ -148,7 +148,8 @@ describe("the frame sign in opens in", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     expect(screen.getByText("Sign in")).toBeInTheDocument();
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    const tab = screen.getAllByText("Sign in").find((el) => el.tagName === "SPAN" && el.className.includes("entry-label"));
+    expect(tab).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
   });
 
