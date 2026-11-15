@@ -35,14 +35,17 @@ class ApiResponseHeadersMiddleware(MiddlewareMixin):
     """
     Keep API responses out of browser caches and out of browser tabs (IR-821).
 
-    Every response under `/api/` gets `Cache-Control: no-store` (ASVS 8.2.1),
+    Every response Django serves under `/api/` gets `Cache-Control: no-store`
+    (ASVS 8.2.1),
     so a record, a review or a person's details is never left in a shared
     computer's cache. Public endpoints get it too: one rule is easier to keep
     than a list of what is safe to cache, and the app's own data layer does the
     caching it needs in memory.
 
     JSON responses also get `Content-Disposition: attachment; filename="api.json"`
-    (ASVS 14.4.2, decided by Ashlee Sean on 2026-11-15). A browser then never
+    (ASVS 14.4.2; the decision is recorded in docs/testing/SECURITY_CHECKLIST.md).
+    The AI runtime's replies under `/api/v1/ai/runtime/` never pass through
+    Django: nginx sends them `no-store` (runtime-edge.conf), not this filename. A browser then never
     renders an API response as a page, even if a future content type would let
     it. The app's own fetch calls ignore the header; an API address opened
     directly in a tab downloads instead of displaying.
