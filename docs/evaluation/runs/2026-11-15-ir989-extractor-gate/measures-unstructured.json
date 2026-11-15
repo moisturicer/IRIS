@@ -1,0 +1,274 @@
+{
+ "papers": {
+  "Accelerating massive ensembles of ordinary differential equations-with-annotations": {
+   "extractor": "unstructured",
+   "extractor_version": "general/v0:hi_res",
+   "extractor_options": {
+    "call": {
+     "mode": "synchronous",
+     "attempts": 2,
+     "attempts_made": 1,
+     "attempt_timeout_seconds": 290.0
+    },
+    "strategy": "hi_res",
+    "coordinates": "true",
+    "include_page_breaks": "true",
+    "extract_image_block_types": "[\"Image\", \"Table\"]",
+    "pdf_infer_table_structure": "true"
+   },
+   "content_hash": "c8316247835f782cac5f7c4feedf30681684c5bd11c2074c5c6cb3eb80fd5e38",
+   "pages_billed": 17,
+   "credits": null,
+   "figures_stored": 15,
+   "figures_described": 15,
+   "formula_crops": 18,
+   "numbered_headings": 28,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "title": 1,
+    "font": 5,
+    "bookmark": 12,
+    "numbering": 16
+   },
+   "formulas": 18,
+   "latex_formulas": 18,
+   "inline_math": 0,
+   "elements": 289,
+   "boxed_share": 1.0,
+   "pages": 17,
+   "printed_pages": 16,
+   "line_boxes": {
+    "matched": 201,
+    "fallback": 7
+   },
+   "line_box_match_rate": 0.966
+  },
+  "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning": {
+   "extractor": "unstructured",
+   "extractor_version": "general/v0:hi_res",
+   "extractor_options": {
+    "call": {
+     "mode": "synchronous",
+     "attempts": 2,
+     "attempts_made": 1,
+     "attempt_timeout_seconds": 350.0
+    },
+    "strategy": "hi_res",
+    "coordinates": "true",
+    "include_page_breaks": "true",
+    "extract_image_block_types": "[\"Image\", \"Table\"]",
+    "pdf_infer_table_structure": "true"
+   },
+   "content_hash": "c0cea49ca717ba87365a754ef150efed81c455dc75033c31b7b276c89474537f",
+   "pages_billed": 23,
+   "credits": null,
+   "figures_stored": 5,
+   "figures_described": 5,
+   "formula_crops": 4,
+   "numbered_headings": 20,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "title": 1,
+    "font": 7,
+    "bookmark": 20,
+    "numbering": 3
+   },
+   "formulas": 4,
+   "latex_formulas": 4,
+   "inline_math": 0,
+   "elements": 274,
+   "boxed_share": 1.0,
+   "pages": 23,
+   "printed_pages": 22,
+   "line_boxes": {
+    "matched": 168,
+    "fallback": 12
+   },
+   "line_box_match_rate": 0.933
+  },
+  "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties": {
+   "extractor": "unstructured",
+   "extractor_version": "general/v0:hi_res",
+   "extractor_options": {
+    "call": {
+     "mode": "synchronous",
+     "attempts": 2,
+     "attempts_made": 1,
+     "attempt_timeout_seconds": 320.0
+    },
+    "strategy": "hi_res",
+    "coordinates": "true",
+    "include_page_breaks": "true",
+    "extract_image_block_types": "[\"Image\", \"Table\"]",
+    "pdf_infer_table_structure": "true"
+   },
+   "content_hash": "db63145aa6c48741c5cf1cf98c610468644db7d5f33e65b2b93b2772a52a412b",
+   "pages_billed": 20,
+   "credits": null,
+   "figures_stored": 2,
+   "figures_described": 2,
+   "formula_crops": 43,
+   "numbered_headings": 25,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [
+    "A PREPRINT"
+   ],
+   "heading_signals": {
+    "title": 1,
+    "font": 9,
+    "bookmark": 27,
+    "open_section": 2
+   },
+   "formulas": 43,
+   "latex_formulas": 39,
+   "inline_math": 1,
+   "elements": 362,
+   "boxed_share": 1.0,
+   "pages": 20,
+   "printed_pages": 19,
+   "line_boxes": {
+    "matched": 178,
+    "fallback": 38
+   },
+   "line_box_match_rate": 0.824
+  },
+  "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators": {
+   "extractor": "unstructured",
+   "extractor_version": "general/v0:hi_res",
+   "extractor_options": {
+    "call": {
+     "mode": "synchronous",
+     "attempts": 2,
+     "attempts_made": 1,
+     "attempt_timeout_seconds": 170.0
+    },
+    "strategy": "hi_res",
+    "coordinates": "true",
+    "include_page_breaks": "true",
+    "extract_image_block_types": "[\"Image\", \"Table\"]",
+    "pdf_infer_table_structure": "true"
+   },
+   "content_hash": "92d3e7b7b616dd36045469045e71fa48cf01df51f343d9e538e0764a7f6ceb64",
+   "pages_billed": 5,
+   "credits": null,
+   "figures_stored": 2,
+   "figures_described": 2,
+   "formula_crops": 7,
+   "numbered_headings": 17,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "title": 1,
+    "numbering": 17,
+    "font": 3
+   },
+   "formulas": 7,
+   "latex_formulas": 7,
+   "inline_math": 0,
+   "elements": 134,
+   "boxed_share": 1.0,
+   "pages": 5,
+   "printed_pages": 0,
+   "line_boxes": {
+    "matched": 112,
+    "fallback": 4
+   },
+   "line_box_match_rate": 0.966
+  },
+  "Noise-adjusted turnover in estimated networks": {
+   "extractor": "unstructured",
+   "extractor_version": "general/v0:hi_res",
+   "extractor_options": {
+    "call": {
+     "mode": "synchronous",
+     "attempts": 2,
+     "attempts_made": 1,
+     "attempt_timeout_seconds": 200.0
+    },
+    "strategy": "hi_res",
+    "coordinates": "true",
+    "include_page_breaks": "true",
+    "extract_image_block_types": "[\"Image\", \"Table\"]",
+    "pdf_infer_table_structure": "true"
+   },
+   "content_hash": "38bec0c23915ce7f6735ad8370b4dff173927777c8e6e8bb29e57e5cf4b5ad73",
+   "pages_billed": 8,
+   "credits": null,
+   "figures_stored": 1,
+   "figures_described": 1,
+   "formula_crops": 11,
+   "numbered_headings": 5,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "title": 1,
+    "font": 2,
+    "bookmark": 5
+   },
+   "formulas": 11,
+   "latex_formulas": 11,
+   "inline_math": 0,
+   "elements": 90,
+   "boxed_share": 1.0,
+   "pages": 8,
+   "printed_pages": 8,
+   "line_boxes": {
+    "fallback": 18,
+    "matched": 49
+   },
+   "line_box_match_rate": 0.731
+  },
+  "State-Space-Based FIR Filtering on a Quantum Computer": {
+   "extractor": "unstructured",
+   "extractor_version": "general/v0:hi_res",
+   "extractor_options": {
+    "call": {
+     "mode": "synchronous",
+     "attempts": 2,
+     "attempts_made": 1,
+     "attempt_timeout_seconds": 170.0
+    },
+    "strategy": "hi_res",
+    "coordinates": "true",
+    "include_page_breaks": "true",
+    "extract_image_block_types": "[\"Image\", \"Table\"]",
+    "pdf_infer_table_structure": "true"
+   },
+   "content_hash": "1f8273db282926d82cb1a4e48be4225eaba0904c3af64e2eee6535898444373a",
+   "pages_billed": 5,
+   "credits": null,
+   "figures_stored": 4,
+   "figures_described": 4,
+   "formula_crops": 7,
+   "numbered_headings": 17,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "title": 1,
+    "numbering": 1,
+    "font": 1,
+    "bookmark": 16
+   },
+   "formulas": 7,
+   "latex_formulas": 7,
+   "inline_math": 0,
+   "elements": 91,
+   "boxed_share": 1.0,
+   "pages": 5,
+   "printed_pages": 0,
+   "line_boxes": {
+    "matched": 77,
+    "fallback": 4
+   },
+   "line_box_match_rate": 0.951
+  }
+ }
+}

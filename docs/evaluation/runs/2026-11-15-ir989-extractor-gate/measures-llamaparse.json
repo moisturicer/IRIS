@@ -1,0 +1,348 @@
+{
+ "papers": {
+  "Accelerating massive ensembles of ordinary differential equations-with-annotations": {
+   "extractor": "llamaparse",
+   "extractor_version": "2026-09-28",
+   "extractor_options": {
+    "tier": "agentic",
+    "version": "2026-09-28",
+    "disable_cache": true,
+    "output_options": {
+     "markdown": {
+      "tables": {
+       "merge_continued_tables": true
+      }
+     },
+     "images_to_save": [
+      "layout"
+     ],
+     "granular_bboxes": [
+      "word",
+      "line",
+      "cell"
+     ],
+     "extract_printed_page_number": true
+    },
+    "processing_control": {
+     "timeouts": {
+      "base_in_seconds": 300,
+      "extra_time_per_page_in_seconds": 30
+     }
+    },
+    "processing_options": {
+     "cost_optimizer": {
+      "enable": true
+     },
+     "specialized_chart_parsing": "agentic"
+    }
+   },
+   "content_hash": "f6aee84152e3c3030e5a3a110866889df3cf5715fcabb290f7b0887d13c93fdc",
+   "pages_billed": 17,
+   "credits": "448.000",
+   "figures_stored": 0,
+   "figures_described": 0,
+   "formula_crops": 0,
+   "numbered_headings": 30,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "unrecorded": 35
+   },
+   "formulas": 23,
+   "latex_formulas": 23,
+   "inline_math": 385,
+   "elements": 348,
+   "boxed_share": 0.94,
+   "pages": 17,
+   "printed_pages": 10
+  },
+  "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning": {
+   "extractor": "llamaparse",
+   "extractor_version": "2026-09-28",
+   "extractor_options": {
+    "tier": "agentic",
+    "version": "2026-09-28",
+    "disable_cache": true,
+    "output_options": {
+     "markdown": {
+      "tables": {
+       "merge_continued_tables": true
+      }
+     },
+     "images_to_save": [
+      "layout"
+     ],
+     "granular_bboxes": [
+      "word",
+      "line",
+      "cell"
+     ],
+     "extract_printed_page_number": true
+    },
+    "processing_control": {
+     "timeouts": {
+      "base_in_seconds": 300,
+      "extra_time_per_page_in_seconds": 30
+     }
+    },
+    "processing_options": {
+     "cost_optimizer": {
+      "enable": true
+     },
+     "specialized_chart_parsing": "agentic"
+    }
+   },
+   "content_hash": "b1b008c711cacb7c8612b7eae67f78c96f2de35daacfdde89d201bfc55579103",
+   "pages_billed": 23,
+   "credits": "475.000",
+   "figures_stored": 0,
+   "figures_described": 0,
+   "formula_crops": 0,
+   "numbered_headings": 19,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "unrecorded": 26
+   },
+   "formulas": 4,
+   "latex_formulas": 4,
+   "inline_math": 345,
+   "elements": 232,
+   "boxed_share": 0.966,
+   "pages": 23,
+   "printed_pages": 18
+  },
+  "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties": {
+   "extractor": "llamaparse",
+   "extractor_version": "2026-09-28",
+   "extractor_options": {
+    "tier": "agentic",
+    "version": "2026-09-28",
+    "disable_cache": true,
+    "output_options": {
+     "markdown": {
+      "tables": {
+       "merge_continued_tables": true
+      }
+     },
+     "images_to_save": [
+      "layout"
+     ],
+     "granular_bboxes": [
+      "word",
+      "line",
+      "cell"
+     ],
+     "extract_printed_page_number": true
+    },
+    "processing_control": {
+     "timeouts": {
+      "base_in_seconds": 300,
+      "extra_time_per_page_in_seconds": 30
+     }
+    },
+    "processing_options": {
+     "cost_optimizer": {
+      "enable": true
+     },
+     "specialized_chart_parsing": "agentic"
+    }
+   },
+   "content_hash": "476cc3e7eda2e76147d215cf80a6d5317d44fa587487377f2e12b2edf92dc4dd",
+   "pages_billed": 20,
+   "credits": "551.000",
+   "figures_stored": 0,
+   "figures_described": 0,
+   "formula_crops": 0,
+   "numbered_headings": 25,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [
+    "A PREPRINT"
+   ],
+   "heading_signals": {
+    "unrecorded": 40
+   },
+   "formulas": 39,
+   "latex_formulas": 39,
+   "inline_math": 212,
+   "elements": 323,
+   "boxed_share": 0.991,
+   "pages": 20,
+   "printed_pages": 19
+  },
+  "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators": {
+   "extractor": "llamaparse",
+   "extractor_version": "2026-09-28",
+   "extractor_options": {
+    "tier": "agentic",
+    "version": "2026-09-28",
+    "disable_cache": true,
+    "output_options": {
+     "markdown": {
+      "tables": {
+       "merge_continued_tables": true
+      }
+     },
+     "images_to_save": [
+      "layout"
+     ],
+     "granular_bboxes": [
+      "word",
+      "line",
+      "cell"
+     ],
+     "extract_printed_page_number": true
+    },
+    "processing_control": {
+     "timeouts": {
+      "base_in_seconds": 300,
+      "extra_time_per_page_in_seconds": 30
+     }
+    },
+    "processing_options": {
+     "cost_optimizer": {
+      "enable": true
+     },
+     "specialized_chart_parsing": "agentic"
+    }
+   },
+   "content_hash": "61e6b0cf0f270561b9e84fa926544ec7764cdc2d1e670e50f8f501c040d8d5da",
+   "pages_billed": 5,
+   "credits": "136.000",
+   "figures_stored": 0,
+   "figures_described": 0,
+   "formula_crops": 0,
+   "numbered_headings": 18,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "unrecorded": 20
+   },
+   "formulas": 7,
+   "latex_formulas": 7,
+   "inline_math": 108,
+   "elements": 138,
+   "boxed_share": 0.957,
+   "pages": 5,
+   "printed_pages": 0
+  },
+  "Noise-adjusted turnover in estimated networks": {
+   "extractor": "llamaparse",
+   "extractor_version": "2026-09-28",
+   "extractor_options": {
+    "tier": "agentic",
+    "version": "2026-09-28",
+    "disable_cache": true,
+    "output_options": {
+     "markdown": {
+      "tables": {
+       "merge_continued_tables": true
+      }
+     },
+     "images_to_save": [
+      "layout"
+     ],
+     "granular_bboxes": [
+      "word",
+      "line",
+      "cell"
+     ],
+     "extract_printed_page_number": true
+    },
+    "processing_control": {
+     "timeouts": {
+      "base_in_seconds": 300,
+      "extra_time_per_page_in_seconds": 30
+     }
+    },
+    "processing_options": {
+     "cost_optimizer": {
+      "enable": true
+     },
+     "specialized_chart_parsing": "agentic"
+    }
+   },
+   "content_hash": "d685759e7a7322015129d46a0179e4cd4734e1c5886edf6ad0e915b7d26eecc6",
+   "pages_billed": 8,
+   "credits": "65.000",
+   "figures_stored": 0,
+   "figures_described": 0,
+   "formula_crops": 0,
+   "numbered_headings": 5,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "unrecorded": 8
+   },
+   "formulas": 9,
+   "latex_formulas": 9,
+   "inline_math": 180,
+   "elements": 90,
+   "boxed_share": 0.989,
+   "pages": 8,
+   "printed_pages": 8
+  },
+  "State-Space-Based FIR Filtering on a Quantum Computer": {
+   "extractor": "llamaparse",
+   "extractor_version": "2026-09-28",
+   "extractor_options": {
+    "tier": "agentic",
+    "version": "2026-09-28",
+    "disable_cache": true,
+    "output_options": {
+     "markdown": {
+      "tables": {
+       "merge_continued_tables": true
+      }
+     },
+     "images_to_save": [
+      "layout"
+     ],
+     "granular_bboxes": [
+      "word",
+      "line",
+      "cell"
+     ],
+     "extract_printed_page_number": true
+    },
+    "processing_control": {
+     "timeouts": {
+      "base_in_seconds": 300,
+      "extra_time_per_page_in_seconds": 30
+     }
+    },
+    "processing_options": {
+     "cost_optimizer": {
+      "enable": true
+     },
+     "specialized_chart_parsing": "agentic"
+    }
+   },
+   "content_hash": "dac9b10ff623c4735b996dfa298e50f3b2b549bf8afaa9babf027a49b48cff21",
+   "pages_billed": 5,
+   "credits": "56.000",
+   "figures_stored": 0,
+   "figures_described": 0,
+   "formula_crops": 0,
+   "numbered_headings": 16,
+   "off_level": 0,
+   "off_level_examples": [],
+   "false_headings": [],
+   "heading_signals": {
+    "unrecorded": 18
+   },
+   "formulas": 20,
+   "latex_formulas": 20,
+   "inline_math": 197,
+   "elements": 157,
+   "boxed_share": 0.994,
+   "pages": 5,
+   "printed_pages": 0
+  }
+ }
+}
