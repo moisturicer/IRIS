@@ -189,17 +189,19 @@
    for the current one (IR-1097, D6; the prototype's `mark` and `mark.now`), apart from a citation's maroon-ringed
    passage, which draws above the text layer and stays visible over them. The
    text is drawn on the canvas beneath and this layer is transparent, so the
-   fill multiplies into the page: the words stay Ink on yellow (14:1). */
+   fill must be translucent: `multiply` would blend only inside the text
+   layer's own stacking context (nothing there) and paint opaque over the
+   words (IR-1143). Over white these read as #f7e08f and #f2c94c, and the
+   words show through as Ink on yellow. */
 .textLayer mark.find-hit {
   position: static;
   color: transparent;
-  background-color: #f7e08f;
-  mix-blend-mode: multiply;
+  background-color: rgb(244 208 40 / 0.5);
   border-radius: 0;
 }
 
 .textLayer mark.find-hit-current {
-  background-color: #f2c94c;
+  background-color: rgb(238 180 20 / 0.62);
 }
 
 /* Review threads' passages (IR-875, IR-1097): the reviewer's pen. A rose fill
