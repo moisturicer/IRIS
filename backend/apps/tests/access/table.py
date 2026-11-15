@@ -764,6 +764,22 @@ OPPORTUNITIES = {
     "opportunity-remove": Entry({"POST": _case(
         RDCO_ONLY, kwargs={"pk": Ref("pending_opportunity")}, data={"reason": "Cancelled"},
     )}),
+    # IR-649, ADR-050 decision 13: the owner is the caller, so the list is
+    # anyone's own. Only a confirmed Call can be saved: a waiting one is the
+    # same 404 as a missing one, even to its Adviser and RDCO (owner,
+    # 2026-11-16). Unsaving deletes only one's own row and answers 204 alike.
+    "opportunity-saved": Entry({"GET": _case(SIGNED_IN)}),
+    "opportunity-save": Entry({
+        "PUT": [
+            _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")}, data={}),
+            _case(row(ANON, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+                  kwargs={"pk": Ref("pending_opportunity")}, data={}),
+        ],
+        "DELETE": [
+            _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")}),
+            _case(SIGNED_IN, kwargs={"pk": Ref("pending_opportunity")}),
+        ],
+    }),
     "api-root": Shadowed(by="opportunity-list", why="The empty-prefix list matches before the router root."),
 }
 LIBRARY = {

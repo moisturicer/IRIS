@@ -68,6 +68,7 @@ INCLUDED: dict[str, str] = {
     "notifications.Notification": "notifications",
     "notifications.NotificationRead": "notifications",
     "opportunities.Opportunity": "opportunities_posted",
+    "opportunities.SavedCall": "saved_calls",
     "reviews.Review": "workflow_acts",
     "reviews.ReviewComment": "workflow_acts",
     "reviews.ReviewRound": "workflow_acts",

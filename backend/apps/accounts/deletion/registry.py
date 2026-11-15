@@ -112,6 +112,7 @@ RELATIONS: dict[str, Rule] = {
     "ai.PaperBrief.requested_by": Rule(KEEP, "A paper's AI Overview is shared, not the person's"),
     # --- other features
     "opportunities.Opportunity.posted_by": Rule(KEEP, "A Call's Posted by shows \"Former user\""),
+    "opportunities.SavedCall.owner":       Rule(DELETE, "Saved Calls (IR-649)"),
     "library.SavedRecord.owner":           Rule(DELETE, "Saved papers and reading status"),
     "library.SavedFeed.owner":             Rule(DELETE, "Private custom feeds (IR-577)"),
     "library.ReadingNote.owner":           Rule(DELETE, "Private reading notes (IR-580)"),
