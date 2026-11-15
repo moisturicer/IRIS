@@ -31,7 +31,7 @@ from apps.documents.testing import real_pdf_bytes
 from apps.documents.requests import ItemSpec, create_request, requesting_party
 from apps.library.models import SavedFeed
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
-from apps.records.models import DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
+from apps.records.models import Classification, DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
 from apps.reviews.models import ReviewComment, ReviewerSeat, SavedReply
 from apps.reviews.routing import accept_and_route, enter_at_adviser, route
@@ -359,8 +359,12 @@ def build_world() -> World:
     )
     o["opportunity"] = Opportunity.objects.create(
         title="Matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
-        posted_by=users["rdco"], opportunity_type="internal_call", posting_office="RDCO",
+        posted_by=users["rdco"], opportunity_type="conference", location="Cebu City",
+        external_url="https://example.org/call", description="A matrix call.",
     )
+    # A complete Call, so an allowed edit is answered 200, not 400 (IR-760).
+    matrix_area = Classification.objects.get_or_create(name="Matrix Area")[0]
+    o["opportunity"].areas.set([matrix_area])
     # IR-577: a saved feed is private to its owner, so every other account is
     # refused it as it would a missing one.
     o["feed"] = SavedFeed.objects.create(
@@ -372,6 +376,8 @@ def build_world() -> World:
     )
     o["adviser_opportunity"] = Opportunity.objects.create(
         title="Adviser's matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
-        posted_by=users["adviser"], opportunity_type="internal_call", posting_office="Adviser",
+        posted_by=users["adviser"], opportunity_type="conference", location="Cebu City",
+        external_url="https://example.org/call", description="A matrix call.",
     )
+    o["adviser_opportunity"].areas.set([matrix_area])
     return world

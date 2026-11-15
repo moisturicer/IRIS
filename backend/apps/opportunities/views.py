@@ -27,7 +27,10 @@ class OpportunityViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Closed-and-stale items drop off for everyone, including posters: an
         # opportunity nobody can act on is noise on a deadline board.
-        return Opportunity.objects.visible().select_related("posted_by")
+        return (
+            Opportunity.objects.visible()
+            .select_related("posted_by").prefetch_related("areas")
+        )
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):

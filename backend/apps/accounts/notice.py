@@ -34,7 +34,7 @@ from rest_framework.exceptions import APIException, PermissionDenied
 from apps.audit.models import AuditEvent
 from apps.audit.services import create_audit_event
 
-from .models import DataNotice, NoticeAnswer, User
+from .models import DataNotice, NoticeAnswer, NoticeDraft, User
 
 #: The code the server answers every blocked request with. A client keys off
 #: it, never off the message.
@@ -131,6 +131,31 @@ def notice_payload(notice: DataNotice) -> dict:
         "text": notice.display_text(),
         "published_at": notice.published_at,
     }
+
+
+def draft_payload(draft: NoticeDraft | None) -> dict | None:
+    """The draft as RDCO's Notices page reads it, or None when none is saved."""
+    if draft is None:
+        return None
+    editor = draft.updated_by
+    return {
+        "text": draft.text,
+        "based_on_version": draft.based_on_version,
+        "updated_at": draft.updated_at,
+        "updated_by": None if editor is None else (editor.get_full_name() or editor.email),
+    }
+
+
+def save_draft(editor: User, *, based_on_version: int, text: str) -> NoticeDraft:
+    """Keep `text` as the one draft, replacing any earlier one."""
+    draft, _ = NoticeDraft.objects.update_or_create(
+        pk=1,
+        defaults={
+            "text": text, "based_on_version": based_on_version,
+            "updated_by": editor, "updated_at": timezone.now(),
+        },
+    )
+    return draft
 
 
 def version_payload(notice: DataNotice) -> dict:
@@ -251,6 +276,8 @@ def publish_notice(publisher: User, *, based_on_version: int, text: str) -> Data
     notice = DataNotice.objects.create(
         number=current.number + 1, text=text, published_by=publisher, published_at=timezone.now(),
     )
+    # The paste is published now; the draft it came from is done with (IR-1138).
+    NoticeDraft.objects.all().delete()
     create_audit_event(
         AuditEvent.NOTICE_PUBLISHED, publisher,
         metadata={

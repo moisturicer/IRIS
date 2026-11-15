@@ -3518,7 +3518,7 @@ describe("Notes in the reading workspace (IR-580)", () => {
     await userEvent.click(screen.getByRole("button", NOTES));
     await screen.findByRole("textbox", { name: "Your note on this paper" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Close Notes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close notes" }));
     expect(screen.queryByRole("complementary", NOTES)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", NOTES));
 
@@ -3565,7 +3565,7 @@ describe("Notes in the reading workspace (IR-580)", () => {
     const panel = await screen.findByRole("complementary", NOTES);
     await waitFor(() => expect(panel).toHaveFocus());
 
-    await userEvent.click(screen.getByRole("button", { name: "Close Notes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close notes" }));
 
     await waitFor(() => expect(screen.getByRole("button", NOTES)).toHaveFocus());
   });

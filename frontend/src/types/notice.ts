@@ -47,3 +47,12 @@ export interface NoticeAnswerPayload {
   /** Required when a No becomes a Yes (ADR-054 decision 13, IR-791); ignored otherwise. */
   papers?: "all" | "from_now";
 }
+
+/** RDCO's saved, unpublished next version of the notice (IR-1138). */
+export interface NoticeDraft {
+  text: string;
+  /** The version the text started from. */
+  based_on_version: number;
+  updated_at: string;
+  updated_by: string | null;
+}

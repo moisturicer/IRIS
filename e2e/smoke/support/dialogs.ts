@@ -87,12 +87,23 @@ const consoleAction = (id: string, button: string, kind: "pool" | "seat", source
         seat_state: kind === "seat" ? "in_review" : null, seat_state_label: kind === "seat" ? "In review" : null,
         opened_at: "2026-11-01T08:00:00+08:00", due_at: "2026-11-12T08:00:00+08:00", original_due_at: "2026-11-12T08:00:00+08:00",
         is_overdue: false, clock_paused: false, can_extend: true,
+        authors_line: "Ada Lovelace · v1", clearance_strip: [],
+        status: kind === "pool" ? { kind: "unassigned", text: "Unassigned" } : { kind: "due", text: "Due in 2 days" },
+        actions: kind === "pool" ? ["assign", "extend"] : ["reassign", "extend"],
       }],
       load: [{ reviewer: 5, name: "Ines Tan", open_count: 1, overdue: 0 }, { reviewer: 6, name: "Rey Cruz", open_count: 0, overdue: 0 }],
     });
     api.on("GET", "/assignments/7/assign/", { assignment: 7, party: "rdco", party_label: "RDCO", members: [{ id: 5, name: "Ines Tan", seated: false }] });
   },
-  open: async (page) => { await page.getByRole("button", { name: new RegExp(`^${button}`) }).first().click(); },
+  // Assign is the row's own button; Reassign and Extend sit in its "More actions" menu (IR-1136).
+  open: async (page) => {
+    if (kind === "pool") {
+      await page.getByRole("button", { name: new RegExp(`^${button}`) }).first().click();
+      return;
+    }
+    await page.getByRole("button", { name: /^More actions/ }).first().click();
+    await page.getByRole("menuitem", { name: new RegExp(`^${button}`) }).first().click();
+  },
   dialog: anyDialog,
 });
 const reviewAction = (
@@ -193,7 +204,11 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "post a call", screen: "opportunities", sources: ["features/opportunities/OpportunityFormDialog.tsx", "features/opportunities/CallsAndConferencesPage.tsx"],
-    override: (api) => api.on("GET", "/opportunities/", { count: 0, next: null, previous: null, results: [], can_post: true }),
+    override: (api) => {
+      api.on("GET", "/opportunities/", { count: 0, next: null, previous: null, results: [], can_post: true });
+      // The form's Areas (IR-760), so the scan sees the checkboxes, not a load error.
+      api.on("GET", "/records/classifications/", paginated([{ id: 1, name: "Agriculture" }]));
+    },
     open: press("Post a call"), dialog: anyDialog,
   },
   {
@@ -373,7 +388,7 @@ export const DIALOGS: DialogCase[] = [
     viewport: { width: 640, height: 900 },
     open: press("Show chat history"), dialog: (page) => page.getByRole("dialog", { name: "Chat history" }),
   },
-  consoleAction("assign a reviewer", "Assign reviewer", "pool", "features/review/AssignReviewerDialog.tsx"),
+  consoleAction("assign a reviewer", "Assign", "pool", "features/review/AssignReviewerDialog.tsx"),
   consoleAction("reassign a reviewer", "Reassign", "seat", "features/review/ReassignDialog.tsx"),
   consoleAction("extend a due date", "Extend due date", "seat", "features/review/ExtendDueDateDialog.tsx"),
   reviewAction("accept and publish a paper", "accept_publish", "Accept & publish…", "features/records/paper-view/DecisionDialog.tsx"),
@@ -485,7 +500,7 @@ export const DIALOGS: DialogCase[] = [
         ...PAPER_DETAIL, is_ip: action === "release_ip", embargo: { state: "held", until: "2026-12-01" },
         capabilities: ["cite", "set_embargo", "release_embargo", ...(action === "release_ip" ? ["release_ip"] : [])],
       });
-      api.on("GET", "/users/role-requests/", paginated([]));
+      api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
     },
     open: async (page) => {
       const label = action === "set" ? "Change date" : action === "release" ? "Release embargo" : "Release IP mark";

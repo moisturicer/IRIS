@@ -7,12 +7,16 @@ import { describe, expect, it } from "vitest";
 
 import type { MyReviewsRow } from "@/types/reviews";
 
-import { dueLabel, holderLine, overdueLabel, readView, routingLine, viewSearch, waitLabel } from "./myReviews";
+import {
+  dueLabel, holderLine, kickerParts, overdueLabel, pageLine, readView, routingLine, viewSearch, waitLabel,
+} from "./myReviews";
 
 function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
   return {
     key: "seat:1", kind: "seat", record: 7, title: "Smart Campus Energy Monitor",
-    record_type_name: "Thesis / Research", party: "itso", party_label: "ITSO",
+    record_type_name: "Thesis / Research", authors: ["Maria Clara Santos"],
+    unit: "College of Computer Studies", version: 1, opens: "review",
+    party: "itso", party_label: "ITSO",
     seat: 1, assignment: 3, holder: 9, holder_name: "Ana Reyes",
     is_mine: true, routed_by: null, routed_reason: "", submitted_by: null,
     waiting_since: "2026-10-01T00:00:00Z", waiting_days: 2, waiting_on: null,
@@ -86,6 +90,21 @@ describe("holderLine", () => {
       .toBe("ITSO · Unassigned");
   });
 
+});
+
+describe("pageLine (IR-1135)", () => {
+  it("speaks from an office seat or an Adviser's", () => {
+    expect(pageLine("itso")).toBe("Papers routed to ITSO. Claim one, or let your coordinator assign it.");
+    expect(pageLine(undefined)).toBe("Papers where you are named as adviser.");
+  });
+});
+
+describe("kickerParts (IR-1135)", () => {
+  it("lists authors, unit and version, leaving out what the server does not know", () => {
+    expect(kickerParts(row({ authors: ["A. Cruz", "B. Lim"] })))
+      .toEqual(["A. Cruz, B. Lim", "College of Computer Studies", "v1"]);
+    expect(kickerParts(row({ authors: [], unit: "", version: null }))).toEqual([]);
+  });
 });
 
 describe("routingLine", () => {

@@ -14,6 +14,7 @@ urlpatterns = [
     # Admin read the history. Both stay behind the sign-in block.
     path("notice/versions/",        views.NoticeVersionsView.as_view(), name="notice-versions"),
     path("notice/versions/impact/", views.NoticeImpactView.as_view(),   name="notice-impact"),
+    path("notice/draft/",           views.NoticeDraftView.as_view(),    name="notice-draft"),
     path("logout/",               views.LogoutView.as_view(),         name="auth-logout"),
     path("token/refresh/",        TokenRefreshView.as_view(),         name="token-refresh"),
     # Retired by IR-643 (ADR-045 §8): both answer only "invalid link", so a

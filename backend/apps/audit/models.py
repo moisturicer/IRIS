@@ -116,6 +116,10 @@ class AuditEvent(models.Model):
     # A person downloaded their own data (ADR-051 decision 13, IR-786). Metadata
     # is `sections` and `format` only: never a byte of what was downloaded.
     PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
+    # A Call was deleted (ADR-050 decisions 15-16). Metadata: `reason` and
+    # `call`, a copy of the Call as it was. Migration opportunities/0002 writes
+    # one per retired-type Call with no actor; IR-763 writes one per deletion.
+    CALL_DELETED = "CALL_DELETED"
 
     # Unverified registrations (ADR-051 decisions 24-25, IR-705). REPLACED's
     # `user` is the earlier account, removed because its address registered
@@ -230,6 +234,7 @@ class AuditEvent(models.Model):
         (TEMPLATE_REPLACED,            "Template Replaced"),
         (TEMPLATE_REMOVED,             "Template Removed"),
         (RECORD_TYPE_DESCRIBED,        "Record Type Description Changed"),
+        (CALL_DELETED,                 "Call Deleted"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

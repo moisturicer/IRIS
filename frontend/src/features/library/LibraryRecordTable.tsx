@@ -185,11 +185,11 @@ export function LibraryRecordTable({
           aria-label="Select all records"
           className="accent-brand"
         />
-        <span className="text-label font-bold uppercase tracking-wider text-stone-400">Title</span>
-        <span className="text-label font-bold uppercase tracking-wider text-stone-400">Authors</span>
-        <span className="text-label font-bold uppercase tracking-wider text-stone-400">Published</span>
-        <span className="text-label font-bold uppercase tracking-wider text-stone-400">Status / IP</span>
-        <span className="text-label font-bold uppercase tracking-wider text-stone-400 text-right">
+        <span className="text-label font-bold text-stone-400">Title</span>
+        <span className="text-label font-bold text-stone-400">Authors</span>
+        <span className="text-label font-bold text-stone-400">Published</span>
+        <span className="text-label font-bold text-stone-400">Status / IP</span>
+        <span className="text-label font-bold text-stone-400 text-right">
           Actions
         </span>
       </div>

@@ -82,8 +82,8 @@ const currentStep = (name: RegExp) => {
 };
 const stepHeading = () => screen.getByRole("heading", { level: 3, name: /^Step \d of 3/ });
 
-const firstName = () => screen.getByRole("textbox", { name: "First Name" });
-const lastName  = () => screen.getByRole("textbox", { name: "Last Name" });
+const firstName = () => screen.getByRole("textbox", { name: "First name" });
+const lastName  = () => screen.getByRole("textbox", { name: "Last name" });
 const email     = () => screen.getByRole("textbox", { name: "Institutional email" });
 const college   = () => screen.getByRole("combobox", { name: "College" });
 const program   = () => screen.getByRole("combobox", { name: "Program" });
@@ -120,7 +120,7 @@ async function fillAffiliation(user: User, role: "Student" | "Adviser" = "Studen
 
 async function finish(user: User) {
   await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
-  await user.type(screen.getByLabelText("Confirm Password"), "IrisDemo123!");
+  await user.type(screen.getByLabelText("Confirm password"), "IrisDemo123!");
   await user.click(screen.getByRole("checkbox", { name: CONSENT }));
   await user.click(within(aiQuestion()).getByRole("radio", { name: "No" }));
   await user.click(screen.getByRole("button", { name: "Register" }));
@@ -310,7 +310,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
     await fillIdentity(user);
     await fillAffiliation(user);
     await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
-    await user.type(screen.getByLabelText("Confirm Password"), "IrisDemo123!");
+    await user.type(screen.getByLabelText("Confirm password"), "IrisDemo123!");
     await user.click(screen.getByRole("checkbox", { name: CONSENT }));
     await user.click(within(aiQuestion()).getByRole("radio", { name: "No" }));
 
@@ -344,7 +344,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
 
     await fillAffiliation(user);
     expect(screen.getByLabelText("Password")).toBeRequired();
-    expect(screen.getByLabelText("Confirm Password")).toBeRequired();
+    expect(screen.getByLabelText("Confirm password")).toBeRequired();
     expect(screen.queryByText(/\((required|optional)\)/)).not.toBeInTheDocument();
   });
 
@@ -368,7 +368,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
     await fillAffiliation(user);
     inOrder([
       screen.getByLabelText("Password"),
-      screen.getByLabelText("Confirm Password"),
+      screen.getByLabelText("Confirm password"),
       screen.getByRole("checkbox", { name: CONSENT }),
       aiQuestion(),
       screen.getByRole("button", { name: "Register" }),
@@ -468,7 +468,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     expect(password).toHaveAccessibleDescription("At least 8 characters");
     expect(password).not.toHaveAttribute("aria-invalid");
 
-    const confirm = screen.getByLabelText("Confirm Password");
+    const confirm = screen.getByLabelText("Confirm password");
     await user.type(confirm, "short-enougX");
     expect(confirm).toHaveAccessibleDescription("Passwords do not match.");
     await user.clear(confirm);
@@ -489,7 +489,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     expect(password).toHaveAttribute("type", "password");
 
     await user.click(screen.getByRole("button", { name: "Show confirmed password" }));
-    expect(screen.getByLabelText("Confirm Password")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Confirm password")).toHaveAttribute("type", "text");
   });
 
   it("says what happens next before anything is sent", async () => {
@@ -510,7 +510,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     renderSignup();
     await reachSecurity(user);
     await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
-    await user.type(screen.getByLabelText("Confirm Password"), "IrisDemo123!");
+    await user.type(screen.getByLabelText("Confirm password"), "IrisDemo123!");
 
     const action = screen.getByRole("button", { name: "Register" });
     expect(action).toBeEnabled();
@@ -557,7 +557,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     renderSignup();
     await reachSecurity(user);
     await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
-    await user.type(screen.getByLabelText("Confirm Password"), "IrisDemo123!");
+    await user.type(screen.getByLabelText("Confirm password"), "IrisDemo123!");
 
     const summary = screen.getByRole("region", { name: "Check your details" });
     const terms = within(summary).getAllByRole("term").map((t) => t.textContent);
@@ -626,7 +626,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
       stepHeading(),
       screen.getByRole("region", { name: "Check your details" }),
       screen.getByLabelText("Password"),
-      screen.getByLabelText("Confirm Password"),
+      screen.getByLabelText("Confirm password"),
       screen.getByRole("checkbox", { name: CONSENT }),
       aiQuestion(),
       screen.getByRole("button", { name: "Register" }),
@@ -806,7 +806,7 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     expect(nav).toHaveTextContent(/Identity, completed.*Affiliation, completed.*Security & agreement, completed/);
 
     // The form is gone: the confirmation replaces it rather than sitting under it.
-    expect(screen.queryByRole("textbox", { name: "First Name" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "First name" })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
 
@@ -1052,7 +1052,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     await submit(user);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Confirm Password")).toHaveAccessibleDescription("Passwords do not match."),
+      expect(screen.getByLabelText("Confirm password")).toHaveAccessibleDescription("Passwords do not match."),
     );
   });
 
@@ -1091,7 +1091,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     expect(alert).toHaveTextContent(/IRIS can't be reached right now/);
     expect(stepHeading()).toHaveTextContent("Step 3 of 3 · Security & agreement");
     expect(screen.getByLabelText("Password")).toHaveValue("IrisDemo123!");
-    expect(screen.getByLabelText("Confirm Password")).toHaveValue("IrisDemo123!");
+    expect(screen.getByLabelText("Confirm password")).toHaveValue("IrisDemo123!");
     expect(screen.getByRole("checkbox", { name: CONSENT })).toBeChecked();
     expect(tab(/^Identity, completed$/)).toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);

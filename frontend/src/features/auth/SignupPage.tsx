@@ -576,7 +576,7 @@ export default function SignupPage() {
                   // dt and dd sit directly in the div, as a dl group must; the
                   // Change link rides in the dd beside the value it changes.
                   <div key={term} className="py-1">
-                    <dt className="text-label font-semibold uppercase tracking-wide text-stone-600">{term}</dt>
+                    <dt className="text-label font-semibold text-stone-600">{term}</dt>
                     <dd className="flex items-center gap-3">
                       <span className="min-w-0 flex-1 break-words text-small text-stone-900">{value}</span>
                       <Link
@@ -656,9 +656,9 @@ export default function SignupPage() {
               </fieldset>
 
               <div className="grid gap-5 sm:grid-cols-2 sm:gap-3">
-                <Input id="signup-first-name" label="First Name" required
+                <Input id="signup-first-name" label="First name" required
                   autoComplete="given-name" {...field("first_name")} />
-                <Input id="signup-last-name" label="Last Name" required
+                <Input id="signup-last-name" label="Last name" required
                   autoComplete="family-name" {...field("last_name")} />
               </div>
 
@@ -736,7 +736,7 @@ export default function SignupPage() {
 
               <Input
                 id="signup-password2"
-                label="Confirm Password"
+                label="Confirm password"
                 required
                 type={showPassword2 ? "text" : "password"}
                 autoComplete="new-password"

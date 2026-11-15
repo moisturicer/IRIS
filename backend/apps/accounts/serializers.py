@@ -60,6 +60,14 @@ class UserSerializer(serializers.ModelSerializer):
         return profile.affiliation(obj).course
 
 
+class UserListSerializer(UserSerializer):
+    """One row of the Users page: a user plus when they last signed in (IR-1138)."""
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ["last_login"]
+        read_only_fields = UserSerializer.Meta.read_only_fields + ["last_login"]
+
+
 class AdviserOptionSerializer(UserSerializer):
     """
     One row of `GET /users/advisers/`, the adviser picker every signed-in user

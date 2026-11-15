@@ -114,7 +114,12 @@ export const TRACKER = {
   reviews: [], versions: [], review_comments: [], resubmissions: [],
 };
 
-export const EMPTY_REVIEWS = { rows: [], counts: { to_review: 0, in_review: 0, done: 0 }, next: null };
+export const EMPTY_REVIEWS = {
+  rows: [],
+  counts: { to_review: 0, in_review: 0, done: 0 },
+  outcome_counts: { all: 0, cleared: 0, finding: 0, accepted: 0, rejected: 0, published: 0 },
+  next: null,
+};
 export const EMPTY_CONSOLE = { office: "rdco", office_label: "RDCO", rows: [], load: [] };
 
 export const STATES: UiState[] = [
@@ -198,11 +203,11 @@ export const STATES: UiState[] = [
   // Review.
   ...reads("my-reviews", "GET", "/reviews/mine/", {
     error: "Could not load My Reviews",
-    empty: { reply: EMPTY_REVIEWS, shows: "Nothing to review" },
+    empty: { reply: EMPTY_REVIEWS, shows: "Nothing waiting for you" },
     revoked: "My Reviews isn't available to you",
   }, {
     loading: (page) => page.locator('[aria-busy="true"]').first(),
-    ok: EMPTY_REVIEWS, recovered: text("Nothing to review"),
+    ok: EMPTY_REVIEWS, recovered: text("Nothing waiting for you"),
   }),
   ...reads("office-console", "GET", "/reviews/office/", {
     error: "Could not load the console",
@@ -261,9 +266,9 @@ export const AXE_STATES: AxeState[] = [
     shows: (page) => page.getByText(/1 saved paper is no longer available to you/),
   },
   ...([
-    ["to_review", "Nothing to review"],
-    ["in_review", "Nothing in review"],
-    ["done", "No decisions yet"],
+    ["to_review", "Nothing waiting for you"],
+    ["in_review", "Nothing here"],
+    ["done", "Nothing here"],
   ] as const).map(([tab, title]) => ({
     id: `my reviews · ${tab.replace("_", " ")} empty`, screen: "my-reviews", path: `/review?tab=${tab}`,
     override: (api: MockApi) => api.on("GET", "/reviews/mine/", EMPTY_REVIEWS),

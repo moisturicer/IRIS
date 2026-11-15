@@ -144,7 +144,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
             </p>
           )}
 
-          <p className="px-3 py-1.5 text-2xs font-bold uppercase tracking-wider text-stone-500">
+          <p className="px-3 py-1.5 text-2xs font-bold text-stone-500">
             Reading status
           </p>
           {READING_STATUSES.map((option) => {
@@ -187,7 +187,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
           </div>
 
           <div className="border-t border-stone-100 mt-1 pt-1">
-            <p className="px-3 py-1.5 text-2xs font-bold uppercase tracking-wider text-stone-500">
+            <p className="px-3 py-1.5 text-2xs font-bold text-stone-500">
               Your folders
             </p>
             <div className="max-h-40 overflow-y-auto">
