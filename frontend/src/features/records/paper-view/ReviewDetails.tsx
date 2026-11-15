@@ -209,7 +209,8 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
 
 function Section({ id, title, action, children }: { id?: string; title: string; action?: ReactNode; children: ReactNode }) {
   const headingId = useId();
-  const heading = <h3 id={headingId} className="font-display text-base font-semibold text-stone-900">{title}</h3>;
+  // A pull request sidebar's small sans label (IR-1131), not a title: the rule above does the dividing.
+  const heading = <h3 id={headingId} className="text-small font-semibold text-stone-600">{title}</h3>;
   return (
     <section id={id} tabIndex={id ? -1 : undefined} aria-labelledby={headingId} className={cn("space-y-2 border-t border-stone-200 pt-4 first:border-0 first:pt-0", FOCUS_RING)}>
       {action ? <div className="flex items-center justify-between gap-2">{heading}{action}</div> : heading}

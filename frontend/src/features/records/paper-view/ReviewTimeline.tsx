@@ -2,19 +2,29 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { createPortal } from "react-dom";
 
 import { recordsApi } from "@/api/records";
+import { ClearanceStrip } from "@/components/shared/ClearanceStrip";
 import { Button } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { errorDetail } from "@/lib/errorDetail";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { cn, formatDate } from "@/lib/utils";
-import type { MentionedPerson, RecordTracker, ReviewComment } from "@/types/records";
+import { useAuthStore } from "@/store/auth.store";
+import type { ClearanceStripEntry, MentionedPerson, RecordTracker, ReviewComment } from "@/types/records";
 
-import { RailHeading } from "./headings";
-import { ReviewStatus } from "./ReviewStatus";
+import { initials } from "./commentThreads";
+import { ReviewStatus, turnLine } from "./ReviewStatus";
 import { MentionPicker, MentionedPeople, peopleIn } from "./Mentions";
 import { SavedReplies } from "./SavedReplies";
 import { timelineEntries, type TimelineEntry, type TimelineKind } from "./timelineEntries";
+
+/** The submission, drawn as the first box of the timeline, as a pull request opens with its description. */
+export interface TimelineSubmission {
+  /** Who submitted v1, as the server names them. */
+  author: string | null;
+  at: string | null;
+  abstract: string;
+}
 
 /** A glyph per kind of entry, beside its words, never instead of them. */
 const KIND_ICON: Record<TimelineKind, string> = {
@@ -62,8 +72,16 @@ interface Discussion {
  * what the server stored, never a guess at it.
  *
  * The host remounts it (a new `key`) when something it shows has changed.
+ *
+ * **Its look** (IR-1131) follows a pull request's page: an optional first box
+ * for the submission, each comment a box with its replies inside it and a
+ * reply field in its foot, every other entry one line with a round badge on
+ * the same rail, an optional box saying where the review stands, and the
+ * composer as a box. Every word in them is still the server's.
  */
-export function ReviewTimeline({ recordId, canComment = false, statusTarget, renderStatus, beforeComment, onCommented }: {
+export function ReviewTimeline({
+  recordId, canComment = false, statusTarget, renderStatus, beforeComment, onCommented, submission, statusBox = false, onLoaded,
+}: {
   recordId: number;
   canComment?: boolean;
   /** A comment was posted: the Threads tab reads its threads again (IR-875). */
@@ -74,12 +92,22 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
   renderStatus?: (data: RecordTracker) => ReactNode;
   /** Between the timeline and the comment box: the workspace's Readiness (IR-681). */
   beforeComment?: ReactNode;
+  /** The submission's box, first; its "v1 submitted" line is then not repeated. */
+  submission?: TimelineSubmission;
+  /** Draw where the review stands, from `clearance_strip`, after the timeline. */
+  statusBox?: boolean;
+  /** Each tracker read, so the host can count the conversation for its tab. */
+  onLoaded?: (data: RecordTracker) => void;
 }) {
   const headingId = useId();
   const [data, setData] = useState<RecordTracker | null>(null);
   /** Why the read failed (IR-906): a timeout offers Retry, anything else Try again. */
   const [failed, setFailed] = useState<"failed" | "interrupted" | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const loadedRef = useRef(onLoaded);
+  loadedRef.current = onLoaded;
+  const viewer = useAuthStore((s) => s.user);
+  const viewerName = viewer ? `${viewer.first_name} ${viewer.last_name}`.trim() : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +115,9 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
     recordsApi
       .tracker(recordId)
       .then(({ data: payload }) => {
-        if (!cancelled) setData(payload);
+        if (cancelled) return;
+        setData(payload);
+        loadedRef.current?.(payload);
       })
       .catch((error: unknown) => {
         if (!cancelled) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
@@ -121,15 +151,16 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
     },
   };
 
-  const entries = data ? timelineEntries(data) : [];
+  // The submission's own box says it was submitted; its line would repeat it.
+  const entries = data ? timelineEntries(data).filter((e) => !(submission && e.key === "version-1")) : [];
 
   return (
     <div className="space-y-6">
       {data && !failed && (statusTarget === undefined
         ? <ReviewStatus data={data} />
         : statusTarget && createPortal(renderStatus ? renderStatus(data) : <ReviewStatus data={data} />, statusTarget))}
-      <section aria-labelledby={headingId} className="space-y-3">
-        <RailHeading id={headingId}>Timeline</RailHeading>
+      <section aria-labelledby={headingId} className="space-y-4">
+        <h3 id={headingId} className="sr-only">Timeline</h3>
 
         {failed ? (
           <div className="space-y-2">
@@ -160,24 +191,32 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
                 Routing recorded from {formatDate(data.routing_recorded_from)}.
               </p>
             )}
-            {entries.length === 0 ? (
-              <p className="text-small text-stone-600">Nothing has happened in this review yet.</p>
-            ) : (
-              <ol aria-label="Review timeline" className="relative space-y-4 border-l border-stone-200 ml-2">
-                {entries.map((entry) => (
-                  <TimelineItem key={entry.key} entry={entry} discussion={discussion} />
-                ))}
-              </ol>
-            )}
+            <div className="review-rail">
+              {submission && <SubmissionBox submission={submission} />}
+              {entries.length === 0 ? (
+                !submission && <p className="text-small text-stone-600">Nothing has happened in this review yet.</p>
+              ) : (
+                <ol aria-label="Review timeline" className="review-tl">
+                  {entries.map((entry) => (
+                    <TimelineItem key={entry.key} entry={entry} discussion={discussion} />
+                  ))}
+                </ol>
+              )}
+            </div>
+            {statusBox && <StatusBox data={data} />}
             {beforeComment}
             {canComment && (
-              <CommentForm
-                label="Comment"
-                submitLabel="Comment"
-                recordId={recordId}
-                onSubmit={(body, mentions) => discussion.post(body, undefined, mentions)}
-                clearOnSuccess
-              />
+              <div className="review-composer">
+                {viewerName ? <Avatar name={viewerName} large /> : <span aria-hidden />}
+                <CommentForm
+                  label="Comment"
+                  submitLabel="Comment"
+                  recordId={recordId}
+                  onSubmit={(body, mentions) => discussion.post(body, undefined, mentions)}
+                  clearOnSuccess
+                  boxed
+                />
+              </div>
             )}
             <p role="status" className="text-small text-stone-700">{draftNote}</p>
           </>
@@ -187,98 +226,188 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
   );
 }
 
-function TimelineItem({ entry, discussion }: { entry: TimelineEntry; discussion: Discussion }) {
-  const byline = [entry.actor, entry.party].filter(Boolean) as string[];
-  const thread = entry.comment;
-  const [replying, setReplying] = useState(false);
-  const replyLabel = entry.actor ? `Reply to ${entry.actor}` : "Reply to this comment";
+/** A person's initials in a round chip. Decorative: their name is always written beside it. */
+function Avatar({ name, large = false }: { name: string | null; large?: boolean }) {
+  return <span aria-hidden className={cn("review-avatar", large && "review-avatar-lg")}>{initials(name)}</span>;
+}
 
+/** The submission, as a pull request opens with its description: who, when, and the abstract. */
+function SubmissionBox({ submission }: { submission: TimelineSubmission }) {
+  const who = submission.author ?? "The authors";
   return (
-    <li className="relative pl-6">
-      <span
-        aria-hidden
-        className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-white ring-1 ring-stone-200 flex items-center justify-center"
-      >
-        <i className={cn("fas text-2xs text-stone-600", KIND_ICON[entry.kind])} />
-      </span>
-      <div className="flex items-baseline gap-x-2 gap-y-1 flex-wrap">
-        <p className="text-small font-semibold text-stone-900">{entry.act}</p>
-        {entry.status && (
-          <span className="px-1.5 py-0.5 rounded-control bg-stone-100 text-2xs font-semibold text-stone-700">
-            {entry.status}
-          </span>
+    <div className="review-tl-cmt">
+      <Avatar name={submission.author} large />
+      <article className="review-box" aria-label={`Submission by ${who}`}>
+        <header className="review-box-head">
+          <p>
+            <b>{who}</b>{" "}
+            submitted v1{submission.at && <> · <time dateTime={submission.at}>{formatDate(submission.at)}</time></>}
+          </p>
+        </header>
+        {submission.abstract.trim() && (
+          <div className="review-box-body">
+            <p className="review-abstract whitespace-pre-wrap break-words">{submission.abstract}</p>
+          </div>
         )}
-        <VersionTag version={entry.version} />
+      </article>
+    </div>
+  );
+}
+
+/**
+ * Where the review stands, after the timeline, like the box at the end of a
+ * pull request: one line, the server's turn line, and every office's
+ * clearance folded under it. The tone follows the strip's kinds; every word
+ * is the server's (`turnLine`, `clearance_strip`).
+ */
+function StatusBox({ data }: { data: RecordTracker }) {
+  const id = useId();
+  const strip: ClearanceStripEntry[] = Array.isArray(data.clearance_strip) ? data.clearance_strip : [];
+  if (strip.length === 0) return null;
+  const tone = strip.some((e) => e.kind === "revision" || e.kind === "not_cleared")
+    ? { name: "attention", icon: "fa-rotate-left" }
+    : strip.every((e) => e.kind === "cleared" || e.kind === "kept")
+      ? { name: "settled", icon: "fa-check" }
+      : { name: "active", icon: "fa-hourglass-half" };
+  const line = turnLine(data);
+  return (
+    <section aria-labelledby={id} className="review-mbox">
+      <div className="review-mbox-head">
+        <span aria-hidden className={cn("review-mb-ic", tone.name)}><i className={cn("fas", tone.icon)} /></span>
+        <div className="min-w-0">
+          <h3 id={id}>{line}</h3>
+          {line !== data.workflow_state_label && <p className="text-2xs text-stone-600">{data.workflow_state_label}</p>}
+        </div>
       </div>
-      <p className="text-2xs text-stone-600 mt-0.5">
-        {byline.map((part, i) => (
-          <span key={i} className={cn(i === 0 && entry.actor && "font-semibold text-stone-700")}>
-            {i > 0 && " · "}
-            {part}
-          </span>
-        ))}
-        {byline.length > 0 && " · "}
-        {entry.at ? <time dateTime={entry.at}>{formatDate(entry.at)}</time> : "Date not recorded"}
-        {thread?.root.edited_at && " · Edited"}
-      </p>
+      <details className="review-mbox-list">
+        <summary className={FOCUS_RING}><i className="fas fa-chevron-right text-3xs" aria-hidden />Show all clearances</summary>
+        <ClearanceStrip entries={strip} className="flex-col !items-start gap-y-2 px-[14px] pb-3" />
+      </details>
+    </section>
+  );
+}
 
-      {thread ? (
-        <EditableComment
-          comment={thread.root}
-          discussion={discussion}
-          action={<TextAction label="Reply" name={replyLabel} onClick={() => setReplying(true)} />}
-        />
-      ) : (
-        entry.note && (
-          <p className="text-small text-stone-700 leading-relaxed mt-1 break-words">“{entry.note}”</p>
-        )
-      )}
-      {/* By position: two items can read the same (one label, one state). */}
-      {entry.details.map((line, i) => (
-        <p key={i} className="text-2xs text-stone-600 mt-0.5 break-words">
-          {line}
-        </p>
-      ))}
+function TimelineItem({ entry, discussion }: { entry: TimelineEntry; discussion: Discussion }) {
+  if (entry.comment) return <CommentItem entry={entry} thread={entry.comment} discussion={discussion} />;
+  const byline = [entry.actor, entry.party].filter(Boolean) as string[];
 
-      {thread && thread.replies.length > 0 && (
-        <ol
-          aria-label={entry.actor ? `Replies to ${entry.actor}` : "Replies"}
-          className="mt-3 space-y-3 border-l border-stone-200 pl-4"
-        >
-          {thread.replies.map((reply) => (
-            <Reply key={reply.id} reply={reply} discussion={discussion} />
+  // Every other entry: one line on the rail, with a round badge.
+  return (
+    <li className="review-tl-ev">
+      <span aria-hidden className="review-badge"><i className={cn("fas", KIND_ICON[entry.kind])} /></span>
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-x-2 gap-y-1 flex-wrap">
+          <p className="text-small font-semibold text-stone-900">{entry.act}</p>
+          {entry.status && (
+            <span className="px-1.5 py-0.5 rounded-control bg-stone-100 text-2xs font-semibold text-stone-700">
+              {entry.status}
+            </span>
+          )}
+          <VersionTag version={entry.version} />
+        </div>
+        <p className="text-2xs text-stone-600 mt-0.5">
+          {byline.map((part, i) => (
+            <span key={i} className={cn(i === 0 && entry.actor && "font-semibold text-stone-700")}>
+              {i > 0 && " · "}
+              {part}
+            </span>
           ))}
-        </ol>
-      )}
-
-      {thread && replying && (
-        <CommentForm
-          label={replyLabel}
-          submitLabel="Send reply"
-          recordId={discussion.recordId}
-          onSubmit={async (body, mentions) => {
-            await discussion.post(body, thread.root.id, mentions);
-            setReplying(false);
-          }}
-          onCancel={() => setReplying(false)}
-        />
-      )}
+          {byline.length > 0 && " · "}
+          {entry.at ? <time dateTime={entry.at}>{formatDate(entry.at)}</time> : "Date not recorded"}
+        </p>
+        {entry.note && (
+          <p className="text-small text-stone-700 leading-relaxed mt-1 break-words">“{entry.note}”</p>
+        )}
+        {/* By position: two items can read the same (one label, one state). */}
+        {entry.details.map((line, i) => (
+          <p key={i} className="text-2xs text-stone-600 mt-0.5 break-words">
+            {line}
+          </p>
+        ))}
+      </div>
     </li>
   );
 }
 
-/** A reply, under the comment it answers. Threads are one level deep. */
+/**
+ * A comment as a box (IR-1131): who wrote it, what they did and when, the
+ * party as a small tag, the text, its replies inside the box, and a reply
+ * field in its foot for a viewer who may comment.
+ */
+function CommentItem({ entry, thread, discussion }: {
+  entry: TimelineEntry;
+  thread: NonNullable<TimelineEntry["comment"]>;
+  discussion: Discussion;
+}) {
+  const [replying, setReplying] = useState(false);
+  const replyLabel = entry.actor ? `Reply to ${entry.actor}` : "Reply to this comment";
+  const who = entry.actor ?? "Someone";
+
+  return (
+    <li className="review-tl-cmt">
+      <Avatar name={entry.actor} large />
+      <article className="review-box" aria-label={`Comment by ${who}`}>
+        <header className="review-box-head">
+          <p>
+            <b>{who}</b>{" "}
+            {entry.act.charAt(0).toLowerCase() + entry.act.slice(1)}{" "}
+            {entry.at ? <time dateTime={entry.at}>{formatDate(entry.at)}</time> : "· date not recorded"}
+            {thread.root.edited_at && " · Edited"}{" "}
+            <VersionTag version={entry.version} />
+          </p>
+          {entry.party && <span className="review-label">{entry.party}</span>}
+        </header>
+        <div className="review-box-body">
+          <EditableComment comment={thread.root} discussion={discussion} />
+        </div>
+        {thread.replies.length > 0 && (
+          <ol aria-label={entry.actor ? `Replies to ${entry.actor}` : "Replies"} className="review-box-replies">
+            {thread.replies.map((reply) => (
+              <Reply key={reply.id} reply={reply} discussion={discussion} />
+            ))}
+          </ol>
+        )}
+        {discussion.canComment && (
+          <div className="review-box-foot">
+            {replying ? (
+              <CommentForm
+                label={replyLabel}
+                submitLabel="Send reply"
+                recordId={discussion.recordId}
+                onSubmit={async (body, mentions) => {
+                  await discussion.post(body, thread.root.id, mentions);
+                  setReplying(false);
+                }}
+                onCancel={() => setReplying(false)}
+              />
+            ) : (
+              <button type="button" aria-label={replyLabel} onClick={() => setReplying(true)}
+                className={cn("review-reply-field", FOCUS_RING)}>
+                {replyLabel}…
+              </button>
+            )}
+          </div>
+        )}
+      </article>
+    </li>
+  );
+}
+
+/** A reply, inside the box of the comment it answers. Threads are one level deep. */
 function Reply({ reply, discussion }: { reply: ReviewComment; discussion: Discussion }) {
   return (
-    <li>
-      <p className="text-2xs text-stone-600">
-        {reply.author_name && <span className="font-semibold text-stone-700">{reply.author_name}</span>}
-        {reply.author_name && " · "}
-        <time dateTime={reply.created_at}>{formatDate(reply.created_at)}</time>
-        {reply.edited_at && " · Edited"}{" "}
-        <VersionTag version={reply.version} />
-      </p>
-      <EditableComment comment={reply} discussion={discussion} />
+    <li className="review-box-rep">
+      <Avatar name={reply.author_name} />
+      <div className="min-w-0">
+        <p className="text-2xs text-stone-600">
+          {reply.author_name && <span className="font-semibold text-stone-900">{reply.author_name}</span>}
+          {reply.author_name && " · "}
+          <time dateTime={reply.created_at}>{formatDate(reply.created_at)}</time>
+          {reply.edited_at && " · Edited"}{" "}
+          <VersionTag version={reply.version} />
+        </p>
+        <EditableComment comment={reply} discussion={discussion} />
+      </div>
     </li>
   );
 }
@@ -372,6 +501,8 @@ interface CommentFormProps {
   onCancel?: () => void;
   /** Empty the box once the server has it (the composer, not an edit). */
   clearOnSuccess?: boolean;
+  /** Drawn as a box: the label in its head, the field in its body, the controls in its foot (IR-1131). */
+  boxed?: boolean;
 }
 
 /**
@@ -379,7 +510,7 @@ interface CommentFormProps {
  * the server's own words, and what was written stays in the box.
  */
 function CommentForm({
-  label, submitLabel, initial = "", recordId, initialMentions = [], onSubmit, onCancel, clearOnSuccess,
+  label, submitLabel, initial = "", recordId, initialMentions = [], onSubmit, onCancel, clearOnSuccess, boxed = false,
 }: CommentFormProps) {
   const id = useId();
   const [body, setBody] = useState(initial);
@@ -407,37 +538,62 @@ function CommentForm({
     }
   };
 
+  const field = (
+    <textarea
+      ref={ref}
+      id={id}
+      rows={3}
+      value={body}
+      onChange={(e) => setBody(e.target.value)}
+      className={fieldClasses(false)}
+    />
+  );
+  const alert = error && (
+    <p role="alert" className={LOAD_ERROR}>
+      <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
+      {error}
+    </p>
+  );
+  const buttons = (
+    <div className="flex justify-end gap-2">
+      {onCancel && (
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={sending}>
+          Cancel
+        </Button>
+      )}
+      <Button type="submit" disabled={!ready} loading={sending}>
+        {submitLabel}
+      </Button>
+    </div>
+  );
+
+  if (boxed) {
+    return (
+      <form onSubmit={submit} noValidate className="review-box">
+        <div className="review-box-head">
+          <label htmlFor={id} className="font-semibold text-stone-900">{label}</label>
+        </div>
+        <div className="review-box-body space-y-2">
+          {field}
+          <SavedReplies textareaRef={ref} value={body} onChange={setBody} />
+          <MentionPicker recordId={recordId} value={mentioned} onChange={setMentioned} />
+          {alert}
+        </div>
+        <div className="review-box-foot">{buttons}</div>
+      </form>
+    );
+  }
+
   return (
     <form onSubmit={submit} noValidate className="mt-3 space-y-2">
       <label htmlFor={id} className={LABEL}>
         {label}
       </label>
-      <textarea
-        ref={ref}
-        id={id}
-        rows={3}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        className={fieldClasses(false)}
-      />
+      {field}
       <SavedReplies textareaRef={ref} value={body} onChange={setBody} />
       <MentionPicker recordId={recordId} value={mentioned} onChange={setMentioned} />
-      {error && (
-        <p role="alert" className={LOAD_ERROR}>
-          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
-        </p>
-      )}
-      <div className="flex justify-end gap-2">
-        {onCancel && (
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={sending}>
-            Cancel
-          </Button>
-        )}
-        <Button type="submit" disabled={!ready} loading={sending}>
-          {submitLabel}
-        </Button>
-      </div>
+      {alert}
+      {buttons}
     </form>
   );
 }
