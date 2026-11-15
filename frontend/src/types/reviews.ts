@@ -115,7 +115,16 @@ export interface OfficeConsoleRow {
   can_extend:       boolean;
   /** Which clearances this record holds, in the server's words (IR-1083). */
   clearance_strip:  ClearanceStripEntry[];
+  /** "Ada Lovelace, Alan Turing · v2": the authors and the Version under review. */
+  authors_line:     string;
+  /** The status chip, worded by the server; `kind` picks only its tone. */
+  status:           { kind: OfficeConsoleStatusKind; text: string };
+  /** What the viewer may do to this row, in menu order. */
+  actions:          OfficeConsoleAction[];
 }
+
+export type OfficeConsoleStatusKind = "kept" | "overdue" | "unassigned" | "due" | "paused" | "no_date";
+export type OfficeConsoleAction = "assign" | "reassign" | "extend";
 
 /** One member's load in the console: every member, idle ones too. */
 export interface OfficeLoad {
