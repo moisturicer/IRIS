@@ -511,6 +511,10 @@ class Investigation:
                 "passage": passage.handle, "paper": paper[0] if paper else None,
                 "page": passage.page, "section": passage.section, "text": passage.text[passage.overlap:],
                 **({"repeats_previous_chars": passage.overlap} if passage.overlap else {}),
+                # Read as continuous text with the passage it continues (IR-397).
+                **({"continues": passage.continues} if passage.continues else {}),
+                # Context from the hit's section; search did not rank it (IR-1055).
+                **({"section_context": True} if passage.section_mate else {}),
             })
         if result.turn is not None:
             turn = result.turn

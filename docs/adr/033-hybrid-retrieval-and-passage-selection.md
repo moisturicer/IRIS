@@ -200,6 +200,19 @@ A lost two text questions to C and won none, so C stands against A (rule 2). B l
 
 **Scope.** The gap matters only to chunking strategies that keep a Figure as its own chunk (labeled). Structural and fixed-window fold Figures into prose. The text set ran on `iris_ir1054`, which holds 67 of the proxy set's 89 scored questions.
 
+## Amendment — 2026-11-15 (IR-397): §4 lives in the AI runtime's search, and ships on
+
+**Where.** Since IR-957, Django no longer answers reader questions; the AI runtime's agent does, through its own `search` tool (`ai/research/tools.py`). A selection step in Django's `SourceSelection` would reach only the eval harness. §4 is therefore built in the runtime (`ai/research/selection.py`), applied to both the keyword and the hybrid search. Django's `SourceSelection` is unchanged.
+
+**On by default, unmeasured.** Jive Tyler Revalde decided on 2026-11-15 that the per-paper cap, joining and the token budget ship on. This is an exception to §5, made by a person, not a measured result. Each part switches off on its own (`RUNS_PASSAGES_PER_PAPER=0`, `RUNS_JOIN_PASSAGES=off`, `RUNS_PASSAGE_TOKENS=0`). No harness yet measures the runtime's search, so no number supports the default.
+
+**How §4 reads in the runtime.** Two divergences from the text above, both chosen by the same person:
+
+- **Joined chunks stay separate passages, linked.** Adjacent hits from one Manuscript arrive consecutively, in reading order. Each one after the first names the passage it `continues`, and repeated text is shown once. Each part keeps its own handle, so a citation still opens its own page, with its own regions and its own Figure. A single merged passage would need one handle to carry several pages' regions.
+- **The budget scales with the request.** The agent picks how many passages to ask for, so the budget is that number × 700 tokens: the chunker's maximum chunk, counted from the chunk's stored `token_count`. A search therefore never returns fewer hits than it did before this change. Hits that would push the total past the budget are skipped for smaller ones further down the ranking, and the top hit is always returned.
+
+The cap (3) applies outside Paper Chat only. When it removes a hit, the next-ranked hits from other papers fill the slot.
+
 ## Alternatives Considered
 
 **Keyword search restricted to the vector candidates** — run the vector search, then keyword-match within its top *n*. Rejected. It cannot surface a passage the vector search missed, which is the entire failure hybrid retrieval addresses. It buys a smaller keyword query in exchange for the only benefit on offer.
