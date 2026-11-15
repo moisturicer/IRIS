@@ -73,8 +73,8 @@ export function ChatMessageList({
       <div className="shrink-0 px-4 pb-1 pt-6 text-center sm:px-6">
         <div className={`${CHAT_OPENING_COLUMN} animate-fade-in-up motion-reduce:animate-none`}>
           <AskIrisEmblem className="w-16 h-16 mx-auto mb-5" />
-          <h2 className="text-[26px] font-bold text-stone-900 mb-2">What do you want to ask?</h2>
-          <p className="mx-auto max-w-xl text-[15px] text-stone-500 leading-relaxed">
+          <h2 className="text-display font-bold text-stone-900 mb-2">What do you want to ask?</h2>
+          <p className="mx-auto max-w-xl text-body text-stone-500 leading-relaxed">
             Every answer is grounded in published research records
             {indexedRecords != null && (
               <> — <strong className="text-stone-700">{indexedRecords}</strong> currently searchable</>

@@ -19,6 +19,7 @@ import { passageFromRange, type Passage } from "./threads/passage";
 import { ThreadMarks, useReaderAnnotations, type ReaderMark } from "./threads/readerAnnotations";
 import type { FindHit } from "./findInPaper";
 import { PaperFind } from "./PaperFind";
+import { ReaderWatermark } from "./ReaderWatermark";
 import {
   PANE_TOP_PX,
   READER_TOOLBAR_TOP,
@@ -200,6 +201,8 @@ function PdfPageView({
       style={{ width, height, ["--total-scale-factor" as string]: scale }}
     >
       {live && page && <LivePageLayers page={page} scale={scale} hits={hits} onPaint={onPaint} />}
+      {/* Over the paper, under the reader's own highlights and citations (IR-1128). */}
+      <ReaderWatermark width={width} height={height} scale={scale} />
       <HighlightMarks highlights={highlights} page={pageNumber} />
       <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
       <ThreadMarks marks={marks} page={pageNumber} />
