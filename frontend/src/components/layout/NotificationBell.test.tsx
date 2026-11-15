@@ -172,6 +172,23 @@ describe("the bell's popover (IR-1137)", () => {
     expect(within(dialog).getByRole("link", { name: "See all" })).toHaveAttribute("href", "/notifications");
   });
 
+  it("shows the newest three whatever order the store holds them in", async () => {
+    const dated = [1, 2, 3, 4].map((id) => ({ ...notification(id, `Update ${id}`), created_at: `2026-10-0${id}T09:00:00Z` }));
+    useNotificationsStore.setState({ items: dated, unreadCount: 4 });
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>,
+    );
+
+    const dialog = await openBell();
+    expect(within(dialog).getAllByRole("button", { name: /Update/ }).map((b) => b.textContent)).toEqual([
+      expect.stringContaining("Update 4"),
+      expect.stringContaining("Update 3"),
+      expect.stringContaining("Update 2"),
+    ]);
+  });
+
   it("closes on Escape and returns focus to the bell", async () => {
     useNotificationsStore.setState({ items: four(), unreadCount: 4 });
     render(

@@ -27,11 +27,9 @@ import { cn, formatDate } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
 import { notificationTypeLabel } from "./notificationLabels";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
+import { isUnread, UnreadDot, UnreadWord } from "./unread";
 
 type Filter = "all" | "unread";
-
-/** Waiting on the reader: unread, and its task has not ended. */
-const isUnread = (n: Notification) => !n.is_read && n.resolved_at == null;
 
 /** The day a notification belongs to, in plain words, newest group first. */
 function dayGroup(createdAt: string, now: Date): string {
@@ -58,6 +56,9 @@ export default function NotificationsPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  // A failed mark-read or mark-all is said, not swallowed: the row would
+  // otherwise look read while the server still holds it unread.
+  const [actionFailed, setActionFailed] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -79,8 +80,13 @@ export default function NotificationsPage() {
   };
 
   const handleMarkRead = async (id: number) => {
-    await notificationsApi.markRead(id);
-    setRead(id);
+    try {
+      await notificationsApi.markRead(id);
+      setRead(id);
+      setActionFailed(false);
+    } catch {
+      setActionFailed(true);
+    }
   };
 
   // Opening a record is navigation first: a failed read flag is re-synced on
@@ -92,9 +98,14 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAllRead = async () => {
-    await notificationsApi.markAllRead();
-    markAllRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    try {
+      await notificationsApi.markAllRead();
+      markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setActionFailed(false);
+    } catch {
+      setActionFailed(true);
+    }
   };
 
   const unreadCount = notifications.filter(isUnread).length;
@@ -139,14 +150,19 @@ export default function NotificationsPage() {
         title="Notifications"
         description="Updates on your records and reviews. Use Open to go to the record."
         actions={
-          unreadCount > 0 ? (
-            <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
-              <i className="fas fa-check-double mr-2" aria-hidden />
-              Mark all as read
-            </Button>
-          ) : undefined
+          // Always there, as in the prototype; nothing to do at zero unread.
+          <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={unreadCount === 0}>
+            <i className="fas fa-check-double mr-2" aria-hidden />
+            Mark all as read
+          </Button>
         }
       />
+
+      {actionFailed && (
+        <p role="alert" className="mb-section-sm text-small font-medium text-brand-dark">
+          Couldn&apos;t update your notifications. Check your connection and try again.
+        </p>
+      )}
 
       {!loading && !loadFailed && notifications.length > 0 && (
         <div
@@ -224,10 +240,7 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
   return (
     <li className="flex items-start gap-3 px-5 py-4 max-sm:flex-wrap">
       {/* Unread mark: a maroon dot, with the word for screen readers beside the text. */}
-      <span
-        aria-hidden
-        className={cn("mt-2 block w-2 h-2 shrink-0 rounded-full", unread ? "bg-brand" : "bg-transparent")}
-      />
+      <UnreadDot unread={unread} className="mt-2" />
 
       <div className="flex-1 min-w-0 max-sm:basis-[calc(100%-1.25rem)]">
         <span
@@ -236,7 +249,7 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
             unread ? "text-stone-900 font-medium" : "text-stone-600",
           )}
         >
-          {unread && <span className="sr-only">Unread: </span>}
+          <UnreadWord unread={unread} />
           {n.message}
         </span>
         {resolved && (

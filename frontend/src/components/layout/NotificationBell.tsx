@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { notificationsApi } from "@/api/notifications";
 import { useNotificationsStore } from "@/store/notifications.store";
 import type { Notification } from "@/types/notifications";
+import { isUnread, UnreadDot, UnreadWord } from "@/features/notifications/unread";
 import { formatDate, cn } from "@/lib/utils";
 
 /** How many of the latest unread items the popover shows before deferring to the full page. */
@@ -46,6 +47,11 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
   const items = useNotificationsStore((s) => s.items);
   const markReadInStore = useNotificationsStore((s) => s.markRead);
   const unreadBadge = unreadCount > 9 ? "9+" : String(unreadCount);
+
+  // Newest first, whatever order the store was filled in.
+  const latest = [...items]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, PREVIEW_LIMIT);
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -139,14 +145,14 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
               </p>
             ) : (
               <ul>
-                {items.slice(0, PREVIEW_LIMIT).map((n) => {
-                  const resolved = n.resolved_at != null;
+                {latest.map((n) => {
+                  const unread = isUnread(n);
                   const body = (
                     <>
-                      <span aria-hidden className={cn("mt-1.5 block w-2 h-2 shrink-0 rounded-full", resolved ? "bg-transparent" : "bg-brand")} />
+                      <UnreadDot unread={unread} className="mt-1.5" />
                       <span className="min-w-0 flex-1">
-                        <span className={cn("block text-small leading-snug", resolved ? "text-stone-600" : "text-stone-900 font-medium")}>
-                          {!resolved && <span className="sr-only">Unread: </span>}
+                        <span className={cn("block text-small leading-snug", unread ? "text-stone-900 font-medium" : "text-stone-600")}>
+                          <UnreadWord unread={unread} />
                           {n.message}
                         </span>
                         <span className="block text-label text-stone-600 mt-0.5">

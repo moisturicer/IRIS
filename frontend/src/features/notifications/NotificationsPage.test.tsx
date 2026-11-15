@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { renderScreen, screen, userEvent } from "@/test/render";
 
+import { NotificationBell } from "@/components/layout/NotificationBell";
+import { useNotificationsStore } from "@/store/notifications.store";
+
 import NotificationsPage from "./NotificationsPage";
 
 const list = vi.fn();
@@ -102,6 +105,56 @@ describe("Notifications", () => {
 
       await userEvent.click(screen.getByRole("button", { name: /Mark all as read/ }));
       expect(await screen.findByRole("button", { name: "Unread 0" })).toBeInTheDocument();
+    });
+  });
+
+  describe("with the bell beside it (IR-1137)", () => {
+    const seed = () => {
+      const now = new Date().toISOString();
+      const rows = [at(1, now, "First"), at(2, now, "Second"), at(3, now, "Third")];
+      useNotificationsStore.setState({ items: rows, unreadCount: 3 });
+      list.mockResolvedValueOnce({ data: { results: rows } });
+    };
+
+    it("agrees on the unread count after marking one and after marking all", async () => {
+      markRead.mockResolvedValue({});
+      markAllRead.mockResolvedValue({});
+      seed();
+      renderScreen(
+        <>
+          <NotificationBell />
+          <NotificationsPage />
+        </>,
+      );
+
+      expect(await screen.findByRole("button", { name: "Unread 3" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Notifications, 3 unread" })).toBeInTheDocument();
+
+      await userEvent.click(screen.getAllByRole("button", { name: "Mark as read" })[0]);
+      expect(await screen.findByRole("button", { name: "Unread 2" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Notifications, 2 unread" })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: /Mark all as read/ }));
+      expect(await screen.findByRole("button", { name: "Unread 0" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Notifications" })).toBeInTheDocument();
+    });
+
+    it("says so when marking read fails, and leaves the row unread", async () => {
+      markRead.mockRejectedValue(new Error("Network Error"));
+      seed();
+      renderScreen(<NotificationsPage />);
+
+      await userEvent.click((await screen.findAllByRole("button", { name: "Mark as read" }))[0]);
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't update your notifications");
+      expect(screen.getByRole("button", { name: "Unread 3" })).toBeInTheDocument();
+    });
+
+    it("keeps Mark all as read on the page, disabled when nothing is unread", async () => {
+      list.mockResolvedValueOnce({ data: { results: [{ ...at(1, new Date().toISOString(), "Done"), is_read: true }] } });
+      renderScreen(<NotificationsPage />);
+
+      expect(await screen.findByRole("button", { name: /Mark all as read/ })).toBeDisabled();
     });
   });
 
