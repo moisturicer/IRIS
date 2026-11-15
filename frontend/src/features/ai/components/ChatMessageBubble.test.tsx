@@ -240,6 +240,65 @@ describe("a cited answer", () => {
     }
   });
 
+  describe("a question's Ask again and Edit controls (IR-1162)", () => {
+    const question: ChatMessage = {
+      id: "q1", role: "user", content: "What did the flood study find?", createdAt: "2026-09-20T00:00:00.000Z",
+    };
+
+    it("sends the question again when Ask again is used", async () => {
+      const onAskAgain = vi.fn();
+      renderScreen(<ChatMessageBubble message={question} onAskAgain={onAskAgain} onEdit={vi.fn()} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Ask again" }));
+      expect(onAskAgain).toHaveBeenCalledWith("What did the flood study find?");
+    });
+
+    it("hands the question to Edit without sending it", async () => {
+      const onAskAgain = vi.fn();
+      const onEdit = vi.fn();
+      renderScreen(<ChatMessageBubble message={question} onAskAgain={onAskAgain} onEdit={onEdit} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+      expect(onEdit).toHaveBeenCalledWith("What did the flood study find?");
+      expect(onAskAgain).not.toHaveBeenCalled();
+    });
+
+    it("works from the keyboard", async () => {
+      const onAskAgain = vi.fn();
+      renderScreen(<ChatMessageBubble message={question} onAskAgain={onAskAgain} onEdit={vi.fn()} />);
+
+      await userEvent.tab();
+      expect(screen.getByRole("button", { name: "Ask again" })).toHaveFocus();
+      await userEvent.keyboard("{Enter}");
+      expect(onAskAgain).toHaveBeenCalledTimes(1);
+    });
+
+    it("is unavailable while a run is active", async () => {
+      const onAskAgain = vi.fn();
+      renderScreen(<ChatMessageBubble message={question} onAskAgain={onAskAgain} onEdit={vi.fn()} controlsDisabled />);
+
+      expect(screen.getByRole("button", { name: "Ask again" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Edit" })).toBeDisabled();
+    });
+
+    it("offers neither where the page gives no handler, and none on an answer", () => {
+      renderScreen(<ChatMessageBubble message={question} />);
+      expect(screen.queryByRole("button", { name: /ask again|edit/i })).toBeNull();
+
+      renderScreen(<ChatMessageBubble message={assistantMessage()} onAskAgain={vi.fn()} onEdit={vi.fn()} />);
+      expect(screen.queryByRole("button", { name: /ask again|edit/i })).toBeNull();
+    });
+
+    it("keeps Retry on a run that ended without an answer", async () => {
+      const onRetry = vi.fn();
+      const ended = assistantMessage({ endedRun: { id: "r1", state: "failed" }, citations: [] });
+      renderScreen(<ChatMessageBubble message={ended} onRetry={onRetry} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(onRetry).toHaveBeenCalledWith(ended);
+    });
+  });
+
   it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(
       <ChatMessageBubble message={assistantMessage({ degraded: true })} />,

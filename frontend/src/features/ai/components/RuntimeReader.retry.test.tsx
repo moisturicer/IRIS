@@ -76,3 +76,23 @@ test("a retry that cannot start says the conversation changed and offers to reco
   expect(await screen.findByRole("alert")).toHaveTextContent("changed");
   expect(screen.getByRole("button", { name: "Reconnect" })).toBeInTheDocument();
 });
+
+test("any question can be asked again or edited as a new Turn (IR-1162)", async () => {
+  const asked = run({ state: "completed" });
+  const again = run({ id: "run-2", state: "queued", question: "Compare" });
+  reopened(asked);
+  const post = vi.spyOn(apiClient, "post").mockImplementation(async () => {
+    server.latest = again;
+    return { data: again };
+  });
+  const user = userEvent.setup();
+  render(<MemoryRouter><RuntimeReader conversationId="conversation-1" /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  expect(screen.getByRole("textbox")).toHaveValue("Compare");
+  expect(post).not.toHaveBeenCalled();
+
+  await user.click(screen.getByRole("button", { name: "Ask again" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0]).not.toContain("/retry");
+});

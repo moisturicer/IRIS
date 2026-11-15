@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { CHAT_COLUMN, CHAT_COMPOSER_FIELD, CHAT_COMPOSER_ICON, CHAT_COMPOSER_SURFACE, CHAT_OPENING_COLUMN } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
@@ -24,11 +24,13 @@ interface ChatInputProps {
   onDraftChange?: (text: string) => void;
   /** While an answer is being written, the send button becomes this stop button. */
   onStop?: () => void;
+  /** The text box, for a page to move focus into it (IR-1162). */
+  textareaRef?: Ref<HTMLTextAreaElement>;
 }
 
 const ATTACH_CLOSED = "Attaching files is not available yet";
 
-export function ChatInput({ onSend, disabled, sendDisabled, children, beside, placeholder, label, draft, onDraftChange, maxLength, onStop, centered = false }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, sendDisabled, children, beside, placeholder, label, draft, onDraftChange, maxLength, onStop, centered = false, textareaRef }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
   const text = draft ?? ownText;
   const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
@@ -59,6 +61,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, beside, pl
     >
       <div className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 p-1.5 ${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} ${CHAT_COMPOSER_SURFACE}`}>
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
