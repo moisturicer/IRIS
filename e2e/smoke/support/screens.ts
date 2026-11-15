@@ -74,7 +74,9 @@ const OPPORTUNITY = {
   areas: [1], area_names: ["Agriculture"], start_date: "2027-02-10", end_date: "2027-02-12",
   registration_fee: "PHP 5,000", is_featured: false,
   posted_by: 2, posted_by_name: "RDCO", created_at: when("11-01"), updated_at: when("11-01"),
-  days_left: 39, is_closed: false, can_edit: false,
+  days_left: 39, is_closed: false,
+  papers_state: "accepting", papers_label: "Accepting papers",
+  event_state: "upcoming", event_label: "Upcoming", can_edit: false,
 };
 
 const LONG_TITLE = "A comparative study of low-cost capacitive soil moisture sensing for upland rice in Cebu";

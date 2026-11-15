@@ -12,6 +12,12 @@ class OpportunitySerializer(serializers.ModelSerializer):
     # in the browser would drift with the user's clock and timezone.
     days_left        = serializers.SerializerMethodField()
     is_closed        = serializers.SerializerMethodField()
+    # ADR-050 decision 6 (IR-761): two independent states, worded here so
+    # every client shows the same tag. `event_state` is null when none applies.
+    papers_state     = serializers.SerializerMethodField()
+    papers_label     = serializers.SerializerMethodField()
+    event_state      = serializers.SerializerMethodField()
+    event_label      = serializers.SerializerMethodField()
     type_display     = serializers.CharField(source="get_opportunity_type_display", read_only=True)
     posted_by_name   = serializers.SerializerMethodField()
     # A capability, not a role (IR-530): the board shows Edit and Delete from
@@ -36,7 +42,8 @@ class OpportunitySerializer(serializers.ModelSerializer):
             "external_url", "due_date", "location", "areas", "area_names",
             "start_date", "end_date", "registration_fee", "is_featured",
             "posted_by", "posted_by_name", "created_at", "updated_at",
-            "days_left", "is_closed", "can_edit",
+            "days_left", "is_closed", "papers_state", "papers_label",
+            "event_state", "event_label", "can_edit",
         ]
         # posted_by is set from request.user in perform_create, never accepted
         # from the client -- otherwise a poster could attribute a call to
@@ -71,6 +78,18 @@ class OpportunitySerializer(serializers.ModelSerializer):
 
     def get_is_closed(self, obj):
         return obj.is_closed()
+
+    def get_papers_state(self, obj):
+        return obj.papers_state()
+
+    def get_papers_label(self, obj):
+        return obj.papers_label()
+
+    def get_event_state(self, obj):
+        return obj.event_state()
+
+    def get_event_label(self, obj):
+        return obj.event_label()
 
     def get_area_names(self, obj):
         return sorted(area.name for area in obj.areas.all())

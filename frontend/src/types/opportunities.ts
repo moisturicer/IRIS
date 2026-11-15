@@ -7,6 +7,16 @@ export type OpportunityType =
   | "journal"
   | "book_chapter";
 
+/** ADR-050 decision 6 (IR-761): accepting through the paper deadline, then closed. */
+export type CallPapersState = "accepting" | "closed";
+
+/**
+ * ADR-050 decisions 6 and 7 (IR-761). `over` begins the day after the event's
+ * last date, so it can sit beside `accepting` while a later deadline keeps the
+ * Call listed. A Call leaves the board list the day after its latest date.
+ */
+export type CallEventState = "upcoming" | "happening" | "over";
+
 export interface Opportunity {
   id:               number;
   opportunity_type: OpportunityType;
@@ -42,6 +52,21 @@ export interface Opportunity {
    */
   days_left:        number;
   is_closed:        boolean;
+  /**
+   * Two independent states, decided and worded server-side in Manila's date
+   * (IR-761): a Call can be Accepting papers and Happening now at once. Show
+   * the label as sent; branch on the state.
+   */
+  papers_state:     CallPapersState;
+  /** "Accepting papers" or "Submissions closed". */
+  papers_label:     string;
+  /** Null for a Call with no event dates until it is Over. */
+  event_state:      CallEventState | null;
+  /**
+   * "Upcoming", "Happening now", "Event over", or "Over" for a Call with no
+   * event dates; null when `event_state` is.
+   */
+  event_label:      string | null;
   /**
    * May this viewer edit or delete it (IR-530)? Decided server-side by the
    * same permission class that guards the update and delete endpoints, so the

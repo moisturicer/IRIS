@@ -25,12 +25,14 @@ class OpportunityViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Closed-and-stale items drop off for everyone, including posters: an
-        # opportunity nobody can act on is noise on a deadline board.
-        return (
-            Opportunity.objects.visible()
-            .select_related("posted_by").prefetch_related("areas")
-        )
+        # An Over Call leaves the board for everyone, posters included
+        # (ADR-050 decision 7), but only the list drops it: detail, edit,
+        # delete and the calendar still reach it, so a poster can fix a
+        # mistyped date that ended a Call (owner, 2026-11-15).
+        calls = Opportunity.objects.select_related("posted_by").prefetch_related("areas")
+        if self.action == "list":
+            return calls.not_over()
+        return calls
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
