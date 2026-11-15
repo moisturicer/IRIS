@@ -54,7 +54,7 @@ export function DownloadRequestModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Request download access" size="max-w-md">
+    <Modal open={open} onClose={onClose} title="Request download access" size="md">
       <div className="space-y-4">
         <p className="text-body text-stone-600 leading-relaxed">
           You are requesting permission to download documents for{" "}
@@ -80,7 +80,7 @@ export function DownloadRequestModal({
             RDCO reads this when deciding. Up to {NOTE_MAX_LENGTH} characters.
           </p>
         </div>
-        <p className="text-small text-stone-500 bg-stone-50 border border-stone-100 rounded-lg px-3 py-2">
+        <p className="text-small text-stone-500 bg-stone-50 border border-stone-100 rounded-control px-3 py-2">
           Every copy carries your name. Do not redistribute it without permission.
         </p>
         <div className="flex gap-2 justify-end pt-1">
@@ -88,7 +88,7 @@ export function DownloadRequestModal({
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg text-body font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 disabled:opacity-50"
+            className="px-4 py-2 rounded-control text-body font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -96,7 +96,7 @@ export function DownloadRequestModal({
             type="button"
             onClick={handleSubmit}
             disabled={submitting || !ready}
-            className="px-4 py-2 rounded-lg text-body font-semibold text-white bg-brand hover:bg-brand-light disabled:opacity-50"
+            className="px-4 py-2 rounded-control text-body font-semibold text-white bg-brand hover:bg-brand-light disabled:opacity-50"
           >
             {submitting ? "Submitting…" : "Submit request"}
           </button>

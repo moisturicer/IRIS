@@ -100,7 +100,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
         aria-expanded={open}
         aria-haspopup="true"
         title={showTitle ? "Notifications" : undefined}
-        className="relative w-11 h-11 md:w-[34px] md:h-[34px] touch:w-11 touch:h-11 rounded-lg border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
+        className="relative w-11 h-11 md:w-[34px] md:h-[34px] touch:w-11 touch:h-11 rounded-control border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
       >
         <i className="fas fa-bell text-body" aria-hidden />
         {unreadCount > 0 && (
@@ -115,7 +115,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
           role="dialog"
           aria-label="Notifications"
           className={cn(
-            "absolute top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-overlay rounded-xl border border-stone-200 shadow-card-md z-50 overflow-hidden",
+            "absolute top-full mt-2 w-[22rem] max-w-[calc(100vw-2rem)] bg-overlay rounded-card border border-stone-200 shadow-card-md z-50 overflow-hidden",
             align === "start" ? "left-0" : "right-0",
           )}
         >

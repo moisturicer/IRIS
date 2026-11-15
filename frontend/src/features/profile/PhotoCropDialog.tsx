@@ -79,7 +79,7 @@ export function PhotoCropDialog({
       open
       onClose={onClose}
       title="Crop your photo"
-      size="max-w-sm"
+      size="sm"
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className={cn(PILL_SECONDARY, FOCUS_RING)}>Cancel</button>
@@ -107,7 +107,7 @@ export function PhotoCropDialog({
           onPointerUp={() => { drag.current = null; }}
           onPointerCancel={() => { drag.current = null; }}
           className={cn(
-            "relative overflow-hidden rounded-lg bg-stone-900 cursor-grab active:cursor-grabbing touch-none select-none",
+            "relative overflow-hidden rounded-control bg-stone-900 cursor-grab active:cursor-grabbing touch-none select-none",
             FOCUS_RING,
           )}
           style={{ width: STAGE, height: STAGE }}
@@ -150,7 +150,7 @@ export function PhotoCropDialog({
             value={view.zoom}
             disabled={!image}
             onChange={(e) => { if (image) setView((v) => zoomView(image, STAGE, v, Number(e.target.value))); }}
-            className={cn("flex-1 accent-brand rounded", FOCUS_RING)}
+            className={cn("flex-1 accent-brand rounded-control", FOCUS_RING)}
           />
           <i className="fas fa-magnifying-glass-plus text-label" aria-hidden />
         </label>

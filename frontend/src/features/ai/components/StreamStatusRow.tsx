@@ -49,7 +49,7 @@ export function StreamStatusRow({
         <button
           type="button"
           onClick={onStop}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5
+          className="inline-flex items-center gap-1.5 rounded-control border border-stone-200 px-3 py-1.5
             text-small font-medium text-stone-600 hover:border-stone-300 hover:text-stone-900"
         >
           <i className="fas fa-stop text-label" aria-hidden />

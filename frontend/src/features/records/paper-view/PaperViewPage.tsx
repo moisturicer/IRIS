@@ -10,7 +10,8 @@ import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
-import { Skeleton } from "@/components/ui";
+import { Skeleton, SkeletonBlock } from "@/components/ui";
+import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
 import { useElementWidth } from "@/hooks/useElementWidth";
@@ -140,7 +141,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
   };
 
   return (
-    <section className="bg-white border border-stone-200 rounded-2xl p-5">
+    <section className="bg-white border border-stone-200 rounded-card p-5">
       <h2 className="text-heading font-semibold text-stone-900 mb-1">IP classification</h2>
       <p className="text-xs text-stone-500 mb-3">
         Office staff only. Sets the structured IP type recorded against this disclosure.
@@ -170,7 +171,7 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
           type="button"
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className="min-h-11 reading-split:min-h-9 px-3 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
+          className="min-h-11 reading-split:min-h-9 px-3 rounded-control bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-40 transition-colors"
         >
           {saving ? "Saving…" : "Save classification"}
         </button>
@@ -192,28 +193,25 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
  */
 function MainColumnSkeleton() {
   return (
-    <div className="min-w-0 space-y-4 animate-pulse motion-reduce:animate-none" aria-hidden>
-      <div className="h-5 w-56 rounded bg-stone-200" />
-      <div className="h-9 w-full rounded bg-stone-200" />
-      <div className="h-9 w-2/3 rounded bg-stone-200" />
-      <div className="h-32 w-full rounded-2xl bg-stone-100" />
+    <div className="min-w-0 space-y-4" aria-hidden>
+      <SkeletonBlock tone="strong" className="h-5 w-56" />
+      <SkeletonBlock tone="strong" className="h-9 w-full" />
+      <SkeletonBlock tone="strong" className="h-9 w-2/3" />
+      <SkeletonBlock shape="card" className="h-32 w-full" />
     </div>
   );
 }
 
 function LoadingSkeleton() {
-  // The shapes are decoration; the page announces its load once, as the other surfaces do (IR-939).
+  // The page announces its load once, as the other surfaces do (IR-939).
   return (
-    <div role="status">
-      <span className="sr-only">Loading this record…</span>
-      <div aria-hidden className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start animate-pulse">
-        <MainColumnSkeleton />
-        <div className="space-y-4">
-          <div className="h-44 rounded-2xl bg-stone-100" />
-          <div className="h-36 rounded-2xl bg-stone-100" />
-        </div>
+    <LoadingRegion label="Loading this record…" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+      <MainColumnSkeleton />
+      <div className="space-y-4">
+        <SkeletonBlock shape="card" className="h-44" />
+        <SkeletonBlock shape="card" className="h-36" />
       </div>
-    </div>
+    </LoadingRegion>
   );
 }
 
@@ -731,7 +729,7 @@ export default function PaperViewPage() {
       {/* The owner reads their own unsubmitted upload; nobody else is served
           it (IR-273), so only they are told. */}
       {!viewedVersion && record.manuscript_unsubmitted && (
-        <div className="rounded-xl border border-stone-300 bg-surface px-4 py-3 flex items-start gap-3">
+        <div className="rounded-card border border-stone-300 bg-surface px-4 py-3 flex items-start gap-3">
           <i className="fas fa-file-pen text-sm text-brand mt-0.5" aria-hidden />
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-semibold text-stone-900">Your revised manuscript, not yet submitted</p>
@@ -1109,7 +1107,7 @@ export default function PaperViewPage() {
                     id={WAITING_TARGET.revision}
                     tabIndex={-1}
                     aria-labelledby="revision-requested-heading"
-                    className="rounded-2xl border border-stone-300 bg-surface p-4 scroll-mt-20 focus:outline-none"
+                    className="rounded-card border border-stone-300 bg-surface p-4 scroll-mt-20 focus:outline-none"
                   >
                     <h2
                       id="revision-requested-heading"
@@ -1204,7 +1202,7 @@ export default function PaperViewPage() {
                 )}
 
                 {record.workflow_state === "rejected" && (
-                  <div className="rounded-2xl border border-stone-300 bg-surface p-4">
+                  <div className="rounded-card border border-stone-300 bg-surface p-4">
                     <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
                       <i className="fas fa-circle-xmark text-xs" aria-hidden />
                       This record was rejected

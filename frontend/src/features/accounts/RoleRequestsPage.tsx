@@ -71,13 +71,13 @@ export default function RoleRequestsPage() {
           action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
         />
       ) : requests.length === 0 ? (
-        <div className="bg-white rounded-xl border border-stone-200 py-16 text-center">
+        <div className="bg-white rounded-card border border-stone-200 py-16 text-center">
           <i className="fas fa-check-circle text-display text-stone-500 mb-3 block" aria-hidden />
           <p className="text-body font-medium text-stone-700">All caught up!</p>
           <p className="text-small text-stone-500 mt-1">No pending role requests.</p>
         </div>
       ) : (
-        <div className="relative bg-white rounded-xl border border-stone-200 overflow-x-auto">
+        <div className="relative bg-white rounded-card border border-stone-200 overflow-x-auto">
           <table className="w-full text-body">
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50">

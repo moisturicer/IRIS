@@ -350,9 +350,9 @@ export function MetadataForm({
       <details
         open={moreOpen}
         onToggle={(e) => onMoreOpenChange((e.currentTarget as HTMLDetailsElement).open)}
-        className="rounded-xl border border-stone-200"
+        className="rounded-card border border-stone-200"
       >
-        <summary className={cn("cursor-pointer select-none rounded-xl px-4 py-3 text-body font-medium text-stone-800", FOCUS_RING)}>
+        <summary className={cn("cursor-pointer select-none rounded-card px-4 py-3 text-body font-medium text-stone-800", FOCUS_RING)}>
           More details
           <span className="ml-2 font-normal text-stone-600">Field, PSCED and hints for your adviser</span>
         </summary>

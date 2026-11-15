@@ -148,7 +148,7 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, on
             const nameId = `${ids}-${o.verdict}-name`;
             return (
               <label key={o.verdict} className={cn(
-                "flex items-start gap-2.5 rounded-lg border px-3 py-2",
+                "flex items-start gap-2.5 rounded-control border px-3 py-2",
                 verdict === o.verdict ? SELECTED : "border-stone-200",
                 o.unavailable && "opacity-70",
               )}>
@@ -167,7 +167,7 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, on
         </fieldset>
 
         {(closing.length > 0 || closingThreads.length > 0) && (
-          <section aria-label="What this Decision closes" className="rounded-lg bg-stone-100 px-3 py-2 text-small text-stone-800 space-y-1">
+          <section aria-label="What this Decision closes" className="rounded-control bg-stone-100 px-3 py-2 text-small text-stone-800 space-y-1">
             <p className="font-semibold">This Decision also closes</p>
             <ul className="list-disc pl-5">
               {closing.map((line) => <li key={line}>{line}</li>)}

@@ -127,7 +127,7 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
       title="Edit details"
       displayTitle
       sheet
-      size="max-w-2xl"
+      size="lg"
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button type="button" onClick={onClose} className={cn(PILL_SECONDARY, FOCUS_RING)}>

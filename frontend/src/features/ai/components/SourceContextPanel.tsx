@@ -64,7 +64,7 @@ export function SourceContextPanel({ open, question = null, citations, sources, 
         <button
           type="button"
           onClick={onClose}
-          className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+          className="p-2 rounded-control text-stone-400 hover:bg-stone-100 hover:text-stone-700"
           aria-label="Hide sources panel"
         >
           <i className="fas fa-xmark text-body" aria-hidden />
@@ -98,8 +98,8 @@ function PassageRow({ citation, title }: { citation: ChatCitation; title: string
   return (
     <Link to={to} state={state} title={snippet || undefined}
       aria-label={openCitationLabel(citation, title)}
-      className="group/row grid grid-cols-[1.375rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-stone-100">
-      <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-md bg-surface text-2xs font-semibold tabular-nums leading-none text-brand ring-1 ring-stone-300">
+      className="group/row grid grid-cols-[1.375rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-control px-2 py-1.5 transition-colors duration-150 hover:bg-stone-100">
+      <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-control bg-surface text-2xs font-semibold tabular-nums leading-none text-brand ring-1 ring-stone-300">
         {citation.marker}
       </span>
       <span className="min-w-0">

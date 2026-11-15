@@ -247,7 +247,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   // Shown in the pane's header, and beside the launcher while a narrow window
   // keeps the pane closed, so a first visit sees it either way.
   const offer = (
-    <div role="group" aria-label="Guided tour" className="w-full rounded-lg border border-stone-300 bg-white p-3">
+    <div role="group" aria-label="Guided tour" className="w-full rounded-control border border-stone-300 bg-white p-3">
       <p className="text-small text-stone-800">New to the Review workspace? Take a short tour of its main parts.</p>
       <div className="mt-2 flex gap-2">
         <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} onClick={() => startTour(tourOpener())}>Start tour</button>

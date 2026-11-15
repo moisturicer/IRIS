@@ -25,7 +25,7 @@ type Acting =
   | { act: "extend"; row: OfficeConsoleRow };
 
 const BACK_LINK = cn(
-  "inline-flex min-h-9 items-center rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-stone-400",
+  "inline-flex min-h-9 items-center rounded-control border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-stone-400",
   COLOUR_TRANSITION,
   FOCUS_RING,
 );
@@ -118,7 +118,7 @@ export default function OfficeConsolePage() {
         <div className="space-y-8">
           <section aria-labelledby="console-workload">
             <h2 id="console-workload" className="mb-3 text-body font-semibold text-stone-900">Workload</h2>
-            <div className="overflow-x-auto rounded-xl border border-stone-200">
+            <div className="overflow-x-auto rounded-card border border-stone-200">
               <table aria-labelledby="console-workload" className="w-full text-small">
                 <thead className="bg-stone-50 text-left text-stone-600">
                   <tr>

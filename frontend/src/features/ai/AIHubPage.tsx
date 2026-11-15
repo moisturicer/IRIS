@@ -19,7 +19,7 @@ export default function AIHubPage() {
         <button
           type="button"
           onClick={() => setMode("search")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-control font-medium transition-colors
+          className={`flex items-center gap-2 px-4 py-2 rounded-control text-control font-medium transition-colors
             ${mode === "search"
               ? "bg-brand text-white"
               : "bg-stone-100 text-stone-700 hover:bg-stone-200"
@@ -34,7 +34,7 @@ export default function AIHubPage() {
         <button
           type="button"
           onClick={() => setMode("ask")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-control font-medium transition-colors
+          className={`flex items-center gap-2 px-4 py-2 rounded-control text-control font-medium transition-colors
             ${mode === "ask"
               ? "bg-brand text-white"
               : "bg-stone-100 text-stone-700 hover:bg-stone-200"
@@ -50,7 +50,7 @@ export default function AIHubPage() {
 
       {/* ── Ask a Question — Coming Soon panel ──────────────────────────── */}
       {mode === "ask" && (
-        <div className="flex flex-col items-center text-center py-16 px-6 bg-surface rounded-xl border border-stone-200">
+        <div className="flex flex-col items-center text-center py-16 px-6 bg-surface rounded-card border border-stone-200">
           <div className="w-14 h-14 rounded-full bg-stone-50 border border-stone-200 flex items-center justify-center mb-5">
             <i className="fas fa-robot text-2xl text-stone-600" aria-hidden />
           </div>
@@ -66,7 +66,7 @@ export default function AIHubPage() {
 
       {/* ── Semantic Search — Coming Soon panel ─────────────────────────── */}
       {mode === "search" && (
-        <div className="flex flex-col items-center text-center py-16 px-6 bg-surface rounded-xl border border-stone-200">
+        <div className="flex flex-col items-center text-center py-16 px-6 bg-surface rounded-card border border-stone-200">
           <div className="w-14 h-14 rounded-full bg-stone-50 border border-stone-200 flex items-center justify-center mb-5">
             <i className="fas fa-search text-2xl text-stone-600" aria-hidden />
           </div>

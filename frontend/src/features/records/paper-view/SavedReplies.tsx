@@ -95,7 +95,7 @@ export function SavedReplies({ textareaRef, value, onChange }: {
         <i className="fas fa-reply-all mr-1.5" aria-hidden />Saved replies
       </Button>
       {open && (
-        <div id={menuId} className="rounded-lg border border-stone-200 bg-white p-2 space-y-1.5">
+        <div id={menuId} className="rounded-control border border-stone-200 bg-white p-2 space-y-1.5">
           {loaded.state === "loading" && <p className="text-2xs text-stone-600">Loading your saved replies…</p>}
           {loaded.state === "failed" && <p className="text-2xs text-stone-600">Your saved replies couldn&rsquo;t be loaded.</p>}
           {loaded.state === "ready" && replies.length === 0 && (
@@ -192,7 +192,7 @@ function ReplyItem({ reply, onSaved, onDeleted }: {
   };
 
   return (
-    <li aria-labelledby={titleId} className="rounded-lg border border-stone-200 p-2 space-y-1.5">
+    <li aria-labelledby={titleId} className="rounded-control border border-stone-200 p-2 space-y-1.5">
       <p id={titleId} className="text-small font-semibold text-stone-800">{reply.title}</p>
       {mode === "edit" ? (
         <ReplyForm submitLabel="Save changes" initial={reply} onCancel={() => setMode("view")}

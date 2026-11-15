@@ -174,7 +174,7 @@ function Comparison({ recordId, data, ids, view, threads, showUnchanged, onShowU
     return (
       <div className="space-y-4">
         <div role={data.state === "preparing" ? "status" : undefined}
-          className="rounded-lg border border-stone-200 bg-white p-3">
+          className="rounded-control border border-stone-200 bg-white p-3">
           <p className="text-stone-900">{data.message}</p>
           {data.state === "unavailable" && (
             <button type="button" onClick={onRetry} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-2")}>Try again</button>
@@ -214,7 +214,7 @@ function Comparison({ recordId, data, ids, view, threads, showUnchanged, onShowU
 
       {(data.notices ?? []).map((n) => (
         <p key={`${n.code}-${n.side}`} role="note"
-          className="rounded-lg border border-stone-300 bg-stone-100 p-3 text-stone-800">
+          className="rounded-control border border-stone-300 bg-stone-100 p-3 text-stone-800">
           <i className="fas fa-circle-info mr-2 text-stone-600" aria-hidden />{n.message}
         </p>
       ))}

@@ -51,7 +51,7 @@ export function RelatedPublishedResearch({ recordId }: { recordId: number }) {
       <SectionHeading>Related published research</SectionHeading>
       {state.kind === "loading" && (
         <div
-          className="h-16 rounded-2xl ring-1 ring-stone-200 bg-white animate-pulse motion-reduce:animate-none"
+          className="h-16 rounded-card ring-1 ring-stone-200 bg-white animate-pulse motion-reduce:animate-none"
           aria-hidden
         />
       )}
@@ -88,7 +88,7 @@ export function RelatedPublishedResearch({ recordId }: { recordId: number }) {
               <li key={item.id}>
                 <Link
                   to={`/records/${item.id}`}
-                  className="group flex items-baseline justify-between gap-3 bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-stone-300 hover:shadow-card-md transition-colors duration-200"
+                  className="group flex items-baseline justify-between gap-3 bg-white ring-1 ring-stone-200 rounded-card p-4 hover:ring-stone-300 hover:shadow-card-md transition-colors duration-200"
                 >
                   <span className="min-w-0">
                     <span className="block font-semibold text-stone-900 leading-snug group-hover:text-brand">

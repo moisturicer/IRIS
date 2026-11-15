@@ -21,7 +21,7 @@ export function SubmissionStatus({ status }: { status: Status }) {
   return (
     <section
       aria-labelledby="submission-status-heading"
-      className="rounded-2xl border border-stone-200 bg-surface p-4 space-y-4"
+      className="rounded-card border border-stone-200 bg-surface p-4 space-y-4"
     >
       <div>
         <h2 id="submission-status-heading" className="text-sm font-bold text-stone-900">
@@ -33,7 +33,7 @@ export function SubmissionStatus({ status }: { status: Status }) {
       {waiting.length > 0 && (
         <section
           aria-labelledby="waiting-on-you-heading"
-          className="rounded-xl border border-stone-300 bg-surface p-3"
+          className="rounded-card border border-stone-300 bg-surface p-3"
         >
           <h3 id="waiting-on-you-heading" className="text-sm font-bold text-brand-dark">
             Waiting on you
@@ -49,7 +49,7 @@ export function SubmissionStatus({ status }: { status: Status }) {
                   onClick={(event) => {
                     if (focusFragmentTarget(WAITING_TARGET[item.kind])) event.preventDefault();
                   }}
-                  className={cn("rounded-sm font-semibold text-brand underline underline-offset-2", FOCUS_RING)}
+                  className={cn("rounded-control font-semibold text-brand underline underline-offset-2", FOCUS_RING)}
                 >
                   {item.action_label}{" "}
                   <span className="sr-only">({item.label})</span>

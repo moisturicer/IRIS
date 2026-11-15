@@ -149,7 +149,7 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
             <span className="sr-only">Loading the review timeline…</span>
             <div aria-hidden className="space-y-3">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-10 rounded-lg bg-stone-100 animate-pulse motion-reduce:animate-none" />
+                <div key={i} className="h-10 rounded-control bg-stone-100 animate-pulse motion-reduce:animate-none" />
               ))}
             </div>
           </div>
@@ -204,7 +204,7 @@ function TimelineItem({ entry, discussion }: { entry: TimelineEntry; discussion:
       <div className="flex items-baseline gap-x-2 gap-y-1 flex-wrap">
         <p className="text-small font-semibold text-stone-900">{entry.act}</p>
         {entry.status && (
-          <span className="px-1.5 py-0.5 rounded bg-stone-100 text-2xs font-semibold text-stone-700">
+          <span className="px-1.5 py-0.5 rounded-control bg-stone-100 text-2xs font-semibold text-stone-700">
             {entry.status}
           </span>
         )}
@@ -336,7 +336,7 @@ function EditableComment({
 function VersionTag({ version }: { version: number | null }) {
   if (version === null) return null;
   return (
-    <span className="px-1.5 py-0.5 rounded ring-1 ring-stone-200 text-2xs font-semibold text-stone-700 tabular-nums">
+    <span className="px-1.5 py-0.5 rounded-control ring-1 ring-stone-200 text-2xs font-semibold text-stone-700 tabular-nums">
       <span className="sr-only">Made against </span>v{version}
     </span>
   );

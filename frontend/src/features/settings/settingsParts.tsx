@@ -13,7 +13,7 @@ export function Panel({
 }: { title: string; caption: string; children: ReactNode }) {
   const titleId = useId();
   return (
-    <section aria-labelledby={titleId} className="bg-white rounded-xl border border-stone-200 p-5 sm:p-6">
+    <section aria-labelledby={titleId} className="bg-white rounded-card border border-stone-200 p-5 sm:p-6">
       <h2 id={titleId} className="text-heading font-semibold text-stone-900">{title}</h2>
       <p className="text-small text-stone-600 mt-1">{caption}</p>
       <div className="mt-5">{children}</div>
@@ -27,7 +27,7 @@ export function Message({ tone, role, children }: { tone: "ok" | "error"; role: 
     <p
       role={role}
       className={cn(
-        "text-small rounded-lg px-3 py-2 flex items-start gap-2",
+        "text-small rounded-control px-3 py-2 flex items-start gap-2",
         tone === "ok" ? TONES.settled : TONES.active,
       )}
     >

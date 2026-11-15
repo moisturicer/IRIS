@@ -160,9 +160,9 @@ export default function MyLibraryPage() {
   const savedPanel = (
     <div>
       {failure && (
-        <p role="alert" className="mb-3 flex flex-wrap items-center gap-x-2 rounded-xl border border-stone-300 bg-surface px-3 py-2 text-small text-brand">
+        <p role="alert" className="mb-3 flex flex-wrap items-center gap-x-2 rounded-card border border-stone-300 bg-surface px-3 py-2 text-small text-brand">
           {failure.message}
-          <button type="button" onClick={dismissFailure} className={cn("ml-auto rounded-md px-2 py-1 font-semibold hover:bg-stone-100", FOCUS_RING)}>
+          <button type="button" onClick={dismissFailure} className={cn("ml-auto rounded-control px-2 py-1 font-semibold hover:bg-stone-100", FOCUS_RING)}>
             Dismiss
           </button>
         </p>
@@ -243,7 +243,7 @@ export default function MyLibraryPage() {
               onClick={() => selectTab(t.value)}
               onKeyDown={onTabKey}
               className={cn(
-                "relative min-h-11 shrink-0 whitespace-nowrap rounded-t-lg px-3 text-small font-semibold",
+                "relative min-h-11 shrink-0 whitespace-nowrap rounded-t-control px-3 text-small font-semibold",
                 "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
                 COLOUR_TRANSITION,
                 FOCUS_RING,

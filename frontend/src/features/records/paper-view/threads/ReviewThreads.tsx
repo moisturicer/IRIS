@@ -209,7 +209,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       id={threadDomId(root.id)}
       tabIndex={-1}
       aria-labelledby={`${ids}-h`}
-      className={cn("rounded-lg border border-stone-200 bg-white px-3 py-3 space-y-2", FOCUS_RING)}
+      className={cn("rounded-control border border-stone-200 bg-white px-3 py-3 space-y-2", FOCUS_RING)}
     >
       <header className="flex flex-wrap items-center gap-2">
         <h4 id={`${ids}-h`} className="sr-only">
@@ -256,7 +256,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       </div>
 
       {root.answer && (
-        <p className="rounded bg-stone-50 px-2 py-1.5 text-small text-stone-800">
+        <p className="rounded-control bg-stone-50 px-2 py-1.5 text-small text-stone-800">
           <span className="font-semibold">
             {root.answer.by ?? "The authors"} {root.answer.kind === "addressed" ? "marked it addressed" : "declined it"}:
           </span>{" "}
@@ -372,7 +372,7 @@ function SuggestedWording({ root }: { root: ReviewComment }) {
   const ids = useId();
   const check = root.wording_check;
   return (
-    <section aria-labelledby={`${ids}-wording`} className="rounded bg-stone-50 px-2 py-1.5 space-y-0.5">
+    <section aria-labelledby={`${ids}-wording`} className="rounded-control bg-stone-50 px-2 py-1.5 space-y-0.5">
       <p id={`${ids}-wording`} className="text-2xs font-semibold text-stone-600">Suggested wording</p>
       <p className="text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
       {check && (
@@ -508,7 +508,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   };
 
   return (
-    <form onSubmit={submit} aria-label="New comment" className="rounded-lg border border-stone-300 bg-white p-3 space-y-2">
+    <form onSubmit={submit} aria-label="New comment" className="rounded-control border border-stone-300 bg-white p-3 space-y-2">
       <p className="text-2xs text-stone-600">
         {target.kind === "passage"
           ? <>Comment on <b className="text-stone-800">p.{target.passage.page}</b> of v{target.version}</>

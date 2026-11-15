@@ -66,7 +66,7 @@ export function UnlistedCard({ record, onChanged }: UnlistedCardProps) {
   return (
     <section
       aria-labelledby={headingId}
-      className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card space-y-3"
+      className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card space-y-3"
     >
       <RailHeading id={headingId}>Unlisted</RailHeading>
       {noticeLine}
@@ -151,7 +151,7 @@ function PublishUnlistedDialog({ open, recordId, kind, onCancel, onPublished, on
       open={open}
       onClose={publishing ? STAY_OPEN : close}
       title={`Publish this ${kind} to Discover?`}
-      size="max-w-md"
+      size="md"
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" className="min-h-11" onClick={close} disabled={publishing}>

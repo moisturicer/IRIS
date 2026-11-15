@@ -193,11 +193,11 @@ export function SavedView({
       : { title: `Nothing in ${title} yet`, message: "Save a paper from Discover or a paper's page to file it here." };
   const removeLabel = view.kind === "folder" ? "Remove from folder" : "Remove from library";
 
-  const textButton = cn("min-h-10 rounded-lg px-3 text-small font-semibold text-stone-700 hover:bg-stone-100", COLOUR_TRANSITION, FOCUS_RING);
+  const textButton = cn("min-h-10 rounded-control px-3 text-small font-semibold text-stone-700 hover:bg-stone-100", COLOUR_TRANSITION, FOCUS_RING);
 
   return (
     <div>
-      <div className="mb-section rounded-2xl border border-stone-200 bg-white p-card-compact md:p-card">
+      <div className="mb-section rounded-card border border-stone-200 bg-white p-card-compact md:p-card">
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative min-w-[12rem] flex-1">
           <span className="sr-only">Search this folder</span>
@@ -207,7 +207,7 @@ export function SavedView({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by title or author"
-            className="w-full rounded-lg border border-field bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-600 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="w-full rounded-control border border-field bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-600 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </label>
         {folderControl}
@@ -220,7 +220,7 @@ export function SavedView({
         >
           {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <option key={key} value={key}>{SORT_LABELS[key]}</option>)}
         </Select>
-        <div className="flex items-center rounded-lg border border-stone-300 bg-white p-0.5">
+        <div className="flex items-center rounded-control border border-stone-300 bg-white p-0.5">
           {(["list", "grid"] as const).map((mode) => (
             <button
               key={mode}
@@ -228,7 +228,7 @@ export function SavedView({
               onClick={() => setLayout(mode)}
               aria-label={`${mode === "list" ? "List" : "Grid"} view`}
               aria-pressed={layout === mode}
-              className={cn("rounded-md px-2.5 py-1.5", COLOUR_TRANSITION, FOCUS_RING,
+              className={cn("rounded-control px-2.5 py-1.5", COLOUR_TRANSITION, FOCUS_RING,
                 layout === mode ? SELECTED_SEGMENT : "text-stone-500 hover:text-stone-800")}
             >
               <i className={cn("fas", mode === "list" ? "fa-list" : "fa-table-cells-large", "text-small")} aria-hidden />
@@ -249,7 +249,7 @@ export function SavedView({
               if (e.key === "Enter") e.currentTarget.blur();
               if (e.key === "Escape") setRenaming(false);
             }}
-            className="rounded-lg border border-field px-3 py-1.5 font-display text-title font-semibold focus:border-brand focus:outline-none"
+            className="rounded-control border border-field px-3 py-1.5 font-display text-title font-semibold focus:border-brand focus:outline-none"
           />
         ) : (
           <h2 className="font-display text-title font-semibold text-stone-900">{title}</h2>
@@ -269,7 +269,7 @@ export function SavedView({
 
 
       {selected.size > 0 && view.kind !== "history" && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-stone-300 bg-surface px-3 py-2">
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-card border border-stone-300 bg-surface px-3 py-2">
           <span className="text-small font-semibold text-brand">Selected papers</span>
           <button type="button" onClick={() => remove([...selected])} className={cn(PILL_SECONDARY, "ml-auto min-h-9 px-3")}>
             {removeLabel}
@@ -279,7 +279,7 @@ export function SavedView({
       )}
 
       {unavailable > 0 && !isLoading && !isFailed && (
-        <p className="mb-3 flex flex-wrap items-center gap-x-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-small text-stone-700">
+        <p className="mb-3 flex flex-wrap items-center gap-x-2 rounded-card border border-stone-200 bg-white px-3 py-2 text-small text-stone-700">
           <span>
             <i className="fas fa-eye-slash mr-1.5 text-stone-500" aria-hidden />
             {unavailable === 1 ? "1 saved paper is" : `${unavailable} saved papers are`} no longer available to you. They may have been unpublished or withdrawn.
@@ -294,7 +294,7 @@ export function SavedView({
 
       {isLoading ? (
         <LoadingRegion label="Loading saved papers…" onRetry={retry} className="space-y-2">
-          {[0, 1, 2].map((i) => <div key={i} className="h-16 rounded-xl border border-stone-200 bg-white motion-safe:animate-pulse" />)}
+          {[0, 1, 2].map((i) => <div key={i} className="h-16 rounded-card border border-stone-200 bg-white motion-safe:animate-pulse" />)}
         </LoadingRegion>
       ) : isFailed ? (
         <ReadFailedState

@@ -266,7 +266,7 @@ function PartyReviewers({ row, ids, readable, people }: { row: TrackerPartyRow; 
   const unasked = UNASKED.has(row.state);
   const showSeats = !row.in_pool && readable && seats.length > 0;
   return (
-    <li id={detailsTarget(ids, row.party)} tabIndex={-1} className={cn("rounded", FOCUS_RING)}>
+    <li id={detailsTarget(ids, row.party)} tabIndex={-1} className={cn("rounded-control", FOCUS_RING)}>
       <p className={cn("flex items-center gap-2 text-small font-semibold", unasked ? "text-stone-600" : "text-stone-900")}>
         <span>{row.label}</span>
         {!showSeats && !row.in_pool && (
@@ -365,7 +365,7 @@ function Person({ person, name = person?.name ?? "A reviewer", role = person?.ro
       {open && createPortal(
         <div ref={card} id={cardId} role="dialog" aria-label={name} tabIndex={-1}
           style={position}
-          className={cn("fixed z-50 w-56 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-stone-300 bg-overlay p-3 shadow-sm", FOCUS_RING)}>
+          className={cn("fixed z-50 w-56 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-control border border-stone-300 bg-overlay p-3 shadow-sm", FOCUS_RING)}>
           <p className="font-display text-base font-semibold text-stone-900">{name}</p>
           {role && <p className="text-small text-stone-600">{role} on this record</p>}
           {person && <dl className="mt-2 space-y-1 break-words text-small text-stone-700">

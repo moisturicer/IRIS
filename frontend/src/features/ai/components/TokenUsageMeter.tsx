@@ -72,7 +72,7 @@ export function TokenUsageMeter({ usage }: { usage: ReaderUsage }) {
         <Ring used={share} size={20} stroke={3} />
       </button>
       {open && <span id={tipId} role="tooltip"
-        className={cn("absolute bottom-full right-0 z-30 mb-2 flex w-60 items-center gap-3.5 rounded-xl border border-stone-200 bg-white p-3.5 text-left shadow-card-md",
+        className={cn("absolute bottom-full right-0 z-30 mb-2 flex w-60 items-center gap-3.5 rounded-card border border-stone-200 bg-white p-3.5 text-left shadow-card-md",
           "motion-safe:animate-fade-in-up")}>
         <span className="relative inline-flex shrink-0">
           <Ring used={share} reserved={reserved} size={52} stroke={5} />

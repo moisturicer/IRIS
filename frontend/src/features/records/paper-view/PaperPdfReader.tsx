@@ -636,7 +636,7 @@ function PaperPdfReaderSource({
 
   if (status === "error") {
     return (
-      <div className="flex flex-col items-center gap-3 py-16 px-6 text-center rounded-2xl border border-stone-200 bg-stone-50">
+      <div className="flex flex-col items-center gap-3 py-16 px-6 text-center rounded-card border border-stone-200 bg-stone-50">
         <i className="fas fa-file-circle-exclamation text-2xl text-stone-300" aria-hidden />
         <p className="text-sm font-semibold text-stone-700">Could not load the paper</p>
         <p className="text-xs text-stone-500 max-w-sm">
@@ -662,7 +662,7 @@ function PaperPdfReaderSource({
           ? "flex-1 min-h-0"
           : cn(
               READING_PANE_HEIGHT,
-              "reading-wide:rounded-2xl reading-wide:border reading-wide:border-stone-200 reading-wide:overflow-hidden",
+              "reading-wide:rounded-card reading-wide:border reading-wide:border-stone-200 reading-wide:overflow-hidden",
             ),
       )}
     >
@@ -675,7 +675,7 @@ function PaperPdfReaderSource({
             ? "shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-stone-100 border-b border-stone-200"
             : cn(
                 "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
-                "rounded-xl bg-overlay border border-stone-200",
+                "rounded-card bg-overlay border border-stone-200",
                 READER_TOOLBAR_TOP,
                 "reading-wide:static reading-wide:shrink-0 reading-wide:mb-0 reading-wide:rounded-none",
                 "reading-wide:border-0 reading-wide:border-b reading-wide:bg-canvas",
@@ -786,7 +786,7 @@ function PaperPdfReaderSource({
         aria-label={ready ? `Paper, ${pageCount} page${pageCount === 1 ? "" : "s"}` : "Paper"}
         tabIndex={0}
         className={cn(
-          "rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+          "rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
           // A stable gutter, so the scrollbar appearing once the pages load
           // does not narrow the pane and set off a second refit.
           fill

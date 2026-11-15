@@ -215,7 +215,7 @@ export function FilesSection({
 
   if (failed && slots == null) {
     return (
-      <div role="alert" className="rounded-2xl border border-stone-300 bg-surface p-card text-small text-brand-dark">
+      <div role="alert" className="rounded-card border border-stone-300 bg-surface p-card text-small text-brand-dark">
         Could not load this record's files.{" "}
         <button type="button" onClick={() => void load()} className={cn("font-semibold underline", FOCUS_RING)}>
           Try again
@@ -379,7 +379,7 @@ export function FilesSection({
             />
           )}
           {files.length > 0 && (
-            <ul className="divide-y divide-stone-200 rounded-2xl border border-stone-200 bg-white">
+            <ul className="divide-y divide-stone-200 rounded-card border border-stone-200 bg-white">
               {files.map((f) => (
                 <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 px-card-compact py-3">
                   <span className="min-w-0">
@@ -433,7 +433,7 @@ export function FilesSection({
 function DocumentCard({ name, asked, children }: { name: string; asked?: Asked; children: ReactNode }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className="rounded-2xl border border-stone-200 bg-white p-card-compact sm:p-card space-y-3">
+    <section aria-labelledby={headingId} className="rounded-card border border-stone-200 bg-white p-card-compact sm:p-card space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 id={headingId} className="text-heading font-semibold text-stone-900">
           {name}

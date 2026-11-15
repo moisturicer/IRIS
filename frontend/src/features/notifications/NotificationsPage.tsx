@@ -118,7 +118,7 @@ export default function NotificationsPage() {
       aria-pressed={filter === value}
       onClick={() => setFilter(value)}
       className={cn(
-        "h-9 px-3.5 rounded-lg text-small font-semibold border",
+        "h-9 px-3.5 rounded-control text-small font-semibold border",
         COLOUR_TRANSITION,
         FOCUS_RING,
         filter === value
@@ -152,7 +152,7 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      <div className="bg-surface rounded-2xl border border-stone-200 overflow-hidden">
+      <div className="bg-surface rounded-card border border-stone-200 overflow-hidden">
         {loading ? (
           <Skeleton onRetry={load} />
         ) : loadFailed ? (
@@ -283,7 +283,7 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
             aria-label="Mark as read"
             title="Mark as read"
             className={cn(
-              "w-9 h-9 rounded-lg flex items-center justify-center text-stone-500 hover:bg-stone-100 hover:text-stone-900",
+              "w-9 h-9 rounded-control flex items-center justify-center text-stone-500 hover:bg-stone-100 hover:text-stone-900",
               COLOUR_TRANSITION,
               FOCUS_RING,
             )}

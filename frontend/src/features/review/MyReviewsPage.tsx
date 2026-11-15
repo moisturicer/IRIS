@@ -193,7 +193,7 @@ export default function MyReviewsPage() {
             )}
             {coordinatorOffice && (
               <Link to={pathFor("reviewOffice")}
-                className={cn("inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+                className={cn("inline-flex min-h-11 items-center gap-2 rounded-control border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
                 <i className="fas fa-users-gear" aria-hidden />
                 {officeLabel} console
               </Link>
@@ -500,7 +500,7 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
         to={href}
         aria-label={`${label}: ${row.title}`}
         className={cn(
-          "inline-flex min-h-9 items-center rounded-lg bg-brand px-3 text-small font-semibold text-white hover:bg-brand-dark",
+          "inline-flex min-h-9 items-center rounded-control bg-brand px-3 text-small font-semibold text-white hover:bg-brand-dark",
           COLOUR_TRANSITION,
           FOCUS_RING,
         )}
