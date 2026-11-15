@@ -1231,3 +1231,75 @@ def _email_role_users(role, *, subject, greeting, body):
             message=f"{greeting},\n\n{body}\n\n-- The IRIS Team",
             recipient_list=emails,
         )
+
+
+# ---------------------------------------------------------------------------
+# Calls for papers (IR-762, ADR-050 decisions 8-11). In-app only.
+# ---------------------------------------------------------------------------
+
+def notify_call_requested(call, *, resubmitted=False):
+    """
+    Broadcast to RDCO that an Adviser's Call waits for it, bound to the Call
+    so the notice settles once RDCO decides (ADR-069). A resubmission is a
+    new request with a notice of its own.
+    """
+    try:
+        role = _role(RoleName.RDCO)
+        if role is None:
+            return
+        name = _name(call.posted_by)
+        if resubmitted:
+            message = f'{name} changed the call "{call.title}" and asked RDCO to confirm it again.'
+        else:
+            message = f'{name} asked RDCO to confirm the call "{call.title}".'
+        Notification.objects.create(
+            sender=call.posted_by, broadcast_to_role=role,
+            notif_type=_get_type("Call Request Submitted"), message=message,
+            **_task(TaskKind.CALL_REQUEST, call),
+        )
+    except Exception:
+        _log_failure("notify_call_requested", user=call.posted_by)
+
+
+def _tell_poster(call, *, type_name, message, sender=None):
+    """An informational notice to a Call's poster. None when their account is gone."""
+    try:
+        if call.posted_by is None:
+            return
+        Notification.objects.create(
+            sender=sender, recipient=call.posted_by,
+            notif_type=_get_type(type_name), message=message,
+        )
+    except Exception:
+        _log_failure(f"notify {type_name}", user=call.posted_by)
+
+
+def notify_call_confirmed(call, *, confirmed_by):
+    _tell_poster(
+        call, type_name="Call Confirmed", sender=confirmed_by,
+        message=f'RDCO confirmed your call "{call.title}". It is now on Calls & Conferences.',
+    )
+
+
+def notify_call_rejected(call, *, rejected_by, reason):
+    _tell_poster(
+        call, type_name="Call Rejected", sender=rejected_by,
+        message=f'RDCO did not confirm your call "{call.title}". Reason: {reason}',
+    )
+
+
+def notify_call_removed(call, *, removed_by, reason):
+    _tell_poster(
+        call, type_name="Call Removed", sender=removed_by,
+        message=f'RDCO removed your call "{call.title}". Reason: {reason}',
+    )
+
+
+def notify_call_lapsed(call):
+    _tell_poster(
+        call, type_name="Call Request Lapsed",
+        message=(
+            f'Your call "{call.title}" was removed because its paper deadline passed '
+            "before it was confirmed. You may post a new one."
+        ),
+    )

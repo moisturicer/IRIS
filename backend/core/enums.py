@@ -555,6 +555,24 @@ class EmbargoState(models.TextChoices):
     RELEASED = "released", "Embargo released"
 
 
+class CallStatus(models.TextChoices):
+    """
+    Where a Call stands with RDCO (ADR-050 decision 8, amended 2026-11-15;
+    IR-762). `Opportunity.status`.
+
+    RDCO's Calls are confirmed at once; an Adviser's wait. Only a confirmed
+    Call is on the board. There is no expired status: a pending or rejected
+    Call whose paper deadline passes is deleted (`remove_lapsed_requests`).
+    Not governed by the vocabulary guard, like the other Call enums: its
+    "pending" and "rejected" are spelled the same as request and clearance
+    words, and every use goes through this enum anyway.
+    """
+
+    PENDING = "pending", "Waiting for RDCO"
+    CONFIRMED = "confirmed", "Confirmed"
+    REJECTED = "rejected", "Rejected"
+
+
 class CallPapersState(models.TextChoices):
     """
     Whether a Call still takes papers (ADR-050 decision 6, IR-761).

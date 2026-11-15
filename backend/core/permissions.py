@@ -208,9 +208,22 @@ class IsOpportunityPoster(BasePermission):
         return get_role_name(request.user) in OPPORTUNITY_POSTER_ROLES
 
     def has_object_permission(self, request, view, obj):
-        if get_role_name(request.user) in OPPORTUNITY_MODERATOR_ROLES:
-            return True
-        return obj.posted_by_id == request.user.pk
+        return is_call_moderator(request.user) or obj.posted_by_id == request.user.pk
+
+
+def is_call_moderator(user) -> bool:
+    """RDCO: confirms, rejects, features and removes any Call (ADR-050 decisions 8, 11, 12)."""
+    return get_role_name(user) in OPPORTUNITY_MODERATOR_ROLES
+
+
+class IsCallModerator(BasePermission):
+    """
+    RDCO's acts on Calls (ADR-050 decisions 8-12, IR-762): reading the Call
+    Requests queue, confirming, rejecting and removing. The same role set as
+    `IsOpportunityPoster`'s moderator half, so the two cannot disagree.
+    """
+    def has_permission(self, request, view):
+        return is_call_moderator(request.user)
 
 
 def owns_or_staffs_record(user, record) -> bool:

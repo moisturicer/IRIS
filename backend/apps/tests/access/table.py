@@ -725,8 +725,29 @@ OPPORTUNITIES = {
               **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
         _case(SIGNED_IN if m == "GET" else POSTER, kwargs={"pk": Ref("adviser_opportunity")},
               **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
+        # IR-762: reading a waiting Call is its Adviser's and RDCO's alone. A
+        # write is refused on role before lookup (403), the same as for a
+        # missing Call, so it reveals nothing.
+        _case(row(ANON, HIDE, HIDE, OK, HIDE, HIDE, HIDE, OK, HIDE, HIDE) if m == "GET" else POSTER,
+              kwargs={"pk": Ref("pending_opportunity")},
+              **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
     ] for m in ("GET", "PUT", "PATCH", "DELETE")}),
-    "opportunity-calendar": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")})}),
+    "opportunity-calendar": Entry({"GET": [
+        _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")}),
+        # IR-762: the calendar serves confirmed Calls only, even to their Adviser.
+        _case(row(ANON, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs={"pk": Ref("pending_opportunity")}),
+    ]}),
+    # IR-762, ADR-050 decision 8: a waiting Call is its Adviser's and RDCO's
+    # alone; anyone else is answered as if it did not exist.
+    "opportunity-requests": Entry({"GET": _case(RDCO_ONLY)}),
+    "opportunity-mine": Entry({"GET": _case(POSTER)}),
+    "opportunity-confirm": Entry({"POST": _case(RDCO_ONLY, kwargs={"pk": Ref("pending_opportunity")}, data={})}),
+    "opportunity-reject": Entry({"POST": _case(
+        RDCO_ONLY, kwargs={"pk": Ref("pending_opportunity")}, data={"reason": "Broken link"},
+    )}),
+    "opportunity-remove": Entry({"POST": _case(
+        RDCO_ONLY, kwargs={"pk": Ref("pending_opportunity")}, data={"reason": "Cancelled"},
+    )}),
     "api-root": Shadowed(by="opportunity-list", why="The empty-prefix list matches before the router root."),
 }
 LIBRARY = {

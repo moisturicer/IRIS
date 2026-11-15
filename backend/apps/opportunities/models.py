@@ -16,10 +16,44 @@ from django.db import models
 from django.db.models.functions import Coalesce, Greatest
 from django.utils import timezone
 
-from core.enums import CallEventState, CallPapersState
+from core.enums import CallEventState, CallPapersState, CallStatus
+from core.permissions import is_call_moderator
 
 
 class OpportunityQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        """
+        The Calls `user` may open (ADR-050 decision 8): every confirmed Call,
+        plus their own in any status; RDCO sees all. Anything else is filtered
+        out, so the API answers it exactly like a missing Call (404).
+        """
+        if is_call_moderator(user):
+            return self
+        return self.filter(models.Q(status=CallStatus.CONFIRMED) | models.Q(posted_by=user))
+
+    def waiting(self, today=None):
+        """
+        Waiting for RDCO's decision: pending, with its paper deadline not yet
+        passed. The same rule as `Opportunity.is_waiting`.
+        """
+        return self.filter(
+            status=CallStatus.PENDING, due_date__gte=today or timezone.localdate(),
+        )
+
+    def lapsed(self, today=None):
+        """
+        Pending or rejected Calls whose paper deadline has passed: they have left
+        RDCO's queue, and the daily job deletes them (decision 9, amended).
+        """
+        return self.filter(
+            status__in=(CallStatus.PENDING, CallStatus.REJECTED),
+            due_date__lt=today or timezone.localdate(),
+        )
+
+    def on_board(self, today=None):
+        """What the board lists: confirmed Calls that aren't Over."""
+        return self.filter(status=CallStatus.CONFIRMED).not_over(today)
+
     def not_over(self, today=None):
         """
         The Calls the board lists: every one not yet Over (ADR-050 decision 7).
@@ -81,6 +115,16 @@ class Opportunity(models.Model):
     # Free text: fees are often tiered or in another currency (decision 3).
     registration_fee = models.CharField(max_length=200, blank=True)
     is_featured      = models.BooleanField(default=False)
+    # ADR-050 decision 8 (IR-762). Pending by default, so a Call saved by any
+    # path that forgets to decide stays off the board rather than going public
+    # unchecked. The view confirms RDCO's own at once.
+    status           = models.CharField(
+        max_length=16, choices=CallStatus.choices, default=CallStatus.PENDING,
+    )
+    # RDCO's reason for rejecting it; cleared when the Adviser resubmits.
+    review_reason    = models.TextField(blank=True)
+    # When RDCO last confirmed or rejected it. Who did is IR-763's audit event.
+    reviewed_at      = models.DateTimeField(null=True, blank=True)
     posted_by        = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL, null=True, blank=True,
@@ -92,9 +136,10 @@ class Opportunity(models.Model):
     objects = OpportunityQuerySet.as_manager()
 
     class Meta:
-        # Featured first, then soonest deadline: the board's job is "what closes
-        # next", not "what was posted last".
-        ordering = ["-is_featured", "due_date"]
+        # Soonest deadline first: the board's job is "what closes next", not
+        # "what was posted last". Featured doesn't move a Call (ADR-050
+        # decision 12, IR-762); it only adds a star and a label.
+        ordering = ["due_date", "id"]
         verbose_name_plural = "opportunities"
         indexes = [models.Index(fields=["due_date"])]
 
@@ -167,6 +212,22 @@ class Opportunity(models.Model):
         if state == CallEventState.OVER and self.has_event():
             return self.EVENT_OVER_LABEL
         return state.label
+
+    def is_waiting(self, today=None):
+        """
+        Waiting for RDCO's decision: pending, with its paper deadline not yet
+        passed. A lapsed request has left RDCO's queue and is deleted by the
+        daily job (decision 9, as amended), so it can't be decided either.
+        """
+        return self.status == CallStatus.PENDING and self.due_date >= (today or timezone.localdate())
+
+    def posted_by_adviser(self):
+        """
+        Was this posted by someone other than RDCO, whose account still exists?
+        Then RDCO removing it needs a reason they receive (ADR-050 decision 11,
+        owner 2026-11-15). Read from the poster's role today.
+        """
+        return self.posted_by is not None and not is_call_moderator(self.posted_by)
 
     def poster_name(self):
         """Posted by: the poster's account name (decision 3), or "" once they are gone."""

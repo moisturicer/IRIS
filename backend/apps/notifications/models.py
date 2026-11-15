@@ -33,6 +33,8 @@ class TaskKind(models.TextChoices):
     DOWNLOAD_REQUEST = "download_request", "A download request"
     DELETE_REQUEST = "delete_request", "A delete request"
     ROLE_REQUEST = "role_request", "A role request"
+    # IR-762: an Adviser's Call waiting for RDCO (ADR-050 decision 8).
+    CALL_REQUEST = "call_request", "A Call waiting for RDCO"
 
 
 class NotificationQuerySet(models.QuerySet):
