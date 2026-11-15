@@ -147,7 +147,7 @@ def merge_sibling_sections(
     """Merge a draft under ``sibling_merge_floor`` with a neighbouring section
     under the same parent heading below ``root`` (IR-1147): forward first,
     then backward. Figure passages are passed over, never merged."""
-    floor = options.sibling_merge_floor
+    floor = options.effective_sibling_merge_floor
     if not floor or len(drafts) <= 1:
         return list(drafts)
 

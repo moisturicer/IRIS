@@ -97,12 +97,13 @@ def test_off_is_the_default():
     assert ChunkingOptions().sibling_merge_floor == 0
 
 
-def test_the_floor_is_validated():
+def test_the_floor_is_validated_and_capped_at_the_target():
     with pytest.raises(ValueError):
         ChunkingOptions(sibling_merge_floor=-1)
-    with pytest.raises(ValueError):
-        ChunkingOptions(target_tokens=300, sibling_merge_floor=301)
-    assert ChunkingOptions(target_tokens=300, sibling_merge_floor=300).sibling_merge_floor == 300
+    # A deployment that lowers the target must still chunk under the default floor.
+    assert ChunkingOptions(target_tokens=300, sibling_merge_floor=450).effective_sibling_merge_floor == 300
+    assert ChunkingOptions(max_tokens=30, sibling_merge_floor=450).effective_sibling_merge_floor == 30
+    assert ChunkingOptions(sibling_merge_floor=450).effective_sibling_merge_floor == 450
 
 
 def test_short_sibling_sections_merge_under_their_parent():

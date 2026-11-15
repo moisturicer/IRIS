@@ -24,10 +24,14 @@ def test_a_trial_variant_sets_the_floor():
     assert variant.chunking_options(ChunkingOptions()).sibling_merge_floor == 300
 
 
-@pytest.mark.parametrize("text", ["x=::sibling_merge_floor=lots", "x=::target_tokens=200,sibling_merge_floor=300"])
-def test_a_bad_floor_is_refused(text):
+def test_a_bad_floor_is_refused():
     with pytest.raises(VariantError):
-        parse_variant(text).chunking_options(ChunkingOptions())
+        parse_variant("x=::sibling_merge_floor=lots")
+
+
+def test_a_small_target_under_the_default_floor_still_builds(settings):
+    settings.AI_CHUNK_MAX_TOKENS = 30
+    assert default_chunking_options().effective_sibling_merge_floor == 30
 
 
 def test_the_floor_round_trips_through_storage():
