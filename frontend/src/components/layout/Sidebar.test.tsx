@@ -222,7 +222,7 @@ describe("the sidebar's list", () => {
     signIn(role, true);
     renderAt("/records/mine");
 
-    await screen.findByRole("heading", { name: "My Library" }).catch(() => undefined);
+    await screen.findByRole("navigation", { name: "Main" });
     expect(apiClient.get).not.toHaveBeenCalledWith("/dashboard/queue-counts/");
   });
 

@@ -225,7 +225,12 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     const read = () => {
       dashboardApi
         .queueCounts()
-        .then(({ data }) => { if (live) setQueueCounts(data); })
+        .then(({ data }) => {
+          // A reply of another shape is a failed read, not three zeros (F1).
+          const ok = [data?.download_requests, data?.delete_requests, data?.role_change_requests]
+            .every((n) => typeof n === "number");
+          if (live) setQueueCounts(ok ? data : NO_QUEUES);
+        })
         .catch(() => { if (live) setQueueCounts(NO_QUEUES); });
     };
     read();
