@@ -35,9 +35,10 @@ from .serializers import (
     RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer, PublishNoticeSerializer, AiAnswerChangeSerializer,
 )
 from . import ai_answer
-from .models import DataNotice
+from .models import DataNotice, NoticeDraft
 from .notice import (
-    accounts_to_answer, answer_notice, answer_payload, notice_payload, publish_notice,
+    accounts_to_answer, answer_notice, answer_payload, draft_payload, notice_payload, publish_notice,
+    save_draft,
     requires_answer, version_payload,
 )
 from .models import RecoveryPurpose
@@ -240,6 +241,31 @@ class NoticeVersionsView(APIView):
         serializer.is_valid(raise_exception=True)
         notice = publish_notice(request.user, **serializer.validated_data)
         return Response(version_payload(notice), status=status.HTTP_201_CREATED)
+
+
+class NoticeDraftView(APIView):
+    """
+    GET    /auth/notice/draft/   the saved draft, or null (IR-1138)
+    PUT    /auth/notice/draft/   {based_on_version, text}: keep it, replacing any earlier one
+    DELETE /auth/notice/draft/   discard it
+
+    RDCO only, like publishing. A draft is not a version: nobody else reads it,
+    it is not counted in the impact and nobody is asked to answer it.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        return Response(draft_payload(NoticeDraft.objects.select_related("updated_by").first()))
+
+    def put(self, request):
+        serializer = PublishNoticeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        draft = save_draft(request.user, **serializer.validated_data)
+        return Response(draft_payload(draft))
+
+    def delete(self, request):
+        NoticeDraft.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class NoticeImpactView(APIView):
