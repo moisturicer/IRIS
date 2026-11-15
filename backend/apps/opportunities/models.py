@@ -11,32 +11,34 @@ The name is `Opportunity`, not `Conference`, because records.Conference already
 exists and means something else entirely -- a FK on Record recording "this paper
 was presented at X". Reusing that name would be actively confusing.
 """
-from datetime import date, timedelta
-
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Coalesce, Greatest
+from django.utils import timezone
+
+from core.enums import CallEventState, CallPapersState
 
 
 class OpportunityQuerySet(models.QuerySet):
-    def visible(self, today=None):
+    def not_over(self, today=None):
         """
-        What a browser should see.
+        The Calls the board lists: every one not yet Over (ADR-050 decision 7).
 
-        Past-deadline items do not vanish the moment they close -- someone
-        mid-application needs to still find the page they were reading. They
-        grey out as "Closed" in place (see `is_closed`) and only drop off the
-        board once they are stale enough that nobody is still acting on them.
+        The same rule as `Opportunity.is_over`, in SQL: a Call stays through
+        the latest of its deadline, start and end dates. A Call whose deadline
+        has passed stays, marked Submissions closed, until its event is over.
         """
-        today = today or date.today()
-        return self.filter(due_date__gte=today - Opportunity.HIDE_AFTER_CLOSE)
+        today = today or timezone.localdate()
+        last_day = Greatest(
+            "due_date",
+            Coalesce("start_date", "due_date"),
+            Coalesce("end_date", "due_date"),
+        )
+        return self.alias(last_day=last_day).filter(last_day__gte=today)
 
 
 class Opportunity(models.Model):
     """A call for papers, posted in IRIS by RDCO or an Adviser (ADR-050)."""
-
-    # How long a closed opportunity stays greyed out on the board before it
-    # drops off entirely. IR-761 replaces this with the Over rule (decision 7).
-    HIDE_AFTER_CLOSE = timedelta(days=30)
 
     # ADR-050 decision 2. Grants, funding windows and internal CIT-U calls are
     # off the board (decision 1); migration 0002 deleted them, each with a copy
@@ -107,10 +109,64 @@ class Opportunity(models.Model):
 
     def days_left(self, today=None):
         """Whole days until the deadline. Negative once it has passed."""
-        return (self.due_date - (today or date.today())).days
+        return (self.due_date - (today or timezone.localdate())).days
 
     def is_closed(self, today=None):
         return self.days_left(today) < 0
+
+    # ADR-050 decisions 6 and 7 (IR-761). Every rule takes "today" so a test can
+    # pass the day in; left out, it is Manila's date, not the machine's.
+
+    def last_day(self):
+        """The latest date entered. A Call is Over the day after it."""
+        return max(d for d in (self.due_date, self.start_date, self.end_date) if d)
+
+    def is_over(self, today=None):
+        return (today or timezone.localdate()) > self.last_day()
+
+    def papers_state(self, today=None):
+        if (today or timezone.localdate()) <= self.due_date:
+            return CallPapersState.ACCEPTING
+        return CallPapersState.CLOSED
+
+    def has_event(self):
+        return bool(self.start_date or self.end_date)
+
+    def event_state(self, today=None):
+        """
+        Upcoming, Happening now or Over; None for a Call with no event dates
+        until the Call itself is Over.
+
+        An event is over the day after its last date, even while a later paper
+        deadline keeps the Call on the board (owner, 2026-11-15). An end date
+        with no start is never Happening now (owner, 2026-11-15).
+        """
+        today = today or timezone.localdate()
+        if not self.has_event():
+            return CallEventState.OVER if self.is_over(today) else None
+        if self.start_date:
+            if today < self.start_date:
+                return CallEventState.UPCOMING
+            if today <= max(self.start_date, self.end_date or self.start_date):
+                return CallEventState.HAPPENING
+        elif today <= self.end_date:
+            return CallEventState.UPCOMING
+        return CallEventState.OVER
+
+    #: An event's Over, worded so it reads beside "Accepting papers" (owner,
+    #: 2026-11-15). A Call with no event reads plain "Over".
+    EVENT_OVER_LABEL = "Event over"
+
+    def papers_label(self, today=None):
+        return self.papers_state(today).label
+
+    def event_label(self, today=None):
+        state = self.event_state(today)
+        if state is None:
+            return None
+        if state == CallEventState.OVER and self.has_event():
+            return self.EVENT_OVER_LABEL
+        return state.label
 
     def poster_name(self):
         """Posted by: the poster's account name (decision 3), or "" once they are gone."""
