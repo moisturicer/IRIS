@@ -226,9 +226,9 @@ def paginate(request, rows, default_size: int, build, *, with_count: bool = Fals
     With `with_count` it also carries `count`, the whole list's size (IR-1133:
     the Papers and Advised headings show it); collaborators send none.
 
-    `next` is the URL of the following page, or `None` on the last; nothing on
-    the page shows a count, so none is computed (one extra row is read to know
-    whether another page exists). A page past the end is empty, not an error:
+    `next` is the URL of the following page, or `None` on the last; one extra
+    row is read to know whether another page exists, so no total is computed
+    unless `with_count` asks for it. A page past the end is empty, not an error:
     a paper may leave the list between two reads.
     """
     params = request.query_params

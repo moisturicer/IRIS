@@ -111,7 +111,6 @@ export function PersonProfileView({ profile, lists, self = false }: PersonProfil
                 <PaperSection title="Advised" list={lists.advised} onMore={() => lists.onMore("advised")} />
               </>
             )}
-
           </div>
 
           {lists && showsRail && (

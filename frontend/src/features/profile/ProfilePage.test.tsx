@@ -90,7 +90,6 @@ describe("the profile", () => {
 
     expect(await screen.findByText("You have no published papers yet")).toBeVisible();
     expect(screen.queryByRole("heading", { name: /^Advised/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Advised" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Collaborators" })).not.toBeInTheDocument();
   });
 
