@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ai.infrastructure.db import PoolSize
+from ai.research.selection import Policy
 
 EXECUTORS = ("deterministic", "agent")
 DEPTHS = ("ordinary", "deep")
@@ -87,6 +88,8 @@ class RunsConfig:
     query_vector_cache: bool = False
     #: Pooled connections per process; None opens one per use, as tests and scripts do (IR-1012).
     db_pool: "PoolSize | None" = None
+    #: What a search hands the agent (IR-397, IR-1055); on unless switched off.
+    selection: Policy = Policy()
 
 
 def problems(values) -> list[str]:
@@ -107,7 +110,28 @@ def problems(values) -> list[str]:
         found.append("RUNS_DEEP_CONCURRENCY must be below RUNS_WORKER_CONCURRENCY")
     if str(getattr(values, "RUNS_QUERY_VECTOR_CACHE", "") or "").strip() not in ("", "off", "on"):
         found.append("RUNS_QUERY_VECTOR_CACHE must be on or off")
+    for name in ("RUNS_JOIN_PASSAGES", "RUNS_SECTION_MATES"):
+        if _text(values, name) not in ("", "off", "on"):
+            found.append(f"{name} must be on or off")
+    for name in ("RUNS_PASSAGES_PER_PAPER", "RUNS_PASSAGE_TOKENS"):
+        if _text(values, name) and not _text(values, name).isdigit():
+            found.append(f"{name} must be a whole number; 0 turns it off")
     return found
+
+
+def _text(values, name) -> str:
+    return str(getattr(values, name, "") or "").strip()
+
+
+def selection(values) -> Policy:
+    """Passage selection, on by default (owner decision 2026-11-15, ADR-033 amendment)."""
+    default = Policy()
+    return Policy(
+        per_paper=int(_text(values, "RUNS_PASSAGES_PER_PAPER") or default.per_paper),
+        join=_text(values, "RUNS_JOIN_PASSAGES") != "off",
+        tokens_per_passage=int(_text(values, "RUNS_PASSAGE_TOKENS") or default.tokens_per_passage),
+        section_mates=_text(values, "RUNS_SECTION_MATES") != "off",
+    )
 
 
 def query_vector_cache(values) -> bool:
@@ -142,5 +166,6 @@ def read(values) -> RunsConfig:
         ),
         redis_url=getattr(values, "RUNS_REDIS_URL", ""),
         query_vector_cache=query_vector_cache(values),
+        selection=selection(values),
         db_pool=PoolSize(values.RUNS_DB_POOL_SIZE, values.RUNS_DB_ACQUIRE_SECONDS),
     )

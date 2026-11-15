@@ -21,6 +21,7 @@ import asyncpg
 
 from ai.infrastructure import db
 from ai.research import metadata
+from ai.research.selection import Hit, Policy, select
 from ai.runs.store import CURRENT_HANDOFF, CURRENT_SOURCE_TURN, RunStore
 
 log = logging.getLogger(__name__)
@@ -100,6 +101,10 @@ class PassageRef:
     source: Source
     #: Leading characters of `text` that repeat the previous passage, left out when shown (IR-733).
     overlap: int = 0
+    #: Handle of the passage this one continues in the same source (IR-397).
+    continues: str | None = None
+    #: Added from the hit's own section for context, not retrieved (IR-1055).
+    section_mate: bool = False
 
 
 @dataclass(frozen=True)
@@ -283,7 +288,7 @@ def _filter_sql(first: int) -> str:
 
 
 _COLUMNS = ("c.id, c.record_id, c.chunk_set_id, cs.extraction_hash, c.source_page,"
-            " c.content, c.context_path, r.title")
+            " c.content, c.context_path, r.title, c.sequence, c.token_count, c.section_key")
 _CHUNKS = ("FROM iris_ai.research_chunks() c"
            " JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active"
            " JOIN public.records_record r ON r.id = c.record_id")
@@ -347,6 +352,16 @@ def overlap(previous: str, text: str) -> int:
     return 0
 
 
+def _hit(row) -> Hit:
+    """A row as selection sees it; a chunk with no stored count is estimated at 4 chars a token."""
+    key = row["section_key"]
+    if isinstance(key, str):
+        key = json.loads(key)
+    tokens = row["token_count"]
+    return Hit(row["id"], row["record_id"], row["chunk_set_id"], row["sequence"],
+               tuple(key) if key else None, tokens if tokens is not None else len(row["content"]) // 4 + 1)
+
+
 def shown_bytes(text: str) -> int:
     """What `text` costs once JSON-encoded in a tool result and again as message content."""
     return len(json.dumps(json.dumps(text, ensure_ascii=False), ensure_ascii=False).encode("utf-8"))
@@ -384,7 +399,7 @@ class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
                  scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None,
                  reranker=None, follow_stored_grant: bool = False,
-                 cache_query_vectors: bool = False):
+                 cache_query_vectors: bool = False, selection: Policy | None = None):
         self.dsn = dsn
         self.grant = grant
         self.run_id = run_id
@@ -402,6 +417,8 @@ class ResearchTools:
         #: (space id, query) -> vector, for this run alone; never shared (IR-953).
         self.cache_query_vectors = cache_query_vectors
         self._vectors: dict = {}
+        #: Per-paper cap, joining and token budget (IR-397); on by default.
+        self.selection = selection or Policy()
 
     async def _grant(self, conn) -> str | None:
         """The grant this call reads under: the run's stored one when following it (IR-880).
@@ -506,7 +523,8 @@ class ResearchTools:
         source = Source(bound["record_id"], current["chunk_set_id"], current["extraction_hash"])
         return current["title"], source, bound["chunk_id"]
 
-    def _passages(self, title, rows, handles, source=None, overlaps=None):
+    def _passages(self, title, rows, handles, source=None, overlaps=None, placed=None):
+        handle_of = {row["id"]: h for row, h in zip(rows, handles)}
         return tuple(
             PassageRef(
                 handle=h, record_id=row["record_id"], page=row["source_page"],
@@ -514,9 +532,35 @@ class ResearchTools:
                 text=row["content"],
                 source=source or Source(row["record_id"], row["chunk_set_id"], row["extraction_hash"]),
                 overlap=overlaps[n] if overlaps else 0,
+                continues=handle_of.get(placed[n].continues) if placed else None,
+                section_mate=placed[n].section_mate if placed else False,
             )
             for n, (row, h) in enumerate(zip(rows, handles))
         )
+
+    def _chosen(self, rows, limit: int):
+        """Rows as selection orders them, with each continued part's repeated text measured."""
+        by_id = {r["id"]: r for r in rows}
+        placed = select([_hit(r) for r in rows], limit, self.selection, scoped=self.scope is not None)
+        chosen = [by_id[p.hit.id] for p in placed]
+        overlaps = [overlap(by_id[p.continues]["content"], by_id[p.hit.id]["content"]) if p.continues else 0
+                    for p in placed]
+        return chosen, placed, overlaps
+
+    async def _found(self, conn, rows, limit: int):
+        """Records and passages for a search's ranked rows, after selection."""
+        rows, placed, overlaps = self._chosen(rows, limit)
+        firsts = list({row["record_id"]: row for row in rows}.values())
+        record_handles = await self._handles(
+            conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in firsts])
+        passage_handles = await self._handles(
+            conn, [("P", r["record_id"], r["chunk_set_id"], r["id"]) for r in rows])
+        passages = self._passages(None, rows, passage_handles, overlaps=overlaps, placed=placed)
+        records = tuple(
+            RecordRef(h, r["record_id"], r["title"],
+                      Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]))
+            for r, h in zip(firsts, record_handles))
+        return records, passages
 
     async def search(self, query: str, limit: int = 10) -> ToolResult:
         """Keyword search over readable Passages, ranked as Django's full-text retriever does."""
@@ -539,7 +583,8 @@ class ResearchTools:
                 f"""WITH q AS (SELECT replace(plainto_tsquery('{CONFIG}', $1)::text, '&', '|')::tsquery AS q),
                     hits AS (
                         SELECT c.id, c.record_id, c.chunk_set_id, cs.extraction_hash, c.source_page,
-                               c.content, c.context_path, r.title, ts_rank(c.search_vector, q.q) AS rank
+                               c.content, c.context_path, r.title, c.sequence, c.token_count,
+                               c.section_key, ts_rank(c.search_vector, q.q) AS rank
                           FROM q, iris_ai.research_chunks() c
                           JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active
                           JOIN public.records_record r ON r.id = c.record_id
@@ -547,25 +592,17 @@ class ResearchTools:
                            AND ($2::bigint IS NULL OR c.record_id = $2))
                     SELECT *, count(*) OVER () AS total FROM hits
                      ORDER BY rank DESC, id LIMIT $3""",
-                query, self.scope, limit,
+                # Room below the limit, so a capped paper's slots go to the next ranks.
+                query, self.scope, max(limit, CANDIDATES),
             )
             if not rows:
                 return ToolResult(NO_MATCH, coverage=Coverage(total=0, inspected_records=inspected))
-            firsts = list({row["record_id"]: row for row in rows}.values())
-            record_handles = await self._handles(
-                conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in firsts])
-            passage_handles = await self._handles(
-                conn, [("P", r["record_id"], r["chunk_set_id"], r["id"]) for r in rows])
-            passages = self._passages(None, rows, passage_handles)
-            records = tuple(
-                RecordRef(h, r["record_id"], r["title"],
-                          Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]))
-                for r, h in zip(firsts, record_handles)
-            )
+            records, passages = await self._found(conn, rows, limit)
             total = rows[0]["total"]
+            hits = sum(not p.section_mate for p in passages)
             return ToolResult(
                 OK, records=records, passages=passages,
-                coverage=Coverage(len(passages), total, total > len(passages), inspected),
+                coverage=Coverage(len(passages), total, total > hits, inspected),
                 dependencies=frozenset(p.source for p in passages),
             )
 
@@ -1169,20 +1206,12 @@ class ResearchTools:
                     WHERE c.id = ANY($1::bigint[]) AND c.deleted_at IS NULL
                       AND ($2::bigint IS NULL OR c.record_id = $2)""",
                 [r["id"] for r in ordered], self.scope))
-            rows = [r for r in ordered if r["id"] in still][:limit]
-            coverage = Coverage(len(rows), None, truncated, found["inspected"])
+            rows = [r for r in ordered if r["id"] in still]
             if not rows:
-                return ToolResult(NO_MATCH, coverage=coverage, signals=signals)
-            firsts = list({row["record_id"]: row for row in rows}.values())
-            record_handles = await self._handles(
-                conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in firsts])
-            passage_handles = await self._handles(
-                conn, [("P", r["record_id"], r["chunk_set_id"], r["id"]) for r in rows])
-            passages = self._passages(None, rows, passage_handles)
-            records = tuple(
-                RecordRef(h, r["record_id"], r["title"],
-                          Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]))
-                for r, h in zip(firsts, record_handles))
+                return ToolResult(NO_MATCH, coverage=Coverage(0, None, truncated, found["inspected"]),
+                                  signals=signals)
+            records, passages = await self._found(conn, rows, limit)
+            coverage = Coverage(len(passages), None, truncated, found["inspected"])
             return ToolResult(OK, records=records, passages=passages, coverage=coverage,
                               dependencies=frozenset(p.source for p in passages), signals=signals)
 
