@@ -10,20 +10,6 @@
 
 /** Sizes of 12 px or more, by file. */
 export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
-  "src/features/ai/AIHubPage.tsx": 6,
-  "src/features/ai/components/AskIrisNotice.tsx": 1,
-  "src/features/ai/components/AssistantMessageSkeleton.tsx": 1,
-  "src/features/ai/components/ChatInput.tsx": 1,
-  "src/features/ai/components/ChatMessageBubble.tsx": 1,
-  "src/features/ai/components/ChatMessageList.tsx": 2,
-  "src/features/ai/components/ChatToolbar.tsx": 3,
-  "src/features/ai/components/ConversationSidebar.tsx": 5,
-  "src/features/ai/components/CopyButton.tsx": 2,
-  "src/features/ai/components/ReasoningBar.tsx": 5,
-  "src/features/ai/components/RuntimeReader.tsx": 3,
-  "src/features/ai/components/SourceContextPanel.tsx": 4,
-  "src/features/ai/components/StreamStatusRow.tsx": 2,
-  "src/features/ai/components/TokenUsageMeter.tsx": 4,
   "src/features/records/paper-view/AddReviewerDialog.tsx": 1,
   "src/features/records/paper-view/DecisionDialog.tsx": 4,
   "src/features/records/paper-view/NewVersionDialog.tsx": 4,
@@ -39,14 +25,6 @@ export const FONT_SIZE_ALLOWANCE: Record<string, number> = {
  * is empty the floor holds everywhere and the test needs no exceptions.
  */
 export const SUB_12PX_ALLOWANCE: Record<string, number> = {
-  "src/features/ai/AIHubPage.tsx": 2,
-  "src/features/ai/components/ChatMessageBubble.tsx": 2,
-  "src/features/ai/components/ConversationSidebar.tsx": 2,
-  "src/features/ai/components/ModelPill.tsx": 1,
-  "src/features/ai/components/ReasoningBar.tsx": 2,
-  "src/features/ai/components/RuntimeReader.tsx": 1,
-  "src/features/ai/components/SourceContextPanel.tsx": 1,
-  "src/features/ai/components/StreamStatusRow.tsx": 1,
   "src/features/records/paper-view/RouteDialog.tsx": 2,
   "src/features/records/paper-view/threads/ReviewThreads.tsx": 2,
 };
