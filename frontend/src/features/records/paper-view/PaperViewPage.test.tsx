@@ -2899,6 +2899,23 @@ describe("the Overview's header (IR-569)", () => {
     expect(within(details).getByText("Applied Research")).toBeInTheDocument();
   });
 
+  it("sets the authors and the Adviser in one row, with the program line under them (IR-1142)", async () => {
+    shownRecord = {
+      ...record, origin: "institutional", adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos",
+      paper_details: { ...sidebarDetails, programs: ["BS Computer Science"] },
+    };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const authors = screen.getByRole("list", { name: "Authors" });
+    const adviser = screen.getByRole("list", { name: "Adviser" });
+    expect(authors.parentElement).toBe(adviser.parentElement);
+    // The Adviser is named once as a role; an author is a name, not a pill saying "Author".
+    expect(within(adviser).getByText("Adviser")).toBeInTheDocument();
+    expect(within(authors).queryByText("Author")).not.toBeInTheDocument();
+    expect(screen.getByText(/^BS Computer Science · /)).toBeInTheDocument();
+  });
+
   it("names the authors once and dates the work once, above the abstract (IR-1089)", async () => {
     shownRecord = { ...record, publication_year: 2025, access_count: 3 };
     renderPaperView();
