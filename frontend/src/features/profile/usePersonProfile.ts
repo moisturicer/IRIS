@@ -10,6 +10,8 @@ import type { Collaborator, ProfilePage, ProfilePaper, PublicProfile } from "@/t
 /** One paged list on the Profile and what the reader has done with it. */
 export interface ListState<T> {
   items:       T[];
+  /** The whole list's size when the server sent it (the papers lists); else `null`. */
+  count:       number | null;
   /** The last page loaded; `0` while the first has not. */
   page:        number;
   hasMore:     boolean;
@@ -37,11 +39,11 @@ export type PersonProfileState =
 
 function firstPage<T>(result: PromiseSettledResult<AxiosResponse<ProfilePage<T>>>): ListState<T> {
   if (result.status === "fulfilled") {
-    const { results, next } = result.value.data;
-    return { items: results, page: 1, hasMore: next !== null, loading: false, loadingMore: false, error: null };
+    const { results, next, count } = result.value.data;
+    return { items: results, count: count ?? null, page: 1, hasMore: next !== null, loading: false, loadingMore: false, error: null };
   }
   return {
-    items: [], page: 0, hasMore: false, loading: false, loadingMore: false,
+    items: [], count: null, page: 0, hasMore: false, loading: false, loadingMore: false,
     error: errorDetail(result.reason, "This couldn't load. Try again."),
   };
 }
@@ -59,7 +61,7 @@ function loadMoreProfileList(id: number, key: ListKey, list: IdList, patch: List
       const seen = new Set(value.items.map((item) => item.id));
       return {
         items: [...value.items, ...data.results.filter((item) => !seen.has(item.id))],
-        page, hasMore: data.next !== null, loading: false, loadingMore: false, error: null,
+        count: data.count ?? value.count, page, hasMore: data.next !== null, loading: false, loadingMore: false, error: null,
       };
     });
   }).catch((error: unknown) => {
@@ -184,12 +186,12 @@ export function useOwnProfileLists(id: number | null) {
 }
 
 function pendingList<T>(): ListState<T> {
-  return { items: [], page: 0, hasMore: false, loading: true, loadingMore: false, error: null };
+  return { items: [], count: null, page: 0, hasMore: false, loading: true, loadingMore: false, error: null };
 }
 
 function pendingLists(loading = true) {
   const list = <T,>() => loading ? pendingList<T>() : {
-    items: [], page: 0, hasMore: false, loading: false, loadingMore: false, error: null,
+    items: [], count: null, page: 0, hasMore: false, loading: false, loadingMore: false, error: null,
   };
   return { research: list<ProfilePaper>(), advised: list<ProfilePaper>(), collaborators: list<Collaborator>() };
 }

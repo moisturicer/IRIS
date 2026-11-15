@@ -236,7 +236,7 @@ class PaperListTests(PublicProfileTestCase):
 
         self.assertEqual(self.get(self.ana.pk, "research").data["results"], [])
 
-    def test_a_paper_carries_its_fields_and_its_view_count_and_no_totals(self):
+    def test_a_paper_carries_its_fields_and_its_view_count_and_no_citation_figure(self):
         classification = Classification.objects.create(name="Engineering")
         record = self.paper(
             "Mine", [self.ana], self.maria, classification=classification,
@@ -247,7 +247,7 @@ class PaperListTests(PublicProfileTestCase):
 
         response = self.get(self.ana.pk, "research")
 
-        self.assertEqual(set(response.data), {"next", "results"})
+        self.assertEqual(set(response.data), {"count", "next", "results"})
         row = response.data["results"][0]
         self.assertEqual(set(row), PAPER_KEYS)
         self.assertEqual(row["id"], record.pk)
@@ -258,7 +258,7 @@ class PaperListTests(PublicProfileTestCase):
         self.assertEqual(row["publication_year"], 2025)
         self.assertEqual(row["views"], 41)
         body = json.dumps(response.data).lower()
-        for word in ("count", "total", "citation"):
+        for word in ("total", "citation"):
             self.assertNotIn(word, body)
 
     def test_a_paper_without_an_area_or_year_reads_empty_not_missing(self):
@@ -270,7 +270,7 @@ class PaperListTests(PublicProfileTestCase):
         self.assertIsNone(row["publication_year"])
         self.assertEqual(row["authors"], [])
 
-    def test_newest_first_and_paging_ends_with_a_null_next_and_no_count(self):
+    def test_newest_first_and_paging_ends_with_a_null_next_and_the_whole_count(self):
         papers = [self.paper(f"Paper {n}", [self.ana]) for n in range(5)]
         newest_first = [p.pk for p in reversed(papers)]
 
@@ -285,7 +285,18 @@ class PaperListTests(PublicProfileTestCase):
         self.assertIsNotNone(second.data["next"])
         self.assertIsNone(last.data["next"])
         for response in (first, second, last):
-            self.assertNotIn("count", response.data)
+            self.assertEqual(response.data["count"], 5)  # the whole list, not the page
+
+    def test_the_count_is_what_the_viewer_may_read_and_the_same_for_two_viewers(self):
+        self.paper("Advised", [self.ana], self.maria)
+        self.paper("Draft", [self.ana], self.maria, status=PipelineStatus.DRAFT)
+
+        for viewer in (self.viewer, self.ana, self.maria):
+            with self.subTest(viewer=viewer.email):
+                self.client.force_authenticate(viewer)
+                advised = self.get(self.maria.pk, "advised")
+                self.assertEqual(advised.data["count"], 1)
+                self.assertEqual(len(advised.data["results"]), 1)
 
     def test_the_next_link_leads_to_the_next_page(self):
         for n in range(3):
@@ -304,7 +315,7 @@ class PaperListTests(PublicProfileTestCase):
         response = self.get(self.ana.pk, "research", page=9, page_size=10)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data, {"next": None, "results": []})
+        self.assertEqual(response.data, {"count": 1, "next": None, "results": []})
 
     def test_a_bad_page_or_size_is_refused(self):
         for query in ({"page": "0"}, {"page": "x"}, {"page_size": "0"}, {"page_size": "-1"}, {"page_size": "x"}):

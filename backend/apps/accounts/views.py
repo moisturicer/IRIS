@@ -498,7 +498,7 @@ class PublicProfilePapersView(APIView):
     A person's published papers, newest first, ten at a time (IR-696).
 
     Discover's visibility, so nothing unpublished is listed; each paper carries
-    its view count and there are no totals. A subclass says which papers.
+    its view count, and the list's `count` (IR-1133). A subclass says which papers.
     """
     permission_classes = [IsAuthenticated]
 
@@ -510,6 +510,7 @@ class PublicProfilePapersView(APIView):
         rows = self.papers(request.user, person)
         return Response(public_profile.paginate(
             request, rows, public_profile.PAPERS_PAGE_SIZE, public_profile.paper_payload,
+            with_count=True,
         ))
 
 

@@ -59,8 +59,7 @@ describe("the profile", () => {
     renderScreen(<ProfilePage />, { route: "/profile" });
 
     expect(screen.getByRole("heading", { level: 1, name: "Ana L. Reyes" })).toBeVisible();
-    expect(screen.getByText("Student")).toBeVisible();
-    expect(screen.getByText("College of Computer Studies · BS Computer Science")).toBeVisible();
+    expect(screen.getByText("Student · College of Computer Studies · BS Computer Science")).toBeVisible();
   });
 
   it("names the university under the affiliation, as another person's Profile does (IR-948)", () => {
@@ -89,8 +88,8 @@ describe("the profile", () => {
     vi.spyOn(peopleApi, "collaborators").mockResolvedValue(page([]) as never);
     renderScreen(<ProfilePage />, { route: "/profile" });
 
-    expect(await screen.findByText("No published papers yet.")).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "Research" })).not.toBeInTheDocument();
+    expect(await screen.findByText("You have no published papers yet")).toBeVisible();
+    expect(screen.queryByRole("heading", { name: /^Advised/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Advised" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Collaborators" })).not.toBeInTheDocument();
   });
@@ -102,10 +101,10 @@ describe("the profile", () => {
     vi.spyOn(peopleApi, "advised").mockReturnValue(new Promise((resolve) => { finishAdvised = resolve; }) as never);
     renderScreen(<ProfilePage />, { route: "/profile" });
 
-    expect(screen.queryByText("No published papers yet.")).not.toBeInTheDocument();
+    expect(screen.queryByText("You have no published papers yet")).not.toBeInTheDocument();
     finishResearch(page([]));
     finishAdvised(page([]));
-    expect(await screen.findByText("No published papers yet.")).toBeVisible();
+    expect(await screen.findByText("You have no published papers yet")).toBeVisible();
   });
 
   it("keeps a failed list in place and retries only that list", async () => {
@@ -116,7 +115,7 @@ describe("the profile", () => {
     vi.spyOn(peopleApi, "collaborators").mockResolvedValue(page([]) as never);
     renderScreen(<ProfilePage />, { route: "/profile" });
 
-    const section = (await screen.findByRole("heading", { level: 2, name: "Research" })).closest("section")!;
+    const section = (await screen.findByRole("heading", { level: 2, name: /^Papers\b/ })).closest("section")!;
     expect(within(section).getByRole("alert")).toBeVisible();
     expect(screen.getByRole("link", { name: "Paper 600" })).toBeVisible();
 
@@ -133,7 +132,7 @@ describe("the profile", () => {
     vi.spyOn(peopleApi, "advised").mockResolvedValue(page([]) as never);
     vi.spyOn(peopleApi, "collaborators").mockResolvedValue(page([]) as never);
     renderScreen(<ProfilePage />, { route: "/profile" });
-    const list = await screen.findByRole("list", { name: "Research" });
+    const list = await screen.findByRole("list", { name: "Papers" });
 
     await userEvent.click(screen.getByRole("button", { name: "Show more research papers" }));
     await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(12));
@@ -232,7 +231,7 @@ describe("editing", () => {
   it("says this is how others see you", () => {
     renderScreen(<ProfilePage />, { route: "/profile" });
 
-    expect(screen.getByRole("note")).toHaveTextContent(/how other people signed in to IRIS see you/i);
+    expect(screen.getByRole("note")).toHaveTextContent(/this is how other IRIS accounts see your profile/i);
   });
 
   it("confirms a save it was sent back from, and otherwise says nothing", () => {
