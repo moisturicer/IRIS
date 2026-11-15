@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** — 2026-11-16 (IR-572, under IR-553), awaiting acceptance by Lee Jasmin Adolfo. [ADR-044](044-account-backed-research-library.md) §Consequences left the design of folders to IR-572 ("a reader's own folders are additive, so they need their own membership table"). Three product choices were made for IR-572 by Hermoine Zozobrado on 2026-11-16: names are unique per account and creating an existing name returns that folder (§3), an account holds at most 10 folders with names of at most 60 characters (§3), and folders made in a browser before this change are hidden, not shown read-only, until IR-579 imports them (§7). The rest follows from ADR-044. Nothing in it is authorised until it is accepted.
+**Accepted** — 2026-11-16 by Lee Jasmin Adolfo (verbally; relayed and recorded by Hermoine Zozobrado on IR-572). Built in IR-572 ([PR #827](https://github.com/moisturicer/IRIS/pull/827)). Proposed the same day. [ADR-044](044-account-backed-research-library.md) §Consequences left the design of folders to IR-572 ("a reader's own folders are additive, so they need their own membership table"). Three product choices were made for IR-572 by Hermoine Zozobrado on 2026-11-16: names are unique per account and creating an existing name returns that folder (§3), an account holds at most 10 folders with names of at most 60 characters (§3), and folders made in a browser before this change are hidden, not shown read-only, until IR-579 imports them (§7). The rest follows from ADR-044.
 
 ## Context
 
