@@ -138,7 +138,7 @@ describe("the bell's touch targets (IR-1092)", () => {
     );
   });
 
-  it("makes Mark all read and View all notifications at least 44px tall on a phone", async () => {
+  it("makes See all at least 44px tall on a phone", async () => {
     useNotificationsStore.setState({ items: [notification(1, "A review was requested")], unreadCount: 1 });
     render(
       <MemoryRouter>
@@ -148,8 +148,60 @@ describe("the bell's touch targets (IR-1092)", () => {
 
     const dialog = await openBell();
 
-    expect(within(dialog).getByRole("button", { name: "Mark all read" })).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
-    expect(within(dialog).getByRole("link", { name: "View all notifications" })).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
+    expect(within(dialog).getByRole("link", { name: "See all" })).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
+  });
+});
+
+// IR-1137: the popover is a labelled dialog of the latest three, and hands
+// focus back to the bell when it closes.
+describe("the bell's popover (IR-1137)", () => {
+  const four = () => [1, 2, 3, 4].map((id) => notification(id, `Update ${id}`));
+
+  it("declares a dialog popup and shows only the latest three", async () => {
+    useNotificationsStore.setState({ items: four(), unreadCount: 4 });
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "Notifications, 4 unread" })).toHaveAttribute("aria-haspopup", "dialog");
+    const dialog = await openBell();
+    expect(within(dialog).getAllByRole("button", { name: /Update/ })).toHaveLength(3);
+    expect(within(dialog).queryByText("Update 4")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "See all" })).toHaveAttribute("href", "/notifications");
+  });
+
+  it("closes on Escape and returns focus to the bell", async () => {
+    useNotificationsStore.setState({ items: four(), unreadCount: 4 });
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>,
+    );
+
+    await openBell();
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Notifications, 4 unread" })).toHaveFocus();
+  });
+
+  it("marks an opened item read, closes, and drops the count by one", async () => {
+    vi.mocked(notificationsApi.markRead).mockResolvedValue({} as never);
+    useNotificationsStore.setState({ items: four(), unreadCount: 4 });
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>,
+    );
+
+    const dialog = await openBell();
+    await userEvent.click(within(dialog).getByRole("button", { name: /Update 1/ }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(notificationsApi.markRead).toHaveBeenCalledWith(1);
+    expect(screen.getByRole("button", { name: "Notifications, 3 unread" })).toBeInTheDocument();
   });
 });
 
@@ -341,7 +393,7 @@ describe("several bells sharing one fetch (IR-370)", () => {
     expect(screen.getAllByRole("button", { name: "Notifications, 1 unread" })).toHaveLength(3);
 
     await userEvent.click(screen.getAllByRole("button", { name: "Notifications, 1 unread" })[1]);
-    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mark all read" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("link", { name: /Your manuscript was returned/ }));
     expect(screen.getAllByRole("button", { name: "Notifications" })).toHaveLength(3);
     expect(notificationsApi.list).toHaveBeenCalledTimes(1);
   });

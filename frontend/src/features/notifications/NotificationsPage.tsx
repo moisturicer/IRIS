@@ -7,13 +7,12 @@
  * never inferred here) is history: it shows a settled line instead of asking
  * for anything, and it is never counted as unread.
  *
- * A notification about a record is one link: the whole row opens the record
- * and marks the notification read, the way the bell's items already do. The
- * mark-read control is a sibling of that link, never nested inside it, so
- * each stays its own focus stop.
+ * A notification about a record has an Open button: it goes to the record and
+ * marks the notification read, the way the bell's items do. A notification with
+ * no record has only the mark-read control. Days are the viewer's own, from
+ * each timestamp in the browser's time zone (IR-1137).
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { differenceInCalendarDays, formatDistanceToNowStrict, parseISO } from "date-fns";
 
 import { notificationsApi } from "@/api/notifications";
@@ -21,13 +20,13 @@ import { failureMessage } from "@/lib/readFailure";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
 import { notificationTypeLabel } from "./notificationLabels";
-import { SELECTED } from "@/components/ui/highlightRoles";
+import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 
 type Filter = "all" | "unread";
 
@@ -39,8 +38,7 @@ function dayGroup(createdAt: string, now: Date): string {
   const days = differenceInCalendarDays(now, parseISO(createdAt));
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
-  if (days < 7) return "Earlier this week";
-  return "Older";
+  return formatDate(createdAt);
 }
 
 /** "3 hours ago" for today, otherwise the date. */
@@ -118,15 +116,20 @@ export default function NotificationsPage() {
       aria-pressed={filter === value}
       onClick={() => setFilter(value)}
       className={cn(
-        "h-9 px-3.5 rounded-control text-small font-semibold border",
+        "min-h-8 touch:min-h-11 px-3 rounded-control text-small font-semibold inline-flex items-center gap-1.5",
         COLOUR_TRANSITION,
         FOCUS_RING,
-        filter === value
-          ? SELECTED
-          : "border-stone-300 text-stone-700 hover:border-brand hover:text-brand",
+        filter === value ? SELECTED_SEGMENT : "text-stone-600 hover:text-stone-900",
       )}
     >
       {label}
+      {value === "unread" && (
+        <>
+          {/* A real space, so the accessible name reads "Unread 3". */}
+          {" "}
+          <span className="tabular-nums opacity-80">{unreadCount}</span>
+        </>
+      )}
     </button>
   );
 
@@ -146,9 +149,13 @@ export default function NotificationsPage() {
       />
 
       {!loading && !loadFailed && notifications.length > 0 && (
-        <div role="group" aria-label="Show" className="flex items-center gap-2 mb-section-sm">
+        <div
+          role="group"
+          aria-label="Show"
+          className="inline-flex gap-0.5 p-0.5 mb-section-sm rounded-card bg-stone-100 border border-stone-200"
+        >
           {filterButton("all", "All")}
-          {filterButton("unread", unreadCount > 0 ? `Unread (${unreadCount})` : "Unread")}
+          {filterButton("unread", "Unread")}
         </div>
       )}
 
@@ -168,8 +175,8 @@ export default function NotificationsPage() {
         ) : groups.length === 0 ? (
           <EmptyState
             icon="fa-check"
-            title="You're all caught up."
-            message="Nothing is waiting on you."
+            title="You're up to date"
+            message="New review activity on your papers appears here."
             action={<Button variant="outline" size="sm" onClick={() => setFilter("all")}>Show all</Button>}
           />
         ) : (
@@ -213,69 +220,45 @@ interface RowProps {
 function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
   const resolved = n.resolved_at != null;
   const unread = isUnread(n);
-  const opens = n.record != null;
-
-  const body = (
-    <>
-      <span className="sr-only">{unread ? "Unread: " : ""}</span>
-      <span
-        className={cn(
-          "block text-body max-w-[75ch]",
-          unread ? "text-stone-900 font-medium" : "text-stone-600",
-        )}
-      >
-        {n.message}
-      </span>
-      {resolved && (
-        // The server's own words, never worked out here (ADR-069): it says what
-        // happened and when, so nothing on the row still asks the reader to act.
-        <span className="mt-1 flex items-center gap-1.5 text-small font-medium text-stone-700">
-          <i className="fas fa-check text-stone-500" aria-hidden />
-          {n.resolved_label}
-        </span>
-      )}
-      <span className="mt-1 flex flex-wrap items-center gap-x-2 text-small text-stone-500">
-        <time dateTime={n.created_at}>{time}</time>
-        {n.notif_type_name && (
-          <>
-            <span aria-hidden>·</span>
-            <span>{notificationTypeLabel(n.notif_type_name)}</span>
-          </>
-        )}
-      </span>
-    </>
-  );
 
   return (
-    <li
-      className={cn(
-        "group relative flex items-start gap-3 px-5 py-4",
-        COLOUR_TRANSITION,
-        opens && "hover:bg-stone-50 [&:has(a:focus-visible)]:ring-2 [&:has(a:focus-visible)]:ring-inset [&:has(a:focus-visible)]:ring-brand",
-      )}
-    >
-      {/* Unread mark: a maroon dot, with the word for screen readers above. */}
+    <li className="flex items-start gap-3 px-5 py-4 max-sm:flex-wrap">
+      {/* Unread mark: a maroon dot, with the word for screen readers beside the text. */}
       <span
         aria-hidden
         className={cn("mt-2 block w-2 h-2 shrink-0 rounded-full", unread ? "bg-brand" : "bg-transparent")}
       />
 
-      <div className="flex-1 min-w-0">
-        {opens ? (
-          // The link's ::after covers the whole row, so the row is the target.
-          <Link
-            to={`/records/${n.record}`}
-            onClick={onOpen}
-            className="block focus-visible:outline-none after:absolute after:inset-0 after:content-['']"
-          >
-            {body}
-          </Link>
-        ) : (
-          body
+      <div className="flex-1 min-w-0 max-sm:basis-[calc(100%-1.25rem)]">
+        <span
+          className={cn(
+            "block text-body max-w-[75ch]",
+            unread ? "text-stone-900 font-medium" : "text-stone-600",
+          )}
+        >
+          {unread && <span className="sr-only">Unread: </span>}
+          {n.message}
+        </span>
+        {resolved && (
+          // The server's own words, never worked out here (ADR-069): it says what
+          // happened and when, so nothing on the row still asks the reader to act.
+          <span className="mt-1 flex items-center gap-1.5 text-small font-medium text-stone-700">
+            <i className="fas fa-check text-stone-500" aria-hidden />
+            {n.resolved_label}
+          </span>
         )}
+        <span className="mt-1 flex flex-wrap items-center gap-x-2 text-small text-stone-500">
+          <time dateTime={n.created_at}>{time}</time>
+          {n.notif_type_name && (
+            <>
+              <span aria-hidden>·</span>
+              <span>{notificationTypeLabel(n.notif_type_name)}</span>
+            </>
+          )}
+        </span>
       </div>
 
-      <div className="relative z-10 flex items-center gap-1 shrink-0 -my-1">
+      <div className="flex items-center gap-1 shrink-0 self-center max-sm:ml-5">
         {unread && (
           <button
             type="button"
@@ -283,7 +266,7 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
             aria-label="Mark as read"
             title="Mark as read"
             className={cn(
-              "w-9 h-9 rounded-control flex items-center justify-center text-stone-500 hover:bg-stone-100 hover:text-stone-900",
+              "w-9 h-9 touch:w-11 touch:h-11 rounded-control flex items-center justify-center text-stone-500 hover:bg-stone-100 hover:text-stone-900",
               COLOUR_TRANSITION,
               FOCUS_RING,
             )}
@@ -291,11 +274,16 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
             <i className="fas fa-check text-small" aria-hidden />
           </button>
         )}
-        {opens && (
-          <i
-            aria-hidden
-            className="fas fa-chevron-right w-9 text-center text-label text-stone-400 group-hover:text-brand pointer-events-none"
-          />
+        {n.record != null && (
+          <ButtonLink
+            to={`/records/${n.record}`}
+            variant="outline"
+            size="sm"
+            onClick={onOpen}
+            aria-label={`Open: ${n.message}`}
+          >
+            Open
+          </ButtonLink>
         )}
       </div>
     </li>

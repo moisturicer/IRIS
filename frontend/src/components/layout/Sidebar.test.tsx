@@ -441,6 +441,9 @@ describe("the account menu", () => {
     expect(screen.queryByRole("link", { name: "Settings & Profile" })).not.toBeInTheDocument();
     // The one Help link is the footer's, outside the menu the trigger controls.
     const menu = document.getElementById(trigger.getAttribute("aria-controls")!)!;
+    // IR-1137: Notifications is reachable from the account menu too.
+    expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings", "Notifications"]);
+    expect(within(menu).getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
     expect(within(menu).queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Help" })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
@@ -577,6 +580,7 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
     for (const item of [
       screen.getByRole("link", { name: "Profile" }),
       screen.getByRole("link", { name: "Settings" }),
+      screen.getByRole("link", { name: "Notifications" }),
       screen.getByRole("button", { name: "Sign out" }),
     ]) {
       expect(item).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
