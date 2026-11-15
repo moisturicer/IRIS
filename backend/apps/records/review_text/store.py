@@ -64,11 +64,14 @@ def attach(version, previous) -> None:
     from ..tasks import read_review_text
 
     if created:
-        transaction.on_commit(lambda: read_review_text.delay(text.pk))
+        # Robust, like every step after this commit (IR-1049): the version is
+        # saved whatever the queue does, and `readings._requeue_if_lost` sends
+        # a lost read again when the comparison is opened.
+        transaction.on_commit(lambda: read_review_text.delay(text.pk), robust=True)
     # Earlier Versions get the same reader now, so the comparison with this
     # one is ready when it is opened (ADR-058 §3 as amended, point 4).
     record_id, number = version.record_id, version.number
-    transaction.on_commit(lambda: readings.prepare_earlier(record_id, number))
+    transaction.on_commit(lambda: readings.prepare_earlier(record_id, number), robust=True)
 
 
 def read_text(text_id) -> str | None:
