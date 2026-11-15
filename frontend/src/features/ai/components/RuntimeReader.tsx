@@ -148,6 +148,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const pending = useRef<{ question: string; depth: Depth; key: string; conversation?: ReaderConversation }>();
   const pendingRetry = useRef<{ key: string; run: ReaderRun }>();
   const sending = useRef(false);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
   // Opening a conversation by its address: loading, then its content or one of the shared read states (IR-906).
@@ -346,6 +347,9 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     return () => observer.disconnect();
   }, []);
 
+  const blocked = busy || !!error || !!opening || !!(run && activeRun(run));
+  const editQuestion = (question: string) => { setDraft(question); composerRef.current?.focus(); };
+
   return <div className={`flex h-full max-h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : "overflow-hidden"}`}>
     <div ref={scroller} onScroll={e => {
       const box = e.currentTarget;
@@ -372,7 +376,10 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
           return <div key={item.id} className="space-y-5">
             {messages.filter(m => m.id === `q:${item.id}` || (m.id === `a:${item.id}` && !(writing && item.id === run?.id))).map(m => <div key={m.id}>
               <ChatMessageBubble message={m} compact={dense} inlineSources
-                sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources} />
+                sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources}
+                controlsDisabled={blocked}
+                onAskAgain={m.role === "user" ? question => void send(question) : undefined}
+                onEdit={m.role === "user" ? editQuestion : undefined} />
             </div>)}
             {(() => {
               // The streamed draft stays up until the checked answer lands, so it never blinks out between the two.
@@ -416,7 +423,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
           Stop compaction</button>}
       </div>
     </div>
-    <ChatInput centered={centered} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
+    <ChatInput centered={centered} textareaRef={composerRef} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
       beside={usage.latest && <TokenUsageMeter usage={usage.latest} />}
       onStop={run && activeRun(run) && !compactionRun(run) && !busy ? () => void stop() : undefined}
       maxLength={4000}

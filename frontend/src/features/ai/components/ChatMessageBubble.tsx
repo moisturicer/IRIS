@@ -38,6 +38,12 @@ interface ChatMessageBubbleProps {
   onSelectSources?: (message: ChatMessage) => void;
   /** The sources open beneath the answer itself, rather than in a panel. */
   inlineSources?: boolean;
+  /** Send this question again as a new Turn (IR-1162). */
+  onAskAgain?: (question: string) => void;
+  /** Put this question in the input to change and send (IR-1162). */
+  onEdit?: (question: string) => void;
+  /** Disables Ask again and Edit while a run is active. */
+  controlsDisabled?: boolean;
 }
 
 /**
@@ -80,6 +86,40 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
 }
 
 /**
+ * Ask a question again, or edit it and send it (IR-1162). Neither replaces
+ * anything: the earlier Turn stays and a new one follows.
+ */
+export function QuestionControls({
+  question, disabled, onAskAgain, onEdit, className,
+}: {
+  question: string;
+  disabled?: boolean;
+  onAskAgain?: (question: string) => void;
+  onEdit?: (question: string) => void;
+  className?: string;
+}) {
+  if (!onAskAgain && !onEdit) return null;
+  const button = "inline-flex items-center gap-1.5 min-h-8 px-2 rounded-md text-[13px] font-medium text-stone-500 " +
+    "hover:text-stone-900 hover:bg-stone-100 disabled:opacity-50 disabled:cursor-not-allowed";
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      {onAskAgain && (
+        <button type="button" disabled={disabled} onClick={() => onAskAgain(question)} className={button}>
+          <i className="fas fa-rotate-right text-[10px]" aria-hidden />
+          Ask again
+        </button>
+      )}
+      {onEdit && (
+        <button type="button" disabled={disabled} onClick={() => onEdit(question)} className={button}>
+          <i className="fas fa-pen text-[10px]" aria-hidden />
+          Edit
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * The way to ask a question again: for a queued run that ended unanswered
  * (IR-548), and for an answer that was cut off before it finished (IR-907).
  */
@@ -112,6 +152,7 @@ function RetryButton({ onRetry, disabled }: { onRetry?: () => void; disabled?: b
  */
 export function ChatMessageBubble({
   message, compact = false, retryDisabled, onRetry, sourcesSelected = false, onSelectSources, inlineSources = false,
+  onAskAgain, onEdit, controlsDisabled,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
   const [expanded, setExpanded] = useState(false);
@@ -159,7 +200,16 @@ export function ChatMessageBubble({
         {!isUser && <ReasoningSummary summary={message.reasoningSummary} compact={compact} />}
         {!isUser && message.comparison && <ComparisonTable comparison={message.comparison} />}
         {isUser ? (
-          <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
+          <>
+            <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
+            <QuestionControls
+              question={message.content}
+              disabled={controlsDisabled}
+              onAskAgain={onAskAgain}
+              onEdit={onEdit}
+              className="mt-1 -mb-1 -ml-2"
+            />
+          </>
         ) : !message.listing || message.listing.count ? (
           <CitationText
             text={message.content}
