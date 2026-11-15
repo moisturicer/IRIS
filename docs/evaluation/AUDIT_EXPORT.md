@@ -51,6 +51,18 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 ## Event types
 
+### Signing in and registering (IR-659)
+
+Account events, excluded from workflow metrics. None has a `record`. No row holds a password, a token or a link (ASVS 7.1.1).
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `LOGIN` | A sign-in succeeds. `user` is the account | `email` |
+| `FAILED_LOGIN` | A sign-in is refused, one row per refused request. `user` is the account only when the password was right (`unverified`, `locked_by_admin`); otherwise `null`, so a guess adds nothing to someone's history | `email` (as typed), `ip` (the client, behind the trusted proxies, IR-656) and `reason`: `invalid_credentials` (wrong password, unknown or inactive account), `unverified`, `locked_by_admin` (RDCO's lock), `too_many_attempts` (axes refused it: the attempt that trips the lock and every one during it, right password or not). Rows written before IR-659 have only `email` |
+| `ACCOUNT_REGISTERED` | An account is created through `POST /auth/register/`, in the same transaction. `user` is the new account. A refused registration writes nothing | `requested_role` (`Student`, `Adviser` or `null`) |
+| `EMAIL_VERIFICATION_COMPLETED` | The account's email is verified (IR-643, ADR-045) | `purpose`, `outcome`, `correlation_id` |
+| `LOGOUT` | A person signs out | `email` |
+
 ### Research metadata corrections (IR-563, ADR-046)
 
 `SYSTEM_SETTING_CHANGED` is an administrative event, excluded from workflow metrics. The actor is the System Admin that changed the setting (RDCO before IR-781). Metadata contains `key`, `old_value` and `new_value`. Writing the value a setting already holds records nothing.

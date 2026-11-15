@@ -133,6 +133,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-393** | Chunks carry a stored keyword index the database maintains — no FR- id; part C of IR-390's spec, and the asset the hybrid retrieval in … | [details](traceability/IR-393.md) | **IMPLEMENTED** |
 | **IR-395** | An exact term finds its papers — keyword and vector search fused behind a switch — no FR- id; part E of IR-390's spec, and the first of … | [details](traceability/IR-395.md) | **IMPLEMENTED** |
 | **IR-656** | The sign-in lockout counts the real client behind the proxies: a stranger's guesses no longer lock the owner out, and a forged … | [details](traceability/IR-656.md) | **IMPLEMENTED** |
+| **IR-659** | Sign-in refusals, lockouts and registration are audited, with a reason and the client address, and no secret in any row — ASVS 7.2.1, 7.1.1; no FR- id | [details](traceability/IR-659.md) | **PARTIAL** |
 | **IR-406** | The Publish dialog can offer the manuscript's own title and abstract — no FR- id; B1 of the IR-374 frontend redesign spec (§4.5, Appendix … | [details](traceability/IR-406.md) | **IMPLEMENTED** |
 | **IR-409** | The Publish dialog offers the manuscript's own title and abstract as chips — no FR- id; F3b of the IR-374 frontend redesign spec (§4.5 … | [details](traceability/IR-409.md) | **IMPLEMENTED** |
 | **IR-380** | The AI Summary runs as its own Inference task — no FR- id; part F of IR-375's spec, and the first caller to move off `answer`'s model | [details](traceability/IR-380.md) | **IMPLEMENTED** |
