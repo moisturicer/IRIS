@@ -511,6 +511,12 @@ The rule failed one check as measured. Jive Tyler Revalde, IR-980's owner, decid
 
 **Carried to the cutover.** Unstructured shaping keeps line-end hyphens (IR-1054 found the same defect), which also blocks some evaluation labels from matching. No Jira issue tracks that fix yet.
 
+## Amendment — 2026-11-15 (IR-1149): formulas enter the indexed text by default
+
+`AI_FORMULA_TEXT_INDEXED` now defaults to on: a transcribed formula's LaTeX and one-line description enter its chunk's embedded and keyword-indexed text. Jive Tyler Revalde decided this on 2026-11-15. It is an exception to ADR-033 §5, made by a person: no `eval_retrieval` run has measured it. The setting is read at chunking, so existing chunk sets change only after a re-chunk. Readers saw the LaTeX before and still do.
+
+Figure descriptions need no change. A described Figure's description already enters its chunk's embedded text (IR-852), and none is written unless `LLM_DESCRIBE_FIGURE_MODEL` is set, because each description is a paid call.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
