@@ -32,6 +32,14 @@ interface OwnersAnswer {
   owners: { id: number; name: string; is_primary: boolean }[];
 }
 
+/** The Delete requests tabs' counts (IR-1138). */
+export interface DeleteRequestCounts {
+  pending:  number;
+  approved: number;
+  declined: number;
+  all:      number;
+}
+
 export const recordsApi = {
   // Published records (paginated, filterable)
   list:           (params?: Record<string, unknown>) =>
@@ -352,6 +360,9 @@ export const recordsApi = {
       params,
       signal: options.signal,
     }),
+  /** How many requests are in each state, for the count beside each tab (IR-1138). */
+  deleteRequestCounts:     () =>
+    apiClient.get<DeleteRequestCounts>("/records/delete-requests/counts/"),
   approveDeleteRequest:    (id: number) =>
     apiClient.post(`/records/delete-requests/${id}/approve/`),
   declineDeleteRequest:    (id: number, note: string) =>

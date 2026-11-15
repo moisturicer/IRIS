@@ -2,10 +2,11 @@
  * RDCO's delete-request queue: approve or decline what is pending, read what is decided.
  * Accessible to staff roles only (gated by ProtectedRoute in router/index.tsx).
  *
- * Two tabs, never mixed (IR-1076, audit WF-02):
+ * Four tabs: Pending, Approved, Declined and All, each with its count (IR-1138;
+ * IR-1076, audit WF-02, had two). The action appears per row, only on a pending one:
  *   - Pending asks the server for `status=pending` and is the only place the
  *     approve and decline actions appear.
- *   - Decided asks for `status=decided` (approved and declined) and shows each
+ *   - Approved and Declined ask for that status, All for none, and show each
  *     outcome with the requester's reason, RDCO's note on a decline, and the
  *     date it was decided.
  *   - The API pages at 20; "Load more" reads the next page and appends it.
@@ -20,13 +21,14 @@
  *   - Approving soft-deletes the record and notifies the owner.
  *
  * Backend endpoints:
- *   GET  /records/delete-requests/?status=pending|decided → the queue, narrowed
+ *   GET  /records/delete-requests/?status=pending|approved|declined → the queue, narrowed
+ *   GET  /records/delete-requests/counts/                          → the count beside each tab
  *   POST /records/delete-requests/<id>/approve/           → approve (soft-deletes record)
  *   POST /records/delete-requests/<id>/decline/           → decline, with a note (restores record)
  */
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { recordsApi } from "@/api/records";
+import { recordsApi, type DeleteRequestCounts } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
 import { Button }      from "@/components/ui/Button";
 import { WARNING_NOTICE }  from "@/components/ui/fieldClasses";
@@ -48,6 +50,11 @@ import type { DeleteRequest } from "@/types/records";
 
 import { RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
 
+type Tab = "pending" | "approved" | "declined" | "all";
+const TABS: readonly (readonly [Tab, string])[] = [
+  ["pending", "Pending"], ["approved", "Approved"], ["declined", "Declined"], ["all", "All"],
+];
+
 const requesterName = (req: DeleteRequest) =>
   req.requested_by_name ?? req.requested_by_email ?? "the requester";
 
@@ -57,7 +64,17 @@ export default function DeleteRequestsPage() {
   const [approveTarget, setApproveTarget] = useState<DeleteRequest | null>(null);
   const [approving,     setApproving]     = useState(false);
   const [declining,    setDeclining]    = useState<DeleteRequest | null>(null);
-  const [tab, setTab] = useState<"pending" | "decided">("pending");
+  const [tab, setTab] = useState<Tab>("pending");
+  // The number beside each tab (IR-1138). A failed read leaves a tab without
+  // one rather than showing a stale number.
+  const [counts, setCounts] = useState<DeleteRequestCounts | null>(null);
+  const loadCounts = useCallback(() => {
+    Promise.resolve()
+      .then(() => recordsApi.deleteRequestCounts())
+      .then(({ data }) => setCounts(data))
+      .catch(() => setCounts(null));
+  }, []);
+  useEffect(loadCounts, [loadCounts]);
   // The row an approval came from is gone after the reload, so focus goes to the tab.
   const tabFocus = useFocusAfterCommit<HTMLButtonElement>();
 
@@ -67,7 +84,7 @@ export default function DeleteRequestsPage() {
   const read = usePagedRead(
     (page, signal) =>
       recordsApi
-        .listDeleteRequests({ status: tab, ...pageParam(page) }, { signal })
+        .listDeleteRequests({ ...(tab === "all" ? {} : { status: tab }), ...pageParam(page) }, { signal })
         .then(({ data }) => toPage(data)),
     [tab],
   );
@@ -84,6 +101,7 @@ export default function DeleteRequestsPage() {
       await recordsApi.approveDeleteRequest(req.id);
       addToast({ type: "success", message: `Deletion of "${req.record_title}" approved.` });
       queueCountsChanged();
+      loadCounts();
       read.retry();
       tabFocus.focusNext();
     } catch (err) {
@@ -116,7 +134,7 @@ export default function DeleteRequestsPage() {
 
       {/* Pending and Decided: a request is in exactly one of them */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        {(["pending", "decided"] as const).map((s) => (
+        {TABS.map(([s, label]) => (
           <Button
             key={s}
             ref={tab === s ? tabFocus.ref : undefined}
@@ -126,7 +144,8 @@ export default function DeleteRequestsPage() {
             variant="ghost"
             size="sm"
           >
-            {s === "pending" ? "Pending" : "Decided"}
+            {label}
+            {counts && <>{" "}<span className="tabular-nums text-stone-500">{counts[s]}</span></>}
           </Button>
         ))}
         <Button
@@ -158,7 +177,11 @@ export default function DeleteRequestsPage() {
         <EmptyState
           icon="fa-trash-alt"
           title="No delete requests"
-          message={tab === "pending" ? "No deletions are pending approval." : "No requests have been decided yet."}
+          message={
+            tab === "pending" ? "No deletions are pending approval."
+            : tab === "all" ? "No one has asked to remove a record yet."
+            : `No ${tab} requests yet.`
+          }
         />
       ) : (
         <div className="bg-white rounded-card border border-stone-200 overflow-hidden">
@@ -178,7 +201,7 @@ export default function DeleteRequestsPage() {
                   <th className="px-4 py-3 font-semibold text-stone-600">Date</th>
                   <th className="px-4 py-3 font-semibold text-stone-600">Status</th>
                   <th className="px-4 py-3 font-semibold text-stone-600 text-right">
-                    {tab === "pending" ? "Action" : "Decided on"}
+                    {tab === "approved" || tab === "declined" ? "Decided on" : "Action"}
                   </th>
                 </tr>
               </thead>
@@ -286,6 +309,7 @@ export default function DeleteRequestsPage() {
             addToast({ type: "success", message: `Deletion of "${declining.record_title}" declined.` });
             setDeclining(null);
             queueCountsChanged();
+            loadCounts();
             read.retry();
             tabFocus.focusNext();
           }}

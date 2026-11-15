@@ -2104,12 +2104,12 @@ class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
         status_filter = self.request.query_params.get("status")
         if status_filter == "decided":
             qs = qs.exclude(status=RequestStatus.PENDING)
-        elif status_filter:
+        elif status_filter and status_filter != "all":
             qs = qs.filter(status=status_filter)
         return qs.order_by("-created_at", "-pk")
 
     def get_permissions(self):
-        if self.action in ("list", "retrieve"):
+        if self.action in ("list", "retrieve", "counts"):
             # The Delete Requests queue is RDCO's, matching approve/decline
             # below. IsStaff would have shown the queue to all four offices
             # while only RDCO could act on it (IR-165).
@@ -2125,6 +2125,24 @@ class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):
             # someone else's record. See tests.py::DeadPermissionKwargSweepTests.
             return [IsAuthenticated(), IsRDCO()]
         return super().get_permissions()
+
+    def counts(self, request):
+        """
+        GET /delete-requests/counts/ -- how many requests are in each state
+        (IR-1138), for the count beside each tab. Never narrowed by `?status=`.
+        """
+        from django.db.models import Count
+
+        by_status = dict(
+            DeleteRequest.objects.values_list("status").annotate(n=Count("pk")).order_by()
+        )
+        pending = by_status.get(RequestStatus.PENDING, 0)
+        approved = by_status.get(RequestStatus.APPROVED, 0)
+        declined = by_status.get(RequestStatus.DECLINED, 0)
+        return Response({
+            "pending": pending, "approved": approved, "declined": declined,
+            "all": sum(by_status.values()),
+        })
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsRDCO])
     def approve(self, request, pk=None):

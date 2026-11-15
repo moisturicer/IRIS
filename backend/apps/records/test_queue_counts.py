@@ -63,3 +63,46 @@ class QueueCountsTests(APITestCase):
         self.client.force_authenticate(None)
         response = self.client.get(reverse("dashboard-queue-counts"))
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+
+class DeleteRequestStatusCountsTests(APITestCase):
+    """`GET /records/delete-requests/counts/` (IR-1138): the count beside each tab."""
+
+    def setUp(self):
+        self.rdco = make_user("drc_rdco@cit.edu", "RDCO")
+        self.student = make_user("drc_student@cit.edu", "Student")
+        self.record = Record.objects.create(
+            title="A" * 10, abstract="B" * 40,
+            record_type=RecordType.objects.get_or_create(name="Thesis / Research")[0],
+            added_by=self.student, pipeline_status="published",
+        )
+
+    def make(self, state):
+        DeleteRequest.objects.create(
+            record=self.record, requested_by=self.student, status=state,
+            previous_pipeline_status="published",
+        )
+
+    def counts(self, user):
+        self.client.force_authenticate(user)
+        return self.client.get(reverse("delete-requests-counts"))
+
+    def test_counts_each_state_and_the_whole_queue(self):
+        for state in ("pending", "pending", "approved", "declined", "declined", "declined"):
+            self.make(state)
+        response = self.counts(self.rdco)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"pending": 2, "approved": 1, "declined": 3, "all": 6})
+
+    def test_an_empty_queue_is_all_zeros(self):
+        self.assertEqual(self.counts(self.rdco).data, {"pending": 0, "approved": 0, "declined": 0, "all": 0})
+
+    def test_anyone_else_is_refused(self):
+        self.assertEqual(self.counts(self.student).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_all_lists_every_state(self):
+        for state in ("pending", "approved", "declined"):
+            self.make(state)
+        self.client.force_authenticate(self.rdco)
+        response = self.client.get(reverse("delete-requests"), {"status": "all"})
+        self.assertEqual(response.data["count"], 3)

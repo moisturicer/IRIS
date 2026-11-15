@@ -18,6 +18,7 @@ from core.permissions import (
     IsAccountAdmin,
     IsAdmin,
     IsSystemAdmin,
+    STAFF_ROLES,
     is_system_admin,
     role_change_refusal,
 )
@@ -29,7 +30,7 @@ from apps.audit.models import AuditEvent
 from . import people_search, profile, public_profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
-    UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
+    UserSerializer, UserListSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
     RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer, PublishNoticeSerializer, AiAnswerChangeSerializer,
 )
@@ -568,16 +569,37 @@ def _verified_unless_system_admin(actor, users):
 
 
 class UserListView(generics.ListAPIView):
-    serializer_class   = UserSerializer
+    """
+    GET /users/?search=&role=
+
+    `role` narrows the list: a role name, or `office` for the four office
+    roles (IR-1138). Each row carries `last_login` and the affiliation names
+    the Users page shows as Unit and Last active.
+    """
+    serializer_class   = UserListSerializer
     permission_classes = [IsAuthenticated, IsAccountAdmin]
     # A deleted account leaves the Users page (ADR-051 §11, IR-785).
-    queryset           = User.objects.filter(deleted_at__isnull=True).select_related("role").order_by("-date_joined")
+    queryset           = (
+        User.objects.filter(deleted_at__isnull=True)
+        .select_related(
+            "role",
+            "adviser_profile__college", "adviser_profile__department",
+            "student_profile__course__department__college",
+        )
+        .order_by("-date_joined")
+    )
     # The default SearchFilter matches nothing until a view names its fields,
     # so the Users page's search box listed everyone (IR-478).
     search_fields      = ["email", "first_name", "last_name"]
 
     def get_queryset(self):
-        return _verified_unless_system_admin(self.request.user, super().get_queryset())
+        users = _verified_unless_system_admin(self.request.user, super().get_queryset())
+        role = self.request.query_params.get("role")
+        if role == "office":
+            return users.filter(role__name__in=STAFF_ROLES)
+        if role:
+            return users.filter(role__name=role)
+        return users
 
 
 class AdviserListView(generics.ListAPIView):

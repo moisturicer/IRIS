@@ -23,6 +23,7 @@ import { Select }       from "@/components/ui/Select";
 import { Badge }        from "@/components/ui/Badge";
 import { Modal }        from "@/components/ui/Modal";
 import { STAFF_ROLES } from "@/lib/constants";
+import { formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore }   from "@/store/ui.store";
 import { rolesToOffer, rowActions } from "./accountActions";
@@ -59,6 +60,8 @@ export default function UserListPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [search, setSearch]   = useState("");
+  // "" is everyone; a role name or "office" narrows it (IR-1138).
+  const [role, setRole]       = useState("");
 
   // Lock/unlock confirm dialog
   const [lockTarget, setLockTarget] = useState<UserListItem | null>(null);
@@ -72,10 +75,10 @@ export default function UserListPage() {
   const [coordConfirming, setCoordConfirming] = useState(false);
   const [coordError, setCoordError]           = useState<string | null>(null);
 
-  const load = (p = page) => {
+  const load = (p = page, r = role) => {
     setLoading(true);
     accountsApi
-      .userList({ page: p, search })
+      .userList({ page: p, search, ...(r ? { role: r } : {}) })
       .then(({ data }) => {
         setUsers(data.results);
         setTotal(data.count);
@@ -89,6 +92,7 @@ export default function UserListPage() {
   useEffect(() => { load(page); }, [page]);
 
   const handleSearch = () => { setPage(1); load(1); };
+  const handleRole = (next: string) => { setRole(next); setPage(1); load(1, next); };
 
   const handleToggleLock = async () => {
     if (!lockTarget) return;
@@ -183,6 +187,13 @@ export default function UserListPage() {
       ),
     },
     {
+      header: "Unit",
+      id: "unit",
+      cell: ({ row }) => (
+        <span className="text-stone-700">{row.original.department_name || row.original.college_name || "—"}</span>
+      ),
+    },
+    {
       header: "Status",
       accessorKey: "is_active",
       cell: ({ row }) => (
@@ -192,6 +203,15 @@ export default function UserListPage() {
           </Badge>
           {/* Only the System Admin's list holds these; RDCO's leaves them out (IR-705, IR-804). */}
           {row.original.is_verified === false && <Badge variant="warning">Unverified</Badge>}
+        </span>
+      ),
+    },
+    {
+      header: "Last active",
+      id: "last_active",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-stone-600">
+          {row.original.last_login ? formatDate(row.original.last_login) : "Never"}
         </span>
       ),
     },
@@ -245,6 +265,19 @@ export default function UserListPage() {
           className="max-w-xs"
         />
         <Button variant="secondary" size="sm" onClick={handleSearch}>Filter</Button>
+        <div className="w-44">
+          <Select
+            aria-label="Role"
+            size="sm"
+            value={role}
+            onChange={(e) => handleRole(e.target.value)}
+          >
+            <option value="">All roles</option>
+            <option value="Student">Students</option>
+            <option value="Adviser">Advisers</option>
+            <option value="office">Office staff</option>
+          </Select>
+        </div>
       </div>
 
       {loadFailed && !loading ? (

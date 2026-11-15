@@ -20,12 +20,14 @@ import DeleteRequestsPage from "./DeleteRequestsPage";
 const listDeleteRequests = vi.fn();
 const declineDeleteRequest = vi.fn();
 const approveDeleteRequest = vi.fn();
+const deleteRequestCounts = vi.fn();
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
     listDeleteRequests: (...args: unknown[]) => listDeleteRequests(...args),
     approveDeleteRequest: (...args: unknown[]) => approveDeleteRequest(...args),
     declineDeleteRequest: (...args: unknown[]) => declineDeleteRequest(...args),
+    deleteRequestCounts: () => deleteRequestCounts(),
   },
 }));
 
@@ -55,6 +57,8 @@ function readSignal(options?: { signal?: AbortSignal }): AbortSignal {
 
 beforeEach(() => {
   listDeleteRequests.mockReset();
+  deleteRequestCounts.mockReset();
+  deleteRequestCounts.mockResolvedValue({ data: { pending: 2, approved: 1, declined: 3, all: 6 } });
   declineDeleteRequest.mockReset();
   approveDeleteRequest.mockReset();
   useUIStore.setState({ toasts: [] });
@@ -87,7 +91,7 @@ describe("DeleteRequestsPage reads", () => {
     renderScreen(<DeleteRequestsPage />);
     await waitFor(() => expect(signals).toHaveLength(1));
 
-    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+    await userEvent.click(screen.getByRole("button", { name: /^All/ }));
 
     await waitFor(() => expect(signals).toHaveLength(2));
     expect(signals[0].aborted).toBe(true);
@@ -134,37 +138,58 @@ describe("DeleteRequestsPage tabs (IR-1076)", () => {
 
     expect(await screen.findByRole("link", { name: "Still waiting" })).toBeInTheDocument();
     expect(listDeleteRequests.mock.calls[0][0]).toEqual({ status: "pending" });
-    expect(screen.getByRole("button", { name: "Pending" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Pending/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Approve Deletion" })).toBeInTheDocument();
   });
 
-  it("offers Pending and Decided, and no tab that mixes the two", () => {
+  it("offers Pending, Approved, Declined and All, each with its count (IR-1138)", async () => {
     listDeleteRequests.mockResolvedValue({ data: { results: [] } });
 
     renderScreen(<DeleteRequestsPage />);
 
+    expect(await screen.findByRole("button", { name: "Pending 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approved 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Declined 3" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All 6" })).toBeInTheDocument();
+  });
+
+  it("shows the tabs without a number when the counts do not load, and still lists", async () => {
+    deleteRequestCounts.mockRejectedValue(new Error("down"));
+    listDeleteRequests.mockResolvedValue({ data: { results: [waiting] } });
+
+    renderScreen(<DeleteRequestsPage />);
+
+    expect(await screen.findByRole("link", { name: "Still waiting" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pending" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Decided" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Approved" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument();
+  });
+
+  it("asks for approved or declined requests alone", async () => {
+    listDeleteRequests.mockResolvedValue({ data: { results: [] } });
+    renderScreen(<DeleteRequestsPage />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /^Approved/ }));
+    await waitFor(() => expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "approved" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Declined/ }));
+    await waitFor(() => expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "declined" }));
   });
 
   it("shows decided requests with their outcome and reason, and no action", async () => {
     listDeleteRequests.mockImplementation((params: { status?: string }) =>
       Promise.resolve({
-        data: { results: params.status === "decided" ? [turnedDown, removed] : [waiting] },
+        data: { results: params.status === undefined ? [turnedDown, removed] : [waiting] },
       }),
     );
 
     renderScreen(<DeleteRequestsPage />);
     await screen.findByRole("link", { name: "Still waiting" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+    await userEvent.click(screen.getByRole("button", { name: /^All/ }));
 
     expect(await screen.findByRole("link", { name: "Turned down" })).toBeInTheDocument();
-    expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "decided" });
-    expect(screen.getByText("Declined")).toBeInTheDocument();
-    expect(screen.getByText("Approved")).toBeInTheDocument();
+    expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({});
+    expect(within(screen.getByRole("table")).getByText("Declined")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("Approved")).toBeInTheDocument();
     expect(screen.getByText("Kept for the archive")).toBeInTheDocument();
     expect(screen.getByText("Duplicate upload")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Approve Deletion/ })).not.toBeInTheDocument();
@@ -185,9 +210,9 @@ describe("DeleteRequestsPage tabs (IR-1076)", () => {
     listDeleteRequests.mockResolvedValue({ data: { results: [] } });
 
     renderScreen(<DeleteRequestsPage />);
-    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+    await userEvent.click(screen.getByRole("button", { name: /^All/ }));
 
-    expect(await screen.findByText("No requests have been decided yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No one has asked to remove a record yet.")).toBeInTheDocument();
   });
 });
 
@@ -305,12 +330,12 @@ describe("DeleteRequestsPage decline with a note (IR-1099)", () => {
     });
     listDeleteRequests.mockImplementation((params: { status?: string }) =>
       Promise.resolve({
-        data: { results: params.status === "decided" ? [declined, older, removed] : [waiting] },
+        data: { results: params.status === undefined ? [declined, older, removed] : [waiting] },
       }),
     );
 
     renderScreen(<DeleteRequestsPage />);
-    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+    await userEvent.click(screen.getByRole("button", { name: /^All/ }));
 
     const noted = within(await rowFor("Turned down"));
     expect(noted.getByText("RDCO's note:")).toBeInTheDocument();
@@ -389,7 +414,7 @@ describe("DeleteRequestsPage approve confirmation (IR-1028)", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Approve deletion" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Pending" })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Pending/ })).toHaveFocus());
   });
 
   it("disables the buttons while the approval is in flight", async () => {
@@ -481,9 +506,9 @@ describe("DeleteRequestsPage paging (IR-1076)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
     await screen.findByRole("link", { name: "Second page paper" });
 
-    await userEvent.click(screen.getByRole("button", { name: "Decided" }));
+    await userEvent.click(screen.getByRole("button", { name: /^All/ }));
 
-    await waitFor(() => expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({ status: "decided" }));
+    await waitFor(() => expect(listDeleteRequests.mock.calls.at(-1)?.[0]).toEqual({}));
     expect(await screen.findByRole("button", { name: "Load more" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Second page paper" })).not.toBeInTheDocument();
   });
