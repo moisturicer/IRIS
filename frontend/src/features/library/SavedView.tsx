@@ -9,8 +9,8 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { Select } from "@/components/ui/Select";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
-import type { Collection, ReadingVisit } from "@/lib/recordLibrary";
-import { readingStatusLabel, sortedItems, type LibraryItem } from "@/store/library.store";
+import type { ReadingVisit } from "@/lib/recordLibrary";
+import { MAX_FOLDER_NAME, readingStatusLabel, sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
 import { cn } from "@/lib/utils";
 import type { RecordListItem } from "@/types/records";
 
@@ -27,7 +27,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   year:  "Year published",
 };
 
-/** The list endpoint caps `page_size` at 100, so large folders resolve in chunks. */
+/** The list endpoint caps `page_size` at 100, so a long history resolves in chunks. */
 const ID_CHUNK = 100;
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -38,7 +38,8 @@ function chunk<T>(items: T[], size: number): T[][] {
 
 interface SavedViewProps {
   view:        Exclude<LibraryView, { kind: "research" }>;
-  collections: Collection[];
+  /** The reader's own folders (IR-572); every Record in one is also a save. */
+  folders:     LibraryFolder[];
   history:     ReadingVisit[];
   /** The account's saves (IR-566), keyed by Record id. */
   library:     Record<number, LibraryItem>;
@@ -47,8 +48,8 @@ interface SavedViewProps {
   libraryInterrupted?: boolean;
   onRetryLibrary: () => void;
   onRemove:    (ids: number[]) => void;
-  onRename:    (id: string, name: string) => void;
-  onDelete:    (id: string) => void;
+  onRename:    (id: number, name: string) => void;
+  onDelete:    (id: number) => void;
   onClearHistory: () => void;
   /** The Reading status filters, set under the search in the toolbar. */
   filters?:       ReactNode;
@@ -59,11 +60,13 @@ interface SavedViewProps {
 /**
  * One view of the reader's saved reading.
  *
- * **Account views** (All saved, a Reading status) read the library store,
- * whose server response already went through `visible_to()`: an unavailable
- * save arrives as its id and nothing else (ADR-044 §4).
+ * **Account views** (All saved, a Reading status, one of the reader's own
+ * folders) read the library store, whose server response already went through
+ * `visible_to()`: an unavailable save arrives as its id and nothing else
+ * (ADR-044 §4). A folder holds saves, so its papers are the saves it lists, in
+ * the order they were filed (IR-572).
  *
- * **Browser views** (own folders, history) still hold bare ids. Those resolve
+ * **History**, still this browser's until IR-756, holds bare ids. Those resolve
  * through the *list* endpoint (`?id=1,2,3`), which applies the visibility
  * predicate, never through detail one id at a time: a stale localStorage id
  * must not become a way to learn about a record the viewer may not read.
@@ -72,9 +75,9 @@ interface SavedViewProps {
  * rather than silently hidden.
  */
 export function SavedView({
-  view, collections, history, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, onClearHistory, filters, folderControl,
+  view, folders, history, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, onClearHistory, filters, folderControl,
 }: SavedViewProps) {
-  const accountView = view.kind === "saved" || view.kind === "status";
+  const accountView = view.kind !== "history";
   const [records, setRecords] = useState<RecordListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -86,7 +89,7 @@ export function SavedView({
   const [citing, setCiting] = useState<RecordListItem | null>(null);
   const [renaming, setRenaming] = useState(false);
 
-  const folder = view.kind === "folder" ? collections.find((c) => c.id === view.id) : undefined;
+  const folder = view.kind === "folder" ? folders.find((f) => f.id === view.id) : undefined;
   const statusFilter = view.kind === "status" ? view.status : null;
   const title = view.kind === "saved"
     ? "All saved"
@@ -94,20 +97,22 @@ export function SavedView({
       ? readingStatusLabel(view.status)
       : view.kind === "history" ? "History" : folder?.name ?? "Folder";
 
-  /* The account's saves this view shows, newest first. */
-  const accountItems = useMemo(
-    () => (accountView
+  /* The account's saves this view shows: a folder's in filing order, newest
+     first; every other account view's newest saved first. */
+  const accountItems = useMemo(() => {
+    if (view.kind === "folder") {
+      return (folder?.recordIds ?? []).flatMap((id) => (library[id] ? [library[id]] : []));
+    }
+    return accountView
       ? sortedItems(library).filter((i) => statusFilter === null || i.readingStatus === statusFilter)
-      : []),
-    [accountView, library, statusFilter],
-  );
+      : [];
+  }, [view.kind, folder, accountView, library, statusFilter]);
 
   /* The ids this view asks for, newest first. */
-  const viewIds = useMemo<number[]>(() => {
-    if (accountView) return accountItems.map((i) => i.recordId);
-    if (view.kind === "history") return history.map((v) => v.recordId);
-    return folder ? [...folder.recordIds].reverse() : [];
-  }, [accountView, accountItems, view.kind, history, folder]);
+  const viewIds = useMemo<number[]>(
+    () => (accountView ? accountItems.map((i) => i.recordId) : history.map((v) => v.recordId)),
+    [accountView, accountItems, history],
+  );
   const idKey = accountView ? "" : viewIds.join(",");
 
   const load = useCallback(async () => {
@@ -190,7 +195,9 @@ export function SavedView({
     ? { title: "No reading history yet", message: "Papers you open in this browser are listed here, newest first. It is cleared when you sign out." }
     : view.kind === "saved"
       ? { title: "No saved papers yet", message: "Save a paper from Discover or a paper's page and it follows your account." }
-      : { title: `Nothing in ${title} yet`, message: "Save a paper from Discover or a paper's page to file it here." };
+      : view.kind === "folder"
+        ? { title: `Nothing in ${title} yet`, message: "File a paper here from its Save menu on Discover or its page." }
+        : { title: `Nothing in ${title} yet`, message: "Save a paper from Discover or a paper's page to file it here." };
   const removeLabel = view.kind === "folder" ? "Remove from folder" : "Remove from library";
 
   const textButton = cn("min-h-10 rounded-control px-3 text-small font-semibold text-stone-700 hover:bg-stone-100", COLOUR_TRANSITION, FOCUS_RING);
@@ -243,8 +250,13 @@ export function SavedView({
           <input
             autoFocus
             defaultValue={folder.name}
+            maxLength={MAX_FOLDER_NAME}
             aria-label={`Rename ${folder.name}`}
-            onBlur={(e) => { if (e.target.value.trim()) onRename(folder.id, e.target.value.trim()); setRenaming(false); }}
+            onBlur={(e) => {
+              const name = e.target.value.trim();
+              if (name && name !== folder.name) onRename(folder.id, name);
+              setRenaming(false);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
               if (e.key === "Escape") setRenaming(false);
@@ -302,7 +314,7 @@ export function SavedView({
           what="saved papers"
           title="Could not load these papers"
           message={accountView
-            ? "Your saved papers are safe in your account; only loading them failed."
+            ? "Your saved papers and folders are safe in your account; only loading them failed."
             : "This list is still stored in this browser; only fetching the papers failed."}
           onRetry={retry}
         />

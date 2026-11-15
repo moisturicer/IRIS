@@ -8,9 +8,9 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { formatAuthorList, recordYearLabel } from "@/features/discover/discoverUtils";
 import { waitingHref } from "@/features/records/waitingOnYou";
-import type { Collection, ReadingVisit } from "@/lib/recordLibrary";
+import type { ReadingVisit } from "@/lib/recordLibrary";
 import { cn, formatDate } from "@/lib/utils";
-import { sortedItems, type LibraryItem } from "@/store/library.store";
+import { sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
 import type { MyResearchItem } from "@/types/records";
 
 import type { LibraryView } from "./ReadingPanel";
@@ -39,7 +39,8 @@ interface LibraryOverviewProps {
   onRetry:     () => void;
   library:     Record<number, LibraryItem>;
   history:     ReadingVisit[];
-  collections: Collection[];
+  /** The reader's own folders, which follow the account (IR-572). */
+  folders:     LibraryFolder[];
   onOpenSubmissions: (filter: ResearchFilter) => void;
   onOpenSaved: (view: LibraryView) => void;
 }
@@ -51,7 +52,7 @@ interface LibraryOverviewProps {
  * except beside Waiting on you, where each one is a thing to do.
  */
 export function LibraryOverview({
-  research, loading, failed, interrupted = false, onRetry, library, history, collections, onOpenSubmissions, onOpenSaved,
+  research, loading, failed, interrupted = false, onRetry, library, history, folders, onOpenSubmissions, onOpenSaved,
 }: LibraryOverviewProps) {
   const waiting = useMemo(() => research.filter(isWaiting), [research]);
   const recent = useMemo(
@@ -213,19 +214,19 @@ export function LibraryOverview({
             </div>
           )}
 
-          {collections.length > 0 && (
+          {folders.length > 0 && (
             <div className="mt-5 border-t border-stone-200 pt-4">
-              <h3 className="text-label font-semibold text-stone-600">Your folders, in this browser</h3>
+              <h3 className="text-label font-semibold text-stone-600">Your folders</h3>
               <ul className="mt-1 -mx-2">
-                {collections.slice(0, 4).map((c) => (
-                  <li key={c.id}>
+                {folders.slice(0, 4).map((f) => (
+                  <li key={f.id}>
                     <button
                       type="button"
-                      onClick={() => onOpenSaved({ kind: "folder", id: c.id })}
+                      onClick={() => onOpenSaved({ kind: "folder", id: f.id })}
                       className={cn("flex min-h-9 w-full items-center gap-3 rounded-control px-2 text-left text-small text-stone-700 hover:bg-stone-50", COLOUR_TRANSITION, FOCUS_RING)}
                     >
                       <i className="fas fa-folder w-4 text-center text-stone-500" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                      <span className="min-w-0 flex-1 truncate">{f.name}</span>
                     </button>
                   </li>
                 ))}

@@ -19,6 +19,25 @@ export type SavedRecordEntry =
     }
   | { record_id: number; available: false };
 
+/**
+ * One of the reader's own folders (IR-572, ADR-070). `record_ids` are the saved
+ * Records filed in it, newest filing first. Every one is also a save, so its
+ * paper (or `available: false`) comes from the saves list, never from here.
+ */
+export interface FolderEntry {
+  id:         number;
+  name:       string;
+  record_ids: number[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** What filing a Record answers: the folder, and the save filing made or kept. */
+export interface FilingEntry {
+  folder: FolderEntry;
+  save:   SavedRecordEntry;
+}
+
 /** The keys of a saved feed's query: exactly the ones Discover writes into its URL. */
 export type FeedQueryKey = "q" | "type" | "college" | "classification" | "year" | "ip" | "sort";
 export type FeedQuery = Partial<Record<FeedQueryKey, string>>;
@@ -116,6 +135,21 @@ export const libraryApi = {
     apiClient.put<SavedRecordEntry>(`/library/saves/${recordId}/`, body),
   /** Idempotent: 204 whether or not it was saved. */
   unsave: (recordId: number) => apiClient.delete(`/library/saves/${recordId}/`),
+
+  /** The reader's own folders, oldest first, with the account limit (IR-572). */
+  folders: () => apiClient.get<{ results: FolderEntry[]; limit: number }>("/library/folders/"),
+  /** Creating a name the reader already has, ignoring case, returns that folder. */
+  createFolder: (name: string) => apiClient.post<FolderEntry>("/library/folders/", { name }),
+  renameFolder: (folderId: number, name: string) =>
+    apiClient.patch<FolderEntry>(`/library/folders/${folderId}/`, { name }),
+  /** Idempotent: 204 whether or not it was there. Never deletes a save. */
+  deleteFolder: (folderId: number) => apiClient.delete(`/library/folders/${folderId}/`),
+  /** Saves the Record if it was not saved. Idempotent. */
+  fileInFolder: (folderId: number, recordId: number) =>
+    apiClient.put<FilingEntry>(`/library/folders/${folderId}/records/${recordId}/`),
+  /** Idempotent: 204 whether or not it was filed. Never unsaves. */
+  removeFromFolder: (folderId: number, recordId: number) =>
+    apiClient.delete(`/library/folders/${folderId}/records/${recordId}/`),
 
   /** The reader's saved feeds, with the account limit (IR-577). */
   feeds: () => apiClient.get<{ results: SavedFeed[]; limit: number }>("/library/feeds/"),

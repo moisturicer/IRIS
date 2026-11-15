@@ -1,19 +1,29 @@
 /**
- * The account library store (IR-566, ADR-044 §6): one session's saves,
- * optimistic with a visible rollback, and fenced across account switches.
+ * The account library store (IR-566, ADR-044 §6; IR-572, ADR-070): one
+ * session's saves and folders, optimistic with a visible rollback, and fenced
+ * across account switches.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { libraryApi, type SavedRecordEntry } from "@/api/library";
+import { libraryApi, type FolderEntry, type SavedRecordEntry } from "@/api/library";
 import type { User } from "@/types/auth";
 import type { RecordListItem } from "@/types/records";
 
 import { useAuthStore } from "./auth.store";
 import { useLibraryStore } from "./library.store";
 
+// IR-572 adds the folder calls: the store now reads folders with the saves.
 vi.mock("@/api/library", () => ({
-  libraryApi: { saves: vi.fn(), save: vi.fn(), unsave: vi.fn() },
+  libraryApi: {
+    saves: vi.fn(), save: vi.fn(), unsave: vi.fn(),
+    folders: vi.fn(), createFolder: vi.fn(), renameFolder: vi.fn(), deleteFolder: vi.fn(),
+    fileInFolder: vi.fn(), removeFromFolder: vi.fn(),
+  },
 }));
+
+type Api = typeof libraryApi;
+const answer = <K extends keyof Api>(_: K, data: unknown) =>
+  ({ data }) as Awaited<ReturnType<Api[K]>>;
 
 const record = { id: 5, title: "Rainwater Harvesting Survey" } as RecordListItem;
 
@@ -32,10 +42,22 @@ function signIn(id: number) {
   useAuthStore.getState().login({ id, email: `r${id}@cit.edu`, role_name: "Student" } as unknown as User, "a", "r");
 }
 
+const folder = (id: number, name: string, record_ids: number[] = []): FolderEntry => ({
+  id, name, record_ids, created_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z",
+});
+
+/** Load a library holding `saved` and `folders`, as the server lists them. */
+async function loaded(saved: SavedRecordEntry[], folders: FolderEntry[]) {
+  vi.mocked(libraryApi.saves).mockResolvedValue(answer("saves", { results: saved }));
+  vi.mocked(libraryApi.folders).mockResolvedValue(answer("folders", { results: folders, limit: 10 }));
+  await useLibraryStore.getState().ensureLoaded(true);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   sessionStorage.clear();
+  vi.mocked(libraryApi.folders).mockResolvedValue(answer("folders", { results: [], limit: 10 }));
   signIn(1);
 });
 
@@ -105,5 +127,201 @@ describe("library store", () => {
     await a;
 
     expect(useLibraryStore.getState().items[record.id]?.readingStatus).toBeNull();
+  });
+});
+
+describe("library store: folders (IR-572)", () => {
+  const names = () => useLibraryStore.getState().folders.map((f) => [f.name, f.recordIds]);
+
+  it("loads the account's folders with its saves, and forgets both on sign-out", async () => {
+    await loaded([entry()], [folder(3, "Methods", [record.id])]);
+
+    expect(names()).toEqual([["Methods", [record.id]]]);
+    expect(useLibraryStore.getState().folderLimit).toBe(10);
+
+    useAuthStore.getState().logout();
+    expect(useLibraryStore.getState().folders).toEqual([]);
+  });
+
+  it("is not ready when the folders could not be read", async () => {
+    vi.mocked(libraryApi.saves).mockResolvedValue(answer("saves", { results: [entry()] }));
+    vi.mocked(libraryApi.folders).mockRejectedValue(new Error("offline"));
+
+    await useLibraryStore.getState().ensureLoaded(true);
+
+    expect(useLibraryStore.getState().load).toBe("error");
+  });
+
+  it("creates a folder from the server's answer, and says why when it is refused", async () => {
+    await loaded([], []);
+    vi.mocked(libraryApi.createFolder)
+      .mockResolvedValueOnce(answer("createFolder", folder(3, "Methods")))
+      .mockRejectedValueOnce({ response: { status: 400, data: { code: "folder_limit", detail: "You have 10 folders. Delete one to make another." } } });
+
+    await expect(useLibraryStore.getState().createFolder("Methods")).resolves.toMatchObject({ id: 3 });
+    await expect(useLibraryStore.getState().createFolder("Results")).resolves.toBeNull();
+
+    expect(names()).toEqual([["Methods", []]]);
+    expect(useLibraryStore.getState().failure?.message).toBe("You have 10 folders. Delete one to make another.");
+  });
+
+  it("creating a name it already has keeps one folder", async () => {
+    await loaded([], [folder(3, "Methods")]);
+    vi.mocked(libraryApi.createFolder).mockResolvedValue(answer("createFolder", folder(3, "Methods")));
+
+    await useLibraryStore.getState().createFolder("methods");
+
+    expect(names()).toEqual([["Methods", []]]);
+  });
+
+  it("renames at once and rolls a refused rename back visibly", async () => {
+    await loaded([], [folder(3, "Methods")]);
+    vi.mocked(libraryApi.renameFolder).mockRejectedValue(new Error("offline"));
+
+    const pending = useLibraryStore.getState().renameFolder(3, "Method papers");
+    expect(names()).toEqual([["Method papers", []]]);
+    await pending;
+
+    expect(names()).toEqual([["Methods", []]]);
+    expect(useLibraryStore.getState().failure?.message).toMatch(/could not rename/i);
+  });
+
+  it("deletes a folder without touching the saves, and brings it back if refused", async () => {
+    await loaded([entry("reading")], [folder(3, "Methods", [record.id])]);
+    vi.mocked(libraryApi.deleteFolder).mockRejectedValueOnce(new Error("offline"));
+
+    await useLibraryStore.getState().deleteFolder(3);
+    expect(names()).toEqual([["Methods", [record.id]]]);
+    expect(useLibraryStore.getState().failure?.message).toMatch(/could not delete this folder/i);
+
+    vi.mocked(libraryApi.deleteFolder).mockResolvedValueOnce(answer("deleteFolder", undefined));
+    await useLibraryStore.getState().deleteFolder(3);
+    expect(names()).toEqual([]);
+    expect(useLibraryStore.getState().items[record.id]?.readingStatus).toBe("reading");
+  });
+
+  it("filing an unsaved paper shows it saved and filed at once, and rolls both back if refused", async () => {
+    await loaded([], [folder(3, "Methods")]);
+    const filing = deferred<Awaited<ReturnType<Api["fileInFolder"]>>>();
+    vi.mocked(libraryApi.fileInFolder).mockReturnValue(filing.promise);
+
+    const pending = useLibraryStore.getState().fileInFolder(3, record.id, record);
+    expect(names()).toEqual([["Methods", [record.id]]]);
+    expect(useLibraryStore.getState().items[record.id]).toBeDefined();
+    filing.resolve(Promise.reject(new Error("offline")) as never);
+    await pending;
+
+    expect(names()).toEqual([["Methods", []]]);
+    expect(useLibraryStore.getState().items[record.id]).toBeUndefined();
+    expect(useLibraryStore.getState().failure).toEqual({ recordId: record.id, message: expect.stringMatching(/could not add this paper/i) });
+  });
+
+  it("keeps the server's folder and save after a filing", async () => {
+    await loaded([], [folder(3, "Methods")]);
+    vi.mocked(libraryApi.fileInFolder).mockResolvedValue(
+      answer("fileInFolder", { folder: folder(3, "Methods", [record.id]), save: entry() }),
+    );
+
+    await expect(useLibraryStore.getState().fileInFolder(3, record.id, record)).resolves.toBe(true);
+
+    expect(names()).toEqual([["Methods", [record.id]]]);
+    expect(useLibraryStore.getState().items[record.id]?.savedAt).toBe("2026-11-01T08:00:00Z");
+  });
+
+  it("taking a paper out of a folder keeps it saved, and a refusal puts it back", async () => {
+    await loaded([entry("reading")], [folder(3, "Methods", [record.id])]);
+    vi.mocked(libraryApi.removeFromFolder).mockRejectedValueOnce(new Error("offline"));
+
+    await useLibraryStore.getState().removeFromFolder(3, record.id);
+    expect(names()).toEqual([["Methods", [record.id]]]);
+    expect(useLibraryStore.getState().failure?.message).toMatch(/still in the folder/i);
+
+    vi.mocked(libraryApi.removeFromFolder).mockResolvedValueOnce(answer("removeFromFolder", undefined));
+    await useLibraryStore.getState().removeFromFolder(3, record.id);
+    expect(names()).toEqual([["Methods", []]]);
+    expect(useLibraryStore.getState().items[record.id]?.readingStatus).toBe("reading");
+    expect(libraryApi.unsave).not.toHaveBeenCalled();
+  });
+
+  it("unsaving takes a paper out of every folder, and a refused unsave puts it back in them", async () => {
+    await loaded([entry()], [folder(3, "Methods", [record.id]), folder(4, "Results", [record.id])]);
+    vi.mocked(libraryApi.unsave).mockRejectedValueOnce(new Error("offline"));
+
+    const pending = useLibraryStore.getState().unsave(record.id);
+    expect(names()).toEqual([["Methods", []], ["Results", []]]);
+    await pending;
+
+    expect(names()).toEqual([["Methods", [record.id]], ["Results", [record.id]]]);
+  });
+
+  it("a filing answer that lands after the paper was unsaved does not put it back", async () => {
+    await loaded([entry()], [folder(3, "Methods")]);
+    const filing = deferred<Awaited<ReturnType<Api["fileInFolder"]>>>();
+    vi.mocked(libraryApi.fileInFolder).mockReturnValue(filing.promise);
+    vi.mocked(libraryApi.unsave).mockResolvedValue(answer("unsave", undefined));
+
+    const pending = useLibraryStore.getState().fileInFolder(3, record.id, record);
+    await useLibraryStore.getState().unsave(record.id);
+    filing.resolve(answer("fileInFolder", { folder: folder(3, "Methods", [record.id]), save: entry() }));
+    await pending;
+
+    expect(useLibraryStore.getState().items[record.id]).toBeUndefined();
+    expect(names()).toEqual([["Methods", []]]);
+  });
+
+  it("a filing answer that lands after a newer Reading status keeps the newer status", async () => {
+    await loaded([entry()], [folder(3, "Methods")]);
+    const filing = deferred<Awaited<ReturnType<Api["fileInFolder"]>>>();
+    vi.mocked(libraryApi.fileInFolder).mockReturnValue(filing.promise);
+    vi.mocked(libraryApi.save).mockResolvedValue(answer("save", entry("reading")));
+
+    const pending = useLibraryStore.getState().fileInFolder(3, record.id, record);
+    await useLibraryStore.getState().save(record.id, "reading", record);
+    filing.resolve(answer("fileInFolder", { folder: folder(3, "Methods", [record.id]), save: entry(null) }));
+    await pending;
+
+    expect(useLibraryStore.getState().items[record.id]?.readingStatus).toBe("reading");
+    expect(names()).toEqual([["Methods", [record.id]]]);
+  });
+
+  it("a refused take-out puts the paper back where it was in the folder", async () => {
+    await loaded([entry()], [folder(3, "Methods", [7, record.id, 8])]);
+    vi.mocked(libraryApi.removeFromFolder).mockRejectedValue(new Error("offline"));
+
+    await useLibraryStore.getState().removeFromFolder(3, record.id);
+
+    expect(names()).toEqual([["Methods", [7, record.id, 8]]]);
+  });
+
+  it("a refused unsave puts the paper back where it was in each folder", async () => {
+    await loaded([entry()], [folder(3, "Methods", [7, record.id]), folder(4, "Results", [record.id, 8])]);
+    vi.mocked(libraryApi.unsave).mockRejectedValue(new Error("offline"));
+
+    await useLibraryStore.getState().unsave(record.id);
+
+    expect(names()).toEqual([["Methods", [7, record.id]], ["Results", [record.id, 8]]]);
+  });
+
+  it("drops a folder answer that lands after the account changed", async () => {
+    await loaded([], []);
+    const created = deferred<Awaited<ReturnType<Api["createFolder"]>>>();
+    vi.mocked(libraryApi.createFolder).mockReturnValue(created.promise);
+
+    const pending = useLibraryStore.getState().createFolder("Methods");
+    signIn(2);
+    created.resolve(answer("createFolder", folder(3, "Methods")));
+    await pending;
+
+    expect(useLibraryStore.getState().folders).toEqual([]);
+  });
+
+  it("never writes a folder to browser storage", async () => {
+    await loaded([], []);
+    vi.mocked(libraryApi.createFolder).mockResolvedValue(answer("createFolder", folder(3, "Methods")));
+    const before = JSON.stringify({ ...localStorage });
+
+    await useLibraryStore.getState().createFolder("Methods");
+
+    expect(JSON.stringify({ ...localStorage })).toBe(before);
   });
 });
