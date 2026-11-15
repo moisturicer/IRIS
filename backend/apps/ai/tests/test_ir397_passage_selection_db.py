@@ -28,8 +28,15 @@ def flooding(n):
 
 def test_a_paper_that_outranks_the_rest_still_leaves_room_for_another(research, space, monkeypatch):
     # The share is off by default (IR-1150); this checks it when switched on.
-    from ai.research import selection, tools
-    monkeypatch.setattr(tools, "Policy", lambda: selection.Policy(paper_share=50))
+    from ai.research.selection import Policy
+    from ai.research.tools import ResearchTools
+    from ai.runs import service
+
+    class Shared(ResearchTools):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **{**kwargs, "selection": Policy(paper_share=50)})
+
+    monkeypatch.setattr(service, "ResearchTools", Shared)
     reader = make_user("select-cap@cit.edu")
     verbose = paper("Verbose flood study", {p: [flooding(p)] for p in range(1, 7)})
     other = paper("Short flood note", {1: [("Results", "flooding seen once")]})
