@@ -68,11 +68,12 @@ const USERS = Array.from({ length: 6 }, (_, i) => ({
 
 /** One open call, so the board draws its filters as it does with data. */
 const OPPORTUNITY = {
-  id: 1, opportunity_type: "funding_window", type_display: "Funding Window",
-  title: "Internal research grant, second cycle", posting_office: "RDCO", audience: "Faculty and graduate students",
-  description: "Seed funding for projects that start in the next term.", funding_ceiling: "50000.00",
-  external_url: "https://example.edu/grants", due_date: "2026-12-15", is_featured: false, tags: ["funding"],
-  source: "internal", posted_by: 2, posted_by_name: "RDCO", created_at: when("11-01"), updated_at: when("11-01"),
+  id: 1, opportunity_type: "conference", type_display: "Conference",
+  title: "International Conference on Applied Computing", description: "Full papers on applied computing.",
+  external_url: "https://example.edu/icac", due_date: "2026-12-15", location: "Cebu City, Philippines",
+  areas: [1], area_names: ["Agriculture"], start_date: "2027-02-10", end_date: "2027-02-12",
+  registration_fee: "PHP 5,000", is_featured: false,
+  posted_by: 2, posted_by_name: "RDCO", created_at: when("11-01"), updated_at: when("11-01"),
   days_left: 39, is_closed: false, can_edit: false,
 };
 

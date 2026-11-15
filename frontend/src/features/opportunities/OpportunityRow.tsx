@@ -5,7 +5,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import type { Opportunity } from "@/types/opportunities";
 
-import { countdown, dateParts, formatCeiling, formatDueDate, typeMeta } from "./opportunityUtils";
+import { countdown, dateParts, formatDueDate, typeMeta } from "./opportunityUtils";
 
 interface OpportunityRowProps {
   opportunity: Opportunity;
@@ -29,7 +29,7 @@ const LINK =
  * One call on the deadline board (IR-530).
  *
  * Read left to right as the question the board answers: *when* (the date
- * block), *what* (type, title, who posts it, who may apply), then *what I can
+ * block), *what* (type, title, where, which Areas), then *what I can
  * do* (save it, put the deadline in my calendar, go and apply). Edit and
  * delete appear only when the server says this viewer may (`can_edit`).
  */
@@ -47,17 +47,10 @@ export function OpportunityRow({
   const titleId = useId();
   const type    = typeMeta(o.opportunity_type);
   const chip    = countdown(o);
-  const ceiling = formatCeiling(o.funding_ceiling);
   const date    = dateParts(o.due_date);
   const urgent  = !o.is_closed && chip.tone === "attention";
 
-  // The ceiling is the one figure a reader compares across calls, so it is
-  // the one part of the line set heavier.
-  const meta = [
-    { text: o.posting_office, strong: false },
-    { text: o.audience, strong: false },
-    { text: ceiling ? `Up to ${ceiling}` : "", strong: true },
-  ].filter((part) => part.text);
+  const meta = [o.location, ...(o.area_names ?? [])].filter(Boolean);
 
   return (
     <article
@@ -106,12 +99,6 @@ export function OpportunityRow({
               Featured
             </span>
           )}
-          {o.source === "external" && (
-            <span className="inline-flex items-center gap-1">
-              <i className="fas fa-globe" aria-hidden="true" />
-              From an outside body
-            </span>
-          )}
         </p>
 
         <h3
@@ -126,12 +113,10 @@ export function OpportunityRow({
 
         {meta.length > 0 && (
           <p className="text-small text-stone-600 mt-1">
-            {meta.map((part, i) => (
+            {meta.map((text, i) => (
               <span key={i}>
                 {i > 0 && <span aria-hidden="true" className="mx-1.5 text-stone-400">·</span>}
-                <span className={part.strong ? "font-semibold text-stone-800 tabular-nums" : undefined}>
-                  {part.text}
-                </span>
+                <span>{text}</span>
               </span>
             ))}
           </p>
@@ -139,16 +124,6 @@ export function OpportunityRow({
 
         {o.description && (
           <p className="text-small text-stone-600 mt-2 line-clamp-2 max-w-prose">{o.description}</p>
-        )}
-
-        {o.tags.length > 0 && (
-          <ul className="flex flex-wrap gap-1.5 mt-2.5" aria-label="Tags">
-            {o.tags.map((tag) => (
-              <li key={tag} className="px-2 py-0.5 rounded-control bg-stone-100 text-label text-stone-700">
-                {tag}
-              </li>
-            ))}
-          </ul>
         )}
 
       </div>
@@ -204,10 +179,10 @@ export function OpportunityRow({
               <span className="sr-only">(opens in a new tab)</span>
             </a>
           ) : (
-            // No link means the poster gave none: say who to ask rather than
-            // draw a button that goes nowhere.
+            // Only a Call migrated from a Conference Deadline lacks a link
+            // (IR-760): say who to ask rather than draw a button that goes nowhere.
             <span className="ml-1 text-small text-stone-600 xl:max-w-56 xl:text-right">
-              No link given. Ask {o.posting_office.split("(")[0].trim() || "the posting office"}.
+              No link given. Ask {o.posted_by_name || "RDCO"}.
             </span>
           )}
         </div>

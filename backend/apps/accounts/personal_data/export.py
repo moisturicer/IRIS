@@ -570,16 +570,18 @@ def opportunities_posted(user) -> list[dict]:
             "id": row.pk,
             "type": row.opportunity_type,
             "title": row.title,
-            "posting_office": row.posting_office,
-            "audience": row.audience,
             "description": row.description,
             "external_url": row.external_url,
             "due_date": row.due_date,
-            "tags": row.tags,
+            "location": row.location,
+            "areas": sorted(area.name for area in row.areas.all()),
+            "start_date": row.start_date,
+            "end_date": row.end_date,
+            "registration_fee": row.registration_fee,
             "posted_at": row.created_at,
             "updated_at": row.updated_at,
         }
-        for row in Opportunity.objects.filter(posted_by=user).order_by("id")
+        for row in Opportunity.objects.filter(posted_by=user).prefetch_related("areas").order_by("id")
     ]
 
 
