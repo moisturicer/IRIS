@@ -12,8 +12,6 @@ import { affiliationOf, displayName, initialsOf } from "@/features/profile/names
 
 interface DiscoverPeopleResultsProps {
   query: string;
-  preview?: boolean;
-  onSeeAll?: () => void;
 }
 
 const ROLE_OPTIONS = ["Student", "Adviser", "Faculty", "ITSO", "IERC", "KTTO", "RDCO"];
@@ -70,8 +68,11 @@ function PersonResult({ person }: { person: PeopleSearchResult }) {
   );
 }
 
-/** Matching public people: a five-person Discover preview or a filtered directory. */
-export function DiscoverPeopleResults({ query, preview = false, onSeeAll }: DiscoverPeopleResultsProps) {
+/**
+ * Matching public people, as a filtered directory. It is Discover's People tab
+ * and nowhere else: a search on the Papers tab never shows people (IR-1082).
+ */
+export function DiscoverPeopleResults({ query }: DiscoverPeopleResultsProps) {
   const [college, setCollege] = useState("");
   const [department, setDepartment] = useState("");
   const [role, setRole] = useState("");
@@ -126,13 +127,6 @@ export function DiscoverPeopleResults({ query, preview = false, onSeeAll }: Disc
 
   useEffect(() => {
     const trimmedQuery = query.trim();
-    if (preview && !trimmedQuery) {
-      setResults([]);
-      setCount(0);
-      activeSearch.current = searchKey;
-      setLoading(false);
-      return;
-    }
 
     let current = true;
     const params: PeopleSearchParams = {
@@ -162,28 +156,7 @@ export function DiscoverPeopleResults({ query, preview = false, onSeeAll }: Disc
       setFailure(true);
     }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [query, college, department, role, page, preview, retry, searchKey, requestedPage]);
-
-  if (preview) {
-    if (!query.trim() || (!loading && results.length === 0 && !failure)) return null;
-    return (
-      <section aria-labelledby="discover-people-heading" className="mb-6">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 id="discover-people-heading" className="font-display text-title font-semibold text-stone-900">People</h2>
-          {count > 0 && (
-            <button type="button" onClick={onSeeAll} className={cn("shrink-0 text-small font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
-              See all people
-            </button>
-          )}
-        </div>
-        {failure ? <p role="status" className="text-small text-stone-600">People could not be loaded.</p>
-          : loading && results.length === 0 ? <p role="status" className="text-small text-stone-600">Searching people…</p>
-            : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {results.slice(0, 5).map((person) => <PersonResult key={person.id} person={person} />)}
-            </div>}
-      </section>
-    );
-  }
+  }, [query, college, department, role, page, retry, searchKey, requestedPage]);
 
   const nextPage = requestedPage * PEOPLE_PAGE_SIZE < count;
   return (
@@ -191,21 +164,21 @@ export function DiscoverPeopleResults({ query, preview = false, onSeeAll }: Disc
       <div className="mb-4 flex flex-wrap gap-3">
         <label className="grid gap-1 text-small font-medium text-stone-700">
           College
-          <select value={college} onChange={(event) => { setCollege(event.target.value); setDepartment(""); }} className="h-10 min-w-44 rounded-lg border border-field bg-white px-3 text-body">
+          <select value={college} onChange={(event) => { setCollege(event.target.value); setDepartment(""); }} className="h-11 min-w-44 rounded-lg border border-field bg-white px-3 text-body">
             <option value="">All colleges</option>
             {colleges.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-small font-medium text-stone-700">
           Department
-          <select value={department} onChange={(event) => setDepartment(event.target.value)} disabled={!college} className="h-10 min-w-44 rounded-lg border border-field bg-white px-3 text-body disabled:bg-stone-100">
+          <select value={department} onChange={(event) => setDepartment(event.target.value)} disabled={!college} className="h-11 min-w-44 rounded-lg border border-field bg-white px-3 text-body disabled:bg-stone-100">
             <option value="">All departments</option>
             {departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-small font-medium text-stone-700">
           Role
-          <select value={role} onChange={(event) => setRole(event.target.value)} className="h-10 min-w-36 rounded-lg border border-field bg-white px-3 text-body">
+          <select value={role} onChange={(event) => setRole(event.target.value)} className="h-11 min-w-36 rounded-lg border border-field bg-white px-3 text-body">
             <option value="">All roles</option>
             {ROLE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>

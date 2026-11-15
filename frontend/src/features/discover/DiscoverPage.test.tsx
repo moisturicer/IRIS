@@ -339,21 +339,164 @@ describe("the phone toolbar (IR-1080)", () => {
   });
 });
 
+// IR-1082 (spec §4.6, audit VIS-01, VIS-05, LAY-01, LAY-02, US-01 to US-04): one filled action, one
+// control height, labelled filters, Sort and a live count in the results header, list rows. jsdom
+// loads no Tailwind, so fill and height are asserted as the class tokens that give them; the
+// "three results at 1440 x 900" criterion is a measured one (see the traceability file).
+describe("the toolbar and the result rows (IR-1082)", () => {
+  const FILLED = /(^|\s)bg-brand(\s|$)/;
+  /** Every height token a control may carry: the one control height, or a segment filling its track. */
+  const HEIGHT_TOKENS = new Set(["h-11", "min-h-11", "sm:h-11", "sm:min-h-0", "h-full"]);
+
+  async function controls() {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const row = screen.getByRole("group", { name: "Discover controls" });
+    const switcher = screen.getByRole("group", { name: "Discover results" });
+    return { row, switcher, buttons: [...within(row).getAllByRole("button"), ...within(switcher).getAllByRole("button")] };
+  }
+
+  it("has exactly one filled control, Publish, and no selected segment is filled maroon", async () => {
+    const { buttons } = await controls();
+    expect(buttons.filter((b) => FILLED.test(b.className)).map((b) => b.textContent?.trim())).toEqual(["Publish"]);
+  });
+
+  it("draws the chosen segment white and raised, with no maroon, in both segmented controls", async () => {
+    const { row, switcher } = await controls();
+    for (const chosen of [within(row).getByRole("button", { name: "Latest", pressed: true }), within(switcher).getByRole("button", { name: "Papers", pressed: true })]) {
+      expect(chosen.className).toMatch(/(^|\s)bg-surface(\s|$)/);
+      expect(chosen.className).not.toMatch(/(^|\s)text-white(\s|$)/);
+    }
+  });
+
+  it("gives every control the one control height", async () => {
+    const { row, switcher, buttons } = await controls();
+    for (const button of buttons) {
+      const heights = button.className.split(/\s+/).filter((token) => /^(sm:)?(min-)?h-/.test(token));
+      expect(heights.length, button.textContent ?? "").toBeGreaterThan(0);
+      for (const token of heights) expect(HEIGHT_TOKENS.has(token), `${button.textContent}: ${token}`).toBe(true);
+    }
+    for (const track of [within(row).getByRole("group", { name: "Discover feed" }), switcher]) {
+      expect(track.className).toMatch(/(^|\s)sm:h-11(\s|$)/);
+    }
+    // The 1 / 2 / 3 column toggle is a control of the row, at the same height.
+    expect(within(row).getByRole("button", { name: /^1 column/ }).className).toMatch(/(^|\s)h-11(\s|$)/);
+  });
+
+  it("labels every filter with visible text, and its button names the label and the value", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const sheet = await filterSheet();
+    for (const [label, value] of [["Type", "Any type"], ["College", "Any"], ["Classification", "Any"], ["Year (completed)", "Any year"], ["IP & patents", "Any"]]) {
+      expect(within(sheet).getByText(label)).toBeVisible();
+      expect(within(sheet).getByRole("button", { name: `${label} ${value}` })).toBeInTheDocument();
+    }
+    await choose(/^Type/, /^Project$/, sheet);
+    expect(within(sheet).getByRole("button", { name: "Type Project" })).toBeInTheDocument();
+  });
+
+  it("keeps Sort out of the Filters panel and puts it in the results header beside a live count", async () => {
+    total = 3;
+    renderDiscover();
+    const header = await screen.findByRole("group", { name: "Results" });
+    expect(within(header).getByRole("status")).toHaveTextContent("3 papers");
+    expect(within(header).getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
+    expect(within(await filterSheet()).queryByText("Sort")).not.toBeInTheDocument();
+  });
+
+  it("says one paper in the singular, and keeps the count on For you, where there is no Sort", async () => {
+    renderDiscover();
+    const header = await screen.findByRole("group", { name: "Results" });
+    await waitFor(() => expect(within(header).getByRole("status")).toHaveTextContent("1 paper"));
+    expect(within(header).getByRole("status")).not.toHaveTextContent("1 papers");
+
+    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenCalled());
+    expect(within(await screen.findByRole("group", { name: "Results" })).getByRole("status")).toHaveTextContent("1 paper");
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+  });
+
+  it("offers no Sort over a failed read or an empty list, where there is nothing to order", async () => {
+    vi.mocked(recordsApi.list).mockImplementationOnce(() => Promise.reject(new Error("down")));
+    const first = renderDiscover();
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+    first.unmount();
+
+    listed = [];
+    renderDiscover();
+    await screen.findByText("Nothing has been published yet.");
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the count's live region in the page from the start, so a count that lands in it is announced", async () => {
+    renderDiscover();
+    // Present while the first read is still out, and empty until it lands.
+    const status = within(screen.getByRole("group", { name: "Results" })).getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    await waitFor(() => expect(status).toHaveTextContent("1 paper"));
+  });
+
+  it("opens a filter from its visible label too", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const sheet = await filterSheet();
+    await userEvent.click(within(sheet).getByText("Type"));
+    expect(await screen.findByRole("listbox", { name: "Type" })).toBeInTheDocument();
+  });
+
+  it("hides Areas until there are Areas to choose from", async () => {
+    const classifications = vi.mocked(recordsApi.classifications).getMockImplementation()!;
+    const pscedList = vi.mocked(recordsApi.pscedList).getMockImplementation()!;
+    vi.mocked(recordsApi.classifications).mockImplementation(() => page([]) as never);
+    vi.mocked(recordsApi.pscedList).mockImplementation(() => page([]) as never);
+    try {
+      renderDiscover();
+      await screen.findByText(publishedThesis.title);
+      await waitFor(() => expect(recordsApi.pscedList).toHaveBeenCalled());
+      expect(screen.queryByRole("button", { name: /Areas/ })).not.toBeInTheDocument();
+      // The rest of the row is still there.
+      expect(screen.getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
+    } finally {
+      vi.mocked(recordsApi.classifications).mockImplementation(classifications);
+      vi.mocked(recordsApi.pscedList).mockImplementation(pscedList);
+    }
+  });
+
+  it("draws one column as a list row with a single footer, and no abstract panel", async () => {
+    renderDiscover();
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    expect(within(card).getAllByRole("button", { name: "Cite this paper" })).toHaveLength(1);
+    expect(within(card).getAllByRole("button", { name: "Save" })).toHaveLength(1);
+    expect(within(card).queryByText("From the abstract")).not.toBeInTheDocument();
+    // The outline thumbnail is decoration: nothing for a screen reader to announce.
+    const thumbnail = card.querySelector(".w-24");
+    expect(thumbnail).not.toBeNull();
+    expect(thumbnail).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
 describe("browsing", () => {
-  it("previews up to five matching people and opens filtered People results", async () => {
+  it("lists matching people only on the People tab, and filters them there", async () => {
     people = Array.from({ length: 6 }, (_, index) => discoverPerson(index + 1));
     const { container } = renderDiscover();
 
     await userEvent.type(screen.getByRole("textbox", { name: "Search records" }), "climate");
-    expect(await screen.findByRole("heading", { name: "People" })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: /Lena M\. Cruz 1/ })).toHaveAttribute("href", "/people/1");
-    expect(screen.getAllByRole("link", { name: /Lena M\. Cruz/ })).toHaveLength(5);
-    expect(screen.getAllByText("LC")[0]).toHaveClass("rounded-full");
-    expect(screen.getAllByText("College of Engineering · Computer Studies · BS Computer Science")).toHaveLength(5);
-    expect(screen.getAllByText(/3 published papers/)).toHaveLength(5);
+    await screen.findByText(publishedThesis.title);
+    // The Papers tab holds papers: no People section, no See all, no people request.
+    expect(screen.queryByRole("heading", { name: "People" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "See all people" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Lena M\. Cruz/ })).not.toBeInTheDocument();
+    expect(peopleApi.search).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: "See all people" }));
+    await userEvent.click(screen.getByRole("button", { name: "People" }));
     expect(screen.getByRole("button", { name: "People", pressed: true })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Lena M\. Cruz 1/ })).toHaveAttribute("href", "/people/1");
+    expect(screen.getAllByRole("link", { name: /Lena M\. Cruz/ })).toHaveLength(6);
+    expect(screen.getAllByText("LC")[0]).toHaveClass("rounded-full");
+    expect(screen.getAllByText("College of Engineering · Computer Studies · BS Computer Science")).toHaveLength(6);
+    expect(screen.getAllByText(/3 published papers/)).toHaveLength(6);
+
     const college = screen.getByRole("combobox", { name: "College" });
     await userEvent.selectOptions(college, "4");
     const department = await screen.findByRole("combobox", { name: "Department" });
@@ -366,14 +509,26 @@ describe("browsing", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("keeps Discover usable when the people-search response has a malformed person", async () => {
+  it("keeps Discover usable when the people-search response has a malformed person, and offers Try again on the People tab", async () => {
     vi.mocked(peopleApi.search).mockImplementation(() => Promise.resolve({ data: { count: 1, results: [{}] } } as never));
     renderDiscover();
     await userEvent.type(screen.getByRole("textbox", { name: "Search records" }), "climate");
+    await screen.findByText(publishedThesis.title);
+    // A People failure never reaches the Papers tab.
+    expect(screen.queryByText(/people could/i)).not.toBeInTheDocument();
 
-    expect(await screen.findByText("People could not be loaded.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "People" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("We couldn’t load people.");
     expect(screen.getByRole("heading", { level: 1, name: "Discover" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /undefined/ })).not.toBeInTheDocument();
+
+    const calls = vi.mocked(peopleApi.search).mock.calls.length;
+    people = [discoverPerson(1)];
+    vi.mocked(peopleApi.search).mockImplementation(() => peoplePage({ results: people, count: people.length, next: null }));
+    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("link", { name: /Lena M\. Cruz 1/ })).toBeInTheDocument();
+    expect(vi.mocked(peopleApi.search).mock.calls.length).toBeGreaterThan(calls);
   });
 
   it("offers For you, Latest, and Trending, opening on the latest catalogue", async () => {
@@ -403,14 +558,15 @@ describe("browsing", () => {
     expect(screen.getByRole("button", { name: "1 column; switch to 2" })).toBeInTheDocument();
     expect(card.parentElement).toHaveClass("grid-cols-1");
     expect(card.parentElement).not.toHaveClass("md:grid-cols-2");
-    const preview = within(card).getByRole("complementary", { name: "Manuscript and abstract preview" });
-    expect(preview).toHaveTextContent("From the abstract");
-    expect(preview).toHaveTextContent("An abstract.");
+    // One column is a list row with a 96 px outline thumbnail, not an abstract panel.
+    expect(card.querySelector(".w-24")).not.toBeNull();
+    expect(within(card).queryByRole("complementary")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "1 column; switch to 2" }));
     expect(card.parentElement).toHaveClass("md:grid-cols-2");
     expect(localStorage.getItem("iris.discover.columns")).toBe("2");
-    expect(within(card).queryByRole("complementary", { name: "Manuscript and abstract preview" })).not.toBeInTheDocument();
+    // Two and three columns are text only.
+    expect(card.querySelector(".w-24")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "2 columns; switch to 3" }));
     expect(card.parentElement).toHaveClass("xl:grid-cols-3");
@@ -427,13 +583,14 @@ describe("browsing", () => {
       record_type: "1", college: "4", year_from: "2026", year_to: "2026",
     })));
     const forYouFilters = await filterSheet();
-    expect(screen.queryByRole("button", { name: /Sort:/ })).not.toBeInTheDocument();
+    // Recommendations have their own order, so there is no Sort, though the count stays.
+    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
     await choose(/^Year/, /^2009$/, forYouFilters);
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2009" })));
     expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Latest" }));
     await waitFor(() => expect(lastListParams()).toMatchObject({ record_type: "1", college: "4", year_from: "2009" }));
-    expect(within(await filterSheet()).getByRole("button", { name: /^Sort/ })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
   });
 
   it("offers clearing active For you filters when they match no research", async () => {
@@ -533,17 +690,15 @@ describe("browsing", () => {
     expect(screen.queryByRole("tab", { name: /proposals/i })).not.toBeInTheDocument();
   });
 
-  it("sorts by most viewed through ordering, and back to newest", async () => {
+  it("sorts by most viewed through ordering, and back to newest, from the results header", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    const sheet = await filterSheet();
-    await userEvent.click(within(sheet).getByRole("button", { name: /^sort/i }));
-    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Most viewed" }));
+    const sort = screen.getByRole("combobox", { name: "Sort" });
+    await userEvent.selectOptions(sort, "Most viewed");
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-access_count" }));
 
-    await userEvent.click(within(sheet).getByRole("button", { name: /^sort/i }));
-    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Newest" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "Newest");
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at" }));
   });
 
@@ -1023,8 +1178,7 @@ describe("continuity", () => {
     await screen.findByText(publishedThesis.title);
 
     await choose(/^type/i, /^project$/i);
-    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^sort/i }));
-    await userEvent.click(within(await screen.findByRole("listbox")).getByRole("option", { name: "Most viewed" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "Most viewed");
 
     const query = screen.getByRole("status", { name: "Current query" });
     await waitFor(() => expect(query).toHaveTextContent("type=2"));
@@ -1508,6 +1662,7 @@ describe("a question is offered Ask IRIS (IR-1095)", () => {
   it("searches People by the same content words as papers", async () => {
     renderDiscover(`/?q=${encodeURIComponent(QUESTION)}`);
     await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: "People" }));
 
     await waitFor(() => expect(peopleApi.search).toHaveBeenCalledWith(expect.objectContaining({ q: "weather data forecast dengue" })));
   });

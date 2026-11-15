@@ -4,10 +4,9 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import type { ForYouItem, RecordListItem } from "@/types/records";
 import { CitationIcon } from "./DiscoverIcons";
-import { ManuscriptCover } from "./ManuscriptCover";
+import { PaperThumbnail } from "./PaperThumbnail";
 import { PaperSaveDropdown } from "./PaperSaveDropdown";
 import {
-  cardHook,
   formatAuthorList,
   ipTypeLabel,
   indexedOnLabel,
@@ -20,7 +19,8 @@ interface DiscoverResultCardProps {
   searchHighlight: string;
   onCite:          () => void;
   reason?:         ForYouItem["reason"];
-  expanded?:       boolean;
+  /** One column: a list row with a 96 px outline thumbnail. Two and three columns are text-only tiles. */
+  row?:            boolean;
   /** For you only: hide this recommendation for the reader's account (IR-576). */
   onNotInterested?: () => void;
 }
@@ -40,9 +40,8 @@ function reasonLabel(reason: ForYouItem["reason"]): string {
  * so the card names none rather than guessing one; citation and download
  * counts do not exist, so views are the only figure.
  */
-export function DiscoverResultCard({ record, searchHighlight, onCite, reason, expanded = false, onNotInterested }: DiscoverResultCardProps) {
+export function DiscoverResultCard({ record, searchHighlight, onCite, reason, row = false, onNotInterested }: DiscoverResultCardProps) {
   const abstract = record.abstract?.trim() ?? "";
-  const hook = cardHook({ abstract, ai_hook: record.ai_hook });
 
   const flags = [
     record.is_ip && { key: "ip", icon: "fa-shield-halved", label: ipTypeLabel(record.ip_type) },
@@ -52,7 +51,8 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
 
   return (
     <ResearchCard
-      layout="grid"
+      layout={row ? "list" : "grid"}
+      compact={row}
       href={`/records/${record.id}`}
       title={record.title}
       titleContent={highlightTerms(record.title, searchHighlight)}
@@ -73,22 +73,9 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
         ? <span className="italic text-stone-500">Authors not recorded</span>
         : highlightTerms(formatAuthorList(record.authors), searchHighlight)}
       summary={abstract ? highlightTerms(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
-      summaryClassName={expanded ? "xl:line-clamp-5" : undefined}
-      splitFooter={expanded}
-      previewLabel="Manuscript and abstract preview"
-      preview={expanded && <>
-        <ManuscriptCover recordId={record.id} available={record.has_manuscript ?? record.file_count > 0} />
-        <div className="mt-auto border-t border-stone-200 px-5 pb-5 pt-4">
-          <div className="flex items-center gap-2">
-            <span aria-hidden className="h-0.5 w-4 rounded-full bg-brand" />
-            <span className="text-label font-semibold uppercase tracking-wide text-stone-700">{record.ai_hook?.trim() ? "At a glance" : "From the abstract"}</span>
-          </div>
-          <p className="mt-2 line-clamp-3 font-display text-[1.13rem] leading-snug text-stone-800">
-            {hook ? highlightTerms(hook, searchHighlight) : "No abstract has been added yet."}
-          </p>
-        </div>
-      </>}
-      footerClassName="rounded-b-xl border-stone-200 bg-white"
+      summaryClassName={row ? "line-clamp-2" : undefined}
+      thumbnail={row && <PaperThumbnail />}
+      footerClassName={row ? undefined : "rounded-b-xl border-stone-200 bg-white"}
       footer={
         <>
           <ResearchOriginBadge origin={record.origin} />

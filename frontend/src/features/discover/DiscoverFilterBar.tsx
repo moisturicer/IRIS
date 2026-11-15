@@ -51,9 +51,6 @@ interface DiscoverFilterBarProps {
   className?: string;
   filters:   DiscoverFilters;
   onChange:  (next: DiscoverFilters) => void;
-  showSort?: boolean;
-  sort:      DiscoverSort;
-  onSort:    (next: DiscoverSort) => void;
   options:   DiscoverFilterOptions;
   /** Reference data still loading: the lists say so rather than look empty. */
   loading:   boolean;
@@ -72,16 +69,14 @@ export function activeFilterCount(filters: DiscoverFilters): number {
 }
 
 /**
- * One Filters control keeps the feed toolbar compact at every width. Its
- * dropdown holds every catalogue filter and the optional Latest sort control.
+ * One Filters control keeps the feed toolbar compact at every width. Its panel
+ * holds every catalogue filter, each with a visible label. Sort is not here: it
+ * sits in the results header beside the count (IR-1082).
  */
 export function DiscoverFilterBar({
   className,
   filters,
   onChange,
-  showSort = true,
-  sort,
-  onSort,
   options,
   loading,
   resultCount,
@@ -207,10 +202,6 @@ export function DiscoverFilterBar({
         </div>
         <div className="flex flex-col gap-3 overflow-y-auto px-4 py-4">
           {controls()}
-          {showSort && <DiscoverFilterDropdown
-            inline block neutral name="Sort" options={SORT_OPTIONS} selected={sort}
-            onChange={(v) => onSort(v as DiscoverSort)}
-          />}
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3">
             <button
