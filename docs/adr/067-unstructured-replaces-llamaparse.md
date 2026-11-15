@@ -428,6 +428,25 @@ Unstructured's text as-is (13 only for line-end hyphens Unstructured keeps,
 22 for papers or labels that miss on Docling too), which caps every strategy
 near 0.62 and narrows every gap. Voyage spend for all runs was about $2.20.
 
+**Rerun with fuller transcriptions (2026-11-15, `runs/2026-11-15-ir1054-rerun/`).**
+The same arms after 1,131 of 1,355 formulas and 393 of 474 Figures were
+transcribed or described (Claude Sonnet 5.5 via OpenRouter):
+
+| Strategy | Main set | One-paper slice | Figure set |
+|---|---|---|---|
+| structural | 0.573 | 0.649 | 0.345 |
+| **structural + Figure passages** | 0.551 | **0.649** | **0.931** |
+| labeled | 0.545 | 0.622 | 0.931 |
+| fixed-window (baseline) | **0.618** | 0.622 | 0.379 |
+
+The decisions stand: structural with Figure passages matches or beats labeled
+on every set, and keeps its Figure-set gain for two main-set questions. The
+baseline leads the main set by 0.067 (7 questions to 1, paired, p ≈ 0.07):
+its ~600-token windows cross headings, while structural never merges short
+sections, and the questions it wins need that context (three are follow-ups).
+That is a lead for a later, measured change to structural's merging, not a
+reason to ship the baseline (decision 12).
+
 ## Amendment — 2026-11-15 (IR-1126): Unstructured's image descriptions, data path and measurement
 
 This amendment records facts. It changes no decision: figures are still

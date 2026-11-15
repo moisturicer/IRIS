@@ -1,0 +1,20 @@
+{
+  "g_structural_plain/proxy_starter": {
+    "/contextualizedembeddings": 4638,
+    "/contextualizedembeddings calls": 200,
+    "/rerank": 4065827,
+    "/rerank calls": 99
+  },
+  "g_structural_plain/proxy_record_scoped": {
+    "/contextualizedembeddings": 754,
+    "/contextualizedembeddings calls": 74,
+    "/rerank": 1060473,
+    "/rerank calls": 37
+  },
+  "g_structural_plain/figure_reranker_ir1125": {
+    "/contextualizedembeddings": 1050,
+    "/contextualizedembeddings calls": 58,
+    "/rerank": 1164311,
+    "/rerank calls": 29
+  }
+}
