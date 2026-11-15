@@ -389,6 +389,22 @@ class ExportContentTests(APITestCase):
         self.assertNotIn("Mine, deleted.", str(mine))
         self.assertNotIn("Someone else's.", str(mine))
 
+
+    def test_the_comments_they_reported_are_theirs_without_the_reported_words(self):
+        from apps.records.models import CommentReport, PublicComment
+
+        paper = _paper("Reported in public", self.stranger, status=PipelineStatus.PUBLISHED)
+        theirs = PublicComment.objects.create(record=paper, author=self.stranger, body="SOMEONE ELSE's words.")
+        CommentReport.objects.create(comment=theirs, reporter=self.me, reason="other",
+                                     note="It names a student.", reported_text=theirs.body)
+        CommentReport.objects.create(comment=theirs, reporter=self.stranger, reason="spam",
+                                     reported_text=theirs.body)
+
+        body = self.export()
+
+        [mine] = body["comment_reports"]
+        self.assertEqual((mine["reason"], mine["note"], mine["state"]), ("other", "It names a student.", "open"))
+        self.assertNotIn("SOMEONE ELSE", json.dumps(body))
     def test_a_finished_review_round_is_in_the_acts_of_its_actor_only(self):
         from apps.reviews.models import ReviewRound
 

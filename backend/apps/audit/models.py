@@ -132,6 +132,12 @@ class AuditEvent(models.Model):
     # The daily job deleted a request whose paper deadline passed while it
     # waited or stood rejected (amendment of 2026-11-15, point 2). No actor.
     CALL_LAPSED    = "CALL_LAPSED"
+    # Comment moderation (ADR-032 §7, amendment 2026-10-31; IR-691). `user` is
+    # RDCO or the System Admin; the record is the comment's paper. Metadata:
+    # `comment`, its id, and `reports_closed`; REMOVED adds the moderator's
+    # `reason`. Never the comment's text.
+    COMMENT_REMOVED           = "COMMENT_REMOVED"
+    COMMENT_REPORTS_DISMISSED = "COMMENT_REPORTS_DISMISSED"
 
     # Unverified registrations (ADR-051 decisions 24-25, IR-705). REPLACED's
     # `user` is the earlier account, removed because its address registered
@@ -231,6 +237,8 @@ class AuditEvent(models.Model):
         (CALL_REJECTED,                "Call Rejected"),
         (CALL_REMOVED,                 "Call Removed"),
         (CALL_LAPSED,                  "Call Request Lapsed"),
+        (COMMENT_REMOVED,              "Comment Removed"),
+        (COMMENT_REPORTS_DISMISSED,    "Comment Reports Dismissed"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

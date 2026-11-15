@@ -1194,6 +1194,10 @@ export default function PaperViewPage() {
                       // A failed reload leaves the page as it was; the next visit catches up.
                       recordsApi.detail(record.id).then(({ data }) => setRecord(data)).catch(() => {});
                     }}
+                    onRefreshed={(fresh) => {
+                      setRecord(fresh);
+                      setTrackerVersion((n) => n + 1);
+                    }}
                   />
                 )}
 

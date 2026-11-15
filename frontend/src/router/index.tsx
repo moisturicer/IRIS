@@ -46,6 +46,7 @@ const UserListPage = lazy(() => import("@/features/accounts/UserListPage"));
 const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage"));
 const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
+const ReportedCommentsPage = lazy(() => import("@/features/admin/ReportedCommentsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
 const AccountDeletionRequestsPage = lazy(() => import("@/features/admin/AccountDeletionRequestsPage"));
 const RetentionPage = lazy(() => import("@/features/admin/RetentionPage"));
@@ -236,6 +237,15 @@ export const routes: RouteObject[] = [{
               path: pathFor("retention"),
               element: <DeferredPage name="Retention"><RetentionPage /></DeferredPage>,
               handle: { crumb: "Retention" },
+            }],
+          },
+          {
+            // RDCO and the System Admin share it (IR-693, decision 2026-11-15).
+            element: <ProtectedRoute allowedRoles={[...rolesFor("reportedComments"), ...rolesFor("adminReportedComments")]} />,
+            children: [{
+              path: pathFor("reportedComments"),
+              element: <DeferredPage name="Reported Comments"><ReportedCommentsPage /></DeferredPage>,
+              handle: { crumb: "Reported Comments" },
             }],
           },
           {

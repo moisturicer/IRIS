@@ -16,7 +16,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
+from kombu.exceptions import OperationalError
 from rest_framework import status
+from rest_framework.test import APITransactionTestCase
 
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.notifications.models import Notification
@@ -40,6 +42,8 @@ from core.enums import (
     PipelineStatus,
     RecordTypeName,
     ResubmissionRequestState,
+    ReviewTextState,
+    RoleName,
     SeatState,
     VersionCause,
     WorkflowState,
@@ -48,6 +52,7 @@ from core.enums import (
 from .test_decisions import decide_url
 from .test_office_review import detail_url
 from .test_revisions import RevisionTestBase
+from .workflow_test_helpers import make_user
 
 RESTART_ALL = {"RESUBMISSION_POLICY": lifecycle.ResubmissionPolicy.RESTART_ALL}
 
@@ -750,3 +755,125 @@ class WhoMaySubmitTests(NewVersionTestBase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("not in review", response.data["detail"])
+
+
+# --- AC: a saved version is never reported as a failure (IR-1049) ---------------------
+
+#: Redis refusing the connection: every Celery publish raises this.
+QUEUE_DOWN = OperationalError("Error 111 connecting to redis:6379. Connection refused.")
+
+class SavedVersionIsReportedSavedTests(APITransactionTestCase):
+    """
+    IR-1049: on the deployed site an owner's v2 was saved, and then the request
+    answered with an error, so the page said it "could not be submitted".
+
+    `submit_new_version` commits, and then its follow-up work runs in the same
+    request: queueing the manuscript's read and its review text, placing the
+    review threads, and telling the reviewers. A `TestCase` never commits, so
+    there that work only runs after the response; here the commit is real, as
+    in production, and a step that fails fails inside the request.
+
+    The helpers are `NewVersionTestBase`'s, borrowed because a `TestCase`
+    subclass cannot commit.
+    """
+
+    make_record = NewVersionTestBase.make_record
+    new_model = NewVersionTestBase.new_model
+    post = NewVersionTestBase.post
+    accept = NewVersionTestBase.accept
+    route = NewVersionTestBase.route
+    seat = NewVersionTestBase.seat
+    accepted_to = NewVersionTestBase.accepted_to
+    opened_seat = NewVersionTestBase.opened_seat
+    ask = NewVersionTestBase.ask
+    asked = NewVersionTestBase.asked
+    thesis = NewVersionTestBase.thesis
+    upload_manuscript = NewVersionTestBase.upload_manuscript
+    submit_version = NewVersionTestBase.submit_version
+    versions = NewVersionTestBase.versions
+
+    def setUp(self):
+        self.owner = make_user("commit-owner@cit.edu", RoleName.STUDENT)
+        self.adviser = make_user("commit-adviser@cit.edu", RoleName.ADVISER)
+        self.rdco = make_user("commit-rdco@cit.edu", RoleName.RDCO)
+        self.ierc = make_user("commit-ierc@cit.edu", RoleName.IERC)
+
+    def ierc_asked_and_revised(self):
+        """IERC asked for a revision and the owner uploaded a revised manuscript."""
+        record = self.thesis(Party.IERC)
+        self.opened_seat(record, Party.IERC, self.ierc)
+        self.asked(record, self.ierc)
+        self.assertEqual(self.upload_manuscript(record).status_code, status.HTTP_200_OK)
+        return record
+
+    def submit_with_queue_down(self, record):
+        """Submit with every Celery publish refused; the response and what was logged."""
+        with patch("celery.app.task.Task.apply_async", side_effect=QUEUE_DOWN), \
+                self.assertLogs("django.db.backends.base", level="ERROR") as logged:
+            response = self.submit_version(record)
+        return response, logged.output
+
+    def test_with_the_task_queue_down_the_saved_version_is_still_reported_saved(self):
+        record = self.ierc_asked_and_revised()
+
+        response, logged = self.submit_with_queue_down(record)
+
+        # The owner is told what happened: v2 went in, with the tracker.
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIn("parties", response.data)
+        self.assertEqual([v.number for v in self.versions(record)], [1, 2])
+        self.assertFalse(ResubmissionRequest.objects.filter(
+            record=record, state=ResubmissionRequestState.OPEN,
+        ).exists())
+        # Each step that could not be queued is logged, and none stopped the rest.
+        self.assertTrue(any("Connection refused" in line for line in logged))
+
+    def test_the_reviewers_are_still_told_and_the_threads_still_placed(self):
+        record = self.ierc_asked_and_revised()
+        before = set(Notification.objects.values_list("pk", flat=True))
+
+        with patch("apps.reviews.thread_places.place_threads", return_value=0) as place:
+            self.submit_with_queue_down(record)
+
+        # Neither needs the queue: telling IERC is a row, and the threads are
+        # placed in the request instead.
+        told = Notification.objects.exclude(pk__in=before)
+        self.assertEqual({n.recipient for n in told}, {self.ierc})
+        place.assert_called_once()
+        self.assertEqual(place.call_args.args[0].pk, record.pk)
+
+    def test_the_manuscript_read_that_was_not_sent_can_be_retried(self):
+        from apps.documents.models import PdfExtraction
+        from apps.documents.sources import COULD_NOT_QUEUE
+
+        record = self.ierc_asked_and_revised()
+
+        self.submit_with_queue_down(record)
+
+        # Marked failed, not left `queued`, so nothing takes it for a read on its way.
+        record.refresh_from_db()
+        extraction = PdfExtraction.objects.get(record=record)
+        self.assertEqual((extraction.status, extraction.error), ("failed", COULD_NOT_QUEUE))
+        self.assertEqual(extraction.source_revision, record.manuscript_revision)
+        # With the queue back, Retry sends it.
+        self.client.force_authenticate(self.owner)
+        # The commit is real here, so the send runs inside the request.
+        with patch("apps.documents.tasks.extract_manuscript_text.delay") as send:
+            response = self.client.post(
+                reverse("record-retry-extraction", args=[record.pk]),
+                {"manuscript_revision": str(record.manuscript_revision)}, format="json",
+            )
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED, response.data)
+        send.assert_called_once_with(record.pk, str(record.manuscript_revision))
+
+    def test_the_review_text_waits_pending_for_the_next_comparison(self):
+        from apps.records.models import ReviewText
+
+        record = self.ierc_asked_and_revised()
+
+        self.submit_with_queue_down(record)
+
+        # `readings._requeue_if_lost` sends it again once a comparison is opened
+        # after `STALE_PENDING`.
+        v2 = RecordVersion.objects.get(record=record, number=2)
+        self.assertEqual(ReviewText.objects.get(pk=v2.review_text_id).state, ReviewTextState.PENDING)

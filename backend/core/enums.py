@@ -332,6 +332,32 @@ class CommentDeletion(models.TextChoices):
     MODERATOR = "moderator", "Removed"
 
 
+class CommentReportReason(models.TextChoices):
+    """
+    Why a reader reported a Comment (ADR-032 §7, amendment 2026-10-31;
+    IR-691). `CommentReport.reason`. *Other* needs a note.
+    """
+
+    SPAM = "spam", "Spam"
+    HARASSMENT = "harassment", "Harassment"
+    OFF_TOPIC = "off_topic", "Off-topic"
+    OTHER = "other", "Other"
+
+
+class CommentReportState(models.TextChoices):
+    """
+    Where a Comment report stands (IR-691). `CommentReport.state`. Only an
+    `open` report is in the Reported comments queue; the others say how it
+    left: RDCO or the System Admin dismissed it or removed the comment, or the
+    writer deleted the comment first (decision 2026-11-15).
+    """
+
+    OPEN = "open", "Open"
+    DISMISSED = "dismissed", "Dismissed"
+    REMOVED = "removed", "Closed by removal"
+    WRITER_DELETED = "writer_deleted", "Closed: the writer deleted the comment"
+
+
 class ThreadSeverity(models.TextChoices):
     """
     How much a reviewer's review thread asks of the author (ADR-032 §7,

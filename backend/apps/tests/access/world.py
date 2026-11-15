@@ -285,6 +285,12 @@ def build_world() -> World:
     # The owner's Comment on the published paper (IR-690): only its writer edits or deletes it.
     from apps.records.models import PublicComment
     o["public_comment"] = PublicComment.objects.create(record=published, author=owner, body="Thanks for reading.")
+    # A Comment `other` reported (IR-691): RDCO or the System Admin dismisses its report.
+    from apps.records.models import CommentReport
+    o["reported_comment"] = reported = PublicComment.objects.create(
+        record=published, author=owner, body="Buy followers here.",
+    )
+    CommentReport.objects.create(comment=reported, reporter=other, reason="spam", reported_text=reported.body)
     o["download_request"] = DownloadRequest.objects.create(
         record=published, requested_by=other, note="For my thesis.",
     )

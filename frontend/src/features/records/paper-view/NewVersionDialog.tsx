@@ -5,7 +5,7 @@ import { Button, Modal } from "@/components/ui";
 import { errorDetail } from "@/lib/errorDetail";
 import { joinLabels } from "@/lib/utils";
 import { useUIStore } from "@/store/ui.store";
-import type { NewVersionHint, ResponseLetterEntry } from "@/types/records";
+import type { NewVersionHint, RecordDetail, ResponseLetterEntry } from "@/types/records";
 
 import { LetterEntries } from "./threads/ResponseLetter";
 
@@ -17,6 +17,27 @@ interface NewVersionDialogProps {
   onClose: () => void;
   /** Submitted: the sentence the page announces. */
   onDone: (outcome: string) => void;
+  /** Not submitted after all: the record as a re-read found it, for the page to show. */
+  onRefreshed: (record: RecordDetail) => void;
+}
+
+const NOT_SUBMITTED = "The new version could not be submitted.";
+
+/** What the page announces once version `number` is in. */
+function submittedMessage(number: number): string {
+  return `v${number} submitted. The reviewers who asked for changes have been notified.`;
+}
+
+/**
+ * After a failure the server gave no reason for (IR-1049), the record as it
+ * now stands decides what to say: the version may have been saved before the
+ * answer failed. The error to show, or `null` when version `number` was saved.
+ */
+function notSubmittedMessage(record: RecordDetail, number: number): string | null {
+  if ((record.versions ?? []).some((version) => version.number >= number)) return null;
+  return record.revision?.new_version
+    ? `${NOT_SUBMITTED} Please try again.`
+    : `${NOT_SUBMITTED} The page now shows where the record stands.`;
 }
 
 /**
@@ -45,8 +66,17 @@ export function newVersionSummary(hint: NewVersionHint): string {
  * **The response to reviewers** (ADR-032 §7, IR-876): the dialog shows the
  * letter the Version will carry, assembled from the owner's answers as they
  * stand, and holds *Submit* while the server says a *Must fix* has none.
+ *
+ * **A failure with no reason is checked, not reported** (IR-1049). A 5xx, a
+ * timeout or a dropped connection can arrive after the version was saved, and
+ * then a retry can only be refused. So the dialog reads the record again: the
+ * version is there, and it is reported submitted; it is not, and the page
+ * shows the record as it stands before a retry is suggested; the record cannot
+ * be read either, and the owner is asked to reload before trying again.
  */
-export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDone }: NewVersionDialogProps) {
+export function NewVersionDialog({
+  recordId, hint, newManuscript, onClose, onDone, onRefreshed,
+}: NewVersionDialogProps) {
   const addToast = useUIStore((s) => s.addToast);
   const [sending, setSending] = useState(false);
   const blockedId = useId();
@@ -57,17 +87,34 @@ export function NewVersionDialog({ recordId, hint, newManuscript, onClose, onDon
     setSending(true);
     try {
       await recordsApi.submitNewVersion(recordId);
-      onDone(`v${hint.number} submitted. The reviewers who asked for changes have been notified.`);
+      onDone(submittedMessage(hint.number));
     } catch (err) {
       // A toast, not a line in the dialog, so the confirmation keeps its size.
-      addToast({
-        type: "error",
-        persist: true,
-        message: errorDetail(err, "The new version could not be submitted. Please try again."),
-      });
+      const refusal = errorDetail(err, "");
+      const message = refusal || (await settleUnexplainedFailure());
+      if (message) addToast({ type: "error", persist: true, message });
     } finally {
       setSending(false);
     }
+  };
+
+  /**
+   * Read the record again and settle the outcome: report the version
+   * submitted, or hand the page the record as it stands. Returns the error to
+   * show, or `null` when the version went in.
+   */
+  const settleUnexplainedFailure = async (): Promise<string | null> => {
+    let record: RecordDetail;
+    let message: string | null;
+    try {
+      ({ data: record } = await recordsApi.detail(recordId));
+      message = notSubmittedMessage(record, hint.number);
+    } catch {
+      return `The page couldn't confirm whether v${hint.number} was submitted. Reload the page to check before trying again.`;
+    }
+    if (message) onRefreshed(record);
+    else onDone(submittedMessage(hint.number));
+    return message;
   };
 
   return (

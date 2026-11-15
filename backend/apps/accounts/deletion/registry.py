@@ -78,6 +78,8 @@ RELATIONS: dict[str, Rule] = {
     "records.DeleteRequest.reviewed_by":    Rule(KEEP, "Who decided someone else's request"),
     "records.PublicComment.author":         Rule(KEEP, "A Comment on a published paper shows \"Former user\" (IR-690)"),
     "records.PublicComment.deleted_by":     Rule(KEEP, "Who deleted or removed a Comment"),
+    "records.CommentReport.reporter":       Rule(KEEP, "A report is RDCO's moderation record; no response names who reported (IR-691)"),
+    "records.CommentReport.resolved_by":    Rule(KEEP, "Who removed a comment or dismissed its reports"),
     # --- reviews and documents: who reviewed what is history (ADR-051 §11)
     "reviews.Review.reviewed_by":           Rule(KEEP, "Review history"),
     "reviews.RecordClearance.reviewed_by":  Rule(KEEP, "Review history"),

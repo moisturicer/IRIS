@@ -164,6 +164,24 @@ def _decided_request(model_path):
     return resolve
 
 
+def _comment_report(notification):
+    """A reported comment: ends when none of its reports is open (IR-691)."""
+    from apps.records.models import CommentReport
+    from core.enums import CommentReportState
+
+    reports = CommentReport.objects.filter(comment_id=notification.task_id)
+    if not reports.exists() or reports.filter(state=CommentReportState.OPEN).exists():
+        return None
+    last = reports.order_by("-resolved_at", "-pk").first()
+    when = last.resolved_at or timezone.now()
+    labels = {
+        CommentReportState.REMOVED: "Removed",
+        CommentReportState.DISMISSED: "Dismissed",
+        CommentReportState.WRITER_DELETED: "Deleted by its writer",
+    }
+    return when, f"{labels.get(last.state, 'Handled')} on {_day(when)}"
+
+
 def _call_request(notification):
     """
     An Adviser's Call waiting for RDCO: ends when RDCO decides it, when its
@@ -190,6 +208,7 @@ RESOLVERS = {
     TaskKind.DOWNLOAD_REQUEST: _decided_request("records.DownloadRequest"),
     TaskKind.DELETE_REQUEST: _decided_request("records.DeleteRequest"),
     TaskKind.ROLE_REQUEST: _decided_request("accounts.RoleRequest"),
+    TaskKind.COMMENT_REPORT: _comment_report,
     TaskKind.CALL_REQUEST: _call_request,
 }
 

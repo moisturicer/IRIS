@@ -10,7 +10,7 @@ This is the feature's first ADR. It replaces IR-121's decisions on types, postin
 
 An amendment of 2026-11-12 (IR-758, below) restates both in this ADR's own text and settles which list a Call's Areas come from.
 
-An amendment of 2026-11-15 (IR-762, below, Proposed) deletes a request whose paper deadline passes instead of expiring it, and stops an Adviser saving a past paper deadline.
+An amendment of 2026-11-15 (IR-762, below, accepted 2026-11-15) deletes a request whose paper deadline passes instead of expiring it, and stops an Adviser saving a past paper deadline.
 
 ## Context
 
@@ -134,7 +134,7 @@ IR-758 (spec, under IR-671), IR-759 (this ADR), IR-760, IR-761, IR-762, IR-763, 
 
 ## Amendment — 2026-11-15 (IR-762): a lapsed request is deleted, and an Adviser can't enter a past deadline
 
-**Status of this amendment: Proposed** — decided by Hermoine Zozobrado, 2026-11-15, while building IR-762. It is accepted when IR-762's PR merges.
+**Status of this amendment: Accepted** — decided by Hermoine Zozobrado, 2026-11-15, while building IR-762. Accepted by Lee Jasmin Adolfo on 2026-11-15, as relayed by Hermoine Zozobrado, when IR-762's PR (#808) merged.
 
 1. **An Adviser can't save a Call whose paper deadline has passed** (decision 5). The check uses Manila's date, and covers a new Call and an edit. RDCO's dates stay unchecked, so RDCO can still post a late-breaking deadline. A request can no longer be entered already expired, so decision 9's last sentence no longer applies.
    - Consequence: once its paper deadline has passed, an Adviser can still edit their Call, but only by moving the deadline to today or later. The edit returns it to waiting (decision 10). An edit that keeps the past deadline is refused, since point 2 would delete it. RDCO's edits stay unchecked.

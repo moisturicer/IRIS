@@ -402,6 +402,12 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "POST": _case(row(ANON, OK, OK, OK, OK, OK, OK, OK, OK, OK),
                       kwargs={"pk": Ref("published")}, data={"body": "Did you test it in the rain?"}),
     }),
+    # Anyone signed in reports someone else's Comment; its writer may not (IR-691).
+    "record-comment-reports": Entry({
+        "POST": _case(row(ANON, OK, DENY, OK, OK, OK, OK, OK, OK, OK),
+                      kwargs={"pk": Ref("published"), "comment_id": Ref("public_comment")},
+                      data={"reason": "spam"}),
+    }),
     "record-comment": Entry({
         "PATCH": _case(row(ANON, DENY, OK, DENY, DENY, DENY, DENY, DENY, DENY, DENY),
                        kwargs={"pk": Ref("published"), "comment_id": Ref("public_comment")},
@@ -437,7 +443,17 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-types": Entry({"GET": _case(SIGNED_IN)}),
     "dashboard-stats": Entry({"GET": _case(SIGNED_IN)}),
     # IR-1138: the sidebar's counts for RDCO's three queues.
-    "dashboard-queue-counts": Entry({"GET": _case(RDCO_ONLY)}),
+    # RDCO's queues, plus the Reported comments queue both roles share (IR-691).
+    "dashboard-queue-counts": Entry({"GET": _case(ACCOUNT_ADMINS)}),
+    # -- Comment reports and moderation (IR-691, decision 2026-11-15) ------
+    "comment-moderation": Entry({"GET": _case(ACCOUNT_ADMINS)}),
+    "comment-moderation-remove": Entry({
+        "POST": _case(ACCOUNT_ADMINS, kwargs={"comment_id": Ref("public_comment")},
+                      data={"reason": "Off-topic advertising."}),
+    }),
+    "comment-moderation-dismiss": Entry({
+        "POST": _case(ACCOUNT_ADMINS, kwargs={"comment_id": Ref("reported_comment")}),
+    }),
 }
 
 

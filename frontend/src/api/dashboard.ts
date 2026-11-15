@@ -10,11 +10,16 @@ export interface DashboardStats {
   total_published: number;
 }
 
-/** What waits in RDCO's three queues (IR-1138). RDCO only: anyone else is refused. */
+/**
+ * What waits in each queue the caller works (IR-1138): RDCO's three request
+ * queues, and the Reported comments queue RDCO shares with the System Admin
+ * (IR-691), who is told that count alone. Anyone else is refused.
+ */
 export interface QueueCounts {
-  download_requests: number;
-  delete_requests:   number;
-  role_change_requests:     number;
+  download_requests?:    number;
+  delete_requests?:      number;
+  role_change_requests?: number;
+  reported_comments?:    number;
 }
 
 export const dashboardApi = {
