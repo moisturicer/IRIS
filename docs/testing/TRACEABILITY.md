@@ -145,9 +145,10 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-434** | An overview citation names a page — no FR- id; part D of IR-425's spec | [details](traceability/IR-434.md) | **IMPLEMENTED** |
 | **IR-433** | The AI Overview is a structured account, not two paragraphs of prose — no FR- id; part C of IR-425's spec | [details](traceability/IR-433.md) | **IMPLEMENTED** |
 | **IR-604** | Each paper gets a one-sentence hook, written with the Overview — no FR- id; part H of IR-425's spec, needed by IR-567's Discover card | [details](traceability/IR-604.md) | **IMPLEMENTED** |
-| **IR-577** | Save a private custom feed from Discover's filters: owner-only `SavedFeed` holding Discover's own query, capped at 10, stale values corrected first — no FR- id; user stories 15 to 17 of IR-557's spec | [details](traceability/IR-577.md) | **IMPLEMENTED** |
-| **IR-567** | For you from the Areas the reader chooses, with a reason on every item and a stable cursor — no FR- id; user stories 1, 2, 4, 5, 8, 9, 12 of IR-557's spec (file written after the fact) | [details](traceability/IR-567.md) | **IMPLEMENTED** |
-| **IR-575** | My saved research shapes For you: saved Records' Areas join the chosen ones, saved Records sink, saves invalidate the feed — no FR- id; user stories 3, 7, 11 of IR-557's spec | [details](traceability/IR-575.md) | **IMPLEMENTED** |
+| **IR-577** | Save a private custom feed from Discover's filters: owner-only `SavedFeed` holding Discover's own query, capped at 10, stale values corrected first — no FR- id; user stories 15 to 17 of IR-557's spec | [details](traceability/IR-577.md) | **VERIFIED** |
+| **IR-567** | For you from the Areas the reader chooses, with a reason on every item and a stable cursor — no FR- id; user stories 1, 2, 4, 5, 8, 9, 12 of IR-557's spec (file written after the fact) | [details](traceability/IR-567.md) | **VERIFIED** |
+| **IR-575** | My saved research shapes For you: saved Records' Areas join the chosen ones, saved Records sink, saves invalidate the feed — no FR- id; user stories 3, 7, 11 of IR-557's spec | [details](traceability/IR-575.md) | **VERIFIED** |
+| **IR-576** | "Not interested" with Undo, and a reset for my interests — IR-557, ADR-062; no FR- id | [details](traceability/IR-576.md) | **VERIFIED** |
 | **IR-665** | An uploaded PDF must really be one: its bytes carry the signature and it opens with at least one page; `uploads/create/` no longer skips … | [details](traceability/IR-665.md) | **IMPLEMENTED** |
 | **IR-383** | Question resolution runs as its own Inference task, on a model that exists — no FR- id; part E of IR-375's spec, and the ticket that closes … | [details](traceability/IR-383.md) | **IMPLEMENTED** |
 | **IR-382** | Groq dialect: the vendor's request shape behind the adapter, with citation-marker normalisation — no FR- id; part H of IR-375's spec, and … | [details](traceability/IR-382.md) | **IMPLEMENTED** |
@@ -191,7 +192,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-424** | Answer presentation: Markdown structure, delimited formulas and no invented images — no FR- id; changes answer-path behaviour (IR-426 … | [details](traceability/IR-424.md) | **IMPLEMENTED** |
 | **IR-440** | Retrieval looks past 40 candidates — no FR- id; a bug fix, not a technique | [details](traceability/IR-440.md) | **IMPLEMENTED** |
 | **IR-442** | A retrieval miss is detectable rather than silent — no FR- id; the checker for the failure class ADR-023 measures in aggregate but cannot … | [details](traceability/IR-442.md) | **IMPLEMENTED** |
-| **IR-568** | Related works says why it is empty (ready, no matches, not indexed, incompatible, unavailable) without revealing hidden Records — no FR- id; user story 14 of IR-557's spec | [details](traceability/IR-568.md) | **IMPLEMENTED** |
+| **IR-568** | Related works says why it is empty (ready, no matches, not indexed, incompatible, unavailable) without revealing hidden Records — no FR- id; user story 14 of IR-557's spec | [details](traceability/IR-568.md) | **VERIFIED** |
 | **IR-312** | A proposer sees when their idea was already done here — the Novelty check; FR-M4 (stable label only) | [details](traceability/IR-312.md) | **IMPLEMENTED** |
 | **IR-786** | A person downloads a copy of their own data from one owner-only, audited, rate-limited endpoint — ADR-051 decision 13; FR-M6-06 (stable label only) | [details](traceability/IR-786.md) | **PARTIAL** |
 | **IR-791** | A paper keeps its Contact person's AI answer from draft creation, the disclosure gate reads it, submit asks no consent, and a person changes their own answer — ADR-054 decisions 5, 6, 9-13, 16-17; FR-M6-02 (stable label only) | [details](traceability/IR-791.md) | **IMPLEMENTED** |
@@ -328,7 +329,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-948** | Your own Profile mounts the shared view; IR-949 adds its own papers and collaborators — IR-694; no FR- id | [details](traceability/IR-948.md) | **PARTIAL** |
 | **IR-949** | Your own Profile reads its Research, Advised and Collaborators lists from IR-696; own-ID backend check returns 200; browser review at 375 and 1280 px remains | [details](traceability/IR-949.md) | **PARTIAL** |
 | **IR-326** | Streaming Ask IRIS endpoint — no FR- id; part C of IR-323's "event-shaped answer path", under ADR-028 (one deterministic retrieval call … | [details](traceability/IR-326.md) | **IMPLEMENTED** |
-| **IR-369** | A paper's views count each account once (owners never, published papers only); Trending is views gained in the last 30 days — no FR- id | [details](traceability/IR-369.md) | **IMPLEMENTED** |
+| **IR-369** | A paper's views count each account once (owners never, published papers only); Trending is views gained in the last 30 days — no FR- id | [details](traceability/IR-369.md) | **VERIFIED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
