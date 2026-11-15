@@ -35,9 +35,6 @@ UNSTRUCTURED_PRICE = "AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE"
 PRICES = {
     "AI_ADMISSION_LANE_CONCURRENCY": '{"extraction": 2}',
     UNSTRUCTURED_PRICE: "0.01",
-    "AI_ADMISSION_EXTRACTION_CREDIT_USD": "",
-    "AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE": "",
-    "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE": "",
 }
 
 
@@ -80,10 +77,6 @@ def test_an_unstructured_read_with_no_usage_stays_at_its_reservation(settings):
 def test_a_missing_unstructured_price_refuses_as_not_configured(settings):
     enforce(settings, **{
         **PRICES, UNSTRUCTURED_PRICE: "",
-        # LlamaParse's price cannot stand in for Unstructured's.
-        "AI_ADMISSION_EXTRACTION_CREDIT_USD": "0.00125",
-        "AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE": "10",
-        "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE": "0",
     })
     adapter = _unstructured(Usage(pages=3))
 

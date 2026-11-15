@@ -346,8 +346,6 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
     "apps.documents.tasks.extract_manuscript_text": {"queue": "extraction"},
-    # IR-846: LlamaExtract reads the parse, with the same outbound access.
-    "apps.documents.tasks.read_manuscript_metadata": {"queue": "extraction"},
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
@@ -674,19 +672,12 @@ AI_ADMISSION_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_MAX_OUTPUT_TOKENS", defaul
 # Queued questions waiting or running at once, and per asker.
 AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
 AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
-# IR-850 (ADR-056 §6): what an off-campus read costs. A read reserves its
-# pages x (tier credits + add-on credits) x the credit's price, and settles to
-# the credits reported. Required for extraction only; none has a default.
-AI_ADMISSION_EXTRACTION_CREDIT_USD = config("AI_ADMISSION_EXTRACTION_CREDIT_USD", default="")
-AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", default="")
-AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", default="")
-# IR-983: Unstructured's flat US$ per page; required only when it reads. No default.
+# IR-983 (ADR-041): what an off-campus read costs, Unstructured's flat US$ per
+# page. A read reserves pages x price and settles to the pages reported.
+# Required for extraction only; no default.
 AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE = config(
     "AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE", default=""
 )
-# IR-846: LlamaExtract's credits per page, on the same credit price. Required
-# for Publish's LlamaExtract reading only; unset refuses it and Publish falls back.
-AI_ADMISSION_METADATA_CREDITS_PER_PAGE = config("AI_ADMISSION_METADATA_CREDITS_PER_PAGE", default="")
 # Added to an attempt's own timeout to make its lease. Not a spending limit.
 AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
 # IR-717 (ADR-049 §6-7): Django-signed research grants, verified inside
@@ -988,22 +979,11 @@ AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
 # inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
 # above.
 # Which Extractor reads manuscripts (IR-838); read only in apps.ai.extraction.
-# LlamaParse is the only value (IR-843, ADR-056).
-EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="llamaparse")
-# LlamaParse (IR-841, ADR-056); read only in apps.ai.extraction. With DEBUG
-# off Django refuses to start without a key and a dated version; with DEBUG on
-# it starts, and reads fail as unavailable until both are set (IR-843).
-LLAMAPARSE_API_KEY = config("LLAMAPARSE_API_KEY", default="")
-LLAMAPARSE_TIER = config("LLAMAPARSE_TIER", default="agentic")
-LLAMAPARSE_VERSION = config("LLAMAPARSE_VERSION", default="")
-LLAMAPARSE_BASE_URL = config("LLAMAPARSE_BASE_URL", default="https://api.cloud.llamaindex.ai")
-# One job's budget is base + per page x its page count.
-LLAMAPARSE_TIMEOUT_BASE_SECONDS = config("LLAMAPARSE_TIMEOUT_BASE_SECONDS", default=300, cast=int)
-LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS = config("LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS", default=30, cast=int)
-# Sizes the task's time limit when PDF_VALIDATION_MAX_PAGES is unset.
-LLAMAPARSE_MAX_PAGES = config("LLAMAPARSE_MAX_PAGES", default=1000, cast=int)
+# Unstructured is the only value (IR-988, ADR-067).
+EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="unstructured")
 # Unstructured's Platform API, hi_res (IR-985, ADR-067); read only in
-# apps.ai.extraction. Not selectable until IR-988's cutover.
+# apps.ai.extraction. With DEBUG off Django refuses to start without a key;
+# with DEBUG on it starts, and reads fail as unavailable until one is set.
 UNSTRUCTURED_PLATFORM_API_KEY = config("UNSTRUCTURED_PLATFORM_API_KEY", default="")
 UNSTRUCTURED_BASE_URL = config("UNSTRUCTURED_BASE_URL", default="https://api.unstructuredapp.io")
 # One attempt's timeout is base + per page x its page count; a timeout retries once.
@@ -1014,26 +994,6 @@ UNSTRUCTURED_MAX_PAGES = config("UNSTRUCTURED_MAX_PAGES", default=1000, cast=int
 # Figures kept per read, and pixels per Figure image (IR-987).
 UNSTRUCTURED_MAX_FIGURES = config("UNSTRUCTURED_MAX_FIGURES", default=200, cast=int)
 UNSTRUCTURED_MAX_FIGURE_PIXELS = config("UNSTRUCTURED_MAX_FIGURE_PIXELS", default=16_000_000, cast=int)
-# LlamaExtract (IR-846, ADR-056 §15): Publish suggestions read from the parse
-# job above, with the same key and region. Unset version reads nothing and
-# Publish falls back to the shaped document; "latest" only with DEBUG on.
-LLAMAEXTRACT_TIER = config("LLAMAEXTRACT_TIER", default="agentic")
-LLAMAEXTRACT_VERSION = config("LLAMAEXTRACT_VERSION", default="")
-LLAMAEXTRACT_TIMEOUT_SECONDS = config("LLAMAEXTRACT_TIMEOUT_SECONDS", default=600, cast=int)
-
-def _unit_interval(value):
-    """Empty is unset; anything else must be a number from 0 to 1."""
-    if value in (None, ""):
-        return None
-    number = float(value)
-    if not 0 <= number <= 1:
-        raise ValueError(f"must be between 0 and 1, not {value!r}")
-    return number
-
-# The LlamaExtract confidence at or above which Publish may fill in a title or
-# abstract unasked (IR-846). No default: unset offers every value for the
-# author to accept, until a measured cut-off is chosen.
-PUBLISH_AUTOFILL_MIN_CONFIDENCE = config("PUBLISH_AUTOFILL_MIN_CONFIDENCE", default="", cast=_unit_interval)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
 # path off the gateway — it posted to a route the gateway never registered, at
 # an endpoint returning no vector field — and Django now embeds in-process

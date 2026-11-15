@@ -6,7 +6,7 @@
 
 **Amended 2026-11-14 (IR-984):** the Extractor is Unstructured's Platform API with `strategy=hi_res`, not Transform, and the spike gate's reading-order rule is judged on real two-column pages. The spike gate passed on that basis; see the amendment at the end.
 
-**Not built.** LlamaParse stays the running Extractor until both gates in decision 2 pass and IR-988 runs. Until then this ADR decides what IRIS is moving to and how the move is judged; it changes no behaviour.
+**Built (IR-988, 2026-11-16):** both gates passed (the quality gate by the owner's decision, amendment of 2026-11-15) and Unstructured is the only Extractor; LlamaParse's code, settings and admission prices are deleted, and so is LlamaExtract, which read LlamaParse's parse jobs (ADR-056 decision 15 was already withdrawn). **The corpus has not been re-read yet:** `reextract_manuscripts` plans and caps that run, and stored LlamaParse Extractions are read from their stored structure until it does.
 
 **Supersedes [ADR-056](056-manuscript-extraction-moves-to-llamaparse.md) decisions 1, 2, 3, 8 and 9** (the vendor, its pinning, what is requested, its labels and its Figure crops) once the cutover runs. **Amends ADR-056 decision 4** (what the stored raw result is). **Replaces ADR-056 decision 14** (LlamaParse's acceptance check against Docling) with this ADR's two gates (decision 2). Decision 15 was already withdrawn. ADR-056 decisions 5–7, 10, 12 and 16 carry over unchanged, decisions 11 and 13 carry over adapted to Unstructured (decision 9), and so do its IR-851, IR-859 and IR-879/IR-883 amendments where they still apply (decision 12). ADR-056 stays `Accepted` until IR-988, then becomes `Superseded by ADR-067`.
 
