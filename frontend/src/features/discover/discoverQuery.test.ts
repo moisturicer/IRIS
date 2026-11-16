@@ -5,8 +5,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DEFAULT_QUERY, feedCriteria, feedQueryOf, feedSearchParams, listParams, parseDiscoverQuery, sameFeedQuery,
-  writeDiscoverQuery,
+  DEFAULT_QUERY, ORDER_OPTIONS, feedCriteria, feedQueryOf, feedSearchParams, listParams, orderOf, parseDiscoverQuery,
+  sameFeedQuery, withOrder, writeDiscoverQuery,
 } from "./discoverQuery";
 
 const parse = (search: string) => parseDiscoverQuery(new URLSearchParams(search));
@@ -65,6 +65,41 @@ describe("parseDiscoverQuery", () => {
   });
 });
 
+describe("one sort for Discover (IR-1187)", () => {
+  it("offers Best, Newest, Most viewed and Trending, in that order", () => {
+    expect(ORDER_OPTIONS.map((o) => o.label)).toEqual(["Best", "Newest", "Most viewed", "Trending"]);
+  });
+
+  it.each([
+    ["", "newest"],
+    ["sort=viewed", "viewed"],
+    ["feed=latest", "newest"],
+    ["feed=for_you", "best"],
+    ["feed=trending", "trending"],
+  ])("reads an old link %s as %s", (search, order) => {
+    expect(orderOf(parse(search))).toBe(order);
+  });
+
+  it("lands an old tab link carrying a sort on the tab, the order it showed", () => {
+    // The tab ignored the sort, so the link showed the tab's own order.
+    expect(orderOf(parse("feed=trending&sort=viewed"))).toBe("trending");
+    expect(orderOf(parse("feed=for_you&sort=viewed"))).toBe("best");
+    expect(writeDiscoverQuery(new URLSearchParams(), parse("feed=trending&sort=viewed")).toString()).toBe("feed=trending");
+  });
+
+  it.each([
+    ["best", { feed: "for_you", sort: "newest" }, { ordering: "-created_at" }],
+    ["newest", { feed: "latest", sort: "newest" }, { ordering: "-created_at" }],
+    ["viewed", { feed: "latest", sort: "viewed" }, { ordering: "-access_count" }],
+    ["trending", { feed: "trending", sort: "newest" }, { ordering: "trending" }],
+  ] as const)("asks for %s exactly as its tab or sort did", (order, shape, params) => {
+    const query = withOrder(parse("sort=viewed&type=2"), order);
+    expect(query).toMatchObject({ ...shape, filters: { recordType: "2" } });
+    expect(listParams(query)).toMatchObject(params);
+    expect(orderOf(parseDiscoverQuery(writeDiscoverQuery(new URLSearchParams(), query)))).toBe(order);
+  });
+});
+
 describe("writeDiscoverQuery", () => {
   it("round-trips: what it writes parses back to the same query", () => {
     const query = parse("q=rain&type=2&college=4,5&year_from=2019&year_to=2019&ip=has_ip&sort=viewed");
@@ -87,11 +122,13 @@ describe("writeDiscoverQuery", () => {
 
 describe("saved feeds use Discover's own query (IR-577)", () => {
   it("stores a query in Discover's spelling, without the tab", () => {
-    const query = parse("q=flood&classification=7,4&college=5&year_from=2018&ip=patent&type=2&sort=viewed&feed=for_you");
+    const query = parse("q=flood&classification=7,4&college=5&year_from=2018&ip=patent&type=2&sort=viewed");
 
     expect(feedQueryOf(query)).toEqual({
       q: "flood", type: "2", college: "5", classification: "4,7", year_from: "2018", ip: "patent", sort: "viewed",
     });
+    // IR-1187: Best is one order of four, so it carries no second sort to store.
+    expect(feedQueryOf(parse("q=flood&sort=viewed&feed=for_you"))).toEqual({ q: "flood" });
   });
 
   it("saves Trending as most viewed and omits the default sort", () => {

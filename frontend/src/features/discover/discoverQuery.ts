@@ -26,6 +26,35 @@ export interface DiscoverQuery {
 
 export const DEFAULT_QUERY: DiscoverQuery = { q: "", filters: EMPTY_FILTERS, sort: "newest", feed: "latest" };
 
+/**
+ * How Discover is ordered, as the reader chooses it: one control for what were
+ * the For you / Latest / Trending tabs and Latest's own Sort (IR-1187). It is
+ * derived from `feed` and `sort`, so the URL keeps its spelling and a link to
+ * an old tab lands on the matching order. Best is the For you feed (ADR-062).
+ */
+export type DiscoverOrder = "best" | "newest" | "viewed" | "trending";
+
+/** Newest and Most viewed keep the catalogue sort's own labels, which a saved
+ *  feed's "Sorted by" line also reads, so the two cannot drift apart. */
+export const ORDER_OPTIONS: { value: DiscoverOrder; label: string }[] = [
+  { value: "best", label: "Best" },
+  ...SORT_OPTIONS.map((option) => ({ value: option.value as DiscoverSort, label: option.label })),
+  { value: "trending", label: "Trending" },
+];
+
+export function orderOf(query: DiscoverQuery): DiscoverOrder {
+  if (query.feed === "for_you") return "best";
+  if (query.feed === "trending") return "trending";
+  return query.sort;
+}
+
+/** `query` in `order`; its search and filters are left as they are. */
+export function withOrder(query: DiscoverQuery, order: DiscoverOrder): DiscoverQuery {
+  if (order === "best") return { ...query, feed: "for_you", sort: "newest" };
+  if (order === "trending") return { ...query, feed: "trending", sort: "newest" };
+  return { ...query, feed: "latest", sort: order };
+}
+
 /** The URL keys Discover owns. Any other key (`publish`) is left alone. */
 const KEYS = ["q", "type", "college", "classification", "year_from", "year_to", "ip", "sort", "feed"] as const;
 /** Keys Discover once wrote and no longer reads; removed, never carried along (IR-947). */
@@ -62,7 +91,12 @@ function yearRange(params: URLSearchParams): { yearFrom: string; yearTo: string 
 }
 
 export function parseDiscoverQuery(params: URLSearchParams): DiscoverQuery {
-  const sort = params.get("sort");
+  const feed = params.get("feed") === "for_you" || params.get("feed") === "trending"
+    ? params.get("feed") as DiscoverQuery["feed"]
+    : "latest";
+  // Only Latest has a sort of its own; a tab ignored it, so a sort beside a
+  // tab is dropped and the order has one spelling (IR-1187).
+  const sort = feed === "latest" && params.get("sort") === "viewed" ? "viewed" : "newest";
   return {
     q: (params.get("q") ?? "").trim(),
     filters: {
@@ -72,10 +106,8 @@ export function parseDiscoverQuery(params: URLSearchParams): DiscoverQuery {
       ...yearRange(params),
       ip: single(params.get("ip"), isIp),
     },
-    sort: sort === "viewed" ? "viewed" : "newest",
-    feed: params.get("feed") === "for_you" || params.get("feed") === "trending"
-      ? params.get("feed") as DiscoverQuery["feed"]
-      : "latest",
+    sort,
+    feed,
   };
 }
 
