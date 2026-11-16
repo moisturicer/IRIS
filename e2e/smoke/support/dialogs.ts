@@ -177,7 +177,7 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog", { name: "Delete this comment?" }),
   },
   {
-    id: "cite a paper", screen: "paper-view", sources: ["features/discover/PaperCiteModal.tsx", "features/discover/DiscoverPage.tsx", "components/ui/Modal.tsx"],
+    id: "cite a paper", screen: "paper-view", sources: ["features/discover/PaperCiteModal.tsx", "components/ui/Modal.tsx"],
     open: press(/Cite/), dialog: anyDialog,
   },
   {
