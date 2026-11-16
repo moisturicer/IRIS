@@ -1,12 +1,13 @@
 import { useEffect, useId } from "react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
+import { InterruptedState } from "@/components/shared/InterruptedState";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
-import { useSavedCallsStore, type SavedCall } from "@/store/savedCalls.store";
+import { savedInOrder, useSavedCallsStore, type SavedCall } from "@/store/savedCalls.store";
 
 import { CallDetails } from "./CallDetails";
 import { CallTags } from "./CallTags";
@@ -26,8 +27,9 @@ import { formatDueDate } from "./opportunityUtils";
  */
 export function SavedCallsSection() {
   const load = useSavedCallsStore((s) => s.load);
+  const interrupted = useSavedCallsStore((s) => s.interrupted);
   const items = useSavedCallsStore((s) => s.items);
-  const sorted = useSavedCallsStore((s) => s.sorted);
+  const order = useSavedCallsStore((s) => s.order);
   const ensureLoaded = useSavedCallsStore((s) => s.ensureLoaded);
   const unsave = useSavedCallsStore((s) => s.unsave);
 
@@ -43,6 +45,9 @@ export function SavedCallsSection() {
       </LoadingRegion>
     );
   }
+  if (load === "error" && interrupted) {
+    return <InterruptedState framed what="saved calls" onRetry={() => void ensureLoaded(true)} />;
+  }
   if (load === "error") {
     return (
       <EmptyState
@@ -56,8 +61,7 @@ export function SavedCallsSection() {
     );
   }
 
-  // `items` is read so a change re-renders; `sorted` orders the same items.
-  const list = Object.keys(items).length > 0 ? sorted() : [];
+  const list = savedInOrder(items, order);
   if (list.length === 0) {
     return (
       <EmptyState
@@ -74,7 +78,7 @@ export function SavedCallsSection() {
     <ol aria-label="Saved calls" className="bg-white rounded-card border border-stone-200 divide-y divide-stone-200">
       {list.map((item) => (
         <li key={item.callId}>
-          <SavedCallRow item={item} onRemove={(title) => void unsave(item.callId, title)} />
+          <SavedCallRow item={item} onRemove={(title) => void unsave({ id: item.callId, title })} />
         </li>
       ))}
     </ol>
@@ -83,9 +87,8 @@ export function SavedCallsSection() {
 
 function SavedCallRow({ item, onRemove }: { item: SavedCall; onRemove: (title: string) => void }) {
   const titleId = useId();
-  const call = item.available ? item.call : undefined;
 
-  if (!call) {
+  if (!item.available) {
     // Sent back to RDCO or rejected: nothing more is shown about it (IR-649).
     return (
       <article aria-labelledby={titleId} className="p-card-compact md:p-card flex flex-wrap items-center justify-between gap-3">
@@ -100,6 +103,7 @@ function SavedCallRow({ item, onRemove }: { item: SavedCall; onRemove: (title: s
     );
   }
 
+  const { call } = item;
   return (
     <article aria-labelledby={titleId} className="p-card-compact md:p-card space-y-3">
       <CallTags call={call} allEvents />

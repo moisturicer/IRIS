@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { opportunitiesApi } from "@/api/opportunities";
+import { isRequestTimeout } from "@/api/requestPolicy";
 import type { Opportunity, SavedCallEntry } from "@/types/opportunities";
 
 import { useAuthStore } from "./auth.store";
@@ -14,46 +15,48 @@ import { useUIStore } from "./ui.store";
  *
  * - **Cleared on every session change**, so the next person on a shared PC
  *   starts empty.
- * - **Fenced:** an answer that lands after the session changed is dropped.
+ * - **Fenced:** an answer, or a toast's Try again, from before the session
+ *   changed is ignored.
  * - **Optimistic, with a rollback that says so:** a save or removal shows at
  *   once; if the server refuses, the previous state returns and a toast says
  *   what failed, with Try again (DESIGN.md §Toasts).
+ * - **A timed-out read is "interrupted"**, as the library's is (IR-906).
  *
  * Nothing here touches the browser's storage. Calls saved in the browser
  * before this are deleted, never imported (`lib/recordLibrary.ts`).
  */
 
-export interface SavedCall {
-  callId:    number;
-  /** False once the Call is sent back to RDCO or rejected (IR-649): only its id is known. */
-  available: boolean;
-  savedAt:   string;
-  call?:     Opportunity;
-}
+/**
+ * One saved Call, in the API's two shapes: a confirmed Call whole, or one
+ * sent back to RDCO or rejected, of which only the id is known (IR-649).
+ */
+export type SavedCall =
+  | { callId: number; available: true; savedAt: string; call: Opportunity }
+  | { callId: number; available: false };
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
 interface SavedCallsState {
   epoch: number;
   load:  LoadState;
+  /** `load` is `error` because the read timed out, not because it was refused. */
+  interrupted: boolean;
   items: Record<number, SavedCall>;
+  /** The saved Call ids, newest first, as the server orders them; a new save goes first. */
+  order: number[];
   ensureLoaded: (force?: boolean) => Promise<void>;
-  isSaved: (callId: number) => boolean;
-  /** Saved Calls, newest first; an unavailable one, which has no date, last. */
-  sorted: () => SavedCall[];
   save:   (call: Opportunity) => Promise<boolean>;
-  /** `title` names the Call in a failure, when the store no longer has it. */
-  unsave: (callId: number, title: string) => Promise<boolean>;
+  unsave: (call: Pick<Opportunity, "id" | "title">) => Promise<boolean>;
 }
 
 function toItem(entry: SavedCallEntry): SavedCall {
   return entry.available
     ? { callId: entry.call_id, available: true, savedAt: entry.saved_at, call: entry.call }
-    : { callId: entry.call_id, available: false, savedAt: "" };
+    : { callId: entry.call_id, available: false };
 }
 
 const currentEpoch = () => useAuthStore.getState().sessionEpoch;
-const empty = () => ({ load: "idle" as LoadState, items: {} as Record<number, SavedCall> });
+const empty = () => ({ load: "idle" as LoadState, interrupted: false, items: {} as Record<number, SavedCall>, order: [] as number[] });
 
 /** Per-Call write sequence: only the newest write's answer is applied. */
 const writes = new Map<number, number>();
@@ -64,7 +67,8 @@ function nextWrite(callId: number): number {
 }
 const isLatest = (callId: number, n: number) => writes.get(callId) === n;
 
-function without(items: Record<number, SavedCall>, callId: number, value?: SavedCall) {
+/** `items` with `callId` set back to `value`, or taken out when there is none. */
+function restore(items: Record<number, SavedCall>, callId: number, value: SavedCall | undefined) {
   const next = { ...items };
   if (value) next[callId] = value;
   else delete next[callId];
@@ -74,8 +78,12 @@ function without(items: Record<number, SavedCall>, callId: number, value?: Saved
 let inflightLoad: Promise<void> | null = null;
 
 export const useSavedCallsStore = create<SavedCallsState>()((set, get) => {
-  const failed = (message: string, retry: () => void) =>
-    useUIStore.getState().addToast({ type: "error", message, action: { label: "Try again", onClick: retry } });
+  /** A toast for a failed write. Its Try again does nothing once the session changed. */
+  const failed = (message: string, epoch: number, retry: () => void) =>
+    useUIStore.getState().addToast({
+      type: "error", message,
+      action: { label: "Try again", onClick: () => { if (currentEpoch() === epoch) retry(); } },
+    });
 
   return {
     epoch: currentEpoch(),
@@ -87,36 +95,32 @@ export const useSavedCallsStore = create<SavedCallsState>()((set, get) => {
       if (!force && (load === "ready" || load === "loading")) return inflightLoad ?? undefined;
 
       const epoch = currentEpoch();
-      set({ load: "loading", epoch });
+      set({ load: "loading", interrupted: false, epoch });
       const request = opportunitiesApi.saved().then(
         ({ data }) => {
           if (currentEpoch() !== epoch) return;
+          const entries = Array.isArray(data?.results) ? data.results : [];
           const items: Record<number, SavedCall> = {};
-          for (const entry of data?.results ?? []) items[entry.call_id] = toItem(entry);
-          set({ items, load: "ready" });
+          for (const entry of entries) items[entry.call_id] = toItem(entry);
+          set({ items, order: entries.map((e) => e.call_id), load: "ready" });
         },
-        () => {
+        (error: unknown) => {
           if (currentEpoch() !== epoch) return;
-          set({ load: "error" });
+          set({ load: "error", interrupted: isRequestTimeout(error) });
         },
       );
       inflightLoad = request.finally(() => { inflightLoad = null; });
       return inflightLoad;
     },
 
-    isSaved: (callId) => get().items[callId] !== undefined,
-
-    sorted: () => Object.values(get().items).sort((a, b) => {
-      if (a.available !== b.available) return a.available ? -1 : 1;
-      return b.savedAt.localeCompare(a.savedAt);
-    }),
-
     save: async (call) => {
       const epoch = currentEpoch();
       const n = nextWrite(call.id);
       const previous = get().items[call.id];
+      const previousOrder = get().order;
       set((s) => ({
-        items: { ...s.items, [call.id]: { callId: call.id, available: true, savedAt: previous?.savedAt || new Date().toISOString(), call } },
+        items: { ...s.items, [call.id]: { callId: call.id, available: true, savedAt: new Date().toISOString(), call } },
+        order: previous ? s.order : [call.id, ...s.order],
       }));
       try {
         const { data } = await opportunitiesApi.save(call.id);
@@ -125,29 +129,35 @@ export const useSavedCallsStore = create<SavedCallsState>()((set, get) => {
         return true;
       } catch {
         if (currentEpoch() !== epoch || !isLatest(call.id, n)) return false;
-        set((s) => ({ items: without(s.items, call.id, previous) }));
-        failed(`Could not save ${call.title}. Nothing was changed.`, () => void get().save(call));
+        set((s) => ({ items: restore(s.items, call.id, previous), order: previousOrder }));
+        failed(`Could not save ${call.title}. Nothing was changed.`, epoch, () => void get().save(call));
         return false;
       }
     },
 
-    unsave: async (callId, title) => {
+    unsave: async (call) => {
       const epoch = currentEpoch();
-      const n = nextWrite(callId);
-      const previous = get().items[callId];
-      set((s) => ({ items: without(s.items, callId) }));
+      const n = nextWrite(call.id);
+      const previous = get().items[call.id];
+      const previousOrder = get().order;
+      set((s) => ({ items: restore(s.items, call.id, undefined), order: s.order.filter((id) => id !== call.id) }));
       try {
-        await opportunitiesApi.unsave(callId);
+        await opportunitiesApi.unsave(call.id);
         return true;
       } catch {
-        if (currentEpoch() !== epoch || !isLatest(callId, n)) return false;
-        set((s) => ({ items: without(s.items, callId, previous) }));
-        failed(`Could not remove ${title}. It is still saved.`, () => void get().unsave(callId, title));
+        if (currentEpoch() !== epoch || !isLatest(call.id, n)) return false;
+        set((s) => ({ items: restore(s.items, call.id, previous), order: previousOrder }));
+        failed(`Could not remove ${call.title}. It is still saved.`, epoch, () => void get().unsave(call));
         return false;
       }
     },
   };
 });
+
+/** Saved Calls, newest first, as the server orders them (ADR-050 decision 13). */
+export function savedInOrder(items: Record<number, SavedCall>, order: number[]): SavedCall[] {
+  return order.flatMap((id) => (items[id] ? [items[id]] : []));
+}
 
 /** A new session starts with no saved Calls (the IR-746 pattern, as `library.store.ts`). */
 useAuthStore.subscribe((state, previous) => {

@@ -85,10 +85,10 @@ export function CallsAndConferencesPage() {
   const [activeArea, setActiveArea] = useState("");
   const [savedOnly,  setSavedOnly]  = useState(false);
   const savedItems   = useSavedCallsStore((s) => s.items);
+  const savedLoad    = useSavedCallsStore((s) => s.load);
   const ensureSaved  = useSavedCallsStore((s) => s.ensureLoaded);
   const saveCall     = useSavedCallsStore((s) => s.save);
   const unsaveCall   = useSavedCallsStore((s) => s.unsave);
-  useEffect(() => { void ensureSaved(); }, [ensureSaved]);
 
   const [icsBusy,   setIcsBusy]   = useState<number | null>(null);
 
@@ -105,6 +105,9 @@ export function CallsAndConferencesPage() {
       .board()
       .then((board) => {
         if (cancelled) return;
+        // Read the account's saves afresh with each board, so a save made on
+        // another device shows here too.
+        void ensureSaved(true);
         setItems([...board.items].sort(byBoardOrder));
         setCanPost(board.can_post);
         setCanFeature(board.can_feature);
@@ -112,13 +115,23 @@ export function CallsAndConferencesPage() {
       .catch(() => { if (!cancelled) setLoadFailed(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [ensureSaved]);
 
   useEffect(() => load(), [load]);
 
   // ---- Filtering ---------------------------------------------------------
 
-  const savedSet = useMemo(() => new Set(Object.keys(savedItems).map(Number)), [savedItems]);
+  /**
+   * The saved Calls on the board: the account's list once it has loaded, and
+   * until then (or if it can't load) the server's `is_saved` on each Call, so
+   * a failed read never shows every bookmark as unsaved.
+   */
+  const savedSet = useMemo(
+    () => savedLoad === "ready"
+      ? new Set(Object.keys(savedItems).map(Number))
+      : new Set(items.filter((o) => o.is_saved).map((o) => o.id)),
+    [savedLoad, savedItems, items],
+  );
   /** Saved calls that are on the board now, which is what the Saved chip counts. */
   const savedOnBoard = useMemo(() => items.filter((o) => savedSet.has(o.id)).length, [items, savedSet]);
 
@@ -168,7 +181,7 @@ export function CallsAndConferencesPage() {
 
   /** Save or unsave; the store shows it at once and rolls back with a toast on failure. */
   const handleToggleSave = (o: Opportunity) => {
-    if (savedSet.has(o.id)) void unsaveCall(o.id, o.title);
+    if (savedSet.has(o.id)) void unsaveCall(o);
     else void saveCall(o);
   };
 

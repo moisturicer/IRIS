@@ -27,16 +27,16 @@ import { useLibrary, useReadingHistory } from "./useLibrary";
 type Tab = "overview" | "research" | "saved" | "calls" | "downloads";
 type SavedViewKind = Exclude<LibraryView, { kind: "research" }>;
 
-const AUTHOR_TABS: { value: Tab; label: string }[] = [
-  { value: "overview",  label: "Overview" },
-  { value: "research",  label: "My submissions" },
-  { value: "saved",     label: "Saved papers" },
+/** Every tab, in order. `reader`: every reader has it, author or not (IR-743, IR-766). */
+const AUTHOR_TABS: { value: Tab; label: string; reader: boolean }[] = [
+  { value: "overview",  label: "Overview",          reader: false },
+  { value: "research",  label: "My submissions",    reader: false },
+  { value: "saved",     label: "Saved papers",      reader: true },
   // Calls for papers the reader saved, apart from papers (IR-766).
-  { value: "calls",     label: "Saved calls" },
-  { value: "downloads", label: "Download requests" },
+  { value: "calls",     label: "Saved calls",       reader: true },
+  { value: "downloads", label: "Download requests", reader: true },
 ];
-/** Every reader has their saves, saved calls and download requests (IR-743, IR-766). */
-const READER_TABS = AUTHOR_TABS.filter((t) => t.value === "saved" || t.value === "calls" || t.value === "downloads");
+const READER_TABS = AUTHOR_TABS.filter((t) => t.reader);
 
 type StatusFilter = "all" | ReadingStatus;
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -47,7 +47,8 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 const ALL_SAVED: SavedViewKind = { kind: "saved" };
 
 function tabFromSection(section: string | null, canAuthor: boolean): Tab {
-  if (section === "saved" || section === "calls" || section === "downloads") return section;
+  const readerTab = READER_TABS.find((t) => t.value === section);
+  if (readerTab) return readerTab.value;
   if (!canAuthor) return "saved";
   return section === "research" ? section : "overview";
 }

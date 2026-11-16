@@ -330,6 +330,16 @@ describe("saved calls (IR-766)", () => {
     expect(screen.getAllByRole("article").map((a) => within(a).getByRole("heading").textContent)).toEqual(["Workshop on Edge AI"]);
   });
 
+  it("keeps the server's saved marks when the account's list can't be read", async () => {
+    saved.mockRejectedValue(new Error("Network Error"));
+    serve([call({ id: 301, title: "Marked saved", is_saved: true }), call({ id: 302, title: "Not saved" })]);
+    await renderBoard();
+
+    expect(screen.getByRole("button", { name: "Save Marked saved" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Save Not saved" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /^Saved\s*1$/ })).toBeInTheDocument();
+  });
+
   it("rolls a failed save back and says so in a toast with Try again", async () => {
     serve([month()]);
     saveCall.mockRejectedValueOnce(new Error("Network Error"));

@@ -30,7 +30,6 @@ const LINK =
   "inline-flex items-center gap-1.5 min-h-11 lg:min-h-8 px-3.5 rounded-full text-small font-semibold " +
   "bg-white text-stone-800 ring-1 ring-stone-300 hover:ring-brand/40 hover:text-brand";
 
-
 /**
  * One call on the deadline board (IR-530, IR-764).
  *

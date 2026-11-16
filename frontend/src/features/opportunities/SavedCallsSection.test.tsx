@@ -101,6 +101,17 @@ describe("Saved calls", () => {
     expect(await screen.findByRole("article", { name: "ICCE 2027" })).toBeInTheDocument();
   });
 
+  it("says a read that took too long was interrupted, and retries", async () => {
+    const { RequestTimeoutError } = await import("@/api/requestPolicy");
+    saved.mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/opportunities/saved/"));
+    renderScreen(<SavedCallsSection />);
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+
+    saved.mockResolvedValue({ data: { results: [] } });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("heading", { name: "No saved calls" })).toBeInTheDocument();
+  });
+
   it("has no serious accessibility violations", async () => {
     const { container } = await open([
       { call_id: 22, available: true, saved_at: "2026-11-15T08:00:00Z", call: openCall },
