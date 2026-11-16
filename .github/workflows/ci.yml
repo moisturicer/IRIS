@@ -510,11 +510,11 @@ jobs:
       # IR-663: the real nginx, with the real config and snippet mounted where
       # the frontend image puts them, answers with the security headers on the
       # SPA route, an asset, a 404 and the legacy activation path. A stand-in
-      # index.html replaces the build; `backend` resolves to the runner so the
-      # proxy locations load, and nothing here is proxied. `nginx -t` first, so
-      # a config error fails with nginx's own message. No `ai-gateway` host on
-      # purpose (IR-892): nginx must start without the gateway, as the Core
-      # journeys stack runs it.
+      # index.html replaces the build. Nothing here is proxied: since IR-200 the
+      # backend is looked up per request, so nginx starts without one.
+      # `nginx -t` first, so a config error fails with nginx's own message.
+      # No `ai-gateway` host on purpose (IR-892): nginx must start without the
+      # gateway, as the Core journeys stack runs it.
       - name: nginx sends the browser security headers
         run: |
           mkdir -p "$RUNNER_TEMP/html/assets"
@@ -528,8 +528,8 @@ jobs:
                   -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
                   -v $PWD/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro
                   -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"
-          docker run --rm --add-host backend:127.0.0.1 $mounts "$image" nginx -t
-          docker run -d --name iris-nginx --add-host backend:127.0.0.1 -p 8080:8080 $mounts "$image"
+          docker run --rm $mounts "$image" nginx -t
+          docker run -d --name iris-nginx -p 8080:8080 $mounts "$image"
           trap 'docker logs iris-nginx; docker rm -f iris-nginx' EXIT
           ready=
           for i in $(seq 1 20); do curl -s -o /dev/null localhost:8080/ && { ready=1; break; }; sleep 1; done
@@ -559,6 +559,12 @@ jobs:
       # IR-782: IRIS's own /admin/... and /rdco/... pages load the app, not Django.
       - name: nginx closes /django-admin/ unless allowlisted
         run: sh scripts/check_django_admin_allowlist.sh
+
+      # IR-200: nginx looks the backend up per request. A recreated backend at a
+      # new address is reached with no nginx restart, and two containers
+      # answering to `backend` both get requests.
+      - name: nginx follows a recreated backend and shares requests between two
+        run: sh scripts/check_nginx_backend_resolution.sh
 
       # IR-620: beat's only job is ADR-043's hourly deadline task. Booting it
       # proves the service starts and loads that entry; validating the file
