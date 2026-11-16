@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import {
@@ -24,6 +25,7 @@ import { OpportunityRow } from "./OpportunityRow";
 import {
   DEADLINE_GROUPS,
   OPPORTUNITY_TYPES,
+  areaNames,
   byBoardOrder,
   deadlineGroup,
   matchesQuery,
@@ -47,17 +49,21 @@ function chipClass(on: boolean) {
 type FormTarget = null | "new" | Opportunity;
 
 /**
- * Calls & Conferences: a deadline board (IR-121, redesigned in IR-530).
+ * Calls & Conferences: a board of calls for papers (IR-121, IR-530; ADR-050,
+ * IR-764).
  *
- * The one question it answers is "what can I still apply to, and by when", so
- * the board is a single column grouped by how soon each call closes, in date
- * order inside each group; a featured call is starred, not moved. Closed calls
- * stay in a last group, so someone mid-application can still find the page,
- * until the server drops them a month after the deadline.
+ * The one question it answers is "where can I still send a paper, and by
+ * when", so the board is a single column grouped by how soon papers close, in
+ * date order inside each group; a Featured call is starred, never moved. Calls
+ * whose submissions have closed stay in a last group until their event is
+ * over, when the server takes them off the board.
  *
- * RDCO and Advisers post here, and change what they posted. The page
- * offers that only when the server says so (`can_post`, `can_edit`); the API
- * is the boundary either way.
+ * RDCO and Advisers post here, and change what they posted. The page offers
+ * that only when the server says so (`can_post`, `can_edit`, `can_feature`);
+ * the API is the boundary either way. An Adviser's new or edited Call waits
+ * for RDCO, so it leaves the board and a toast says where it went.
+ *
+ * Feedback on an action is a toast, never a box that grows inside the board.
  *
  * Saving is per-browser (`lib/opportunityLibrary`), and the page says so.
  * There is no server-side bookmark, and no in-app reminder: the calendar
@@ -69,16 +75,18 @@ export function CallsAndConferencesPage() {
 
   const [items,    setItems]    = useState<Opportunity[]>([]);
   const [canPost,  setCanPost]  = useState(false);
+  const [canFeature, setCanFeature] = useState(false);
   const [loading,  setLoading]  = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
 
   const [activeType, setActiveType] = useState<OpportunityType | null>(null);
   const [query,      setQuery]      = useState("");
+  /** An Area's name, or "" for every Area. */
+  const [activeArea, setActiveArea] = useState("");
   const [savedOnly,  setSavedOnly]  = useState(false);
   const [savedIds,   setSavedIds]   = useState<number[]>(() => getSavedOpportunityIds());
 
   const [icsBusy,   setIcsBusy]   = useState<number | null>(null);
-  const [icsFailed, setIcsFailed] = useState<number | null>(null);
 
   const [formTarget, setFormTarget] = useState<FormTarget>(null);
   const [deleting,   setDeleting]   = useState<Opportunity | null>(null);
@@ -95,6 +103,7 @@ export function CallsAndConferencesPage() {
         if (cancelled) return;
         setItems([...board.items].sort(byBoardOrder));
         setCanPost(board.can_post);
+        setCanFeature(board.can_feature);
         // The whole board is here, so a saved id that is not on it belongs to
         // a call that was deleted or has dropped off: forget it.
         setSavedIds(pruneSavedOpportunities(board.items.map((o) => o.id)));
@@ -112,10 +121,16 @@ export function CallsAndConferencesPage() {
   /** Saved calls that are on the board now, which is what the Saved chip counts. */
   const savedOnBoard = useMemo(() => items.filter((o) => savedSet.has(o.id)).length, [items, savedSet]);
 
-  /** Everything the search and saved filters keep, before the type filter. */
+  /** Every Area on the board, for the Area filter. */
+  const areas = useMemo(() => areaNames(items), [items]);
+
+  /** Everything the search, Area and saved filters keep, before the type filter. */
   const searched = useMemo(
-    () => items.filter((o) => matchesQuery(o, query) && (!savedOnly || savedSet.has(o.id))),
-    [items, query, savedOnly, savedSet],
+    () => items.filter((o) =>
+      matchesQuery(o, query)
+      && (!activeArea || (o.area_names ?? []).includes(activeArea))
+      && (!savedOnly || savedSet.has(o.id))),
+    [items, query, activeArea, savedOnly, savedSet],
   );
 
   const visible = useMemo(
@@ -138,12 +153,13 @@ export function CallsAndConferencesPage() {
     return counts;
   }, [searched]);
 
-  const openCount = useMemo(() => items.filter((o) => !o.is_closed).length, [items]);
-  const filtered  = activeType !== null || query.trim() !== "" || savedOnly;
+  const openCount = useMemo(() => items.filter((o) => o.papers_state === "accepting").length, [items]);
+  const filtered  = activeType !== null || query.trim() !== "" || activeArea !== "" || savedOnly;
 
   const clearFilters = () => {
     setActiveType(null);
     setQuery("");
+    setActiveArea("");
     setSavedOnly(false);
   };
 
@@ -156,7 +172,6 @@ export function CallsAndConferencesPage() {
 
   const handleDownloadIcs = async (o: Opportunity) => {
     setIcsBusy(o.id);
-    setIcsFailed(null);
     try {
       const { data } = await opportunitiesApi.calendar(o.id);
       // Fetched with auth then handed to the browser as a blob: a plain link
@@ -170,19 +185,34 @@ export function CallsAndConferencesPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      // Said on the row it failed for, not by replacing the whole board.
-      setIcsFailed(o.id);
+      // A toast, not a line inside the row: nothing on the board moves. It
+      // names the call and stays until the reader acts on it or dismisses it.
+      addToast({
+        type: "error",
+        message: `Could not build the calendar file for ${o.title}. Try again.`,
+        persist: true,
+        action: { label: "Try again", onClick: () => void handleDownloadIcs(o) },
+      });
     } finally {
       setIcsBusy(null);
     }
   };
 
   const handleSaved = (saved: Opportunity, created: boolean) => {
-    setItems((current) =>
-      [...current.filter((o) => o.id !== saved.id), saved].sort(byBoardOrder),
-    );
+    // Only a confirmed Call is on the board. An Adviser's post or edit waits
+    // for RDCO (ADR-050 decisions 8 and 10), so it leaves the board, as a
+    // reload would show, and the toast says where it went.
+    const onBoard = saved.status === "confirmed";
+    setItems((current) => {
+      const others = current.filter((o) => o.id !== saved.id);
+      return (onBoard ? [...others, saved] : others).sort(byBoardOrder);
+    });
     setFormTarget(null);
-    addToast({ type: "success", message: created ? "Call posted." : "Changes saved." });
+    addToast(
+      onBoard
+        ? { type: "success", message: created ? "Call posted." : "Changes saved." }
+        : { type: "info", message: "Call sent to RDCO. It appears on the board once RDCO confirms it." },
+    );
   };
 
   const confirmDelete = async () => {
@@ -221,7 +251,7 @@ export function CallsAndConferencesPage() {
     ? ""
     : filtered
       ? `Showing ${visible.length} of ${items.length} ${items.length === 1 ? "call" : "calls"}.`
-      : `${openCount} open ${openCount === 1 ? "call" : "calls"}${items.length > openCount ? `, ${items.length - openCount} recently closed` : ""}.` +
+      : `${openCount} ${openCount === 1 ? "call" : "calls"} accepting papers${items.length > openCount ? `, ${items.length - openCount} with submissions closed` : ""}.` +
         (savedOnBoard > 0 ? " Saved calls are kept in this browser only." : "");
 
   return (
@@ -238,8 +268,8 @@ export function CallsAndConferencesPage() {
           Counts appear only once there is a board to count; a 0 before the
           data arrives would be a number IRIS does not know. */}
       <div className="space-y-3 mb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 min-w-0 max-w-md">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="basis-full sm:basis-auto flex-1 min-w-0 sm:max-w-md">
             <Input
               id={`${ids}-search`}
               type="search"
@@ -250,6 +280,20 @@ export function CallsAndConferencesPage() {
               disabled={loadFailed}
               leading={<SearchGlyph className="h-3 w-3" />}
             />
+          </div>
+          <div data-area-filter className="w-full sm:w-auto">
+            <Select
+              id={`${ids}-area`}
+              label="Area"
+              inline
+              size="sm"
+              value={activeArea}
+              onChange={(e) => setActiveArea(e.target.value)}
+              disabled={loadFailed}
+            >
+              <option value="">All Areas</option>
+              {areas.map((name) => <option key={name} value={name}>{name}</option>)}
+            </Select>
           </div>
           <button
             type="button"
@@ -326,7 +370,7 @@ export function CallsAndConferencesPage() {
           title="No calls posted yet"
           message={
             canPost
-              ? "Post the first internal call, conference deadline or funding window, and it appears here for everyone."
+              ? "Post the first call for papers, from a conference, workshop, journal or book, and it appears here for everyone."
               : "RDCO and advisers post calls here as they open. Check back soon."
           }
           action={postButton || undefined}
@@ -339,7 +383,7 @@ export function CallsAndConferencesPage() {
           message={
             savedOnly && savedOnBoard === 0
               ? "Use the bookmark on a call to keep it here. Saved calls stay in this browser only."
-              : "Try another type, or clear the search."
+              : "Try another type or Area, or clear the search."
           }
           action={<Button variant="outline" onClick={clearFilters}>Clear filters</Button>}
         />
@@ -369,7 +413,6 @@ export function CallsAndConferencesPage() {
                       saved={savedSet.has(o.id)}
                       savedHintId={`${ids}-saved-hint`}
                       icsBusy={icsBusy === o.id}
-                      icsFailed={icsFailed === o.id}
                       onToggleSave={() => handleToggleSave(o.id)}
                       onDownloadIcs={() => void handleDownloadIcs(o)}
                       onEdit={() => setFormTarget(o)}
@@ -386,6 +429,7 @@ export function CallsAndConferencesPage() {
       {formTarget !== null && (
         <OpportunityFormDialog
           opportunity={formTarget === "new" ? null : formTarget}
+          canFeature={formTarget === "new" ? canFeature : formTarget.can_feature}
           onClose={() => setFormTarget(null)}
           onSaved={handleSaved}
         />

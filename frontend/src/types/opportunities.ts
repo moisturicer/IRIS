@@ -122,4 +122,9 @@ export interface OpportunityInput {
 export interface OpportunityBoard {
   items:    Opportunity[];
   can_post: boolean;
+  /**
+   * Whether this viewer may feature a new Call: RDCO alone (ADR-050 decision
+   * 12). An existing Call says so itself, in `can_feature`.
+   */
+  can_feature: boolean;
 }

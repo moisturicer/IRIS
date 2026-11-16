@@ -18,8 +18,10 @@ import {
   OPPORTUNITY_TYPES,
   checkDraft,
   draftFrom,
+  hasEvent,
   inputFrom,
   serverErrors,
+  withType,
   type DraftErrors,
   type DraftField,
   type OpportunityDraft,
@@ -31,6 +33,12 @@ interface OpportunityFormDialogProps {
   onClose: () => void;
   /** The saved call as the server returned it. */
   onSaved: (saved: Opportunity, created: boolean) => void;
+  /**
+   * Whether to offer "Feature this call": RDCO alone (ADR-050 decision 12).
+   * The page passes the Call's own `can_feature`, or the board's for a new
+   * one. The server ignores Featured from anyone else either way.
+   */
+  canFeature: boolean;
 }
 
 /** Closing is refused while saving, so a half-sent change is never abandoned. */
@@ -52,8 +60,12 @@ const FIELD_ORDER: DraftField[] = [
  * The browser checks only that the required fields are filled (IR-760). The
  * server decides; whatever it rejects comes back against its field. Whether
  * this viewer may post or edit at all is the server's `can_post` / `can_edit`, read by the page before offering this.
+ *
+ * A Journal or Book Chapter has no event: choosing one hides the start and
+ * end dates and fills an empty location with "Online", which the poster can
+ * change (ADR-050 decision 4, IR-764).
  */
-export function OpportunityFormDialog({ opportunity, onClose, onSaved }: OpportunityFormDialogProps) {
+export function OpportunityFormDialog({ opportunity, onClose, onSaved, canFeature }: OpportunityFormDialogProps) {
   const editing = opportunity !== null;
   const [draft, setDraft] = useState<OpportunityDraft>(() =>
     opportunity ? draftFrom(opportunity) : EMPTY_DRAFT,
@@ -185,7 +197,12 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           label="Type"
           required
           value={draft.opportunity_type}
-          onChange={(e) => set("opportunity_type", e.target.value as OpportunityDraft["opportunity_type"])}
+          onChange={(e) => {
+            const type = e.target.value as Exclude<OpportunityDraft["opportunity_type"], "">;
+            setDraft((d) => withType(d, type));
+            // Filling the location answers its error, if it had one.
+            setErrors((found) => ({ ...found, opportunity_type: undefined, location: undefined }));
+          }}
           error={errors.opportunity_type}
         >
           <option value="" disabled>Choose a type</option>
@@ -300,6 +317,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           hint="Where to read the full call and submit."
         />
 
+        {hasEvent(draft.opportunity_type) && (
         <div className="grid gap-section-sm sm:grid-cols-2">
           <Input
             id={`${ids.form}-start`}
@@ -320,9 +338,10 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
             value={draft.end_date}
             onChange={(e) => set("end_date", e.target.value)}
             error={errors.end_date}
-            hint="A journal or book chapter keeps no dates."
+            hint="A one-day event needs only its start date."
           />
         </div>
+        )}
 
         <Input
           id={`${ids.form}-fee`}
@@ -336,6 +355,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           error={errors.registration_fee}
         />
 
+        {canFeature && (
         <label className="flex items-start gap-2 min-h-11 sm:min-h-0 text-small text-stone-700">
           <input
             type="checkbox"
@@ -346,9 +366,10 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           />
           <span>
             <span className="font-medium text-stone-900">Feature this call</span>
-            <span className="block text-stone-600">Marks it with a star on the board.</span>
+            <span className="block text-stone-600">Adds a star and the label Featured. It doesn't move the call.</span>
           </span>
         </label>
+        )}
       </form>
     </Modal>
   );

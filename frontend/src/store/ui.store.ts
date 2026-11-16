@@ -10,6 +10,12 @@ export interface Toast {
    * the server's reason in it). Off unless a caller asks.
    */
   persist?: boolean;
+  /**
+   * One thing the reader can do about it, such as Try again (IR-764). Taking
+   * it closes the toast. An error toast with an action should also persist,
+   * so the action doesn't leave before the reader can reach it.
+   */
+  action?: { label: string; onClick: () => void };
 }
 
 /** How long a toast stays when it does not persist. */

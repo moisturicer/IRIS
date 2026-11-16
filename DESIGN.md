@@ -325,6 +325,9 @@ In the AI Overview a citation is the page it cites: "p8", 12 px semibold maroon 
 ### Inputs / Fields
 A white field with a Rule Stone outline and the control radius. Focus darkens the outline to maroon with a soft maroon ring. A disabled field sits on Endpaper with a not-allowed cursor and says why beside it. Paper Chat's composer holds the scope chip and Send inside its field. The Ask IRIS page's composer is one line that grows with the question up to a cap, over a row of round icon controls (attach, closed until uploads exist; compare) and a Bar Stone settings pill whose menu offers only what the server supports. Send is Bar Stone until there is something to send.
 
+### Toasts (IR-764)
+A toast reports the outcome of something the reader just did, in the bottom-right corner, over the page and never inside it, so nothing on the screen moves. A success leaves after about 4 seconds. An error that offers a way out carries **one action** (such as Try again) beside Dismiss and stays until the reader takes it or dismisses it; taking the action closes the toast. It names what failed ("Could not build the calendar file for ICCE 2027. Try again."). Calls & Conferences reports its calendar failure this way instead of a line that grew inside the row. A decision the reader must make first is a dialog, a field's error stays under its field, and a page that didn't load keeps its own error state.
+
 ### Navigation
 - **Record bar:** 56 px, Bar Stone, a Desk Stone hairline under it. Back (always labelled), a hairline divider, the paper's title on Paper, then the section tabs.
 - **Ask IRIS icon:** a 56 px Binding Maroon circle at the bottom right with the white Folio Ribbon Ask IRIS glyph, shown only while the panel is closed, lifting 2 px on hover.

@@ -44,6 +44,15 @@ export function ToastContainer() {
             <i className={`fa ${kind.icon} mt-0.5 shrink-0`} aria-hidden />
             <span className="sr-only">{kind.word}</span>
             <p className="flex-1">{t.message}</p>
+            {t.action && (
+              <button
+                type="button"
+                onClick={() => { removeToast(t.id); t.action!.onClick(); }}
+                className={`shrink-0 font-semibold underline underline-offset-2 ${kind.dismiss}`}
+              >
+                {t.action.label}
+              </button>
+            )}
             <button
               onClick={() => removeToast(t.id)}
               className={`shrink-0 ${kind.dismiss}`}

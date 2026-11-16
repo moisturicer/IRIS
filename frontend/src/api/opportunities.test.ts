@@ -32,4 +32,13 @@ describe("opportunitiesApi.board", () => {
     get.mockResolvedValueOnce({ data: { count: 0, next: null, results: [], can_post: false } });
     expect((await opportunitiesApi.board()).can_post).toBe(false);
   });
+
+  it("lets only RDCO, who reviews requests, feature a new call (IR-764)", async () => {
+    get.mockResolvedValueOnce({ data: { count: 0, next: null, results: [], can_post: true, can_review_requests: true } });
+    expect((await opportunitiesApi.board()).can_feature).toBe(true);
+    get.mockResolvedValueOnce({ data: { count: 0, next: null, results: [], can_post: true, can_review_requests: false } });
+    expect((await opportunitiesApi.board()).can_feature).toBe(false);
+    get.mockResolvedValueOnce({ data: { count: 0, next: null, results: [], can_post: true } });
+    expect((await opportunitiesApi.board()).can_feature).toBe(false);
+  });
 });
