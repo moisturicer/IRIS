@@ -205,7 +205,7 @@ export const routes: RouteObject[] = [{
               },
               {
                 path: pathFor("setup"),
-                element: <DeferredPage name="Setup"><SetupPage /></DeferredPage>,
+                element: <DeferredPage message="Loading setup"><SetupPage /></DeferredPage>,
                 handle: { crumb: "Setup" },
               },
             ],
