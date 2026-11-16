@@ -625,7 +625,10 @@ class RunStore:
             row["conversation_id"],
         )
         prior = await conn.fetch(
-            f"""SELECT question, answer, kind, ordinal, coalesce(sources, ({LEGACY_SOURCES})) AS sources
+            f"""SELECT question, answer, kind, ordinal, coalesce(sources, ({LEGACY_SOURCES})) AS sources,
+                       (SELECT coalesce(jsonb_agg(jsonb_build_array(ci.record_id, ci.page) ORDER BY ci.position),
+                                        '[]')
+                          FROM iris_ai.citation ci WHERE ci.turn_id = t.id) AS cited
                   FROM iris_ai.turn t
                 WHERE conversation_id = $1 AND ordinal > $3 AND {CURRENT_SOURCE_TURN}
                 ORDER BY ordinal DESC LIMIT $2""",
@@ -657,7 +660,8 @@ class RunStore:
                      grant=row["reader_grant"], depth=row["depth"], allowance=row["allowance"],
                      remaining_seconds=float(row["remaining"]),
                      prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"], t["ordinal"],
-                                           _sources_from_json(t["sources"]))
+                                           _sources_from_json(t["sources"]),
+                                           tuple((rid, page) for rid, page in t["cited"] or ()))
                                  for t in reversed(prior)),
                      state=row["state"], checkpoint=dict(checkpoint) if checkpoint else None,
                      spent={k: int(v) for k, v in spent.items()},

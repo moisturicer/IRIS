@@ -32,6 +32,9 @@ EVIDENCE_TOOL_VERSION = "research-8"
 #: research-8's tools and checks, its instructions rewritten as one text (IR-1166).
 COHERENT_PROMPT_VERSION = "agent-research-9"
 COHERENT_TOOL_VERSION = "research-9"
+#: research-9 with earlier Turns numbered and listing what they cited (IR-1168).
+CITED_PROMPT_VERSION = "agent-research-10"
+CITED_TOOL_VERSION = "research-10"
 
 INSTRUCTIONS = (
     "You are the IRIS research assistant. Answer the reader's question directly. "
@@ -152,6 +155,18 @@ COHERENT_INSTRUCTIONS = (
     "on a one-paragraph answer. The reader sees only your final answer, so never mention or correct an "
     "earlier draft."
 )
+#: Where research-10 says how to use an earlier Turn's number and citations (IR-1168).
+_TURNS_ANCHOR = "Earlier Turns of a long conversation may arrive as a derived summary."
+#: research-9's text plus how to use the numbered earlier Turns (IR-1168).
+CITED_INSTRUCTIONS = COHERENT_INSTRUCTIONS.replace(_TURNS_ANCHOR, (
+    "Each earlier Turn's question is labelled with its number, such as [IRIS earlier Turn 2], and its "
+    "answer may end with the papers it cited and their pages. To answer a follow-up from the source an "
+    "earlier answer used, reread that Turn with recover_turn by its number, or read a cited page again "
+    "with read_page. " + _TURNS_ANCHOR), 1)
+#: Labels an earlier Turn's question under research-10 (IR-1168).
+EARLIER_TURN = "[IRIS earlier Turn {n}] "
+#: Opens the list, under an earlier answer, of the papers it cited (IR-1168).
+CITED_NOTE = "\n\nPapers this answer cited: "
 #: Opens a Paper Chat under research-7: the one paper every question is about (IR-995).
 PAPER_CHAT_PREFIX = "[IRIS paper chat] This conversation is about one paper: "
 #: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
@@ -177,6 +192,7 @@ PROMPTS = {
     (CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION): CHAT_INSTRUCTIONS,
     (EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION): EVIDENCE_INSTRUCTIONS,
     (COHERENT_PROMPT_VERSION, COHERENT_TOOL_VERSION): COHERENT_INSTRUCTIONS,
+    (CITED_PROMPT_VERSION, CITED_TOOL_VERSION): CITED_INSTRUCTIONS,
 }
 
 # --- Repair -------------------------------------------------------------------
