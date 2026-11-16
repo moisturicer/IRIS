@@ -213,9 +213,9 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   useEffect(() => {
     if (changesVisible) setChangesOpened(true);
   }, [changesVisible]);
-  const showChange = ({ version, page, regions }: ShowPlace) => {
-    onShowVersion?.(version === latest ? null : version);
-    tw.showPlace(page, regions);
+  const showChange = (place: ShowPlace) => {
+    onShowVersion?.(place.version === latest ? null : place.version);
+    tw.showPlace(place);
   };
 
   useEffect(() => {

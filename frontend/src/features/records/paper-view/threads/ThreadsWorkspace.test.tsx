@@ -83,6 +83,7 @@ function StandInReader() {
   const a = useReaderAnnotations();
   return (
     <div>
+      {a?.landing && <p>{`Landed on page ${a.landing.page} of v${a.landing.version}: ${a.landing.label}`}</p>}
       {a?.marks.filter((m) => m.version === a.currentVersion).map((m) => (
         <button key={m.key} type="button" onClick={m.onActivate} aria-label={m.label}>{m.pin}</button>
       ))}
@@ -130,6 +131,14 @@ describe("threads in the review workspace", () => {
     await user.click(await screen.findByRole("button", { name: "Thread 1, ITSO, Must fix" }));
     expect(screen.getByRole("tab", { name: /Threads/ })).toHaveAttribute("aria-selected", "true");
     await waitFor(() => expect(screen.getByRole("article", { name: "Thread 1, ITSO" })).toHaveFocus());
+  });
+
+  it("lands the reader on a thread's passage, named for the reader, from Show in paper (IR-1195)", async () => {
+    const user = userEvent.setup();
+    openWorkspace();
+    await user.click(await screen.findByRole("tab", { name: /Threads/ }));
+    await user.click(await screen.findByRole("button", { name: "Show in paper: “a sample of 40”" }));
+    expect(screen.getByText("Landed on page 4 of v2: Thread 1, ITSO, Must fix, page 4")).toBeInTheDocument();
   });
 
   it("shows a party's open threads from Readiness, which Details holds (IR-1094)", async () => {

@@ -120,9 +120,11 @@ describe("a ready comparison", () => {
     const user = userEvent.setup();
     const { onShowInPaper } = open();
     await user.click(await screen.findByRole("button", { name: "Show in v3, p. 2" }));
-    expect(onShowInPaper).toHaveBeenLastCalledWith({ version: 3, page: 2, regions: [REGION] });
+    expect(onShowInPaper).toHaveBeenLastCalledWith({ version: 3, page: 2, regions: [REGION],
+      tag: "Changed", label: "Changed in v3, page 2, 1.1 Background of the Study" });
     await user.click(screen.getByRole("button", { name: "Show in v2, p. 2" }));
-    expect(onShowInPaper).toHaveBeenLastCalledWith({ version: 2, page: 2, regions: [REGION] });
+    expect(onShowInPaper).toHaveBeenLastCalledWith({ version: 2, page: 2, regions: [REGION],
+      tag: "Changed", label: "Changed in v2, page 2, 1.1 Background of the Study" });
   });
 
   it("shows the unchanged sections on request", async () => {

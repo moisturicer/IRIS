@@ -16,7 +16,9 @@ import { FIND_HIT_CURRENT_CLASS, paintFindHits } from "./findHighlights";
 import { HighlightMarks, type ReaderHighlight } from "./ReaderHighlights";
 import { SelectionMenu, menuPosition, type MenuPosition, type SelectionAction } from "./SelectionMenu";
 import { passageFromRange, type Passage } from "./threads/passage";
-import { ThreadMarks, useReaderAnnotations, type ReaderMark } from "./threads/readerAnnotations";
+import {
+  LandingMark, ThreadMarks, useReaderAnnotations, type ReaderLanding, type ReaderMark,
+} from "./threads/readerAnnotations";
 import type { FindHit } from "./findInPaper";
 import { PaperFind } from "./PaperFind";
 import { ReaderWatermark } from "./ReaderWatermark";
@@ -30,12 +32,15 @@ import {
   MAX_SCALE,
   MIN_SCALE,
   anchorDelta,
+  centredLandingDelta,
   citationLandingDelta,
   firstRegionOn,
   fitScale,
   liveWindow,
+  passageBand,
   regionInView,
   windowReadingBand,
+  type PassageBand,
   type ReadingAnchor,
   type RegionBand,
 } from "./readerGeometry";
@@ -167,6 +172,8 @@ function PdfPageView({
   scale,
   regions,
   marks,
+  landing,
+  landingFocusRef,
   highlights,
   hits,
   registerRef,
@@ -180,6 +187,9 @@ function PdfPageView({
   regions: Region[];
   /** Review threads' highlights and pins (IR-875); empty outside Review. */
   marks: ReaderMark[];
+  /** The passage Review showed (IR-1195), on the Version shown; null outside Review. */
+  landing: ReaderLanding | null;
+  landingFocusRef: (el: HTMLElement | null) => void;
   /** The reader's own saved highlights (IR-583). */
   highlights: ReaderHighlight[];
   hits: FindHit[];
@@ -209,6 +219,7 @@ function PdfPageView({
       <HighlightMarks highlights={highlights} page={pageNumber} />
       <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
       <ThreadMarks marks={marks} page={pageNumber} />
+      <LandingMark landing={landing} page={pageNumber} focusRef={landingFocusRef} />
     </div>
   );
 }
@@ -355,7 +366,10 @@ function PaperPdfReaderSource({
     () => (annotations?.marks ?? []).filter((m) => m.version === shownVersion),
     [annotations?.marks, shownVersion],
   );
-  const threadLanding = annotations?.landing ?? null;
+  // Drawn and landed on only on its own Version: a removed passage is in v1, an added one in v2.
+  const threadLanding = annotations?.landing?.version === shownVersion ? annotations.landing : null;
+  const landingFocus = useRef<HTMLElement | null>(null);
+  const landingFocusRef = useCallback((el: HTMLElement | null) => { landingFocus.current = el; }, []);
   const [commentable, setCommentable] = useState(false);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const paneRef = useRef<HTMLDivElement>(null);
@@ -439,14 +453,17 @@ function PaperPdfReaderSource({
    */
   const land = (
     pageNumber: number,
-    target: RegionBand | { anchor: ReadingAnchor } | null,
+    target: RegionBand | { anchor: ReadingAnchor } | { centre: PassageBand } | null,
     behavior: ScrollBehavior,
     onlyIfHidden = false,
   ): boolean => {
     const anchor = target && "anchor" in target ? target.anchor : null;
-    const region = target && "anchor" in target ? null : target;
+    const centre = target && "centre" in target ? target.centre : null;
+    const region = target && !("anchor" in target) && !("centre" in target) ? target : null;
     const delta = (pageBox: { top: number; height: number }, view: { top: number; bottom: number }) =>
-      anchor ? anchorDelta(pageBox, anchor.fraction, view.top) : citationLandingDelta(pageBox, region, view);
+      anchor ? anchorDelta(pageBox, anchor.fraction, view.top)
+        : centre ? centredLandingDelta(pageBox, centre, view, centre.start)
+          : citationLandingDelta(pageBox, region, view);
     const page = pageRefs.current.get(pageNumber);
     const toolbar = toolbarRef.current;
     if (!page || !toolbar) return false;
@@ -541,14 +558,19 @@ function PaperPdfReaderSource({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [findLanding, painted, scale]);
 
-  // A thread's passage, once its page is painted at this zoom (IR-875).
+  // A passage Review showed -- a change or a thread's (IR-875, IR-1195) --
+  // once its page is painted at this zoom: centred, then focused where it
+  // lies, so a screen reader says where the reader landed. The scroll is
+  // the landing's own, so focusing doesn't scroll again.
   const landedThreadRef = useRef<number | null>(null);
   useEffect(() => {
     if (!threadLanding || landedThreadRef.current === threadLanding.key) return;
     if (painted.get(threadLanding.page) !== scale) return;
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (land(threadLanding.page, threadLanding, reduceMotion ? "auto" : "smooth")) {
+    const band = passageBand(threadLanding.regions, threadLanding.page);
+    if (land(threadLanding.page, band ? { centre: band } : null, reduceMotion ? "auto" : "smooth")) {
       landedThreadRef.current = threadLanding.key;
+      landingFocus.current?.focus({ preventScroll: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadLanding, painted, scale]);
@@ -862,6 +884,8 @@ function PaperPdfReaderSource({
               scale={scale}
               regions={highlightRegions}
               marks={marks}
+              landing={threadLanding}
+              landingFocusRef={landingFocusRef}
               hits={find.hitsByPage.get(index + 1) ?? NO_HITS}
               highlights={highlights}
               registerRef={registerRef}

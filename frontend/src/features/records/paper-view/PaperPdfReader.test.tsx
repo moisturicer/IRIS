@@ -431,6 +431,103 @@ describe("landing on a cited passage (IR-354)", () => {
   });
 });
 
+/**
+ * Show in paper from Review (IR-1195): a change's or a thread's passage is
+ * outlined on the Version it belongs to, centred in the reading band, and
+ * takes keyboard focus under a name that says where the reader landed.
+ */
+describe("landing on a review passage (IR-1195)", () => {
+  // A passage that starts in the left column and carries on at the top of the right one.
+  const REGIONS = [
+    { page: 2, left: 0.05, top: 0.4, right: 0.48, bottom: 0.45 },
+    { page: 2, left: 0.52, top: 0.1, right: 0.95, bottom: 0.15 },
+  ];
+  const LANDING = { version: 2, page: 2, regions: REGIONS, label: "Added in v2, page 2, Method", tag: "Added", key: 1 };
+  type Landing = typeof LANDING;
+
+  let scrollBy: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    vi.stubGlobal("innerHeight", 768);
+  });
+  const landings = () => scrollBy.mock.calls.filter(([arg]) => typeof arg === "object");
+
+  const reader = (landing: Landing | null) => (
+    <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: null, landing }}>
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
+    </ReaderAnnotationsContext.Provider>
+  );
+
+  async function openThenLand(landing: Landing) {
+    const view = render(reader(null));
+    await screen.findByText("Page 1 / 3");
+    placePages([
+      { top: 484, height: 1000 },
+      { top: 1500, height: 1000 },
+      { top: 2516, height: 1000 },
+    ]);
+    vi.spyOn(screen.getByRole("toolbar", { name: "Paper tools" }), "getBoundingClientRect").mockReturnValue(box(400, 44));
+    view.rerender(reader(landing));
+    return view;
+  }
+
+  it("outlines every region of the passage, says what it is in words, and takes focus", async () => {
+    await openThenLand(LANDING);
+    const page2 = screen.getByRole("group", { name: "Page 2" });
+    const passage = await within(page2).findByRole("group", { name: "Added in v2, page 2, Method" });
+    await waitFor(() => expect(passage).toHaveFocus());
+    expect(within(page2).getByText("Added")).toBeInTheDocument();
+    // The outlines are decorative (the group above names the passage), so,
+    // as with citation highlights below, this reaches past the accessible
+    // tree, scoped to the page found through it.
+    expect(page2.querySelectorAll("[data-landing-region]")).toHaveLength(2);
+    expect(screen.getByRole("group", { name: "Page 1" }).querySelector("[data-landing-region]")).toBeNull();
+  });
+
+  it("brings the passage's middle to the middle of the reading band", async () => {
+    await openThenLand(LANDING);
+    // The passage spans 1500 + 100 = 1600 to 1500 + 450 = 1950: its middle is 1775.
+    // The band runs from under the stuck toolbar to the window's bottom.
+    const middle = (READER_TOOLBAR_TOP_PX + 44 + 768) / 2;
+    await waitFor(() => expect(scrollBy).toHaveBeenCalledWith({ top: 1775 - middle, behavior: "smooth" }));
+  });
+
+  it("lands instantly with reduced motion", async () => {
+    mediaQueryAt(true);
+    await openThenLand(LANDING);
+    await waitFor(() => expect(landings()).toHaveLength(1));
+    expect(landings()[0][0]).toMatchObject({ behavior: "auto" });
+  });
+
+  it("lands and takes focus again when shown a second time", async () => {
+    const view = await openThenLand(LANDING);
+    const passage = await screen.findByRole("group", { name: "Added in v2, page 2, Method" });
+    await waitFor(() => expect(passage).toHaveFocus());
+    screen.getByRole("toolbar", { name: "Paper tools" }).querySelector("button")?.focus();
+
+    view.rerender(reader({ ...LANDING, key: 2 }));
+
+    await waitFor(() => expect(landings()).toHaveLength(2));
+    await waitFor(() =>
+      expect(screen.getByRole("group", { name: "Added in v2, page 2, Method" })).toHaveFocus());
+  });
+
+  it("draws nothing and does not move for a passage of a Version not shown", async () => {
+    // The reader shows v2, the current Version; the passage is v1's.
+    await openThenLand({ ...LANDING, version: 1, label: "Removed in v1, page 2, Method", tag: "Removed" });
+    await screen.findByRole("group", { name: "Page 2" });
+    expect(screen.queryByRole("group", { name: "Removed in v1, page 2, Method" })).toBeNull();
+    expect(landings()).toHaveLength(0);
+  });
+
+  it("has no serious or critical violations with a passage outlined", async () => {
+    const { container } = await openThenLand(LANDING);
+    await screen.findByRole("group", { name: "Added in v2, page 2, Method" });
+    await expectNoBlockingA11yViolations(container);
+  });
+});
+
 describe("citation highlights", () => {
   it("draws a region only on the page it names", async () => {
     const regions: Region[] = [

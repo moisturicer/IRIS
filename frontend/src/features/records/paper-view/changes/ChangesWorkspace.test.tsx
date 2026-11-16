@@ -58,7 +58,8 @@ const record = (versions: number) => ({
 
 function StandInReader() {
   const a = useReaderAnnotations();
-  return <p>{a?.landing ? `Landed on page ${a.landing.page}` : "Not landed"}</p>;
+  const l = a?.landing;
+  return <p>{l ? `Landed on page ${l.page} of v${l.version}: ${l.label}` : "Not landed"}</p>;
 }
 
 function openWorkspace(versions: number) {
@@ -106,7 +107,7 @@ describe("the Changes tab in the review workspace", () => {
     await user.click(await screen.findByRole("tab", { name: "Changes" }));
     await user.click(await screen.findByRole("button", { name: "Show in v1, p. 4" }));
     expect(onShowVersion).toHaveBeenCalledWith(1);
-    expect(screen.getByText("Landed on page 4")).toBeInTheDocument();
+    expect(screen.getByText("Landed on page 4 of v1: Removed in v1, page 4, Method")).toBeInTheDocument();
   });
 
   it("opens a thread listed under its section in the Threads tab", async () => {
