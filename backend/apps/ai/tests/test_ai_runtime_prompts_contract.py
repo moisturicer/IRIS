@@ -32,6 +32,8 @@ PREFIXES = {
     ("agent-research-6", "research-6"): "e0671d785429b53a6c5bac9b4fb15e27cc879d27ab2cdcf6879e2a19dcb2448e",
     ("agent-research-7", "research-7"): "5066cba368de644c242875266c85051ddf32c6af295fbe0bffbfcb003088791b",
     ("agent-research-8", "research-8"): "fd35528d31fd95aebfaff7d3763a1931f3351bcbd48feec99586f36a91b54e85",
+    # Recorded when research-9 was written (IR-1166); its bytes are pinned from here on.
+    ("agent-research-9", "research-9"): "c6dd733fe29458bea04f63ae016c3dbc02fcd4563a99182ff4b744fd196431b9",
 }
 #: The notes, prefixes and repair texts every research version sends, before the move.
 NOTES = "74d1d448eb110799d49624570b4ca686e8ddca28adf6cb0d53b647db008f27d2"
