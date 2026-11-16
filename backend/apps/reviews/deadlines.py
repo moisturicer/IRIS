@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.audit import workflow as audit
 from core.enums import AssignmentState, DocumentRequestState, ResubmissionRequestState
 from core.permissions import is_office_coordinator
+from core.text_limits import too_long, too_long_message
 
 from .models import Extension, Holiday, RecordAssignment, ResubmissionRequest, Turnaround
 from .seats import SeatError, SeatRefused
@@ -111,6 +112,8 @@ def extend(assignment, actor, *, due_at, reason):
         raise SeatError("This assignment has no running deadline to extend.")
     if not isinstance(reason, str) or not reason.strip():
         raise SeatError("Give a reason for the extension.")
+    if too_long(reason.strip()):
+        raise SeatError(too_long_message("A reason for the extension"))
     if due_at is None or timezone.is_naive(due_at) or due_at <= assignment.due_at:
         raise SeatError("The new deadline must be later than the current deadline, with a timezone.")
     local = due_at.astimezone(MANILA)

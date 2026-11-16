@@ -58,6 +58,7 @@ from core.permissions import (
     is_office_member,
     office_parties_of,
 )
+from core.text_limits import too_long, too_long_message
 
 from .models import RecordAssignment, ResubmissionRequest, Review, ReviewerSeat
 
@@ -370,6 +371,8 @@ def reassign(seat, coordinator, reviewer, *, reason) -> ReviewerSeat:
     _require_open(seat)
     if not isinstance(reason, str) or not reason.strip():
         raise SeatError("Give a reason for the reassignment.")
+    if too_long(reason.strip()):
+        raise SeatError(too_long_message("A reason for the reassignment"))
     if seat.reviewer_id == reviewer.pk:
         raise SeatError(f"{_name(reviewer)} already holds this seat.")
     seat.state = SeatState.WITHDRAWN
