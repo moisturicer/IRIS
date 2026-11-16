@@ -142,7 +142,8 @@ test("RDCO's coordination screens, Import Records included, are one RDCO group",
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
     "Main: Workflow analytics", "Main: Calls & Conferences",
     "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
-    "RDCO: Delete Requests", "RDCO: Notices", "RDCO: Setup",
+    "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments", "RDCO: Notices",
+    "RDCO: Setup",
   ]);
 });
 
@@ -190,12 +191,22 @@ describe("the pages nested under My Reviews (IR-1085, D5)", () => {
   });
 });
 
-test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Retention and Notices (IR-783, IR-788, IR-795, IR-800)", () => {
+test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Reported Comments, Retention and Notices (IR-783, IR-788, IR-693, IR-795, IR-800)", () => {
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
     "Main: Discover",
     "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
-    "Administration: Retention", "Administration: Notices",
+    "Administration: Reported Comments", "Administration: Retention", "Administration: Notices",
   ]);
+});
+
+// IR-693 (decision 2026-11-15): one Reported comments page, in RDCO's and the
+// System Admin's navigation and nobody else's.
+test("the Reported comments page is RDCO's and the System Admin's alone, at /moderation/comments", () => {
+  for (const role of Object.values(ROLES)) {
+    const page = navFor(role).filter((item) => item.label === "Reported Comments");
+    const allowed = role === ROLES.RDCO || role === ROLES.SYSTEM_ADMIN;
+    expect(page.map((item) => item.to), role).toEqual(allowed ? ["/moderation/comments"] : []);
+  }
 });
 
 // IR-800: one Notices page at one address, in RDCO's and the System Admin's
@@ -325,7 +336,9 @@ test("RDCO coordination links use the RDCO section and addresses", () => {
     { label: "Users", to: "/rdco/users", section: "RDCO" },
     { label: "Role Requests", to: "/rdco/role-requests", section: "RDCO" },
     { label: "Download Requests", to: "/rdco/download-requests", section: "RDCO" },
+    { label: "Call Requests", to: "/rdco/call-requests", section: "RDCO" },
     { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
+    { label: "Reported Comments", to: "/moderation/comments", section: "RDCO" },
     { label: "Notices", to: "/notices", section: "RDCO" },
     { label: "Setup", to: "/rdco/setup", section: "RDCO" },
   ]);

@@ -137,8 +137,9 @@ class WritingAndReplyingTests(CommentTestBase):
     def test_each_comment_carries_who_when_and_whether_edited(self):
         made = self.posted(self.ana, "Hello.")
 
+        # IR-691 added `can_remove`, the moderators' offer.
         self.assertEqual(set(made), {"id", "author_name", "body", "created_at", "edited_at", "is_author",
-                                     "can_edit", "can_report", "reply_to", "deletion_kind"})
+                                     "can_edit", "can_report", "can_remove", "reply_to", "deletion_kind"})
         self.assertEqual(made["author_name"], "Ana Cruz")
         self.assertIsNone(made["edited_at"])
         self.assertIsNone(made["reply_to"])
@@ -203,11 +204,13 @@ class WritingAndReplyingTests(CommentTestBase):
         self.assertEqual(listed["count"], 2)
         self.assertIn(keep["id"], [c["id"] for c in listed["comments"]])
 
-    def test_report_is_not_offered_until_reports_exist(self):
-        # IR-691 adds reporting; until then the server offers nothing it can't do.
+    def test_report_is_offered_on_someone_else_s_comment_only(self):
+        # Changed deliberately by IR-691: reports exist now, so Report is offered.
+        # Who may report, and the rest, is test_comment_reports.py's.
         self.posted(self.ana)
 
-        self.assertFalse(self.thread(self.ben)["comments"][0]["can_report"])
+        self.assertTrue(self.thread(self.ben)["comments"][0]["can_report"])
+        self.assertFalse(self.thread(self.ana)["comments"][0]["can_report"])
 
 
 class PostingIsRateLimitedTests(CommentTestBase):

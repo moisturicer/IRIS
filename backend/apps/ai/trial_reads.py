@@ -85,16 +85,14 @@ def _give_revision(extraction) -> None:
 
 def _store_media(extraction, document, raw: dict, pdf_bytes: bytes, crop: Callable) -> tuple[int, int]:
     """Figures and formula crops for the stored read, as extraction stores them (IR-987, IR-1102)."""
-    from django.conf import settings
-
+    from apps.ai.extraction.selection import figure_limits
     from apps.ai.extraction.unstructured_client import _figures
     from apps.documents import formulas
     from apps.documents.figures import replace_figures
 
     _give_revision(extraction)
     extraction.refresh_from_db()
-    figures = _figures(raw.get("elements") or [], document,
-                       settings.UNSTRUCTURED_MAX_FIGURES, settings.UNSTRUCTURED_MAX_FIGURE_PIXELS)
+    figures = _figures(raw.get("elements") or [], document, *figure_limits())
     replace_figures(extraction, figures)
     formulas.replace_formulas(extraction, crop(pdf_bytes, document))
     return extraction.figures.count(), extraction.formulas.count()

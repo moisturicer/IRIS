@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { RecordListItem } from "@/types/records";
-import {
-  addCollection,
-  getCollections,
-  removeFromCollections,
-  toggleRecordInCollection,
-  type Collection,
-} from "@/lib/recordLibrary";
 import { cn } from "@/lib/utils";
 import { PILL_PRIMARY, PILL_SECONDARY, PILL_SELECTED } from "@/components/ui/pillStyles";
-import { READING_STATUSES, useLibraryStore } from "@/store/library.store";
+import { MAX_FOLDER_NAME, READING_STATUSES, atFolderLimit, useLibraryStore } from "@/store/library.store";
 import { useLibrary } from "@/features/library/useLibrary";
 
 interface PaperSaveDropdownProps {
@@ -26,14 +19,13 @@ interface PaperSaveDropdownProps {
 /**
  * Save a record, give it a Reading status, or file it in a folder.
  *
- * Saves and Reading status belong to the signed-in account (IR-566,
- * ADR-044) and come from the one library store, so this menu, the Record page
- * and My Library always agree. The reader's own folders stay in this browser
- * until IR-572, and the menu says so where they are listed.
+ * Saves, Reading status (IR-566, ADR-044) and the reader's own folders
+ * (IR-572, ADR-070) belong to the signed-in account and come from the one
+ * library store, so this menu, the Record page and My Library always agree.
+ * Filing a paper saves it; taking it out of a folder leaves it saved.
  */
 export function PaperSaveDropdown({ record, variant = "icon", emphasis = "secondary" }: PaperSaveDropdownProps) {
   const [open, setOpen] = useState(false);
-  const [folders, setFolders] = useState<Collection[]>(() => getCollections());
   const [newName, setNewName] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -42,10 +34,14 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
   const failure = useLibraryStore((s) => (s.failure?.recordId === record.id ? s.failure : null));
   const save = useLibraryStore((s) => s.save);
   const unsave = useLibraryStore((s) => s.unsave);
+  const folders = useLibraryStore((s) => s.folders);
+  const folderLimit = useLibraryStore((s) => s.folderLimit);
+  const createFolder = useLibraryStore((s) => s.createFolder);
+  const fileInFolder = useLibraryStore((s) => s.fileInFolder);
+  const removeFromFolder = useLibraryStore((s) => s.removeFromFolder);
 
   useEffect(() => {
     if (!open) return;
-    setFolders(getCollections());
 
     function handlePointerDown(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -68,25 +64,25 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
   const status = item?.readingStatus ?? null;
   const label = isSaved ? "Saved" : "Save";
 
-  const fileInFolder = (next: Collection[], folderId: string) => {
-    const updated = toggleRecordInCollection(next, folderId, record.id);
-    setFolders(updated);
-    // Filing a paper saves it: a folder holds saved papers.
-    const nowIn = updated.find((f) => f.id === folderId)?.recordIds.includes(record.id);
-    if (nowIn && !isSaved) void save(record.id, undefined, record);
+  const full = atFolderLimit(folders, folderLimit);
+
+  const toggleFolder = (folderId: number, filed: boolean) => {
+    // Filing a paper saves it (a folder holds saved papers); taking it out of
+    // a folder leaves it saved.
+    if (filed) void removeFromFolder(folderId, record.id);
+    else void fileInFolder(folderId, record.id, record);
   };
 
-  const handleCreate = () => {
-    if (!newName.trim()) return;
-    const next = addCollection(folders, newName);
-    fileInFolder(next, next[next.length - 1].id);
+  const handleCreate = async () => {
+    const name = newName.trim();
+    if (!name || full) return;
     setNewName("");
+    const made = await createFolder(name, record.id);
+    if (made && !made.recordIds.includes(record.id)) await fileInFolder(made.id, record.id, record);
   };
 
-  const handleRemove = () => {
-    setFolders(removeFromCollections(folders, [record.id]));
-    void unsave(record.id);
-  };
+  // Unsaving takes the paper out of every folder too.
+  const handleRemove = () => void unsave(record.id);
 
   return (
     <div className="relative" ref={containerRef}>
@@ -198,7 +194,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                     key={folder.id}
                     type="button"
                     aria-pressed={checked}
-                    onClick={() => fileInFolder(folders, folder.id)}
+                    onClick={() => toggleFolder(folder.id, checked)}
                     className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 transition text-left"
                   >
                     <span className="flex items-center gap-2 min-w-0">
@@ -219,17 +215,19 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      handleCreate();
+                      void handleCreate();
                     }
                   }}
                   placeholder="New folder…"
                   aria-label="New folder name"
+                  maxLength={MAX_FOLDER_NAME}
+                  disabled={full}
                   className="flex-1 min-w-0 px-2 py-1.5 bg-stone-50 border border-field rounded-control text-xs outline-none focus:border-brand"
                 />
                 <button
                   type="button"
-                  onClick={handleCreate}
-                  disabled={!newName.trim()}
+                  onClick={() => void handleCreate()}
+                  disabled={full || !newName.trim()}
                   className="w-7 h-7 shrink-0 rounded-control bg-brand text-white disabled:opacity-30 flex items-center justify-center transition"
                   aria-label="Create folder"
                 >
@@ -237,7 +235,9 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                 </button>
               </div>
               <p className="mt-2 mb-1 text-2xs text-stone-500 leading-snug">
-                Saves and reading status follow your account. Your folders stay in this browser for now.
+                {full
+                  ? `You have ${folderLimit} folders, the most an account holds. Delete one in My Library to make another.`
+                  : "Saves, reading status and folders follow your account."}
               </p>
             </div>
           </div>

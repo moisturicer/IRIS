@@ -108,6 +108,7 @@ Client-side gating is **UX only**; enforcement is server-side (`S-02`…`S-05`).
 | Ask IRIS | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | My Library *(reader)* | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Calls & Conferences | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| My Calls *(the Calls you posted; IR-765)* | — | ◐ | ◐ | — | — | — |
 | Notifications · Settings · Help | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Submit Disclosure** | ✅ | ✅ | — | — | — | — |
 | **My Workspace** *(author)* | ✅ | ✅ | — | — | — | — |
@@ -118,6 +119,7 @@ Client-side gating is **UX only**; enforcement is server-side (`S-02`…`S-05`).
 | ~~Approved Proposals~~ (removed by IR-271) | — | — | — | — | — | — |
 | Import Records *(file on behalf of)* | — | — | ✅ | — | — | — |
 | Download Requests | — | — | ✅ | — | — | — |
+| Call Requests *(Advisers' Calls waiting for RDCO; ADR-050, IR-765)* | — | — | ✅ | — | — | — |
 | Delete Requests | — | — | ✅ | — | — | — |
 | Audit log | — | — | ✅ | — | — | — |
 | Role approvals | — | — | ✅ | — | — | — |

@@ -252,9 +252,8 @@ services:
         condition: service_completed_successfully
 
   celery-extraction:
-    # LlamaParse is a cloud service (ADR-056, IR-842), so the worker that sends
-    # PDFs to it needs a route out. It also downloads results from presigned
-    # storage URLs on another host.
+    # Unstructured is a cloud service (ADR-067, IR-988), so the worker that
+    # sends PDFs to it needs a route out.
     networks:
       - private
       - egress

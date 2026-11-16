@@ -32,7 +32,7 @@ import { IP_TYPE_LABELS } from "@/types/records";
 import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
-import { recordVisit } from "@/lib/recordLibrary";
+import { useHistoryStore } from "@/store/history.store";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
 import { RelatedWorks } from "./RelatedWorks";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
@@ -523,9 +523,10 @@ export default function PaperViewPage() {
         setRecord(data);
         setLoadFailed(null);
         // access_count is a global counter, so it cannot answer "what have I
-        // read?". My Library's reading history is written here instead, per
-        // browser. See lib/recordLibrary.
-        recordVisit(data.id, data.title);
+        // read?". The reader's history is recorded here, on their account, by
+        // an explicit call (IR-756): reading the Record above records nothing,
+        // and a paused history sends nothing at all.
+        void useHistoryStore.getState().recordVisit(data.id);
       })
       // A 404 is a missing record and a refused one alike (IR-153): the API
       // never says which, so neither does this page, and a 403 reads the same.
@@ -761,6 +762,11 @@ export default function PaperViewPage() {
           recordId={record.id}
           version={viewedVersion?.number ?? null}
           scrollToPage={openedInShown ? openedInShown.page : viewedVersion ? null : landingPage}
+          // Where the reader left off follows their account (IR-573); a citation,
+          // a highlight or `?page=` above still wins, and an earlier Version keeps
+          // none. A citation still being re-read keeps none yet, so the old place
+          // is never put back only to jump to the citation after.
+          keepPlace={resolution.status !== "loading"}
           highlightRegions={highlightRegions}
           navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
           highlights={drawnHighlights}
@@ -1193,6 +1199,10 @@ export default function PaperViewPage() {
                       setTrackerVersion((n) => n + 1);
                       // A failed reload leaves the page as it was; the next visit catches up.
                       recordsApi.detail(record.id).then(({ data }) => setRecord(data)).catch(() => {});
+                    }}
+                    onRefreshed={(fresh) => {
+                      setRecord(fresh);
+                      setTrackerVersion((n) => n + 1);
                     }}
                   />
                 )}

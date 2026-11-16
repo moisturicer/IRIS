@@ -76,6 +76,10 @@ const lines = [
   "EMAIL_HOST_USER=iris-e2e@cit.edu",
   `EMAIL_HOST_PASSWORD=${hex(8)}`,
   "",
+  "# The AI gateway's service secret (IR-957): the frontend's nginx edge needs it",
+  "# to start, though the gateway itself is off in this stack (its profile).",
+  `AI_GATEWAY_SERVICE_SECRET=${hex(32)}`,
+  "",
   "# Account recovery (ADR-045 §8)",
   `RECOVERY_COUNTER_HMAC_KEY=${hex(32)}`,
   `RECOVERY_MAIL_ENCRYPTION_KEY=${fernetKey}`,
@@ -103,10 +107,9 @@ const lines = [
   "PDF_VALIDATION_MAX_OBJECTS=200000",
   "PDF_VALIDATION_MAX_DEPTH=100",
   "",
-  "# Production settings refuse to start without LlamaParse (IR-843). A",
+  "# Production settings refuse to start without Unstructured (IR-988). A",
   "# placeholder: no journey needs a paper read, and any read fails.",
-  "LLAMAPARSE_API_KEY=e2e-placeholder-not-a-key",
-  "LLAMAPARSE_VERSION=2026-09-28",
+  "UNSTRUCTURED_PLATFORM_API_KEY=e2e-placeholder-not-a-key",
   "",
 ];
 

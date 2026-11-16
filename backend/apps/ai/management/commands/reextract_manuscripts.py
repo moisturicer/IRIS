@@ -1,7 +1,7 @@
-"""Cut the corpus over to LlamaParse, with the bill shown first (IR-842, ADR-056).
+"""Cut the corpus over to Unstructured, with the bill shown first (IR-988, ADR-067).
 
     python manage.py reextract_manuscripts --dry-run
-    python manage.py reextract_manuscripts --credit-ceiling 2000 [--record N ...]
+    python manage.py reextract_manuscripts --max-cost 25 [--record N ...]
     python manage.py reextract_manuscripts --rollback [--record N ...]
 
 A run queues each permitted paper's read on the `extraction` queue; the gate
@@ -21,15 +21,15 @@ from apps.ai.admission.limits import NotConfigured
 
 
 class Command(BaseCommand):
-    help = "Re-read manuscripts with LlamaParse, showing the cost first."
+    help = "Re-read manuscripts with Unstructured, showing the cost first."
 
     def add_arguments(self, parser):
         parser.add_argument("--record", type=int, action="append", dest="record_ids")
         parser.add_argument("--limit", type=int, default=0, help="At most this many papers, lowest id first.")
         parser.add_argument("--dry-run", action="store_true", help="Print the plan and stop.")
         parser.add_argument(
-            "--credit-ceiling", default=None,
-            help="Refuse when the estimate exceeds this many LlamaParse credits. Required for a real run.",
+            "--max-cost", default=None,
+            help="Refuse when the estimate exceeds this many US dollars of Unstructured reads. Required for a real run.",
         )
         parser.add_argument(
             "--rollback", action="store_true",
@@ -56,10 +56,10 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("\nDry run: nothing was sent."))
             return
 
-        ceiling = self._ceiling(options["credit_ceiling"])
+        ceiling = self._ceiling(options["max_cost"])
         if plan.exceeds(ceiling):
             raise CommandError(
-                f"Estimated {plan.credits:,} credits, over the ceiling of {ceiling:,}. Nothing was sent. "
+                f"Estimated US${plan.usd:,.2f}, over the ceiling of US${ceiling:,.2f}. Nothing was sent. "
                 f"Narrow the run (--record, --limit) or raise the ceiling deliberately."
             )
         queued = reextraction.queue_reads(plan)
@@ -72,17 +72,16 @@ class Command(BaseCommand):
         try:
             ceiling = Decimal(raw) if raw is not None else Decimal(0)
         except InvalidOperation:
-            raise CommandError(f"--credit-ceiling must be a number, not {raw!r}.") from None
-        if ceiling <= 0:
-            raise CommandError("A real run needs --credit-ceiling set above 0: spend is approved before it runs.")
+            raise CommandError(f"--max-cost must be a number, not {raw!r}.") from None
+        if not ceiling.is_finite() or ceiling <= 0:
+            raise CommandError("A real run needs --max-cost set above 0: spend is approved before it runs.")
         return ceiling
 
     def _write_plan(self, plan):
-        self.stdout.write(self.style.MIGRATE_HEADING("\nLlamaParse cutover"))
+        self.stdout.write(self.style.MIGRATE_HEADING("\nUnstructured cutover"))
         self.stdout.write(f"  papers to read       {len(plan.to_read)}")
         self.stdout.write(f"  pages                {plan.pages}")
-        self.stdout.write(f"  credits (upper)      {plan.credits:,}  at {plan.credits_per_page}/page")
-        self.stdout.write(f"  LlamaParse (upper)   ~US${plan.usd:,.2f}")
+        self.stdout.write(f"  Unstructured         ~US${plan.usd:,.2f}  at US${plan.usd_per_page}/page")
         self.stdout.write(
             f"  Voyage (upper)       ~US${plan.embed_usd:,.4f}  ({plan.embed_tokens:,} tokens if every "
             f"chunk changed; backfill_embeddings --dry-run prices the real set)"

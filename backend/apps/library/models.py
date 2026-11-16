@@ -24,7 +24,7 @@ class SavedRecord(models.Model):
     Unique on `(owner, record)`, so a Record is saved at most once per reader;
     the single nullable `reading_status` gives "at most one status" with no
     extra check. Setting a status saves the Record, and unsaving deletes the
-    row, which clears its status with it.
+    row, which clears its status and takes it out of every folder (IR-572).
 
     Both foreign keys cascade: removing an account removes its library, and a
     deleted Record vanishes from every library. A withdrawn or restricted one
@@ -51,6 +51,71 @@ class SavedRecord(models.Model):
 
     def __str__(self):
         return f"SavedRecord(owner={self.owner_id}, record={self.record_id})"
+
+
+#: How many folders one account may hold, and how long a folder's name may be
+#: (IR-572, ADR-070 §3). The interface reads the limit from the API; the name
+#: bound is mirrored as `MAX_FOLDER_NAME` in `store/library.store.ts`, so change
+#: both together.
+MAX_FOLDERS = 10
+MAX_FOLDER_NAME = 60
+
+
+class LibraryFolder(models.Model):
+    """
+    One of a reader's own folders (IR-572, ADR-070).
+
+    Owner-only: every queryset starts from `owner=request.user`, so another
+    reader's folder cannot be addressed and reads exactly like a missing one.
+    The name is unique per account ignoring case, which the database enforces;
+    that is also what makes creating a folder idempotent -- creating a name the
+    reader already has returns that folder rather than a second one.
+
+    Not in Django admin, no `AuditEvent`, and never a discovery signal.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="library_folders"
+    )
+    name = models.CharField(max_length=MAX_FOLDER_NAME)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("name"), "owner", name="unique_library_folder_name"),
+        ]
+
+    def __str__(self):
+        return f"LibraryFolder(owner={self.owner_id}, name={self.name!r})"
+
+
+class FolderMembership(models.Model):
+    """
+    One saved Record filed in one folder (IR-572, ADR-070 §2).
+
+    **It points at the save, not at the Record.** A folder holds saved papers,
+    so filing a Record saves it first, and unsaving it removes it from every
+    folder by cascade. The reverse never happens: deleting a membership, or
+    the whole folder, leaves the save and its Reading status as they were.
+
+    Unique on `(folder, saved_record)`, which is unique per folder and Record
+    because a save is unique per owner and Record. Both sides belong to one
+    owner: the views take the folder and the save from the authenticated user
+    alone.
+    """
+
+    folder = models.ForeignKey(LibraryFolder, on_delete=models.CASCADE, related_name="memberships")
+    saved_record = models.ForeignKey(SavedRecord, on_delete=models.CASCADE, related_name="memberships")
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["folder", "saved_record"], name="unique_folder_membership"),
+        ]
+
+    def __str__(self):
+        return f"FolderMembership(folder={self.folder_id}, saved_record={self.saved_record_id})"
 
 
 #: The longest note body, in characters (ADR-064 §4). The editor's own copy is
@@ -195,3 +260,128 @@ class SavedFeed(models.Model):
 
     def __str__(self):
         return f"SavedFeed(owner={self.owner_id}, name={self.name!r})"
+
+
+#: How many Records one reader's history keeps (ADR-044 §Amendment 2026-11-01,
+#: point 1). The browser kept the same number before IR-756.
+MAX_HISTORY_ENTRIES = 50
+
+
+class ReadingVisit(models.Model):
+    """
+    One Record one reader opened, and when they last did (IR-756).
+
+    Unique on `(owner, record)`: opening a Record again moves `viewed_at`
+    forward rather than adding a row, and only the `MAX_HISTORY_ENTRIES` most
+    recent are kept per reader. A visit is written only by the paper view's own
+    `PUT /library/history/<record_id>/`, never as a side effect of reading the
+    Record, so an API client, a prefetch or a link preview records nothing.
+
+    Both foreign keys cascade. A Record that is merely withdrawn or restricted
+    keeps its row and is listed as unavailable until access returns, because
+    every read rechecks `Record.objects.visible_to()`.
+
+    Only its reader sees it: not in Django admin, no staff endpoint, no
+    `AuditEvent`, and never read by anything that recommends, ranks, discusses
+    or prompts (a guard test enforces it). History is not a discovery signal.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reading_visits"
+    )
+    record = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="+"
+    )
+    viewed_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "record"], name="unique_reading_visit"),
+        ]
+        indexes = [models.Index(fields=["owner", "-viewed_at"], name="library_visit_owner_idx")]
+
+    def __str__(self):
+        return f"ReadingVisit(owner={self.owner_id}, record={self.record_id})"
+
+
+class LibraryPreferences(models.Model):
+    """
+    One reader's library settings (IR-756, ADR-044 §Amendment 2026-11-01, point 7).
+
+    Created the first time a reader changes a setting, never by reading one: no
+    row means every default. `keep_history` off pauses history -- the paper
+    view's visit is answered 204 and records nothing, while the entries already
+    kept stay until the reader clears them.
+    """
+
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="library_preferences"
+    )
+    keep_history = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"LibraryPreferences(owner={self.owner_id})"
+
+    @classmethod
+    def keeps_history(cls, user) -> bool:
+        """The reader's `keep_history`, or the default when they never set it."""
+        prefs = cls.objects.filter(owner=user).only("keep_history").first()
+        return prefs.keep_history if prefs else cls._meta.get_field("keep_history").default
+
+
+#: How many Records keep a reading position per reader (IR-573, decided by the
+#: owner 2026-11-16): the most recently read, as history keeps its 50.
+MAX_READING_POSITIONS = 200
+
+
+class ReadingPosition(models.Model):
+    """
+    Where one reader is in one Record's Manuscript (IR-573, ADR-044 §Amendment
+    2026-11-16, resume): the page, and how far down it the top of their view was.
+
+    **It belongs to the bytes it was read on**, as a highlight does (IR-583):
+    `manuscript_revision` and `manuscript_sha256` are the identity the server was
+    serving that reader (`records.versions.served_manuscript_identity`). It is
+    given back only while that is still what they are served, so a replaced
+    Manuscript never inherits another file's place, and it is deleted once no
+    one is served those bytes (`signals.py`).
+
+    Unique on `(owner, record)`: reading on moves the one position. Only the
+    current paper keeps one -- an earlier Version opened from the picker is a
+    deliberate comparison and is never saved. `MAX_READING_POSITIONS` are kept
+    per reader, the most recently read.
+
+    Both foreign keys cascade. Only its reader sees it: not in Django admin, no
+    `AuditEvent`, and never read by anything that recommends, ranks, discusses
+    or prompts (a guard test enforces it), so draft and review reading is never
+    a discovery signal.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reading_positions"
+    )
+    record = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="+"
+    )
+    manuscript_revision = models.UUIDField()
+    manuscript_sha256 = models.CharField(max_length=64)
+    #: 1-based, as the reader's "Page n / N" counts.
+    page = models.PositiveIntegerField()
+    #: How far down `page` the top of the view was, 0 to 1: a fraction of a page
+    #: survives a change of zoom or layout, a pixel offset does not.
+    fraction = models.FloatField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "record"], name="unique_reading_position"),
+            models.CheckConstraint(condition=models.Q(page__gte=1), name="reading_position_page_from_one"),
+            models.CheckConstraint(
+                condition=models.Q(fraction__gte=0, fraction__lte=1), name="reading_position_fraction_of_page",
+            ),
+        ]
+        indexes = [models.Index(fields=["owner", "-updated_at"], name="library_position_owner_idx")]
+
+    def __str__(self):
+        return f"ReadingPosition(owner={self.owner_id}, record={self.record_id})"

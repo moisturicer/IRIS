@@ -36,6 +36,17 @@ class UnknownChunkingStrategy(ChunkingError):
         )
 
 
+class EvaluationOnlyStrategy(ChunkingError):
+    """Raised when ingestion names a baseline kept for measurement (IR-1054)."""
+
+    def __init__(self, strategy: str, allowed: list[str]):
+        self.strategy = strategy
+        super().__init__(
+            f"Chunking strategy {strategy!r} is an evaluation baseline and cannot "
+            f"index papers. Use one of: {', '.join(allowed)}"
+        )
+
+
 @runtime_checkable
 class Chunker(Protocol):
     """Turns a normalized document into a ChunkSet.

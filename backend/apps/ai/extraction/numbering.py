@@ -1,6 +1,6 @@
 """Outline numbering: the depth a heading's own number claims (IR-314).
 
-Read by LlamaParse shaping (IR-859, ADR-056 §8 as amended): an extractor's
+Read by the evidence rules (IR-1057), as LlamaParse shaping did (IR-859): an extractor's
 heading level is unreliable, and the document's own numbering is the best
 signal of nesting. Reading it used to mean dotted decimals and nothing else,
 which is the CIT-U thesis convention but not the scientific-paper one:

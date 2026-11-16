@@ -35,6 +35,7 @@ from django.utils import timezone
 
 from core.enums import (
     AssignmentState,
+    CallStatus,
     DocumentRequestState,
     Party,
     RequestStatus,
@@ -163,6 +164,42 @@ def _decided_request(model_path):
     return resolve
 
 
+def _comment_report(notification):
+    """A reported comment: ends when none of its reports is open (IR-691)."""
+    from apps.records.models import CommentReport
+    from core.enums import CommentReportState
+
+    reports = CommentReport.objects.filter(comment_id=notification.task_id)
+    if not reports.exists() or reports.filter(state=CommentReportState.OPEN).exists():
+        return None
+    last = reports.order_by("-resolved_at", "-pk").first()
+    when = last.resolved_at or timezone.now()
+    labels = {
+        CommentReportState.REMOVED: "Removed",
+        CommentReportState.DISMISSED: "Dismissed",
+        CommentReportState.WRITER_DELETED: "Deleted by its writer",
+    }
+    return when, f"{labels.get(last.state, 'Handled')} on {_day(when)}"
+
+
+def _call_request(notification):
+    """
+    An Adviser's Call waiting for RDCO: ends when RDCO decides it, when its
+    paper deadline passes (it has left RDCO's queue), or when it is gone. A resubmission
+    reopens the same row, so `settle_call` runs before it does, and the
+    request it starts sends a new notice (ADR-069 decision 5).
+    """
+    from apps.opportunities.models import Opportunity
+
+    call = Opportunity.objects.filter(pk=notification.task_id).first()
+    if call is None or (call.status == CallStatus.PENDING and not call.is_waiting()):
+        return timezone.now(), "No longer waiting"
+    if call.status == CallStatus.PENDING:
+        return None
+    when = call.reviewed_at or timezone.now()
+    return when, f"{call.get_status_display()} on {_day(when)}"
+
+
 RESOLVERS = {
     TaskKind.ASSIGNMENT: _assignment,
     TaskKind.SEAT: _seat,
@@ -171,6 +208,8 @@ RESOLVERS = {
     TaskKind.DOWNLOAD_REQUEST: _decided_request("records.DownloadRequest"),
     TaskKind.DELETE_REQUEST: _decided_request("records.DeleteRequest"),
     TaskKind.ROLE_REQUEST: _decided_request("accounts.RoleRequest"),
+    TaskKind.COMMENT_REPORT: _comment_report,
+    TaskKind.CALL_REQUEST: _call_request,
 }
 
 
@@ -206,6 +245,11 @@ def settle(notifications) -> int:
 def settle_for(user) -> int:
     """Settle what `user` can see: called by the list endpoint before it answers."""
     return settle(Notification.objects.visible_to(user))
+
+
+def settle_call(call) -> int:
+    """Settle RDCO's notices about one Call: called before a resubmission reopens it."""
+    return settle(Notification.objects.filter(task_kind=TaskKind.CALL_REQUEST, task_id=call.pk))
 
 
 def settle_record(record) -> int:

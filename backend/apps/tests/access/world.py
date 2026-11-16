@@ -29,13 +29,13 @@ from apps.documents.models import (
 )
 from apps.documents.testing import real_pdf_bytes
 from apps.documents.requests import ItemSpec, create_request, requesting_party
-from apps.library.models import SavedFeed
+from apps.library.models import LibraryFolder, SavedFeed
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
 from apps.records.models import Classification, DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
 from apps.reviews.models import ReviewComment, ReviewerSeat, SavedReply
 from apps.reviews.routing import accept_and_route, enter_at_adviser, route
-from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName, ThreadSeverity
+from core.enums import CallStatus, Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName, ThreadSeverity
 
 #: The matrix's columns, in the order every table row lists them.
 ROLES = (
@@ -125,7 +125,7 @@ class World:
         from apps.opportunities.models import Opportunity
         if isinstance(obj, Opportunity):
             return user is not None
-        if isinstance(obj, (SavedFeed, SavedReply)):
+        if isinstance(obj, (LibraryFolder, SavedFeed, SavedReply)):
             return user is not None and obj.owner_id == user.pk
         # A record type and its listed Requirements are on Guidelines for
         # anyone signed in (ADR-063 decision 7, IR-971).
@@ -301,6 +301,12 @@ def build_world() -> World:
     # The owner's Comment on the published paper (IR-690): only its writer edits or deletes it.
     from apps.records.models import PublicComment
     o["public_comment"] = PublicComment.objects.create(record=published, author=owner, body="Thanks for reading.")
+    # A Comment `other` reported (IR-691): RDCO or the System Admin dismisses its report.
+    from apps.records.models import CommentReport
+    o["reported_comment"] = reported = PublicComment.objects.create(
+        record=published, author=owner, body="Buy followers here.",
+    )
+    CommentReport.objects.create(comment=reported, reporter=other, reason="spam", reported_text=reported.body)
     o["download_request"] = DownloadRequest.objects.create(
         record=published, requested_by=other, note="For my thesis.",
     )
@@ -361,6 +367,7 @@ def build_world() -> World:
         title="Matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
         posted_by=users["rdco"], opportunity_type="conference", location="Cebu City",
         external_url="https://example.org/call", description="A matrix call.",
+        status=CallStatus.CONFIRMED,
     )
     # A complete Call, so an allowed edit is answered 200, not 400 (IR-760).
     matrix_area = Classification.objects.get_or_create(name="Matrix Area")[0]
@@ -370,6 +377,8 @@ def build_world() -> World:
     o["feed"] = SavedFeed.objects.create(
         owner=owner, name="Owner fixture feed", query={"q": "flood"},
     )
+    # IR-572: a reader's folder is private to its owner in the same way.
+    o["folder"] = LibraryFolder.objects.create(owner=owner, name="Owner fixture folder")
     # IR-877: a saved reply is private to its owner in the same way.
     o["saved_reply"] = SavedReply.objects.create(
         owner=owner, title="Owner fixture reply", body="Thank you, this reads well.",
@@ -378,6 +387,15 @@ def build_world() -> World:
         title="Adviser's matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
         posted_by=users["adviser"], opportunity_type="conference", location="Cebu City",
         external_url="https://example.org/call", description="A matrix call.",
+        status=CallStatus.CONFIRMED,
     )
     o["adviser_opportunity"].areas.set([matrix_area])
+    # IR-762: an Adviser's Call waiting for RDCO, seen only by its Adviser and RDCO.
+    o["pending_opportunity"] = Opportunity.objects.create(
+        title="Adviser's waiting call", due_date=timezone.now().date()+timedelta(days=10),
+        posted_by=users["adviser"], opportunity_type="conference", location="Cebu City",
+        external_url="https://example.org/call", description="A matrix call.",
+        status=CallStatus.PENDING,
+    )
+    o["pending_opportunity"].areas.set([matrix_area])
     return world

@@ -34,6 +34,7 @@ export function ToastContainer() {
     <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none">
       {toasts.map((t) => {
         const kind = KIND[t.type];
+        const action = t.action;
         return (
           <div
             key={t.id}
@@ -44,6 +45,15 @@ export function ToastContainer() {
             <i className={`fa ${kind.icon} mt-0.5 shrink-0`} aria-hidden />
             <span className="sr-only">{kind.word}</span>
             <p className="flex-1">{t.message}</p>
+            {action && (
+              <button
+                type="button"
+                onClick={() => { removeToast(t.id); action.onClick(); }}
+                className={`shrink-0 font-semibold underline underline-offset-2 ${kind.dismiss}`}
+              >
+                {action.label}
+              </button>
+            )}
             <button
               onClick={() => removeToast(t.id)}
               className={`shrink-0 ${kind.dismiss}`}

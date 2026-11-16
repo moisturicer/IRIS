@@ -79,12 +79,25 @@ describe("the reset-password screen", () => {
     expect(document.head.querySelector('meta[name="referrer"]')).toBeNull();
   });
 
+  it("shows the strength while typing and refuses fewer than 12 characters before sending (IR-819)", async () => {
+    const user = userEvent.setup();
+    const confirmReset = vi.spyOn(authApi, "confirmPasswordReset");
+    openLink();
+    const field = screen.getByLabelText("New password");
+    await user.type(field, "Short-pw-1");
+    expect(screen.getByText("Password strength: Too short")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Confirm new password"), "Short-pw-1");
+    await user.click(screen.getByRole("button", { name: "Set new password" }));
+    expect(field).toHaveAccessibleDescription("New password must be at least 12 characters.");
+    expect(confirmReset).not.toHaveBeenCalled();
+  });
+
   it("labels both fields, offers show/hide and states the policy, with no blocking violations", async () => {
     const user = userEvent.setup();
     const { container } = openLink();
     const field = screen.getByLabelText("New password");
     expect(field).toHaveAttribute("type", "password");
-    expect(field).toHaveAccessibleDescription(/at least 8 characters/i);
+    expect(field).toHaveAccessibleDescription(/at least 12 characters/i);
     await user.click(screen.getByRole("button", { name: "Show new password" }));
     expect(field).toHaveAttribute("type", "text");
     expect(screen.getByLabelText("Confirm new password")).toBeInTheDocument();
@@ -124,7 +137,8 @@ describe("the reset-password screen", () => {
     const user = userEvent.setup();
     openLink();
 
-    await choose(user, "password", "passwordX");
+    // Twelve characters, so the form sends it and the server refuses it (IR-819).
+    await choose(user, "password1234", "password1234X");
 
     const summary = await screen.findByRole("alert");
     expect(summary).toHaveFocus();

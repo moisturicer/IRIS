@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 
 import { useAuthStore } from "@/store/auth.store";
+import { useHistoryStore } from "@/store/history.store";
 import { useLibraryStore } from "@/store/library.store";
 
 /**
@@ -23,4 +24,19 @@ export function useLibrary() {
 
   const retry = useCallback(() => void ensureLoaded(true), [ensureLoaded]);
   return { load, interrupted, retry };
+}
+
+/**
+ * Read the signed-in reader's history and its setting (IR-756) each time My
+ * Library mounts, so a paper opened on another device since is there. Keyed on
+ * the session too; the store drops an answer for an older one.
+ */
+export function useReadingHistory() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const sessionEpoch = useAuthStore((s) => s.sessionEpoch);
+  const refresh = useHistoryStore((s) => s.refresh);
+
+  useEffect(() => {
+    if (isAuthenticated) void refresh();
+  }, [isAuthenticated, sessionEpoch, refresh]);
 }

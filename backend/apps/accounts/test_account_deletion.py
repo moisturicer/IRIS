@@ -12,6 +12,7 @@ import uuid
 from unittest import mock
 
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
@@ -25,7 +26,16 @@ from apps.accounts.models import (
 from apps.accounts.test_system_admin import make
 from apps.ai.models import Conversation
 from apps.audit.models import AuditEvent
-from apps.library.models import ReadingHighlight, ReadingNote, SavedRecord
+from apps.library.models import (
+    LibraryPreferences,
+    ReadingHighlight,
+    ReadingNote,
+    ReadingPosition,
+    ReadingVisit,
+    SavedRecord,
+)
+from apps.opportunities.models import SavedCall
+from apps.opportunities.tests import make_opportunity
 from apps.notifications.models import Notification, NotificationType
 from apps.records.models import DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews.models import RecordAssignment, Review, ReviewerSeat
@@ -266,6 +276,7 @@ class ConfirmTests(DeletionBase):
                                    status=PipelineStatus.PUBLISHED)
         Review.objects.create(record=self.published, reviewed_by=self.person, stage="adviser", status="approved")
         SavedRecord.objects.create(owner=self.person, record=self.published)
+        SavedCall.objects.create(owner=self.person, call=make_opportunity())
         Conversation.objects.create(user=self.person, title="Private")
         Notification.objects.create(recipient=self.person, message="Yours",
                                     notif_type=NotificationType.objects.first())
@@ -288,7 +299,9 @@ class ConfirmTests(DeletionBase):
         self.assertIsNone(self.person.role)
         self.assertFalse(self.person.has_usable_password())
         self.assertFalse(AdviserProfile.objects.filter(user=self.person).exists())
-        for model, field in ((SavedRecord, "owner"), (Conversation, "user"), (Notification, "recipient")):
+        for model, field in (
+            (SavedRecord, "owner"), (SavedCall, "owner"), (Conversation, "user"), (Notification, "recipient"),
+        ):
             with self.subTest(model=model.__name__):
                 self.assertFalse(model.objects.filter(**{field: self.person}).exists())
         self.assertFalse(RoleRequest.objects.filter(user=self.person, status=RequestStatus.PENDING).exists())
@@ -331,6 +344,13 @@ class ConfirmTests(DeletionBase):
             owner=self.person, record=self.published, manuscript_revision=uuid.uuid4(),
             manuscript_sha256="a" * 64, page=1, quote="A kept passage.",
         )
+        ReadingVisit.objects.create(owner=self.person, record=self.published, viewed_at=timezone.now())
+        LibraryPreferences.objects.create(owner=self.person, keep_history=False)
+        ReadingPosition.objects.create(
+            owner=self.person, record=self.published, manuscript_revision=uuid.uuid4(),
+            manuscript_sha256="a" * 64, page=4, fraction=0.5,
+        )
+        self.assertTrue(ReadingPosition.objects.filter(owner=self.person).exists())
 
         response, _send = self.confirm(self.sysadmin, self.made.pk)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
@@ -343,6 +363,9 @@ class ConfirmTests(DeletionBase):
         self.assertFalse(SavedFeed.objects.filter(owner=self.person).exists())
         self.assertFalse(ReadingNote.objects.filter(owner=self.person).exists())
         self.assertFalse(ReadingHighlight.objects.filter(owner=self.person).exists())
+        self.assertFalse(ReadingVisit.objects.filter(owner=self.person).exists())
+        self.assertFalse(LibraryPreferences.objects.filter(owner=self.person).exists())
+        self.assertFalse(ReadingPosition.objects.filter(owner=self.person).exists())
 
     def test_the_row_and_the_history_that_points_at_it_survive(self):
         self.confirm(self.sysadmin, self.made.pk)

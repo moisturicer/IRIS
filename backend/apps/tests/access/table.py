@@ -68,6 +68,8 @@ SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE)
 OWNS_FEED = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
 #: `saved_reply`, a person's private saved reply (IR-877): the same shape.
 OWNS_SAVED_REPLY = OWNS_FEED
+#: `folder`, a reader's own folder (IR-572): the same shape.
+OWNS_FOLDER = OWNS_FEED
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY, DENY)
 
@@ -402,6 +404,12 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "POST": _case(row(ANON, OK, OK, OK, OK, OK, OK, OK, OK, OK),
                       kwargs={"pk": Ref("published")}, data={"body": "Did you test it in the rain?"}),
     }),
+    # Anyone signed in reports someone else's Comment; its writer may not (IR-691).
+    "record-comment-reports": Entry({
+        "POST": _case(row(ANON, OK, DENY, OK, OK, OK, OK, OK, OK, OK),
+                      kwargs={"pk": Ref("published"), "comment_id": Ref("public_comment")},
+                      data={"reason": "spam"}),
+    }),
     "record-comment": Entry({
         "PATCH": _case(row(ANON, DENY, OK, DENY, DENY, DENY, DENY, DENY, DENY, DENY),
                        kwargs={"pk": Ref("published"), "comment_id": Ref("public_comment")},
@@ -437,7 +445,17 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-types": Entry({"GET": _case(SIGNED_IN)}),
     "dashboard-stats": Entry({"GET": _case(SIGNED_IN)}),
     # IR-1138: the sidebar's counts for RDCO's three queues.
-    "dashboard-queue-counts": Entry({"GET": _case(RDCO_ONLY)}),
+    # RDCO's queues, plus the Reported comments queue both roles share (IR-691).
+    "dashboard-queue-counts": Entry({"GET": _case(ACCOUNT_ADMINS)}),
+    # -- Comment reports and moderation (IR-691, decision 2026-11-15) ------
+    "comment-moderation": Entry({"GET": _case(ACCOUNT_ADMINS)}),
+    "comment-moderation-remove": Entry({
+        "POST": _case(ACCOUNT_ADMINS, kwargs={"comment_id": Ref("public_comment")},
+                      data={"reason": "Off-topic advertising."}),
+    }),
+    "comment-moderation-dismiss": Entry({
+        "POST": _case(ACCOUNT_ADMINS, kwargs={"comment_id": Ref("reported_comment")}),
+    }),
 }
 
 
@@ -758,8 +776,45 @@ OPPORTUNITIES = {
               **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
         _case(SIGNED_IN if m == "GET" else POSTER, kwargs={"pk": Ref("adviser_opportunity")},
               **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
+        # IR-762: reading a waiting Call is its Adviser's and RDCO's alone. A
+        # write is refused on role before lookup (403), the same as for a
+        # missing Call, so it reveals nothing.
+        _case(row(ANON, HIDE, HIDE, OK, HIDE, HIDE, HIDE, OK, HIDE, HIDE) if m == "GET" else POSTER,
+              kwargs={"pk": Ref("pending_opportunity")},
+              **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
     ] for m in ("GET", "PUT", "PATCH", "DELETE")}),
-    "opportunity-calendar": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")})}),
+    "opportunity-calendar": Entry({"GET": [
+        _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")}),
+        # IR-762: the calendar serves confirmed Calls only, even to their Adviser.
+        _case(row(ANON, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs={"pk": Ref("pending_opportunity")}),
+    ]}),
+    # IR-762, ADR-050 decision 8: a waiting Call is its Adviser's and RDCO's
+    # alone; anyone else is answered as if it did not exist.
+    "opportunity-requests": Entry({"GET": _case(RDCO_ONLY)}),
+    "opportunity-mine": Entry({"GET": _case(POSTER)}),
+    "opportunity-confirm": Entry({"POST": _case(RDCO_ONLY, kwargs={"pk": Ref("pending_opportunity")}, data={})}),
+    "opportunity-reject": Entry({"POST": _case(
+        RDCO_ONLY, kwargs={"pk": Ref("pending_opportunity")}, data={"reason": "Broken link"},
+    )}),
+    "opportunity-remove": Entry({"POST": _case(
+        RDCO_ONLY, kwargs={"pk": Ref("pending_opportunity")}, data={"reason": "Cancelled"},
+    )}),
+    # IR-649, ADR-050 decision 13: the owner is the caller, so the list is
+    # anyone's own. Only a confirmed Call can be saved: a waiting one is the
+    # same 404 as a missing one, even to its Adviser and RDCO (owner,
+    # 2026-11-16). Unsaving deletes only one's own row and answers 204 alike.
+    "opportunity-saved": Entry({"GET": _case(SIGNED_IN)}),
+    "opportunity-save": Entry({
+        "PUT": [
+            _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")}, data={}),
+            _case(row(ANON, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+                  kwargs={"pk": Ref("pending_opportunity")}, data={}),
+        ],
+        "DELETE": [
+            _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")}),
+            _case(SIGNED_IN, kwargs={"pk": Ref("pending_opportunity")}),
+        ],
+    }),
     "api-root": Shadowed(by="opportunity-list", why="The empty-prefix list matches before the router root."),
 }
 LIBRARY = {
@@ -806,6 +861,46 @@ LIBRARY = {
     "library-feed": Entry({
         "PATCH": _case(OWNS_FEED, kwargs={"feed_id": Ref("feed")}, data={"name": "Renamed feed"}),
         "DELETE": _case(OWNS_FEED, kwargs={"feed_id": Ref("feed")}),
+    }),
+    # IR-572, ADR-070 §4: a folder is the caller's own, so listing and creating
+    # are anyone's, and another account's folder is the same 404 as a missing
+    # one on a rename or a filing. Filing also rechecks `visible_to()` on the
+    # Record. Deleting a folder or a filing removes only the caller's own rows,
+    # so it answers 204 to everybody: it is idempotent and discloses nothing.
+    "library-folders": Entry({
+        "GET": _case(SIGNED_IN),
+        "POST": _case(SIGNED_IN, data={"name": "Matrix folder"}),
+    }),
+    "library-folder": Entry({
+        "PATCH": _case(OWNS_FOLDER, kwargs={"folder_id": Ref("folder")}, data={"name": "Renamed folder"}),
+        "DELETE": _case(SIGNED_IN, kwargs={"folder_id": Ref("folder")}),
+    }),
+    "library-folder-record": Entry({
+        "PUT": _case(OWNS_FOLDER, kwargs={"folder_id": Ref("folder"), "record_id": Ref("record")}),
+        "DELETE": _case(SIGNED_IN, kwargs={"folder_id": Ref("folder"), "record_id": Ref("record")}),
+    }),
+    # IR-756: reading history and the setting that pauses it are the caller's
+    # own, so listing, clearing and changing the setting are anyone's. Recording
+    # a visit is gated by the Record: a caller who cannot read it gets the 404 of
+    # a missing one. No route reads another account's history.
+    "library-history": Entry({
+        "GET": _case(SIGNED_IN),
+        "DELETE": _case(SIGNED_IN),
+    }),
+    "library-visit": Entry({
+        "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),
+    }),
+    "library-preferences": Entry({
+        "GET": _case(SIGNED_IN),
+        "PATCH": _case(SIGNED_IN, data={"keep_history": True}),
+    }),
+    # IR-573: a reading position is the caller's own, in a Record they can
+    # read; one they cannot is the 404 of a missing one on both read and write.
+    "library-position": Entry({
+        "GET": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
+        "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={
+            "manuscript_revision": "00000000-0000-4000-8000-000000000000", "page": 1, "fraction": 0,
+        }),
     }),
 }
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {

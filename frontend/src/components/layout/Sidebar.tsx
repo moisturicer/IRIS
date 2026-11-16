@@ -191,7 +191,14 @@ interface SidebarProps {
  * 1024 px it is at full width, or as the rail if the user chooses (stored per
  * browser; the choice is not read below 1024 px).
  */
-const NO_QUEUES: QueueCounts = { download_requests: 0, delete_requests: 0, role_change_requests: 0 };
+const NO_QUEUES: QueueCounts = {};
+
+/** Each count the reply holds as a number; anything else is no count rather than a wrong one (F1). */
+function countsIn(data: unknown): QueueCounts {
+  const reply = (data ?? {}) as Record<string, unknown>;
+  const keys = ["download_requests", "delete_requests", "role_change_requests", "reported_comments"] as const;
+  return Object.fromEntries(keys.filter((key) => typeof reply[key] === "number").map((key) => [key, reply[key]]));
+}
 
 export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ className, inert, onDismiss }, ref) {
   const { user } = useAuth();
@@ -215,22 +222,20 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // on, and My Reviews from the same `review_access` flag its route reads.
   const nav = navFor(roleName as Parameters<typeof navFor>[0], user?.review_access);
 
-  // RDCO's three queues, in one call (IR-1138). Read again when the address
-  // changes, as the Library dot is, and when a decision is made on a queue
-  // page. Only RDCO asks; a failed read shows no count rather than a stale one.
-  const showsQueues = canAccess(roleName as never, "roleRequests");
+  // The queues' counts, in one call (IR-1138): RDCO's three and the Reported
+  // comments queue RDCO shares with the System Admin (IR-693). Read again when
+  // the address changes, as the Library dot is, and when a decision is made on
+  // a queue page. Only those two roles ask; a failed read shows no count
+  // rather than a stale one.
+  const showsQueues = canAccess(roleName as never, "roleRequests")
+    || canAccess(roleName as never, "adminReportedComments");
   useEffect(() => {
     if (!showsQueues) { setQueueCounts(NO_QUEUES); return; }
     let live = true;
     const read = () => {
       dashboardApi
         .queueCounts()
-        .then(({ data }) => {
-          // A reply of another shape is a failed read, not three zeros (F1).
-          const ok = [data?.download_requests, data?.delete_requests, data?.role_change_requests]
-            .every((n) => typeof n === "number");
-          if (live) setQueueCounts(ok ? data : NO_QUEUES);
-        })
+        .then(({ data }) => { if (live) setQueueCounts(countsIn(data)); })
         .catch(() => { if (live) setQueueCounts(NO_QUEUES); });
     };
     read();
@@ -261,6 +266,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     roleRequests: queueCounts.role_change_requests,
     downloadRequests: queueCounts.download_requests,
     deleteRequests: queueCounts.delete_requests,
+    reportedComments: queueCounts.reported_comments,
+    adminReportedComments: queueCounts.reported_comments,
   };
   // A dot, not a count: what matters is that something waits (spec §4.2).
   const DOTS: Partial<Record<NavEntry["key"], string | undefined>> = {

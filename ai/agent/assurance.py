@@ -15,6 +15,7 @@ import re
 from decimal import Decimal
 from typing import Optional
 
+from ai.agent.prompts import REPAIR_FEEDBACK as _FEEDBACK, REPAIR_NOTE, UNSEEN_DRAFT
 from ai.agent.tools import Investigation, counted
 from ai.research.metadata import fold
 from ai.research.tools import Count
@@ -135,41 +136,8 @@ def check(text: str, investigation: Investigation, *, prior=(), excluded=()) -> 
     return tuple(sorted(findings(text, investigation, prior=prior, excluded=excluded)))
 
 
-#: What the model is told to fix, per rule; the codes themselves never reach it or the reader.
-_FEEDBACK = {
-    "unknown_citation": "Cite only passage handles this conversation returned, in square brackets, "
-                        "and use no other brackets. Not valid: {items}. If a passage you read supports "
-                        "the claim, cite that one; otherwise remove the claim or say the sources read "
-                        "do not establish it.",
-    "excluded_citation": "The reader ruled out the papers behind {items}; do not cite them. Remove "
-                         "what only they supported.",
-    "unsupported_number": "These numbers are not stated in the passages you cited, their pages, the paper "
-                          "titles or the search coverage: {items}. If a passage you read states the "
-                          "number, cite it; otherwise remove the number, or say the sources read do not "
-                          "give it.",
-    "unknown_title": "These are not titles of papers you read: {items}. If you read the paper, give its "
-                     "exact title; otherwise name only papers this conversation returned, or say the "
-                     "sources read do not establish it.",
-    "outage_absence": "A research step failed, so its result is unknown, not empty; do not say that "
-                      "nothing matched, such as {items}. Say what could not be checked instead.",
-    "completeness_overclaim": "A search returns a sample of matching passages, never the whole "
-                              "repository; qualify claims of completeness such as {items} as what "
-                              "the search found. State a total only in the sentence giving the exact "
-                              "figure count_records returned.",
-}
 _ITEMS = 8
 _ITEM_CHARS = 80
-REPAIR_NOTE = (
-    "[IRIS validation] Your draft failed these checks. Rewrite the whole answer once. For each item: "
-    "correct it if a passage you read supports it; otherwise remove the claim, qualify it, or say the "
-    "sources read do not establish it. Keep everything else, with its citations. Do not refuse or "
-    "shorten the answer as a whole; answer as fully as the passages allow. This is your last turn."
-)
-
-
-#: research-8's repair adds this, so the answer never refers to a draft the reader did not see (IR-1004).
-UNSEEN_DRAFT = ("The reader never saw that draft: write the answer as if for the first time, without "
-                "mentioning, correcting or apologising for it.")
 
 
 def feedback(found: dict[str, list[str]], *, unseen: bool = False) -> str:

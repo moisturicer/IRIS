@@ -352,3 +352,27 @@ revocation, generic delivery states, limits, forced credential rollout and legac
 activation retirement. Dependent tickets reference this accepted contract and
 its configuration, state rules and required automated evidence. Acceptance does
 not claim that either recovery journey is implemented or deployed.
+
+## Amendment 2026-11-15 (IR-819): the configured password rules
+
+**Proposed. Awaiting acceptance by a named person.** §4's decision stands: a
+reset applies every configured `AUTH_PASSWORD_VALIDATORS`, untrimmed, at most
+128 characters, never the current password. What it called the *current*
+validators changes, to meet ASVS 4.0.3 Level 1 (2.1.1, 2.1.2, 2.1.7) as IR-617
+found missing:
+
+- the minimum is **12** characters, not 8;
+- a `MaximumLengthValidator` refuses more than 128 characters on registration
+  and a signed-in change too, not only on a reset;
+- a `BreachedPasswordValidator` refuses a password found in data breaches. It is
+  checked against a local list of 30,402 breached passwords of 12 to 128
+  characters (`apps/accounts/passwords/`, from SecLists, MIT licence). No
+  password, hash or prefix leaves the server, so no outside service is involved.
+- Common-password and numeric-only rejection stay as they were.
+
+Existing passwords keep working: validators run only when a password is set.
+Registration, change and reset show a strength meter that guides; the server's
+refusal stays authoritative and is shown verbatim.
+
+The evidence table's "length boundaries 7/8/128/129" becomes **11/12/128/129**.
+

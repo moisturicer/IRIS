@@ -17,6 +17,8 @@ Unpublished research, IP disclosures before filing, ethics submissions, and pers
 
 Under RA 10173 (Data Privacy Act), personal data in submissions and consent records is in scope.
 
+**Every kind of sensitive data, where it lives, who reads it and where it goes** is listed in [`DATA_INVENTORY.md`](DATA_INVENTORY.md) ([IR-824](https://citiris.atlassian.net/browse/IR-824)).
+
 ---
 
 ## 2 · Authentication
@@ -85,7 +87,7 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 - Endpoints require authentication except those a signed-out person needs, such as login, registration, activation and recovery. Each route's rule is declared in the matrix (§3).
 - 404 and 403 must be indistinguishable for a record the user may not see, because a 403 confirms the record exists.
 - Result counts must be computed after visibility filtering.
-- Responses carry Referrer-Policy, nosniff and X-Frame-Options ([IR-663](https://citiris.atlassian.net/browse/IR-663)). **The Content-Security-Policy is report-only**, so it reports violations and blocks nothing until the manual walk-through recorded in `TRACEABILITY.md` passes.
+- Responses carry Referrer-Policy, nosniff and X-Frame-Options ([IR-663](https://citiris.atlassian.net/browse/IR-663)). **The Content-Security-Policy is enforced in production** on both nginx and Django ([IR-823](https://citiris.atlassian.net/browse/IR-823)), after `e2e/specs/08-csp-walkthrough.spec.ts` walked 66 screens, as a student, an Adviser with a paper in review, RDCO, ITSO, IERC and KTTO members, an office coordinator, the System Admin, signed out, and the Django admin, with no violation. Development only reports, because the debug toolbar and DRF's browsable API carry inline code.
 - Production trusts the proxy's scheme header and redirects to HTTPS without a loop ([IR-662](https://citiris.atlassian.net/browse/IR-662)).
 
 ---
@@ -126,7 +128,7 @@ In production, `private` is an internal Compose network with no route to the int
 | `celery-beat` | Nothing | It only queues tasks |
 | `backend`, `celery-default` | AI vendors, mail server | Answers and email |
 | `celery-embedding`, `celery-shadow` | AI vendors | Embedding, overviews and evidence decisions |
-| `celery-extraction` | LlamaParse and its result storage | It sends each permitted PDF to be read ([ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md), [IR-842](https://citiris.atlassian.net/browse/IR-842)). It also checks uploads with `pypdf`, so a hostile PDF that exploits that check now has a route out |
+| `celery-extraction` | Unstructured | It sends each permitted PDF to be read ([ADR-067](../adr/067-unstructured-replaces-llamaparse.md), [IR-988](https://citiris.atlassian.net/browse/IR-988)). It also checks uploads with `pypdf`, so a hostile PDF that exploits that check now has a route out |
 | `ai-gateway` | AI vendors | Chat |
 | `caddy` | The certificate authority | Getting and renewing certificates |
 
@@ -142,12 +144,12 @@ In production, `private` is an internal Compose network with no route to the int
 2. **Voyage's training opt-out**, an account setting. The repository can't show whether it was exercised (§11).
 3. **`VOYAGE_API_KEY` as a production secret.**
 
-[ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md) sends **whole Manuscript PDFs** to LlamaParse the only Extractor since [IR-843](https://citiris.atlassian.net/browse/IR-843) removed Docling. Its conditions:
+[ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md) sends **whole Manuscript PDFs** to an outside Extractor: LlamaParse until [IR-988](https://citiris.atlassian.net/browse/IR-988), Unstructured since ([ADR-067](../adr/067-unstructured-replaces-llamaparse.md)). Its conditions:
 
 1. **The same disclosure check**, read when a read is queued and again just before sending ([IR-850](https://citiris.atlassian.net/browse/IR-850)).
 2. **ADR-041 admission**, which refuses every read unless admission enforces.
 3. **No vendor copy kept.** Every job sets `disable_cache`, and the uploaded file is deleted afterwards. Retention in writing and the region are still ADR-056's open conditions, and no-training evidence is [IR-827](https://citiris.atlassian.net/browse/IR-827)'s (§11).
-4. **`LLAMAPARSE_API_KEY` and a dated `LLAMAPARSE_VERSION` as production settings.** Django won't start without them when LlamaParse is selected.
+4. **`UNSTRUCTURED_PLATFORM_API_KEY` as a production setting.** Django won't start without it (IR-988).
 
 The threat model's Django ↔ LlamaParse boundary ([ADR-053](../adr/053-threat-model.md), [IR-864](https://citiris.atlassian.net/browse/IR-864)) lists what each condition is for.
 

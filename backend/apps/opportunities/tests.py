@@ -13,10 +13,12 @@ Run with:
 from datetime import date, timedelta
 
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
+from core.enums import CallStatus
 
 from .models import Opportunity
 from .services import build_ics
@@ -36,9 +38,11 @@ def make_opportunity(**overrides):
         "opportunity_type": Opportunity.TYPE_CONFERENCE,
         "title":            "International Conference on Research",
         "description":      "Full papers on any research topic.",
-        "due_date":         date.today() + timedelta(days=28),
+        "due_date":         timezone.localdate() + timedelta(days=28),
         "location":         "Cebu City, Philippines",
         "external_url":     "https://example.org/icr",
+        # The model defaults to pending (IR-762); most tests need a Call on the board.
+        "status":           CallStatus.CONFIRMED,
     }
     fields.update(overrides)
     call = Opportunity.objects.create(**fields)
@@ -77,7 +81,7 @@ class OpportunityPermissionTests(APITestCase):
             "opportunity_type": Opportunity.TYPE_WORKSHOP,
             "title":            "Workshop on Capstone Research",
             "description":      "Short papers on capstone research.",
-            "due_date":         str(date.today() + timedelta(days=14)),
+            "due_date":         str(timezone.localdate() + timedelta(days=14)),
             "location":         "CIT-U, Cebu City",
             "areas":            [an_area().pk],
             "external_url":     "https://example.org/capstone",
@@ -264,7 +268,7 @@ class OpportunityCapabilityTests(APITestCase):
             "opportunity_type": Opportunity.TYPE_JOURNAL,
             "title":            "New Call",
             "description":      "A special issue.",
-            "due_date":         str(date.today() + timedelta(days=10)),
+            "due_date":         str(timezone.localdate() + timedelta(days=10)),
             "location":         "Online",
             "areas":            [an_area().pk],
             "external_url":     "https://example.org/issue",
@@ -281,38 +285,49 @@ class OpportunityCapabilityTests(APITestCase):
 
 
 class OpportunityVisibilityTests(APITestCase):
-    """Closed items grey out in place, then drop off once nobody can act."""
+    """
+    A Call stays listed, marked closed, until it is Over (ADR-050 decision 7).
+
+    **Updated deliberately by IR-761.** These pinned the 30-day rule the Over
+    rule replaces, and read the machine's date where the server now reads
+    Manila's. `test_call_states.py` pins each boundary day.
+
+    **Updated deliberately by IR-762:** `test_featured_sorts_before_a_sooner_deadline`
+    is removed. Featured no longer moves a Call (ADR-050 decision 12), and
+    `test_call_review.FeaturedTests` pins the new order.
+    """
 
     def setUp(self):
         self.user = make_user("browser@cit.edu", "Student")
         self.client.force_authenticate(self.user)
 
-    def test_open_and_recently_closed_are_listed_but_stale_are_not(self):
-        open_item   = make_opportunity(title="Open",   due_date=date.today() + timedelta(days=5))
-        closing_today  = make_opportunity(title="Today",  due_date=date.today())
-        recent      = make_opportunity(title="Recent", due_date=date.today() - timedelta(days=3))
-        stale       = make_opportunity(title="Stale",  due_date=date.today() - timedelta(days=90))
+    def test_a_closed_call_stays_listed_until_it_is_over(self):
+        today = timezone.localdate()
+        open_item   = make_opportunity(title="Open",   due_date=today + timedelta(days=5))
+        closing_today  = make_opportunity(title="Today",  due_date=today)
+        event_ahead = make_opportunity(
+            title="Event ahead", due_date=today - timedelta(days=90),
+            start_date=today + timedelta(days=3),
+        )
+        over        = make_opportunity(title="Over",   due_date=today - timedelta(days=3))
 
         titles = [row["title"] for row in self.client.get(reverse("opportunity-list")).data["results"]]
         self.assertIn(open_item.title, titles)
         self.assertIn(closing_today.title, titles)
-        self.assertIn(recent.title, titles)
-        self.assertNotIn(stale.title, titles)
+        self.assertIn(event_ahead.title, titles)
+        self.assertNotIn(over.title, titles)
 
     def test_days_left_and_is_closed_are_served(self):
-        make_opportunity(title="Past", due_date=date.today() - timedelta(days=2))
+        today = timezone.localdate()
+        make_opportunity(
+            title="Past", due_date=today - timedelta(days=2), start_date=today + timedelta(days=5),
+        )
         row = next(
             r for r in self.client.get(reverse("opportunity-list")).data["results"]
             if r["title"] == "Past"
         )
         self.assertEqual(row["days_left"], -2)
         self.assertTrue(row["is_closed"])
-
-    def test_featured_sorts_before_a_sooner_deadline(self):
-        make_opportunity(title="Soon",     due_date=date.today() + timedelta(days=1))
-        make_opportunity(title="Featured", due_date=date.today() + timedelta(days=40), is_featured=True)
-        titles = [r["title"] for r in self.client.get(reverse("opportunity-list")).data["results"]]
-        self.assertLess(titles.index("Featured"), titles.index("Soon"))
 
 
 class IcsExportTests(APITestCase):
@@ -347,7 +362,7 @@ class IcsExportTests(APITestCase):
 
     def test_all_day_event_ends_the_following_day(self):
         """DTEND is exclusive; equal DTSTART/DTEND is dropped by some clients."""
-        due = date.today() + timedelta(days=10)
+        due = timezone.localdate() + timedelta(days=10)
         body = build_ics(make_opportunity(due_date=due))
         self.assertIn(f"DTSTART;VALUE=DATE:{due.strftime('%Y%m%d')}", body)
         self.assertIn(f"DTEND;VALUE=DATE:{(due + timedelta(days=1)).strftime('%Y%m%d')}", body)
@@ -526,7 +541,7 @@ class MigratedCallTests(APITestCase):
         self.client.force_authenticate(self.rdco)
         self.call = Opportunity.objects.create(
             opportunity_type="conference", title="Migrated Conference",
-            due_date=date.today() + timedelta(days=20),
+            due_date=timezone.localdate() + timedelta(days=20),
         )
         self.url = reverse("opportunity-detail", args=[self.call.pk])
 

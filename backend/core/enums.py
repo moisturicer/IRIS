@@ -332,6 +332,32 @@ class CommentDeletion(models.TextChoices):
     MODERATOR = "moderator", "Removed"
 
 
+class CommentReportReason(models.TextChoices):
+    """
+    Why a reader reported a Comment (ADR-032 §7, amendment 2026-10-31;
+    IR-691). `CommentReport.reason`. *Other* needs a note.
+    """
+
+    SPAM = "spam", "Spam"
+    HARASSMENT = "harassment", "Harassment"
+    OFF_TOPIC = "off_topic", "Off-topic"
+    OTHER = "other", "Other"
+
+
+class CommentReportState(models.TextChoices):
+    """
+    Where a Comment report stands (IR-691). `CommentReport.state`. Only an
+    `open` report is in the Reported comments queue; the others say how it
+    left: RDCO or the System Admin dismissed it or removed the comment, or the
+    writer deleted the comment first (decision 2026-11-15).
+    """
+
+    OPEN = "open", "Open"
+    DISMISSED = "dismissed", "Dismissed"
+    REMOVED = "removed", "Closed by removal"
+    WRITER_DELETED = "writer_deleted", "Closed: the writer deleted the comment"
+
+
 class ThreadSeverity(models.TextChoices):
     """
     How much a reviewer's review thread asks of the author (ADR-032 §7,
@@ -553,6 +579,58 @@ class EmbargoState(models.TextChoices):
 
     ACTIVE = "active", "Under embargo"
     RELEASED = "released", "Embargo released"
+
+
+class CallStatus(models.TextChoices):
+    """
+    Where a Call stands with RDCO (ADR-050 decision 8, amended 2026-11-15;
+    IR-762). `Opportunity.status`.
+
+    RDCO's Calls are confirmed at once; an Adviser's wait. Only a confirmed
+    Call is on the board. There is no expired status: a pending or rejected
+    Call whose paper deadline passes is deleted (`remove_lapsed_requests`).
+    Not governed by the vocabulary guard, like the other Call enums: its
+    "pending" and "rejected" are spelled the same as request and clearance
+    words, and every use goes through this enum anyway.
+    """
+
+    PENDING = "pending", "Waiting for RDCO"
+    CONFIRMED = "confirmed", "Confirmed"
+    REJECTED = "rejected", "Rejected"
+
+
+class CallPapersState(models.TextChoices):
+    """
+    Whether a Call still takes papers (ADR-050 decision 6, IR-761).
+    `Opportunity.papers_state`.
+
+    Derived from the paper deadline in Manila's date, never stored. The label
+    is the wording the board shows.
+    """
+
+    ACCEPTING = "accepting", "Accepting papers"
+    CLOSED = "closed", "Submissions closed"
+
+
+class CallEventState(models.TextChoices):
+    """
+    Where a Call's event stands (ADR-050 decisions 6 and 7, IR-761).
+    `Opportunity.event_state`, which is null for a Call with no event state.
+
+    Derived, never stored. `OVER` begins the day after the event's last date,
+    and may sit beside "Accepting papers" while a later deadline keeps the
+    Call listed; the Call leaves the board the day after the latest date
+    entered (`Opportunity.is_over`). Such an event reads "Event over"
+    (`Opportunity.EVENT_OVER_LABEL`); a Call with no event reads "Over".
+    `UPCOMING` and that wording are the owner's 2026-11-15 decisions.
+
+    Neither Call enum is in the vocabulary guard's `GOVERNED_ENUMS`: "closed"
+    and "over" mean other things in other modules, like `EmbargoState`'s words.
+    """
+
+    UPCOMING = "upcoming", "Upcoming"
+    HAPPENING = "happening", "Happening now"
+    OVER = "over", "Over"
 
 
 class RoleName(models.TextChoices):

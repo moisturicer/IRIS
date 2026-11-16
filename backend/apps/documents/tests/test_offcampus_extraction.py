@@ -1,12 +1,11 @@
 """An extraction that leaves campus is gated and admitted (IR-850, ADR-056 §5-6).
 
-The in-memory Extractor stands in for LlamaParse with ``leaves_campus=True``.
+The in-memory Extractor stands in for Unstructured with ``leaves_campus=True``.
 Admission writes through its own connection, so these run against real
 Postgres with committed transactions.
 """
 
 from datetime import date
-from decimal import Decimal
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -42,9 +41,7 @@ PAGES = len(FIXTURE.pages)
 #: Placeholders for tests only: nothing here is an approved price.
 PRICES = {
     "AI_ADMISSION_LANE_CONCURRENCY": '{"extraction": 2}',
-    "AI_ADMISSION_EXTRACTION_CREDIT_USD": "0.00125",
-    "AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE": "10",
-    "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE": "2",
+    "AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE": "0.015",
 }
 
 
@@ -82,7 +79,7 @@ def _record(*, consent=True, embargo=None, released=True):
 
 
 def _offcampus(**kwargs):
-    kwargs.setdefault("usage", Usage(pages=3, credits=Decimal("24")))
+    kwargs.setdefault("usage", Usage(pages=2))
     return InMemoryExtractor(DOCUMENT, leaves_campus=True, **kwargs)
 
 
@@ -149,9 +146,9 @@ def test_a_paper_nobody_has_released_is_not_sent(enforced):
     assert _extraction(record).phase == ExtractionPhase.AWAITING_DISCLOSURE
 
 
-def test_an_eligible_paper_is_reserved_at_its_pages_and_settled_to_the_credits_reported(enforced):
+def test_an_eligible_paper_is_reserved_at_its_pages_and_settled_to_the_pages_reported(enforced):
     record = _record()
-    extractor = _offcampus(usage=Usage(pages=PAGES, credits=Decimal("24")))
+    extractor = _offcampus(usage=Usage(pages=2))
 
     _run(extractor, record)
 
@@ -161,14 +158,14 @@ def test_an_eligible_paper_is_reserved_at_its_pages_and_settled_to_the_credits_r
     (reservation,) = _reservations()
     assert reservation.lane == "extraction"
     assert reservation.operation == "extraction"
-    # PAGES x (10 tier + 2 add-on credits) x US$0.00125 a credit.
+    # PAGES x US$0.015 a page.
     assert reservation.reserved_cost_micros == PAGES * 15_000
     assert reservation.state == SETTLED
-    assert reservation.charge_cost_micros == 30_000  # 24 credits
+    assert reservation.charge_cost_micros == 30_000  # 2 pages reported
     assert _charged_micros() == 30_000
 
 
-@pytest.mark.parametrize("usage", [Usage(pages=PAGES, credits=None), None], ids=["no-credits", "no-usage"])
+@pytest.mark.parametrize("usage", [Usage(pages=0), None], ids=["no-pages", "no-usage"])
 def test_unreported_usage_stays_charged_at_its_reservation(enforced, usage):
     record = _record()
 
@@ -193,11 +190,7 @@ def test_with_admission_off_nothing_is_sent(settings):
     assert not _reservations().exists()
 
 
-@pytest.mark.parametrize("unset", [
-    "AI_ADMISSION_EXTRACTION_CREDIT_USD",
-    "AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE",
-    "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE",
-])
+@pytest.mark.parametrize("unset", ["AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE"])
 def test_an_unset_extraction_price_refuses_the_read(settings, unset):
     enforce(settings, **{**PRICES, unset: ""})
     record = _record()

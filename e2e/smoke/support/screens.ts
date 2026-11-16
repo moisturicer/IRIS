@@ -11,7 +11,7 @@
 //   - for table-heavy screens, the small-screen behaviour (see TABLE_BEHAVIOUR).
 import type { Locator, Page } from "@playwright/test";
 import type { MockApi } from "./mock-api";
-import { PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
+import { mockReadingHistory, PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
 
 export interface Screen {
   /** Stable name in the results table. */
@@ -46,7 +46,15 @@ function shell(api: MockApi, role: SmokeRole) {
     total_mine: 0, pending_mine: 0, approved_mine: 0, declined_mine: 0, needs_action_mine: 0, total_published: 1,
   });
   api.on("GET", "/notifications/", paginated([]));
-  if (role === "RDCO") api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
+  // Reading history (IR-756): My Library reads it, and the paper view records a visit.
+  mockReadingHistory(api);
+  if (role === "RDCO") {
+    api.on("GET", "/dashboard/queue-counts/", {
+      download_requests: 0, delete_requests: 0, role_change_requests: 0, reported_comments: 0,
+    });
+  }
+  // IR-691: the System Admin shares the Reported comments queue, so its sidebar asks for that count alone.
+  if (role === "System Admin") api.on("GET", "/dashboard/queue-counts/", { reported_comments: 0 });
 }
 
 const wrap = (role: SmokeRole, extra?: (api: MockApi) => void) => (api: MockApi) => {
@@ -81,15 +89,44 @@ const USERS = Array.from({ length: 6 }, (_, i) => ({
   date_joined: when("01-05"),
 }));
 
+/** One reported comment with two reports, so the queue draws its reasons and a reader's note. */
+const REPORTED_COMMENT = {
+  id: 41, record: { id: 7, title: "Solar dryers for rural farms in the Visayas region" },
+  author_name: "Maria Cristina Dela Cruz-Santos",
+  reported_texts: ["Buy cheap followers at example.test"], current_text: "Buy cheap followers at example.test",
+  deletion_kind: null, report_count: 2,
+  reasons: [{ reason: "spam", count: 1 }, { reason: "other", count: 1 }],
+  notes: ["It names a student."], first_reported_at: when("11-14"),
+};
+
 /** One open call, so the board draws its filters as it does with data. */
-const OPPORTUNITY = {
+export const OPPORTUNITY = {
   id: 1, opportunity_type: "conference", type_display: "Conference",
   title: "International Conference on Applied Computing", description: "Full papers on applied computing.",
   external_url: "https://example.edu/icac", due_date: "2026-12-15", location: "Cebu City, Philippines",
   areas: [1], area_names: ["Agriculture"], start_date: "2027-02-10", end_date: "2027-02-12",
   registration_fee: "PHP 5,000", is_featured: false,
   posted_by: 2, posted_by_name: "RDCO", created_at: when("11-01"), updated_at: when("11-01"),
-  days_left: 39, is_closed: false, can_edit: false,
+  days_left: 39, is_closed: false,
+  papers_state: "accepting", papers_label: "Accepting papers",
+  event_state: "upcoming", event_label: "Upcoming",
+  status: "confirmed", status_label: "Confirmed", review_reason: "", reviewed_at: null,
+  can_edit: false, can_delete: false, can_remove: false, can_confirm: false,
+  can_reject: false, can_feature: false, edit_returns_to_pending: false,
+};
+
+/** An Adviser's Call waiting for RDCO (IR-765), with what RDCO may do with it. */
+const CALL_REQUEST = {
+  ...OPPORTUNITY, id: 2, title: "Visayas Symposium on Island Energy Grids", posted_by: 7, posted_by_name: "Ana Reyes",
+  status: "pending", status_label: "Waiting for RDCO",
+  can_confirm: true, can_reject: true, can_feature: true,
+};
+
+/** One of the viewer's own Calls, rejected, with RDCO's reason (IR-765). */
+const MY_CALL = {
+  ...OPPORTUNITY, id: 3, title: "Workshop on Edge AI for Agriculture",
+  status: "rejected", status_label: "Rejected", review_reason: "The link goes to last year's call.",
+  can_edit: true, can_delete: true, edit_returns_to_pending: true,
 };
 
 const LONG_TITLE = "A comparative study of low-cost capacitive soil moisture sensing for upland rice in Cebu";
@@ -207,6 +244,8 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/records/", paginated([PAPER]));
       api.on("GET", "/users/search/", { count: 0, next: null, results: [] });
       api.on("GET", "/library/saves/", { results: [] });
+      // IR-572: folders are read with the saves.
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
       api.on("GET", "/library/feeds/", { results: [], limit: 10 });
     },
     heading: "Discover",
@@ -219,6 +258,8 @@ export const SCREENS: Screen[] = [
       api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
       api.on("GET", `/records/${PAPER.id}/comments/`, { comments: [], count: 0 });
       api.on("GET", "/library/saves/", { results: [] });
+      // IR-572: folders are read with the saves.
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
       api.on("GET", `/library/highlights/${PAPER.id}/`, { results: [] });
       api.on("GET", `/ai/records/${PAPER.id}/overview/`, { state: "not_indexed", overview: null });
       api.on("GET", `/records/${PAPER.id}/similar/`, { results: [] });
@@ -234,6 +275,8 @@ export const SCREENS: Screen[] = [
     id: "my-library", path: "/records/mine", route: "/records/mine", role: "Student",
     mocks: wrap("Student", (api) => {
       api.on("GET", "/library/saves/", { results: [] });
+      // IR-572: folders are read with the saves.
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
       api.on("GET", "/records/mine/", []);
     }),
     heading: "My Library",
@@ -241,9 +284,23 @@ export const SCREENS: Screen[] = [
   },
   {
     id: "opportunities", path: "/opportunities", route: "/opportunities", role: "Student",
-    mocks: wrap("Student", (api) => api.on("GET", "/opportunities/", { count: 1, next: null, previous: null, results: [OPPORTUNITY], can_post: false })),
+    mocks: wrap("Student", (api) => {
+      api.on("GET", "/opportunities/", { count: 1, next: null, previous: null, results: [OPPORTUNITY], can_post: false, can_review_requests: false });
+      // The reader's saved Calls follow the account (IR-766).
+      api.on("GET", "/opportunities/saved/", { results: [] });
+    }),
     heading: "Calls & Conferences",
     primary: (p) => p.getByRole("button", { name: /^All\s*\d*$/ }).first(), primaryLabel: "All (filter)",
+  },
+  {
+    // A poster's own Calls (IR-765). RDCO and Advisers reach it; the smoke roles have no Adviser.
+    id: "my-calls", path: "/opportunities/mine", route: "/opportunities/mine", role: "RDCO",
+    mocks: wrap("RDCO", (api) => {
+      api.on("GET", "/opportunities/mine/", paginated([MY_CALL]));
+      api.on("GET", "/records/classifications/", paginated([{ id: 1, name: "Agriculture" }]));
+    }),
+    heading: "My Calls",
+    primary: (p) => p.getByRole("button", { name: /^Edit and send again/ }).first(), primaryLabel: "Edit and send again",
   },
   {
     id: "notifications", path: "/notifications", route: "/notifications", role: "Student",
@@ -380,6 +437,12 @@ export const SCREENS: Screen[] = [
     table: (p) => p.getByRole("table").first(),
   },
   {
+    id: "call-requests", path: "/rdco/call-requests", route: "/rdco/call-requests", role: "RDCO",
+    mocks: wrap("RDCO", (api) => api.on("GET", "/opportunities/requests/", paginated([CALL_REQUEST]))),
+    heading: "Call Requests",
+    primary: (p) => p.getByRole("button", { name: /^Confirm / }).first(), primaryLabel: "Confirm",
+  },
+  {
     id: "download-requests", path: "/rdco/download-requests", route: "/rdco/download-requests", role: "RDCO",
     mocks: wrap("RDCO", (api) => api.on("GET", "/records/download-requests/", paginated([DOWNLOAD_REQUEST]))),
     heading: "Download Requests",
@@ -401,6 +464,13 @@ export const SCREENS: Screen[] = [
     mocks: wrap("RDCO", (api) => api.on("GET", "/documents/setup/record-types/", SETUP_RECORD_TYPES)),
     heading: "Setup",
     primary: (p) => p.getByRole("button", { name: "Add a requirement" }), primaryLabel: "Add a requirement",
+  },
+  // IR-693: RDCO and the System Admin share this queue at one path, as Notices does.
+  {
+    id: "reported-comments", path: "/moderation/comments", route: "/moderation/comments", role: "RDCO",
+    mocks: wrap("RDCO", (api) => api.on("GET", "/moderation/comments/", { comments: [REPORTED_COMMENT] })),
+    heading: "Reported comments",
+    primary: (p) => p.getByRole("button", { name: /^Remove / }).first(), primaryLabel: "Remove",
   },
 
   // --- System Admin --------------------------------------------------------

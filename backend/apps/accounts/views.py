@@ -23,11 +23,12 @@ from core.permissions import (
     role_change_refusal,
 )
 from core.pagination import LargeResultsPagination
+from core.text_limits import too_long, too_long_message
 from core.throttling import UserBurstThrottle
 from apps.audit.services import create_audit_event
 from apps.audit import retention
 from apps.audit.models import AuditEvent
-from . import people_search, profile, public_profile
+from . import people_search, profile, public_profile, sign_in_audit
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, UserListSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
@@ -107,6 +108,10 @@ class RegisterView(generics.CreateAPIView):
                 except Role.DoesNotExist:
                     pass  # Unknown role — skip silently
 
+            # IR-659: with the account, in its transaction. The account is the row's
+            # user, so no address is copied into metadata (as ADR-045's events).
+            create_audit_event(AuditEvent.ACCOUNT_REGISTERED, user, metadata={"requested_role": role_name or None})
+
             # The verification email goes the resend's way (ADR-045 §6, IR-643):
             # an intent committed with the account, mailed by a worker after
             # commit, under the same limits. A rollback leaves no intent and
@@ -157,12 +162,16 @@ class LoginView(APIView):
             if user.password != verified_hash or not user.is_active:
                 user = None
         if not user:
-            create_audit_event("FAILED_LOGIN", None, metadata={"email": email})
+            # Axes's lockout reply replaces this one, and its callable writes the row (IR-659).
+            if not sign_in_audit.axes_refused(request):
+                sign_in_audit.refused(email, sign_in_audit.INVALID_CREDENTIALS)
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
         if not user.is_verified:
+            sign_in_audit.refused(email, sign_in_audit.UNVERIFIED, user=user)
             return Response({"detail": "Email not verified."}, status=status.HTTP_403_FORBIDDEN)
         if user.is_locked:
             # RDCO's lock: it lifts only when RDCO unlocks, so no `unlock_at` (IR-555).
+            sign_in_audit.refused(email, LOCKED_BY_ADMIN, user=user)
             return Response(
                 {"detail": "Account is locked.", "code": LOCKED_BY_ADMIN},
                 status=status.HTTP_403_FORBIDDEN,
@@ -177,6 +186,7 @@ class LoginView(APIView):
         with transaction.atomic():
             locked = User.objects.select_for_update().get(pk=user.pk)
             if locked.password != user.password:
+                sign_in_audit.refused(email, sign_in_audit.INVALID_CREDENTIALS)
                 return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
             refresh = start_session(locked)
         create_audit_event("LOGIN", user, metadata={"email": user.email})
@@ -417,6 +427,11 @@ class ChangePasswordView(APIView):
             serializer.is_valid(raise_exception=True)
             set_password_and_invalidate(user, serializer.validated_data["new_password"], timezone.now())
             create_audit_event(AuditEvent.PASSWORD_CHANGED, user)
+            # The same non-secret notice a reset sends (IR-820, ASVS 2.2.3 and
+            # 2.5.5), so a change made from a stolen session reaches the owner.
+            # After commit, and best effort: it can never undo the change.
+            user_id = user.pk
+            transaction.on_commit(lambda: recovery_service.notify_password_changed(user_id))
         return Response({"detail": "Password changed. Sign in again with your new password.",
                          "code": SessionEndReason.PASSWORD_CHANGED})
 
@@ -1008,6 +1023,8 @@ class SystemSettingView(APIView):
         value = request.data.get("value")
         if not isinstance(value, str):
             return Response({"value": ["A text value is required."]}, status=400)
+        if too_long(value):
+            return Response({"value": [too_long_message("A setting")]}, status=400)
         # A retention period is whole days, or blank to erase nothing (IR-794).
         if key in retention.setting_keys() and (error := retention.period_error(value)):
             return Response({"value": [error]}, status=400)

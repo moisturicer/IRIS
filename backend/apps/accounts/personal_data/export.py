@@ -296,6 +296,38 @@ def papers_viewed(user) -> list[dict]:
     return [{**_paper(row.record_id, titles), "first_viewed_at": row.viewed_at} for row in rows]
 
 
+def reading_history(user) -> list[dict]:
+    """The papers the person opened while keeping history (IR-756), and when
+    they last did. Unlike `papers_viewed`, the person can clear or pause it. The
+    title is given only while they may still read the paper."""
+    from apps.library.models import ReadingVisit
+
+    rows = list(ReadingVisit.objects.filter(owner=user).order_by("-viewed_at", "-id"))
+    titles = _readable_titles(user, [row.record_id for row in rows])
+    return [{**_paper(row.record_id, titles), "viewed_at": row.viewed_at} for row in rows]
+
+
+def library_preferences(user) -> dict:
+    """The person's library settings; the defaults when they never changed one."""
+    from apps.library.models import LibraryPreferences
+
+    return {"keep_history": LibraryPreferences.keeps_history(user)}
+
+
+def reading_positions(user) -> list[dict]:
+    """Where the person is in each paper they read (IR-573): the page, how far
+    down it, and when. The place is theirs either way; the title is given only
+    while they may still read the paper."""
+    from apps.library.models import ReadingPosition
+
+    rows = list(ReadingPosition.objects.filter(owner=user).order_by("-updated_at", "-id"))
+    titles = _readable_titles(user, [row.record_id for row in rows])
+    return [
+        {**_paper(row.record_id, titles), "page": row.page, "fraction": row.fraction, "updated_at": row.updated_at}
+        for row in rows
+    ]
+
+
 def reading_notes(user) -> list[dict]:
     """
     The person's own private notes (IR-580, ADR-064 §8): the text they typed and
@@ -350,6 +382,34 @@ def saved_feeds(user) -> list[dict]:
     ]
 
 
+def folders(user) -> list[dict]:
+    """
+    The person's own folders (IR-572, ADR-070 §6): the name they gave and the
+    papers they filed, newest filing first. A paper's title is given only while
+    they may still read it; that they filed it is theirs either way.
+    """
+    from apps.library.models import FolderMembership, LibraryFolder
+
+    own = list(LibraryFolder.objects.filter(owner=user).order_by("id"))
+    filed: dict[int, list[int]] = {folder.pk: [] for folder in own}
+    for folder_id, record_id in (
+        FolderMembership.objects.filter(folder__owner=user)
+        .order_by("-added_at", "-pk")
+        .values_list("folder_id", "saved_record__record_id")
+    ):
+        filed[folder_id].append(record_id)
+    titles = _readable_titles(user, [pk for ids in filed.values() for pk in ids])
+    return [
+        {
+            "name": folder.name,
+            "papers": [_paper(record_id, titles) for record_id in filed[folder.pk]],
+            "created_at": folder.created_at,
+            "updated_at": folder.updated_at,
+        }
+        for folder in own
+    ]
+
+
 def saved_replies(user) -> list[dict]:
     """The person's own reusable review texts (IR-877): the title and the text."""
     from apps.reviews.models import SavedReply
@@ -396,6 +456,21 @@ def comments(user) -> list[dict]:
         {"paper": _paper(row.record_id, titles), "body": None if row.deletion_kind else row.body,
          "is_reply": row.reply_to_id is not None, "deletion": row.deletion_kind,
          "at": row.created_at, "edited_at": row.edited_at}
+        for row in rows
+    ]
+
+
+def comment_reports(user) -> list[dict]:
+    """The Comments the person reported (IR-691): the paper, their reason and
+    note, when, and whether it is still open. Never the reported words, which
+    are someone else's, nor who acted on it."""
+    from apps.records.models import CommentReport
+
+    rows = list(CommentReport.objects.filter(reporter=user).select_related("comment").order_by("id"))
+    titles = _readable_titles(user, [row.comment.record_id for row in rows])
+    return [
+        {"paper": _paper(row.comment.record_id, titles), "reason": row.reason, "note": row.note,
+         "at": row.created_at, "state": row.state}
         for row in rows
     ]
 
@@ -578,10 +653,37 @@ def opportunities_posted(user) -> list[dict]:
             "start_date": row.start_date,
             "end_date": row.end_date,
             "registration_fee": row.registration_fee,
+            # Where it stands with RDCO, and RDCO's reason while rejected (IR-762):
+            # both are already shown to the poster in the app.
+            "status": row.status,
+            "review_reason": row.review_reason,
             "posted_at": row.created_at,
             "updated_at": row.updated_at,
         }
         for row in Opportunity.objects.filter(posted_by=user).prefetch_related("areas").order_by("id")
+    ]
+
+
+def saved_calls(user) -> list[dict]:
+    """The Calls the person saved (IR-649). The title is given only while the
+    Call is confirmed, which is when the saved list shows it too."""
+    from apps.opportunities.models import Opportunity, SavedCall
+    from core.enums import CallStatus
+
+    rows = list(SavedCall.objects.filter(owner=user).order_by("id"))
+    titles = dict(
+        Opportunity.objects.visible_to(user)
+        .filter(pk__in=[row.call_id for row in rows], status=CallStatus.CONFIRMED)
+        .values_list("pk", "title")
+    )
+    return [
+        {
+            "call_id": row.call_id,
+            "title": titles.get(row.call_id),
+            "available": row.call_id in titles,
+            "saved_at": row.saved_at,
+        }
+        for row in rows
     ]
 
 
@@ -710,19 +812,25 @@ SECTIONS: dict[str, Callable] = {
     "papers_owned": papers_owned,
     "saved_papers": saved_papers,
     "papers_viewed": papers_viewed,
+    "reading_history": reading_history,
+    "library_preferences": library_preferences,
+    "reading_positions": reading_positions,
     "saved_feeds": saved_feeds,
+    "folders": folders,
     "reading_notes": reading_notes,
     "reading_highlights": reading_highlights,
     "saved_replies": saved_replies,
     "viewed_marks": viewed_marks,
     "review_mentions": review_mentions,
     "comments": comments,
+    "comment_reports": comment_reports,
     "discovery": discovery,
     "conversations": conversations,
     "download_requests": download_requests,
     "delete_requests": delete_requests,
     "notifications": notifications,
     "opportunities_posted": opportunities_posted,
+    "saved_calls": saved_calls,
     "workflow_acts": workflow_acts,
     "consent": consent,
 }

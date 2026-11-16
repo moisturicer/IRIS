@@ -45,7 +45,7 @@ class RegistrationPasswordPolicyTests(APITestCase):
         self.assertEqual(
             sorted(response.data["password"]),
             sorted([
-                "This password is too short. It must contain at least 8 characters.",
+                "This password is too short. It must contain at least 12 characters.",
                 "This password is too common.",
                 "This password is entirely numeric.",
             ]),
@@ -118,8 +118,106 @@ class ChangePasswordPolicyTests(APITestCase):
         self.assertEqual(
             sorted(response.data["new_password"]),
             sorted([
-                "This password is too short. It must contain at least 8 characters.",
+                "This password is too short. It must contain at least 12 characters.",
                 "This password is too common.",
                 "This password is entirely numeric.",
             ]),
         )
+
+
+# --- IR-819: ASVS Level 1 lengths and the breached list -------------------------
+
+ELEVEN = "Kalamansi-T1"[:11]           # 11 characters, otherwise fine
+TWELVE = "Kalamansi-T1"                 # exactly 12
+TOO_LONG = "Kalamansi-Tide-" + "x" * 114  # 129 characters
+BREACHED = "123456daniel"                  # in passwords/breached-12plus.txt.gz, not in Django's own list
+LONG_OK = "Kalamansi-Tide-" + "x" * 113    # exactly 128
+
+
+class LevelOneRegistrationTests(APITestCase):
+    url = reverse("auth-register")
+
+    def register(self, password):
+        return self.client.post(self.url, registration(password), format="json")
+
+    def test_eleven_characters_are_refused_and_twelve_register(self):
+        short = self.register(ELEVEN)
+        self.assertEqual(short.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("This password is too short. It must contain at least 12 characters.", short.data["password"])
+        self.assertEqual(self.register(TWELVE).status_code, status.HTTP_201_CREATED)
+
+    def test_more_than_128_characters_are_refused(self):
+        response = self.register(TOO_LONG)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("This password is too long. It must contain at most 128 characters.", response.data["password"])
+
+    def test_128_characters_register(self):
+        self.assertEqual(self.register(LONG_OK).status_code, status.HTTP_201_CREATED)
+
+    def test_a_breached_password_is_refused_whatever_its_case(self):
+        for password in (BREACHED, BREACHED.upper()):
+            with self.subTest(password=password):
+                response = self.register(password)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("This password has appeared in a data breach. Choose a different one.",
+                              response.data["password"])
+
+
+class LevelOneChangeTests(APITestCase):
+    url = reverse("password-change")
+
+    def setUp(self):
+        self.user = make_user("level-one-changer@cit.edu")
+        self.client.force_authenticate(self.user)
+
+    def change(self, new_password):
+        return self.client.post(self.url, {"old_password": "pw12345!", "new_password": new_password}, format="json")
+
+    def test_each_rule_holds_on_a_signed_in_change(self):
+        for password, message in (
+            (ELEVEN, "This password is too short. It must contain at least 12 characters."),
+            (TOO_LONG, "This password is too long. It must contain at most 128 characters."),
+            (BREACHED, "This password has appeared in a data breach. Choose a different one."),
+        ):
+            with self.subTest(password=password[:20]):
+                response = self.change(password)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn(message, response.data["new_password"])
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("pw12345!"))
+        self.assertEqual(self.change(TWELVE).status_code, status.HTTP_200_OK)
+
+
+class LevelOneResetTests(APITestCase):
+    """A reset goes through `password_errors`, which applies the same validators."""
+
+    def test_each_rule_holds_on_a_reset(self):
+        from apps.accounts.recovery.service import password_errors
+
+        user = make_user("level-one-resetter@cit.edu")
+        for password, message in (
+            (ELEVEN, "This password is too short. It must contain at least 12 characters."),
+            (BREACHED, "This password has appeared in a data breach. Choose a different one."),
+        ):
+            with self.subTest(password=password):
+                self.assertIn(message, password_errors(user, password, password)["new_password"])
+        self.assertIn("new_password", password_errors(user, TOO_LONG, TOO_LONG))
+        self.assertEqual(password_errors(user, TWELVE, TWELVE), {})
+
+
+class LevelOneResetOverHttpTests(APITestCase):
+    """The breached rule at the reset endpoint itself, not only `password_errors`."""
+
+    def test_a_reset_to_a_breached_password_is_refused_and_the_link_kept(self):
+        from apps.accounts.test_credential_invalidation import CONFIRM, emailed_reset_token
+
+        user = make_user("level-one-http@cit.edu")
+        token = emailed_reset_token(self.client, user.email)
+        response = self.client.post(CONFIRM, {"token": token, "new_password": BREACHED,
+                                              "confirm_password": BREACHED}, format="json")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("This password has appeared in a data breach. Choose a different one.",
+                      response.json()["errors"]["new_password"])
+        ok = self.client.post(CONFIRM, {"token": token, "new_password": TWELVE,
+                                        "confirm_password": TWELVE}, format="json")
+        self.assertEqual(ok.status_code, 200, ok.content)

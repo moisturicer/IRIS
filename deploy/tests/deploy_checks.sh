@@ -175,7 +175,7 @@ deploy; rc=$?
 check "succeeds"                                  [ "$rc" -eq 0 ]
 check "fast-forwards to the new commit"           head_is "$new"
 check "rebuilds"                                  ran "up -d --build"
-check "restarts frontend after the rebuild"       ran "restart frontend"
+check "doesn't restart frontend when the API answers" not_ran "restart frontend"
 check "checks the site over HTTPS"                ran "curl https://iris.example.invalid/"
 check "checks the API through the site"           ran "curl https://iris.example.invalid/api/v1/colleges/"
 check "reports the deployed commit"               said "done, running ${new:0:8}"
@@ -304,6 +304,15 @@ deploy; rc=$?
 check "after a restart with nothing new, an API that fails (IR-200)" ran "restart frontend"
 check "is fixed by restarting frontend once"      [ "$rc" -eq 0 ]
 check "and says so"                               said "restarted frontend"
+
+new_case stale-frontend-after-rebuild
+push_change "second"
+rm -f "$FAKE/restart_ran"
+touch "$FAKE/stale_frontend"
+deploy; rc=$?
+check "after a rebuild, an API that fails restarts frontend" ran "restart frontend"
+check "once, and the deploy succeeds"             [ "$rc" -eq 0 ]
+check "and says so after the rebuild too"         said "restarted frontend"
 
 new_case flapping
 push_change "second"

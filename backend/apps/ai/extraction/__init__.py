@@ -28,7 +28,6 @@ from .ports import (
     classify,
 )
 from .serialization import document_from_json, document_to_json, read_document
-from .shaping import shape_llamaparse
 
 __all__ = [
     # port
@@ -53,7 +52,6 @@ __all__ = [
     "document_to_json",
     "document_from_json",
     "read_document",
-    "shape_llamaparse",
     "flatten_for_search",
     "extraction_hash",
     "page_report",

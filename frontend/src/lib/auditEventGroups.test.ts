@@ -50,6 +50,15 @@ describe("groupAuditEventTypes", () => {
     expect(listed).toEqual(["LOGIN"]);
   });
 
+  it("puts every Call event under Calls, not Other (IR-763)", () => {
+    const calls = [
+      "CALL_POSTED", "CALL_EDITED", "CALL_DELETED", "CALL_CONFIRMED",
+      "CALL_REJECTED", "CALL_REMOVED", "CALL_LAPSED",
+    ].map((type) => option(type, type));
+
+    expect(groupAuditEventTypes(calls)).toEqual([{ group: "Calls", types: calls }]);
+  });
+
   it("returns nothing for an empty list", () => {
     expect(groupAuditEventTypes([])).toEqual([]);
   });
