@@ -9,6 +9,12 @@ MIDDLEWARE = ["debug_toolbar.middleware.DebugToolbarMiddleware"] + MIDDLEWARE  #
 
 INTERNAL_IPS = ["127.0.0.1"]
 
+# Report, don't block, in development (IR-823). The debug toolbar injects inline
+# scripts and styles, and DRF's browsable API has inline style attributes; an
+# enforced policy would break both for whoever is developing. Production
+# enforces (base.py), and the CSP walk-through runs against production settings.
+CONTENT_SECURITY_POLICY_REPORT_ONLY = True
+
 # Local dev origins, listed rather than waved through (IR-154). This was
 # `CORS_ALLOW_ALL_ORIGINS = True`, which combined with base.py's
 # CORS_ALLOW_CREDENTIALS = True to let any origin make authenticated requests

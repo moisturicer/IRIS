@@ -544,7 +544,7 @@ jobs:
               'x-content-type-options: nosniff' \
               'referrer-policy: same-origin' \
               'x-frame-options: DENY' \
-              "content-security-policy-report-only: default-src 'self'; script-src 'self';"; do
+              "content-security-policy: default-src 'self'; script-src 'self';"; do
               echo "$headers" | grep -qiF "$expected" || { echo "::error::$path lacks '$expected'"; status=1; }
             done
           done
