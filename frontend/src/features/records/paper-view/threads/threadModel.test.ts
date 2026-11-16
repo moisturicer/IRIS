@@ -20,6 +20,16 @@ describe("groupThreads", () => {
     ]);
     expect(drafts.map((t) => [t.pin, t.root.id])).toEqual([["D1", 11]]);
   });
+
+  it("leaves Conversation's discussion and its replies out, and reads no kind as a thread (IR-1194)", () => {
+    const { sent } = groupThreads([
+      comment({ id: 10, kind: "discussion" }),
+      comment({ id: 11, kind: "discussion", reply_to: 10 }),
+      comment({ id: 12, kind: "thread" }),
+      comment({ id: 13 }),
+    ]);
+    expect(sent.map((t) => [t.pin, t.root.id])).toEqual([["1", 12], ["2", 13]]);
+  });
 });
 
 describe("countLabel", () => {

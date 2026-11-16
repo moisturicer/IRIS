@@ -339,6 +339,8 @@ export type Capability =
   | "tag_ip"
   | "attach_file"
   | "comment_review"
+  /** A thread on no passage, from *New comment*: a reviewer's; an owner's threads are on a passage (IR-1194). */
+  | "open_general_thread"
   | "finish_review"
   | "comment_public"
   | "cite";
@@ -935,6 +937,12 @@ export interface MentionedPerson {
  */
 export interface ReviewComment {
   id:          number;
+  /**
+   * Conversation's discussion or a review thread (ADR-032 §7 as amended
+   * 2026-11-16, IR-1194). A reply takes its parent's kind. Missing on an
+   * older payload, which reads as a thread.
+   */
+  kind?:       ReviewCommentKind;
   author:      number | null;
   author_name: string | null;
   /** Plain text, verbatim. Never render as markup. */
@@ -1003,11 +1011,16 @@ export interface ReviewComment {
    * flag is true; the screen compares no role (ADR-032 §10).
    */
   can_delete?:           boolean;
+  /** Its writer may post this draft on its own, before *Finish review* (IR-1194). */
+  can_post?:             boolean;
   can_change_severity?:  boolean;
   can_resolve?:          boolean;
   can_reopen?:           boolean;
   can_answer?:           boolean;
 }
+
+/** Where a review comment lives: Conversation, or Threads (IR-1194). */
+export type ReviewCommentKind = "discussion" | "thread";
 
 /** A thread's party: an office, the Adviser, or (null) the authors. */
 export type ThreadParty = Party;
@@ -1174,6 +1187,8 @@ export interface ReviewRound {
   review:     number | null;
   /** How many threads it sent. */
   threads:    number;
+  /** How many of them were Must fix (IR-1194). Missing on an older payload. */
+  must_fix?:  number;
   created_at: string;
 }
 

@@ -47,6 +47,7 @@ from django.utils import timezone
 
 from apps.audit import workflow as audit
 from core.enums import (
+    ReviewCommentKind,
     ThreadAnswer,
     ThreadEventKind,
     ThreadSeverity,
@@ -91,9 +92,16 @@ def party_label(party: str) -> str:
 
 # --- which threads ----------------------------------------------------------------
 
+def all_threads(record):
+    """Every thread on `record`, drafts included: no replies, no discussion (IR-1194)."""
+    return ReviewComment.objects.filter(
+        record=record, reply_to__isnull=True, kind=ReviewCommentKind.THREAD,
+    )
+
+
 def published(record):
-    """Every thread on `record` that has been sent: no drafts, no replies."""
-    return ReviewComment.objects.filter(record=record, reply_to__isnull=True, is_draft=False)
+    """Every thread on `record` that has been sent: no drafts, no replies, no discussion."""
+    return all_threads(record).filter(is_draft=False)
 
 
 def open_threads(record):
@@ -111,9 +119,7 @@ def closing_threads(record, user):
     every sent one plus their own drafts, which *Finish review* sends just
     before deciding. The decision token covers exactly these.
     """
-    rows = ReviewComment.objects.filter(
-        record=record, reply_to__isnull=True, state=ThreadState.OPEN,
-    )
+    rows = all_threads(record).filter(state=ThreadState.OPEN)
     viewer = getattr(user, "pk", None)
     return rows.filter(Q(is_draft=False) | Q(author_id=viewer)).order_by("created_at", "pk")
 
@@ -235,10 +241,7 @@ def _thread(record, user, thread_id) -> ReviewComment:
     """A thread `user` may see on `record`, locked, or `ThreadNotFound`."""
     if not may_read_review(user, record):
         raise ThreadNotFound
-    thread = (
-        ReviewComment.objects.select_for_update()
-        .filter(record=record, pk=thread_id, reply_to__isnull=True).first()
-    )
+    thread = all_threads(record).select_for_update().filter(pk=thread_id).first()
     if thread is None or (thread.is_draft and thread.author_id != getattr(user, "pk", None)):
         raise ThreadNotFound
     return thread

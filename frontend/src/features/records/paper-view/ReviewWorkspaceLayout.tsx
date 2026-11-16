@@ -19,6 +19,7 @@ import type { ShowPlace } from "./changes/ChangeItem";
 import { ChangesTab } from "./changes/ChangesTab";
 import { TabBesideMenu } from "./TabBesideMenu";
 import { ReviewThreads } from "./threads/ReviewThreads";
+import { isDiscussion } from "./threads/threadModel";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
 import { DRAWER_BELOW_PX, fitWidths, maxWidth, minWidth, SIDE_TAB_MIN_PX, type Widths } from "./reviewGeometry";
 import { GuidedTour } from "./tour/GuidedTour";
@@ -352,8 +353,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const body: Record<Tab, ReactNode> = {
     conversation: (
       <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
-        onCommented={tw.threads.reload} renderStatus={renderDetails} submission={submission} statusBox
-        onLoaded={(data) => setCommentCount((data.review_comments ?? []).filter((c) => !c.is_draft).length)} />
+        onCommented={tw.threads.reload} onOpenThreads={tw.openThreads} renderStatus={renderDetails} submission={submission} statusBox
+        onLoaded={(data) => setCommentCount((data.review_comments ?? []).filter((c) => !c.is_draft && isDiscussion(c)).length)} />
     ),
     threads: <ReviewThreads {...tw.panel} />,
     changes: !comparable ? (
@@ -452,7 +453,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           </div>
           <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}>
             <ReviewFooterActions record={record} can={can} actions={FOOTER_ACTIONS} onChanged={onChanged}
-              finishing={finishing && !record.review_claim && !unopened} onFinish={tw.finish}
+              finishing={finishing && !record.review_claim && !unopened} onFinish={tw.finish} drafts={tw.threads.drafts.length}
               lead={record.review_claim
                 ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
                 : unopened ? <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button> : undefined} />

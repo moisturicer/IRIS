@@ -141,6 +141,12 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     finish: (verdict?: ReviewVerdict) => setFinishing(verdict ?? true),
     /** Open one thread in the Threads tab (the Changes tab's thread links). */
     openThread,
+    /** Conversation's *View in Threads* (IR-1194): one thread by id, else the tab. */
+    openThreads: (id?: number) => {
+      const thread = id === undefined ? undefined : threads.sent.find((t) => t.root.id === id);
+      if (thread) openThread(thread);
+      else showThreads();
+    },
     /** Show the paper and land on this page's band (the Changes tab's *Show in paper*). */
     showPlace: (page: number, regions: readonly PageRegion[]) => {
       const first = regions.find((r) => r.page === page);

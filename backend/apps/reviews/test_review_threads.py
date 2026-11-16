@@ -28,6 +28,8 @@ from .test_office_review import tracker_url
 
 FIX = "must_fix"
 SUGGEST = "suggestion"
+#: A passage of v1: an owner's thread is on one (IR-1194).
+ANCHOR = {"version": 1, "page": 3, "quote": "forty respondents"}
 
 
 def finish_url(record):
@@ -42,6 +44,10 @@ class ThreadTestBase(ReviewCommentTestBase):
 
     def thread(self, record, as_user, body="Clarify the sampling in §3.", **extra):
         return self.commented(record, as_user, body, **extra)
+
+    def owner_thread(self, record, body="Is the consent form attached?", **extra):
+        """The owner's thread, on a passage: their remark on the whole paper is discussion."""
+        return self.thread(record, self.owner, body, anchor=ANCHOR, **extra)
 
     def finish(self, record, as_user, verdict="comment_only", summary="Read it through.", **extra):
         return self.post(finish_url(record), as_user, {"verdict": verdict, "summary": summary, **extra})
@@ -85,23 +91,24 @@ class ThreadTestBase(ReviewCommentTestBase):
 
 class AThreadOnTheWireTests(ThreadTestBase):
 
-    def test_an_owner_s_thread_is_general_has_no_severity_and_posts_at_once(self):
+    def test_an_owner_s_thread_is_on_a_passage_has_no_severity_and_posts_at_once(self):
         record = self.at_adviser_open()
 
-        made = self.thread(record, self.owner, "Is the consent form attached?")
+        made = self.owner_thread(record, "Is the consent form attached?")
 
         self.assertFalse(made["is_draft"])
+        self.assertEqual(made["kind"], "thread")
         self.assertIsNone(made["severity"])
         self.assertIsNone(made["party"])
         self.assertEqual(made["party_label"], "The authors")
-        self.assertIsNone(made["anchor"])
+        self.assertEqual(made["anchor"]["quote"], ANCHOR["quote"])
         self.assertEqual(made["state"], ThreadState.OPEN)
         self.assertIn(made["id"], self.ids(record, self.adviser))
 
     def test_an_owner_may_not_give_their_thread_a_severity(self):
         record = self.at_adviser_open()
 
-        response = self.comment(record, self.owner, "Mine.", severity=FIX)
+        response = self.comment(record, self.owner, "Mine.", anchor=ANCHOR, severity=FIX)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -149,7 +156,7 @@ class AThreadOnTheWireTests(ThreadTestBase):
 
     def test_a_reply_has_no_severity_and_no_anchor(self):
         record = self.at_adviser_open()
-        question = self.thread(record, self.owner, "Is the consent form attached?")
+        question = self.owner_thread(record, "Is the consent form attached?")
 
         for extra in ({"severity": FIX}, {"anchor": {"version": 1, "page": 1, "quote": "x"}}):
             with self.subTest(extra=extra):
@@ -168,7 +175,7 @@ class AReplyNamesItsWriterTests(ThreadTestBase):
 
     def test_each_reply_carries_its_writer_s_party_label_in_the_server_s_words(self):
         record = self.itso_open()
-        question = self.thread(record, self.owner, "Is the IP form enough?")
+        question = self.owner_thread(record, "Is the IP form enough?")
 
         by_owner = self.replied(record, self.owner, question["id"], "Adding context.")
         by_itso = self.replied(record, self.itso, question["id"], "Yes.")
@@ -187,7 +194,7 @@ class AReplyNamesItsWriterTests(ThreadTestBase):
 
     def test_the_label_is_the_party_the_writer_held_when_they_wrote_it(self):
         record = self.itso_open()
-        question = self.thread(record, self.owner, "Is the IP form enough?")
+        question = self.owner_thread(record, "Is the IP form enough?")
         reply = self.replied(record, self.itso, question["id"], "Yes.")
 
         self.cleared(record, self.itso)  # ITSO's part is done; the reply keeps its party
@@ -197,7 +204,7 @@ class AReplyNamesItsWriterTests(ThreadTestBase):
 
     def test_a_viewer_who_may_not_read_the_review_gets_no_reply_and_no_label(self):
         record = self.itso_open()
-        question = self.thread(record, self.owner, "Is the IP form enough?")
+        question = self.owner_thread(record, "Is the IP form enough?")
         self.replied(record, self.itso, question["id"], "Yes.")
 
         refused = self.listed(record, self.stranger)
@@ -272,7 +279,7 @@ class DraftsTests(ThreadTestBase):
     def test_replies_owners_and_former_reviewers_post_at_once(self):
         record = self.itso_open()
         self.cleared(record, self.itso)  # ITSO's part is done
-        question = self.thread(record, self.owner, "Is the IP form enough?")
+        question = self.owner_thread(record, "Is the IP form enough?")
 
         reply = self.thread(record, self.rdco, "Yes.", reply_to=question["id"])
         former = self.thread(record, self.itso, "One more note.")
@@ -571,8 +578,8 @@ class ResolvingTests(ThreadTestBase):
 
     def test_an_owner_resolves_their_own_thread_and_a_reviewer_may_too(self):
         record = self.at_adviser_open()
-        mine = self.thread(record, self.owner, "Did I attach the form?")
-        theirs = self.thread(record, self.owner, "And the second one?")
+        mine = self.owner_thread(record, "Did I attach the form?")
+        theirs = self.owner_thread(record, "And the second one?")
 
         self.assertEqual(self.act(record, self.owner, mine["id"], "resolve").status_code, 200)
         self.assertEqual(self.act(record, self.adviser, theirs["id"], "resolve").status_code, 200)
@@ -649,7 +656,7 @@ class ResolvingTests(ThreadTestBase):
 
     def test_an_owner_s_own_thread_needs_no_answer(self):
         record = self.at_adviser_open()
-        mine = self.thread(record, self.owner, "Note to self.")
+        mine = self.owner_thread(record, "Note to self.")
 
         self.assertEqual(self.answer(record, mine["id"]).status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -781,7 +788,7 @@ class DecisionClosesWhatItListedTests(ThreadTestBase):
     def test_the_adviser_s_reject_closes_open_threads_too(self):
         record = self.at_adviser_open()
         made = self.must_fix_sent(record, self.adviser)
-        mine = self.thread(record, self.owner, "Did I attach the form?")
+        mine = self.owner_thread(record, "Did I attach the form?")
 
         self.decided(record, self.adviser, "reject", "Out of scope for this programme.")
 

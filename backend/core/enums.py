@@ -369,6 +369,18 @@ class ThreadSeverity(models.TextChoices):
     SUGGESTION = "suggestion", "Suggestion"
 
 
+class ReviewCommentKind(models.TextChoices):
+    """
+    What a review comment is (ADR-032 §7, 2026-11-16 amendment; IR-1194). A
+    *discussion* is a Conversation comment: it posts at once and carries none
+    of a thread's fields. A *thread* is a review item. A reply takes its
+    parent's kind.
+    """
+
+    DISCUSSION = "discussion", "Discussion"
+    THREAD = "thread", "Thread"
+
+
 class ThreadState(models.TextChoices):
     """
     Where a review thread stands (ADR-032 §7). `CLOSED` is a Decision ending

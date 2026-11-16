@@ -35,6 +35,13 @@ class ReviewCommentTestBase(NewVersionTestBase, DecisionTestBase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         return response.data
 
+    def discuss(self, record, as_user, body="Clarify the sampling in §3.", **extra):
+        """A Conversation comment (IR-1194): an owner's remark on the whole paper is one."""
+        return self.comment(record, as_user, body, kind="discussion", **extra)
+
+    def discussed(self, record, as_user, body="Clarify the sampling in §3.", **extra):
+        return self.commented(record, as_user, body, kind="discussion", **extra)
+
     def listed(self, record, as_user):
         self.client.force_authenticate(as_user)
         return self.client.get(comments_url(record))
@@ -76,7 +83,7 @@ class WhoReadsTests(ReviewCommentTestBase):
 
     def test_a_non_participant_gets_a_404(self):
         record = self.at_adviser_open()
-        self.commented(record, self.owner)
+        self.discussed(record, self.owner)
 
         # ITSO reads every record, but holds no part in this one.
         for viewer in (self.itso, self.stranger):
@@ -101,7 +108,7 @@ class WhoReadsTests(ReviewCommentTestBase):
 
     def test_a_participant_who_is_not_an_owner_reads_it(self):
         record = self.at_adviser_open()
-        self.commented(record, self.owner, "Is the consent form attached?")
+        self.discussed(record, self.owner, "Is the consent form attached?")
 
         response = self.listed(record, self.adviser)
 
@@ -121,7 +128,7 @@ class WhoReadsTests(ReviewCommentTestBase):
         # ADR-032 §10 (IR-479): an office holding the record now reads its
         # review before claiming; §7: only participants write.
         record = self.routed(Party.ITSO)
-        self.commented(record, self.owner)
+        self.discussed(record, self.owner)
 
         self.assertEqual(self.listed(record, self.itso2).status_code, status.HTTP_200_OK)
         self.assertEqual(self.comment(record, self.itso2).status_code, status.HTTP_403_FORBIDDEN)
@@ -129,7 +136,7 @@ class WhoReadsTests(ReviewCommentTestBase):
     def test_a_draft_is_not_under_review(self):
         record = self.make_record()
 
-        response = self.comment(record, self.owner)
+        response = self.discuss(record, self.owner)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.listed(record, self.owner).data, [])
@@ -142,7 +149,7 @@ class CommentRecordsItsVersionTests(ReviewCommentTestBase):
     def test_an_owner_comments_and_it_is_made_against_the_latest_version(self):
         record = self.at_adviser_open()
 
-        made = self.commented(record, self.owner, "Is the consent form attached?")
+        made = self.discussed(record, self.owner, "Is the consent form attached?")
 
         response = self.listed(record, self.owner)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
@@ -177,7 +184,7 @@ class CommentRecordsItsVersionTests(ReviewCommentTestBase):
         record = self.at_adviser_open()
         record.versions.all().delete()
 
-        made = self.commented(record, self.owner)
+        made = self.discussed(record, self.owner)
 
         self.assertIsNone(made["version"])
 
@@ -196,7 +203,7 @@ class CommentRecordsItsVersionTests(ReviewCommentTestBase):
         for body in ("", "   \n "):
             with self.subTest(body=body):
                 self.assertEqual(
-                    self.comment(record, self.owner, body).status_code,
+                    self.discuss(record, self.owner, body).status_code,
                     status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -227,7 +234,7 @@ class RepliesAndEditsTests(ReviewCommentTestBase):
     def test_a_reply_to_another_record_s_comment_is_refused(self):
         record = self.at_adviser_open()
         elsewhere = self.at_adviser_open()
-        foreign = self.commented(elsewhere, self.owner)
+        foreign = self.discussed(elsewhere, self.owner)
 
         response = self.comment(record, self.owner, "Hm.", reply_to=foreign["id"])
 
@@ -235,7 +242,7 @@ class RepliesAndEditsTests(ReviewCommentTestBase):
 
     def test_the_author_edits_and_the_edit_is_stamped(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Is the consnet form attached?")
+        made = self.discussed(record, self.owner, "Is the consnet form attached?")
 
         response = self.edit(record, self.owner, made["id"], "Is the consent form attached?")
 
@@ -247,7 +254,7 @@ class RepliesAndEditsTests(ReviewCommentTestBase):
 
     def test_saving_the_same_words_is_not_an_edit(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Unchanged.")
+        made = self.discussed(record, self.owner, "Unchanged.")
 
         self.edit(record, self.owner, made["id"], "Unchanged.")
 
@@ -256,7 +263,7 @@ class RepliesAndEditsTests(ReviewCommentTestBase):
 
     def test_only_the_author_edits(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Mine.")
+        made = self.discussed(record, self.owner, "Mine.")
 
         self.assertEqual(
             self.edit(record, self.adviser, made["id"], "Not yours.").status_code,
@@ -272,7 +279,7 @@ class RepliesAndEditsTests(ReviewCommentTestBase):
     def test_a_comment_is_edited_only_through_its_own_record(self):
         record = self.at_adviser_open()
         elsewhere = self.at_adviser_open()
-        made = self.commented(elsewhere, self.owner, "On the other record.")
+        made = self.discussed(elsewhere, self.owner, "On the other record.")
 
         response = self.edit(record, self.owner, made["id"], "Moved?")
 
@@ -285,7 +292,7 @@ class NeverPublicTests(ReviewCommentTestBase):
 
     def test_a_published_record_s_reader_gets_none_of_the_review_discussion(self):
         record = self.at_adviser_open()
-        self.commented(record, self.owner, "Internal: the consent form is late.")
+        self.discussed(record, self.owner, "Internal: the consent form is late.")
         self.publish_via_rdco(record)
 
         # Every signed-in user reads a published record, and none of this.
@@ -305,7 +312,7 @@ class TrackerCarriesCommentsTests(ReviewCommentTestBase):
 
     def test_a_participant_s_tracker_carries_the_discussion(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Is the consent form attached?")
+        made = self.discussed(record, self.owner, "Is the consent form attached?")
 
         self.client.force_authenticate(self.adviser)
         tracker = self.client.get(tracker_url(record))
@@ -315,7 +322,7 @@ class TrackerCarriesCommentsTests(ReviewCommentTestBase):
     def test_each_comment_says_whether_this_viewer_may_edit_it(self):
         # The screen follows the server: Edit is offered only where true.
         record = self.at_adviser_open()
-        mine = self.commented(record, self.owner, "Mine.")
+        mine = self.discussed(record, self.owner, "Mine.")
         theirs = self.commented(record, self.adviser, "Theirs.")
         self.finished(record, self.adviser)
 

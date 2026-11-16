@@ -13,12 +13,20 @@
  * tagged with the version it was made against (IR-416). Nothing else is
  * tagged: a version is never worked out from a timestamp.
  *
- * Review comments (IR-419) are entries too, each tagged with the version it
- * was made against. A reply is not an entry of its own: it sits under the
- * comment it answers, as on a pull request, and threads are one level deep.
+ * Conversation comments -- discussion (IR-419; ADR-032 §7 as amended
+ * 2026-11-16, IR-1194) -- are entries too, each tagged with the version it was
+ * made against. A reply is not an entry of its own: it sits under the comment
+ * it answers, as on a pull request, one level deep.
+ *
+ * **A review thread is Threads'.** Its body and replies are not repeated here:
+ * a finished review is one line counting the threads it sent, and a thread
+ * sent outside any review is one line saying who commented where. Each points
+ * to Threads (`toThreads`).
  */
 import { formatDate, joinLabels } from "@/lib/utils";
-import type { RecordTracker, ReviewComment, TrackerResubmission } from "@/types/records";
+import type { RecordTracker, ReviewComment, ReviewRound, TrackerResubmission } from "@/types/records";
+
+import { isDiscussion, plural } from "./threads/threadModel";
 
 export type TimelineKind =
   | "routing"
@@ -30,7 +38,8 @@ export type TimelineKind =
   | "reassignment"
   | "extension"
   | "published"
-  | "comment";
+  | "comment"
+  | "thread";
 
 export interface TimelineEntry {
   key: string;
@@ -57,6 +66,17 @@ export interface TimelineEntry {
   version: number | null;
   /** A comment entry's own: the comment, and its replies, oldest first. */
   comment?: { root: ReviewComment; replies: ReviewComment[] };
+  /**
+   * Where it is read in full, in Threads (IR-1194): one thread, or the tab
+   * (no `thread`). `name` says which, for the link's accessible name.
+   */
+  toThreads?: { thread?: number; name: string };
+}
+
+/** What a finished review sent: "2 threads, 1 Must fix". */
+export function roundSent(r: Pick<ReviewRound, "threads" | "must_fix">): string {
+  const mustFix = r.must_fix ?? 0;
+  return `${plural(r.threads, "thread", "threads")}${mustFix ? `, ${mustFix} Must fix` : ""}`;
 }
 
 export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
@@ -90,8 +110,14 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
   const reviews = tracker.reviews ?? [];
   const reviewIds = new Set(reviews.map((r) => r.id));
 
+  // A finished review's threads, by the review its verdict wrote (IR-1194).
+  const roundByReview = new Map<number, ReviewRound>();
+  for (const r of tracker.review_rounds ?? []) {
+    if (r.review !== null && r.threads > 0) roundByReview.set(r.review, r);
+  }
   for (const r of reviews) {
     const request = requestByReview.get(r.id);
+    const round = roundByReview.get(r.id);
     entries.push({
       key: `review-${r.id}`,
       kind: "review",
@@ -101,8 +127,9 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       act: r.status_label,
       status: request?.state_label ?? null,
       note: r.comment || null,
-      details: [],
+      details: round ? [`Sent ${roundSent(round)}`] : [],
       version: r.version ?? null,
+      ...(round ? { toThreads: { name: `${r.reviewed_by_name ?? r.label}'s threads` } } : {}),
     });
   }
 
@@ -250,28 +277,52 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
     }
   }
 
-  // A finished review that sent comments and took no decision (IR-874):
-  // every other verdict is already here as the review its service wrote.
+  // A finished review that took no decision (IR-874): every other verdict is
+  // already here as the review its service wrote, carrying its count above,
+  // unless that review is not listed and its threads would go unsaid.
   for (const r of tracker.review_rounds ?? []) {
-    if (r.verdict !== "comment_only") continue;
-    const n = r.threads;
+    const decided = r.verdict !== "comment_only";
+    if (decided && (r.threads === 0 || (r.review !== null && reviewIds.has(r.review)))) continue;
+    const on = r.version ? ` v${r.version}` : "";
     entries.push({
       key: `round-${r.id}`,
       kind: "review",
       at: r.created_at,
       actor: r.actor_name,
       party: r.label,
-      act: `Reviewed${r.version ? ` v${r.version}` : ""}: ${n} comment${n === 1 ? "" : "s"}, no decision`,
+      act: r.threads > 0 ? `Reviewed${on}: ${roundSent(r)}` : `Reviewed${on}, no decision`,
       status: null,
       note: r.summary || null,
       details: [],
       version: r.version,
+      ...(r.threads > 0 ? { toThreads: { name: `${r.actor_name ?? r.label}'s review` } } : {}),
     });
   }
 
   // Null as `reviews` is, to a viewer who may not read the review (IR-479).
   // The viewer's own drafts are theirs alone and wait in Threads (IR-875).
-  const comments = (tracker.review_comments ?? []).filter((c) => !c.is_draft);
+  const sent = (tracker.review_comments ?? []).filter((c) => !c.is_draft);
+
+  // A thread sent outside any review: one line, read in Threads (IR-1194).
+  for (const c of sent) {
+    if (c.reply_to !== null || isDiscussion(c) || c.round) continue;
+    const where = c.anchor ? ` on p.${c.anchor.page}` : "";
+    entries.push({
+      key: `thread-${c.id}`,
+      kind: "thread",
+      at: c.created_at,
+      actor: c.author_name,
+      party: c.party_label ?? null,
+      act: `Commented${where}`,
+      status: c.severity === "must_fix" ? "Must fix" : null,
+      note: null,
+      details: [],
+      version: c.version,
+      toThreads: { thread: c.id, name: `${c.author_name ?? "this"}'s comment${where}` },
+    });
+  }
+
+  const comments = sent.filter(isDiscussion);
   const roots = new Set(comments.filter((c) => c.reply_to === null).map((c) => c.id));
   const replies = new Map<number, ReviewComment[]>();
   for (const c of comments) {
@@ -287,9 +338,9 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       kind: "comment",
       at: c.created_at,
       actor: c.author_name,
-      // A thread names its party and, when anchored, its page (IR-875).
-      party: c.reply_to === null ? c.party_label ?? null : null,
-      act: c.reply_to !== null ? "Replied" : c.anchor ? `Commented on p.${c.anchor.page}` : "Commented",
+      // Who the writer is in this review: "Author", "ITSO"... (IR-1192).
+      party: c.party_label ?? null,
+      act: c.reply_to !== null ? "Replied" : "Commented",
       status: null,
       note: c.body,
       details: [],

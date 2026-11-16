@@ -27,8 +27,10 @@ const postComment = vi.mocked(recordsApi.postReviewComment);
 const editComment = vi.mocked(recordsApi.editReviewComment);
 const mentionable = vi.mocked(recordsApi.reviewMentionable);
 
+// A Conversation comment (discussion) unless a test says otherwise (IR-1194).
 const comment = (overrides: Partial<ReviewComment>): ReviewComment => ({
   id: 1,
+  kind: "discussion",
   author: 3,
   author_name: "Rhea Owner",
   body: "Is the consent form attached?",
@@ -239,7 +241,8 @@ describe("ReviewTimeline", () => {
       respond(discussion([comment({ id: 9, body: "Is it attached?" })]));
       await userEvent.click(screen.getByRole("button", { name: "Comment" }));
 
-      expect(postComment).toHaveBeenCalledWith(7, { body: "Is it attached?" });
+      // A comment here is discussion: it posts at once and never becomes a thread.
+      expect(postComment).toHaveBeenCalledWith(7, { body: "Is it attached?", kind: "discussion" });
       expect(await screen.findByText("Is it attached?")).toBeInTheDocument();
       expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("");
       expect(tracker).toHaveBeenCalledTimes(2);
@@ -302,9 +305,11 @@ describe("ReviewTimeline", () => {
 
       const list = await screen.findByRole("list", { name: "Review timeline" });
       const theirs = within(list).getByText("Theirs.").closest("li")!;
-      expect(within(theirs).queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();
+      expect(within(theirs).queryByRole("button", { name: /actions|edit/i })).not.toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole("button", { name: "Edit your comment" }));
+      // Edit is in the comment's ⋯ menu (IR-1194).
+      await userEvent.click(screen.getByRole("button", { name: "Actions for Rhea Owner's comment" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
       const box = screen.getByRole("textbox", { name: "Edit your comment" });
       expect(box).toHaveValue("Mine.");
       await userEvent.clear(box);
@@ -326,7 +331,7 @@ describe("ReviewTimeline", () => {
       await userEvent.click(await screen.findByRole("checkbox", { name: "Ben Lim" }));
       await userEvent.click(screen.getByRole("button", { name: "Comment" }));
 
-      expect(postComment).toHaveBeenCalledWith(7, { body: "Can you check §3?", mentions: [5] });
+      expect(postComment).toHaveBeenCalledWith(7, { body: "Can you check §3?", kind: "discussion", mentions: [5] });
     });
 
     it("an edit starts from whom the comment already mentions (IR-877)", async () => {
@@ -334,15 +339,82 @@ describe("ReviewTimeline", () => {
       editComment.mockResolvedValue({ data: comment({ id: 1 }) } as never);
       renderScreen(<ReviewTimeline recordId={7} canComment />);
 
-      await userEvent.click(await screen.findByRole("button", { name: "Edit your comment" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Actions for Rhea Owner's comment" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
       await userEvent.click(screen.getByRole("button", { name: "Save" }));
       // Unchanged, so not sent: an older payload's comment keeps whom it mentions.
       expect(editComment).toHaveBeenLastCalledWith(7, 1, { body: "Mine." });
 
-      await userEvent.click(await screen.findByRole("button", { name: "Edit your comment" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Actions for Rhea Owner's comment" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
       await userEvent.click(screen.getByRole("button", { name: "Stop mentioning Ana Cruz" }));
       await userEvent.click(screen.getByRole("button", { name: "Save" }));
       expect(editComment).toHaveBeenLastCalledWith(7, 1, { body: "Mine.", mentions: [] });
+    });
+
+    it("edits one's own reply from its menu", async () => {
+      respond(discussion([
+        comment({ id: 1, body: "Which sample size?", author_name: "Mara Santos" }),
+        comment({ id: 2, reply_to: 1, body: "Fourty.", can_edit: true, party_label: "Author",
+          created_at: "2026-09-07T08:00:00Z" }),
+      ]));
+      editComment.mockResolvedValue({ data: comment({ id: 2 }) } as never);
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      const replies = await screen.findByRole("list", { name: "Replies to Mara Santos" });
+      expect(replies).toHaveTextContent("Author");
+      expect(screen.queryByRole("button", { name: "Actions for Mara Santos's comment" })).not.toBeInTheDocument();
+      await userEvent.click(within(replies).getByRole("button", { name: "Actions for Rhea Owner's reply" }));
+      await userEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
+      const box = screen.getByRole("textbox", { name: "Edit your comment" });
+      await userEvent.clear(box);
+      await userEvent.type(box, "Forty.");
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(editComment).toHaveBeenCalledWith(7, 2, { body: "Forty." });
+    });
+  });
+
+  describe("threads are Threads' (IR-1194)", () => {
+    const withThreads = {
+      ...payload,
+      review_comments: [
+        comment({ id: 1, kind: "thread", author_name: "Sam Student", party_label: "The authors", body: "Why forty?",
+          anchor: { version: 1, page: 18, quote: "forty" }, round: null }),
+        comment({ id: 2, kind: "thread", reply_to: 1, body: "Power analysis.", created_at: "2026-09-07T08:00:00Z" }),
+        comment({ id: 3, kind: "thread", body: "In the review.", round: 4, created_at: "2026-09-08T08:00:00Z" }),
+      ],
+      review_rounds: [
+        { id: 4, party: "itso" as const, label: "ITSO", actor_name: "Rita Cruz", version: 2, verdict: "comment_only" as const,
+          summary: "", review: null, threads: 2, must_fix: 1, created_at: "2026-09-08T08:00:00Z" },
+      ],
+    };
+
+    it("shows no thread's text or replies, one line each instead, linking to Threads", async () => {
+      respond(withThreads);
+      const onOpenThreads = vi.fn();
+      const { container } = renderScreen(<ReviewTimeline recordId={7} canComment onOpenThreads={onOpenThreads} />);
+
+      const list = await screen.findByRole("list", { name: "Review timeline" });
+      expect(within(list).queryByText("Why forty?")).not.toBeInTheDocument();
+      expect(within(list).queryByText("Power analysis.")).not.toBeInTheDocument();
+      expect(within(list).queryByText("In the review.")).not.toBeInTheDocument();
+      expect(within(list).getByText("Commented on p.18")).toBeInTheDocument();
+      expect(within(list).getByText("Reviewed v2: 2 threads, 1 Must fix")).toBeInTheDocument();
+
+      await userEvent.click(within(list).getByRole("button", { name: "View Sam Student's comment on p.18 in Threads" }));
+      expect(onOpenThreads).toHaveBeenLastCalledWith(1);
+      await userEvent.click(within(list).getByRole("button", { name: "View Rita Cruz's review in Threads" }));
+      expect(onOpenThreads).toHaveBeenLastCalledWith(undefined);
+      await expectNoBlockingA11yViolations(container);
+    });
+
+    it("draws no link where the host gives nowhere to go", async () => {
+      respond(withThreads);
+      renderScreen(<ReviewTimeline recordId={7} />);
+
+      await screen.findByRole("list", { name: "Review timeline" });
+      expect(screen.queryByRole("button", { name: /in Threads$/ })).not.toBeInTheDocument();
     });
   });
 });
