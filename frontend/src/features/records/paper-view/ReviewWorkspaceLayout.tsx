@@ -327,7 +327,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
       requestReview={mayRequest ? { targets: targets.map((t) => t.label), onOpen: () => { setRouted(""); setRequesting(true); } } : undefined}
       addColleague={<ReviewActionBar record={record} can={can} actions={ADD_COLLEAGUE} label="Reviewer actions"
         primary={false} onChanged={onChanged} className="pt-1" />}
-      onAllDocuments={() => onDocuments(true)} />
+      onAllDocuments={() => onDocuments(true)} onCompare={comparable ? () => reveal("changes") : undefined} />
   );
   const RouteDialog = ROUTE?.Dialog;
   const ownSeat = record.my_seats.find((s) => s.state === "assigned" || s.state === "in_review") ?? record.my_seats[record.my_seats.length - 1];

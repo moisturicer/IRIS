@@ -67,6 +67,9 @@
 .review-tl-cmt, .review-composer { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; align-items: start; }
 .review-tl-ev { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; margin-left: 38px; font-size: 13px; line-height: 20px; }
 .review-badge { position: relative; width: 28px; height: 28px; margin: -2px; border-radius: 9999px; display: grid; place-items: center; box-sizing: content-box; border: 2px solid white; background: theme('colors.stone.100'); color: theme('colors.stone.600'); font-size: 12px; }
+/* Details tab (IR-1193): people in brand maroon, an office without a person in a quiet outline. */
+.review-avatar-brand { background: theme('colors.brand.DEFAULT'); flex-shrink: 0; }
+.review-avatar-office { flex-shrink: 0; color: theme('colors.stone.600'); background: white; border: 1px solid theme('colors.stone.300'); }
 .review-avatar-lg { width: 36px; height: 36px; font-size: 13px; }
 .review-box { min-width: 0; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.control'); background: white; font-size: 14px; line-height: 22px; overflow: hidden; }
 .review-box-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 14px; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); font-size: 13px; line-height: 20px; color: theme('colors.stone.600'); }
