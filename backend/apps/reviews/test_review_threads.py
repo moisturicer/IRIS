@@ -159,6 +159,54 @@ class AThreadOnTheWireTests(ThreadTestBase):
                 )
 
 
+# --- IR-1192: a reply names who its writer is in this review ------------------------------
+
+class AReplyNamesItsWriterTests(ThreadTestBase):
+
+    def replied(self, record, as_user, thread_id, body="Noted."):
+        return self.thread(record, as_user, body, reply_to=thread_id)
+
+    def test_each_reply_carries_its_writer_s_party_label_in_the_server_s_words(self):
+        record = self.itso_open()
+        question = self.thread(record, self.owner, "Is the IP form enough?")
+
+        by_owner = self.replied(record, self.owner, question["id"], "Adding context.")
+        by_itso = self.replied(record, self.itso, question["id"], "Yes.")
+        by_adviser = self.replied(record, self.adviser, question["id"], "Agreed.")
+
+        self.assertEqual(
+            [r["party_label"] for r in (by_owner, by_itso, by_adviser)],
+            ["Author", "ITSO", "Adviser"],
+        )
+        # A reply is not a thread: it still carries no party of its own.
+        self.assertEqual([r["party"] for r in (by_owner, by_itso, by_adviser)], [None, None, None])
+        listed = {c["id"]: c["party_label"] for c in self.listed(record, self.owner).data}
+        self.assertEqual(
+            [listed[r["id"]] for r in (by_owner, by_itso, by_adviser)], ["Author", "ITSO", "Adviser"],
+        )
+
+    def test_the_label_is_the_party_the_writer_held_when_they_wrote_it(self):
+        record = self.itso_open()
+        question = self.thread(record, self.owner, "Is the IP form enough?")
+        reply = self.replied(record, self.itso, question["id"], "Yes.")
+
+        self.cleared(record, self.itso)  # ITSO's part is done; the reply keeps its party
+
+        listed = {c["id"]: c["party_label"] for c in self.listed(record, self.owner).data}
+        self.assertEqual(listed[reply["id"]], "ITSO")
+
+    def test_a_viewer_who_may_not_read_the_review_gets_no_reply_and_no_label(self):
+        record = self.itso_open()
+        question = self.thread(record, self.owner, "Is the IP form enough?")
+        self.replied(record, self.itso, question["id"], "Yes.")
+
+        refused = self.listed(record, self.stranger)
+
+        self.assertEqual(refused.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertNotIn("party_label", str(refused.data))
+        self.assertNotIn("Yes.", str(refused.data))
+
+
 # --- AC: drafts are visible only to their writer ----------------------------------------
 
 class DraftsTests(ThreadTestBase):

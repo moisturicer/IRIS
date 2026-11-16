@@ -16,6 +16,8 @@ interface RowMenuProps {
   /** Names the trigger and the menu, so each row's menu is told apart: "Actions for Ada Lovelace". */
   label: string;
   items: RowMenuItem[];
+  /** A smaller trigger in the review pane's split layout, where rows are tight (IR-1192). */
+  compact?: boolean;
 }
 
 /**
@@ -28,7 +30,7 @@ interface RowMenuProps {
  * in a portal at the trigger's edge, because the table clips what overflows it.
  * Renders nothing when there is nothing to offer.
  */
-export function RowMenu({ label, items }: RowMenuProps) {
+export function RowMenu({ label, items, compact = false }: RowMenuProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -104,9 +106,13 @@ export function RowMenu({ label, items }: RowMenuProps) {
         aria-controls={open ? menuId : undefined}
         aria-label={label}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-full text-stone-600 transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand aria-expanded:bg-stone-100 motion-reduce:transition-none"
+        className={cn(
+          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-stone-600 transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand aria-expanded:bg-stone-100 motion-reduce:transition-none",
+          // 36px in the split layout, as the review pane's other controls (`reading-split:min-h-9`).
+          compact && "-my-2 -mr-2 reading-split:h-9 reading-split:w-9",
+        )}
       >
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" className={compact ? "h-4 w-4" : "h-5 w-5"} aria-hidden="true">
           <circle cx="5" cy="12" r="1.8" />
           <circle cx="12" cy="12" r="1.8" />
           <circle cx="19" cy="12" r="1.8" />
