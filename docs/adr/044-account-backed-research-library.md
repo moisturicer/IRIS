@@ -106,7 +106,7 @@ They stay in `lib/opportunityLibrary.ts`, labelled browser-only, and keep their 
 
 ## Amendment — 2026-11-16 (IR-756): old browser history is dropped, and the account-data rules
 
-**Status of this amendment: Proposed** — decided by Hermoine Zozobrado, 2026-11-16, while building IR-756. It is accepted when IR-756's PR merges.
+**Status of this amendment: Accepted** — 2026-11-16, when IR-756's PR (#828) merged after Ashlee's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado, 2026-11-16, while building IR-756.
 
 1. **Point 8 above now matches IR-579's card: browser history is never imported.** The paper view stops writing `iris_reading_history`, and nothing reads it. The wipe on every sign-in, sign-out and session end stays (Q2), so the shared-PC leak stays closed and whatever an older build left goes at the next one. Importing it would hand one browser's list to whoever signs in, the bug this ADR exists to fix, and a history of 50 recent papers refills on its own within days.
 2. **Deleting an account deletes its reading history and its `LibraryPreferences`.** The personal-data download lists them: a `reading_history` section, with each paper's id and when it was last opened, and its title only while the person may still read it; and a `library_preferences` section with `keep_history`. History is the reader's own data, so it goes back to them and goes with them, as notes and highlights do.
