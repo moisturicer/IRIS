@@ -38,6 +38,6 @@ def to_single_year(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("library", "0006_reading_history")]
+    dependencies = [("library", "0007_reading_positions")]
 
     operations = [migrations.RunPython(to_range, to_single_year)]
