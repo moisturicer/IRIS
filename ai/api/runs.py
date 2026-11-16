@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import uuid
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, Query
@@ -86,19 +87,41 @@ def _meter(s) -> dict:
             "compacts_at_tokens": rule.threshold_tokens if rule else None}
 
 
+def _cursor(raw: str | None):
+    """The (updated_at, id) a page ended at; ValueError if `raw` is not one."""
+    if raw is None:
+        return None
+    stamp, _, ident = raw.partition("|")
+    when = datetime.fromisoformat(stamp)
+    if when.tzinfo is None:
+        raise ValueError(raw)
+    return when, uuid.UUID(ident)
+
+
 @router.get("/conversations")
 async def list_conversations(
+    q: str | None = Query(default=None, max_length=200),
+    before: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=50, ge=1, le=100),
     grant: str | None = Header(default=None, alias=GRANT_HEADER),
     service: RunService | None = Depends(_service),
     protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
 ):
-    """The reader's recent Conversations, for the history list. Reader protocol only."""
+    """The reader's Conversations for the history list, one page at a time. Reader protocol only."""
     if protocol is None:
         return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
+    try:
+        cursor = _cursor(before)
+    except ValueError:
+        return JSONResponse({"status": "invalid_cursor"}, status_code=422)
 
     async def act(s: RunService):
-        items = await s.store.list_conversations(grant)
-        return JSONResponse({"protocol": public.PROTOCOL, "conversations": items})
+        items = await s.store.list_conversations(
+            grant, q=(q or "").strip() or None, before=cursor, limit=limit + 1)
+        page = items[:limit]
+        more = len(items) > limit
+        return JSONResponse({"protocol": public.PROTOCOL, "conversations": page,
+                             "next": f"{page[-1]['updated_at']}|{page[-1]['id']}" if more else None})
 
     return await _call(service, act, protocol)
 

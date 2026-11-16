@@ -113,10 +113,14 @@ export function runtimeReader(scope?: number | (() => number | undefined)) {
         { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },
-    async list() {
-      const { data } = await apiClient.get<{ protocol: string; conversations: ReaderConversationSummary[] }>(
-        `${base}/conversations`, config());
-      return checked(data).conversations;
+    /** One page of the reader's Conversations, newest first; `q` searches their questions and answers. */
+    async list(params: { q?: string; before?: string } = {}) {
+      const { data } = await apiClient.get<{ protocol: string; conversations: ReaderConversationSummary[]; next: string | null }>(
+        `${base}/conversations`, {
+          ...config(), params: { ...(params.q ? { q: params.q } : {}), ...(params.before ? { before: params.before } : {}) },
+        });
+      checked(data);
+      return { conversations: data.conversations, next: data.next ?? null };
     },
     async remove(id: string) {
       await apiClient.delete(`${base}/conversations/${encodeURIComponent(id)}`, config());

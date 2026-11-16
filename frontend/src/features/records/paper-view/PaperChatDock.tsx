@@ -184,7 +184,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
   // The reader's own chats about this paper. A failure shows none.
   useEffect(() => {
     let cancelled = false;
-    void api.list().then(items => { if (!cancelled) setRecent(items.filter(c => c.record_id === props.record.id)); })
+    void api.list().then(page => { if (!cancelled) setRecent(page.conversations.filter(c => c.record_id === props.record.id)); })
       .catch(() => { if (!cancelled) setRecent([]); });
     return () => { cancelled = true; };
   }, [api, props.record.id, conversationId]);
