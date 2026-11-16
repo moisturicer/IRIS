@@ -34,9 +34,9 @@ RUN_KEYS = {
     "depth", "awaiting_reader", "created_at", "finished_at", "plan", "context", "sources_available",
     "capabilities", "compaction", "kind", "cursor", "retry_of", "retried_by", "activity", "usage",
 }
-CONVERSATION_KEYS = {"protocol", "id", "revision", "runs", "turns"}
+CONVERSATION_KEYS = {"protocol", "id", "revision", "title", "runs", "turns"}
 TURN_KEYS = {"id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations", "facts", "papers"}
-CITATION_KEYS = {"record_id", "page", "quote", "revision", "regions"}
+CITATION_KEYS = {"record_id", "page", "quote", "revision", "regions", "title"}
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 

@@ -202,7 +202,7 @@ def conversation(snapshot, *, manual_compaction=False, reserved_tokens=None, com
     available = {item["id"]: item.get("sources_available", True) for item in snapshot["runs"]}
     return {
         "protocol": PROTOCOL, "id": snapshot["id"], "revision": snapshot["revision"],
-        "title": snapshot["title"],
+        "title": snapshot.get("title", ""),
         "runs": [run(item, manual_compaction=manual_compaction, reserved_tokens=reserved_tokens,
                      compacts_at_tokens=compacts_at_tokens)
                  for item in snapshot["runs"]],
