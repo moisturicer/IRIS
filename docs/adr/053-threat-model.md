@@ -135,3 +135,7 @@ IR-781 built ADR-051's System Admin role, so it gets its own row under Actors. N
 ## Amendment — 2026-11-15 (IR-823): the CSP is enforced
 
 The script-injection row's gap is closed in production. nginx and Django now send `Content-Security-Policy`, not `-Report-Only`, after a recorded walk-through of 66 screens, as a student, an Adviser with a paper in review, RDCO, ITSO, IERC and KTTO members, an office coordinator, the System Admin, signed out, and the Django admin, found no violation (`e2e/specs/08-csp-walkthrough.spec.ts`). One fix came out of the walk-through: zod is now configured `jitless`, so its `new Function` probe never runs and no page evaluates strings as code. Development still only reports. Awaiting acceptance by a named person, like the other amendments.
+
+## Amendment — 2026-11-17 (IR-1173): the agent is told paper text is data
+
+The "prompt injection in a paper changes an answer" row gains a planned control. [ADR-049](049-dedicated-ai-runtime-and-local-research.md)'s IR-1173 amendment, decided by Jive Tyler I. Revalde, adds a new prompt version that tells the agent paper text is quoted material, delimits it in every tool result, and moves paper titles out of the reader's message role. IR-1172 measured the exposure: the pinned model obeyed none of 18 planted runs, and the answer checks would not catch one that did. The control lowers the risk and does not remove it. Not built yet (IR-1196); the row's status changes when it ships.

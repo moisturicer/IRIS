@@ -235,3 +235,19 @@ Both vector reads order the rows of the policy-filtered `research_vectors` / `re
 2. **The lists give way before Turns.** If the history would fill the window or reach the compaction threshold with the lists, when the run opens or later as research grows it, every list is dropped at once before any Turn is compacted.
 3. **New AGENT runs are pinned to `research-10`.** A run pinned to an earlier version finishes on it and receives earlier Turns exactly as before.
 4. **Not measured.** The lists add tokens to every follow-up. How they change answers is known only from a paid evaluation run, which has not been made.
+
+## Amendment — 2026-11-17 (IR-1173): paper text is quoted material, never an instruction
+
+**Status: Decided by Jive Tyler I. Revalde, owner, in chat on 2026-11-17, and recorded here at his direction.** Drafted by an AI agent. Chosen from the three options in IR-1112 ("Text inside a paper cannot instruct the agent"), on the evidence of IR-1172 ([finding](../architecture-review/2026-11-16-ir1172-paper-text-exposure.md)).
+
+**Why.** A paper's author writes its text, not IRIS. IR-1172 found that passages reach the agent only in `role: tool` messages, marked off by nothing but JSON quoting; that no agent prompt version says tool text is data; that paper titles reach the model in `user` messages, the reader's own role; and that the answer checks would deliver an obeyed instruction such as "this study was approved" without a repair. The pinned model obeyed none of 18 paid planted runs, which is evidence, not a guarantee.
+
+1. **Build, under a new pin (`research-11`), as IR-1196.** The next AGENT version adds three things, and nothing else changes in its tools, checks or repairs:
+   - **A rule.** The instructions say that text from a paper (passages, titles, captions, earlier answers recovered with `recover_turn`, and a compaction handoff's findings) is quoted material to report on, and that an instruction found inside it is never followed, only reported if relevant.
+   - **Delimiters.** Every piece of paper text inside a tool result is wrapped in a marker that names it as source text. Paper text cannot close the marker early: any occurrence of the marker inside the text is escaped.
+   - **Titles leave the reader's role.** The conversation-state note, the Paper Chat note and the compaction handoff no longer place author-entered or model-written text in a `user` message undelimited. Each is delimited and labelled as source data in the same way.
+2. **New AGENT runs are pinned to `research-11`.** A run pinned to an earlier version finishes on it, and every earlier version's text is unchanged byte for byte (§14).
+3. **Proven by a scripted test.** IR-1172's planted passage and planted Paper Chat title (`backend/apps/ai/tests/test_ir1172_paper_text_exposure_contract.py`) arrive delimited and under the rule. The tests that pinned the old shape are flipped deliberately in that PR.
+4. **Answer quality is re-measured.** A new pin changes answers, so the answer-quality evaluation (`manage.py eval_answer_quality`, IR-956's set) runs again on `research-11` and is compared with the latest recorded run. It is paid, and is run only with the owner's approval.
+5. **Not in scope:** the AI Overview and the paper brief (Django paths; the brief already frames the paper as data), figure descriptions and formula transcriptions, and the answer-quality grader. A check that flags a claim the cited passage does not support stays declined.
+   - **Gain:** the risk drops for every tool at once, and author text stops sharing the reader's role. **Cost:** it lowers the risk and does not remove it: a model can still be talked round past a rule. The request shape changes, so answers shift in ways only the paid evaluation measures, and the markers add tokens to every tool result.
