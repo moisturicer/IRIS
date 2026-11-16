@@ -59,6 +59,8 @@ class PriorTurn:
     ordinal: int | None = None
     #: The sources its answer could draw on, rechecked before it is sent again (IR-994).
     sources: frozenset = frozenset()
+    #: (record id, page) per citation of its answer, in citation order (IR-1168).
+    cited: tuple = ()
 
 
 @dataclass(frozen=True)

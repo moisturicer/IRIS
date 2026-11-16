@@ -75,7 +75,7 @@ def _bounds(values) -> dict[str, Bounds]:
 
 def read(values) -> AgentProfile:
     """The whole profile, or `NotConfigured` naming the first problem."""
-    from ai.agent.prompts import COHERENT_PROMPT_VERSION, COHERENT_TOOL_VERSION
+    from ai.agent.prompts import CITED_PROMPT_VERSION, CITED_TOOL_VERSION
     from ai.admission.transport import RESEARCH_LANE
     from ai.infrastructure.openai_adapter import OpenAICompatibleAgentProvider
 
@@ -108,8 +108,8 @@ def read(values) -> AgentProfile:
         raise NotConfigured("RUNS_AGENT_CHECKS must be enforce, flag or advisory")
     pin = Pin(
         model=model, endpoint=provider.endpoint, adapter=OpenAICompatibleAgentProvider.adapter,
-        dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=COHERENT_PROMPT_VERSION,
-        tool_version=COHERENT_TOOL_VERSION, public_version=runs_config.PROTOCOL,
+        dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=CITED_PROMPT_VERSION,
+        tool_version=CITED_TOOL_VERSION, public_version=runs_config.PROTOCOL,
         state_version=runs_config.SCHEMA, data_policy=provider.data_policy,
     )
     return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits,

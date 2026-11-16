@@ -34,8 +34,9 @@ from ai.agent.protocol import (
     AgentRequest, ModelTurn, NotFinal, Pin, StopReason, Text, ToolGroup, ToolResult, User, final_answer,
 )
 from ai.agent.prompts import (  # noqa: F401 -- re-exported: callers and pinned tests name them here
-    CHAT_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION, COHERENT_INSTRUCTIONS, COHERENT_PROMPT_VERSION,
-    COHERENT_TOOL_VERSION, COMPACT_REQUEST, EVIDENCE_INSTRUCTIONS,
+    CHAT_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION, CITED_INSTRUCTIONS, CITED_NOTE, CITED_PROMPT_VERSION,
+    CITED_TOOL_VERSION, COHERENT_INSTRUCTIONS, COHERENT_PROMPT_VERSION,
+    COHERENT_TOOL_VERSION, COMPACT_REQUEST, EARLIER_TURN, EVIDENCE_INSTRUCTIONS,
     EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION, FINAL_NOTE, HYBRID_INSTRUCTIONS, HYBRID_PROMPT_VERSION,
     HYBRID_TOOL_VERSION, INSTRUCTIONS, LISTING_INSTRUCTIONS, LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION,
     MANUSCRIPT_INSTRUCTIONS, MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION, METADATA_INSTRUCTIONS,
@@ -60,9 +61,9 @@ NOTHING_TO_COMPACT = "nothing_to_compact"
 
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
                           RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
-                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION)
-#: Pins that offer research-7's tools and never mention an unseen draft in a repair (IR-1004, IR-1166).
-EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION)
+                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION)
+#: Pins that offer research-7's tools and never mention an unseen draft in a repair (IR-1004, IR-1166, IR-1168).
+EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -337,6 +338,8 @@ class _Run:
         self.repairs = 2
         #: research-8 and research-9 repairs never mention the unseen draft (IR-1004, IR-1166).
         self.fresh_repairs = version in EVIDENCE_TOOL_VERSIONS
+        #: research-10 numbers earlier Turns and lists what they cited (IR-1168).
+        self.cites = version == CITED_TOOL_VERSION
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         #: Sources the history carried when the answer was written (IR-994).
@@ -449,7 +452,13 @@ class _Run:
         # One read gives the handoff's papers the same handles the state message uses.
         also = [*handoff["shown"], *handoff["selected"], *handoff["excluded"]] if handoff else ()
         scope = getattr(self.tools, "scope", None) if self.chat else None
-        shown = await self.investigation.recall(state, also=[*also, *([scope] if scope is not None else [])])
+        asked = [*also, *([scope] if scope is not None else [])]
+        # The same read gives every paper an earlier Turn cited a fresh handle, if still readable (IR-1168).
+        cited = [rid for turn in self.prior for rid, _ in turn.cited] if self.cites else []
+        shown = await self.investigation.recall(state, also=[*asked, *cited])
+        if cited and not asked and not any(state.get(k) for k in ("shown", "selected", "excluded")):
+            # Citations alone open no state message.
+            shown = {}
         if scope is not None and not any(shown.get(k) for k in ("shown", "selected", "excluded")):
             # The scope read alone opens no state message.
             shown = {}
@@ -457,10 +466,55 @@ class _Run:
             # Earlier Turns arrive compacted (IR-734).
             summary = compacting.render(handoff, self.investigation.papers, passages=False)
             history.append(summary)
+        plain, earlier = self._earlier(listed=False), self._earlier(listed=True)
+        closing = self._closing(shown, scope)
+        if earlier != plain and self._overflows([*history, *earlier, *closing]):
+            # A history that would not fit loses the citation lists before any Turn (IR-1168).
+            earlier = plain
+        return [*history, *earlier, *closing]
+
+    def _earlier(self, *, listed: bool) -> list:
+        """The carried Turns; under research-10 numbered, and with what they cited when `listed` (IR-1168)."""
+        history: list = []
         for turn in self.prior:
             answer, sources = DELIVERED_MARKER.sub("", turn.answer), frozenset(turn.sources)
-            history += [User(compacting.reader(turn.question)),
-                        ModelTurn(items=(Text(answer),), stop=StopReason.END, dependencies=sources)]
+            question = compacting.reader(turn.question)
+            if self.cites and turn.ordinal is not None:
+                question = EARLIER_TURN.format(n=turn.ordinal) + question
+                note, papers = self._cited(turn) if listed else ("", frozenset())
+                answer += note
+                sources |= frozenset(s for s in self.investigation.recalled_sources if s.record_id in papers)
+            history += [User(question), ModelTurn(items=(Text(answer),), stop=StopReason.END, dependencies=sources)]
+        return history
+
+    def _cited(self, turn) -> tuple[str, frozenset]:
+        """The papers `turn` cited that the reader can still read, with their pages, and their Record ids."""
+        pages: dict[int, set] = {}
+        for rid, page in turn.cited:
+            if rid in self.investigation.papers:
+                pages.setdefault(rid, set()).update({page} if page else ())
+        parts = []
+        for rid, numbers in pages.items():
+            handle, title = self.investigation.papers[rid]
+            ordered = sorted(numbers)
+            where = (f", page {ordered[0]}" if len(ordered) == 1
+                     else f", pages {', '.join(map(str, ordered))}" if ordered else "")
+            parts.append(f"«{title}» (paper {handle}){where}")
+        return (CITED_NOTE + "; ".join(parts) + "." if parts else ""), frozenset(pages)
+
+    def _overflows(self, history) -> bool:
+        """Whether `history` would fill the window or start a compaction (IR-1168)."""
+        try:
+            _, status = self.agent.estimate(self.request(history))
+        except Unavailable as full:
+            return full.code in WINDOW_FULL
+        rule = self.agent.compaction
+        return (rule is not None and self.context.commit_handoff is not None
+                and status.occupancy_tokens >= rule.threshold_tokens)
+
+    def _closing(self, shown: dict, scope) -> list:
+        """The state message, the Paper Chat note and the reader's question, in that order."""
+        history: list = []
         if shown:
             history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False),
                                 self.investigation.recalled_sources))
