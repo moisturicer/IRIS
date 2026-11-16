@@ -22,7 +22,7 @@ from typing import Optional
 
 from ai.agent.context import Capacity, Reserves
 from ai.agent.prompts import (
-    DERIVED, HANDOFF_PREFIX as PREFIX, READER_MARK, STATE_PREFIX, SUMMARY_REQUEST as NOTE,
+    DERIVED, HANDOFF_PREFIX as PREFIX, READER_MARK, STATE_PREFIX, SUMMARY_REQUEST as NOTE, quoted,
 )
 from ai.agent.protocol import ModelTurn, ToolResult, User
 from ai.research.tools import Source
@@ -246,21 +246,25 @@ def well_formed(body) -> bool:
                     for source in body["source_refs"]))
 
 
-def render(body: dict, papers: dict, *, passages: bool) -> User:
+def render(body: dict, papers: dict, *, passages: bool, delimit: bool = False) -> User:
     """The handoff as the model reads it, with this run's handles for the papers it may still read.
 
     `passages` False drops passage handles, which only the run that read them can use.
+    `delimit` quotes titles and findings as paper text (research-11, IR-1196).
     """
+    def framed(text):
+        return quoted(text) if delimit else text
+
     def listed(ids):
         return [papers[i][0] for i in ids if i in papers]
 
-    shown = [{"position": n, "paper": papers[i][0], "title": papers[i][1]}
+    shown = [{"position": n, "paper": papers[i][0], "title": framed(papers[i][1])}
              for n, i in enumerate((i for i in body["shown"] if i in papers), start=1)]
     view = {
         "derived": True, "note": DERIVED, "goal": body["goal"], "preferences": body["preferences"],
         "shown": shown, "selected": listed(body["selected"]), "excluded": listed(body["excluded"]),
         "plan": body["plan"],
-        "findings": [{"text": f["text"], "turns": f["turns"], "passages": f["passages"] if passages else []}
+        "findings": [{"text": framed(f["text"]), "turns": f["turns"], "passages": f["passages"] if passages else []}
                      for f in body["findings"]],
         "limitations": body["limitations"], "turns": body["turns"],
     }

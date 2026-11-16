@@ -35,14 +35,15 @@ from ai.agent.protocol import (
 )
 from ai.agent.prompts import (  # noqa: F401 -- re-exported: callers and pinned tests name them here
     CHAT_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION, CITED_INSTRUCTIONS, CITED_NOTE, CITED_PROMPT_VERSION,
-    CITED_TOOL_VERSION, COHERENT_INSTRUCTIONS, COHERENT_PROMPT_VERSION,
+    CITED_TOOL_VERSION, COHERENT_INSTRUCTIONS, DELIMITED_INSTRUCTIONS, DELIMITED_PROMPT_VERSION,
+    DELIMITED_TOOL_VERSION, COHERENT_PROMPT_VERSION,
     COHERENT_TOOL_VERSION, COMPACT_REQUEST, EARLIER_TURN, EVIDENCE_INSTRUCTIONS,
     EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION, FINAL_NOTE, HYBRID_INSTRUCTIONS, HYBRID_PROMPT_VERSION,
     HYBRID_TOOL_VERSION, INSTRUCTIONS, LISTING_INSTRUCTIONS, LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION,
     MANUSCRIPT_INSTRUCTIONS, MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION, METADATA_INSTRUCTIONS,
     METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION, PAPER_CHAT_PREFIX, PROMPT_VERSION, PROMPTS,
     RECOVERY_INSTRUCTIONS, RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION, RESEARCH_INSTRUCTIONS,
-    RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, TOOL_VERSION,
+    RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, TOOL_VERSION, quoted,
 )
 from ai.agent.tools import (
     ASK_CLARIFICATION, ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded,
@@ -61,9 +62,11 @@ NOTHING_TO_COMPACT = "nothing_to_compact"
 
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
                           RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
-                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION)
+                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION,
+                          DELIMITED_TOOL_VERSION)
 #: Pins that offer research-7's tools and never mention an unseen draft in a repair (IR-1004, IR-1166, IR-1168).
-EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION)
+EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION,
+                          DELIMITED_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -339,7 +342,9 @@ class _Run:
         #: research-8 and later repairs never mention the unseen draft (IR-1004, IR-1166).
         self.fresh_repairs = version in EVIDENCE_TOOL_VERSIONS
         #: research-10 numbers earlier Turns and lists what they cited (IR-1168).
-        self.cites = version == CITED_TOOL_VERSION
+        self.cites = version in (CITED_TOOL_VERSION, DELIMITED_TOOL_VERSION)
+        #: research-11 quotes paper text wherever it reaches the model (IR-1196).
+        self.delimit = self.investigation.delimit = version == DELIMITED_TOOL_VERSION
         #: Each earlier answer sent with its citation list -> the same answer without it.
         self.unlisted: dict = {}
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
@@ -466,7 +471,7 @@ class _Run:
             shown = {}
         if handoff:
             # Earlier Turns arrive compacted (IR-734).
-            summary = compacting.render(handoff, self.investigation.papers, passages=False)
+            summary = compacting.render(handoff, self.investigation.papers, passages=False, delimit=self.delimit)
             history.append(summary)
         plain, earlier = self._earlier(listed=False), self._earlier(listed=True)
         self.unlisted = {e: p for e, p in zip(earlier, plain) if e != p}
@@ -505,8 +510,11 @@ class _Run:
             ordered = sorted(numbers)
             where = (f", page {ordered[0]}" if len(ordered) == 1
                      else f", pages {', '.join(map(str, ordered))}" if ordered else "")
-            parts.append(f"«{title}» (paper {handle}){where}")
+            parts.append(f"«{self._title(title)}» (paper {handle}){where}")
         return (CITED_NOTE + "; ".join(parts) + "." if parts else ""), frozenset(pages)
+
+    def _title(self, title: str) -> str:
+        return quoted(title) if self.delimit else title
 
     def _overflows(self, history) -> bool:
         """Whether `history` would fill the window or start a compaction (IR-1168)."""
@@ -522,11 +530,14 @@ class _Run:
         """The state message, the Paper Chat note and the reader's question, in that order."""
         history: list = []
         if shown:
+            if self.delimit:
+                shown = {**shown, "shown": [{**p, "title": quoted(p["title"])} for p in shown.get("shown", ())]}
             history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False),
                                 self.investigation.recalled_sources))
         if scope is not None and scope in self.investigation.papers:
             handle, title = self.investigation.papers[scope]
-            note = User(PAPER_CHAT_PREFIX + json.dumps({"paper": handle, "title": title}, ensure_ascii=False),
+            note = User(PAPER_CHAT_PREFIX + json.dumps({"paper": handle, "title": self._title(title)},
+                                                       ensure_ascii=False),
                         self.investigation.recalled_sources)
             history.append(note)
         # The reader's words, unchanged unless they would pass for derived context.
@@ -661,7 +672,8 @@ class _Run:
         self.outcome, self.revision, self.condensed = "compacted", revision, len(cut.gone_turns)
         await self._journal("compaction", {"outcome": "compacted", "revision": revision,
                                            "turns": len(cut.gone_turns), "exchanges": len(cut.gone_exchanges)})
-        rebuilt = cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True))
+        rebuilt = cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True,
+                                                  delimit=self.delimit))
         # What the compacted exchanges showed is no longer in front of the model (IR-736).
         self.investigation.reshown(e.content for e in rebuilt if isinstance(e, ToolResult))
         return rebuilt
