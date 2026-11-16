@@ -1355,10 +1355,10 @@ def notify_call_lapsed(call):
 FILE_QUARANTINED = "File Quarantined"
 
 
-def notify_file_quarantined(*, record, uploader, what: str):
+def notify_file_quarantined(*, record, uploader, what: str, tell_rdco: bool = True):
     """
-    Tell `uploader` (when their account exists) and RDCO that a stored file
-    failed the malware scan and was taken out of use. `what` names it for
+    Tell `uploader` (when their account exists) and, unless `tell_rdco` is
+    off, RDCO that a stored file failed the malware scan and was taken out of use. `what` names it for
     people ("the manuscript", "the file \"memo.pdf\""); never the bytes.
     """
     title = record.title if record is not None else "a record"
@@ -1370,7 +1370,7 @@ def notify_file_quarantined(*, record, uploader, what: str):
         kind = _get_type(FILE_QUARANTINED)
         if uploader is not None:
             Notification.objects.create(recipient=uploader, record=record, notif_type=kind, message=message)
-        role = _role(RoleName.RDCO)
+        role = _role(RoleName.RDCO) if tell_rdco else None
         if role is not None:
             Notification.objects.create(broadcast_to_role=role, record=record, notif_type=kind, message=message)
     except Exception:

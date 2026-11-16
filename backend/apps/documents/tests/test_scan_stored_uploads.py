@@ -100,6 +100,34 @@ class ScanStoredUploadsTests(APITestCase):
         self.assertTrue(told.filter(recipient=self.itso, message__contains='"memo.com"').exists())
         self.assertTrue(told.filter(broadcast_to_role__name="RDCO").exists())
 
+    def test_what_iris_read_from_a_quarantined_manuscript_is_taken_out_of_use(self):
+        from apps.ai.models import ChunkSet
+        from apps.documents.models import PdfExtraction
+
+        PdfExtraction.objects.create(
+            record=self.record, status="done", source_file=self.manuscript,
+            extracted_text="text read from the flagged file",
+        )
+        chunks = ChunkSet.objects.create(
+            record=self.record, extraction_hash="e", strategy_id="s", options={},
+            content_hash="c", is_active=True, page_sizes={},
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            self.run_command()
+        self.assertFalse(PdfExtraction.objects.filter(record=self.record).exists())
+        chunks.refresh_from_db()
+        self.assertFalse(chunks.is_active, "Ask IRIS could still cite the flagged manuscript")
+
+    def test_rdco_is_told_once_per_record(self):
+        # Two uploaders' files on one record fail: each uploader is told, RDCO once.
+        RecordFile.objects.create(record=self.record, filename="other.com", uploaded_by=self.rdco,
+                                  file=ContentFile(EICAR, name="other.com"))
+        with self.captureOnCommitCallbacks(execute=True):
+            self.run_command()
+        told = Notification.objects.filter(notif_type__name="File Quarantined")
+        self.assertEqual(told.filter(broadcast_to_role__name="RDCO", record=self.record).count(), 1)
+        self.assertTrue(told.filter(recipient=self.rdco).exists())
+
     def test_a_quarantined_file_answers_no_longer_available(self):
         with self.captureOnCommitCallbacks(execute=True):
             self.run_command()

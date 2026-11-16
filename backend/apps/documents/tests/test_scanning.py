@@ -16,7 +16,7 @@ from django.test import override_settings
 
 from apps.documents import scanning
 from apps.documents.scanning import (
-    EICAR, FakeScanner, ClamdScanner, ScanUnavailable, UNAVAILABLE, UNSAFE, scan_problem, use_scanner,
+    EICAR, FakeScanner, ClamdScanner, ScanUnavailable, TOO_LARGE, UNAVAILABLE, UNSAFE, scan_problem, use_scanner,
 )
 
 
@@ -74,11 +74,18 @@ def test_clamd_names_the_signature_it_found():
     assert not verdict.clean and verdict.signature == "Win.Test.EICAR_HDB-1"
 
 
-@pytest.mark.parametrize("answer", [b"INSTREAM size limit exceeded. ERROR\0", None])
+@pytest.mark.parametrize("answer", [b"Can't allocate memory ERROR\0", None])
 def test_an_error_or_a_closed_connection_is_unavailable_never_clean(answer):
     clamd = StandInClamd(answer)
-    with pytest.raises(ScanUnavailable):
-        ClamdScanner("127.0.0.1", clamd.port, timeout=5).scan(BytesIO(b"x"))
+    with use_scanner(ClamdScanner("127.0.0.1", clamd.port, timeout=5)):
+        assert scan_problem(BytesIO(b"x")) == UNAVAILABLE
+
+
+def test_a_file_past_clamds_size_limit_is_refused_for_good_not_try_again():
+    # Never clean, and not "try again shortly": the same file would fail again.
+    clamd = StandInClamd(b"INSTREAM size limit exceeded. ERROR\0")
+    with use_scanner(ClamdScanner("127.0.0.1", clamd.port, timeout=5)):
+        assert scan_problem(BytesIO(b"x")) == TOO_LARGE
 
 
 def test_nothing_listening_is_unavailable():

@@ -185,13 +185,15 @@ class SubmitDocumentView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+            # Checked and scanned before the item is locked: a scan can take
+            # seconds, and the locks would be held for all of it.
+            problem = pdf_upload_problem(file) or upload_problem(
+                file, user=request.user, where="requested_document", record=record)
+            if problem:
+                return Response({"file": [problem], "detail": problem}, status=400)
             try:
                 with transaction.atomic():
                     item, slot = resolve_item_for_upload(record, item_id, slot_id)
-                    problem = pdf_upload_problem(file) or upload_problem(
-                        file, user=request.user, where="requested_document", record=record)
-                    if problem:
-                        return Response({"file": [problem], "detail": problem}, status=400)
                     upload = create_upload(record, slot, file, uploaded_by=request.user)
                     fulfil_item(item, upload, uploaded_by=request.user)
             except DocumentRequestError as exc:

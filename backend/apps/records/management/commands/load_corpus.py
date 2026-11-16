@@ -227,36 +227,37 @@ class Command(BaseCommand):
         return user
 
     def _load_one(self, path: Path, title: str, classification, record_type, owner: User) -> Record:
-        # One transaction: a record left with no extraction queued would
-        # dodge every re-run's idempotency check forever (it keys on the
-        # Record existing, not on extraction having been queued).
-        with transaction.atomic():
-            record = Record.objects.create(
-                title=title,
-                origin=self.origin,
-                record_type=record_type,
-                classification=classification,
-                added_by=owner,
-                pipeline_status=self.status,
-                # Test data answers Yes (ADR-054 decision 18, IR-791). A paper
-                # declared institutional is real and nobody answered for it, so it
-                # stores no answer and the gate refuses it. Either way the paper
-                # starts embargoed, so nothing is sent until it is released.
-                ai_consent=None if self.origin == Record.Origin.INSTITUTIONAL else True,
-            )
-            with path.open("rb") as fh:
-                source = File(fh, name=path.name)
-                problem = pdf_upload_problem(source) or upload_problem(
-                    source, user=owner, where="load_corpus", record=record)
-                if problem:
-                    raise ValueError(problem)
+        with path.open("rb") as fh:
+            source = File(fh, name=path.name)
+            # Checked and scanned before the transaction, so a refusal's audit
+            # row survives the rollback; no Record exists yet to name.
+            problem = pdf_upload_problem(source) or upload_problem(source, user=owner, where="load_corpus")
+            if problem:
+                raise ValueError(problem)
+            # One transaction: a record left with no extraction queued would
+            # dodge every re-run's idempotency check forever (it keys on the
+            # Record existing, not on extraction having been queued).
+            with transaction.atomic():
+                record = Record.objects.create(
+                    title=title,
+                    origin=self.origin,
+                    record_type=record_type,
+                    classification=classification,
+                    added_by=owner,
+                    pipeline_status=self.status,
+                    # Test data answers Yes (ADR-054 decision 18, IR-791). A paper
+                    # declared institutional is real and nobody answered for it, so it
+                    # stores no answer and the gate refuses it. Either way the paper
+                    # starts embargoed, so nothing is sent until it is released.
+                    ai_consent=None if self.origin == Record.Origin.INSTITUTIONAL else True,
+                )
                 for field, value in manuscript_changes(None, source).items():
                     setattr(record, field, value)
                 record.abstract_file.save(path.name, source, save=True)
-            RecordOwner.objects.create(record=record, user=owner, is_primary=True)
-            if self.clearing:
-                clear_for_ai(record, actor=owner)
+                RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+                if self.clearing:
+                    clear_for_ai(record, actor=owner)
 
-            reset_manuscript(record)
+                reset_manuscript(record)
 
         return record

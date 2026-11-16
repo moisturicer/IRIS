@@ -91,7 +91,8 @@ services:
     deploy:
       resources:
         limits:
-          # About 1.0 GiB with the signatures loaded, measured 2026-11-16; room to scan a 50 MB file.
+          # About 1.0 GiB with the signatures loaded, measured 2026-11-16 on a development machine
+          # (not yet on the demo host); room to scan a 50 MB file.
           memory: 1536M
 
   migrate:

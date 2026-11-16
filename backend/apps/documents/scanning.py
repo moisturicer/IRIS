@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 UNSAFE = "This file was flagged as unsafe and was not uploaded."
 UNAVAILABLE = "File checking is temporarily unavailable. Please try again shortly."
+#: Past what clamd will read (StreamMaxLength): it can never be checked, so it is refused for good.
+TOO_LARGE = "This file is too large to be checked for malware, so it was not uploaded."
 #: A stored file the one-time scan took out of use (decision 4): its row stays, without the file.
 FILE_GONE = "This file is no longer available."
 
@@ -50,6 +52,10 @@ _CHUNK = 64 * 1024
 
 class ScanUnavailable(Exception):
     """The scanner didn't answer, or answered an error: never a clean verdict."""
+
+
+class ScanTooLarge(ScanUnavailable):
+    """clamd refused the stream as past its size limit: retrying won't help."""
 
 
 @dataclass(frozen=True)
@@ -100,6 +106,8 @@ def _read_answer(text: str) -> Verdict:
         return Verdict(clean=True)
     if body.endswith(" FOUND"):
         return Verdict(clean=False, signature=body[: -len(" FOUND")].strip())
+    if "size limit exceeded" in body.lower():
+        raise ScanTooLarge(f"clamd answered {text!r}")
     raise ScanUnavailable(f"clamd answered {text!r}")
 
 
@@ -169,10 +177,10 @@ def scan_verdict(file) -> Optional[Verdict]:
     `ScanUnavailable` when the scanner can't give one.
     """
     scanner = current_scanner()
-    data = _read_all(file)
     if scanner is None:
         logger.warning("Upload stored unscanned: MALWARE_SCAN=off (development only, ADR-072).")
         return None
+    data = _read_all(file)
     verdict = scanner.scan(BytesIO(data))
     return Verdict(verdict.clean, verdict.signature, hashlib.sha256(data).hexdigest(), len(data))
 
@@ -184,6 +192,9 @@ def scan_problem(file, *, on_unsafe: Optional[Callable[[Verdict], None]] = None)
     """
     try:
         verdict = scan_verdict(file)
+    except ScanTooLarge:
+        logger.warning("Upload refused: past the malware scanner's size limit (ADR-072).")
+        return TOO_LARGE
     except ScanUnavailable:
         logger.exception("Upload refused: the malware scanner is unavailable (ADR-072).")
         return UNAVAILABLE
