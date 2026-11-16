@@ -153,7 +153,7 @@ test("inactivity ends the session and the next request needs reauthentication", 
   test.skip(!process.env.E2E_IDLE_PASS, "Runs only in the idle pass (SESSION_IDLE_TIMEOUT_MINUTES=2); see e2e/README.md");
   const minutes = Number(process.env.E2E_IDLE_MINUTES ?? 2);
   test.setTimeout((minutes + 3) * 60_000);
-  const session = await login("student@cit.edu");
+  const session = await login("student@iris.test");
   await page.addInitScript((r) => sessionStorage.setItem("iris_refresh_token", r), session.refresh);
   await page.goto("/");
   await page.waitForTimeout((minutes + 1) * 60_000);

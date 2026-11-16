@@ -29,7 +29,7 @@ describe("builders that take structured input", () => {
     const params = writeDiscoverQuery(new URLSearchParams(), {
       ...DEFAULT_QUERY,
       q: "solar drying",
-      filters: { ...DEFAULT_QUERY.filters, recordType: "3", colleges: ["1", "2"], year: "2025" },
+      filters: { ...DEFAULT_QUERY.filters, recordType: "3", colleges: ["1", "2"], yearFrom: "2018", yearTo: "2025" },
       sort: "viewed",
     });
     expect([...params.keys()].length).toBeGreaterThan(0);

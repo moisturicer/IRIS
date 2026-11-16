@@ -1,19 +1,21 @@
 // The accounts `seed_demo --accounts-only` creates (IR-227, IR-478). Journeys
-// act as these, and create every Record they touch themselves.
+// act as these, and create every Record they touch themselves. They are
+// `@iris.test` since IR-1067, which moved them off real CIT-U mailboxes; the
+// people journeys register for themselves are still `@cit.edu` (people.ts).
 export const PASSWORD = "IrisDemo123!";
 
 export const ACCOUNTS = {
-  student: "student@cit.edu",
-  adviser: "adviser@cit.edu",
-  rdco: "rdco@cit.edu",
-  itso: "itso@cit.edu",
-  ierc: "ierc@cit.edu",
-  ktto: "ktto@cit.edu",
-  itsoCoordinator: "itso.coordinator@cit.edu",
-  iercCoordinator: "ierc.coordinator@cit.edu",
-  kttoCoordinator: "ktto.coordinator@cit.edu",
-  rdcoCoordinator: "rdco.coordinator@cit.edu",
-  admin: "admin@cit.edu",
+  student: "student@iris.test",
+  adviser: "adviser@iris.test",
+  rdco: "rdco@iris.test",
+  itso: "itso@iris.test",
+  ierc: "ierc@iris.test",
+  ktto: "ktto@iris.test",
+  itsoCoordinator: "itso.coordinator@iris.test",
+  iercCoordinator: "ierc.coordinator@iris.test",
+  kttoCoordinator: "ktto.coordinator@iris.test",
+  rdcoCoordinator: "rdco.coordinator@iris.test",
+  admin: "admin@iris.test",
 } as const;
 
 export type AccountName = keyof typeof ACCOUNTS;
