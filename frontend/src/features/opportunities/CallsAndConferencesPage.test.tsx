@@ -7,6 +7,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ToastContainer } from "@/components/ui/Toast";
+import { useUIStore } from "@/store/ui.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { Opportunity, OpportunityBoard } from "@/types/opportunities";
@@ -87,8 +89,8 @@ const month   = () => call({ id: 102, title: "ICACSIS 2026 paper deadline", days
 const later   = () => call({ id: 103, title: "Energy Letters special issue", opportunity_type: "journal", type_display: "Journal", days_left: 60, due_date: "2026-12-10", location: "Online", area_names: ["Clean Energy"] });
 const closed  = () => call({ id: 104, title: "Last term's symposium", opportunity_type: "symposium", type_display: "Symposium", days_left: -4, is_closed: true, papers_state: "closed", papers_label: "Submissions closed", due_date: "2026-10-07" });
 
-function serve(items: Opportunity[], canPost = false) {
-  board.mockResolvedValue({ items, can_post: canPost });
+function serve(items: Opportunity[], canPost = false, canFeature = false) {
+  board.mockResolvedValue({ items, can_post: canPost, can_feature: canFeature });
 }
 
 async function renderBoard() {
@@ -104,7 +106,10 @@ beforeEach(() => {
   classifications.mockResolvedValue({ data: { count: 2, next: null, previous: null, results: AREAS } });
 });
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  useUIStore.setState({ toasts: [] });
+});
 
 describe("the board", () => {
   it("groups calls by how soon they close, soonest first, closed last", async () => {
@@ -116,17 +121,18 @@ describe("the board", () => {
       "Closes within a week1 call",
       "Closes within a month1 call",
       "Closes later1 call",
-      "Recently closed1 call",
+      "Submissions closed1 call",
     ]);
 
     const week = screen.getByRole("region", { name: /Closes within a week/ });
     const row = within(week).getByRole("article", { name: "Workshop on Edge AI" });
+    expect(within(row).getByText("Accepting papers")).toBeInTheDocument();
     expect(within(row).getByText("3 days left")).toBeInTheDocument();
     expect(within(row).getByRole("link", { name: /View & apply/ })).toHaveAttribute("target", "_blank");
 
-    const done = screen.getByRole("region", { name: /Recently closed/ });
+    const done = screen.getByRole("region", { name: /Submissions closed/ });
     const old = within(done).getByRole("article", { name: "Last term's symposium" });
-    expect(within(old).getByText("Closed")).toBeInTheDocument();
+    expect(within(old).getByText("Submissions closed")).toBeInTheDocument();
     // A closed call has no deadline left to put in a calendar.
     expect(within(old).queryByRole("button", { name: /to your calendar/ })).toBeNull();
   });
@@ -140,13 +146,58 @@ describe("the board", () => {
     expect(within(row).getByText("Clean Energy")).toBeInTheDocument();
   });
 
-  it("says who to ask when a call has no link, rather than drawing a dead button", async () => {
-    // Only a Call migrated from a Conference Deadline can lack one (IR-760).
+  it("shows everything a row carries: about, event dates, fee, Areas, link and who posted it", async () => {
+    serve([call({
+      title: "ICCE 2027", description: "Full papers on computing education.",
+      start_date: "2027-01-20", end_date: "2027-01-22", registration_fee: "PHP 5,000",
+      area_names: ["Artificial Intelligence", "Clean Energy"],
+    })]);
+    await renderBoard();
+    const row = screen.getByRole("article", { name: "ICCE 2027" });
+    expect(within(row).getByText("Conference")).toBeInTheDocument();
+    expect(within(row).getByText("Full papers on computing education.")).toBeInTheDocument();
+    expect(within(row).getByText("Event: Jan 20, 2027 to Jan 22, 2027")).toBeInTheDocument();
+    expect(within(row).getByText("Fee: PHP 5,000")).toBeInTheDocument();
+    expect(within(row).getByText("Cebu City, Philippines")).toBeInTheDocument();
+    expect(within(row).getByText("Clean Energy")).toBeInTheDocument();
+    expect(within(row).getByRole("link", { name: /View & apply/ })).toHaveAttribute("href", "https://www.cit.edu/research/");
+    expect(within(row).getByText("Posted by Maria Santos")).toBeInTheDocument();
+  });
+
+  it("leaves out the fee and event dates when there are none", async () => {
+    serve([later()]);
+    await renderBoard();
+    const row = screen.getByRole("article", { name: "Energy Letters special issue" });
+    expect(within(row).queryByText(/^Fee:/)).toBeNull();
+    expect(within(row).queryByText(/^Event:/)).toBeNull();
+  });
+
+  it("shows Happening now beside the papers tag while the event runs, and no other event tag", async () => {
+    serve([
+      call({ title: "Running now", event_state: "happening", event_label: "Happening now", start_date: "2026-10-10", end_date: "2026-10-12" }),
+      call({ title: "Still ahead", event_state: "upcoming", event_label: "Upcoming", start_date: "2027-01-10" }),
+    ]);
+    await renderBoard();
+    const running = screen.getByRole("article", { name: "Running now" });
+    expect(within(running).getByText("Accepting papers")).toBeInTheDocument();
+    expect(within(running).getByText("Happening now")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Still ahead" })).queryByText("Upcoming")).toBeNull();
+  });
+
+  it("stars a Featured call and says so in words", async () => {
+    serve([call({ title: "Starred", is_featured: true })]);
+    await renderBoard();
+    expect(within(screen.getByRole("article", { name: "Starred" })).getByText("Featured")).toBeInTheDocument();
+  });
+
+  it("draws no link and no fallback for a migrated call that lacks one", async () => {
+    // Only a Call migrated from a Conference Deadline can lack one (IR-760);
+    // the "ask the office" fallback is gone (IR-764).
     serve([call({ title: "Unlinked call", external_url: "" })]);
     await renderBoard();
     const row = screen.getByRole("article", { name: "Unlinked call" });
     expect(within(row).queryByRole("link")).toBeNull();
-    expect(within(row).getByText("No link given. Ask Maria Santos.")).toBeInTheDocument();
+    expect(within(row).queryByText(/Ask /)).toBeNull();
   });
 
   it("has no serious accessibility violations", async () => {
@@ -157,6 +208,16 @@ describe("the board", () => {
 });
 
 describe("order", () => {
+  it("never moves a Featured call ahead of one due the same day", async () => {
+    serve([
+      call({ id: 201, title: "Plain, posted first", due_date: "2026-10-23", days_left: 12 }),
+      call({ id: 202, title: "Featured, posted later", is_featured: true, due_date: "2026-10-23", days_left: 12 }),
+    ]);
+    await renderBoard();
+    const titles = screen.getAllByRole("article").map((a) => within(a).getByRole("heading").textContent);
+    expect(titles).toEqual(["Plain, posted first", "Featured, posted later"]);
+  });
+
   it("runs by date inside a group, with featuring as a mark rather than a jump", async () => {
     serve([
       call({ title: "Featured, later", is_featured: true, days_left: 28, due_date: "2026-11-08" }),
@@ -184,6 +245,21 @@ describe("filters", () => {
     expect(conference).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByRole("article")).toHaveLength(1);
     expect(screen.getByRole("article", { name: "ICACSIS 2026 paper deadline" })).toBeInTheDocument();
+    expect(screen.getByText("Showing 1 of 3 calls.")).toBeInTheDocument();
+  });
+
+  it("narrows the board to one Area", async () => {
+    serve([soon(), month(), later()]);
+    await renderBoard();
+    const user = userEvent.setup();
+
+    const area = screen.getByRole("combobox", { name: "Area" });
+    expect(within(area).getAllByRole("option").map((o) => o.textContent))
+      .toEqual(["All Areas", "Artificial Intelligence", "Clean Energy"]);
+    await user.selectOptions(area, "Clean Energy");
+
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByRole("article", { name: "Energy Letters special issue" })).toBeInTheDocument();
     expect(screen.getByText("Showing 1 of 3 calls.")).toBeInTheDocument();
   });
 
@@ -238,7 +314,7 @@ describe("states", () => {
     const all = screen.getByRole("button", { name: "All" });
     expect(all).toHaveTextContent(/^All$/);
 
-    resolve({ items: [soon()], can_post: false });
+    resolve({ items: [soon()], can_post: false, can_feature: false });
     await waitFor(() => expect(all).toHaveTextContent(/^All\s*1$/));
   });
 
@@ -272,24 +348,34 @@ describe("states", () => {
     expect(screen.queryByRole("button", { name: "Post a call" })).toBeNull();
   });
 
-  it("reports a calendar failure on its row and leaves the board standing", async () => {
+  it("reports a calendar failure in a toast with Try again, and never grows the row", async () => {
     serve([soon(), month()]);
     calendar.mockRejectedValueOnce(new Error("500"));
-    await renderBoard();
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "Workshop on Edge AI" });
+    const user = userEvent.setup();
 
-    await userEvent.setup().click(
-      screen.getByRole("button", { name: "Add the Workshop on Edge AI deadline to your calendar" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Add the Workshop on Edge AI deadline to your calendar" }));
 
-    const row = screen.getByRole("article", { name: "Workshop on Edge AI" });
-    expect(await within(row).findByRole("alert")).toHaveTextContent("Could not build the calendar file.");
-    expect(screen.getAllByRole("article")).toHaveLength(2);
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("Could not build the calendar file for Workshop on Edge AI. Try again.");
+    // A toast, not a line inside the row that pushes the board down.
+    expect(within(screen.getByRole("article", { name: "Workshop on Edge AI" })).queryByRole("alert")).toBeNull();
+    // An error stays until it is dismissed or acted on.
+    expect(useUIStore.getState().toasts[0]).toMatchObject({ type: "error", persist: true });
+
+    calendar.mockResolvedValueOnce({ data: new Blob(["BEGIN:VCALENDAR"]) });
+    URL.createObjectURL = vi.fn(() => "blob:ics");
+    URL.revokeObjectURL = vi.fn();
+    await user.click(within(toast).getByRole("button", { name: "Try again" }));
+    expect(calendar).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 });
 
 describe("posting and changing calls", () => {
   it("offers Edit and Delete only on calls the server says this viewer may change", async () => {
-    serve([call({ title: "Mine", can_edit: true }), call({ title: "Someone else's" })], true);
+    serve([call({ title: "Mine", can_edit: true, can_delete: true }), call({ title: "Someone else's" })], true);
     await renderBoard();
 
     const mine = screen.getByRole("article", { name: "Mine" });
@@ -320,6 +406,84 @@ describe("posting and changing calls", () => {
     for (const gone of [/Posting office/, /Who can apply/, /Funding ceiling/, /Tags/, /Source/]) {
       expect(within(dialog).queryByLabelText(gone)).toBeNull();
     }
+  });
+
+  it("hides the event dates for a Journal and fills its location with Online, which stays editable", async () => {
+    serve([], true);
+    await renderBoard();
+    const user = userEvent.setup();
+    await user.click(screen.getAllByRole("button", { name: "Post a call" })[0]);
+    const dialog = await screen.findByRole("dialog", { name: "Post a call" });
+
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Type" }), "journal");
+    expect(within(dialog).queryByLabelText("Start date (optional)")).toBeNull();
+    expect(within(dialog).queryByLabelText("End date (optional)")).toBeNull();
+    const location = within(dialog).getByRole("textbox", { name: "Location" });
+    expect(location).toHaveValue("Online");
+
+    await user.clear(location);
+    await user.type(location, "Elsevier, online submission");
+    expect(location).toHaveValue("Elsevier, online submission");
+
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Type" }), "conference");
+    expect(within(dialog).getByLabelText("Start date (optional)")).toBeInTheDocument();
+  });
+
+  it("offers Featured on a new call only to someone who may feature (ADR-050 decision 12)", async () => {
+    serve([], true, false);
+    const { unmount } = await renderBoard();
+    await userEvent.setup().click(screen.getAllByRole("button", { name: "Post a call" })[0]);
+    const adviser = await screen.findByRole("dialog", { name: "Post a call" });
+    expect(within(adviser).queryByRole("checkbox", { name: /Feature this call/ })).toBeNull();
+    unmount();
+
+    serve([], true, true);
+    await renderBoard();
+    await userEvent.setup().click(screen.getAllByRole("button", { name: "Post a call" })[0]);
+    const rdco = await screen.findByRole("dialog", { name: "Post a call" });
+    expect(within(rdco).getByRole("checkbox", { name: /Feature this call/ })).not.toBeChecked();
+  });
+
+  it("offers Featured on an edit only when the server says this call may be featured", async () => {
+    serve([
+      call({ id: 31, title: "Featurable", can_edit: true, can_feature: true, is_featured: true }),
+      call({ id: 32, title: "Not featurable", can_edit: true }),
+    ], true, true);
+    await renderBoard();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit Featurable" }));
+    const one = await screen.findByRole("dialog", { name: "Edit call" });
+    expect(within(one).getByRole("checkbox", { name: /Feature this call/ })).toBeChecked();
+    await user.click(within(one).getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Edit Not featurable" }));
+    const two = await screen.findByRole("dialog", { name: "Edit call" });
+    expect(within(two).queryByRole("checkbox", { name: /Feature this call/ })).toBeNull();
+  });
+
+  it("keeps a posted call that waits for RDCO off the board, and says where it went", async () => {
+    serve([month()], true);
+    create.mockResolvedValue({
+      data: call({ id: 950, title: "Waiting call", status: "pending", status_label: "Waiting for RDCO" }),
+    });
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "ICACSIS 2026 paper deadline" });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Post a call" }));
+    const dialog = await screen.findByRole("dialog", { name: "Post a call" });
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Type" }), "journal");
+    await user.type(within(dialog).getByRole("textbox", { name: "Title" }), "Waiting call");
+    await user.type(within(dialog).getByRole("textbox", { name: "About" }), "A special issue.");
+    fireEvent.change(within(dialog).getByLabelText("Paper deadline"), { target: { value: "2026-11-20" } });
+    await user.click(within(within(dialog).getByRole("group", { name: "Areas" })).getByRole("checkbox", { name: "Clean Energy" }));
+    await user.type(within(dialog).getByRole("textbox", { name: "Link" }), "https://example.org/si");
+    await user.click(within(dialog).getByRole("button", { name: "Post call" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ location: "Online", start_date: null, end_date: null }));
+    expect(screen.queryByRole("article", { name: "Waiting call" })).toBeNull();
+    expect(await screen.findByText("Call sent to RDCO. It appears on the board once RDCO confirms it.")).toBeInTheDocument();
   });
 
   it("offers the six types of call and no other", async () => {
@@ -453,7 +617,7 @@ describe("posting and changing calls", () => {
   });
 
   it("deletes a call only after it is confirmed", async () => {
-    serve([call({ id: 8, title: "Doomed call", can_edit: true }), month()], true);
+    serve([call({ id: 8, title: "Doomed call", can_edit: true, can_delete: true }), month()], true);
     remove.mockResolvedValue({});
     await renderBoard();
     const user = userEvent.setup();
@@ -467,11 +631,119 @@ describe("posting and changing calls", () => {
     expect(remove).toHaveBeenCalledWith(8);
   });
 
+  it("offers no plain Delete where the server says a removal needs a reason", async () => {
+    // RDCO on an Adviser's Call: it may edit, but removing it takes a reason
+    // through `remove`, which IR-765 offers (ADR-050 amendment of 2026-11-15).
+    serve([call({ title: "An Adviser's call", can_edit: true, can_delete: false, can_remove: true })], true, true);
+    await renderBoard();
+    const row = screen.getByRole("article", { name: "An Adviser's call" });
+    expect(within(row).getByRole("button", { name: "Edit An Adviser's call" })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /^Delete/ })).toBeNull();
+  });
+
+  it("says before saving that an Adviser's edit sends the call back to RDCO", async () => {
+    serve([call({ id: 41, title: "Confirmed call", can_edit: true, edit_returns_to_pending: true }),
+      call({ id: 42, title: "RDCO's call", can_edit: true })], true);
+    await renderBoard();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Edit Confirmed call" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit call" });
+    expect(within(dialog).getByText(/Saving sends this call back to RDCO/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Edit RDCO's call" }));
+    expect(within(await screen.findByRole("dialog", { name: "Edit call" })).queryByText(/Saving sends this call back/)).toBeNull();
+  });
+
+  it("reports a failed save in a toast with Try again, keeps the sheet and what was typed, and grows nothing", async () => {
+    const mine = call({ id: 51, title: "Kept title", can_edit: true });
+    serve([mine], true);
+    update.mockRejectedValueOnce(new Error("Network Error"));
+    update.mockResolvedValueOnce({ data: { ...mine, title: "Kept title" } });
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "Kept title" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit Kept title" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit call" });
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("Could not save your changes.");
+    expect(toast).toHaveTextContent("Nothing has been lost.");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(within(dialog).getByRole("textbox", { name: "Title" })).toHaveValue("Kept title");
+
+    await user.click(within(toast).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("reports a failed delete in a toast with Try again, and closes the question", async () => {
+    serve([call({ id: 61, title: "Stubborn call", can_edit: true, can_delete: true })], true);
+    remove.mockRejectedValueOnce(new Error("Network Error"));
+    remove.mockResolvedValueOnce({});
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "Stubborn call" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Delete Stubborn call" }));
+    const confirm = await screen.findByRole("dialog", { name: "Delete this call?" });
+    await user.click(within(confirm).getByRole("button", { name: /Delete call/ }));
+
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("Could not delete Stubborn call.");
+    expect(screen.queryByRole("dialog", { name: "Delete this call?" })).toBeNull();
+    expect(screen.getByRole("article", { name: "Stubborn call" })).toBeInTheDocument();
+
+    await user.click(within(toast).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Stubborn call" })).toBeNull());
+    expect(remove).toHaveBeenCalledTimes(2);
+  });
+
+  it("has no serious accessibility violations with a Journal's sheet open", async () => {
+    serve([], true, true);
+    await renderBoard();
+    const user = userEvent.setup();
+    await user.click(screen.getAllByRole("button", { name: "Post a call" })[0]);
+    const dialog = await screen.findByRole("dialog", { name: "Post a call" });
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Type" }), "journal");
+    await expectNoBlockingA11yViolations(dialog);
+  });
+
   it("has no serious accessibility violations with the sheet open", async () => {
     serve([], true);
     await renderBoard();
     await userEvent.setup().click(screen.getAllByRole("button", { name: "Post a call" })[0]);
     const dialog = await screen.findByRole("dialog", { name: "Post a call" });
     await expectNoBlockingA11yViolations(dialog);
+  });
+});
+
+/*
+ * jsdom computes no layout, so a 360 px render is the same tree as any other
+ * (see reflow360.test.tsx). What would push a control off a phone is a row
+ * that can't wrap or a clamp on the words, so that is what is asserted.
+ */
+describe("at 360 px", () => {
+  it("wraps each row's tags and actions, keeps the Area filter to the width, and stays accessible", async () => {
+    serve([
+      call({
+        title: "Busy row", is_featured: true, can_edit: true, can_delete: true, event_state: "happening", event_label: "Happening now",
+        start_date: "2026-10-10", end_date: "2026-10-12", registration_fee: "PHP 5,000",
+      }),
+      closed(),
+    ], true, true);
+    const { container } = await renderBoard();
+    const row = screen.getByRole("article", { name: "Busy row" });
+
+    expect(within(row).getByText("Happening now").parentElement!.className).toMatch(/\bflex-wrap\b/);
+    for (const button of within(row).getAllByRole("button")) {
+      expect(button.parentElement!.className).toMatch(/\bflex-wrap\b/);
+      expect(button.closest(".truncate, [class*='line-clamp']")).toBeNull();
+    }
+    // The filter that holds the Area select takes the full width on a phone.
+    expect(screen.getByRole("combobox", { name: "Area" }).closest(".w-full")).not.toBeNull();
+    await expectNoBlockingA11yViolations(container);
   });
 });

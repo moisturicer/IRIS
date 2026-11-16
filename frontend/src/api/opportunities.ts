@@ -31,15 +31,18 @@ export const opportunitiesApi = {
   board: async (): Promise<OpportunityBoard> => {
     const items: Opportunity[] = [];
     let canPost = false;
+    let canFeature = false;
     for (let page = 1; page <= MAX_PAGES; page += 1) {
       const { data } = await apiClient.get<OpportunityPage>("/opportunities/", {
         params: { page, page_size: PAGE_SIZE },
       });
       items.push(...data.results);
       canPost = data.can_post;
+      // RDCO, who works the Call Requests queue, is who may feature (IR-762).
+      canFeature = data.can_review_requests === true;
       if (!data.next) break;
     }
-    return { items, can_post: canPost };
+    return { items, can_post: canPost, can_feature: canFeature };
   },
 
   create: (input: OpportunityInput) =>

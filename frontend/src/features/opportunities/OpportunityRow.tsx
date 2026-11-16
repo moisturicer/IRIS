@@ -2,10 +2,11 @@ import { useId } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { TONES } from "@/components/ui/statusTones";
 import { cn } from "@/lib/utils";
 import type { Opportunity } from "@/types/opportunities";
 
-import { countdown, dateParts, formatDueDate, typeMeta } from "./opportunityUtils";
+import { countdown, dateParts, eventDates, eventTag, formatDueDate, papersClosed, typeMeta } from "./opportunityUtils";
 
 interface OpportunityRowProps {
   opportunity: Opportunity;
@@ -13,7 +14,6 @@ interface OpportunityRowProps {
   /** The page's sentence saying saves stay in this browser, for the save button to point at. */
   savedHintId: string;
   icsBusy:     boolean;
-  icsFailed:   boolean;
   onToggleSave:  () => void;
   onDownloadIcs: () => void;
   onEdit:        () => void;
@@ -25,20 +25,26 @@ const LINK =
   "inline-flex items-center gap-1.5 min-h-11 lg:min-h-8 px-3.5 rounded-full text-small font-semibold " +
   "bg-white text-stone-800 ring-1 ring-stone-300 hover:ring-brand/40 hover:text-brand";
 
+/** A tag: words in a pill, never colour alone. */
+const TAG = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label font-semibold whitespace-nowrap";
+
 /**
- * One call on the deadline board (IR-530).
+ * One call on the deadline board (IR-530, IR-764).
  *
  * Read left to right as the question the board answers: *when* (the date
- * block), *what* (type, title, where, which Areas), then *what I can
- * do* (save it, put the deadline in my calendar, go and apply). Edit and
- * delete appear only when the server says this viewer may (`can_edit`).
+ * block), *what* (type, title, about, event dates, where, fee, which Areas),
+ * then *what I can do* (save it, put the deadline in my calendar, go and
+ * apply). Two tags say where it stands, worded by the server (ADR-050
+ * decision 6): the papers tag always, and Happening now while the event runs.
+ * Edit and delete appear only when the server says this viewer may.
+ *
+ * Nothing here grows when an action fails: the page says so in a toast.
  */
 export function OpportunityRow({
   opportunity: o,
   saved,
   savedHintId,
   icsBusy,
-  icsFailed,
   onToggleSave,
   onDownloadIcs,
   onEdit,
@@ -46,9 +52,12 @@ export function OpportunityRow({
 }: OpportunityRowProps) {
   const titleId = useId();
   const type    = typeMeta(o.opportunity_type);
+  const closed  = papersClosed(o);
   const chip    = countdown(o);
   const date    = dateParts(o.due_date);
-  const urgent  = !o.is_closed && chip.tone === "attention";
+  const urgent  = !closed && chip.tone === "attention";
+  const eventWhen  = eventDates(o);
+  const eventLabel = eventTag(o);
 
   const meta = [o.location, ...(o.area_names ?? [])].filter(Boolean);
 
@@ -70,10 +79,10 @@ export function OpportunityRow({
       >
         {date ? (
           <span aria-hidden="true" className="flex items-baseline gap-1.5 sm:flex-col sm:items-center sm:gap-0">
-            <span className={cn("text-label font-semibold", o.is_closed ? "text-stone-600" : "text-brand")}>
+            <span className={cn("text-label font-semibold", closed ? "text-stone-600" : "text-brand")}>
               {date.month}
             </span>
-            <span className={cn("font-display font-semibold text-heading sm:text-display", o.is_closed ? "text-stone-600" : "text-stone-900")}>
+            <span className={cn("font-display font-semibold text-heading sm:text-display", closed ? "text-stone-600" : "text-stone-900")}>
               {date.day}
             </span>
             <span className="text-label text-stone-600">{date.weekday}</span>
@@ -82,7 +91,7 @@ export function OpportunityRow({
           <span aria-hidden="true" className="text-label text-stone-600">{o.due_date}</span>
         )}
         <span className="sr-only">
-          {o.is_closed ? "Closed" : "Due"} {formatDueDate(o.due_date)}
+          Paper deadline {formatDueDate(o.due_date)}
         </span>
       </time>
 
@@ -105,7 +114,7 @@ export function OpportunityRow({
           id={titleId}
           className={cn(
             "font-display font-semibold text-title mt-1 break-words text-pretty",
-            o.is_closed ? "text-stone-600" : "text-stone-900",
+            closed ? "text-stone-600" : "text-stone-900",
           )}
         >
           {o.title}
@@ -122,6 +131,13 @@ export function OpportunityRow({
           </p>
         )}
 
+        {(eventWhen || o.registration_fee) && (
+          <p className="flex flex-wrap gap-x-4 gap-y-1 text-small text-stone-600 mt-1">
+            {eventWhen && <span>Event: {eventWhen}</span>}
+            {o.registration_fee && <span>Fee: {o.registration_fee}</span>}
+          </p>
+        )}
+
         {o.description && (
           <p className="text-small text-stone-600 mt-2 line-clamp-2 max-w-prose">{o.description}</p>
         )}
@@ -132,12 +148,26 @@ export function OpportunityRow({
       {/* Under the content until `xl`: the sidebar takes its share from `md`,
           so at `lg` a call with no link still squeezed its title to ~240 px. */}
       <div className="w-full xl:w-auto xl:shrink-0 xl:max-w-xs flex flex-wrap xl:flex-col items-center xl:items-end justify-between xl:justify-start gap-3">
-        <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label font-semibold whitespace-nowrap", chip.className)}>
-          <i className={cn("fas", o.is_closed ? "fa-lock" : "fa-clock")} aria-hidden="true" />
-          {chip.label}
-        </span>
+        <p className="flex flex-wrap items-center gap-2">
+          <span className={cn(TAG, closed ? TONES.quiet : chip.className)}>
+            <i className={cn("fas", closed ? "fa-lock" : "fa-clock")} aria-hidden="true" />
+            <span>{o.papers_label}</span>
+            {!closed && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="font-normal">{chip.label}</span>
+              </>
+            )}
+          </span>
+          {eventLabel && (
+            <span className={cn(TAG, TONES.active)}>
+              <i className="fas fa-circle-play" aria-hidden="true" />
+              {eventLabel}
+            </span>
+          )}
+        </p>
 
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Button
             type="button"
             variant="ghost"
@@ -152,7 +182,7 @@ export function OpportunityRow({
             <i className={cn(saved ? "fas" : "far", "fa-bookmark")} aria-hidden="true" />
           </Button>
 
-          {!o.is_closed && (
+          {!closed && (
             <Button
               type="button"
               variant="ghost"
@@ -167,42 +197,28 @@ export function OpportunityRow({
             </Button>
           )}
 
-          {o.external_url ? (
+          {o.external_url && (
             <a
               href={o.external_url}
               target="_blank"
               rel="noopener noreferrer"
               className={cn(LINK, FOCUS_RING, COLOUR_TRANSITION, "ml-1")}
             >
-              {o.is_closed ? "View call" : "View & apply"}
+              {closed ? "View call" : "View & apply"}
               <i className="fas fa-arrow-up-right-from-square text-3xs" aria-hidden="true" />
               <span className="sr-only">(opens in a new tab)</span>
             </a>
-          ) : (
-            // Only a Call migrated from a Conference Deadline lacks a link
-            // (IR-760): say who to ask rather than draw a button that goes nowhere.
-            <span className="ml-1 text-small text-stone-600 xl:max-w-56 xl:text-right">
-              No link given. Ask {o.posted_by_name || "RDCO"}.
-            </span>
           )}
         </div>
-
-        {icsFailed && (
-          <p role="alert" className="w-full xl:w-auto xl:max-w-64 xl:text-right flex items-start gap-1.5 text-small text-brand">
-            <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden="true" />
-            Could not build the calendar file. Try again.
-          </p>
-        )}
       </div>
 
       {/* ---- Who posted it, and the poster's own controls ----------------- */}
       {/* Last in the row, so the deadline and "View & apply" come before Delete
           in reading and tab order. From `xl` it lines up under the content. */}
-      {(o.posted_by_name || o.can_edit) && (
+      {(o.posted_by_name || o.can_edit || o.can_delete) && (
         <div className="basis-full xl:pl-20 flex flex-wrap items-center gap-x-1 gap-y-1 text-label text-stone-600">
           {o.posted_by_name && <span className="mr-2">Posted by {o.posted_by_name}</span>}
           {o.can_edit && (
-            <>
               <Button
                 type="button"
                 variant="ghost"
@@ -214,6 +230,10 @@ export function OpportunityRow({
                 <i className="fas fa-pen" aria-hidden="true" />
                 Edit
               </Button>
+          )}
+          {/* Plain delete only. RDCO removes an Adviser's Call with a reason
+              (`can_remove`), which is IR-765's to offer. */}
+          {o.can_delete && (
               <Button
                 type="button"
                 variant="ghost"
@@ -225,7 +245,6 @@ export function OpportunityRow({
                 <i className="fas fa-trash-can" aria-hidden="true" />
                 Delete
               </Button>
-            </>
           )}
         </div>
       )}
