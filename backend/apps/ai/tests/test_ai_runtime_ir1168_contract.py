@@ -16,7 +16,8 @@ if str(REPO) not in sys.path:
 from ai.agent.compaction import Compaction  # noqa: E402
 from ai.agent.executor import AgentExecutor, _Run  # noqa: E402
 from ai.agent.prompts import (  # noqa: E402
-    CITED_INSTRUCTIONS, CITED_NOTE, CITED_PROMPT_VERSION, CITED_TOOL_VERSION, COHERENT_INSTRUCTIONS, PROMPTS,
+    CITED_INSTRUCTIONS, CITED_NOTE, CITED_PROMPT_VERSION, CITED_TOOL_VERSION, COHERENT_INSTRUCTIONS, EARLIER_TURN,
+    PROMPTS,
 )
 from ai.research.tools import RecoveredTurn  # noqa: E402
 from ai.runs.executor import PriorTurn  # noqa: E402
@@ -26,6 +27,7 @@ from .test_ai_runtime_agent_loop_contract import (  # noqa: E402
 from .test_ai_runtime_compaction_contract import WINDOW, Handoffs, windowed  # noqa: E402
 from .test_ai_runtime_followups_contract import screened  # noqa: E402
 from .test_ai_runtime_ir1166_contract import PIN_9  # noqa: E402
+from .test_ai_runtime_ir995_contract import Searchable  # noqa: E402
 
 PIN_10 = dataclasses.replace(PIN_9, prompt_version="agent-research-10", tool_version="research-10")
 QUESTION = "What about the second one?"
@@ -33,7 +35,7 @@ FIRST = PriorTurn("Which papers study water?", "Two papers [1] [2].", "answer", 
                   cited=((1, 4), (2, 2), (1, 6)))
 SECOND = PriorTurn("Hello", "Hello; ask about the papers.", "answer", 2)
 #: The note under Turn 1's answer while both papers are readable.
-LISTED = (f"{CITED_NOTE}«Flood forecasting» (paper {handle('R', 1)}), pages 4, 6; "
+LISTED = (f"\n\nPapers this answer cited: «Flood forecasting» (paper {handle('R', 1)}), pages 4, 6; "
           f"«Pond sampling» (paper {handle('R', 2)}), page 2.")
 
 
@@ -58,6 +60,8 @@ def test_research_10_is_a_new_pin_and_research_9_keeps_its_text():
     added = "reread that Turn with recover_turn by its number, or read a cited page again with read_page"
     assert CITED_INSTRUCTIONS.count(added) == 1 and added not in COHERENT_INSTRUCTIONS
     assert CITED_INSTRUCTIONS.count("[IRIS earlier Turn 2]") == 1
+    # research-10's bytes: these texts are part of every follow-up it sends.
+    assert (EARLIER_TURN, CITED_NOTE) == ("[IRIS earlier Turn {n}] ", "\n\nPapers this answer cited: ")
 
 
 def test_a_follow_up_is_sent_each_earlier_turn_with_its_number_and_cited_papers():
@@ -156,3 +160,33 @@ def test_with_room_the_same_rule_keeps_the_lists():
     _, corpus = follow_up(provider, agent={"compaction": rule}, commit_handoff=Handoffs())
     assert [m["phase"] for m in models(corpus)] == ["gather"]
     assert contents(provider)[2] == "Two papers." + LISTED
+
+
+#: Turn 1 citing many pages, so its list outweighs one search result.
+MANY = dataclasses.replace(FIRST, cited=tuple((1, page) for page in range(1, 201)))
+
+
+def used(corpus):
+    return [data["used_tokens"] for name, data in corpus.events if name == "context"]
+
+
+def searched(prior, **kw):
+    provider = wide(tools(call("s", "search", query="flood")), reply("General background."))
+    return (provider, *follow_up(provider, prior=prior, corpus=Searchable(), **kw))
+
+
+def test_lists_also_go_before_a_turn_once_research_grows_the_history():
+    _, _, corpus = searched((MANY, SECOND))
+    opened, grown = used(corpus)
+    _, _, plain = searched((dataclasses.replace(MANY, cited=()), SECOND))
+    lists = opened - used(plain)[0]
+    assert grown - lists < opened + 1 <= grown
+    rule = Compaction(threshold_tokens=opened + 1, summary_tokens=400, keep_exchanges=1, max_attempts=2)
+    provider, _, corpus = searched((MANY, SECOND), agent={"compaction": rule}, commit_handoff=Handoffs())
+    # No Turn was compacted: dropping the lists was enough.
+    assert [m["phase"] for m in models(corpus)] == ["gather", "gather"]
+    assert CITED_NOTE in contents(provider, 0)[2] and CITED_NOTE not in contents(provider, 1)[2]
+    assert contents(provider, 1)[1:5] == [
+        "[IRIS earlier Turn 1] Which papers study water?", "Two papers.",
+        "[IRIS earlier Turn 2] Hello", "Hello; ask about the papers.",
+    ]

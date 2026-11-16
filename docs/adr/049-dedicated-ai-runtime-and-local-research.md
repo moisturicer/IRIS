@@ -231,7 +231,7 @@ Both vector reads order the rows of the policy-filtered `research_vectors` / `re
 
 ## Amendment — 2026-11-16 (IR-1168): earlier Turns carry their number and citations
 
-1. **`research-10` (prompt `agent-research-10`).** Specified by Jive Tyler I. Revalde in IR-1168 (2026-11-16). Same tools, checks and repairs as `research-9`. Each earlier Turn's question is labelled with its number, the one `recover_turn` takes. Under its answer go the papers that answer cited and their pages, as paper handles from the run's own recall. A paper the reader can no longer read, or that is outside a Paper Chat's scope, is left out. The text is research-9's plus one passage on using the numbers and the cited pages.
-2. **The lists give way before Turns.** If the history would fill the window or reach the compaction threshold with the lists, it is sent without them.
+1. **`research-10` (prompt `agent-research-10`).** Specified by Jive Tyler I. Revalde in IR-1168 (2026-11-16). Same tools, checks and repairs as `research-9`. Each earlier Turn's question is labelled with its number, the one `recover_turn` takes. Under its answer go the papers that answer cited and their pages, as paper handles from the run's own recall. A paper the reader can no longer read is left out. The text is research-9's plus one passage on using the numbers and the cited pages.
+2. **The lists give way before Turns.** If the history would fill the window or reach the compaction threshold with the lists, when the run opens or later as research grows it, every list is dropped at once before any Turn is compacted.
 3. **New AGENT runs are pinned to `research-10`.** A run pinned to an earlier version finishes on it and receives earlier Turns exactly as before.
 4. **Not measured.** The lists add tokens to every follow-up. How they change answers is known only from a paid evaluation run, which has not been made.

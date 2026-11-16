@@ -336,10 +336,12 @@ class _Run:
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
         self.chat = tool_set == CHAT_TOOL_VERSION
         self.repairs = 2
-        #: research-8 and research-9 repairs never mention the unseen draft (IR-1004, IR-1166).
+        #: research-8 and later repairs never mention the unseen draft (IR-1004, IR-1166).
         self.fresh_repairs = version in EVIDENCE_TOOL_VERSIONS
         #: research-10 numbers earlier Turns and lists what they cited (IR-1168).
         self.cites = version == CITED_TOOL_VERSION
+        #: Each earlier answer sent with its citation list -> the same answer without it.
+        self.unlisted: dict = {}
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         #: Sources the history carried when the answer was written (IR-994).
@@ -467,11 +469,15 @@ class _Run:
             summary = compacting.render(handoff, self.investigation.papers, passages=False)
             history.append(summary)
         plain, earlier = self._earlier(listed=False), self._earlier(listed=True)
+        self.unlisted = {e: p for e, p in zip(earlier, plain) if e != p}
         closing = self._closing(shown, scope)
-        if earlier != plain and self._overflows([*history, *earlier, *closing]):
+        if self.unlisted and self._overflows([*history, *earlier, *closing]):
             # A history that would not fit loses the citation lists before any Turn (IR-1168).
-            earlier = plain
+            earlier, self.unlisted = plain, {}
         return [*history, *earlier, *closing]
+
+    def _without_lists(self, history: list) -> list:
+        return [self.unlisted.get(e, e) if isinstance(e, ModelTurn) else e for e in history]
 
     def _earlier(self, *, listed: bool) -> list:
         """The carried Turns; under research-10 numbered, and with what they cited when `listed` (IR-1168)."""
@@ -510,7 +516,7 @@ class _Run:
             return full.code in WINDOW_FULL
         rule = self.agent.compaction
         return (rule is not None and self.context.commit_handoff is not None
-                and status.occupancy_tokens >= rule.threshold_tokens)
+                and self.compactions < rule.max_attempts and status.occupancy_tokens >= rule.threshold_tokens)
 
     def _closing(self, shown: dict, scope) -> list:
         """The state message, the Paper Chat note and the reader's question, in that order."""
@@ -604,6 +610,12 @@ class _Run:
             return await self._compaction_failed(history, "capacity_unknown") if forced else history
         if not forced and occupancy < rule.threshold_tokens:
             return history
+        if not forced and self.unlisted:
+            # The citation lists go before any Turn is compacted (IR-1168).
+            history, self.unlisted = self._without_lists(history), {}
+            occupancy = self.agent.occupancy(self.request(history))
+            if occupancy is not None and occupancy < rule.threshold_tokens:
+                return history
         cut = compacting.split(history, rule.keep_exchanges)
         if cut is None:
             self.outcome = NOTHING_TO_COMPACT
