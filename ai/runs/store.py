@@ -173,6 +173,32 @@ def regions(bboxes, page_sizes) -> list[dict]:
 READING_TOOLS = ("read_manuscript", "read_page", "open_passage", "outline", "recover_turn")
 
 
+#: `$4` appears in Conversation `c` as a question, or in an answer whose every source
+#: (cited, or read by a tool) is still readable under the grant.
+_MATCH = """(
+    EXISTS (SELECT 1 FROM iris_ai.ask_run r
+             WHERE r.conversation_id = c.id AND r.question IS NOT NULL
+               AND position(lower($4::text) in lower(r.question)) > 0)
+    OR EXISTS (
+        SELECT 1 FROM iris_ai.turn t
+         WHERE t.conversation_id = c.id
+           AND position(lower($4::text) in lower(t.answer)) > 0
+           AND NOT EXISTS (
+               SELECT 1
+                 FROM (SELECT ct.revision AS rev FROM iris_ai.citation ct WHERE ct.turn_id = t.id
+                       UNION
+                       SELECT s.rev
+                         FROM iris_ai.run_event e
+                        CROSS JOIN LATERAL jsonb_array_elements_text(
+                              CASE WHEN jsonb_typeof(e.data -> 'sources') = 'array'
+                                   THEN e.data -> 'sources' ELSE '[]'::jsonb END) AS s(rev)
+                        WHERE e.run_id = t.run_id AND e.name = 'tool') d
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM public.ai_chunkset cs
+                      JOIN public.records_record rr ON rr.id = cs.record_id
+                     WHERE cs.is_active AND cs.id::text || ':' || cs.extraction_hash = d.rev))))"""
+
+
 class NotFound(Exception):
     pass
 
@@ -1128,23 +1154,30 @@ class RunStore:
             } for t in turns],
         }
 
-    async def list_conversations(self, grant, *, limit=50) -> list[dict]:
-        """The reader's recent Conversations, newest activity first, titled by their first question."""
+    async def list_conversations(self, grant, *, limit=50, q=None, before=None) -> list[dict]:
+        """The reader's Conversations, newest activity first, titled by their first question.
+
+        `q` matches questions, and answers only while their sources stay readable (the
+        `reopen` rule). `before` is the (updated_at, id) of the last item already shown."""
+        after, after_id = before or (None, None)
         async with self._connect() as conn:
             async with conn.transaction(isolation="repeatable_read"):
                 reader, scope = await self._principal(conn, grant)
                 rows = await conn.fetch(
-                    f"""SELECT c.id, c.scope_record_id, c.created_at,
-                               (SELECT r.question FROM iris_ai.ask_run r
-                                 WHERE r.conversation_id = c.id AND r.question <> ''
-                                 ORDER BY r.created_at LIMIT 1) AS title,
-                               coalesce((SELECT max(r.created_at) FROM iris_ai.ask_run r
-                                          WHERE r.conversation_id = c.id), c.created_at) AS updated_at
-                          FROM iris_ai.conversation c
-                         WHERE c.reader_id = $1 AND c.deleted_at IS NULL
-                           AND ($2::bigint IS NULL OR c.scope_record_id = $2)
-                         ORDER BY updated_at DESC LIMIT $3""",
-                    reader, scope, limit,
+                    f"""SELECT c.id, c.scope_record_id, c.title, c.updated_at
+                          FROM (SELECT cv.id, cv.scope_record_id,
+                                       (SELECT r.question FROM iris_ai.ask_run r
+                                         WHERE r.conversation_id = cv.id AND r.question <> ''
+                                         ORDER BY r.created_at LIMIT 1) AS title,
+                                       coalesce((SELECT max(r.created_at) FROM iris_ai.ask_run r
+                                                  WHERE r.conversation_id = cv.id), cv.created_at) AS updated_at
+                                  FROM iris_ai.conversation cv
+                                 WHERE cv.reader_id = $1 AND cv.deleted_at IS NULL
+                                   AND ($2::bigint IS NULL OR cv.scope_record_id = $2)) c
+                         WHERE ($5::timestamptz IS NULL OR (c.updated_at, c.id) < ($5::timestamptz, $6::uuid))
+                           AND ($4::text IS NULL OR {_MATCH})
+                         ORDER BY c.updated_at DESC, c.id DESC LIMIT $3""",
+                    reader, scope, limit, q, after, after_id,
                 )
         return [{"id": str(r["id"]), "title": r["title"] or "", "record_id": r["scope_record_id"],
                  "updated_at": r["updated_at"].isoformat()} for r in rows]
