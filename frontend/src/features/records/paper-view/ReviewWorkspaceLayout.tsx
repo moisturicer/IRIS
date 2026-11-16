@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, ty
 import { createPortal } from "react-dom";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY } from "@/components/ui/pillStyles";
+import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { seatsApi } from "@/api/reviews";
 import { errorDetail } from "@/lib/errorDetail";
 import { useElementWidth } from "@/hooks/useElementWidth";
@@ -271,13 +271,22 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const details = <div ref={setStatusTarget} />;
   // Shown in the pane's header, and beside the launcher while a narrow window
   // keeps the pane closed, so a first visit sees it either way.
+  // One quiet row (IR-1191 misc): what the tour is on the left, Not now and an
+  // outlined Start tour on the right, wrapping under the text when narrow. It
+  // is an offer, not the page's action, so nothing in it is filled.
   const offer = (
-    <div role="group" aria-label="Guided tour" className="w-full rounded-control border border-stone-300 bg-white p-3">
-      <p className="text-small text-stone-800">New to the Review workspace? Take a short tour of its main parts.</p>
-      <div className="mt-2 flex gap-2">
-        <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} onClick={() => startTour(tourOpener())}>Start tour</button>
-        <button type="button" className={cn("review-control font-semibold text-stone-700", FOCUS_RING)}
+    <div role="group" aria-label="Guided tour"
+      className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 rounded-control border border-stone-300 bg-white px-4 py-3">
+      <p className="min-w-0 flex-1 basis-56 text-small text-stone-800">
+        New to the review workspace? A four-step tour shows where everything is.
+      </p>
+      <div className="ml-auto flex shrink-0 items-center gap-1">
+        <button type="button" className={cn("review-control px-3 font-semibold text-stone-700 hover:text-stone-900", FOCUS_RING)}
           onClick={dismissOffer}>Not now</button>
+        <button type="button" onClick={() => startTour(tourOpener())}
+          className={cn(PILL_SECONDARY, "bg-white px-4 text-stone-900 ring-stone-400 reading-split:min-h-9", FOCUS_RING)}>
+          Start tour
+        </button>
       </div>
     </div>
   );

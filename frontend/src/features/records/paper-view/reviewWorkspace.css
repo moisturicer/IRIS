@@ -77,6 +77,14 @@
 .review-label { padding: 0 8px; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.full'); background: white; font-size: 12px; line-height: 18px; font-weight: 600; color: theme('colors.stone.600'); white-space: nowrap; }
 .review-box-replies { margin: 0; padding: 0; list-style: none; }
 .review-box-rep { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; padding: 10px 14px; border-top: 1px solid theme('colors.stone.200'); }
+/* A thread's history (IR-1191, IR-1192): replies by a person in the brand
+ * colour; the authors' answer and other events marked by an outlined icon in
+ * the avatar's place, the answer on a tinted row so it reads as an act. */
+.review-avatar-brand { background: theme('colors.brand.DEFAULT'); }
+.review-event-ic { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid theme('colors.stone.700'); border-radius: theme('borderRadius.full'); background: white; color: theme('colors.stone.800'); font-size: 11px; }
+.review-box-event { align-items: center; padding-top: 6px; padding-bottom: 6px; }
+.review-box-event .review-event-ic { width: 20px; height: 20px; margin: 0 2px; border-color: theme('colors.stone.300'); color: theme('colors.stone.500'); font-size: 10px; }
+.review-box-answer { background: theme('colors.stone.50'); }
 .review-box-foot { padding: 8px 14px; border-top: 1px solid theme('colors.stone.200'); background: theme('colors.stone.50'); }
 .review-box-foot > form { margin-top: 0; }
 .review-reply-field { display: block; width: 100%; min-height: 36px; padding: 0 12px; border: 1px solid theme('colors.stone.300'); border-radius: 8px; background: white; color: theme('colors.stone.600'); font-size: 14px; text-align: left; cursor: text; }

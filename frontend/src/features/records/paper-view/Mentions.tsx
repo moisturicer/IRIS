@@ -26,6 +26,15 @@ export function peopleIn(value: unknown): MentionedPerson[] {
   return Array.isArray(value) ? value.filter(isPerson) : [];
 }
 
+/**
+ * The mentions an edit sends: undefined when they are the ones it started
+ * from, so a payload without them never clears them.
+ */
+export function changedMentions(before: MentionedPerson[], after: number[]): number[] | undefined {
+  const same = after.length === before.length && after.every((id, i) => id === before[i].id);
+  return same ? undefined : after;
+}
+
 export function MentionPicker({ recordId, value, onChange }: {
   recordId: number;
   value: MentionedPerson[];
