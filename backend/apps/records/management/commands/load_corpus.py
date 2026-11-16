@@ -65,6 +65,7 @@ from django.db import transaction
 
 from apps.accounts.models import User
 from apps.documents.sources import manuscript_changes, reset_manuscript
+from apps.documents.scanning import upload_problem
 from apps.documents.validators import pdf_upload_problem
 from apps.records import lifecycle
 from apps.records.corpus_clearance import clear_for_ai, refuse_outside_development
@@ -245,7 +246,8 @@ class Command(BaseCommand):
             )
             with path.open("rb") as fh:
                 source = File(fh, name=path.name)
-                problem = pdf_upload_problem(source)
+                problem = pdf_upload_problem(source) or upload_problem(
+                    source, user=owner, where="load_corpus", record=record)
                 if problem:
                     raise ValueError(problem)
                 for field, value in manuscript_changes(None, source).items():

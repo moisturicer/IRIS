@@ -1810,7 +1810,7 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         for row in rows:
             values, problems = check_import_row(row, choices)
-            pdf, pdf_problems = check_import_pdf(row, pdfs, taken)
+            pdf, pdf_problems = check_import_pdf(row, pdfs, taken, user=request.user)
             problems = problems + pdf_problems
             if check:
                 checked.append({

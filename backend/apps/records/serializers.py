@@ -3,6 +3,7 @@ from rest_framework import serializers
 from core.enums import PipelineStatus, ReviewDecision
 from core.text_limits import FREE_TEXT_MAX_LENGTH, too_long_message
 
+from apps.documents.scanning import upload_problem
 from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, record_versions, resubmission_payload
 
@@ -715,7 +716,8 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             )
         if not file:
             return file
-        problem = pdf_upload_problem(file)
+        problem = pdf_upload_problem(file) or upload_problem(
+            file, user=user, where="manuscript", record=self.instance)
         if problem:
             raise serializers.ValidationError(problem)
         return file

@@ -10,6 +10,7 @@ from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, Record
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
+from .scanning import FILE_GONE, upload_problem
 from .validators import is_pdf_upload, pdf_upload_problem
 
 
@@ -187,7 +188,8 @@ class SubmitDocumentView(APIView):
             try:
                 with transaction.atomic():
                     item, slot = resolve_item_for_upload(record, item_id, slot_id)
-                    problem = pdf_upload_problem(file)
+                    problem = pdf_upload_problem(file) or upload_problem(
+                        file, user=request.user, where="requested_document", record=record)
                     if problem:
                         return Response({"file": [problem], "detail": problem}, status=400)
                     upload = create_upload(record, slot, file, uploaded_by=request.user)
@@ -198,7 +200,8 @@ class SubmitDocumentView(APIView):
             slot, missing = _slot_for_record(record, slot_id)
             if missing:
                 return missing
-            problem = pdf_upload_problem(file)
+            problem = pdf_upload_problem(file) or upload_problem(
+                file, user=request.user, where="upload_slot", record=record)
             if problem:
                 return Response({"file": [problem], "detail": problem}, status=400)
             upload = _store_slot_upload(record, slot, file, request.user)
@@ -362,7 +365,8 @@ class RecordUploadCreateView(APIView):
         if missing:
             return missing
 
-        problem = pdf_upload_problem(file)
+        problem = pdf_upload_problem(file) or upload_problem(
+            file, user=request.user, where="upload_version", record=record)
         if problem:
             return Response({"file": [problem], "detail": problem}, status=400)
 
@@ -393,6 +397,9 @@ class RecordUploadDownloadView(APIView):
 
         if not owns_or_staffs_record(request.user, upload.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        if not upload.file:
+            # Taken out of use by the malware scan (ADR-072 decision 4).
+            return Response({"detail": FILE_GONE}, status=status.HTTP_404_NOT_FOUND)
 
         inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
 
@@ -466,6 +473,10 @@ class RecordFileUploadView(APIView):
             problem = pdf_upload_problem(file)
             if problem:
                 return Response({"file": [problem], "detail": problem}, status=400)
+        # Any type an office attaches is scanned, not only a PDF (ADR-072).
+        problem = upload_problem(file, user=request.user, where="office_attachment", record=record)
+        if problem:
+            return Response({"file": [problem], "detail": problem}, status=400)
         record_file = RecordFile.objects.create(
             record=record,
             file=file,
@@ -536,6 +547,9 @@ class RecordFileDownloadView(APIView):
 
         if not owns_or_staffs_record(request.user, record_file.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        if not record_file.file:
+            # Taken out of use by the malware scan (ADR-072 decision 4).
+            return Response({"detail": FILE_GONE}, status=status.HTTP_404_NOT_FOUND)
 
         inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
         filename = record_file.filename or record_file.file.name.split("/")[-1]
@@ -614,7 +628,8 @@ class RecordFileDownloadAllView(APIView):
         if denied:
             return denied
 
-        files = RecordFile.objects.filter(record_id=record.pk)
+        # A file the malware scan took out of use has none (ADR-072 decision 4).
+        files = RecordFile.objects.filter(record_id=record.pk).exclude(file="")
         buffer = build_zip(files)
         response = HttpResponse(buffer, content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="record_{record.pk}_files.zip"'

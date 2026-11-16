@@ -20,6 +20,9 @@
 #     took the indexing path off it, and nothing in the journeys calls it.
 #     The frontend's start-order dependency on it is dropped to match.
 #
+#   * backend waits for clamav to be healthy, so the first journey's upload
+#     isn't refused while signatures load (ADR-072, IR-666).
+#
 # Not changed: the image builds, gunicorn + UvicornWorker, every Celery worker
 # and beat, nginx, migrations, feature flags (all at their defaults).
 # TLS is out of IR-631's scope, so caddy is behind a profile and the frontend
@@ -34,6 +37,12 @@ services:
     <<: *e2e-env
   backend:
     <<: *e2e-env
+    # Uploads are refused until ClamAV has its signatures (ADR-072, fail
+    # closed), and the journeys upload at once; so the backend waits here.
+    # Production doesn't: the site should come up while ClamAV loads.
+    depends_on:
+      clamav:
+        condition: service_healthy
   celery-default:
     <<: *e2e-env
   celery-extraction:

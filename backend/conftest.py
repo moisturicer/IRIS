@@ -411,3 +411,18 @@ def _connect_the_notice_default() -> None:
     pre_save.connect(
         _new_users_answer_the_notice, dispatch_uid="iris-test-users-answer-the-notice", weak=False,
     )
+
+
+@pytest.fixture(autouse=True)
+def _every_upload_is_scanned_by_the_test_scanner():
+    """Scan every upload with the test scanner, which flags EICAR (IR-666, ADR-072).
+
+    Tests run with DEBUG on, where development may switch scanning off; this
+    keeps every upload path going through the scan, so a path that stops
+    asking is caught by the EICAR tests rather than by nothing. A test about
+    the scanner itself installs its own.
+    """
+    from apps.documents.scanning import FakeScanner, use_scanner
+
+    with use_scanner(FakeScanner()):
+        yield

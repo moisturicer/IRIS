@@ -54,6 +54,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # Malware scanning (ADR-072, IR-666), opt in: `docker compose --profile scan up`,
+  # with MALWARE_SCAN=clamd and MALWARE_SCAN_HOST=clamav in backend/.env. Off by
+  # default, so nobody needs its ~1 GB to develop; uploads are then stored
+  # unscanned, each one logged. Production always scans.
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["scan"]
+    environment:
+      - CLAMD_CONF_StreamMaxLength=60M
+      - CLAMD_CONF_MaxFileSize=60M
+      - CLAMD_CONF_MaxScanSize=200M
+      - CLAMD_CONF_ConcurrentDatabaseReload=no
+    volumes:
+      - clamav_db:/var/lib/clamav
+
   migrate:
     build:
       context: ./backend
@@ -360,3 +375,4 @@ services:
 volumes:
   postgres_data:
   media_files:
+  clamav_db:

@@ -39,3 +39,8 @@ DEFAULT_FROM_EMAIL = "iris@localhost"
 
 # Request budgets come from the same explicit environment keys as production.
 # See backend/.env.example for opt-in local values (IR-371).
+
+# IR-666, ADR-072: a teammate develops without the ClamAV container unless they
+# set MALWARE_SCAN=clamd and MALWARE_SCAN_HOST (the `scan` Compose profile).
+# Uploads are then stored unscanned, each one logged. Never allowed in production.
+MALWARE_SCAN = config("MALWARE_SCAN", default="off")  # noqa: F405
