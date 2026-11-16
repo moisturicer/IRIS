@@ -126,7 +126,7 @@ They stay in `lib/opportunityLibrary.ts`, labelled browser-only, and keep their 
 
 ## Amendment — 2026-11-16 (IR-573): where the reader left off follows the account
 
-**Status of this amendment: Proposed** — decided by Hermoine Zozobrado, 2026-11-16, while building IR-573. It is accepted when IR-573's PR merges.
+**Status of this amendment: Accepted** — 2026-11-16, when IR-573's PR (#841) merged after Ashlee's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado, 2026-11-16, while building IR-573.
 
 IR-553 asks for a per-Record reading position, keyed by owner, Record and Manuscript identity, and for its retention to be recorded before it is built. These are its rules.
 
