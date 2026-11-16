@@ -32,7 +32,9 @@ SORTS = ("newest", "viewed")
 DEFAULT_SORT = "newest"
 #: `has_ip` is Discover's "any IP" option; the rest are the IP types.
 IP_VALUES = frozenset({"has_ip", *IPType.values})
-QUERY_KEYS = ("q", "type", "college", "classification", "year", "ip", "sort")
+#: `year_from` and `year_to` are Discover's year range, either end open
+#: (IR-947); the single `year` key they replaced is refused.
+QUERY_KEYS = ("q", "type", "college", "classification", "year_from", "year_to", "ip", "sort")
 
 EMPTY_FEED = "Add at least one Area, keyword, college, type, year or IP filter."
 
@@ -109,11 +111,11 @@ def clean_query(raw) -> dict:
                 cleaned[key] = value
             else:
                 problems.append("type must be an id.")
-        elif key == "year":
+        elif key in ("year_from", "year_to"):
             if _YEAR.match(value):
                 cleaned[key] = value
             else:
-                problems.append("year must be four digits.")
+                problems.append(f"{key} must be four digits.")
         elif key == "ip":
             if value in IP_VALUES:
                 cleaned[key] = value
@@ -124,6 +126,9 @@ def clean_query(raw) -> dict:
                 problems.append("sort must be newest or viewed.")
             elif value != DEFAULT_SORT:
                 cleaned[key] = value
+
+    if "year_from" in cleaned and "year_to" in cleaned and cleaned["year_from"] > cleaned["year_to"]:
+        problems.append("year_from must not be after year_to.")
 
     for key, model, many in _TAXONOMY:
         if key not in cleaned:

@@ -519,9 +519,12 @@ export default function DiscoverPage() {
       recordTypes: [{ value: ALL_VALUE, label: "Any type" }, ...recordTypes],
       colleges,
       classifications,
+      // Both ends of the range choose from the catalogue's years, plus any year
+      // the URL already holds that the catalogue no longer lists (IR-947).
       years: [
         { value: ALL_VALUE, label: "Any year" },
-        ...(filters.year !== ALL_VALUE && !years.includes(filters.year) ? [filters.year] : [])
+        ...[filters.yearFrom, filters.yearTo]
+          .filter((y, i, all) => y !== ALL_VALUE && !years.includes(y) && all.indexOf(y) === i)
           .concat(years)
           .map((y) => ({ value: y, label: y })),
       ],
@@ -531,7 +534,7 @@ export default function DiscoverPage() {
         ...Object.entries(IP_TYPE_LABELS).map(([value, label]) => ({ value, label })),
       ],
     }),
-    [recordTypes, colleges, classifications, years, filters.year],
+    [recordTypes, colleges, classifications, years, filters.yearFrom, filters.yearTo],
   );
 
   /** Areas shape For you. Until there are Areas to choose (or the reader already holds some),

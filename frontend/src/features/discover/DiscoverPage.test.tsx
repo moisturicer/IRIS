@@ -409,7 +409,7 @@ describe("the toolbar and the result rows (IR-1082)", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     const sheet = await filterSheet();
-    for (const [label, value] of [["Type", "Any type"], ["College", "Any"], ["Classification", "Any"], ["Year (completed)", "Any year"], ["IP & patents", "Any"]]) {
+    for (const [label, value] of [["Type", "Any type"], ["College", "Any"], ["Classification", "Any"], ["Year from", "Any year"], ["Year to", "Any year"], ["IP & patents", "Any"]]) {
       expect(within(sheet).getByText(label)).toBeVisible();
       expect(within(sheet).getByRole("button", { name: `${label} ${value}` })).toBeInTheDocument();
     }
@@ -598,7 +598,7 @@ describe("browsing", () => {
   });
 
   it("keeps filters across feeds, applies them to recommendations, and hides recommendation sorting", async () => {
-    renderDiscover("/?type=1&college=4&year=2026");
+    renderDiscover("/?type=1&college=4&year_from=2026&year_to=2026");
     await screen.findByText(publishedThesis.title);
     await userEvent.click(screen.getByRole("button", { name: "For you" }));
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({
@@ -607,8 +607,8 @@ describe("browsing", () => {
     const forYouFilters = await filterSheet();
     // Recommendations have their own order, so there is no Sort, though the count stays.
     expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
-    await choose(/^Year/, /^2009$/, forYouFilters);
-    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2009" })));
+    await choose(/^Year from/, /^2009$/, forYouFilters);
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2026" })));
     expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Latest" }));
     await waitFor(() => expect(lastListParams()).toMatchObject({ record_type: "1", college: "4", year_from: "2009" }));
@@ -617,7 +617,7 @@ describe("browsing", () => {
 
   it("offers clearing active For you filters when they match no research", async () => {
     recommended = { mode: "for_you", results: [], next_cursor: null, count: 0 };
-    renderDiscover("/?feed=for_you&year=2009");
+    renderDiscover("/?feed=for_you&year_from=2009");
     expect(await screen.findByRole("heading", { name: "No research matches these filters" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, { ordering: "-created_at" }));
@@ -1081,12 +1081,37 @@ describe("filtering", () => {
     expect(lastListParams()).not.toHaveProperty("is_ip");
   });
 
-  it("filters by year through year_from and year_to", async () => {
+  // IR-947: a from–to range replaces the single year; one year is both ends.
+  it("filters by a year range, either end open, through year_from and year_to", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await choose(/^year/i, /^2026$/);
+    await choose(/^Year from/, /^2009$/);
+    await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2009" }));
+    expect(lastListParams()).not.toHaveProperty("year_to");
+    expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent(/^\?year_from=2009$/);
+
+    await choose(/^Year to/, /^2026$/);
+    await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2009", year_to: "2026" }));
+    expect(screen.getByRole("button", { name: "Filters, 1 active" })).toBeInTheDocument();
+  });
+
+  it("never sends a range that ends before it starts", async () => {
+    renderDiscover("/?year_to=2009");
+    await screen.findByText(publishedThesis.title);
+
+    await choose(/^Year from/, /^2026$/);
+
     await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2026", year_to: "2026" }));
+  });
+
+  it("does not read the retired single-year key, and takes it out of the address", async () => {
+    renderDiscover("/?year=2026&type=2");
+    await screen.findByText(publishedThesis.title);
+
+    expect(lastListParams()).not.toHaveProperty("year_from");
+    expect(lastListParams()).not.toHaveProperty("year_to");
+    await waitFor(() => expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent(/^\?type=2$/));
   });
 
   it("does not offer a Proposal type, because Proposals are not in the catalogue", async () => {
@@ -1257,7 +1282,7 @@ describe("continuity", () => {
   });
 
   it("restores the search, filters and sort from the URL", async () => {
-    renderDiscover("/?q=rain&type=2&year=2019&sort=viewed");
+    renderDiscover("/?q=rain&type=2&year_from=2019&year_to=2019&sort=viewed");
 
     await waitFor(() =>
       expect(lastListParams()).toMatchObject({
@@ -1285,7 +1310,7 @@ describe("continuity", () => {
   });
 
   it("falls back to safe defaults for values it does not recognise, and corrects the URL", async () => {
-    renderDiscover("/?sort=bogus&year=19&type=thesis&college=4,x");
+    renderDiscover("/?sort=bogus&year_from=19&type=thesis&college=4,x");
 
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at", college: "4" }));
     expect(lastListParams()).not.toHaveProperty("year_from");
@@ -1337,7 +1362,7 @@ describe("continuity", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^year/i }));
+    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^Year to/ }));
     const options = await screen.findByRole("listbox");
     expect(within(options).getByRole("option", { name: "2009" })).toBeInTheDocument();
   });
@@ -1515,17 +1540,17 @@ describe("saved custom feeds (IR-577)", () => {
   it("offers to save changed filters into the open feed, and only when they differ", async () => {
     const feed = savedFeed({ query: { q: "flood", classification: "7" } });
     withFeeds(feed);
-    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...feed, query: { q: "flood", classification: "7", year: "2026" } } } as never);
+    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...feed, query: { q: "flood", classification: "7", year_from: "2026" } } } as never);
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     await openFeed();
     await screen.findByRole("region", { name: "Feed Coastal hazards" });
     expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument();
 
-    await choose(/^Year/, /2026/);
+    await choose(/^Year from/, /2026/);
 
     await userEvent.click(await screen.findByRole("button", { name: "Save these filters to this feed" }));
-    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { q: "flood", classification: "7", year: "2026" } }));
+    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { q: "flood", classification: "7", year_from: "2026" } }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument());
   });
 

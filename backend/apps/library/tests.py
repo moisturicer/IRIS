@@ -264,14 +264,14 @@ class SavedFeedTests(LibraryTestCase):
         response = self.make(
             "Coastal hazards",
             q="flood", classification=f"{self.civil.id},{self.flood.id}",
-            college=str(self.college.id), year="2018", sort="viewed",
+            college=str(self.college.id), year_from="2018", year_to="2021", sort="viewed",
         )
 
         self.assertEqual(response.status_code, 201)
         # Ids are stored the way Discover spells them: sorted, once each.
         expected = {
             "q": "flood", "classification": f"{self.flood.id},{self.civil.id}",
-            "college": str(self.college.id), "year": "2018", "sort": "viewed",
+            "college": str(self.college.id), "year_from": "2018", "year_to": "2021", "sort": "viewed",
         }
         self.assertEqual(response.data["query"], expected)
         self.assertEqual(response.data["stale"], {})
@@ -367,8 +367,10 @@ class SavedFeedTests(LibraryTestCase):
             {"college": "999999"},
             {"type": "999999"},
             {"classification": "abc"},
-            {"year": "20x8"},
-            {"year": "208"},
+            {"year_from": "20x8"},
+            {"year_to": "208"},
+            {"year_from": "2021", "year_to": "2018"},  # IR-947: ends before it starts
+            {"q": "flood", "year": "2018"},            # IR-947: the retired single-year key
             {"ip": "bogus"},
             {"sort": "bogus"},
             {"q": "flood", "feed": "for_you"},  # a tab is not a criterion
@@ -381,6 +383,13 @@ class SavedFeedTests(LibraryTestCase):
             self.assertEqual(response.status_code, 400, query)
             self.assertIn("query", response.data, query)
         self.assertEqual(SavedFeed.objects.count(), 0)
+
+    def test_a_year_range_may_be_open_at_either_end_or_one_year(self):
+        # IR-947: Discover's year filter is a from–to range.
+        for query in ({"year_from": "2018"}, {"year_to": "2021"}, {"year_from": "2019", "year_to": "2019"}):
+            response = self.client.post(FEEDS, {"name": str(query), "query": query}, format="json")
+            self.assertEqual(response.status_code, 201, query)
+            self.assertEqual(response.data["query"], query)
 
     def test_the_ip_filter_and_record_type_are_accepted(self):
         ok = self.make("IP", ip="has_ip", type=str(self.thesis.id))
