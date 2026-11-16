@@ -50,6 +50,7 @@
     "protocol": "runs-reader-1",
     "id": "00000000-0000-4000-8000-000000000002",
     "revision": 1,
+    "title": "How do these studies sample water?",
     "runs": [
       {
         "protocol": "runs-reader-1",
@@ -114,14 +115,16 @@
             "page": 3,
             "quote": "river gauges measure water level hourly",
             "revision": "1:e-1-1",
-            "regions": []
+            "regions": [],
+            "title": "Flood sensors"
           },
           {
             "record_id": 2,
             "page": 5,
             "quote": "pond water sampled weekly for turbidity",
             "revision": "2:e-2-1",
-            "regions": []
+            "regions": [],
+            "title": "Pond sampling"
           }
         ],
         "facts": [

@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ChatInput } from "./ChatInput";
-import { ANSWER_MARKDOWN, CHAT_COLUMN, CHAT_OPENING, CHAT_STREAM_CARET } from "./answerLayout";
+import { ANSWER_MARKDOWN, CHAT_COLUMN, CHAT_OPENING, CHAT_OPENING_COLUMN, CHAT_STREAM_CARET } from "./answerLayout";
 import { CitationText } from "./CitationText";
 import { ModelPill, type ModelPillOption } from "./ModelPill";
 import { ChatMessageBubble } from "./ChatMessageBubble";
@@ -122,13 +122,15 @@ interface Props {
   onSelectSources?: (message: ChatMessage) => void;
   /** The newest answer, each time one lands: a page shows its sources. */
   onAnswered?: (message: ChatMessage) => void;
+  /** The Conversation's title as the server holds it, each time it is reopened (IR-1160). */
+  onTitle?: (id: string, title: string) => void;
   /** Paper Chat's this-paper / all-papers switch, shown beside the depth. */
   scopeToggle?: { allPapers: boolean; onChange: (allPapers: boolean) => void; locked?: boolean };
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
-  selectedId = null, onSelectSources, onAnswered, scopeToggle }: Props) {
+  selectedId = null, onSelectSources, onAnswered, onTitle, scopeToggle }: Props) {
   // The research scope: this paper, or every paper once the reader widens. Read on each request, so
   // widening continues the same conversation instead of starting another.
   const scope = scopeToggle?.allPapers ? undefined : recordId;
@@ -151,6 +153,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
+  const reportTitle = useRef(onTitle);
+  reportTitle.current = onTitle;
   // Opening a conversation by its address: loading, then its content or one of the shared read states (IR-906).
   const [opening, setOpening] = useState<ReadFailureKind | "loading">();
   const [openAttempt, setOpenAttempt] = useState(0);
@@ -161,6 +165,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     setConversation(next);
     setRun(next.runs[next.runs.length - 1]);
     setError(undefined);
+    if (next.title) reportTitle.current?.(next.id, next.title);
     return next;
   }, [api]);
 
@@ -356,7 +361,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       pinned.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
     }} className={cn(dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
       centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin")}>
-      <div ref={column} className={cn(dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
+      <div ref={column} className={cn(dense ? "space-y-5" : `${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} space-y-6`)}>
         {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
           {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
         {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}

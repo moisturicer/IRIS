@@ -8,6 +8,7 @@ import { RuntimeReader } from "@/features/ai/components/RuntimeReader";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { Button } from "@/components/ui";
 import { RecentChats } from "./RecentChats";
+import { DownloadConversation } from "@/features/ai/components/DownloadConversation";
 import { CONTROL_BASE } from "./controls";
 
 /** A square icon control in the panel's header: quiet at rest, a grey wash on hover. */
@@ -235,6 +236,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
           <i className="fas fa-clock-rotate-left text-xs" aria-hidden />
           {recent.length > 0 && <span aria-hidden className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-3xs font-semibold leading-4 text-white">{recent.length}</span>}
         </button>
+        {conversationId && <DownloadConversation download={() => api.download(conversationId)} className="hover:bg-stone-200" />}
         <button type="button" onClick={newChat} aria-label="New chat" title="New chat" className={ICON_BUTTON}>
           <i className="fas fa-plus text-xs" aria-hidden />
         </button>
