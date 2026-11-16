@@ -15,6 +15,7 @@ import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { importedReference } from "@/test/fixtures/importedReference";
+import { pretendLaidOut } from "@/test/layout";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { recordsApi } from "@/api/records";
 import { peopleApi } from "@/api/people";
@@ -198,6 +199,12 @@ async function filterSheet() {
   return screen.findByRole("dialog", { name: "Filters" });
 }
 
+/** The reader's Areas, a section of the Filters panel (IR-1188). */
+async function areasSection() {
+  const sheet = await filterSheet();
+  return within(sheet).findByRole("region", { name: "Your Areas" });
+}
+
 /** Discover's one order control (IR-1187), found by its visible label. */
 const orderSelect = () => screen.getByRole("combobox", { name: "Sort" });
 
@@ -314,10 +321,11 @@ describe("the phone toolbar (IR-1080)", () => {
     // IR-1187: one Sort dropdown, not three feed tabs.
     expect(within(row).getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
     expect(within(row).queryByRole("group", { name: "Discover feed" })).not.toBeInTheDocument();
-    for (const name of [/^Choose areas|^Edit areas/, /^My feeds/, /^Filters/, "Publish"]) {
+    for (const name of [/^My feeds/, /^Filters/, "Publish"]) {
       expect(within(row).getByRole("button", { name })).toBeInTheDocument();
     }
-    expect(phoneControls(row)).toHaveLength(4);
+    // IR-1188: Areas live in the Filters panel, not beside it.
+    expect(phoneControls(row)).toHaveLength(3);
   });
 
   it("moves Papers and People out of the row and into the header", async () => {
@@ -332,9 +340,9 @@ describe("the phone toolbar (IR-1080)", () => {
     expect(within(results).getByRole("button", { name: "People", pressed: true })).toBeInTheDocument();
   });
 
-  it("shows Filters, Areas and Publish as visible text, with the count beside Filters", async () => {
+  it("shows Filters and Publish as visible text, with the count beside Filters", async () => {
     const row = await phoneToolbar();
-    for (const [name, text] of [[/^Choose areas|^Edit areas/, "Areas"], [/^Filters/, "Filters"], ["Publish", "Publish"]] as const) {
+    for (const [name, text] of [[/^Filters/, "Filters"], ["Publish", "Publish"]] as const) {
       const button = within(row).getByRole("button", { name });
       expect(within(button).getByText(text).className).not.toMatch(/(^|\s)hidden(\s|$)/);
     }
@@ -364,7 +372,7 @@ describe("the phone toolbar (IR-1080)", () => {
     await screen.findByText(publishedThesis.title);
     const row = screen.getByRole("group", { name: "Discover controls" });
     expect(within(row).queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
-    expect(phoneControls(row)).toHaveLength(3);
+    expect(phoneControls(row)).toHaveLength(2);
   });
 });
 
@@ -482,9 +490,10 @@ describe("the toolbar and the result rows (IR-1082)", () => {
       renderDiscover();
       await screen.findByText(publishedThesis.title);
       await waitFor(() => expect(recordsApi.pscedList).toHaveBeenCalled());
-      expect(screen.queryByRole("button", { name: /Areas/ })).not.toBeInTheDocument();
-      // The rest of the row is still there.
-      expect(screen.getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
+      // The panel still opens, with its catalogue filters and no empty Areas section.
+      const sheet = await filterSheet();
+      expect(within(sheet).getByRole("heading", { name: "Filter the list" })).toBeInTheDocument();
+      expect(within(sheet).queryByRole("region", { name: "Your Areas" })).not.toBeInTheDocument();
     } finally {
       vi.mocked(recordsApi.classifications).mockImplementation(classifications);
       vi.mocked(recordsApi.pscedList).mockImplementation(pscedList);
@@ -703,16 +712,62 @@ describe("browsing", () => {
     expect(await screen.findByText("Latest research")).toBeInTheDocument();
   });
 
-  it("saves optional classification and PSCED Areas, then opens Best", async () => {
+  it("saves optional classification and PSCED Areas from the Filters panel, then opens Best", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
-    await userEvent.click(screen.getByRole("button", { name: "Choose areas" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByLabelText("Applied Research"));
-    await userEvent.click(within(dialog).getByLabelText("Engineering"));
-    await userEvent.click(within(dialog).getByRole("button", { name: "Save Areas" }));
+    const areas = await areasSection();
+    await userEvent.click(within(areas).getByLabelText("Applied Research"));
+    await userEvent.click(within(areas).getByLabelText("Engineering"));
+    await userEvent.click(within(areas).getByRole("button", { name: "Save Areas" }));
     await waitFor(() => expect(recordsApi.updateInterests).toHaveBeenCalledWith({ classification_ids: [7], psced_ids: [3] }));
     await waitFor(() => expect(orderSelect()).toHaveValue("best"));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Filters" })).not.toBeInTheDocument());
+  });
+
+  it("keeps the panel open with a message when Areas can't be saved", async () => {
+    vi.mocked(recordsApi.updateInterests).mockRejectedValueOnce(new Error("offline"));
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const areas = await areasSection();
+    await userEvent.click(within(areas).getByLabelText("Applied Research"));
+    await userEvent.click(within(areas).getByRole("button", { name: "Save Areas" }));
+    expect(await within(areas).findByRole("alert")).toHaveTextContent(/Areas couldn.t be saved/);
+    expect(screen.getByRole("dialog", { name: "Filters" })).toBeInTheDocument();
+  });
+
+  it("says so in the panel when Areas can't load, and offers no save", async () => {
+    vi.mocked(recordsApi.interests).mockRejectedValueOnce(new Error("offline"));
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const areas = await areasSection();
+    expect(within(areas).getByRole("alert")).toHaveTextContent(/Areas couldn.t load/);
+    expect(within(areas).getByRole("button", { name: "Save Areas" })).toBeDisabled();
+  });
+
+  it("holds catalogue filters and Areas in one panel, each under its own heading", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const sheet = await filterSheet();
+    expect(within(sheet).getByRole("heading", { name: "Filter the list" })).toBeInTheDocument();
+    expect(within(sheet).getByRole("heading", { name: "Your Areas" })).toBeInTheDocument();
+    // No separate Areas control remains outside the panel.
+    const row = screen.getByRole("group", { name: "Discover controls" });
+    expect(within(row).queryByRole("button", { name: /^(Choose|Edit) areas$|^Areas$/i })).not.toBeInTheDocument();
+  });
+
+  it("clears filters without touching saved Areas", async () => {
+    vi.mocked(recordsApi.interests).mockResolvedValueOnce({
+      data: { classifications: [{ id: 7, name: "Applied Research" }], psced: [] },
+    } as unknown as Awaited<ReturnType<typeof recordsApi.interests>>);
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await choose(/^type/i, /^project$/i);
+    const sheet = await filterSheet();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(lastListParams()).not.toHaveProperty("record_type"));
+    expect(within(await areasSection()).getByLabelText("Applied Research")).toBeChecked();
+    expect(recordsApi.updateInterests).not.toHaveBeenCalled();
+    expect(recordsApi.resetInterests).not.toHaveBeenCalled();
   });
 
   it("loads another For you page with the cursor", async () => {
@@ -946,8 +1001,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Save" }));
     await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
     const saved = browserLibrary();
-    await userEvent.click(await screen.findByRole("button", { name: "Edit areas" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await areasSection();
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
     expect(recordsApi.resetInterests).not.toHaveBeenCalled();
@@ -955,12 +1009,12 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset" }));
 
     await waitFor(() => expect(recordsApi.resetInterests).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Filters" })).not.toBeInTheDocument());
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenCalledTimes(2));
     expect(await screen.findByText(/interests were reset/i)).toBeInTheDocument();
     expect(browserLibrary()).toBe(saved);
     expect(libraryApi.unsave).not.toHaveBeenCalled();
-    expect(await screen.findByRole("button", { name: "Choose areas" })).toBeInTheDocument();
+    expect(within(await areasSection()).getByLabelText("Applied Research")).not.toBeChecked();
   });
 
   it("tells the reader a reset leaves saved papers shaping Best (IR-575)", async () => {
@@ -968,20 +1022,19 @@ describe("Not interested, Undo and reset (IR-576)", () => {
       data: { classifications: [{ id: 7, name: "Applied Research" }], psced: [] },
     } as unknown as Awaited<ReturnType<typeof recordsApi.interests>>);
     renderDiscover("/?feed=for_you");
-    await userEvent.click(await screen.findByRole("button", { name: "Edit areas" }));
-    const dialog = await screen.findByRole("dialog");
+    await screen.findByRole("article", { name: publishedThesis.title });
+    const dialog = await areasSection();
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
 
     expect(within(dialog).getByText(/papers you saved still shape Best until you unsave them/i)).toBeInTheDocument();
   });
 
-  it("keeps the dialog open with a message when the reset fails", async () => {
+  it("keeps the panel open with a message when the reset fails", async () => {
     vi.mocked(recordsApi.resetInterests).mockRejectedValueOnce(new Error("offline"));
     renderDiscover("/?feed=for_you");
     await screen.findByRole("article", { name: publishedThesis.title });
-    await userEvent.click(screen.getByRole("button", { name: "Choose areas" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await areasSection();
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset" }));
@@ -1161,7 +1214,7 @@ describe("filtering", () => {
     await screen.findByText(publishedThesis.title);
     await choose(/^type/i, /^project$/i);
 
-    await userEvent.click(within(await filterSheet()).getByRole("button", { name: "Clear all" }));
+    await userEvent.click(within(await filterSheet()).getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(lastListParams()).not.toHaveProperty("record_type"));
     expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
   });
@@ -1181,6 +1234,43 @@ describe("filtering", () => {
 
     await userEvent.click(within(sheet).getByRole("button", { name: /^show/i }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Filters" })).not.toBeInTheDocument());
+  });
+
+  it("keeps Tab inside the open panel (IR-1188)", async () => {
+    const laidOut = pretendLaidOut();
+    try {
+      renderDiscover();
+      await screen.findByText(publishedThesis.title);
+      const sheet = await filterSheet();
+      expect(within(sheet).getByRole("button", { name: "Close filters" })).toHaveFocus();
+      for (let i = 0; i < 30; i += 1) {
+        await userEvent.tab();
+        expect(sheet).toContainElement(document.activeElement as HTMLElement);
+      }
+      await userEvent.tab({ shift: true });
+      expect(sheet).toContainElement(document.activeElement as HTMLElement);
+    } finally {
+      laidOut.mockRestore();
+    }
+  });
+
+  it("closes on Escape and gives focus back to the Filters control", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await filterSheet();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Filters" })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /^Filters/ })).toHaveFocus();
+  });
+
+  it("fits a 360 px phone: inset on both sides, nothing scrolling sideways", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const sheet = await filterSheet();
+    // jsdom cannot lay out, so the classes that hold the width are what is checked;
+    // Playwright's reflow360 on the open panel measures the real thing.
+    expect(sheet.className).toMatch(/(^|\s)inset-x-4(\s|$)/);
+    expect(sheet.className).toMatch(/(^|\s)overflow-x-hidden(\s|$)/);
   });
 });
 
