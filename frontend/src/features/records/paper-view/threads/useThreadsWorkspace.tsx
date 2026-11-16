@@ -9,7 +9,9 @@ import type { PageRegion, Party, RecordDetail, ReviewVerdict } from "@/types/rec
 
 import { RouteDialog } from "../RouteDialog";
 import { FinishReviewDialog } from "./FinishReviewDialog";
-import { ReaderAnnotationsContext, type ReaderAnnotations, type ReaderMark } from "./readerAnnotations";
+import {
+  ReaderAnnotationsContext, type ReaderAnnotations, type ReaderLanding, type ReaderMark,
+} from "./readerAnnotations";
 import { useNewestResponseLetter } from "./ResponseLetter";
 import type { CommentTarget, ReviewThreadsProps } from "./ReviewThreads";
 import { SEVERITY_WORDS, countLabel, type Thread } from "./threadModel";
@@ -54,19 +56,15 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
   const showInPaper = (t: Thread) => {
     const at = whereShown(t, currentVersion);
     if (!at) return;
-    const first = at.regions.find((r) => r.page === at.page);
     showPaper?.();
-    setLanding({ page: at.page, top: first?.top ?? 0, bottom: first?.bottom ?? 0, key: Date.now() });
+    setLanding({ ...at, label: `${threadLabel(t, false)}, page ${at.page}`, key: Date.now() });
   };
 
   const annotations = useMemo<ReaderAnnotations>(() => {
     const mark = (t: Thread, pending: boolean): ReaderMark | null => {
       const a = whereShown(t, currentVersion);
       if (!a || !a.regions.length) return null;
-      const label = [pending ? `Draft ${t.pin}` : `Thread ${t.pin}`, t.root.party_label,
-        t.root.severity ? SEVERITY_WORDS[t.root.severity] : null]
-        .filter(Boolean).join(", ");
-      return { key: `t${t.root.id}`, pin: t.pin, version: a.version, regions: a.regions, label, pending,
+      return { key: `t${t.root.id}`, pin: t.pin, version: a.version, regions: a.regions, label: threadLabel(t, pending), pending,
         open: focus?.id === t.root.id, onActivate: () => openThread(t) };
     };
     return {
@@ -142,10 +140,10 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     /** Open one thread in the Threads tab (the Changes tab's thread links). */
     openThread,
     /** Show the paper and land on this page's band (the Changes tab's *Show in paper*). */
-    showPlace: (page: number, regions: readonly PageRegion[]) => {
-      const first = regions.find((r) => r.page === page);
+    /** Show a passage of `version` (IR-1195): outlined, centred and focused, named `label`. */
+    showPlace: (place: Omit<ReaderLanding, "key">) => {
       showPaper?.();
-      setLanding({ page, top: first?.top ?? 0, bottom: first?.bottom ?? 0, key: Date.now() });
+      setLanding({ ...place, regions: [...place.regions], key: Date.now() });
     },
     /** Wrap the reader so it draws the pins and offers Comment. */
     wrapReader: (reader: ReactNode) => (
@@ -153,6 +151,13 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     ),
     dialogs,
   };
+}
+
+/** A thread as the reader names it: "Thread 3, ITSO, Must fix", or "Draft D1, …". */
+function threadLabel(t: Thread, pending: boolean): string {
+  return [pending ? `Draft ${t.pin}` : `Thread ${t.pin}`, t.root.party_label,
+    t.root.severity ? SEVERITY_WORDS[t.root.severity] : null]
+    .filter(Boolean).join(", ");
 }
 
 /**

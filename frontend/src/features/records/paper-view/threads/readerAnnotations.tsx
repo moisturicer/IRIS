@@ -38,8 +38,26 @@ export interface ReaderAnnotations {
   marks:          ReaderMark[];
   /** Comment on a passage of the Version shown; null where the viewer may not comment. */
   onComment:      ((passage: Passage, version: number) => void) | null;
-  /** Bumped key: land the reader on this page's band. */
-  landing:        { page: number; top: number; bottom: number; key: number } | null;
+  /** A passage to show: outlined, centred and focused. A new key lands again. */
+  landing:        ReaderLanding | null;
+}
+
+/**
+ * A passage Review sends the reader to (IR-1195): a change from the Changes
+ * tab, or a thread's passage from the Threads tab.
+ */
+export interface ReaderLanding {
+  /** The Version the passage belongs to: drawn and landed on only there. */
+  version: number;
+  /** The page to land on; the passage may carry on past it. */
+  page:    number;
+  regions: PageRegion[];
+  /** What the focused passage is called, e.g. "Added in v2, page 18, Methodology". */
+  label:   string;
+  /** A word drawn by the outline, e.g. "Added": a change's kind is never colour alone. */
+  tag?:    string;
+  /** Bumped on every Show, so showing the same passage again lands and flashes again. */
+  key:     number;
 }
 
 export const ReaderAnnotationsContext = createContext<ReaderAnnotations | null>(null);
@@ -92,6 +110,51 @@ export function ThreadMarks({ marks, page }: { marks: ReaderMark[]; page: number
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The passage Review showed, on one page (IR-1195): an outline per region,
+ * flashed once on arrival, and at its start a focusable group that names it,
+ * with its `tag` in words above the first line.
+ *
+ * Keyed by the landing, so a second Show remounts it and the flash plays
+ * again. Under reduced motion there is no flash (`motion-safe`).
+ */
+export function LandingMark({ landing, page, focusRef }: {
+  landing: ReaderLanding | null;
+  page: number;
+  focusRef: (el: HTMLElement | null) => void;
+}) {
+  if (!landing) return null;
+  const regions = landing.regions.filter((r) => r.page === page);
+  if (regions.length === 0) return null;
+  const first = regions[0];
+  // The focus goes where the reader lands: the passage's first region on its page.
+  const isStart = page === landing.page;
+  const box = (r: PageRegion) => ({
+    left: `${r.left * 100}%`, top: `${r.top * 100}%`,
+    width: `${(r.right - r.left) * 100}%`, height: `${(r.bottom - r.top) * 100}%`,
+  });
+  return (
+    <div key={landing.key} className="absolute inset-0 pointer-events-none">
+      {regions.map((r, i) => (
+        <span key={i} aria-hidden data-landing-region
+          className="absolute rounded-none ring-2 ring-brand motion-safe:animate-citation-flash"
+          style={box(r)} />
+      ))}
+      {isStart && (
+        <div ref={focusRef} role="group" aria-label={landing.label} tabIndex={-1}
+          className={cn("absolute rounded-none outline-none", FOCUS_RING)} style={box(first)}>
+          {landing.tag && (
+            <span aria-hidden
+              className="absolute bottom-full left-0 mb-0.5 rounded-none bg-brand px-1 text-2xs font-semibold leading-tight text-white">
+              {landing.tag}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

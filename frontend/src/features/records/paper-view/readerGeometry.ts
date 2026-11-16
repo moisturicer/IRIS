@@ -122,6 +122,49 @@ export function citationLandingDelta(
 }
 
 /**
+ * A passage's extent on one page, as fractions of its height (IR-1195): from
+ * its highest line to its lowest, and `start`, where its first region in
+ * reading order begins. In a two-column paper the two differ: a passage can
+ * start low in the left column and carry on at the top of the right one.
+ */
+export interface PassageBand extends RegionBand {
+  start: number;
+}
+
+export function passageBand<R extends Pick<Region, "page" | "top" | "bottom">>(regions: readonly R[], page: number): PassageBand | null {
+  const on = regions.filter((region) => region.page === page);
+  if (on.length === 0) return null;
+  return {
+    top: Math.min(...on.map((region) => region.top)),
+    bottom: Math.max(...on.map((region) => region.bottom)),
+    start: on[0].top,
+  };
+}
+
+/**
+ * How far to scroll so a passage shown from Review lands in the middle of
+ * the view (IR-1195). Positive scrolls down.
+ *
+ * A reviewer sent to a change wants it where the eye rests, with what comes
+ * before and after it in sight, not pinned under the toolbar as a citation
+ * is. A passage taller than the view can't be centred: it lands where it
+ * starts (`startTop`, a fraction of the page), just below the view's top.
+ */
+export function centredLandingDelta(
+  page: PageBox,
+  band: RegionBand,
+  view: ReadingBand,
+  startTop = band.top,
+): number {
+  const top = page.top + band.top * page.height;
+  const height = (band.bottom - band.top) * page.height;
+  if (height >= view.bottom - view.top - 2 * PAGE_LANDING_GAP) {
+    return page.top + startTop * page.height - view.top - PAGE_LANDING_GAP;
+  }
+  return top + height / 2 - (view.top + view.bottom) / 2;
+}
+
+/**
  * The region a citation should land on: its first on `page`. Regions arrive
  * in reading order (`apps/ai/regions.py`), so in a two-column paper a
  * passage starting low in the left column lands on its start, not on its
