@@ -139,7 +139,7 @@ export function MyFeeds({ query, matchCount, options, activeFeedId, onOpen, onDe
           <div className="mt-1 border-t border-stone-200 px-3 pb-1.5 pt-2.5">
             {query.feed === "for_you" ? (
               <p className="text-small text-stone-600">
-                To save these filters as a feed, switch to Latest or Trending.
+                To save these filters as a feed, sort by Newest, Most viewed or Trending.
               </p>
             ) : full ? (
               <p className="text-small text-stone-600">You have {limit} saved feeds. Delete one to save another.</p>
