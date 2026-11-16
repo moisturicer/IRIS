@@ -123,6 +123,21 @@ describe("Call Requests", () => {
     expect(within(dialog).getByRole("textbox", { name: "Reason to the Adviser" })).toHaveValue("Broken link.");
   });
 
+  it("shows a refusal of the reason itself under the field, not in a toast", async () => {
+    reject.mockRejectedValueOnce({ response: { status: 400, data: { reason: ["This field may not be blank."] } } });
+    await open([waiting()]);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Reject ICCE 2027" }));
+    const dialog = await screen.findByRole("dialog", { name: "Reject this call" });
+    await user.type(within(dialog).getByRole("textbox", { name: "Reason to the Adviser" }), "   x");
+    await user.click(within(dialog).getByRole("button", { name: "Reject call" }));
+
+    const field = await within(dialog).findByRole("textbox", { name: "Reason to the Adviser", description: "This field may not be blank." });
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("sets and clears Featured, and decides on the version that change produced", async () => {
     setFeatured.mockResolvedValue({ data: waiting({ is_featured: true, updated_at: "2026-11-11T00:00:00Z" }) });
     confirm.mockResolvedValue({ data: {} });

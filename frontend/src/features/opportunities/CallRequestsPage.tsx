@@ -12,7 +12,7 @@
  * Backend: GET /opportunities/requests/, POST /opportunities/<id>/confirm/,
  * POST /opportunities/<id>/reject/, PATCH /opportunities/<id>/ {is_featured}.
  */
-import { useCallback, useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { opportunitiesApi } from "@/api/opportunities";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -27,50 +27,27 @@ import { cn, formatDate } from "@/lib/utils";
 import { useUIStore } from "@/store/ui.store";
 import type { Opportunity } from "@/types/opportunities";
 
+import { FeaturedToggle, posterOf, useCallList, useFeaturedToggle, useReportCallFailure } from "./callActions";
 import { CallDetails } from "./CallDetails";
-import { callFailure } from "./callFailure";
 import { formatDueDate } from "./opportunityUtils";
 
-/** A Call's reason may be up to 2,000 characters (`ReasonSerializer`). */
-export const REASON_MAX_LENGTH = 2000;
-
-const posterOf = (o: Opportunity) => o.posted_by_name || "The Adviser";
+const readRequests = () => opportunitiesApi.requests();
 
 export default function CallRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
-  const [items,   setItems]   = useState<Opportunity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [failed,  setFailed]  = useState(false);
+  const { items, setItems, loading, failed, load } = useCallList(readRequests);
+  const report = useReportCallFailure(load);
 
   const [confirming, setConfirming] = useState<Opportunity | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [rejecting,  setRejecting]  = useState<Opportunity | null>(null);
-  const [featuring,  setFeaturing]  = useState<number | null>(null);
-
-  const load = useCallback(() => {
-    let cancelled = false;
-    setLoading(true);
-    setFailed(false);
-    opportunitiesApi.requests()
-      .then((rows) => { if (!cancelled) setItems(rows); })
-      .catch(() => { if (!cancelled) setFailed(true); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => load(), [load]);
 
   const drop = (id: number) => setItems((current) => current.filter((o) => o.id !== id));
-
-  /** A failed decision: the server's words, and a reload when the Call moved on. */
-  const reportFailure = (err: unknown, lead: string, retry?: () => void) => {
-    const failure = callFailure(err, lead);
-    addToast(failure.stale || !retry
-      ? { type: "error", persist: true, message: failure.message }
-      : { type: "error", message: failure.message, action: { label: "Try again", onClick: retry } });
-    if (failure.stale) load();
-    return failure;
-  };
+  // The server's copy carries the new `updated_at` a decision must name.
+  const featured = useFeaturedToggle(
+    (next) => setItems((current) => current.map((o) => (o.id === next.id ? next : o))),
+    report,
+  );
 
   const confirmCall = async (target: Opportunity) => {
     setConfirmBusy(true);
@@ -79,24 +56,10 @@ export default function CallRequestsPage() {
       drop(target.id);
       addToast({ type: "success", message: `${target.title} confirmed. It's on Calls & Conferences.` });
     } catch (err) {
-      reportFailure(err, `Could not confirm ${target.title}.`, () => void confirmCall(target));
+      report(err, `Could not confirm ${target.title}.`, () => void confirmCall(target));
     } finally {
       setConfirmBusy(false);
       setConfirming(null);
-    }
-  };
-
-  const toggleFeatured = async (target: Opportunity) => {
-    setFeaturing(target.id);
-    try {
-      const { data } = await opportunitiesApi.setFeatured(target.id, !target.is_featured);
-      // The server's copy carries the new `updated_at` a decision must name.
-      setItems((current) => current.map((o) => (o.id === data.id ? data : o)));
-      addToast({ type: "success", message: data.is_featured ? `${data.title} is Featured.` : `${data.title} is no longer Featured.` });
-    } catch (err) {
-      reportFailure(err, `Could not change Featured on ${target.title}.`, () => void toggleFeatured(target));
-    } finally {
-      setFeaturing(null);
     }
   };
 
@@ -141,10 +104,10 @@ export default function CallRequestsPage() {
             <li key={o.id}>
               <RequestRow
                 call={o}
-                featuring={featuring === o.id}
+                featuring={featured.featuringId === o.id}
                 onConfirm={() => setConfirming(o)}
                 onReject={() => setRejecting(o)}
-                onToggleFeatured={() => void toggleFeatured(o)}
+                onToggleFeatured={() => void featured.toggle(o)}
               />
             </li>
           ))}
@@ -167,12 +130,10 @@ export default function CallRequestsPage() {
 
       {rejecting && (
         <RdcoNoteDialog
+          kind="reason"
           title="Reject this call"
           submitLabel="Reject call"
           audience="Adviser"
-          noun="Reason"
-          maxLength={REASON_MAX_LENGTH}
-          field="reason"
           requester={posterOf(rejecting)}
           recordTitle={rejecting.title}
           intro="It stays with the Adviser, who may change it and send it again, or delete it."
@@ -183,7 +144,7 @@ export default function CallRequestsPage() {
             addToast({ type: "success", message: `${rejecting.title} rejected. Its Adviser is told why.` });
             setRejecting(null);
           }}
-          onFailure={(err) => !reportFailure(err, `Could not reject ${rejecting.title}.`).stale}
+          onFailure={(err) => (report(err, `Could not reject ${rejecting.title}.`).stale ? "close" : "keep")}
         />
       )}
     </div>
@@ -243,19 +204,7 @@ function RequestRow({ call: o, featuring, onConfirm, onReject, onToggleFeatured 
             Reject
           </Button>
         )}
-        {o.can_feature && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={onToggleFeatured}
-            disabled={featuring}
-            aria-pressed={o.is_featured}
-            aria-label={`Featured: ${o.title}`}
-          >
-            <i className={cn(o.is_featured ? "fas" : "far", "fa-star")} aria-hidden="true" /> Featured
-          </Button>
-        )}
+        {o.can_feature && <FeaturedToggle call={o} busy={featuring} onToggle={onToggleFeatured} />}
       </div>
     </article>
   );

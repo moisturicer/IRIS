@@ -110,8 +110,16 @@ describe("My Calls", () => {
     expect(screen.getByRole("link", { name: "Go to Calls & Conferences" })).toHaveAttribute("href", "/opportunities");
   });
 
-  it("has no serious accessibility violations", async () => {
+  it("has no serious accessibility violations, nor with the edit or delete dialog open", async () => {
     const { container } = await open([waiting(), rejected(), confirmed()]);
     await expectNoBlockingA11yViolations(container);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit and send again Rejected call" }));
+    await expectNoBlockingA11yViolations(await screen.findByRole("dialog", { name: "Edit call" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Delete Waiting call" }));
+    await expectNoBlockingA11yViolations(await screen.findByRole("dialog", { name: "Delete this call?" }));
   });
 });

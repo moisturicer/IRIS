@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { opportunitiesApi } from "@/api/opportunities";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -14,7 +14,7 @@ import { useUIStore } from "@/store/ui.store";
 import type { CallStatus, Opportunity } from "@/types/opportunities";
 
 import { CallDetails } from "./CallDetails";
-import { callFailure } from "./callFailure";
+import { useCallList, useDeleteCall, useReportCallFailure } from "./callActions";
 import { OpportunityFormDialog } from "./OpportunityFormDialog";
 import { formatDueDate } from "./opportunityUtils";
 
@@ -35,27 +35,14 @@ const STATUS_TONE: Record<CallStatus, string> = {
  * Edit and Delete come from each Call's `can_edit` and `can_delete`.
  * Outcomes are toasts; nothing grows inside the list.
  */
+const readMine = () => opportunitiesApi.mine();
+
 export function MyCallsPage() {
   const addToast = useUIStore((s) => s.addToast);
-  const [items,   setItems]   = useState<Opportunity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [failed,  setFailed]  = useState(false);
+  const { items, setItems, loading, failed, load } = useCallList(readMine);
+  const report = useReportCallFailure(load);
+  const deletion = useDeleteCall((gone) => setItems((current) => current.filter((o) => o.id !== gone.id)), report);
   const [editing, setEditing] = useState<Opportunity | null>(null);
-  const [deleting, setDeleting] = useState<Opportunity | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-
-  const load = useCallback(() => {
-    let cancelled = false;
-    setLoading(true);
-    setFailed(false);
-    opportunitiesApi.mine()
-      .then((rows) => { if (!cancelled) setItems(rows); })
-      .catch(() => { if (!cancelled) setFailed(true); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => load(), [load]);
 
   const handleSaved = (saved: Opportunity) => {
     setItems((current) => current.map((o) => (o.id === saved.id ? saved : o)));
@@ -63,24 +50,6 @@ export function MyCallsPage() {
     addToast(saved.status === "pending"
       ? { type: "info", message: `${saved.title} sent to RDCO. It appears on the board once RDCO confirms it.` }
       : { type: "success", message: "Changes saved." });
-  };
-
-  const deleteCall = async (target: Opportunity) => {
-    setDeleteBusy(true);
-    try {
-      await opportunitiesApi.remove(target.id);
-      setItems((current) => current.filter((o) => o.id !== target.id));
-      addToast({ type: "success", message: `${target.title} deleted.` });
-    } catch (err) {
-      const failure = callFailure(err, `Could not delete ${target.title}.`);
-      addToast(failure.stale
-        ? { type: "error", persist: true, message: failure.message }
-        : { type: "error", message: failure.message, action: { label: "Try again", onClick: () => void deleteCall(target) } });
-      if (failure.stale) load();
-    } finally {
-      setDeleteBusy(false);
-      setDeleting(null);
-    }
   };
 
   return (
@@ -119,7 +88,7 @@ export function MyCallsPage() {
         <ol className="bg-white rounded-card border border-stone-200 divide-y divide-stone-200">
           {items.map((o) => (
             <li key={o.id}>
-              <MyCallRow call={o} onEdit={() => setEditing(o)} onDelete={() => setDeleting(o)} />
+              <MyCallRow call={o} onEdit={() => setEditing(o)} onDelete={() => deletion.ask(o)} />
             </li>
           ))}
         </ol>
@@ -135,14 +104,14 @@ export function MyCallsPage() {
       )}
 
       <ConfirmDialog
-        open={deleting !== null}
+        open={deletion.deleting !== null}
         title="Delete this call?"
-        message={deleting ? `"${deleting.title}" will be deleted. This cannot be undone.` : ""}
+        message={deletion.deleting ? `"${deletion.deleting.title}" will be deleted. This cannot be undone.` : ""}
         confirmLabel="Delete call"
         danger
-        confirming={deleteBusy}
-        onConfirm={() => { if (deleting && !deleteBusy) void deleteCall(deleting); }}
-        onCancel={() => setDeleting(null)}
+        confirming={deletion.busy}
+        onConfirm={deletion.confirm}
+        onCancel={deletion.cancel}
       />
     </div>
   );

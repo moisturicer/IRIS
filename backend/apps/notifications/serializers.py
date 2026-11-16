@@ -1,15 +1,22 @@
 from rest_framework import serializers
+
+from . import services
 from .models import Notification, TaskKind
 
-# Where a notice that carries no Record opens (IR-765). A Call's notices name
-# no Record, so without this they had nowhere to go. Decided here, once, so a
-# screen never infers a destination from a type's name or the viewer's role.
+# Where a notice that carries no Record opens (IR-765), as the frontend's
+# routes (`frontend/src/lib/access.ts`). A Call's notices name no Record, so
+# without this they had nowhere to go. Decided here, once, so a screen never
+# infers a destination from a type's name or the viewer's role.
 CALL_REQUESTS_PAGE = "/rdco/call-requests"
+BOARD = "/opportunities"
+MY_CALLS = "/opportunities/mine"
 TARGET_BY_TYPE = {
-    "Call Confirmed":      "/opportunities",
-    "Call Rejected":       "/opportunities/mine",
-    "Call Removed":        "/opportunities/mine",
-    "Call Request Lapsed": "/opportunities/mine",
+    services.CALL_CONFIRMED: BOARD,
+    # Still the poster's, with RDCO's reason, to change and send again.
+    services.CALL_REJECTED:  MY_CALLS,
+    # Deleted: the board, where a new one can be posted.
+    services.CALL_REMOVED:        BOARD,
+    services.CALL_REQUEST_LAPSED: BOARD,
 }
 
 
@@ -32,5 +39,6 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_target(self, obj):
         if obj.task_kind == TaskKind.CALL_REQUEST:
-            return CALL_REQUESTS_PAGE
+            # Once RDCO has decided, or the request lapsed, it has left the queue.
+            return None if obj.resolved_at else CALL_REQUESTS_PAGE
         return TARGET_BY_TYPE.get(obj.notif_type.name if obj.notif_type_id else "")

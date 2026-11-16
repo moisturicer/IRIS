@@ -22,7 +22,7 @@ import type { Opportunity, OpportunityType } from "@/types/opportunities";
 
 import { RdcoNoteDialog } from "@/features/admin/RdcoNoteDialog";
 
-import { callFailure } from "./callFailure";
+import { posterOf, useDeleteCall, useFeaturedToggle, useReportCallFailure } from "./callActions";
 import { OpportunityFormDialog } from "./OpportunityFormDialog";
 import { OpportunityRow } from "./OpportunityRow";
 import {
@@ -36,7 +36,6 @@ import {
 } from "./opportunityUtils";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 import { SELECTED } from "@/components/ui/highlightRoles";
-import { failureMessage } from "@/lib/readFailure";
 
 /** A filter chip, as My Reviews draws them: soft maroon when on. */
 function chipClass(on: boolean) {
@@ -93,12 +92,9 @@ export function CallsAndConferencesPage() {
   const [icsBusy,   setIcsBusy]   = useState<number | null>(null);
 
   const [formTarget, setFormTarget] = useState<FormTarget>(null);
-  const [deleting,   setDeleting]   = useState<Opportunity | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
   /** The Adviser's Call RDCO is removing with a reason (IR-765). */
   const [removing,   setRemoving]   = useState<Opportunity | null>(null);
-  /** The Call whose Featured is being changed. */
-  const [featuring,  setFeaturing]  = useState<number | null>(null);
+
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -222,59 +218,13 @@ export function CallsAndConferencesPage() {
     );
   };
 
-  /**
-   * Delete a call the reader has already confirmed. The outcome is a toast:
-   * the dialog asked the question and closes either way, so no error box grows
-   * inside it. Try again repeats the delete the reader already decided on.
-   */
-  const deleteCall = async (target: Opportunity) => {
-    setDeleteBusy(true);
-    try {
-      await opportunitiesApi.remove(target.id);
-      setItems((current) => current.filter((o) => o.id !== target.id));
-      addToast({ type: "success", message: "Call deleted." });
-    } catch (err) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      addToast(
-        status === 403 || status === 404
-          ? { type: "error", persist: true, message: `You can no longer delete ${target.title}. It may already be gone.` }
-          : {
-              type: "error",
-              message: failureMessage(err, { lead: `Could not delete ${target.title}.` }),
-              action: { label: "Try again", onClick: () => void deleteCall(target) },
-            },
-      );
-    } finally {
-      setDeleteBusy(false);
-      setDeleting(null);
-    }
-  };
-
-  /** Replace one Call with the server's copy, keeping the board's order. */
-  const replaceCall = (next: Opportunity) =>
-    setItems((current) => current.map((o) => (o.id === next.id ? next : o)).sort(byBoardOrder));
-
-  /** RDCO sets or clears Featured (ADR-050 decision 12). It never moves the Call. */
-  const toggleFeatured = async (target: Opportunity) => {
-    setFeaturing(target.id);
-    try {
-      const { data } = await opportunitiesApi.setFeatured(target.id, !target.is_featured);
-      replaceCall(data);
-      addToast({ type: "success", message: data.is_featured ? `${data.title} is Featured.` : `${data.title} is no longer Featured.` });
-    } catch (err) {
-      const failure = callFailure(err, `Could not change Featured on ${target.title}.`);
-      addToast(failure.stale
-        ? { type: "error", persist: true, message: failure.message }
-        : { type: "error", message: failure.message, action: { label: "Try again", onClick: () => void toggleFeatured(target) } });
-      if (failure.stale) load();
-    } finally {
-      setFeaturing(null);
-    }
-  };
-
-  const confirmDelete = () => {
-    if (deleting && !deleteBusy) void deleteCall(deleting);
-  };
+  const report = useReportCallFailure(load);
+  /** Replace one Call with the server's copy, keeping the board's order; Featured never moves it. */
+  const featured = useFeaturedToggle(
+    (next) => setItems((current) => current.map((o) => (o.id === next.id ? next : o)).sort(byBoardOrder)),
+    report,
+  );
+  const deletion = useDeleteCall((gone) => setItems((current) => current.filter((o) => o.id !== gone.id)), report);
 
   // ---- Render ------------------------------------------------------------
 
@@ -464,10 +414,10 @@ export function CallsAndConferencesPage() {
                       onToggleSave={() => handleToggleSave(o.id)}
                       onDownloadIcs={() => void handleDownloadIcs(o)}
                       onEdit={() => setFormTarget(o)}
-                      onDelete={() => setDeleting(o)}
+                      onDelete={() => deletion.ask(o)}
                       onRemove={() => setRemoving(o)}
-                      onToggleFeatured={() => void toggleFeatured(o)}
-                      featuring={featuring === o.id}
+                      onToggleFeatured={() => void featured.toggle(o)}
+                      featuring={featured.featuringId === o.id}
                     />
                   </li>
                 ))}
@@ -488,13 +438,11 @@ export function CallsAndConferencesPage() {
 
       {removing && (
         <RdcoNoteDialog
+          kind="reason"
           title="Remove this call"
           submitLabel="Remove call"
           audience="Adviser"
-          noun="Reason"
-          maxLength={2000}
-          field="reason"
-          requester={removing.posted_by_name || "The Adviser"}
+          requester={posterOf(removing)}
           recordTitle={removing.title}
           intro="It leaves the board. The Adviser is told in-app, with your reason."
           send={(reason) => opportunitiesApi.removeWithReason(removing.id, reason)}
@@ -505,30 +453,24 @@ export function CallsAndConferencesPage() {
             setRemoving(null);
             addToast({ type: "success", message: `${gone.title} removed. Its Adviser is told why.` });
           }}
-          onFailure={(err) => {
-            // The refusal is a toast; the reason stays typed for another try,
-            // unless the Call is gone, when the board reloads.
-            const failure = callFailure(err, `Could not remove ${removing.title}.`);
-            addToast({ type: "error", persist: true, message: failure.message });
-            if (failure.stale) load();
-            return !failure.stale;
-          }}
+          // The reason stays typed for another try, unless the Call is gone.
+          onFailure={(err) => (report(err, `Could not remove ${removing.title}.`).stale ? "close" : "keep")}
         />
       )}
 
       <ConfirmDialog
-        open={deleting !== null}
+        open={deletion.deleting !== null}
         title="Delete this call?"
         message={
-          deleting
-            ? `"${deleting.title}" will be removed from the board for everyone. This cannot be undone.`
+          deletion.deleting
+            ? `"${deletion.deleting.title}" will be removed from the board for everyone. This cannot be undone.`
             : ""
         }
         confirmLabel="Delete call"
         danger
-        confirming={deleteBusy}
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleting(null)}
+        confirming={deletion.busy}
+        onConfirm={deletion.confirm}
+        onCancel={deletion.cancel}
       />
     </div>
   );

@@ -10,13 +10,15 @@ from rest_framework.test import APITestCase
 
 from apps.notifications import services as notify
 from apps.opportunities.tests import make_opportunity, make_user
+from core.enums import CallStatus
 
 
 class CallNotificationTargetTests(APITestCase):
     def setUp(self):
         self.rdco = make_user("target.rdco@cit.edu", "RDCO")
         self.adviser = make_user("target.adviser@cit.edu", "Adviser")
-        self.call = make_opportunity(posted_by=self.adviser, title="ICCE 2027")
+        # Waiting for RDCO, so its request notice is still open.
+        self.call = make_opportunity(posted_by=self.adviser, title="ICCE 2027", status=CallStatus.PENDING)
 
     def targets(self, user):
         self.client.force_authenticate(user)
@@ -32,15 +34,27 @@ class CallNotificationTargetTests(APITestCase):
         notify.notify_call_confirmed(self.call, confirmed_by=self.rdco)
         self.assertEqual(self.targets(self.adviser)["Call Confirmed"], "/opportunities")
 
-    def test_a_rejected_removed_or_lapsed_call_opens_the_posters_own_calls(self):
+    def test_a_rejected_call_opens_the_posters_own_calls(self):
         notify.notify_call_rejected(self.call, rejected_by=self.rdco, reason="Broken link.")
+        self.assertEqual(self.targets(self.adviser), {"Call Rejected": "/opportunities/mine"})
+
+    def test_a_removed_or_lapsed_call_opens_the_board_since_the_call_is_gone(self):
         notify.notify_call_removed(self.call, removed_by=self.rdco, reason="Duplicate.")
         notify.notify_call_lapsed(self.call)
         self.assertEqual(self.targets(self.adviser), {
-            "Call Rejected": "/opportunities/mine",
-            "Call Removed": "/opportunities/mine",
-            "Call Request Lapsed": "/opportunities/mine",
+            "Call Removed": "/opportunities",
+            "Call Request Lapsed": "/opportunities",
         })
+
+    def test_a_settled_request_opens_nothing_since_it_left_the_queue(self):
+        from django.utils import timezone
+
+        from apps.opportunities.models import Opportunity
+
+        notify.notify_call_requested(self.call)
+        # RDCO confirms it; the listing settles the notice (ADR-069).
+        Opportunity.objects.filter(pk=self.call.pk).update(status=CallStatus.CONFIRMED, reviewed_at=timezone.now())
+        self.assertEqual(self.targets(self.rdco), {"Call Request Submitted": None})
 
     def test_any_other_notice_names_no_target(self):
         from apps.notifications.models import Notification, NotificationType

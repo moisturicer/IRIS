@@ -6,6 +6,7 @@ import { TONES } from "@/components/ui/statusTones";
 import { cn } from "@/lib/utils";
 import type { Opportunity } from "@/types/opportunities";
 
+import { FeaturedToggle } from "./callActions";
 import { CallDetails } from "./CallDetails";
 import { countdown, dateParts, eventTag, formatDueDate, papersClosed } from "./opportunityUtils";
 
@@ -194,19 +195,7 @@ export function OpportunityRow({
               </Button>
           )}
           {o.can_feature && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onToggleFeatured}
-                disabled={featuring}
-                aria-pressed={o.is_featured}
-                aria-label={`Featured: ${o.title}`}
-                className={cn("min-h-11 lg:min-h-0", FOCUS_RING)}
-              >
-                <i className={cn(o.is_featured ? "fas" : "far", "fa-star")} aria-hidden="true" />
-                Featured
-              </Button>
+            <FeaturedToggle call={o} busy={featuring} onToggle={onToggleFeatured} className="min-h-11 lg:min-h-0" />
           )}
           {/* Plain delete; an Adviser's Call is removed by RDCO with a reason. */}
           {o.can_delete && (
