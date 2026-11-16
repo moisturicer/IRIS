@@ -33,6 +33,11 @@ describe("PageContainer", () => {
     expect(PAGE_WIDTH.standard).toContain("mx-auto");
   });
 
+  it("keeps wide-left pages centred, so a wide window never leaves the spare room on one side", () => {
+    expect(PAGE_WIDTH["wide-left"]).toContain("max-w-[100rem]");
+    expect(PAGE_WIDTH["wide-left"]).toContain("mx-auto");
+  });
+
   it("lets full pages use the whole width", () => {
     renderScreen(
       <PageContainer width="full">
