@@ -4,7 +4,11 @@ import { Spinner } from "@/components/ui/Spinner";
 import { reloadPage } from "@/lib/readFailure";
 
 interface DeferredPageProps {
-  name: string;
+  /**
+   * What is loading, in the reader's words and without the ellipsis: "Opening
+   * the paper", not a component's name (IR-1098, audit US-09).
+   */
+  message: string;
   children: ReactNode;
 }
 
@@ -13,13 +17,13 @@ interface DeferredPageProps {
  * The spinner owns the live announcement; the visible copy is decorative so
  * assistive technology hears the loading message once.
  */
-export function DeferredPage({ name, children }: DeferredPageProps) {
+export function DeferredPage({ message, children }: DeferredPageProps) {
   return (
     <Suspense
       fallback={
         <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-stone-600">
-          <Spinner size="lg" label={`Loading ${name}`} onRetry={reloadPage} />
-          <p aria-hidden="true" className="text-sm">Loading {name}…</p>
+          <Spinner size="lg" label={message} onRetry={reloadPage} />
+          <p aria-hidden="true" className="text-sm">{message}…</p>
         </div>
       }
     >

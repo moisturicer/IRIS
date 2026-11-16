@@ -29,6 +29,13 @@ const EVERYONE: RoleName[] = [
   ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO, ROLES.SYSTEM_ADMIN,
 ];
 
+/**
+ * Who posts Calls for papers: RDCO and Advisers (`OPPORTUNITY_POSTER_ROLES`,
+ * ADR-050). Only the route to their own Calls uses it; the board's buttons
+ * come from the server's `can_*` flags.
+ */
+const CALL_POSTERS: RoleName[] = [ROLES.RDCO, ROLES.ADVISER];
+
 /** The research navigation; System Admin uses its own Administration section. */
 const RESEARCH_ROLES = EVERYONE.filter((role) => role !== ROLES.SYSTEM_ADMIN);
 
@@ -104,12 +111,18 @@ interface ScreenDef {
   };
 }
 
+/**
+ * Ask IRIS's nav icon: not a Font Awesome class but the brand's speech bubble,
+ * which the sidebar draws (IR-1098, audit VIS-08). No other row uses a bubble.
+ */
+export const ASK_IRIS_ICON = "ask-iris";
+
 export const SCREEN_ACCESS = {
   // --- open to every authenticated role ---------------------------------
   discover:      { path: "/",              roles: EVERYONE,
                    nav: { label: "Discover", icon: "fa-compass", section: "Main" } },
   ai:            { path: "/ai",            roles: EVERYONE,
-                   nav: { label: "Ask IRIS", icon: "fa-brain", section: "Main", onlyFor: RESEARCH_ROLES } },
+                   nav: { label: "Ask IRIS", icon: ASK_IRIS_ICON, section: "Main", onlyFor: RESEARCH_ROLES } },
   library:       { path: "/records/mine",  roles: EVERYONE,
                    nav: { label: "My Library", icon: "fa-bookmark", section: "Main", onlyFor: RESEARCH_ROLES } },
   // The bell at the top of the sidebar is the entry; its "View all" opens the
@@ -172,6 +185,8 @@ export const SCREEN_ACCESS = {
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,
                    nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Main", onlyFor: RESEARCH_ROLES } },
+  // A poster's own Calls in every status (IR-765), reached from the board.
+  myCalls:       { path: "/opportunities/mine", roles: CALL_POSTERS },
 
   // --- RDCO coordination (ADR-051, IR-783) ----------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
@@ -182,6 +197,9 @@ export const SCREEN_ACCESS = {
                  nav: { label: "Role Requests", icon: "fa-user-check", section: "RDCO" } },
   downloadRequests: { path: "/rdco/download-requests", roles: COORDINATOR,
                  nav: { label: "Download Requests", icon: "fa-download", section: "RDCO" } },
+  // ADR-050 decision 8 and ADR-051: Advisers' Calls waiting for RDCO (IR-765).
+  callRequests:  { path: "/rdco/call-requests", roles: COORDINATOR,
+                 nav: { label: "Call Requests", icon: "fa-bullhorn", section: "RDCO" } },
   deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
                  nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "RDCO" } },
   // One page for RDCO and the System Admin (IR-693, decision 2026-11-15), each

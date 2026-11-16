@@ -201,11 +201,11 @@ describe("saving the filters on screen", () => {
     expect(within(dialog).getByRole("button", { name: "Save feed" })).toBeDisabled();
   });
 
-  it("is not offered on For you, and says how to save its filters", async () => {
+  it("is not offered on Best, and says how to save its filters", async () => {
     show({ query: query("classification=4&feed=for_you") });
     await openMenu();
 
-    expect(await screen.findByText(/switch to Latest or Trending/)).toBeInTheDocument();
+    expect(await screen.findByText(/sort by Newest, Most viewed or Trending/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Save these filters as a feed/ })).not.toBeInTheDocument();
   });
 

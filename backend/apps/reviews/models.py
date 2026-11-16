@@ -476,11 +476,14 @@ class ReviewComment(models.Model):
 
     # --- a top-level comment is a thread (ADR-032 §7, 2026-11-04; IR-874) ---------
     # Every field below describes the thread, so a reply leaves them at their
-    # defaults: it is never a draft, has no severity, and is never resolved.
+    # defaults: it is never a draft, has no severity, and is never resolved --
+    # except `party`, which a reply keeps for its label (IR-1192).
 
     #: The party the thread belongs to, not the person: the writer's party when
     #: they wrote it. Blank for an owner's thread. A withdrawn writer's thread
-    #: stays the party's, and its current Seat holders own it.
+    #: stays the party's, and its current Seat holders own it. A reply stores
+    #: its writer's party the same way, but only to say who wrote it: no rule
+    #: reads a reply's party, and every thread query excludes replies.
     party      = models.CharField(max_length=20, choices=PARTY_CHOICES, blank=True, default="")
     #: A reviewer's thread only. Existing rows were backfilled as *Suggestion*.
     severity   = models.CharField(

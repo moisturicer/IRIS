@@ -78,6 +78,11 @@ class ThreadError(Exception):
     """400: this cannot be done now, or the request is malformed."""
 
 
+#: How a reply by one of the record's owners names its writer: a person, not
+#: the authors as a party (IR-1192). A thread of theirs reads `party_label`.
+AUTHOR_LABEL = "Author"
+
+
 def party_label(party: str) -> str:
     from .seats import _label
 

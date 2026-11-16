@@ -39,7 +39,7 @@ export interface FilingEntry {
 }
 
 /** The keys of a saved feed's query: exactly the ones Discover writes into its URL. */
-export type FeedQueryKey = "q" | "type" | "college" | "classification" | "year" | "ip" | "sort";
+export type FeedQueryKey = "q" | "type" | "college" | "classification" | "year_from" | "year_to" | "ip" | "sort";
 export type FeedQuery = Partial<Record<FeedQueryKey, string>>;
 /** Taxonomy ids a saved feed names that no longer exist, by key (IR-577). */
 export type FeedStale = Partial<Record<"type" | "college" | "classification", number[]>>;

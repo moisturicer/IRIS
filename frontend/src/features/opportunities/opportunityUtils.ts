@@ -5,7 +5,7 @@ import type { Opportunity, OpportunityInput, OpportunityType } from "@/types/opp
 export const OPPORTUNITY_TYPES: { id: OpportunityType; label: string; icon: string }[] = [
   { id: "conference",   label: "Conference",   icon: "fa-microphone-lines"      },
   { id: "congress",     label: "Congress",     icon: "fa-people-group"          },
-  { id: "symposium",    label: "Symposium",    icon: "fa-comments"              },
+  { id: "symposium",    label: "Symposium",    icon: "fa-chalkboard-user"       },
   { id: "workshop",     label: "Workshop",     icon: "fa-screwdriver-wrench"    },
   { id: "journal",      label: "Journal",      icon: "fa-book-open"             },
   { id: "book_chapter", label: "Book chapter", icon: "fa-book"                  },
@@ -15,14 +15,24 @@ export function typeMeta(type: OpportunityType) {
   return OPPORTUNITY_TYPES.find((t) => t.id === type) ?? OPPORTUNITY_TYPES[0];
 }
 
+/** Whether the server says submissions have closed (ADR-050 decision 6). */
+export function papersClosed(o: Pick<Opportunity, "papers_state">): boolean {
+  return o.papers_state === "closed";
+}
+
+/** A Journal or Book Chapter has no event, so no start or end date (ADR-050 decision 4). */
+export function hasEvent(type: OpportunityType | ""): boolean {
+  return type !== "journal" && type !== "book_chapter";
+}
+
 /**
  * The board's sections, in reading order (IR-530).
  *
  * The page answers one question -- "what can I still apply to, and by when"
  * -- so it is grouped by how soon each call closes rather than laid out as a
- * grid the reader has to scan and sort in their head. Closed calls stay in a
- * last section, findable by someone mid-application, until the server drops
- * them a month after their deadline.
+ * grid the reader has to scan and sort in their head. A Call whose papers
+ * are closed stays in a last section while its event is still to come; it
+ * leaves the board when it is Over (ADR-050 decision 7).
  */
 export type DeadlineGroup = "week" | "month" | "later" | "closed";
 
@@ -30,12 +40,12 @@ export const DEADLINE_GROUPS: { id: DeadlineGroup; title: string }[] = [
   { id: "week",   title: "Closes within a week"  },
   { id: "month",  title: "Closes within a month" },
   { id: "later",  title: "Closes later"          },
-  { id: "closed", title: "Recently closed"       },
+  { id: "closed", title: "Submissions closed"    },
 ];
 
-/** Uses the server's `days_left`, never the viewer's clock. */
+/** Uses the server's papers state and `days_left`, never the viewer's clock. */
 export function deadlineGroup(o: Opportunity): DeadlineGroup {
-  if (o.is_closed) return "closed";
+  if (papersClosed(o)) return "closed";
   if (o.days_left <= 7) return "week";
   if (o.days_left <= 30) return "month";
   return "later";
@@ -49,13 +59,35 @@ export function deadlineGroup(o: Opportunity): DeadlineGroup {
  * or less is `active`, anything further off and anything closed is `quiet`.
  */
 export function countdown(o: Opportunity): { label: string; tone: Tone; className: string } {
-  const tone: Tone = o.is_closed || o.days_left > 21 ? "quiet" : o.days_left <= 7 ? "attention" : "active";
+  const closed = papersClosed(o);
+  const tone: Tone = closed || o.days_left > 21 ? "quiet" : o.days_left <= 7 ? "attention" : "active";
   let label: string;
-  if (o.is_closed) label = "Closed";
+  if (closed) label = "Closed";
   else if (o.days_left === 0) label = "Due today";
   else if (o.days_left === 1) label = "1 day left";
   else label = `${o.days_left} days left`;
   return { label, tone, className: TONES[tone] };
+}
+
+/**
+ * The event tag: shown only while the event runs (IR-764). "Upcoming" says
+ * nothing the dates don't, and an Over Call has left the board.
+ */
+export function eventTag(o: Opportunity): string | null {
+  return o.event_state === "happening" ? o.event_label : null;
+}
+
+/** The event's dates in words; one date for a one-day event; null with none. */
+export function eventDates(o: Pick<Opportunity, "start_date" | "end_date">): string | null {
+  if (!o.start_date) return null;
+  const start = formatDueDate(o.start_date);
+  if (!o.end_date || o.end_date === o.start_date) return start;
+  return `${start} to ${formatDueDate(o.end_date)}`;
+}
+
+/** Every Area named on the board, once each, for the Area filter. */
+export function areaNames(items: readonly Opportunity[]): string[] {
+  return [...new Set(items.flatMap((o) => o.area_names ?? []))].sort((a, b) => a.localeCompare(b));
 }
 
 function parseDay(iso: string): Date | null {
@@ -89,17 +121,15 @@ export function matchesQuery(o: Opportunity, query: string): boolean {
 }
 
 /**
- * Soonest deadline first, featured first only among calls due the same day.
+ * Soonest paper deadline first, then oldest post.
  *
- * Deliberately not the server's order (featured first overall): on a board
- * grouped by date, a featured call due in four weeks sitting above one due in
- * twelve days reads as a mistake. Featuring marks a call with a star; it does
- * not reorder time. Applied after every load, add and edit, so the board is
- * always in the order a reload would show.
+ * Featured never moves a Call, not even among Calls due the same day: it adds
+ * a star and a label and nothing else (ADR-050 decision 12). Applied after
+ * every load, add and edit, so the board is always in the order a reload
+ * would show.
  */
 export function byBoardOrder(a: Opportunity, b: Opportunity): number {
   if (a.due_date !== b.due_date) return a.due_date < b.due_date ? -1 : 1;
-  if (a.is_featured !== b.is_featured) return a.is_featured ? -1 : 1;
   return a.id - b.id;
 }
 
@@ -133,6 +163,17 @@ export const EMPTY_DRAFT: OpportunityDraft = {
   registration_fee: "",
   is_featured:      false,
 };
+
+/**
+ * The draft with its type changed. A Journal or Book Chapter fills an empty
+ * location with "Online", which the poster can change (ADR-050 decision 4); a
+ * typed location is never replaced. Its event dates stay in the draft, hidden,
+ * so switching back restores what was typed; `inputFrom` never sends them.
+ */
+export function withType(d: OpportunityDraft, type: OpportunityType): OpportunityDraft {
+  if (hasEvent(type)) return { ...d, opportunity_type: type };
+  return { ...d, opportunity_type: type, location: d.location.trim() ? d.location : "Online" };
+}
 
 export function draftFrom(o: Opportunity): OpportunityDraft {
   return {
@@ -171,6 +212,7 @@ export function checkDraft(d: OpportunityDraft): DraftErrors {
 }
 
 export function inputFrom(d: OpportunityDraft): OpportunityInput {
+  const event = hasEvent(d.opportunity_type);
   return {
     opportunity_type: d.opportunity_type as OpportunityType,
     title:            d.title.trim(),
@@ -179,8 +221,8 @@ export function inputFrom(d: OpportunityDraft): OpportunityInput {
     location:         d.location.trim(),
     areas:            d.areas,
     external_url:     d.external_url.trim(),
-    start_date:       d.start_date || null,
-    end_date:         d.end_date || null,
+    start_date:       event ? d.start_date || null : null,
+    end_date:         event ? d.end_date || null : null,
     registration_fee: d.registration_fee.trim(),
     is_featured:      d.is_featured,
   };

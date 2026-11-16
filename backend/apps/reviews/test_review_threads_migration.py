@@ -95,3 +95,65 @@ def test_existing_comments_become_general_suggestion_threads_of_their_writer_s_p
     finally:
         purge_records_at_current_state()
         call_command("migrate", verbosity=0)
+
+
+_REPLIES_BEFORE = [("reviews", "0029_review_mentions")]
+_REPLIES_AFTER = [("reviews", "0030_backfill_reply_parties")]
+
+
+def test_existing_replies_keep_the_party_their_writer_held_when_they_wrote_them():
+    """IR-1192's backfill, `reviews/0030`: only a reply's `party` is written."""
+    _migrate(_REPLIES_BEFORE)
+    try:
+        owner = _user("ir1192-owner@iris.test", "Student")
+        adviser = _user("ir1192-adviser@iris.test", "Adviser")
+        itso = _user("ir1192-itso@iris.test", "ITSO")
+        thesis = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        record = model_at_current_state("records", "Record").objects.create(
+            title="Replies backfilled", record_type_id=thesis.pk, added_by_id=owner.pk,
+            pipeline_status="in_review", adviser_id=adviser.pk,
+        )
+        _model(_REPLIES_BEFORE, "records", "RecordOwner").objects.create(
+            record_id=record.pk, user_id=owner.pk, is_primary=True,
+        )
+        Assignment = _model(_REPLIES_BEFORE, "reviews", "RecordAssignment")
+        Seat = _model(_REPLIES_BEFORE, "reviews", "ReviewerSeat")
+        for party, reviewer in (("adviser", adviser), ("itso", itso)):
+            assignment = Assignment.objects.create(record_id=record.pk, party=party)
+            Seat.objects.create(assignment_id=assignment.pk, reviewer_id=reviewer.pk, source="claimed",
+                                assigned_at=timezone.now() - timedelta(days=1))
+
+        Comment = _model(_REPLIES_BEFORE, "reviews", "ReviewComment")
+        thread = Comment.objects.create(record_id=record.pk, author_id=itso.pk, body="ITSO's.",
+                                        party="itso", severity="suggestion")
+        by_owner = Comment.objects.create(record_id=record.pk, author_id=owner.pk, body="Owner's.",
+                                          reply_to_id=thread.pk)
+        by_adviser = Comment.objects.create(record_id=record.pk, author_id=adviser.pk, body="Adviser's.",
+                                            reply_to_id=thread.pk)
+        by_itso = Comment.objects.create(record_id=record.pk, author_id=itso.pk, body="ITSO's reply.",
+                                         reply_to_id=thread.pk)
+        orphan = Comment.objects.create(record_id=record.pk, author_id=None, body="Removed account.",
+                                        reply_to_id=thread.pk)
+        before = {
+            c.pk: (c.body, c.created_at, c.edited_at, c.version_id, c.reply_to_id, c.severity)
+            for c in Comment.objects.all()
+        }
+
+        _migrate(_REPLIES_AFTER)
+
+        After = _model(_REPLIES_AFTER, "reviews", "ReviewComment")
+        rows = {c.pk: c for c in After.objects.all()}
+        assert {pk: c.party for pk, c in rows.items()} == {
+            thread.pk: "itso",
+            by_owner.pk: "",
+            by_adviser.pk: "adviser",
+            by_itso.pk: "itso",
+            orphan.pk: "",
+        }
+        assert {
+            c.pk: (c.body, c.created_at, c.edited_at, c.version_id, c.reply_to_id, c.severity)
+            for c in rows.values()
+        } == before
+    finally:
+        purge_records_at_current_state()
+        call_command("migrate", verbosity=0)

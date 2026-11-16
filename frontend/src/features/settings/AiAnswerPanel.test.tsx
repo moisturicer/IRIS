@@ -56,6 +56,8 @@ describe("the person's AI answer", () => {
     const mine = within(panel).getByRole("group", { name: "Your answer" });
     expect(mine).toHaveTextContent("Yes, AI may use your papers");
     expect(mine).toHaveTextContent("Given under notice version 4 on Nov 3, 2026.");
+    // Audit US-11 (IR-1098): "papers you're Contact person of" read as a slip.
+    expect(panel).toHaveTextContent("Your answer covers every paper you are the contact person for.");
     expect(panel).toHaveTextContent("Each paper keeps the answer it started with, and there is no setting per paper.");
     await expectNoBlockingA11yViolations(container);
   });
@@ -99,7 +101,7 @@ describe("the person's AI answer", () => {
   });
 
   it.each([
-    ["All my papers", "all", 2, "Your answer is now Yes. 2 papers you're Contact person of now hold your Yes."],
+    ["All my papers", "all", 2, "Your answer is now Yes. 2 papers you are the contact person for now hold your Yes."],
     ["Only papers from now on", "from_now", 0, "Your answer is now Yes."],
   ] as const)("sends %s and says what changed", async (label, papers, updated, said) => {
     answered(false);

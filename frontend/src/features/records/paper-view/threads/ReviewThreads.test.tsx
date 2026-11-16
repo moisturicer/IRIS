@@ -26,6 +26,7 @@ const api = vi.hoisted(() => ({
   answerThread: vi.fn(),
   changeThreadSeverity: vi.fn(),
   deleteReviewComment: vi.fn(),
+  editReviewComment: vi.fn(),
   reviewMentionable: vi.fn(),
 }));
 vi.mock("@/api/records", () => ({ recordsApi: api }));
@@ -123,6 +124,114 @@ describe("an owner answers a reviewer's thread", () => {
     const t = within(thread(/Thread 1/));
     expect(t.getByText("Declined")).toBeInTheDocument();
     expect(t.getByText("Out of scope.")).toBeInTheDocument();
+  });
+});
+
+// IR-1191: the answer is one row in the history, at the moment it was given.
+describe("the authors' answer sits in the thread's history", () => {
+  const rows = () =>
+    within(screen.getByRole("list", { name: "Replies and history" })).getAllByRole("listitem").map((li) => li.textContent);
+  const answered = (over: Partial<NonNullable<ReviewComment["answer"]>> = {}) => ({
+    kind: "addressed" as const, note: "Consent script added as Appendix C.", by: "Sam Student",
+    at: "2026-10-07T00:00:00Z", ...over,
+  });
+
+  it("orders the answer between the replies around it, and draws no separate box", () => {
+    setup([
+      comment({ id: 1, answer: answered(), events: [
+        { kind: "answered", actor_name: "Sam Student", from: null, to: "addressed", at: "2026-10-07T00:00:00Z" },
+      ] }),
+      comment({ id: 2, reply_to: 1, party: null, party_label: "Author", body: "Is a verbal script enough?", created_at: "2026-10-02T00:00:00Z" }),
+      comment({ id: 3, reply_to: 1, party: null, party_label: "IERC", body: "Note the date each firm agreed.", created_at: "2026-10-09T00:00:00Z" }),
+    ]);
+    expect(rows()).toEqual([
+      expect.stringContaining("Is a verbal script enough?"),
+      expect.stringContaining("Sam Student marked this Addressed"),
+      expect.stringContaining("Note the date each firm agreed."),
+    ]);
+    // Said once, in the history: no box above the replies, no second "answered" line.
+    const t = within(thread(/Thread 1/));
+    expect(t.getAllByText("Consent script added as Appendix C.")).toHaveLength(1);
+    expect(t.queryByText(/answered it/)).toBeNull();
+    // The state badge at the top still says an answer exists, outside the history.
+    const history = screen.getByRole("list", { name: "Replies and history" });
+    expect(t.getAllByText("Addressed").filter((el) => !history.contains(el))).toHaveLength(1);
+  });
+
+  it("puts a reply posted after the answer below it", () => {
+    setup([
+      comment({ id: 1, answer: answered({ kind: "declined", note: "Out of scope.", by: "Ana Cruz", at: "2026-10-03T00:00:00Z" }) }),
+      comment({ id: 2, reply_to: 1, party: null, body: "Understood.", created_at: "2026-10-04T00:00:00Z" }),
+    ]);
+    expect(rows()).toEqual([
+      expect.stringContaining("Ana Cruz declined this"),
+      expect.stringContaining("Understood."),
+    ]);
+    expect(rows()[0]).toContain("Out of scope.");
+  });
+
+  it("dates an answer by its event when it carries no time, and keeps an earlier answer as a line", () => {
+    setup([comment({ id: 1, answer: answered({ at: null }), events: [
+      { kind: "answered", actor_name: "Sam Student", from: null, to: "declined", at: "2026-10-01T00:00:00Z" },
+      { kind: "answered", actor_name: "Sam Student", from: null, to: "addressed", at: "2026-10-05T00:00:00Z" },
+    ] })]);
+    expect(rows()).toEqual([
+      expect.stringContaining("Sam Student answered it"),
+      expect.stringContaining("Sam Student marked this Addressed Oct 5, 2026"),
+    ]);
+  });
+
+  it("says when no note was given, and names the authors when the server names no one", () => {
+    setup([comment({ id: 1, answer: answered({ note: "", by: null }) })]);
+    expect(rows()).toEqual([expect.stringContaining("The authors marked this Addressed")]);
+    expect(rows()[0]).toContain("No answer given.");
+  });
+});
+
+// IR-1192: a reply says who wrote it, as the Conversation tab does.
+describe("a thread's replies", () => {
+  it("show the writer, their party and the date, and the Reply control counts them", () => {
+    setup([
+      comment({ id: 1 }),
+      comment({ id: 2, reply_to: 1, party: null, author_name: "Dr. Marco Lim", party_label: "IERC", body: "Attach it.", created_at: "2026-10-03T00:00:00Z", edited_at: "2026-10-04T00:00:00Z" }),
+      // An older payload: no label from the server.
+      comment({ id: 3, reply_to: 1, party: null, author_name: "Sam Student", party_label: undefined, body: "Will do.", created_at: "2026-10-05T00:00:00Z" }),
+    ]);
+    const [first, second] = within(screen.getByRole("list", { name: "Replies and history" })).getAllByRole("listitem");
+    expect(within(first).getByText("Dr. Marco Lim")).toBeInTheDocument();
+    expect(within(first).getByText("IERC")).toBeInTheDocument();
+    expect(first).toHaveTextContent("Oct 3, 2026");
+    expect(first).toHaveTextContent("edited");
+    expect(within(second).getByText("Sam Student")).toBeInTheDocument();
+    expect(second).toHaveTextContent("Will do.");
+    expect(within(thread(/Thread 1/)).getByRole("button", { name: "Reply, 2 replies" })).toBeInTheDocument();
+  });
+
+  it("edits the viewer's own reply from its menu", async () => {
+    api.editReviewComment.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    const { reload } = setup([
+      comment({ id: 1 }),
+      comment({ id: 2, reply_to: 1, party: null, author_name: "Sam Student", body: "mmm", can_edit: true }),
+      comment({ id: 3, reply_to: 1, party: null, author_name: "Dr. Marco Lim", body: "Attach it." }),
+    ]);
+    // Only the reply the server says is theirs has a menu.
+    expect(screen.queryByRole("button", { name: "Actions for Dr. Marco Lim's reply" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Actions for Sam Student's reply" }));
+    await user.click(screen.getByRole("menuitem", { name: "Edit" }));
+    const box = screen.getByRole("textbox", { name: "Edit your reply" });
+    expect(box).toHaveValue("mmm");
+    expect(box).toHaveFocus();
+    await user.clear(box);
+    await user.keyboard("Will attach the script.");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(api.editReviewComment).toHaveBeenCalledWith(9, 2, { body: "Will attach the script." });
+    expect(reload).toHaveBeenCalled();
+  });
+
+  it("offers no Edit without comment_review", () => {
+    setup([comment({ id: 1 }), comment({ id: 2, reply_to: 1, party: null, author_name: "Sam Student", can_edit: true })], { caps: [] });
+    expect(screen.queryByRole("button", { name: "Actions for Sam Student's reply" })).toBeNull();
   });
 });
 

@@ -714,6 +714,12 @@ export default function PaperViewPage() {
   const landingNotice = viewedVersion || openedInShown
     ? null
     : citationLandingNotice(resolution, pageContext, openAtPage, highlightRegions.length > 0);
+  // A download request waiting on RDCO is the paper's state, so it sits in the
+  // record bar, not beside zoom (IR-1098, audit CMP-06). Only where the bar
+  // shows the paper and has room: on a phone it stays in the reader's toolbar,
+  // as the version does. An earlier version offers no download at all.
+  const pendingInBar =
+    (onPaperTab || reviewerWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && record.download?.state === "pending";
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = () => (
@@ -789,6 +795,7 @@ export default function PaperViewPage() {
                 download={record.download}
                 fill={onPaperTab || reviewerWorkspace}
                 onChanged={reloadRecord}
+                pending={pendingInBar ? "elsewhere" : "here"}
               />
             )
           }
@@ -935,6 +942,15 @@ export default function PaperViewPage() {
         title={!onPaperTab && !reviewerWorkspace ? undefined : arriving ? null : record.title}
         // Not in the bar below 640px, where the reader's toolbar holds it.
         version={(onPaperTab || reviewerWorkspace) && tier !== "single" ? paperVersion : undefined}
+        actions={pendingInBar ? (
+          <PaperDownloadControl
+            recordId={record.id}
+            recordTitle={record.title}
+            download={record.download}
+            fill
+            onChanged={reloadRecord}
+          />
+        ) : undefined}
       />
       <div
         className={cn(

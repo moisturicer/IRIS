@@ -20,20 +20,23 @@ import { MyResearchList } from "./MyResearchList";
 import { FolderPicker, isSameView, viewKey, type LibraryView } from "./ReadingPanel";
 import type { ResearchFilter } from "./researchSections";
 import { isRequestTimeout } from "@/api/requestPolicy";
+import { SavedCallsSection } from "@/features/opportunities/SavedCallsSection";
 import { SavedView } from "./SavedView";
 import { useLibrary, useReadingHistory } from "./useLibrary";
 
-type Tab = "overview" | "research" | "saved" | "downloads";
+type Tab = "overview" | "research" | "saved" | "calls" | "downloads";
 type SavedViewKind = Exclude<LibraryView, { kind: "research" }>;
 
-const AUTHOR_TABS: { value: Tab; label: string }[] = [
-  { value: "overview",  label: "Overview" },
-  { value: "research",  label: "My submissions" },
-  { value: "saved",     label: "Saved papers" },
-  { value: "downloads", label: "Download requests" },
+/** Every tab, in order. `reader`: every reader has it, author or not (IR-743, IR-766). */
+const AUTHOR_TABS: { value: Tab; label: string; reader: boolean }[] = [
+  { value: "overview",  label: "Overview",          reader: false },
+  { value: "research",  label: "My submissions",    reader: false },
+  { value: "saved",     label: "Saved papers",      reader: true },
+  // Calls for papers the reader saved, apart from papers (IR-766).
+  { value: "calls",     label: "Saved calls",       reader: true },
+  { value: "downloads", label: "Download requests", reader: true },
 ];
-/** Every reader has their saves and their download requests (IR-743). */
-const READER_TABS = AUTHOR_TABS.filter((t) => t.value === "saved" || t.value === "downloads");
+const READER_TABS = AUTHOR_TABS.filter((t) => t.reader);
 
 type StatusFilter = "all" | ReadingStatus;
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -44,7 +47,8 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 const ALL_SAVED: SavedViewKind = { kind: "saved" };
 
 function tabFromSection(section: string | null, canAuthor: boolean): Tab {
-  if (section === "saved" || section === "downloads") return section;
+  const readerTab = READER_TABS.find((t) => t.value === section);
+  if (readerTab) return readerTab.value;
   if (!canAuthor) return "saved";
   return section === "research" ? section : "overview";
 }
@@ -52,14 +56,14 @@ function tabFromSection(section: string | null, canAuthor: boolean): Tab {
 /**
  * My Library (IR-410; spec §4.9 as amended 2026-10-11): an author's own
  * research and their saved reading, in tabs: Overview, My submissions, Saved
- * papers and Download requests. A reader who cannot author sees Saved papers
- * and Download requests (IR-743).
+ * papers, Saved calls (IR-766) and Download requests. A reader who cannot
+ * author sees Saved papers, Saved calls and Download requests (IR-743).
  *
  * Owned research comes from `/records/mine/`; saves, Reading status (IR-566,
  * ADR-044), the reader's own folders (IR-572, ADR-070) and reading history
  * (IR-756) from the account. `?section=research` (where
- * the retired `/workspace` lands), `?section=saved` and `?section=downloads`
- * pick a tab.
+ * the retired `/workspace` lands), `?section=saved`, `?section=calls` and
+ * `?section=downloads` pick a tab.
  */
 export default function MyLibraryPage() {
   // The server's `can_author` (IR-1096), not the role name.
@@ -143,7 +147,7 @@ export default function MyLibraryPage() {
     : savedView.kind === "status" ? savedView.status : null;
 
   /* Tabs follow the ARIA tabs pattern: arrows move between them. */
-  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ overview: null, research: null, saved: null, downloads: null });
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ overview: null, research: null, saved: null, calls: null, downloads: null });
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     const i = tabs.findIndex((t) => t.value === tab);
     const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -285,6 +289,7 @@ export default function MyLibraryPage() {
           />
         )}
         {tab === "saved" && savedPanel}
+        {tab === "calls" && <SavedCallsSection />}
         {tab === "downloads" && <DownloadRequestsView />}
       </div>
     </div>

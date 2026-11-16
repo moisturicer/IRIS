@@ -114,7 +114,7 @@ They stay in `lib/opportunityLibrary.ts`, labelled browser-only, and keep their 
 
 ## Amendment — 2026-11-16 (IR-579): old browser saves, folders and stars are deleted, not imported
 
-**Status of this amendment: Proposed** — 2026-11-16, decided by Hermoine Zozobrado while building IR-579, awaiting acceptance by Lee Jasmin Adolfo. It replaces IR-579's import, which Hermoine Zozobrado had accepted earlier the same day on the card.
+**Status of this amendment: Accepted** — 2026-11-16 by Lee Jasmin Adolfo, as relayed by Hermoine Zozobrado, after IR-579's PR (#839) merged with Ashlee's review. Decided by Hermoine Zozobrado, 2026-11-16, while building IR-579. It replaces IR-579's import, which Hermoine Zozobrado had accepted earlier the same day on the card.
 
 **Why.** §7, Q1 and ADR-070 §7 left `iris_record_collections` (the pre-IR-566 status folders and the reader's own folders) and `iris_starred_records` (stars) untouched so that IR-579 could offer them for import. **IRIS has had no readers**: the browser library was never released, so the only browsers holding these keys are the team's development and test machines. An import (a preview resolved through current permissions, selection, a per-account import identity, retries) would protect data nobody needs, and every day the keys stay is a day the next person on that browser could be handed them.
 

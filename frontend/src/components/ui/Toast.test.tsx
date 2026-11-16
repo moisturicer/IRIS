@@ -55,6 +55,14 @@ describe("ToastContainer", () => {
       expect(useUIStore.getState().toasts).toEqual([]);
     });
 
+    it("stays while it offers an action, so the action can be reached (IR-764)", () => {
+      useUIStore.getState().addToast({ type: "error", message: "Not saved", action: { label: "Try again", onClick: () => {} } });
+
+      vi.advanceTimersByTime(60_000);
+
+      expect(useUIStore.getState().toasts).toHaveLength(1);
+    });
+
     it("stays until dismissed when asked to persist", () => {
       useUIStore.getState().addToast({ type: "error", message: "Not saved", persist: true });
 
@@ -64,6 +72,19 @@ describe("ToastContainer", () => {
       useUIStore.getState().removeToast(useUIStore.getState().toasts[0].id);
       expect(useUIStore.getState().toasts).toEqual([]);
     });
+  });
+
+  it("offers the action a toast carries, and closes once it is taken (IR-764)", async () => {
+    const retry = vi.fn();
+    useUIStore.setState({
+      toasts: [{ id: "e", type: "error", message: "Could not build the calendar file. Try again.", action: { label: "Try again", onClick: retry } }],
+    });
+    renderScreen(<ToastContainer />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(retry).toHaveBeenCalledOnce();
+    expect(useUIStore.getState().toasts).toEqual([]);
   });
 
   it("still dismisses", async () => {

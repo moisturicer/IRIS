@@ -21,7 +21,7 @@ const REFRESH_KEY = "iris_refresh_token";
 // What builds before the account library kept in this browser: history
 // (IR-756), status folders and own folders, and stars (IR-579). Every one is
 // deleted, never read or imported (ADR-044 amendments 2026-11-16).
-const OLD_LIBRARY_KEYS = ["iris_reading_history", "iris_record_collections", "iris_starred_records"];
+const OLD_LIBRARY_KEYS = ["iris_reading_history", "iris_record_collections", "iris_starred_records", "iris_saved_opportunities"];
 const LEGACY_KEYS = ["refresh_token", "access_token"];
 
 beforeEach(() => {
@@ -110,6 +110,8 @@ describe("sign-out clears every stored credential", () => {
       { id: "1730000000000", name: "Old browser folder", recordIds: [2] },
     ]));
     localStorage.setItem("iris_starred_records", JSON.stringify([3]));
+    // Calls saved in the browser before they followed the account (IR-766).
+    localStorage.setItem("iris_saved_opportunities", JSON.stringify([4]));
   }
 
   function everyCredentialIsGone() {

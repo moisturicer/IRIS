@@ -14,7 +14,7 @@ import type { ClearanceStripEntry, MentionedPerson, RecordTracker, ReviewComment
 
 import { initials } from "./commentThreads";
 import { ReviewStatus, turnLine } from "./ReviewStatus";
-import { MentionPicker, MentionedPeople, peopleIn } from "./Mentions";
+import { MentionPicker, MentionedPeople, changedMentions, peopleIn } from "./Mentions";
 import { SavedReplies } from "./SavedReplies";
 import { timelineEntries, type TimelineEntry, type TimelineKind } from "./timelineEntries";
 
@@ -37,7 +37,7 @@ const KIND_ICON: Record<TimelineKind, string> = {
   reassignment: "fa-people-arrows",
   extension: "fa-calendar-plus",
   published: "fa-globe",
-  comment: "fa-comment",
+  comment: "fa-note-sticky",
 };
 
 /** What the review discussion lets this viewer do (IR-419). */
@@ -439,9 +439,7 @@ function EditableComment({
         initialMentions={before}
         recordId={discussion.recordId}
         onSubmit={async (body, mentions) => {
-          // Sent only when changed, so a payload without them never clears them.
-          const same = mentions.length === before.length && mentions.every((m, i) => m === before[i].id);
-          await discussion.edit(comment.id, body, same ? undefined : mentions);
+          await discussion.edit(comment.id, body, changedMentions(before, mentions));
           setEditing(false);
         }}
         onCancel={() => setEditing(false)}

@@ -23,6 +23,12 @@ vi.mock("@/api/records", () => ({
   },
 }));
 
+// Saved calls (IR-766) read their own endpoint.
+const savedCalls = vi.fn();
+vi.mock("@/api/opportunities", () => ({
+  opportunitiesApi: { saved: () => savedCalls(), save: vi.fn(), unsave: vi.fn() },
+}));
+
 const downloadBlob = vi.fn();
 vi.mock("@/lib/utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/utils")>()),
@@ -154,6 +160,7 @@ beforeEach(() => {
   history([]);
   folders([]);
   myDownloads([]);
+  savedCalls.mockResolvedValue({ data: { results: [] } });
   vi.mocked(libraryApi.unsave).mockResolvedValue({ status: 204 } as Awaited<ReturnType<typeof libraryApi.unsave>>);
   signIn(9);
 });
@@ -484,7 +491,7 @@ describe("My Library: reading", () => {
     const { container } = renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Download requests"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Saved calls", "Download requests"]);
     expect(screen.getByRole("tab", { name: "Saved papers" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
@@ -495,6 +502,8 @@ describe("My Library: reading", () => {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
+    // Audit LAY-06 (IR-1098): an empty page names the next useful step.
+    expect(screen.getByRole("link", { name: "Browse Discover" })).toHaveAttribute("href", "/");
   });
 });
 
@@ -929,17 +938,18 @@ describe("My Library: download requests (IR-743)", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "No download requests yet" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse Discover" })).toHaveAttribute("href", "/");
     expect(recordsApi.myDownloadRequests).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("My Library follows the server's can_author (IR-1096)", () => {
-  it("gives a Student the server refuses only Saved papers and Download requests, and no Publish", async () => {
+  it("gives a Student the server refuses only Saved papers, Saved calls and Download requests, and no Publish", async () => {
     signIn(12, "Student", false);
     renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Download requests"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Saved calls", "Download requests"]);
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
   });
@@ -948,7 +958,30 @@ describe("My Library follows the server's can_author (IR-1096)", () => {
     signIn(13, "RDCO", true);
     renderScreen(<MyLibraryPage />);
 
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "My submissions", "Saved papers", "Download requests"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "My submissions", "Saved papers", "Saved calls", "Download requests"]);
     expect(screen.getByRole("link", { name: "Publish" })).toBeInTheDocument();
+  });
+});
+
+describe("Saved calls (IR-766)", () => {
+  it("has its own tab, apart from saved papers, at ?section=calls", async () => {
+    savedCalls.mockResolvedValue({ data: { results: [{
+      call_id: 5, available: true, saved_at: "2026-11-15T08:00:00Z",
+      call: {
+        id: 5, opportunity_type: "journal", type_display: "Journal", title: "Energy Letters special issue",
+        description: "", external_url: "https://example.org/si", due_date: "2026-12-01", location: "Online",
+        areas: [], area_names: [], start_date: null, end_date: null, registration_fee: "", is_featured: false,
+        posted_by: 2, posted_by_name: "RDCO", created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z",
+        days_left: 15, is_closed: false, papers_state: "accepting", papers_label: "Accepting papers",
+        event_state: null, event_label: null, status: "confirmed", status_label: "Confirmed", review_reason: "",
+        reviewed_at: null, can_edit: false, can_delete: false, can_remove: false, can_confirm: false,
+        can_reject: false, can_feature: false, edit_returns_to_pending: false,
+      },
+    }] } });
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=calls" });
+
+    expect(await screen.findByRole("article", { name: "Energy Letters special issue" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Saved calls" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("heading", { name: "No saved papers yet" })).toBeNull();
   });
 });

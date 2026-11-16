@@ -5,21 +5,22 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DEFAULT_QUERY, feedCriteria, feedQueryOf, feedSearchParams, listParams, parseDiscoverQuery, sameFeedQuery,
-  writeDiscoverQuery,
+  DEFAULT_QUERY, ORDER_OPTIONS, feedCriteria, feedQueryOf, feedSearchParams, listParams, orderOf, parseDiscoverQuery,
+  sameFeedQuery, withOrder, writeDiscoverQuery,
 } from "./discoverQuery";
 
 const parse = (search: string) => parseDiscoverQuery(new URLSearchParams(search));
 
 describe("parseDiscoverQuery", () => {
   it("reads every field", () => {
-    expect(parse("q=rain&type=2&college=5,4&classification=7&year=2019&ip=patent&sort=viewed")).toEqual({
+    expect(parse("q=rain&type=2&college=5,4&classification=7&year_from=2018&year_to=2021&ip=patent&sort=viewed")).toEqual({
       q: "rain",
       filters: {
         recordType: "2",
         colleges: ["4", "5"],
         classifications: ["7"],
-        year: "2019",
+        yearFrom: "2018",
+        yearTo: "2021",
         ip: "patent",
       },
       sort: "viewed",
@@ -34,11 +35,23 @@ describe("parseDiscoverQuery", () => {
   it.each([
     ["sort=bogus", "an unknown sort"],
     ["type=thesis", "a non-numeric record type"],
-    ["year=19", "a malformed year"],
+    ["year_from=19", "a malformed from year"],
+    ["year_to=20x1", "a malformed to year"],
+    // IR-947: one year is From and To; the old single key is not read.
+    ["year=2019", "the retired single-year key"],
     ["ip=everything", "an unknown IP value"],
     ["college=x,", "college ids that are not ids"],
   ])("falls back to the default for %s (%s)", (search) => {
     expect(parse(search)).toEqual(DEFAULT_QUERY);
+  });
+
+  it("reads an open-ended range from either end (IR-947)", () => {
+    expect(parse("year_from=2018").filters).toMatchObject({ yearFrom: "2018", yearTo: "all" });
+    expect(parse("year_to=2021").filters).toMatchObject({ yearFrom: "all", yearTo: "2021" });
+  });
+
+  it("puts a range written backwards the right way round", () => {
+    expect(parse("year_from=2021&year_to=2018").filters).toMatchObject({ yearFrom: "2018", yearTo: "2021" });
   });
 
   it("keeps the valid ids in a list and drops the rest", () => {
@@ -52,9 +65,44 @@ describe("parseDiscoverQuery", () => {
   });
 });
 
+describe("one sort for Discover (IR-1187)", () => {
+  it("offers Best, Newest, Most viewed and Trending, in that order", () => {
+    expect(ORDER_OPTIONS.map((o) => o.label)).toEqual(["Best", "Newest", "Most viewed", "Trending"]);
+  });
+
+  it.each([
+    ["", "newest"],
+    ["sort=viewed", "viewed"],
+    ["feed=latest", "newest"],
+    ["feed=for_you", "best"],
+    ["feed=trending", "trending"],
+  ])("reads an old link %s as %s", (search, order) => {
+    expect(orderOf(parse(search))).toBe(order);
+  });
+
+  it("lands an old tab link carrying a sort on the tab, the order it showed", () => {
+    // The tab ignored the sort, so the link showed the tab's own order.
+    expect(orderOf(parse("feed=trending&sort=viewed"))).toBe("trending");
+    expect(orderOf(parse("feed=for_you&sort=viewed"))).toBe("best");
+    expect(writeDiscoverQuery(new URLSearchParams(), parse("feed=trending&sort=viewed")).toString()).toBe("feed=trending");
+  });
+
+  it.each([
+    ["best", { feed: "for_you", sort: "newest" }, { ordering: "-created_at" }],
+    ["newest", { feed: "latest", sort: "newest" }, { ordering: "-created_at" }],
+    ["viewed", { feed: "latest", sort: "viewed" }, { ordering: "-access_count" }],
+    ["trending", { feed: "trending", sort: "newest" }, { ordering: "trending" }],
+  ] as const)("asks for %s exactly as its tab or sort did", (order, shape, params) => {
+    const query = withOrder(parse("sort=viewed&type=2"), order);
+    expect(query).toMatchObject({ ...shape, filters: { recordType: "2" } });
+    expect(listParams(query)).toMatchObject(params);
+    expect(orderOf(parseDiscoverQuery(writeDiscoverQuery(new URLSearchParams(), query)))).toBe(order);
+  });
+});
+
 describe("writeDiscoverQuery", () => {
   it("round-trips: what it writes parses back to the same query", () => {
-    const query = parse("q=rain&type=2&college=4,5&year=2019&ip=has_ip&sort=viewed");
+    const query = parse("q=rain&type=2&college=4,5&year_from=2019&year_to=2019&ip=has_ip&sort=viewed");
     expect(parseDiscoverQuery(writeDiscoverQuery(new URLSearchParams(), query))).toEqual(query);
   });
 
@@ -62,7 +110,11 @@ describe("writeDiscoverQuery", () => {
     expect(writeDiscoverQuery(new URLSearchParams(), DEFAULT_QUERY).toString()).toBe("");
   });
 
-  it("leaves keys it does not own, such as the Publish dialog's", () => {
+  it("removes the retired single-year key rather than carrying it along (IR-947)", () => {
+    expect(writeDiscoverQuery(new URLSearchParams("year=2026&q=rain"), parse("q=rain")).toString()).toBe("q=rain");
+  });
+
+    it("leaves keys it does not own, such as the Publish dialog's", () => {
     const written = writeDiscoverQuery(new URLSearchParams("publish=new&sort=bogus"), DEFAULT_QUERY);
     expect(written.toString()).toBe("publish=new");
   });
@@ -70,11 +122,13 @@ describe("writeDiscoverQuery", () => {
 
 describe("saved feeds use Discover's own query (IR-577)", () => {
   it("stores a query in Discover's spelling, without the tab", () => {
-    const query = parse("q=flood&classification=7,4&college=5&year=2018&ip=patent&type=2&sort=viewed&feed=for_you");
+    const query = parse("q=flood&classification=7,4&college=5&year_from=2018&ip=patent&type=2&sort=viewed");
 
     expect(feedQueryOf(query)).toEqual({
-      q: "flood", type: "2", college: "5", classification: "4,7", year: "2018", ip: "patent", sort: "viewed",
+      q: "flood", type: "2", college: "5", classification: "4,7", year_from: "2018", ip: "patent", sort: "viewed",
     });
+    // IR-1187: Best is one order of four, so it carries no second sort to store.
+    expect(feedQueryOf(parse("q=flood&sort=viewed&feed=for_you"))).toEqual({ q: "flood" });
   });
 
   it("saves Trending as most viewed and omits the default sort", () => {
@@ -115,16 +169,39 @@ describe("saved feeds use Discover's own query (IR-577)", () => {
     };
 
     expect(
-      feedCriteria({ q: "flood", classification: "4,7", college: "5", type: "2", year: "2018", ip: "has_ip", sort: "viewed" }, options),
+      feedCriteria({ q: "flood", classification: "4,7", college: "5", type: "2", year_from: "2018", ip: "has_ip", sort: "viewed" }, options),
     ).toEqual([
       "Keywords: flood",
       "Areas: Civil Engineering, no longer available",
       "Colleges: College of Engineering",
       "Type: Thesis",
-      "Year: 2018",
+      "Years: 2018 onward",
       "Intellectual property: any",
       "Sorted by: Most viewed",
     ]);
+  });
+});
+
+describe("a year range in words and in the list request (IR-947)", () => {
+  const noOptions = { classifications: [], colleges: [], recordTypes: [] };
+
+  it.each([
+    [{ year_from: "2018", year_to: "2021" }, "Years: 2018 to 2021"],
+    [{ year_from: "2018" }, "Years: 2018 onward"],
+    [{ year_to: "2021" }, "Years: up to 2021"],
+    [{ year_from: "2019", year_to: "2019" }, "Year: 2019"],
+  ])("describes %o as %s", (stored, line) => {
+    expect(feedCriteria(stored, noOptions)).toEqual([line]);
+  });
+
+  it("asks the list endpoint for each end the reader set, and only those", () => {
+    const at = (search: string) => listParams(parse(search));
+
+    expect(at("year_from=2018&year_to=2021")).toMatchObject({ year_from: "2018", year_to: "2021" });
+    expect(at("year_from=2018")).toMatchObject({ year_from: "2018" });
+    expect(at("year_from=2018")).not.toHaveProperty("year_to");
+    expect(at("year_to=2021")).not.toHaveProperty("year_from");
+    expect(at("")).not.toHaveProperty("year_from");
   });
 });
 

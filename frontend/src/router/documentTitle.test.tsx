@@ -23,7 +23,7 @@ vi.mock("@/api/client", () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }));
 vi.mock("@/config/institution", () => ({
-  INSTITUTION: { name: "Example Research University", shortName: "ERU", logo: "example.png", emailDomain: "example.edu" },
+  INSTITUTION: { name: "Example Research University", shortName: "ERU", logo: "example.png", seal: "example-seal.png", emailDomain: "example.edu" },
 }));
 
 /** The first visit to a record loads the heaviest page in the app (IR-749). */

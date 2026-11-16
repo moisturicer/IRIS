@@ -170,6 +170,7 @@ class _Viewer:
         self.in_review = is_in_review(record)
         self._seats: dict[str, bool] = {}
         self._versions: Optional[list] = None
+        self._owner_ids: Optional[set] = None
 
     @property
     def versions(self) -> list:
@@ -181,10 +182,31 @@ class _Viewer:
                                   .select_related("review_text").order_by("number"))
         return self._versions
 
+    @property
+    def owner_ids(self) -> set:
+        """The record's owners' user ids, read once."""
+        if self._owner_ids is None:
+            self._owner_ids = set(self.record.owners.values_list("user_id", flat=True))
+        return self._owner_ids
+
     def holds(self, party) -> bool:
         if party not in self._seats:
             self._seats[party] = holds_seat(self.user, self.record, party)
         return self._seats[party]
+
+
+def _reply_label(comment: ReviewComment, viewer: _Viewer) -> Optional[str]:
+    """
+    Who a reply's writer is in this review (IR-1192): the party they wrote as,
+    in the server's words, or *Author* for an owner. None when neither holds
+    -- a removed account, or a reviewer's reply from before IR-1192 that the
+    backfill could not place -- so nothing is guessed.
+    """
+    if comment.party:
+        return threads.party_label(comment.party)
+    if comment.author_id is not None and comment.author_id in viewer.owner_ids:
+        return threads.AUTHOR_LABEL
+    return None
 
 
 def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = None) -> dict[str, Any]:
@@ -192,7 +214,7 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
     One comment, as the API and the tracker state it to `user`. Every `can_*`
     is the server's answer, so the screen offers an act only where it is true
     (`threads.py` holds the same rules for the acts). A reply carries the
-    thread fields empty.
+    thread fields empty, but for `party_label`, which names its writer (IR-1192).
     """
     viewer = viewer or _Viewer(comment.record, user)
     mine = comment.author_id is not None and comment.author_id == viewer.pk
@@ -214,7 +236,7 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "mentions": mentions.payload(comment),
         # The thread (ADR-032 §7, IR-874).
         "party": (comment.party or None) if top else None,
-        "party_label": threads.party_label(comment.party) if top else None,
+        "party_label": threads.party_label(comment.party) if top else _reply_label(comment, viewer),
         "severity": comment.severity if top else None,
         "is_draft": comment.is_draft,
         "round": comment.round_id,
@@ -440,10 +462,12 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None,
             raise CommentError(
                 "A reply belongs to its thread: it has no severity, anchor or suggested wording."
             )
-        # Replies post immediately and are never held (ADR-032 §7).
+        # Replies post immediately and are never held (ADR-032 §7). The
+        # writer's party is kept for the reply's label (IR-1192).
+        writer, _seated = writer_party(record, user)
         return _with_mentions(ReviewComment.objects.create(
             record=record, author=user, body=text,
-            version=latest_version(record), reply_to=parent,
+            version=latest_version(record), reply_to=parent, party=writer,
         ), user, people)
 
     party, seated = writer_party(record, user)

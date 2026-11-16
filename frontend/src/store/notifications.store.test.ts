@@ -26,7 +26,7 @@ const unread: Notification = {
   created_at: "2026-10-31T09:00:00Z",
   is_read: false,
   resolved_at: null,
-  resolved_label: "",
+  resolved_label: "", target: null,
 };
 
 function signedInWithUnread() {

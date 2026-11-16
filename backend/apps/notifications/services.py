@@ -1272,6 +1272,14 @@ def _email_role_users(role, *, subject, greeting, body):
 # Calls for papers (IR-762, ADR-050 decisions 8-11). In-app only.
 # ---------------------------------------------------------------------------
 
+# The notice types, by the names migration 0012 seeds. Named once, so the
+# serializer's `target` (IR-765) can't drift from what is sent.
+CALL_REQUEST_SUBMITTED = "Call Request Submitted"
+CALL_CONFIRMED = "Call Confirmed"
+CALL_REJECTED = "Call Rejected"
+CALL_REMOVED = "Call Removed"
+CALL_REQUEST_LAPSED = "Call Request Lapsed"
+
 def notify_call_requested(call, *, resubmitted=False):
     """
     Broadcast to RDCO that an Adviser's Call waits for it, bound to the Call
@@ -1289,7 +1297,7 @@ def notify_call_requested(call, *, resubmitted=False):
             message = f'{name} asked RDCO to confirm the call "{call.title}".'
         Notification.objects.create(
             sender=call.posted_by, broadcast_to_role=role,
-            notif_type=_get_type("Call Request Submitted"), message=message,
+            notif_type=_get_type(CALL_REQUEST_SUBMITTED), message=message,
             **_task(TaskKind.CALL_REQUEST, call),
         )
     except Exception:
@@ -1311,28 +1319,28 @@ def _tell_poster(call, *, type_name, message, sender=None):
 
 def notify_call_confirmed(call, *, confirmed_by):
     _tell_poster(
-        call, type_name="Call Confirmed", sender=confirmed_by,
+        call, type_name=CALL_CONFIRMED, sender=confirmed_by,
         message=f'RDCO confirmed your call "{call.title}". It is now on Calls & Conferences.',
     )
 
 
 def notify_call_rejected(call, *, rejected_by, reason):
     _tell_poster(
-        call, type_name="Call Rejected", sender=rejected_by,
+        call, type_name=CALL_REJECTED, sender=rejected_by,
         message=f'RDCO did not confirm your call "{call.title}". Reason: {reason}',
     )
 
 
 def notify_call_removed(call, *, removed_by, reason):
     _tell_poster(
-        call, type_name="Call Removed", sender=removed_by,
+        call, type_name=CALL_REMOVED, sender=removed_by,
         message=f'RDCO removed your call "{call.title}". Reason: {reason}',
     )
 
 
 def notify_call_lapsed(call):
     _tell_poster(
-        call, type_name="Call Request Lapsed",
+        call, type_name=CALL_REQUEST_LAPSED,
         message=(
             f'Your call "{call.title}" was removed because its paper deadline passed '
             "before it was confirmed. You may post a new one."

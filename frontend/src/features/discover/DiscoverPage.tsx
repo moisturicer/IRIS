@@ -31,8 +31,8 @@ import {
   DiscoverFilterBar,
   HAS_IP,
   type DiscoverFilters,
-  type DiscoverSort,
 } from "./DiscoverFilterBar";
+import { DiscoverOrderSelect } from "./DiscoverOrderSelect";
 import { DiscoverResultCard } from "./DiscoverResultCard";
 import { DiscoverResultsHeader } from "./DiscoverResultsHeader";
 import { DiscoverPeopleResults } from "./DiscoverPeopleResults";
@@ -47,9 +47,12 @@ import {
   feedQueryOf,
   feedSearchParams,
   listParams,
+  orderOf,
   parseDiscoverQuery,
   sameFeedQuery,
+  withOrder,
   writeDiscoverQuery,
+  type DiscoverOrder,
   type DiscoverQuery,
 } from "./discoverQuery";
 import { looksLikeQuestion, searchTerms } from "./searchTerms";
@@ -113,9 +116,11 @@ function writePosition(position: Position) {
  * Discover: find published research, and start a submission (IR-407, F2;
  * spec §4.3).
  *
- * Both feeds retain catalogue filters. Latest adds search and sort; For you uses its
- * cursor-based recommendation endpoint and carries its explanation per item.
- * The URL holds the feed and catalogue query (`discoverQuery.ts`), so Back,
+ * One Sort chooses the order (IR-1187): Best is the For you feed (ADR-062), on
+ * its cursor-based recommendation endpoint with an explanation per item;
+ * Newest, Most viewed and Trending are the catalogue. Every order keeps the
+ * catalogue filters; only the catalogue takes a search.
+ * The URL holds the order and catalogue query (`discoverQuery.ts`), so Back,
  * reload and a copied link restore the view, and requests are fenced by it.
  */
 export default function DiscoverPage() {
@@ -158,7 +163,7 @@ export default function DiscoverPage() {
   /* ── The query lives in the URL; this is its one parsed form ────────── */
   const query = useMemo(() => parseDiscoverQuery(searchParams), [searchParams]);
   const queryKey = discoverQueryKey(query);
-  const { q: activeQuery, filters, sort } = query;
+  const { q: activeQuery, filters } = query;
   const feed = query.feed;
   const feedKey = `${queryKey}|mode=${feed}`;
 
@@ -212,7 +217,15 @@ export default function DiscoverPage() {
     [],
   );
   const setFilters = (next: DiscoverFilters) => updateQuery((current) => ({ ...current, filters: next }));
-  const setSort = (next: DiscoverSort) => updateQuery((current) => ({ ...current, sort: next, feed: "latest" }));
+  /** One order for the list (IR-1187). Best is For you, which never took a
+   *  search, so choosing it clears the box, as its tab did. */
+  const chooseOrder = (next: DiscoverOrder) => {
+    setFeedNotice("");
+    setFeedback(null);
+    setFeedbackError("");
+    updateQuery((current) => ({ ...withOrder(current, next), q: next === "best" ? "" : current.q }));
+    if (next === "best") setSearchInput("");
+  };
 
   /* ── A saved feed is this same query under a name (IR-577) ───────────
      `myfeed` in the URL says which one is open, so a reload or a copied link
@@ -344,7 +357,7 @@ export default function DiscoverPage() {
           psced: psced.data.results ?? [],
         });
       })
-      .catch((error: unknown) => { if (!cancelled) setInterestLoadFailed(errorDetail(error, "Areas couldn’t load. You can still browse Latest; try setting them again later.")); })
+      .catch((error: unknown) => { if (!cancelled) setInterestLoadFailed(errorDetail(error, "Areas couldn’t load. You can still browse the newest research; try setting them again later.")); })
       .finally(() => { if (!cancelled) setInterestLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -519,9 +532,12 @@ export default function DiscoverPage() {
       recordTypes: [{ value: ALL_VALUE, label: "Any type" }, ...recordTypes],
       colleges,
       classifications,
+      // Both ends of the range choose from the catalogue's years, plus any year
+      // the URL already holds that the catalogue no longer lists (IR-947).
       years: [
         { value: ALL_VALUE, label: "Any year" },
-        ...(filters.year !== ALL_VALUE && !years.includes(filters.year) ? [filters.year] : [])
+        ...[filters.yearFrom, filters.yearTo]
+          .filter((y, i, all) => y !== ALL_VALUE && !years.includes(y) && all.indexOf(y) === i)
           .concat(years)
           .map((y) => ({ value: y, label: y })),
       ],
@@ -531,7 +547,7 @@ export default function DiscoverPage() {
         ...Object.entries(IP_TYPE_LABELS).map(([value, label]) => ({ value, label })),
       ],
     }),
-    [recordTypes, colleges, classifications, years, filters.year],
+    [recordTypes, colleges, classifications, years, filters.yearFrom, filters.yearTo],
   );
 
   /** Areas shape For you. Until there are Areas to choose (or the reader already holds some),
@@ -594,7 +610,7 @@ export default function DiscoverPage() {
     if (!(await (pendingDismissals.current.get(record.id) ?? true))) return;
     try {
       await recordsApi.undoNotInterested(record.id);
-      report(`“${record.title}” is back in For you.`);
+      report(`“${record.title}” is back in Best.`);
       setAttempt((n) => n + 1);
     } catch (error) {
       setFeedbackError(errorDetail(error, "Undo didn’t go through. Please try again."));
@@ -628,7 +644,7 @@ export default function DiscoverPage() {
       setInterestSelection({ classification_ids: data.classifications.map((x) => x.id), psced_ids: data.psced.map((x) => x.id) });
       setInterestOpen(false);
       setFeedNotice("");
-      updateQuery((current) => ({ ...current, feed: "for_you" }));
+      updateQuery((current) => withOrder(current, "best"));
       if (feed === "for_you") setAttempt((n) => n + 1);
     } catch (error) {
       setInterestError(errorDetail(error, "Your Areas couldn’t be saved. Please try again."));
@@ -662,20 +678,7 @@ export default function DiscoverPage() {
       <>
       <div role="group" aria-label="Discover controls"
         className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-        <div role="group" aria-label="Discover feed" className={SEGMENT_TRACK}>
-          {([["for_you", "For you"], ["latest", "Latest"], ["trending", "Trending"]] as const).map(([value, label]) => (
-            <button key={value} type="button" aria-pressed={feed === value}
-              title={value === "trending" ? "Most viewed research" : undefined}
-              onClick={() => {
-                setFeedNotice("");
-                setFeedback(null);
-                setFeedbackError("");
-                updateQuery((current) => ({ ...current, feed: value, q: value === "for_you" ? "" : current.q }));
-                if (value === "for_you") setSearchInput("");
-              }}
-              className={segmentClass(feed === value)}>{label}</button>
-          ))}
-        </div>
+        <DiscoverOrderSelect value={orderOf(query)} onChange={chooseOrder} />
         {hasAreas && (
           <button type="button" onClick={() => setInterestOpen(true)}
             aria-label={interests.classifications.length || interests.psced.length ? "Edit areas" : "Choose areas"}
@@ -797,15 +800,8 @@ export default function DiscoverPage() {
         </p>
       )}
 
-      {/* The count and Sort. Always mounted, so its live region exists before a count lands in it
-          and Sort keeps focus while a new sort loads; Sort itself is only offered over a list
-          that is loading or has papers to order, never over a failure or an empty page. */}
-      <DiscoverResultsHeader
-        count={holdQuietly || loading || failed ? null : totalCount}
-        showSort={feed === "latest" && !holdQuietly && !failed && (loading || shownRecords.length > 0)}
-        sort={sort}
-        onSort={setSort}
-      />
+      {/* The count. Always mounted, so its live region exists before a count lands in it. */}
+      <DiscoverResultsHeader count={holdQuietly || loading || failed ? null : totalCount} />
 
       <div className="mt-3">
       {holdQuietly ? null : loading ? (
@@ -943,7 +939,7 @@ export default function DiscoverPage() {
           <InterestChoices title="Research classifications" options={interestOptions.classifications} selected={interestSelection.classification_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, classification_ids: ids }))} />
           <InterestChoices title="PSCED areas" options={interestOptions.psced} selected={interestSelection.psced_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, psced_ids: ids }))} />
           <div className="border-t border-stone-200 pt-4">
-            <p className="text-small text-stone-600">Resetting clears your Areas and everything you marked Not interested. Your saved papers and folders stay, and the papers you saved still shape For you until you unsave them.</p>
+            <p className="text-small text-stone-600">Resetting clears your Areas and everything you marked Not interested. Your saved papers and folders stay, and the papers you saved still shape Best until you unsave them.</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {resetConfirming ? <>
                 <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={resetting} onClick={() => void resetInterests()}>{resetting ? "Resetting…" : "Reset"}</button>

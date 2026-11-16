@@ -198,6 +198,13 @@ async function filterSheet() {
   return screen.findByRole("dialog", { name: "Filters" });
 }
 
+/** Discover's one order control (IR-1187), found by its visible label. */
+const orderSelect = () => screen.getByRole("combobox", { name: "Sort" });
+
+async function chooseOrder(label: "Best" | "Newest" | "Most viewed" | "Trending") {
+  await userEvent.selectOptions(orderSelect(), label);
+}
+
 async function choose(control: RegExp, option: RegExp, scope?: HTMLElement) {
   scope ??= await filterSheet();
   await userEvent.click(within(scope).getByRole("button", { name: control }));
@@ -304,14 +311,13 @@ describe("the phone toolbar (IR-1080)", () => {
     const search = screen.getByRole("textbox", { name: "Search records" });
     expect(search.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    const feed = within(row).getByRole("group", { name: "Discover feed" });
-    for (const name of ["For you", "Latest", "Trending"]) {
-      expect(within(feed).getByRole("button", { name })).toBeInTheDocument();
-    }
+    // IR-1187: one Sort dropdown, not three feed tabs.
+    expect(within(row).getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
+    expect(within(row).queryByRole("group", { name: "Discover feed" })).not.toBeInTheDocument();
     for (const name of [/^Choose areas|^Edit areas/, /^My feeds/, /^Filters/, "Publish"]) {
       expect(within(row).getByRole("button", { name })).toBeInTheDocument();
     }
-    expect(phoneControls(row)).toHaveLength(7);
+    expect(phoneControls(row)).toHaveLength(4);
   });
 
   it("moves Papers and People out of the row and into the header", async () => {
@@ -345,6 +351,7 @@ describe("the phone toolbar (IR-1080)", () => {
     for (const button of phoneControls(row)) {
       expect(button.className, button.textContent ?? "").toMatch(TOUCH_HEIGHT);
     }
+    expect(within(row).getByRole("combobox", { name: "Sort" }).className).toMatch(TOUCH_HEIGHT);
     const results = screen.getByRole("group", { name: "Discover results" });
     for (const button of within(results).getAllByRole("button")) {
       expect(button.className, button.textContent ?? "").toMatch(TOUCH_HEIGHT);
@@ -357,7 +364,7 @@ describe("the phone toolbar (IR-1080)", () => {
     await screen.findByText(publishedThesis.title);
     const row = screen.getByRole("group", { name: "Discover controls" });
     expect(within(row).queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
-    expect(phoneControls(row)).toHaveLength(6);
+    expect(phoneControls(row)).toHaveLength(3);
   });
 });
 
@@ -383,12 +390,11 @@ describe("the toolbar and the result rows (IR-1082)", () => {
     expect(buttons.filter((b) => FILLED.test(b.className)).map((b) => b.textContent?.trim())).toEqual(["Publish"]);
   });
 
-  it("draws the chosen segment white and raised, with no maroon, in both segmented controls", async () => {
-    const { row, switcher } = await controls();
-    for (const chosen of [within(row).getByRole("button", { name: "Latest", pressed: true }), within(switcher).getByRole("button", { name: "Papers", pressed: true })]) {
-      expect(chosen.className).toMatch(/(^|\s)bg-surface(\s|$)/);
-      expect(chosen.className).not.toMatch(/(^|\s)text-white(\s|$)/);
-    }
+  it("draws the chosen segment white and raised, with no maroon, in Papers / People", async () => {
+    const { switcher } = await controls();
+    const chosen = within(switcher).getByRole("button", { name: "Papers", pressed: true });
+    expect(chosen.className).toMatch(/(^|\s)bg-surface(\s|$)/);
+    expect(chosen.className).not.toMatch(/(^|\s)text-white(\s|$)/);
   });
 
   it("gives every control the one control height", async () => {
@@ -398,9 +404,8 @@ describe("the toolbar and the result rows (IR-1082)", () => {
       expect(heights.length, button.textContent ?? "").toBeGreaterThan(0);
       for (const token of heights) expect(HEIGHT_TOKENS.has(token), `${button.textContent}: ${token}`).toBe(true);
     }
-    for (const track of [within(row).getByRole("group", { name: "Discover feed" }), switcher]) {
-      expect(track.className).toMatch(/(^|\s)sm:h-11(\s|$)/);
-    }
+    expect(switcher.className).toMatch(/(^|\s)sm:h-11(\s|$)/);
+    expect(within(row).getByRole("combobox", { name: "Sort" }).className).toMatch(/(^|\s)h-11(\s|$)/);
     // The 1 / 2 / 3 column toggle is a control of the row, at the same height.
     expect(within(row).getByRole("button", { name: /^1 column/ }).className).toMatch(/(^|\s)h-11(\s|$)/);
   });
@@ -409,7 +414,7 @@ describe("the toolbar and the result rows (IR-1082)", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     const sheet = await filterSheet();
-    for (const [label, value] of [["Type", "Any type"], ["College", "Any"], ["Classification", "Any"], ["Year (completed)", "Any year"], ["IP & patents", "Any"]]) {
+    for (const [label, value] of [["Type", "Any type"], ["College", "Any"], ["Classification", "Any"], ["Year from", "Any year"], ["Year to", "Any year"], ["IP & patents", "Any"]]) {
       expect(within(sheet).getByText(label)).toBeVisible();
       expect(within(sheet).getByRole("button", { name: `${label} ${value}` })).toBeInTheDocument();
     }
@@ -417,38 +422,39 @@ describe("the toolbar and the result rows (IR-1082)", () => {
     expect(within(sheet).getByRole("button", { name: "Type Project" })).toBeInTheDocument();
   });
 
-  it("keeps Sort out of the Filters panel and puts it in the results header beside a live count", async () => {
+  it("keeps Sort out of the Filters panel, with the live count in the results header", async () => {
     total = 3;
     renderDiscover();
     const header = await screen.findByRole("group", { name: "Results" });
     expect(within(header).getByRole("status")).toHaveTextContent("3 papers");
-    expect(within(header).getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
+    // IR-1187: Sort is the one order control, in the toolbar row; there is no second one here.
+    expect(within(header).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("combobox", { name: "Sort" })).toHaveLength(1);
     expect(within(await filterSheet()).queryByText("Sort")).not.toBeInTheDocument();
   });
 
-  it("says one paper in the singular, and keeps the count on For you, where there is no Sort", async () => {
+  it("says one paper in the singular, and keeps the count on Best", async () => {
     renderDiscover();
     const header = await screen.findByRole("group", { name: "Results" });
     await waitFor(() => expect(within(header).getByRole("status")).toHaveTextContent("1 paper"));
     expect(within(header).getByRole("status")).not.toHaveTextContent("1 papers");
 
-    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    await chooseOrder("Best");
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenCalled());
     expect(within(await screen.findByRole("group", { name: "Results" })).getByRole("status")).toHaveTextContent("1 paper");
-    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
   });
 
-  it("offers no Sort over a failed read or an empty list, where there is nothing to order", async () => {
+  it("keeps Sort over a failed read or an empty list, so the reader can still choose another order", async () => {
     vi.mocked(recordsApi.list).mockImplementationOnce(() => Promise.reject(new Error("down")));
     const first = renderDiscover();
     await screen.findByRole("alert");
-    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+    expect(orderSelect()).toBeInTheDocument();
     first.unmount();
 
     listed = [];
     renderDiscover();
     await screen.findByText("Nothing has been published yet.");
-    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+    expect(orderSelect()).toHaveValue("newest");
   });
 
   it("keeps the count's live region in the page from the start, so a count that lands in it is announced", async () => {
@@ -553,24 +559,54 @@ describe("browsing", () => {
     expect(vi.mocked(peopleApi.search).mock.calls.length).toBeGreaterThan(calls);
   });
 
-  it("offers For you, Latest, and Trending, opening on the latest catalogue", async () => {
+  it("offers Best, Newest, Most viewed and Trending in one Sort, opening on Newest (IR-1187)", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "Latest" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Trending" })).toHaveAttribute("aria-pressed", "false");
+    const sort = orderSelect();
+    expect(within(sort).getAllByRole("option").map((o) => o.textContent)).toEqual(["Best", "Newest", "Most viewed", "Trending"]);
+    expect(sort).toHaveValue("newest");
+    expect(screen.queryByRole("button", { name: /^(For you|Latest|Trending)$/ })).not.toBeInTheDocument();
     expect(lastListParams()).toMatchObject({ ordering: "-created_at" });
+  });
+
+  it("names Sort by its visible label and is operated from the keyboard", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const sort = orderSelect();
+    // Named by the visible "Sort" text, not by a hidden aria-label.
+    expect(screen.getByLabelText("Sort")).toBe(sort);
+    expect(screen.getByText("Sort")).toBeVisible();
+    expect(sort).not.toHaveAttribute("aria-label");
+
+    // A native select, so arrow keys are the platform's own (jsdom does not emulate them):
+    // what is checked here is that Tab reaches it and a change keeps focus on it.
+    expect(sort.tagName).toBe("SELECT");
+    for (let i = 0; i < 20 && document.activeElement !== sort; i++) await userEvent.tab();
+    expect(sort).toHaveFocus();
+    await chooseOrder("Most viewed");
+    await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-access_count" }));
+    expect(orderSelect()).toHaveFocus();
+  });
+
+  it.each([
+    ["/?feed=for_you", "best"],
+    ["/?feed=trending", "trending"],
+    ["/?feed=latest", "newest"],
+    ["/?sort=viewed", "viewed"],
+  ])("lands an old link %s on the matching option", async (url, value) => {
+    renderDiscover(url);
+    await waitFor(() => expect(orderSelect()).toHaveValue(value));
   });
 
   it("asks the server for Trending (views gained lately) and retains catalogue filters", async () => {
     renderDiscover("/?type=2");
     await screen.findByText(publishedThesis.title);
-    await userEvent.click(screen.getByRole("button", { name: "Trending" }));
+    await chooseOrder("Trending");
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "trending", record_type: "2" }));
-    expect(screen.getByRole("button", { name: "Trending" })).toHaveAttribute("aria-pressed", "true");
+    expect(orderSelect()).toHaveValue("trending");
     expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent("feed=trending");
-    await userEvent.click(screen.getByRole("button", { name: "Latest" }));
+    await chooseOrder("Newest");
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at", record_type: "2" }));
   });
 
@@ -597,38 +633,35 @@ describe("browsing", () => {
     expect(card.parentElement).not.toHaveClass("md:grid-cols-2");
   });
 
-  it("keeps filters across feeds, applies them to recommendations, and hides recommendation sorting", async () => {
-    renderDiscover("/?type=1&college=4&year=2026");
+  it("keeps filters across orders and applies them to recommendations", async () => {
+    renderDiscover("/?type=1&college=4&year_from=2026&year_to=2026");
     await screen.findByText(publishedThesis.title);
-    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    await chooseOrder("Best");
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({
       record_type: "1", college: "4", year_from: "2026", year_to: "2026",
     })));
     const forYouFilters = await filterSheet();
-    // Recommendations have their own order, so there is no Sort, though the count stays.
-    expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
-    await choose(/^Year/, /^2009$/, forYouFilters);
-    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2009" })));
-    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(screen.getByRole("button", { name: "Latest" }));
+    await choose(/^Year from/, /^2009$/, forYouFilters);
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2026" })));
+    expect(orderSelect()).toHaveValue("best");
+    await chooseOrder("Newest");
     await waitFor(() => expect(lastListParams()).toMatchObject({ record_type: "1", college: "4", year_from: "2009" }));
-    expect(screen.getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
   });
 
-  it("offers clearing active For you filters when they match no research", async () => {
+  it("offers clearing active Best filters when they match no research", async () => {
     recommended = { mode: "for_you", results: [], next_cursor: null, count: 0 };
-    renderDiscover("/?feed=for_you&year=2009");
+    renderDiscover("/?feed=for_you&year_from=2009");
     expect(await screen.findByRole("heading", { name: "No research matches these filters" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, { ordering: "-created_at" }));
-    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
+    expect(orderSelect()).toHaveValue("best");
   });
 
   it("offers personalized results with the API explanation", async () => {
     recommended = { mode: "for_you", results: [{ ...publishedThesis, reason: { kind: "selected_area", area: "Applied Research" } }], next_cursor: null, count: 1 };
     renderDiscover();
     await screen.findByText(publishedThesis.title);
-    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    await chooseOrder("Best");
     expect(await screen.findByText("Because you chose Applied Research")).toBeInTheDocument();
     expect(vi.mocked(recordsApi.forYou)).toHaveBeenCalled();
 
@@ -646,31 +679,31 @@ describe("browsing", () => {
     };
     renderDiscover();
     await screen.findByText(publishedThesis.title);
-    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    await chooseOrder("Best");
 
     expect(await screen.findByText("Same Area as a paper you saved")).toBeInTheDocument();
     // The chosen-Area reason is untouched.
     expect(screen.getByText("Because you chose Applied Research")).toBeInTheDocument();
   });
 
-  it("keeps a direct For you link selected after the search debounce", async () => {
+  it("keeps a direct Best link selected after the search debounce", async () => {
     renderDiscover("/?feed=for_you");
     await screen.findByText(publishedThesis.title);
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
+    expect(orderSelect()).toHaveValue("best");
     expect(recordsApi.forYou).toHaveBeenCalledTimes(1);
   });
 
-  it("truthfully explains that For you is showing Latest until Areas are chosen", async () => {
+  it("gives a reader with no Areas the newest research on Best, and says so, instead of an empty list", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
-    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+    await chooseOrder("Best");
     expect(await screen.findByText(/Choose an Area to get recommendations/)).toBeInTheDocument();
     expect(await screen.findByText("Latest research")).toBeInTheDocument();
   });
 
-  it("saves optional classification and PSCED Areas, then opens For you", async () => {
+  it("saves optional classification and PSCED Areas, then opens Best", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     await userEvent.click(screen.getByRole("button", { name: "Choose areas" }));
@@ -679,7 +712,7 @@ describe("browsing", () => {
     await userEvent.click(within(dialog).getByLabelText("Engineering"));
     await userEvent.click(within(dialog).getByRole("button", { name: "Save Areas" }));
     await waitFor(() => expect(recordsApi.updateInterests).toHaveBeenCalledWith({ classification_ids: [7], psced_ids: [3] }));
-    expect(await screen.findByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(orderSelect()).toHaveValue("best"));
   });
 
   it("loads another For you page with the cursor", async () => {
@@ -712,15 +745,14 @@ describe("browsing", () => {
     expect(screen.queryByRole("tab", { name: /proposals/i })).not.toBeInTheDocument();
   });
 
-  it("sorts by most viewed through ordering, and back to newest, from the results header", async () => {
+  it("sorts by most viewed through ordering, and back to newest", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    const sort = screen.getByRole("combobox", { name: "Sort" });
-    await userEvent.selectOptions(sort, "Most viewed");
+    await chooseOrder("Most viewed");
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-access_count" }));
 
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Sort" }), "Newest");
+    await chooseOrder("Newest");
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at" }));
   });
 
@@ -864,7 +896,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
   });
 
-  it("offers Not interested only on For you, not on Latest", async () => {
+  it("offers Not interested only on Best, not on Newest", async () => {
     renderDiscover();
     const card = await screen.findByRole("article", { name: publishedThesis.title });
     expect(within(card).queryByRole("button", { name: "Not interested" })).not.toBeInTheDocument();
@@ -905,7 +937,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     expect(recordsApi.notInterested).not.toHaveBeenCalled();
   });
 
-  it("resets Areas and Not interested after a confirmation, then refreshes For you", async () => {
+  it("resets Areas and Not interested after a confirmation, then refreshes Best", async () => {
     vi.mocked(recordsApi.interests).mockResolvedValueOnce({
       data: { classifications: [{ id: 7, name: "Applied Research" }], psced: [] },
     } as unknown as Awaited<ReturnType<typeof recordsApi.interests>>);
@@ -931,7 +963,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     expect(await screen.findByRole("button", { name: "Choose areas" })).toBeInTheDocument();
   });
 
-  it("tells the reader a reset leaves saved papers shaping For you (IR-575)", async () => {
+  it("tells the reader a reset leaves saved papers shaping Best (IR-575)", async () => {
     vi.mocked(recordsApi.interests).mockResolvedValueOnce({
       data: { classifications: [{ id: 7, name: "Applied Research" }], psced: [] },
     } as unknown as Awaited<ReturnType<typeof recordsApi.interests>>);
@@ -941,7 +973,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
 
-    expect(within(dialog).getByText(/papers you saved still shape For you until you unsave them/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/papers you saved still shape Best until you unsave them/i)).toBeInTheDocument();
   });
 
   it("keeps the dialog open with a message when the reset fails", async () => {
@@ -1081,12 +1113,37 @@ describe("filtering", () => {
     expect(lastListParams()).not.toHaveProperty("is_ip");
   });
 
-  it("filters by year through year_from and year_to", async () => {
+  // IR-947: a from–to range replaces the single year; one year is both ends.
+  it("filters by a year range, either end open, through year_from and year_to", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await choose(/^year/i, /^2026$/);
+    await choose(/^Year from/, /^2009$/);
+    await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2009" }));
+    expect(lastListParams()).not.toHaveProperty("year_to");
+    expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent(/^\?year_from=2009$/);
+
+    await choose(/^Year to/, /^2026$/);
+    await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2009", year_to: "2026" }));
+    expect(screen.getByRole("button", { name: "Filters, 1 active" })).toBeInTheDocument();
+  });
+
+  it("never sends a range that ends before it starts", async () => {
+    renderDiscover("/?year_to=2009");
+    await screen.findByText(publishedThesis.title);
+
+    await choose(/^Year from/, /^2026$/);
+
     await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2026", year_to: "2026" }));
+  });
+
+  it("does not read the retired single-year key, and takes it out of the address", async () => {
+    renderDiscover("/?year=2026&type=2");
+    await screen.findByText(publishedThesis.title);
+
+    expect(lastListParams()).not.toHaveProperty("year_from");
+    expect(lastListParams()).not.toHaveProperty("year_to");
+    await waitFor(() => expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent(/^\?type=2$/));
   });
 
   it("does not offer a Proposal type, because Proposals are not in the catalogue", async () => {
@@ -1257,7 +1314,7 @@ describe("continuity", () => {
   });
 
   it("restores the search, filters and sort from the URL", async () => {
-    renderDiscover("/?q=rain&type=2&year=2019&sort=viewed");
+    renderDiscover("/?q=rain&type=2&year_from=2019&year_to=2019&sort=viewed");
 
     await waitFor(() =>
       expect(lastListParams()).toMatchObject({
@@ -1285,7 +1342,7 @@ describe("continuity", () => {
   });
 
   it("falls back to safe defaults for values it does not recognise, and corrects the URL", async () => {
-    renderDiscover("/?sort=bogus&year=19&type=thesis&college=4,x");
+    renderDiscover("/?sort=bogus&year_from=19&type=thesis&college=4,x");
 
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at", college: "4" }));
     expect(lastListParams()).not.toHaveProperty("year_from");
@@ -1337,7 +1394,7 @@ describe("continuity", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^year/i }));
+    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^Year to/ }));
     const options = await screen.findByRole("listbox");
     expect(within(options).getByRole("option", { name: "2009" })).toBeInTheDocument();
   });
@@ -1515,17 +1572,17 @@ describe("saved custom feeds (IR-577)", () => {
   it("offers to save changed filters into the open feed, and only when they differ", async () => {
     const feed = savedFeed({ query: { q: "flood", classification: "7" } });
     withFeeds(feed);
-    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...feed, query: { q: "flood", classification: "7", year: "2026" } } } as never);
+    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...feed, query: { q: "flood", classification: "7", year_from: "2026" } } } as never);
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     await openFeed();
     await screen.findByRole("region", { name: "Feed Coastal hazards" });
     expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument();
 
-    await choose(/^Year/, /2026/);
+    await choose(/^Year from/, /2026/);
 
     await userEvent.click(await screen.findByRole("button", { name: "Save these filters to this feed" }));
-    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { q: "flood", classification: "7", year: "2026" } }));
+    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { q: "flood", classification: "7", year_from: "2026" } }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument());
   });
 
