@@ -36,6 +36,7 @@ from .test_ai_runtime_executor_selection_db import (
 from .test_ai_runtime_research_db import paper, write_source
 from .test_ai_runtime_runs_db import REPO, admin_dsn, run, session
 from ai.admission import errors  # noqa: E402
+from ai.agent.prompts import quoted  # noqa: E402
 from ai.admission.errors import AdmissionDenied  # noqa: E402
 from ai.admission.ledger import Ledger  # noqa: E402
 from ai.admission.scope import RunBinding, run_key  # noqa: E402
@@ -276,7 +277,8 @@ def test_recovered_evidence_whose_source_changed_is_rebuilt_from_the_question(ru
 
     def cite_fresh(payload):
         found = tool_messages(payload)["again"]
-        assert found["passages"][0]["text"] == revised
+        # The default pin, research-11, quotes paper text (IR-1196).
+        assert found["passages"][0]["text"] == quoted(revised)
         return reply(f"«Flood forecasting» forecasts floods from rainfall gauges [{found['passages'][0]['passage']}].")
 
     vendor = Vendor(fresh, cite_fresh)
