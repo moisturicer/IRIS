@@ -17,6 +17,8 @@ Unpublished research, IP disclosures before filing, ethics submissions, and pers
 
 Under RA 10173 (Data Privacy Act), personal data in submissions and consent records is in scope.
 
+**Every kind of sensitive data, where it lives, who reads it and where it goes** is listed in [`DATA_INVENTORY.md`](DATA_INVENTORY.md) ([IR-824](https://citiris.atlassian.net/browse/IR-824)).
+
 ---
 
 ## 2 · Authentication
@@ -85,7 +87,7 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 - Endpoints require authentication except those a signed-out person needs, such as login, registration, activation and recovery. Each route's rule is declared in the matrix (§3).
 - 404 and 403 must be indistinguishable for a record the user may not see, because a 403 confirms the record exists.
 - Result counts must be computed after visibility filtering.
-- Responses carry Referrer-Policy, nosniff and X-Frame-Options ([IR-663](https://citiris.atlassian.net/browse/IR-663)). **The Content-Security-Policy is report-only**, so it reports violations and blocks nothing until the manual walk-through recorded in `TRACEABILITY.md` passes.
+- Responses carry Referrer-Policy, nosniff and X-Frame-Options ([IR-663](https://citiris.atlassian.net/browse/IR-663)). **The Content-Security-Policy is enforced in production** on both nginx and Django ([IR-823](https://citiris.atlassian.net/browse/IR-823)), after `e2e/specs/08-csp-walkthrough.spec.ts` walked 66 screens, as a student, an Adviser with a paper in review, RDCO, ITSO, IERC and KTTO members, an office coordinator, the System Admin, signed out, and the Django admin, with no violation. Development only reports, because the debug toolbar and DRF's browsable API carry inline code.
 - Production trusts the proxy's scheme header and redirects to HTTPS without a loop ([IR-662](https://citiris.atlassian.net/browse/IR-662)).
 
 ---

@@ -5,7 +5,8 @@ import { accountsApi } from "@/api/accounts";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { EntryFrame } from "@/components/auth/EntryFrame";
 import { EntrySteps, type EntryStep } from "@/components/auth/EntrySteps";
-import { Button, ButtonLink, Input, Select } from "@/components/ui";
+import { Button, ButtonLink, Input, PasswordStrengthMeter, Select } from "@/components/ui";
+import { PASSWORD_MIN_LENGTH, passwordLengthError } from "@/lib/passwordPolicy";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { errorDetail } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
@@ -114,8 +115,8 @@ function validateAll(f: FormState, role: Role): FieldErrors {
     e.email = "Enter a valid email address.";
 
   if (!f.password)          e.password = "Password is required.";
-  else if (f.password.length < 8)
-    e.password = "Password must be at least 8 characters.";
+  else if (passwordLengthError(f.password))
+    e.password = passwordLengthError(f.password);
 
   if (!f.password2)         e.password2 = "Please confirm your password.";
   else if (f.password2 !== f.password)
@@ -439,9 +440,9 @@ export default function SignupPage() {
 
   // Feedback in words, with the check as decoration (IR-539): the hint says
   // the same thing whether or not its colour or its glyph is seen.
-  const passwordHint = form.password.length >= 8
-    ? <><i className="fas fa-check mr-1.5" aria-hidden />At least 8 characters</>
-    : "At least 8 characters";
+  const passwordHint = form.password.length >= PASSWORD_MIN_LENGTH
+    ? <><i className="fas fa-check mr-1.5" aria-hidden />At least {PASSWORD_MIN_LENGTH} characters</>
+    : `At least ${PASSWORD_MIN_LENGTH} characters`;
   const password2Hint = form.password2 && form.password2 === form.password
     ? <><i className="fas fa-check mr-1.5" aria-hidden />Passwords match</>
     : undefined;
@@ -736,6 +737,7 @@ export default function SignupPage() {
                   />
                 }
               />
+              <PasswordStrengthMeter password={form.password} />
 
               <Input
                 id="signup-password2"

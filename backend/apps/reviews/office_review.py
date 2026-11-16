@@ -54,6 +54,7 @@ from core.enums import (
     SeatState,
 )
 from core.permissions import holds_seat
+from core.text_limits import too_long, too_long_message
 
 from . import revisions, routing, seats
 from .models import RecordAssignment, RecordClearance, Review, ReviewerSeat
@@ -175,6 +176,8 @@ def record_office_review(record, actor, *, outcome, comment="", threads=0):
     comment = (comment or "").strip() if isinstance(comment, str) else ""
     if outcome == FINDING and not comment:
         raise OfficeReviewError("Say what the finding is, so RDCO and the author can act on it.")
+    if too_long(comment):
+        raise OfficeReviewError(too_long_message("An office comment"))
 
     seat = _open_seat(record, actor, party)
     blocked = _blocked_reason(record, actor, party) or (

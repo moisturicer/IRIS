@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from django.db import transaction
 from core.permissions import IsStaff, owns_or_staffs_record
+from core.text_limits import too_long, too_long_message
 from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
@@ -308,6 +309,10 @@ class UploadReviewCreateView(APIView):
                 {"detail": "upload and status are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not isinstance(comment, str):
+            return Response({"comment": ["A comment is text."]}, status=status.HTTP_400_BAD_REQUEST)
+        if too_long(comment):
+            return Response({"comment": [too_long_message("A comment")]}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             upload        = RecordUpload.objects.select_related("record").get(pk=upload_id)

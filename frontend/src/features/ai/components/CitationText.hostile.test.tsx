@@ -117,13 +117,11 @@ describe("links in an answer", () => {
     expect(window.__pwned).toBeUndefined();
   });
 
-  it("opens an ordinary https link in a new tab without leaking the opener", () => {
+  it("shows an ordinary https link's address as text, not a link (IR-1172)", () => {
     const container = render("See [the standard](https://example.org/spec).");
 
-    const [link] = Array.from(container.querySelectorAll("a"));
-    expect(link.getAttribute("href")).toBe("https://example.org/spec");
-    expect(link.getAttribute("target")).toBe("_blank");
-    expect(link.getAttribute("rel")).toContain("noreferrer");
+    expectInert(container);
+    expect(container.textContent).toContain("the standard (https://example.org/spec)");
   });
 
   it("does not let answer text forge a citation chip for a marker with no citation", () => {
@@ -201,12 +199,12 @@ describe("one very long unbroken run in an answer (IR-930)", () => {
     expect(container.textContent?.split(BREAK).join("")).toBe(run);
   });
 
-  it("still links a bare https URL and an email address", () => {
-    const container = render("See https://example.org/spec?a=b+c and write to bob+tag@example.org today.");
+  it("keeps a bare https URL and an email address whole, as text (IR-1172)", () => {
+    const text = "See https://example.org/spec?a=b+c and write to bob+tag@example.org today.";
+    const container = render(text);
 
-    const hrefs = anchors(container).map((link) => link.href);
-    expect(hrefs).toContain("https://example.org/spec?a=b+c");
-    expect(hrefs).toContain("mailto:bob+tag@example.org");
+    expectInert(container);
+    expect(container.textContent).toBe(text);
   });
 
   it("keeps a long URL under the limit exactly as written", () => {
@@ -214,7 +212,7 @@ describe("one very long unbroken run in an answer (IR-930)", () => {
     const container = render(`See ${url} and [the spec](${url}).`);
 
     expect(url.length).toBeLessThan(MAX_RUN_CHARS);
-    expect(anchors(container).map((link) => link.href)).toEqual([url, url]);
+    expect(container.textContent).toBe(`See ${url} and the spec (${url}).`);
   });
 
   it.each([
@@ -237,10 +235,10 @@ describe("one very long unbroken run in an answer (IR-930)", () => {
     expect(container.textContent).toContain(body);
   });
 
-  it("still links a bare URL that follows a long run", () => {
+  it("keeps a bare URL whole after a long run", () => {
     const container = render(`${"x+".repeat(5_000)} https://example.org/after`);
 
-    expect(anchors(container).map((link) => link.href)).toContain("https://example.org/after");
+    expect(container.textContent).toContain(" https://example.org/after");
   });
 });
 

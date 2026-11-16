@@ -4,10 +4,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { TONES } from "@/components/ui/statusTones";
 import { useAuth } from "@/hooks/useAuth";
 import { pathFor } from "@/lib/access";
+import { PASSWORD_MIN_LENGTH, passwordLengthError } from "@/lib/passwordPolicy";
 import { cn, formatDate } from "@/lib/utils";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
 import { Panel } from "./settingsParts";
@@ -173,7 +175,8 @@ function SecurityTab({ email, isVerified }: { email: string; isVerified: boolean
     setError(null);
 
     if (newPassword !== confirmPassword) return setError("New passwords do not match.");
-    if (newPassword.length < 8)          return setError("New password must be at least 8 characters.");
+    const tooShortOrLong = passwordLengthError(newPassword, "New password");
+    if (tooShortOrLong)                  return setError(tooShortOrLong);
     if (newPassword === oldPassword)     return setError("New password must differ from your current password.");
 
     setSaving(true);
@@ -223,10 +226,11 @@ function SecurityTab({ email, isVerified }: { email: string; isVerified: boolean
             <input type="password" className={inputClass} value={oldPassword}
               onChange={(e) => setOldPassword(e.target.value)} autoComplete="current-password" />
           </Field>
-          <Field label="New password" hint="At least 8 characters.">
+          <Field label="New password" hint={`At least ${PASSWORD_MIN_LENGTH} characters, and not a common or breached password.`}>
             <input type="password" className={inputClass} value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
           </Field>
+          <PasswordStrengthMeter password={newPassword} />
           <Field label="Confirm new password">
             <input type="password" className={inputClass} value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />

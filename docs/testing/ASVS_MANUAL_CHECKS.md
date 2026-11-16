@@ -136,6 +136,8 @@ List free-text inputs: abstracts, comments, Ask IRIS questions and notes. For ea
 
 `Record` Result: **Fail** Date: 2026-11-05 Person: AI agent, at Ashlee Sean's direction (her confirmation pending) Evidence: local Core journeys stack, production settings through nginx, `main` at `14768455`. An abstract of 2,000,000 characters was accepted (`PATCH /records/<id>/` 200). Limited: Ask IRIS questions (2,000), review comments (10,000), download notes (500), reset passwords (128), names (100). No field limit, only Django's 2.5 MB body default: abstracts, routing and revision reasons, decision comments, document-request messages and rejection reasons, opportunity descriptions. [IR-926](https://citiris.atlassian.net/browse/IR-926).
 
+`Retest` Result: **Pass for length** Date: 2026-11-15 Person: AI agent (Claude Code), at Ashlee Sean's direction (her confirmation pending) Evidence: [IR-926](https://citiris.atlassian.net/browse/IR-926). Through the Django test client on a local pgvector Postgres, **not** the nginx and production-settings stack the original Fail used: `PATCH /api/v1/records/<id>/` with an abstract of 10,001 characters answers 400 naming the 10,000-character limit and keeps the old abstract; exactly 10,000 is accepted. The same limit refuses the other free-text fields listed in `traceability/IR-926.md`, each tested in `test_free_text_limits.py`. Allowed characters (null bytes) were not retested.
+
 ### 5.2.6 Server-side request forgery
 **Requirement:** untrusted data can't steer where the server sends requests.
 

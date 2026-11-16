@@ -308,9 +308,11 @@ vi.mock("./PaperPdfReader", () => ({
     selectionActions,
     clearCorner,
     downloadControl,
+    keepPlace,
   }: {
     clearCorner?: boolean;
     downloadControl?: ReactNode;
+    keepPlace?: boolean;
     scrollToPage: number | null;
     highlightRegions: unknown[];
     toolbarStart?: ReactNode;
@@ -330,6 +332,8 @@ vi.mock("./PaperPdfReader", () => ({
       <p>{highlights?.length ?? 0} saved highlight(s) drawn</p>
       {/* IR-1079: whether the page asked the reader to scroll clear of the corner buttons. */}
       {clearCorner && <p>Reader keeps its last page clear of the corner buttons</p>}
+      {/* IR-573: whether the page asked the reader to keep the reader's place on their account. */}
+      {keepPlace && <p>Reader keeps the reader&apos;s place</p>}
       {(selectionActions ?? []).map((a) => (
         <button key={a.id} type="button" onClick={() => a.run(SELECTED, "rev-1")}>
           Selection: {a.label}
@@ -3152,6 +3156,19 @@ describe("back to the answer after following a citation (IR-578)", () => {
     expect(await screen.findByText(/open at page 14, 2 region\(s\)/i)).toBeInTheDocument();
   });
 
+  it("keeps no place while the citation is re-read, so the old one never lands first (IR-573)", async () => {
+    let answer: (value: unknown) => void = () => {};
+    await conversationReads(() => new Promise((resolve) => { answer = resolve; }));
+
+    renderPaper(ADDRESS);
+
+    expect(await screen.findByText(/open at page none, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.queryByText("Reader keeps the reader's place")).not.toBeInTheDocument();
+    await act(async () => answer(answeredWith([current])));
+    expect(await screen.findByText(/open at page 14, 2 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByText("Reader keeps the reader's place")).toBeInTheDocument();
+  });
+
   it("does not trust the router state a reload kept", async () => {
     await conversationReads(() => Promise.resolve(answeredWith([current])));
     const stale = {
@@ -3750,6 +3767,15 @@ describe("Reading history (IR-756)", () => {
 
     await waitFor(() => expect(libraryApi.visit).toHaveBeenCalledWith(RECORD_ID));
     expect(localStorage.getItem("iris_reading_history")).toBeNull();
+  });
+
+  it("asks the reader to keep the reader's place in the paper (IR-573)", async () => {
+    signIn();
+    renderPaperView();
+    await userEvent.click(await screen.findByRole("tab", { name: "Paper" }));
+
+    expect(await screen.findByText(/open at page none/i)).toBeInTheDocument();
+    expect(screen.getByText("Reader keeps the reader's place")).toBeInTheDocument();
   });
 
   it("sends nothing while the reader has paused history", async () => {

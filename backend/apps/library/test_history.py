@@ -28,6 +28,36 @@ from core.enums import PipelineStatus
 from .models import MAX_HISTORY_ENTRIES, LibraryPreferences, ReadingVisit
 from .tests import LibraryTestCase
 
+
+def offending_lines(pattern, allowed) -> list[str]:
+    """
+    Every line outside `allowed` that names `pattern`, across every backend app,
+    `core`, and the AI runtime (which reads PostgreSQL directly) -- not a list of
+    the apps that recommend or rank, so a new surface that reaches for a reader's
+    private reading is caught the day it is written. Tests and migrations are
+    skipped.
+    """
+    repo = pathlib.Path(settings.BASE_DIR).parent
+    sources = [
+        *(repo / "backend" / "apps").rglob("*.py"),
+        *(repo / "backend" / "core").rglob("*.py"),
+        *(repo / "ai").rglob("*.py"),
+        *(repo / "ai").rglob("*.sql"),
+    ]
+    assert any(p.parts[-2:] == ("library", "views.py") for p in sources), "the scan found no sources"
+    regex = re.compile(pattern)
+    offenders = []
+    for path in sorted(sources):
+        rel = path.relative_to(repo).as_posix()
+        if rel.startswith(tuple(allowed)) or "/migrations/" in rel:
+            continue
+        if path.name.startswith("test") or "/tests/" in rel:
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if regex.search(line):
+                offenders.append(f"{rel}:{number}: {line.strip()}")
+    return offenders
+
 HISTORY = "/api/v1/library/history/"
 
 
@@ -285,34 +315,16 @@ class NoOtherSurfaceReadsHistoryTests(HistoryTestCase):
     )
     #: The models, their related names, the setting, and the tables themselves,
     #: so raw SQL is caught too.
-    PATTERN = re.compile(
+    PATTERN = (
         r"ReadingVisit|reading_visits?|LibraryPreferences|library_preferences|keep_history"
         r"|library_readingvisit|library_librarypreferences"
     )
 
     def test_no_other_app_reads_the_history(self):
-        """Every backend app, `core`, and the AI runtime (which reads PostgreSQL
-        directly), not a list of the ones that recommend or rank: a new surface
-        that reaches for history is caught the day it is written."""
-        repo = pathlib.Path(settings.BASE_DIR).parent
-        sources = [
-            *(repo / "backend" / "apps").rglob("*.py"),
-            *(repo / "backend" / "core").rglob("*.py"),
-            *(repo / "ai").rglob("*.py"),
-            *(repo / "ai").rglob("*.sql"),
-        ]
-        self.assertTrue(any(p.parts[-2:] == ("library", "views.py") for p in sources), "the scan found no sources")
-        offenders = []
-        for path in sorted(sources):
-            rel = path.relative_to(repo).as_posix()
-            if rel.startswith(self.ALLOWED) or "/migrations/" in rel:
-                continue
-            if path.name.startswith("test") or "/tests/" in rel:
-                continue
-            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-                if self.PATTERN.search(line):
-                    offenders.append(f"{rel}:{number}: {line.strip()}")
-        self.assertEqual(offenders, [], "IR-756: nothing outside the library may read a reader's history.")
+        self.assertEqual(
+            offending_lines(self.PATTERN, self.ALLOWED), [],
+            "IR-756: nothing outside the library may read a reader's history.",
+        )
 
     def test_neither_model_is_registered_in_the_django_admin(self):
         from django.contrib import admin

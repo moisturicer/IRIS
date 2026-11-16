@@ -861,6 +861,14 @@ LIBRARY = {
         "GET": _case(SIGNED_IN),
         "PATCH": _case(SIGNED_IN, data={"keep_history": True}),
     }),
+    # IR-573: a reading position is the caller's own, in a Record they can
+    # read; one they cannot is the 404 of a missing one on both read and write.
+    "library-position": Entry({
+        "GET": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
+        "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={
+            "manuscript_revision": "00000000-0000-4000-8000-000000000000", "page": 1, "fraction": 0,
+        }),
+    }),
 }
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "records": RECORDS, "documents": DOCUMENTS_APP, "accounts": ACCOUNTS,

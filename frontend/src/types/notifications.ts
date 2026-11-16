@@ -15,4 +15,6 @@ export interface Notification {
   resolved_at:       string | null;
   /** What happened, ready to show: "Reviewed by you on 20 Oct". Blank until resolved. */
   resolved_label:    string;
+  /** The page to open, for a notice with no Record, such as a Call's (IR-765). */
+  target:            string | null;
 }

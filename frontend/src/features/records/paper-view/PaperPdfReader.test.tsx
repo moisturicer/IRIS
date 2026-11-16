@@ -27,6 +27,7 @@ import { PublishDetailsPreview } from "@/features/publish/PublishDetailsPreview"
 import { useAuthStore } from "@/store/auth.store";
 import { PANE_TOP_PX, READER_TOOLBAR_TOP_PX } from "./paneLayout";
 import { MAX_LIVE_PAGES } from "./readerGeometry";
+import { SAVE_AFTER_MS, SAVE_AT_MOST_MS } from "./useReadingResume";
 
 const manuscriptBlob = vi.fn();
 const versionManuscriptBlob = vi.fn();
@@ -34,6 +35,16 @@ vi.mock("@/api/records", () => ({
   recordsApi: {
     manuscriptBlob: (...args: unknown[]) => manuscriptBlob(...(args as [])),
     versionManuscriptBlob: (...args: unknown[]) => versionManuscriptBlob(...(args as [])),
+  },
+}));
+
+// IR-573: where the reader left off, on their account.
+const position = vi.fn();
+const savePosition = vi.fn();
+vi.mock("@/api/library", () => ({
+  libraryApi: {
+    position: (...args: unknown[]) => position(...(args as [])),
+    savePosition: (...args: unknown[]) => savePosition(...(args as [])),
   },
 }));
 
@@ -1579,5 +1590,287 @@ describe("leaving a paper for another", () => {
     await act(async () => open({ document: fakeDocument(3), destroy }));
 
     expect(destroy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("resuming where the reader left off (IR-573)", () => {
+  /** The bytes shown, as the server names them in `X-Manuscript-Revision`. */
+  const SHOWN = "0b7e6a52-6f1c-4a8e-9d3b-2c1f5e8a7d40";
+  const OTHER = "9c2d4e10-1111-4b2b-8c3c-3d4e5f607182";
+
+  /** Page 2 is 1000px tall, 1500px down; the toolbar sticks at READER_TOOLBAR_TOP_PX. */
+  const OPENED = [
+    { top: 484, height: 1000 },
+    { top: 1500, height: 1000 },
+    { top: 2516, height: 1000 },
+  ];
+  /** Scrolled so the top of the view (the toolbar's bottom, 444) is halfway down page 2. */
+  const HALFWAY_DOWN_PAGE_2 = [
+    { top: -1072, height: 1000 },
+    { top: -56, height: 1000 },
+    { top: 960, height: 1000 },
+  ];
+
+  let scrollBy: ReturnType<typeof vi.fn>;
+  let answer: (value: unknown) => void;
+  let refuse: (reason: unknown) => void;
+
+  beforeEach(() => {
+    scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    manuscriptBlob.mockResolvedValue({ data: pdfBlob(), headers: { "x-manuscript-revision": SHOWN } });
+    versionManuscriptBlob.mockResolvedValue({ data: pdfBlob(), headers: { "x-manuscript-revision": OTHER } });
+    // Held until the test has laid the pages out, as a slow network would.
+    position.mockImplementation(() => new Promise((resolve, reject) => { answer = resolve; refuse = reject; }));
+    savePosition.mockResolvedValue({ status: 204 });
+    useAuthStore.setState({ isAuthenticated: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    act(() => useAuthStore.setState({ sessionEpoch: 0, isAuthenticated: false }));
+  });
+
+  const stored = (page: number, fraction: number, revision = SHOWN) =>
+    ({ data: { position: { page, fraction, manuscript_revision: revision, updated_at: "2026-11-16T08:00:00Z" } } });
+
+  /** The window-scrolling reader, laid out at its opening place. */
+  async function open(props: Partial<ComponentProps<typeof PaperPdfReader>> = {}) {
+    const view = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="opened" keepPlace {...props} />,
+    );
+    await screen.findByText("Page 1 / 3");
+    placePages(OPENED);
+    vi.spyOn(screen.getByRole("toolbar", { name: "Paper tools" }), "getBoundingClientRect").mockReturnValue(box(400, 44));
+    // Let the frame the reader asked for on opening go by on the real clock. A
+    // test that fakes timers before it fires would strand it, and the reader
+    // asks for no other frame while one is pending.
+    await act(() => new Promise<void>((done) => { setTimeout(done, 50); }));
+    return view;
+  }
+
+  /** The reader scrolls, and the next frame measures where they are. */
+  async function scrollTo(boxes: { top: number; height: number }[]) {
+    placePages(boxes);
+    fireEvent.scroll(window);
+    await act(async () => { await vi.advanceTimersByTimeAsync(20); });
+  }
+
+  /**
+   * Fake timers that include the animation frame the reader measures on.
+   * Vitest leaves `requestAnimationFrame` real by default, which would race the
+   * fake clock: a scroll measured or not depending on how fast the run is.
+   */
+  const fakeTimers = () =>
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date", "requestAnimationFrame", "cancelAnimationFrame"],
+    });
+
+  const putsBack = () => scrollBy.mock.calls.filter(([arg]) => typeof arg === "object" && arg.behavior === "auto");
+
+  it("puts the reader back exactly where they left off in this Manuscript", async () => {
+    await open();
+    await act(async () => answer(stored(2, 0.25)));
+
+    // 250px down page 2 comes back to the stuck toolbar's bottom, with no
+    // citation's context above it: reopening must not creep up the paper.
+    await waitFor(() =>
+      expect(scrollBy).toHaveBeenCalledWith({ top: 1500 + 250 - (READER_TOOLBAR_TOP_PX + 44), behavior: "auto" }),
+    );
+    expect(position).toHaveBeenCalledWith(7);
+  });
+
+  it("lets a citation win: it lands on the cited page and the old place is not asked for", async () => {
+    await open({ scrollToPage: 2, navKey: "cited" });
+
+    await waitFor(() => expect(scrollBy).toHaveBeenCalled());
+    expect(position).not.toHaveBeenCalled();
+    expect(putsBack()).toEqual([]);
+  });
+
+  it("never puts a place read on other bytes onto these", async () => {
+    await open();
+    await act(async () => answer(stored(2, 0.25, OTHER)));
+
+    await act(async () => { await Promise.resolve(); });
+    expect(scrollBy).not.toHaveBeenCalled();
+  });
+
+  it("opens at the start when the answer is not a place, and still saves where the reader goes", async () => {
+    await open();
+    await act(async () => answer({ data: { position: { page: "two", fraction: 0.5, manuscript_revision: SHOWN } } }));
+    fakeTimers();
+
+    await scrollTo(HALFWAY_DOWN_PAGE_2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AFTER_MS); });
+
+    expect(putsBack()).toEqual([]);
+    expect(savePosition).toHaveBeenCalledWith(7, { manuscript_revision: SHOWN, page: 2, fraction: 0.5 });
+  });
+
+  it("ignores a place past the end of this paper", async () => {
+    await open();
+    await act(async () => answer(stored(9, 0.1)));
+
+    await act(async () => { await Promise.resolve(); });
+    expect(scrollBy).not.toHaveBeenCalled();
+  });
+
+  it("keeps the reader where they went when they moved before their place came back, and saves it", async () => {
+    await open();
+    fakeTimers();
+    await scrollTo(HALFWAY_DOWN_PAGE_2);
+    await act(async () => answer(stored(3, 0.9)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AFTER_MS); });
+
+    expect(putsBack()).toEqual([]);
+    expect(savePosition).toHaveBeenCalledWith(7, { manuscript_revision: SHOWN, page: 2, fraction: 0.5 });
+  });
+
+  it("keeps no place in an earlier Version: nothing is asked for or saved", async () => {
+    await open({ version: 2 });
+    fakeTimers();
+
+    await scrollTo(HALFWAY_DOWN_PAGE_2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AT_MOST_MS); });
+
+    expect(position).not.toHaveBeenCalled();
+    expect(savePosition).not.toHaveBeenCalled();
+  });
+
+  it("keeps no place for a visitor who is not signed in", async () => {
+    useAuthStore.setState({ isAuthenticated: false });
+    await open();
+    fakeTimers();
+
+    await scrollTo(HALFWAY_DOWN_PAGE_2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AT_MOST_MS); });
+
+    expect(position).not.toHaveBeenCalled();
+    expect(savePosition).not.toHaveBeenCalled();
+  });
+
+  it("keeps no place for a caller that does not ask it to", async () => {
+    await open({ keepPlace: false });
+    fakeTimers();
+
+    await scrollTo(HALFWAY_DOWN_PAGE_2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AT_MOST_MS); });
+
+    expect(position).not.toHaveBeenCalled();
+    expect(savePosition).not.toHaveBeenCalled();
+  });
+
+  describe("saving where the reader is", () => {
+    async function openWithNothingStored(props: Partial<ComponentProps<typeof PaperPdfReader>> = {}) {
+      const view = await open(props);
+      await act(async () => answer({ data: { position: null } }));
+      fakeTimers();
+      return view;
+    }
+
+    it("saves once the reader has been still a moment, with the revision they were shown", async () => {
+      await openWithNothingStored();
+      await scrollTo(HALFWAY_DOWN_PAGE_2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AFTER_MS - 100); });
+      expect(savePosition).not.toHaveBeenCalled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+
+      expect(savePosition).toHaveBeenCalledTimes(1);
+      expect(savePosition).toHaveBeenCalledWith(7, { manuscript_revision: SHOWN, page: 2, fraction: 0.5 });
+    });
+
+    it("saves at least every few seconds while the reader keeps moving", async () => {
+      await openWithNothingStored();
+      const pastHalf = (n: number) => HALFWAY_DOWN_PAGE_2.map((b) => ({ ...b, top: b.top - n * 10 }));
+
+      for (let n = 0; n * 1000 < SAVE_AT_MOST_MS; n += 1) {
+        await scrollTo(pastHalf(n));
+        await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      }
+
+      expect(savePosition).toHaveBeenCalled();
+    });
+
+    it("saves at once when the page is hidden", async () => {
+      await openWithNothingStored();
+      await scrollTo(HALFWAY_DOWN_PAGE_2);
+
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+
+      expect(savePosition).toHaveBeenCalledWith(7, { manuscript_revision: SHOWN, page: 2, fraction: 0.5 });
+    });
+
+    it("saves at once when the reader leaves the paper", async () => {
+      const { unmount } = await openWithNothingStored();
+      await scrollTo(HALFWAY_DOWN_PAGE_2);
+
+      unmount();
+
+      expect(savePosition).toHaveBeenCalledTimes(1);
+    });
+
+    it("saves nothing while the reader has not moved, even when the old place could not be read", async () => {
+      const { unmount } = await open();
+      await act(async () => refuse(new Error("offline")));
+      fakeTimers();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AT_MOST_MS); });
+      unmount();
+
+      expect(savePosition).not.toHaveBeenCalled();
+    });
+
+    it("never sends a place from one session in the next", async () => {
+      await openWithNothingStored();
+      await scrollTo(HALFWAY_DOWN_PAGE_2);
+
+      // Signing out bumps the epoch, which remounts the reader for the next person.
+      act(() => useAuthStore.setState({ sessionEpoch: useAuthStore.getState().sessionEpoch + 1 }));
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AT_MOST_MS); });
+
+      expect(savePosition).not.toHaveBeenCalled();
+    });
+
+    it("stays usable when a save fails, and stops saving once the paper was replaced", async () => {
+      savePosition.mockRejectedValue({ response: { status: 409, data: { code: "manuscript_changed" } } });
+      await openWithNothingStored();
+      await scrollTo(HALFWAY_DOWN_PAGE_2);
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AFTER_MS); });
+      expect(savePosition).toHaveBeenCalledTimes(1);
+
+      await scrollTo(OPENED);
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AT_MOST_MS); });
+
+      expect(savePosition).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Page 1 / 3")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Zoom in" })).toBeEnabled();
+    });
+
+    it("stops saving once the reader may no longer read the paper", async () => {
+      savePosition.mockRejectedValue({ response: { status: 404 } });
+      await openWithNothingStored();
+      await scrollTo(HALFWAY_DOWN_PAGE_2);
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AFTER_MS); });
+
+      await scrollTo(HALFWAY_DOWN_PAGE_2.map((b) => ({ ...b, top: b.top - 100 })));
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AT_MOST_MS); });
+
+      expect(savePosition).toHaveBeenCalledTimes(1);
+    });
+
+    it("tries again after a save that failed for another reason", async () => {
+      savePosition.mockRejectedValueOnce(new Error("offline"));
+      await openWithNothingStored();
+      await scrollTo(HALFWAY_DOWN_PAGE_2);
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AFTER_MS); });
+
+      await scrollTo(HALFWAY_DOWN_PAGE_2.map((b) => ({ ...b, top: b.top - 100 })));
+      await act(async () => { await vi.advanceTimersByTimeAsync(SAVE_AFTER_MS); });
+
+      expect(savePosition).toHaveBeenCalledTimes(2);
+    });
   });
 });

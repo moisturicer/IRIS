@@ -39,7 +39,7 @@ export interface FilingEntry {
 }
 
 /** The keys of a saved feed's query: exactly the ones Discover writes into its URL. */
-export type FeedQueryKey = "q" | "type" | "college" | "classification" | "year" | "ip" | "sort";
+export type FeedQueryKey = "q" | "type" | "college" | "classification" | "year_from" | "year_to" | "ip" | "sort";
 export type FeedQuery = Partial<Record<FeedQueryKey, string>>;
 /** Taxonomy ids a saved feed names that no longer exist, by key (IR-577). */
 export type FeedStale = Partial<Record<"type" | "college" | "classification", number[]>>;
@@ -103,6 +103,18 @@ export type ReadingHistoryEntry =
 /** The reader's library settings (IR-756). `keep_history` false pauses history. */
 export interface LibraryPreferences {
   keep_history: boolean;
+}
+
+/**
+ * Where the reader is in a paper (IR-573): the page, and how far down it the
+ * top of their view was, 0 to 1. The server gives one back only while it was
+ * read on the bytes it serves them now (`manuscript_revision`).
+ */
+export interface ReadingPosition {
+  page: number;
+  fraction: number;
+  manuscript_revision: string;
+  updated_at: string;
 }
 
 /** What a highlight is saved from: the passage, and the revision the paper was opened at. */
@@ -186,4 +198,13 @@ export const libraryApi = {
   preferences: () => apiClient.get<LibraryPreferences>("/library/preferences/"),
   updatePreferences: (body: LibraryPreferences) =>
     apiClient.patch<LibraryPreferences>("/library/preferences/", body),
+  /** Where the reader left off in a paper, or null. A Record they cannot read is a 404. */
+  position: (recordId: number) =>
+    apiClient.get<{ position: ReadingPosition | null }>(`/library/positions/${recordId}/`),
+  /**
+   * Move the reader's place in a paper. `manuscript_revision` is the one the
+   * reader was shown; the server refuses it (409) once that paper is replaced.
+   */
+  savePosition: (recordId: number, body: Pick<ReadingPosition, "manuscript_revision" | "page" | "fraction">) =>
+    apiClient.put(`/library/positions/${recordId}/`, body),
 };

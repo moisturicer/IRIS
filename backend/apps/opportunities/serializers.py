@@ -8,6 +8,7 @@ from core.enums import CallStatus
 
 from . import capabilities
 from core.permissions import is_call_moderator
+from core.text_limits import FREE_TEXT_MAX_LENGTH, too_long_message
 
 from .models import Opportunity
 
@@ -59,7 +60,11 @@ class OpportunitySerializer(serializers.ModelSerializer):
             "posted_by", "created_at", "updated_at", "status", "review_reason", "reviewed_at",
         ]
         extra_kwargs = {
-            "description": {"required": True, "allow_blank": False},
+            # IR-926: the call's body, written by its poster and shown on the board.
+            "description": {
+                "required": True, "allow_blank": False, "max_length": FREE_TEXT_MAX_LENGTH,
+                "error_messages": {"max_length": too_long_message("A description")},
+            },
             "location":    {"required": True, "allow_blank": False},
         }
 

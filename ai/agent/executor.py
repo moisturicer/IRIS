@@ -34,7 +34,8 @@ from ai.agent.protocol import (
     AgentRequest, ModelTurn, NotFinal, Pin, StopReason, Text, ToolGroup, ToolResult, User, final_answer,
 )
 from ai.agent.prompts import (  # noqa: F401 -- re-exported: callers and pinned tests name them here
-    CHAT_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION, COMPACT_REQUEST, EVIDENCE_INSTRUCTIONS,
+    CHAT_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION, COHERENT_INSTRUCTIONS, COHERENT_PROMPT_VERSION,
+    COHERENT_TOOL_VERSION, COMPACT_REQUEST, EVIDENCE_INSTRUCTIONS,
     EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION, FINAL_NOTE, HYBRID_INSTRUCTIONS, HYBRID_PROMPT_VERSION,
     HYBRID_TOOL_VERSION, INSTRUCTIONS, LISTING_INSTRUCTIONS, LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION,
     MANUSCRIPT_INSTRUCTIONS, MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION, METADATA_INSTRUCTIONS,
@@ -59,7 +60,9 @@ NOTHING_TO_COMPACT = "nothing_to_compact"
 
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
                           RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
-                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION)
+                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION)
+#: Pins that offer research-7's tools and never mention an unseen draft in a repair (IR-1004, IR-1166).
+EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -317,8 +320,8 @@ class _Run:
         # One clarification at a time: not twice in a row, however much history is carried.
         asked = bool(context.prior) and context.prior[-1].kind == "clarification"
         version = agent.pin.tool_version
-        #: research-8 offers research-7's tools (IR-1004).
-        tool_set = CHAT_TOOL_VERSION if version == EVIDENCE_TOOL_VERSION else version
+        #: research-8 and research-9 offer research-7's tools (IR-1004, IR-1166).
+        tool_set = CHAT_TOOL_VERSION if version in EVIDENCE_TOOL_VERSIONS else version
         self.investigation = Investigation(
             tools, clarify=not asked,
             metadata=tool_set in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION,
@@ -332,8 +335,8 @@ class _Run:
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
         self.chat = tool_set == CHAT_TOOL_VERSION
         self.repairs = 2
-        #: research-8's repairs never mention the draft the reader did not see (IR-1004).
-        self.fresh_repairs = version == EVIDENCE_TOOL_VERSION
+        #: research-8 and research-9 repairs never mention the unseen draft (IR-1004, IR-1166).
+        self.fresh_repairs = version in EVIDENCE_TOOL_VERSIONS
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         #: Sources the history carried when the answer was written (IR-994).

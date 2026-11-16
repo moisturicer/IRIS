@@ -143,8 +143,10 @@ test("filters narrow the results, the address holds them, and Clear all undoes t
   await expect(paperLink(page, projectTitle)).toBeVisible();
   await expect(filtersButton(page)).toHaveAccessibleName("Filters");
 
-  // Year (completed) is a different filter on the same two papers.
-  sheet = await choose(page, /^Year/, String(lastYear));
+  // The year range is a different filter on the same two papers. One year is
+  // the same From and To (IR-947).
+  sheet = await choose(page, /^Year from/, String(lastYear));
+  sheet = await choose(page, /^Year to/, String(lastYear));
   await expect(paperLink(page, thesisTitle)).toBeVisible();
   await expect(paperLink(page, projectTitle)).toHaveCount(0);
   await sheet.getByRole("button", { name: /^Show \d+ results?$/ }).click();
