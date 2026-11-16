@@ -1,6 +1,7 @@
 /**
  * The dialog RDCO writes a note in when it declines a request (IR-688 for
- * download requests, IR-1099 for delete requests) or revokes a download grant.
+ * download requests, IR-1099 for delete requests), revokes a download grant,
+ * or rejects or removes an Adviser's Call (IR-765, where it is a reason).
  * One component, so the queues ask for it the same way: a note is required, its
  * length is limited here and again by the server, and a refusal keeps what was
  * typed beside the server's reason.
@@ -41,9 +42,24 @@ type Props = {
   send: (note: string) => Promise<unknown>;
   onClose: () => void;
   onDone: () => void;
+  /** What the field is called: "Note" by default, "Reason" for a Call (IR-765). */
+  noun?: string;
+  /** The server's limit on it. Notes are 500 characters; a Call's reason is 2,000. */
+  maxLength?: number;
+  /** The key the server files a refusal of it under: `note`, or `reason` for a Call. */
+  field?: string;
+  /**
+   * Report a failure outside the dialog, as a toast, instead of in a box that
+   * grows inside it (IR-765). Return true to keep the dialog open, with what
+   * was typed, for another try; false to close it.
+   */
+  onFailure?: (err: unknown) => boolean;
 };
 
-export function RdcoNoteDialog({ title, submitLabel, audience, requester, recordTitle, intro, send, onClose, onDone }: Props) {
+export function RdcoNoteDialog({
+  title, submitLabel, audience, requester, recordTitle, intro, send, onClose, onDone,
+  noun = "Note", maxLength = NOTE_MAX_LENGTH, field = "note", onFailure,
+}: Props) {
   const ids = useId();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +75,12 @@ export function RdcoNoteDialog({ title, submitLabel, audience, requester, record
       await send(note.trim());
       onDone();
     } catch (err) {
+      if (onFailure) {
+        if (!onFailure(err)) onClose();
+        return;
+      }
       // The note stays in the box beside the server's reason.
-      setError(fieldError(err, "note") ?? errorDetail(err, "That did not go through. Please try again."));
+      setError(fieldError(err, field) ?? errorDetail(err, "That did not go through. Please try again."));
     } finally {
       setSending(false);
     }
@@ -93,20 +113,20 @@ export function RdcoNoteDialog({ title, submitLabel, audience, requester, record
         </p>
         <div>
           <label htmlFor={noteId} className={LABEL}>
-            Note to the {audience}
+            {noun} to the {audience}
           </label>
           <textarea
             id={noteId}
             required
             rows={4}
-            maxLength={NOTE_MAX_LENGTH}
+            maxLength={maxLength}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             aria-describedby={`${noteId}-help`}
             className={fieldClasses(false)}
           />
           <p id={`${noteId}-help`} className="mt-1 text-small text-stone-600">
-            The {audience} sees this as you write it. Up to {NOTE_MAX_LENGTH} characters.
+            The {audience} sees this as you write it. Up to {maxLength.toLocaleString("en")} characters.
           </p>
         </div>
         {error && (

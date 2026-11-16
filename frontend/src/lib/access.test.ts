@@ -142,7 +142,7 @@ test("RDCO's coordination screens, Import Records included, are one RDCO group",
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
     "Main: Workflow analytics", "Main: Calls & Conferences",
     "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
-    "RDCO: Delete Requests", "RDCO: Reported Comments", "RDCO: Notices",
+    "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments", "RDCO: Notices",
   ]);
 });
 
@@ -335,6 +335,7 @@ test("RDCO coordination links use the RDCO section and addresses", () => {
     { label: "Users", to: "/rdco/users", section: "RDCO" },
     { label: "Role Requests", to: "/rdco/role-requests", section: "RDCO" },
     { label: "Download Requests", to: "/rdco/download-requests", section: "RDCO" },
+    { label: "Call Requests", to: "/rdco/call-requests", section: "RDCO" },
     { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
     { label: "Reported Comments", to: "/moderation/comments", section: "RDCO" },
     { label: "Notices", to: "/notices", section: "RDCO" },

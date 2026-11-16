@@ -4,7 +4,7 @@ import { opportunitiesApi } from "@/api/opportunities";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { Input } from "@/components/ui/Input";
@@ -20,6 +20,9 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/ui.store";
 import type { Opportunity, OpportunityType } from "@/types/opportunities";
 
+import { RdcoNoteDialog } from "@/features/admin/RdcoNoteDialog";
+
+import { callFailure } from "./callFailure";
 import { OpportunityFormDialog } from "./OpportunityFormDialog";
 import { OpportunityRow } from "./OpportunityRow";
 import {
@@ -92,6 +95,10 @@ export function CallsAndConferencesPage() {
   const [formTarget, setFormTarget] = useState<FormTarget>(null);
   const [deleting,   setDeleting]   = useState<Opportunity | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  /** The Adviser's Call RDCO is removing with a reason (IR-765). */
+  const [removing,   setRemoving]   = useState<Opportunity | null>(null);
+  /** The Call whose Featured is being changed. */
+  const [featuring,  setFeaturing]  = useState<number | null>(null);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -243,6 +250,28 @@ export function CallsAndConferencesPage() {
     }
   };
 
+  /** Replace one Call with the server's copy, keeping the board's order. */
+  const replaceCall = (next: Opportunity) =>
+    setItems((current) => current.map((o) => (o.id === next.id ? next : o)).sort(byBoardOrder));
+
+  /** RDCO sets or clears Featured (ADR-050 decision 12). It never moves the Call. */
+  const toggleFeatured = async (target: Opportunity) => {
+    setFeaturing(target.id);
+    try {
+      const { data } = await opportunitiesApi.setFeatured(target.id, !target.is_featured);
+      replaceCall(data);
+      addToast({ type: "success", message: data.is_featured ? `${data.title} is Featured.` : `${data.title} is no longer Featured.` });
+    } catch (err) {
+      const failure = callFailure(err, `Could not change Featured on ${target.title}.`);
+      addToast(failure.stale
+        ? { type: "error", persist: true, message: failure.message }
+        : { type: "error", message: failure.message, action: { label: "Try again", onClick: () => void toggleFeatured(target) } });
+      if (failure.stale) load();
+    } finally {
+      setFeaturing(null);
+    }
+  };
+
   const confirmDelete = () => {
     if (deleting && !deleteBusy) void deleteCall(deleting);
   };
@@ -254,6 +283,14 @@ export function CallsAndConferencesPage() {
       <i className="fas fa-plus" aria-hidden="true" />
       Post a call
     </button>
+  );
+
+  // A poster's own Calls, waiting or rejected ones included, are on My Calls (IR-765).
+  const headerActions = canPost && (
+    <div className="flex flex-wrap items-center gap-2">
+      <ButtonLink to="/opportunities/mine" variant="outline" size="sm">My calls</ButtonLink>
+      {postButton}
+    </div>
   );
 
   const ready = !loading && !loadFailed;
@@ -270,7 +307,7 @@ export function CallsAndConferencesPage() {
       <PageHeader
         title="Calls & Conferences"
         description="Calls for papers from conferences, journals and other venues, posted by RDCO and advisers. Soonest deadline first."
-        actions={postButton || undefined}
+        actions={headerActions || undefined}
       />
 
       {/* ---- Search and filters ------------------------------------------ */}
@@ -428,6 +465,9 @@ export function CallsAndConferencesPage() {
                       onDownloadIcs={() => void handleDownloadIcs(o)}
                       onEdit={() => setFormTarget(o)}
                       onDelete={() => setDeleting(o)}
+                      onRemove={() => setRemoving(o)}
+                      onToggleFeatured={() => void toggleFeatured(o)}
+                      featuring={featuring === o.id}
                     />
                   </li>
                 ))}
@@ -443,6 +483,36 @@ export function CallsAndConferencesPage() {
           canFeature={formTarget === "new" ? canFeature : formTarget.can_feature}
           onClose={() => setFormTarget(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {removing && (
+        <RdcoNoteDialog
+          title="Remove this call"
+          submitLabel="Remove call"
+          audience="Adviser"
+          noun="Reason"
+          maxLength={2000}
+          field="reason"
+          requester={removing.posted_by_name || "The Adviser"}
+          recordTitle={removing.title}
+          intro="It leaves the board. The Adviser is told in-app, with your reason."
+          send={(reason) => opportunitiesApi.removeWithReason(removing.id, reason)}
+          onClose={() => setRemoving(null)}
+          onDone={() => {
+            const gone = removing;
+            setItems((current) => current.filter((o) => o.id !== gone.id));
+            setRemoving(null);
+            addToast({ type: "success", message: `${gone.title} removed. Its Adviser is told why.` });
+          }}
+          onFailure={(err) => {
+            // The refusal is a toast; the reason stays typed for another try,
+            // unless the Call is gone, when the board reloads.
+            const failure = callFailure(err, `Could not remove ${removing.title}.`);
+            addToast({ type: "error", persist: true, message: failure.message });
+            if (failure.stale) load();
+            return !failure.stale;
+          }}
         />
       )}
 

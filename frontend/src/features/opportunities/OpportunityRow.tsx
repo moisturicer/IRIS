@@ -6,7 +6,8 @@ import { TONES } from "@/components/ui/statusTones";
 import { cn } from "@/lib/utils";
 import type { Opportunity } from "@/types/opportunities";
 
-import { countdown, dateParts, eventDates, eventTag, formatDueDate, papersClosed, typeMeta } from "./opportunityUtils";
+import { CallDetails } from "./CallDetails";
+import { countdown, dateParts, eventTag, formatDueDate, papersClosed } from "./opportunityUtils";
 
 interface OpportunityRowProps {
   opportunity: Opportunity;
@@ -18,6 +19,11 @@ interface OpportunityRowProps {
   onDownloadIcs: () => void;
   onEdit:        () => void;
   onDelete:      () => void;
+  /** RDCO removes an Adviser's Call with a reason (`can_remove`, IR-765). */
+  onRemove:      () => void;
+  /** RDCO sets or clears Featured (`can_feature`, IR-765). */
+  onToggleFeatured: () => void;
+  featuring:     boolean;
 }
 
 /** The outbound link: an outline pill, 44 px on touch screens, compact beside a pointer. */
@@ -36,7 +42,8 @@ const TAG = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-labe
  * then *what I can do* (save it, put the deadline in my calendar, go and
  * apply). Two tags say where it stands, worded by the server (ADR-050
  * decision 6): the papers tag always, and Happening now while the event runs.
- * Edit and delete appear only when the server says this viewer may.
+ * Edit, delete, remove with a reason and Featured appear only when the
+ * server says this viewer may (`can_*`); the row compares no role names.
  *
  * Nothing here grows when an action fails: the page says so in a toast.
  */
@@ -49,17 +56,16 @@ export function OpportunityRow({
   onDownloadIcs,
   onEdit,
   onDelete,
+  onRemove,
+  onToggleFeatured,
+  featuring,
 }: OpportunityRowProps) {
   const titleId = useId();
-  const type    = typeMeta(o.opportunity_type);
   const closed  = papersClosed(o);
   const chip    = countdown(o);
   const date    = dateParts(o.due_date);
   const urgent  = !closed && chip.tone === "attention";
-  const eventWhen  = eventDates(o);
   const eventLabel = eventTag(o);
-
-  const meta = [o.location, ...(o.area_names ?? [])].filter(Boolean);
 
   return (
     <article
@@ -97,51 +103,7 @@ export function OpportunityRow({
 
       {/* ---- What ---------------------------------------------------------- */}
       <div className="basis-full sm:basis-0 sm:flex-1 min-w-0">
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-label text-stone-600">
-          <span className="inline-flex items-center gap-1.5 font-semibold text-stone-700">
-            <i className={cn("fas", type.icon, "text-stone-500")} aria-hidden="true" />
-            {type.label}
-          </span>
-          {o.is_featured && (
-            <span className="inline-flex items-center gap-1 font-semibold text-brand">
-              <i className="fas fa-star" aria-hidden="true" />
-              Featured
-            </span>
-          )}
-        </p>
-
-        <h3
-          id={titleId}
-          className={cn(
-            "font-display font-semibold text-title mt-1 break-words text-pretty",
-            closed ? "text-stone-600" : "text-stone-900",
-          )}
-        >
-          {o.title}
-        </h3>
-
-        {meta.length > 0 && (
-          <p className="text-small text-stone-600 mt-1">
-            {meta.map((text, i) => (
-              <span key={i}>
-                {i > 0 && <span aria-hidden="true" className="mx-1.5 text-stone-400">·</span>}
-                <span>{text}</span>
-              </span>
-            ))}
-          </p>
-        )}
-
-        {(eventWhen || o.registration_fee) && (
-          <p className="flex flex-wrap gap-x-4 gap-y-1 text-small text-stone-600 mt-1">
-            {eventWhen && <span>Event: {eventWhen}</span>}
-            {o.registration_fee && <span>Fee: {o.registration_fee}</span>}
-          </p>
-        )}
-
-        {o.description && (
-          <p className="text-small text-stone-600 mt-2 line-clamp-2 max-w-prose">{o.description}</p>
-        )}
-
+        <CallDetails call={o} titleId={titleId} muted={closed} />
       </div>
 
       {/* ---- What I can do ------------------------------------------------- */}
@@ -215,7 +177,7 @@ export function OpportunityRow({
       {/* ---- Who posted it, and the poster's own controls ----------------- */}
       {/* Last in the row, so the deadline and "View & apply" come before Delete
           in reading and tab order. From `xl` it lines up under the content. */}
-      {(o.posted_by_name || o.can_edit || o.can_delete) && (
+      {(o.posted_by_name || o.can_edit || o.can_delete || o.can_remove || o.can_feature) && (
         <div className="basis-full xl:pl-20 flex flex-wrap items-center gap-x-1 gap-y-1 text-label text-stone-600">
           {o.posted_by_name && <span className="mr-2">Posted by {o.posted_by_name}</span>}
           {o.can_edit && (
@@ -231,8 +193,22 @@ export function OpportunityRow({
                 Edit
               </Button>
           )}
-          {/* Plain delete only. RDCO removes an Adviser's Call with a reason
-              (`can_remove`), which is IR-765's to offer. */}
+          {o.can_feature && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onToggleFeatured}
+                disabled={featuring}
+                aria-pressed={o.is_featured}
+                aria-label={`Featured: ${o.title}`}
+                className={cn("min-h-11 lg:min-h-0", FOCUS_RING)}
+              >
+                <i className={cn(o.is_featured ? "fas" : "far", "fa-star")} aria-hidden="true" />
+                Featured
+              </Button>
+          )}
+          {/* Plain delete; an Adviser's Call is removed by RDCO with a reason. */}
           {o.can_delete && (
               <Button
                 type="button"
@@ -244,6 +220,19 @@ export function OpportunityRow({
               >
                 <i className="fas fa-trash-can" aria-hidden="true" />
                 Delete
+              </Button>
+          )}
+          {o.can_remove && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onRemove}
+                aria-label={`Remove ${o.title}`}
+                className={cn("min-h-11 lg:min-h-0", FOCUS_RING)}
+              >
+                <i className="fas fa-trash-can" aria-hidden="true" />
+                Remove
               </Button>
           )}
         </div>
