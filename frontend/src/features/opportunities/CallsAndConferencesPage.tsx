@@ -11,11 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
-import {
-  getSavedOpportunityIds,
-  pruneSavedOpportunities,
-  toggleSavedOpportunity,
-} from "@/lib/opportunityLibrary";
+import { useSavedCallsStore } from "@/store/savedCalls.store";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/store/ui.store";
 import type { Opportunity, OpportunityType } from "@/types/opportunities";
@@ -68,9 +64,10 @@ type FormTarget = null | "new" | Opportunity;
  *
  * Feedback on an action is a toast, never a box that grows inside the board.
  *
- * Saving is per-browser (`lib/opportunityLibrary`), and the page says so.
- * There is no server-side bookmark, and no in-app reminder: the calendar
- * action hands over an .ics file the viewer's own calendar keeps.
+ * Saves follow the account (IR-766, `store/savedCalls.store.ts`), and the
+ * Saved filter shows the saved Calls still on the board; My Library keeps
+ * every saved Call, Over ones included. There is no in-app reminder: the
+ * calendar action hands over an .ics file the viewer's own calendar keeps.
  */
 export function CallsAndConferencesPage() {
   const addToast = useUIStore((s) => s.addToast);
@@ -87,7 +84,11 @@ export function CallsAndConferencesPage() {
   /** An Area's name, or "" for every Area. */
   const [activeArea, setActiveArea] = useState("");
   const [savedOnly,  setSavedOnly]  = useState(false);
-  const [savedIds,   setSavedIds]   = useState<number[]>(() => getSavedOpportunityIds());
+  const savedItems   = useSavedCallsStore((s) => s.items);
+  const ensureSaved  = useSavedCallsStore((s) => s.ensureLoaded);
+  const saveCall     = useSavedCallsStore((s) => s.save);
+  const unsaveCall   = useSavedCallsStore((s) => s.unsave);
+  useEffect(() => { void ensureSaved(); }, [ensureSaved]);
 
   const [icsBusy,   setIcsBusy]   = useState<number | null>(null);
 
@@ -107,9 +108,6 @@ export function CallsAndConferencesPage() {
         setItems([...board.items].sort(byBoardOrder));
         setCanPost(board.can_post);
         setCanFeature(board.can_feature);
-        // The whole board is here, so a saved id that is not on it belongs to
-        // a call that was deleted or has dropped off: forget it.
-        setSavedIds(pruneSavedOpportunities(board.items.map((o) => o.id)));
       })
       .catch(() => { if (!cancelled) setLoadFailed(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -120,7 +118,7 @@ export function CallsAndConferencesPage() {
 
   // ---- Filtering ---------------------------------------------------------
 
-  const savedSet = useMemo(() => new Set(savedIds), [savedIds]);
+  const savedSet = useMemo(() => new Set(Object.keys(savedItems).map(Number)), [savedItems]);
   /** Saved calls that are on the board now, which is what the Saved chip counts. */
   const savedOnBoard = useMemo(() => items.filter((o) => savedSet.has(o.id)).length, [items, savedSet]);
 
@@ -168,9 +166,10 @@ export function CallsAndConferencesPage() {
 
   // ---- Actions -----------------------------------------------------------
 
-  const handleToggleSave = (id: number) => {
-    toggleSavedOpportunity(id);
-    setSavedIds(getSavedOpportunityIds());
+  /** Save or unsave; the store shows it at once and rolls back with a toast on failure. */
+  const handleToggleSave = (o: Opportunity) => {
+    if (savedSet.has(o.id)) void unsaveCall(o.id, o.title);
+    else void saveCall(o);
   };
 
   const handleDownloadIcs = async (o: Opportunity) => {
@@ -249,8 +248,7 @@ export function CallsAndConferencesPage() {
     ? ""
     : filtered
       ? `Showing ${visible.length} of ${items.length} ${items.length === 1 ? "call" : "calls"}.`
-      : `${openCount} ${openCount === 1 ? "call" : "calls"} accepting papers${items.length > openCount ? `, ${items.length - openCount} with submissions closed` : ""}.` +
-        (savedOnBoard > 0 ? " Saved calls are kept in this browser only." : "");
+      : `${openCount} ${openCount === 1 ? "call" : "calls"} accepting papers${items.length > openCount ? `, ${items.length - openCount} with submissions closed` : ""}.`;
 
   return (
     <div>
@@ -296,7 +294,6 @@ export function CallsAndConferencesPage() {
           <button
             type="button"
             aria-pressed={savedOnly}
-            aria-describedby={`${ids}-saved-hint`}
             onClick={() => setSavedOnly((v) => !v)}
             disabled={loadFailed}
             className={chipClass(savedOnly)}
@@ -345,9 +342,6 @@ export function CallsAndConferencesPage() {
       <p role="status" aria-live="polite" className="text-small text-stone-600 min-h-5 mb-section">
         {summary}
       </p>
-      {/* What every save control points at: touch and screen-reader users never
-          see a tooltip, so the per-browser limit is said, not hovered. */}
-      <p id={`${ids}-saved-hint`} className="sr-only">Saved calls are kept in this browser only.</p>
 
       {/* ---- Board ------------------------------------------------------- */}
       {loading ? (
@@ -358,7 +352,7 @@ export function CallsAndConferencesPage() {
           tone="error"
           icon="fa-triangle-exclamation"
           title="Could not load calls and conferences"
-          message="The board did not load. Your saved calls are still kept in this browser."
+          message="The board did not load. Your saved calls are safe in My Library."
           action={<Button variant="outline" onClick={load}>Try again</Button>}
         />
       ) : items.length === 0 ? (
@@ -380,7 +374,7 @@ export function CallsAndConferencesPage() {
           title={savedOnly && savedOnBoard === 0 ? "Nothing saved yet" : "Nothing matches these filters"}
           message={
             savedOnly && savedOnBoard === 0
-              ? "Use the bookmark on a call to keep it here. Saved calls stay in this browser only."
+              ? "Use the bookmark on a call to keep it here and in My Library."
               : "Try another type or Area, or clear the search."
           }
           action={<Button variant="outline" onClick={clearFilters}>Clear filters</Button>}
@@ -409,9 +403,8 @@ export function CallsAndConferencesPage() {
                     <OpportunityRow
                       opportunity={o}
                       saved={savedSet.has(o.id)}
-                      savedHintId={`${ids}-saved-hint`}
                       icsBusy={icsBusy === o.id}
-                      onToggleSave={() => handleToggleSave(o.id)}
+                      onToggleSave={() => handleToggleSave(o)}
                       onDownloadIcs={() => void handleDownloadIcs(o)}
                       onEdit={() => setFormTarget(o)}
                       onDelete={() => deletion.ask(o)}

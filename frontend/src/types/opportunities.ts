@@ -98,10 +98,21 @@ export interface Opportunity {
   can_feature:      boolean;
   /** Saving an edit sends it back to RDCO and off the board: warn first. */
   edit_returns_to_pending: boolean;
+  /** Whether this viewer saved it (IR-649). */
+  is_saved?:        boolean;
 }
 
 /** ADR-050 decision 8 as amended (IR-762): a lapsed request is deleted, so there is no "expired". */
 export type CallStatus = "pending" | "confirmed" | "rejected";
+
+/**
+ * One of the reader's saved Calls (IR-649, ADR-050 decision 13 as amended
+ * 2026-11-16). A confirmed Call comes whole, Over ones included; one sent back
+ * to RDCO or rejected is only its id and `available: false`, for everyone.
+ */
+export type SavedCallEntry =
+  | { call_id: number; available: true; saved_at: string; call: Opportunity }
+  | { call_id: number; available: false };
 
 /** What a poster sends. Everything the server derives is left out. */
 export interface OpportunityInput {
