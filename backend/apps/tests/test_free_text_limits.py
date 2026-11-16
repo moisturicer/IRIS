@@ -166,15 +166,11 @@ class DeletionRejectionReasonLimitTests(DeletionBase):
 class OpportunityDescriptionLimitTests(APITestCase):
 
     def test_a_description_over_the_limit_is_refused_and_nothing_posted(self):
-        from datetime import date, timedelta
+        from apps.opportunities.test_call_review import payload
 
         self.client.force_authenticate(make_opportunity_user("limits-rdco@cit.edu", "RDCO"))
         before = Opportunity.objects.count()
-        response = self.client.post(reverse("opportunity-list"), {
-            "opportunity_type": Opportunity.TYPE_INTERNAL_CALL,
-            "title": "Call", "posting_office": "RDCO", "audience": "Everyone",
-            "description": TOO_LONG, "due_date": str(date.today() + timedelta(days=14)), "tags": [],
-        }, format="json")
+        response = self.client.post(reverse("opportunity-list"), payload(description=TOO_LONG), format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn("description", response.data)
         self.assertIn(LIMIT_MESSAGE, message_of(response))
@@ -209,13 +205,14 @@ class OpportunityDescriptionPatchLimitTests(APITestCase):
 
         rdco = make_opportunity_user("limits-rdco-patch@cit.edu", "RDCO")
         opportunity = make_opportunity(posted_by=rdco)
+        kept = opportunity.description
         self.client.force_authenticate(rdco)
         response = self.client.patch(reverse("opportunity-detail", args=[opportunity.pk]),
                                      {"description": TOO_LONG}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn(LIMIT_MESSAGE, message_of(response))
         opportunity.refresh_from_db()
-        self.assertEqual(opportunity.description, "Competitive institutional seed funding.")
+        self.assertEqual(opportunity.description, kept)
 
 
 class FinishReviewSummaryLimitTests(ThreadTestBase):
