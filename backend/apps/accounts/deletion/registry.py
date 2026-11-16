@@ -118,6 +118,8 @@ RELATIONS: dict[str, Rule] = {
     "library.LibraryFolder.owner":         Rule(DELETE, "Private folders and what is filed in them (IR-572)"),
     "library.ReadingNote.owner":           Rule(DELETE, "Private reading notes (IR-580)"),
     "library.ReadingHighlight.owner":      Rule(DELETE, "Private highlights (IR-583)"),
+    "library.ReadingVisit.owner":          Rule(DELETE, "Private reading history (IR-756)"),
+    "library.LibraryPreferences.owner":    Rule(DELETE, "Library settings, such as pausing history (IR-756)"),
     "reviews.SavedReply.owner":            Rule(DELETE, "Private saved review replies (IR-877)"),
     "reviews.ViewedMark.user":             Rule(DELETE, "Private Viewed marks in a comparison (IR-877)"),
     "reviews.ReviewMention.user":          Rule(DELETE, "Mentions of the person in review comments (IR-877)"),

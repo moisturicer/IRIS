@@ -296,6 +296,24 @@ def papers_viewed(user) -> list[dict]:
     return [{**_paper(row.record_id, titles), "first_viewed_at": row.viewed_at} for row in rows]
 
 
+def reading_history(user) -> list[dict]:
+    """The papers the person opened while keeping history (IR-756), and when
+    they last did. Unlike `papers_viewed`, the person can clear or pause it. The
+    title is given only while they may still read the paper."""
+    from apps.library.models import ReadingVisit
+
+    rows = list(ReadingVisit.objects.filter(owner=user).order_by("-viewed_at", "-id"))
+    titles = _readable_titles(user, [row.record_id for row in rows])
+    return [{**_paper(row.record_id, titles), "viewed_at": row.viewed_at} for row in rows]
+
+
+def library_preferences(user) -> dict:
+    """The person's library settings; the defaults when they never changed one."""
+    from apps.library.models import LibraryPreferences
+
+    return {"keep_history": LibraryPreferences.keeps_history(user)}
+
+
 def reading_notes(user) -> list[dict]:
     """
     The person's own private notes (IR-580, ADR-064 §8): the text they typed and
@@ -780,6 +798,8 @@ SECTIONS: dict[str, Callable] = {
     "papers_owned": papers_owned,
     "saved_papers": saved_papers,
     "papers_viewed": papers_viewed,
+    "reading_history": reading_history,
+    "library_preferences": library_preferences,
     "saved_feeds": saved_feeds,
     "folders": folders,
     "reading_notes": reading_notes,

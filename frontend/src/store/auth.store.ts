@@ -56,9 +56,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   login: (user, access, refresh) => {
     setStoredRefreshToken(refresh);
-    // Reading history is this browser's, not the account's (ADR-044 Q2). A
-    // sign-in may follow someone who closed the tab without signing out, so
-    // their history must not greet the next person.
+    // Wipe what an older build kept of reading history in this browser (it
+    // follows the account since IR-756). A sign-in may follow someone who
+    // closed the tab without signing out, so their copy must not greet the
+    // next person.
     clearReadingHistory();
     // A sign-in is a new session even with no sign-out before it: `/login` has
     // no guard, so a signed-in account can open it and sign in as someone else

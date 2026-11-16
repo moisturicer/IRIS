@@ -1,11 +1,13 @@
 /**
- * The part of a reader's library that still lives in this browser.
+ * What is left of the reader's library in this browser: only the wipe of the
+ * old reading history.
  *
  * **Saves and Reading status belong to the account as of IR-566** (ADR-044),
- * **and the reader's own folders as of IR-572** (ADR-070): see
- * `store/library.store.ts`. What is left here is **reading history**,
- * browser-only and cleared on sign-out and on an account switch (ADR-044 Q2),
- * until IR-756 moves it to the account.
+ * **the reader's own folders as of IR-572** (ADR-070), both in
+ * `store/library.store.ts`, **and reading history as of IR-756**, in
+ * `store/history.store.ts`. What an older build kept in `iris_reading_history`
+ * is never read or uploaded; it is deleted at the next sign-in, sign-out or
+ * session end, so it is dropped, not imported (ADR-044 amendment 2026-11-16).
  *
  * **Old browser data is left untouched for IR-579's import.** Nothing here
  * reads or writes `iris_record_collections` (the pre-IR-566 status folders and
@@ -16,73 +18,11 @@
 
 const HISTORY_KEY = "iris_reading_history";
 
-/** How many visits to keep. Old entries fall off the end. */
-const HISTORY_LIMIT = 50;
-
-export interface ReadingVisit {
-  recordId: number;
-  /** Denormalised so history renders before the records resolve. */
-  title: string;
-  /** ISO timestamp of the most recent visit. */
-  viewedAt: string;
-}
-
-/* ────────────────────────────────────────────────────────────────────────────
- * Storage primitives
- *
- * localStorage throws in private windows and embedded previews, and can hold
- * malformed JSON a previous version wrote. Neither may break a render.
- * ──────────────────────────────────────────────────────────────────────────*/
-
-function readJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJSON(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* storage unavailable — in-memory state still updates for this session */
-  }
-}
-
-/* ────────────────────────────────────────────────────────────────────────────
- * Reading history (browser-only; cleared on sign-out and account switch)
- *
- * The server keeps no reading history: it notes only an account's first opening
- * of a published paper, to count views (IR-369), and never returns it. So this
- * is written when the paper view opens.
- * It is genuinely this browser's history, and is labelled as such.
- * ──────────────────────────────────────────────────────────────────────────*/
-
-export function getReadingHistory(): ReadingVisit[] {
-  const value = readJSON<unknown>(HISTORY_KEY, []);
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (v): v is ReadingVisit =>
-      Boolean(v) && typeof v.recordId === "number" && typeof v.viewedAt === "string",
-  );
-}
-
-/** Record a visit, newest first, one entry per record. */
-export function recordVisit(recordId: number, title: string): ReadingVisit[] {
-  const next = [
-    { recordId, title, viewedAt: new Date().toISOString() },
-    ...getReadingHistory().filter((v) => v.recordId !== recordId),
-  ].slice(0, HISTORY_LIMIT);
-  writeJSON(HISTORY_KEY, next);
-  return next;
-}
-
 /**
- * Forget this browser's history. Called by Clear history, and by the auth
- * store on every sign-in, sign-out and session end (ADR-044 Q2), so the next
- * person on a shared PC never sees what the last one opened.
+ * Delete what an older build kept of this browser's reading history. The auth
+ * store calls it on every sign-in, sign-out and session end (ADR-044 Q2), so
+ * the last person's copy never greets the next one. Nothing writes the key any
+ * more.
  */
 export function clearReadingHistory(): void {
   try {

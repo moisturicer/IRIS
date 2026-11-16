@@ -7,9 +7,9 @@ import { MAX_FOLDER_NAME, atFolderLimit, type LibraryFolder } from "@/store/libr
 /**
  * Which part of My Library the main column shows. `research` is the owner's
  * own records. `saved` and `status` are the account's saves (IR-566,
- * ADR-044), and `folder` one of the reader's own folders, which follow the
- * account too (IR-572, ADR-070). `history` is this browser's history, still
- * browser-only until IR-756.
+ * ADR-044), `folder` one of the reader's own folders, which follow the
+ * account too (IR-572, ADR-070), and `history` the account's reading history
+ * (IR-756).
  */
 export type LibraryView =
   | { kind: "research" }
@@ -41,6 +41,7 @@ interface FolderPickerProps {
 }
 
 const NEW_FOLDER = "__new__";
+const HISTORY = "__history__";
 
 /**
  * The reader's own folders as one picker in the Saved papers toolbar,
@@ -48,7 +49,8 @@ const NEW_FOLDER = "__new__";
  * (IR-572), read from the server with the saves. "New folder…" swaps the
  * picker for a name field in place, and is offered only while the account
  * has room for another. Renaming and deleting a folder happen in the
- * folder's own view.
+ * folder's own view. History (IR-756) is here too, because its pause switch
+ * lives in its view and every reader, author or not, has this toolbar.
  */
 export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: FolderPickerProps) {
   const [creating, setCreating] = useState(false);
@@ -88,7 +90,7 @@ export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: F
     );
   }
 
-  const value = view.kind === "folder" ? `folder:${view.id}` : "";
+  const value = view.kind === "folder" ? `folder:${view.id}` : view.kind === "history" ? HISTORY : "";
   const full = atFolderLimit(folders, limit);
 
   return (
@@ -100,12 +102,14 @@ export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: F
       onChange={(e) => {
         const next = e.target.value;
         if (next === NEW_FOLDER) setCreating(true);
+        else if (next === HISTORY) onViewChange({ kind: "history" });
         else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: Number(next.slice("folder:".length)) });
         else onViewChange({ kind: "saved" });
       }}
       className="max-w-[12rem]"
     >
       <option value="">All saved papers</option>
+      <option value={HISTORY}>History</option>
       {folders.length > 0 && (
         <optgroup label="Your folders">
           {folders.map((f) => <option key={f.id} value={`folder:${f.id}`}>{f.name}</option>)}

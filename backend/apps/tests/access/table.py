@@ -846,6 +846,21 @@ LIBRARY = {
         "PUT": _case(OWNS_FOLDER, kwargs={"folder_id": Ref("folder"), "record_id": Ref("record")}),
         "DELETE": _case(SIGNED_IN, kwargs={"folder_id": Ref("folder"), "record_id": Ref("record")}),
     }),
+    # IR-756: reading history and the setting that pauses it are the caller's
+    # own, so listing, clearing and changing the setting are anyone's. Recording
+    # a visit is gated by the Record: a caller who cannot read it gets the 404 of
+    # a missing one. No route reads another account's history.
+    "library-history": Entry({
+        "GET": _case(SIGNED_IN),
+        "DELETE": _case(SIGNED_IN),
+    }),
+    "library-visit": Entry({
+        "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),
+    }),
+    "library-preferences": Entry({
+        "GET": _case(SIGNED_IN),
+        "PATCH": _case(SIGNED_IN, data={"keep_history": True}),
+    }),
 }
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "records": RECORDS, "documents": DOCUMENTS_APP, "accounts": ACCOUNTS,

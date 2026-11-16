@@ -260,3 +260,71 @@ class SavedFeed(models.Model):
 
     def __str__(self):
         return f"SavedFeed(owner={self.owner_id}, name={self.name!r})"
+
+
+#: How many Records one reader's history keeps (ADR-044 §Amendment 2026-11-01,
+#: point 1). The browser kept the same number before IR-756.
+MAX_HISTORY_ENTRIES = 50
+
+
+class ReadingVisit(models.Model):
+    """
+    One Record one reader opened, and when they last did (IR-756).
+
+    Unique on `(owner, record)`: opening a Record again moves `viewed_at`
+    forward rather than adding a row, and only the `MAX_HISTORY_ENTRIES` most
+    recent are kept per reader. A visit is written only by the paper view's own
+    `PUT /library/history/<record_id>/`, never as a side effect of reading the
+    Record, so an API client, a prefetch or a link preview records nothing.
+
+    Both foreign keys cascade. A Record that is merely withdrawn or restricted
+    keeps its row and is listed as unavailable until access returns, because
+    every read rechecks `Record.objects.visible_to()`.
+
+    Only its reader sees it: not in Django admin, no staff endpoint, no
+    `AuditEvent`, and never read by anything that recommends, ranks, discusses
+    or prompts (a guard test enforces it). History is not a discovery signal.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reading_visits"
+    )
+    record = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="+"
+    )
+    viewed_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "record"], name="unique_reading_visit"),
+        ]
+        indexes = [models.Index(fields=["owner", "-viewed_at"], name="library_visit_owner_idx")]
+
+    def __str__(self):
+        return f"ReadingVisit(owner={self.owner_id}, record={self.record_id})"
+
+
+class LibraryPreferences(models.Model):
+    """
+    One reader's library settings (IR-756, ADR-044 §Amendment 2026-11-01, point 7).
+
+    Created the first time a reader changes a setting, never by reading one: no
+    row means every default. `keep_history` off pauses history -- the paper
+    view's visit is answered 204 and records nothing, while the entries already
+    kept stay until the reader clears them.
+    """
+
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="library_preferences"
+    )
+    keep_history = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"LibraryPreferences(owner={self.owner_id})"
+
+    @classmethod
+    def keeps_history(cls, user) -> bool:
+        """The reader's `keep_history`, or the default when they never set it."""
+        prefs = cls.objects.filter(owner=user).only("keep_history").first()
+        return prefs.keep_history if prefs else cls._meta.get_field("keep_history").default

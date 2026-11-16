@@ -6,6 +6,9 @@ from .views import (
     FolderRecordView,
     HighlightDetailView,
     HighlightListView,
+    LibraryPreferencesView,
+    ReadingHistoryView,
+    ReadingVisitView,
     ReadingNoteView,
     RecordHighlightsView,
     SavedFeedDetailView,
@@ -30,4 +33,7 @@ urlpatterns = [
     ),
     path("feeds/", SavedFeedListView.as_view(), name="library-feeds"),
     path("feeds/<int:feed_id>/", SavedFeedDetailView.as_view(), name="library-feed"),
+    path("history/", ReadingHistoryView.as_view(), name="library-history"),
+    path("history/<int:record_id>/", ReadingVisitView.as_view(), name="library-visit"),
+    path("preferences/", LibraryPreferencesView.as_view(), name="library-preferences"),
 ]

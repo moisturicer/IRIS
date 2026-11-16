@@ -102,7 +102,15 @@ They stay in `lib/opportunityLibrary.ts`, labelled browser-only, and keep their 
 5. **Clear history deletes the rows**, not just hides them.
 6. **History is never a discovery signal.** No For you, ranking or count reads it, as IR-557 promised. A guard test fails if a recommender reads the model.
 7. **The reader can pause history.** `LibraryPreferences.keep_history` defaults to on and is created lazily. It is toggled in the History view beside a notice that history is stored on the account and only the reader sees it. Pausing stops new entries and keeps existing ones. The server enforces it: the `PUT` returns 204 and records nothing.
-8. **Existing browser history is never uploaded automatically.** IR-579 offers it for import with saves and stars, for the same reason as §7.
+8. **Existing browser history is never uploaded automatically.** IR-579 offers it for import with saves and stars, for the same reason as §7. *(Changed by the amendment below: it is dropped, not offered.)*
+
+## Amendment — 2026-11-16 (IR-756): old browser history is dropped, and the account-data rules
+
+**Status of this amendment: Proposed** — decided by Hermoine Zozobrado, 2026-11-16, while building IR-756. It is accepted when IR-756's PR merges.
+
+1. **Point 8 above now matches IR-579's card: browser history is never imported.** The paper view stops writing `iris_reading_history`, and nothing reads it. The wipe on every sign-in, sign-out and session end stays (Q2), so the shared-PC leak stays closed and whatever an older build left goes at the next one. Importing it would hand one browser's list to whoever signs in, the bug this ADR exists to fix, and a history of 50 recent papers refills on its own within days.
+2. **Deleting an account deletes its reading history and its `LibraryPreferences`.** The personal-data download lists them: a `reading_history` section, with each paper's id and when it was last opened, and its title only while the person may still read it; and a `library_preferences` section with `keep_history`. History is the reader's own data, so it goes back to them and goes with them, as notes and highlights do.
+3. **The History view is reached from the Saved papers Folder picker.** Point 7 puts the pause switch there, and IR-776 had removed History from My Library while it was browser-only. The picker is the one control every reader has, author or not, so History is an option in it again.
 
 ## Alternatives Considered
 
