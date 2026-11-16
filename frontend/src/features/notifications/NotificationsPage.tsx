@@ -14,6 +14,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { notificationsApi } from "@/api/notifications";
+import { notificationHref } from "./notificationHref";
 import { failureMessage } from "@/lib/readFailure";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -209,6 +210,7 @@ interface RowProps {
 
 function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
   const resolved = n.resolved_at != null;
+  const href = notificationHref(n);
   const unread = isUnread(n);
 
   return (
@@ -234,8 +236,8 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
       </div>
 
       <div className="flex items-center gap-1 shrink-0 self-center max-sm:ml-5">
-        {/* A notification with no record has no Open button; this is its way to be read. */}
-        {unread && n.record == null && (
+        {/* A notification with nowhere to open has no Open button; this is its way to be read. */}
+        {unread && href == null && (
           <button
             type="button"
             onClick={onMarkRead}
@@ -250,9 +252,9 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
             <i className="fas fa-check text-small" aria-hidden />
           </button>
         )}
-        {n.record != null && (
+        {href != null && (
           <ButtonLink
-            to={`/records/${n.record}`}
+            to={href}
             variant="outline"
             size="sm"
             onClick={onOpen}

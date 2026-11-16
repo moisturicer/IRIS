@@ -15,6 +15,8 @@ from django.contrib.postgres.indexes import GinIndex
 from core.enums import (  # noqa: F401
     PUBLICLY_VISIBLE_STATUSES,
     CommentDeletion,
+    CommentReportReason,
+    CommentReportState,
     EmbargoState,
     IPType,
     PipelineStatus,
@@ -201,6 +203,7 @@ class Record(models.Model):
     publication_year   = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(9999)])
     year_accomplished  = models.PositiveIntegerField(null=True, blank=True)
     year_completed     = models.PositiveIntegerField(null=True, blank=True)
+    # At most 10,000 characters, checked where it is written (IR-926, core/text_limits.py).
     abstract           = models.TextField(blank=True)
     abstract_file      = models.FileField(
         upload_to=abstract_file_path, max_length=255, null=True, blank=True
@@ -872,3 +875,47 @@ class PublicComment(models.Model):
 
     def __str__(self):
         return f"Comment {self.pk} on record {self.record_id}"
+
+
+#: A report's note, for *Other* (IR-691).
+COMMENT_REPORT_NOTE_MAX_LENGTH = 500
+
+
+class CommentReport(models.Model):
+    """
+    A reader's report of someone else's Comment (ADR-032 §7, amendment
+    2026-10-31; IR-691). One per reader per comment. It keeps the comment's
+    text as it was when reported, so RDCO judges what the reader saw even after
+    an edit. Reports are for RDCO and the System Admin alone: no response to
+    the writer, the paper's owners or the reporter carries one.
+    """
+
+    comment     = models.ForeignKey(PublicComment, on_delete=models.CASCADE, related_name="reports")
+    #: `SET_NULL`: a deleted account's report stays, unattributed.
+    reporter    = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    reason      = models.CharField(max_length=20, choices=CommentReportReason.choices)
+    note        = models.TextField(blank=True, default="")
+    reported_text = models.TextField()
+    created_at  = models.DateTimeField(default=timezone.now)
+    state       = models.CharField(
+        max_length=20, choices=CommentReportState.choices, default=CommentReportState.OPEN,
+    )
+    resolved_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["comment", "reporter"], condition=models.Q(reporter__isnull=False),
+                name="comment_report_one_per_reader",
+            ),
+        ]
+        indexes = [models.Index(fields=["state", "comment"], name="comment_report_queue")]
+
+    def __str__(self):
+        return f"Report {self.pk} on comment {self.comment_id}"

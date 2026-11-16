@@ -130,7 +130,7 @@ Decision (2026-11-04): a US$30 ceiling, with each value that changed for deep-by
 
 ## Not decided here
 
-- **Extraction pricing** (`AI_ADMISSION_EXTRACTION_*`, `AI_ADMISSION_METADATA_CREDITS_PER_PAGE`). These are optional: unset, they refuse only off-campus PDF reads and Publish suggestions. Record them separately if wanted.
+- **Extraction pricing** (`AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE`, IR-988). Optional: unset, it refuses only off-campus PDF reads. Record them separately if wanted.
 - **`AI_ADMISSION_LEASE_GRACE_SECONDS`** is a timing allowance with a default (15), not a spending limit.
 
 ## Check after applying (IR-861 demonstration)

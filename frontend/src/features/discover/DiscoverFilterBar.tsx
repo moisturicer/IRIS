@@ -17,7 +17,9 @@ export interface DiscoverFilters {
   recordType:      string;
   colleges:        string[];
   classifications: string[];
-  year:            string;
+  /** Year completed, from and to; either end may be open (IR-947). */
+  yearFrom:        string;
+  yearTo:          string;
   ip:              string;
 }
 
@@ -25,7 +27,8 @@ export const EMPTY_FILTERS: DiscoverFilters = {
   recordType: ALL_VALUE,
   colleges: [],
   classifications: [],
-  year: ALL_VALUE,
+  yearFrom: ALL_VALUE,
+  yearTo: ALL_VALUE,
   ip: ALL_VALUE,
 };
 
@@ -58,12 +61,32 @@ interface DiscoverFilterBarProps {
   resultCount: number | null;
 }
 
+/** Both ends set, and the From after the To. "Any year" never conflicts. */
+export function endsBeforeItStarts(from: string, to: string): boolean {
+  return from !== ALL_VALUE && to !== ALL_VALUE && Number(from) > Number(to);
+}
+
+/**
+ * `filters` with one end of the year range set (IR-947). A range never ends
+ * before it starts: choosing a From after the To moves the To up to it, and a
+ * To before the From moves the From down, so one year is From and To alike.
+ */
+export function withYear(filters: DiscoverFilters, end: "yearFrom" | "yearTo", value: string): DiscoverFilters {
+  const next = { ...filters, [end]: value };
+  if (endsBeforeItStarts(next.yearFrom, next.yearTo)) {
+    if (end === "yearFrom") next.yearTo = value;
+    else next.yearFrom = value;
+  }
+  return next;
+}
+
+/** The year range counts as one filter, however many of its ends are set. */
 export function activeFilterCount(filters: DiscoverFilters): number {
   return (
     filters.colleges.length +
     filters.classifications.length +
     (filters.recordType !== ALL_VALUE ? 1 : 0) +
-    (filters.year !== ALL_VALUE ? 1 : 0) +
+    (filters.yearFrom !== ALL_VALUE || filters.yearTo !== ALL_VALUE ? 1 : 0) +
     (filters.ip !== ALL_VALUE ? 1 : 0)
   );
 }
@@ -109,6 +132,7 @@ export function DiscoverFilterBar({
 
   const set = <K extends keyof DiscoverFilters>(key: K, value: DiscoverFilters[K]) =>
     onChange({ ...filters, [key]: value });
+  const setYear = (end: "yearFrom" | "yearTo", value: string) => onChange(withYear(filters, end, value));
 
   const controls = () => {
     const shared = { inline: true, block: true };
@@ -144,10 +168,17 @@ export function DiscoverFilterBar({
         />
         <DiscoverFilterDropdown
           {...shared}
-          name="Year (completed)"
+          name="Year from"
           options={options.years}
-          selected={filters.year}
-          onChange={(v) => set("year", v)}
+          selected={filters.yearFrom}
+          onChange={(v) => setYear("yearFrom", v)}
+        />
+        <DiscoverFilterDropdown
+          {...shared}
+          name="Year to"
+          options={options.years}
+          selected={filters.yearTo}
+          onChange={(v) => setYear("yearTo", v)}
         />
         <DiscoverFilterDropdown
           {...shared}

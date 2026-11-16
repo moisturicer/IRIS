@@ -1,0 +1,20 @@
+{
+ "eligible": false,
+ "checks": [
+  {
+   "name": "recall",
+   "passed": false,
+   "detail": "recall@10 with reranking 0.643 against 0.786 (lower by +0.143; limit 0.02)"
+  },
+  {
+   "name": "headings",
+   "passed": true,
+   "detail": "wrongly nested numbered headings 0 against 0 (limit 5)"
+  },
+  {
+   "name": "latex",
+   "passed": true,
+   "detail": "papers losing all LaTeX: none"
+  }
+ ]
+}

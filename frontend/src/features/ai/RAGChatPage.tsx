@@ -6,7 +6,7 @@
  * opens read-only (`EarlierConversation`), so nothing a reader asked is lost,
  * and continuing it means asking again here.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useConsumeHandoff } from "@/lib/askHandoff";
 import { runtimeReader, type ReaderConversationSummary } from "@/api/runtimeReader";
@@ -20,6 +20,7 @@ import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
 import { ConversationHistoryList, ConversationSidebar, NewChatButton } from "./components/ConversationSidebar";
 import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
+import { useConversationHistory } from "./hooks/useConversationHistory";
 
 const RUNTIME_ID = /^[0-9a-f-]{36}$/i;
 const EARLIER_ID = /^[1-9]\d*$/;
@@ -47,7 +48,7 @@ function RuntimeAskPage() {
   const recordId = rawRecord && /^[1-9]\d*$/.test(rawRecord) ? Number(rawRecord) : undefined;
   const api = useMemo(() => runtimeReader(), []);
 
-  const [conversations, setConversations] = useState<ReaderConversationSummary[]>([]);
+  const { conversations, setConversations, refresh: refreshList, titleOf, search } = useConversationHistory(api, conversationId);
   const [historyOpen, setHistoryOpen] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ReaderConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -57,10 +58,6 @@ function RuntimeAskPage() {
   const [drawer, setDrawer] = useState<AskPanel | null>(null);
   const drawerOpener = useRef<HTMLElement | null>(null);
 
-  const refreshList = useCallback(async () => {
-    try { setConversations(await api.list()); } catch { /* the list is a convenience; the reader still works */ }
-  }, [api]);
-  useEffect(() => { void refreshList(); }, [refreshList, conversationId]);
   useEffect(() => { setDrawer(null); }, [conversationId]);
   useEffect(() => { setDrawer(null); }, [asDrawers]);
 
@@ -72,13 +69,13 @@ function RuntimeAskPage() {
   };
 
   // A conversation names the tab with its own title (IR-1073); a new chat keeps "Ask IRIS".
-  usePageTitle(conversations.find(c => c.id === conversationId)?.title);
+  usePageTitle(titleOf(conversationId));
 
   if (rawRecord !== null && (!recordId || !Number.isSafeInteger(recordId))) {
     return <p role="alert" className="p-6">This paper could not be opened.</p>;
   }
 
-  const title = conversations.find(c => c.id === conversationId)?.title || "New chat";
+  const title = titleOf(conversationId) || "New chat";
   const newChat = () => navigate("/ai");
 
   const remove = async () => {
@@ -99,7 +96,7 @@ function RuntimeAskPage() {
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
     <div className="relative flex min-h-0 min-w-0 flex-1" {...(drawer ? { inert: "" } : {})}>
       {!asDrawers && <ConversationSidebar conversations={conversations} activeId={conversationId ?? null}
-        open={historyOpen} onNewChat={newChat} onCollapse={() => toggle("history")}
+        open={historyOpen} search={search} onNewChat={newChat} onCollapse={() => toggle("history")}
         onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
         <ChatToolbar sessionTitle={title} historyOpen={shown("history")}
@@ -121,7 +118,7 @@ function RuntimeAskPage() {
       <div className="flex shrink-0 px-3 pt-3">
         <NewChatButton onClick={() => { setDrawer(null); newChat(); }} />
       </div>
-      <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null}
+      <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={search}
         onDelete={id => { setDrawer(null); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
     </ChatDrawer>}
     <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"

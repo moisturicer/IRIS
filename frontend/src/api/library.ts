@@ -19,8 +19,27 @@ export type SavedRecordEntry =
     }
   | { record_id: number; available: false };
 
+/**
+ * One of the reader's own folders (IR-572, ADR-070). `record_ids` are the saved
+ * Records filed in it, newest filing first. Every one is also a save, so its
+ * paper (or `available: false`) comes from the saves list, never from here.
+ */
+export interface FolderEntry {
+  id:         number;
+  name:       string;
+  record_ids: number[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** What filing a Record answers: the folder, and the save filing made or kept. */
+export interface FilingEntry {
+  folder: FolderEntry;
+  save:   SavedRecordEntry;
+}
+
 /** The keys of a saved feed's query: exactly the ones Discover writes into its URL. */
-export type FeedQueryKey = "q" | "type" | "college" | "classification" | "year" | "ip" | "sort";
+export type FeedQueryKey = "q" | "type" | "college" | "classification" | "year_from" | "year_to" | "ip" | "sort";
 export type FeedQuery = Partial<Record<FeedQueryKey, string>>;
 /** Taxonomy ids a saved feed names that no longer exist, by key (IR-577). */
 export type FeedStale = Partial<Record<"type" | "college" | "classification", number[]>>;
@@ -73,6 +92,31 @@ export type HighlightEntry =
     }
   | { id: number; record_id: number; available: false };
 
+/**
+ * One paper in the reader's history (IR-756). One they can no longer read
+ * carries only its id (ADR-044 §Amendment 2026-11-01, point 4).
+ */
+export type ReadingHistoryEntry =
+  | { record_id: number; available: true; viewed_at: string; record: RecordListItem }
+  | { record_id: number; available: false };
+
+/** The reader's library settings (IR-756). `keep_history` false pauses history. */
+export interface LibraryPreferences {
+  keep_history: boolean;
+}
+
+/**
+ * Where the reader is in a paper (IR-573): the page, and how far down it the
+ * top of their view was, 0 to 1. The server gives one back only while it was
+ * read on the bytes it serves them now (`manuscript_revision`).
+ */
+export interface ReadingPosition {
+  page: number;
+  fraction: number;
+  manuscript_revision: string;
+  updated_at: string;
+}
+
 /** What a highlight is saved from: the passage, and the revision the paper was opened at. */
 export interface HighlightDraft {
   manuscript_revision: string;
@@ -117,6 +161,21 @@ export const libraryApi = {
   /** Idempotent: 204 whether or not it was saved. */
   unsave: (recordId: number) => apiClient.delete(`/library/saves/${recordId}/`),
 
+  /** The reader's own folders, oldest first, with the account limit (IR-572). */
+  folders: () => apiClient.get<{ results: FolderEntry[]; limit: number }>("/library/folders/"),
+  /** Creating a name the reader already has, ignoring case, returns that folder. */
+  createFolder: (name: string) => apiClient.post<FolderEntry>("/library/folders/", { name }),
+  renameFolder: (folderId: number, name: string) =>
+    apiClient.patch<FolderEntry>(`/library/folders/${folderId}/`, { name }),
+  /** Idempotent: 204 whether or not it was there. Never deletes a save. */
+  deleteFolder: (folderId: number) => apiClient.delete(`/library/folders/${folderId}/`),
+  /** Saves the Record if it was not saved. Idempotent. */
+  fileInFolder: (folderId: number, recordId: number) =>
+    apiClient.put<FilingEntry>(`/library/folders/${folderId}/records/${recordId}/`),
+  /** Idempotent: 204 whether or not it was filed. Never unsaves. */
+  removeFromFolder: (folderId: number, recordId: number) =>
+    apiClient.delete(`/library/folders/${folderId}/records/${recordId}/`),
+
   /** The reader's saved feeds, with the account limit (IR-577). */
   feeds: () => apiClient.get<{ results: SavedFeed[]; limit: number }>("/library/feeds/"),
   createFeed: (body: { name: string; query: FeedQuery }) =>
@@ -125,4 +184,27 @@ export const libraryApi = {
   updateFeed: (id: number, body: { name?: string; query?: FeedQuery }) =>
     apiClient.patch<SavedFeed>(`/library/feeds/${id}/`, body),
   deleteFeed: (id: number) => apiClient.delete(`/library/feeds/${id}/`),
+
+  /** The papers the reader opened, most recent first, at most 50 (IR-756). */
+  history: () => apiClient.get<{ results: ReadingHistoryEntry[] }>("/library/history/"),
+  /**
+   * The paper view says the reader opened this Record. Idempotent; a 404 for a
+   * Record they cannot read. While history is paused it is a 204 that records nothing.
+   */
+  visit: (recordId: number) => apiClient.put(`/library/history/${recordId}/`, {}),
+  /** Clear history: the server deletes every entry. */
+  clearHistory: () => apiClient.delete("/library/history/"),
+  /** The reader's settings; the defaults when they never changed one. */
+  preferences: () => apiClient.get<LibraryPreferences>("/library/preferences/"),
+  updatePreferences: (body: LibraryPreferences) =>
+    apiClient.patch<LibraryPreferences>("/library/preferences/", body),
+  /** Where the reader left off in a paper, or null. A Record they cannot read is a 404. */
+  position: (recordId: number) =>
+    apiClient.get<{ position: ReadingPosition | null }>(`/library/positions/${recordId}/`),
+  /**
+   * Move the reader's place in a paper. `manuscript_revision` is the one the
+   * reader was shown; the server refuses it (409) once that paper is replaced.
+   */
+  savePosition: (recordId: number, body: Pick<ReadingPosition, "manuscript_revision" | "page" | "fraction">) =>
+    apiClient.put(`/library/positions/${recordId}/`, body),
 };

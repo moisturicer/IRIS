@@ -90,6 +90,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "core.middleware.ContentSecurityPolicyMiddleware",
+    "core.middleware.ApiResponseHeadersMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -158,9 +159,13 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
+# ASVS Level 1 (IR-819): 12 to 128 characters, not common, not breached, not
+# all digits. Registration, change and reset all apply this list.
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    {"NAME": "apps.accounts.password_validation.MaximumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "apps.accounts.password_validation.BreachedPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
@@ -258,8 +263,8 @@ SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30
 # defaults, set here so a change to them is a visible decision.
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
-# Browsers ignore frame-ancestors in a report-only CSP, so this is what denies
-# framing until the CSP is enforced.
+# frame-ancestors denies framing in the enforced CSP; this covers browsers that
+# predate it.
 X_FRAME_OPTIONS = "DENY"
 
 # Django renders no page but the admin, which loads only its own static files.
@@ -276,10 +281,11 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "form-action 'self'",
     "frame-ancestors 'none'",
 ])
-# Report-only until the manual walk-through in docs/testing/traceability/
-# (IR-663) shows no violation. Enforcing is a reviewed change to this line,
-# and to frontend/security-headers.conf, never an environment variable.
-CONTENT_SECURITY_POLICY_REPORT_ONLY = True
+# Enforced since IR-823, after the walk-through (e2e/specs/08-csp-walkthrough.spec.ts)
+# found no violation on 66 screens, the Django admin included. Changing it is a reviewed
+# change to this line and to frontend/security-headers.conf, never an
+# environment variable. development.py keeps it report-only.
+CONTENT_SECURITY_POLICY_REPORT_ONLY = False
 
 # ---- CORS ---------------------------------------------------------------
 
@@ -346,8 +352,6 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
     "apps.documents.tasks.extract_manuscript_text": {"queue": "extraction"},
-    # IR-846: LlamaExtract reads the parse, with the same outbound access.
-    "apps.documents.tasks.read_manuscript_metadata": {"queue": "extraction"},
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
@@ -386,6 +390,12 @@ CELERY_BEAT_SCHEDULE = {
     "unverified-registrations": {
         "task": "apps.accounts.tasks.expire_unverified_registrations",
         "schedule": crontab(hour=3, minute=0),
+    },
+    # ADR-050 decision 9, amended (IR-762): delete Call requests whose paper
+    # deadline has passed, daily at 00:15 Manila, just after the deadline day ends.
+    "lapsed-call-requests": {
+        "task": "apps.opportunities.tasks.remove_lapsed_requests",
+        "schedule": crontab(hour=0, minute=15),
     },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due
@@ -668,15 +678,12 @@ AI_ADMISSION_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_MAX_OUTPUT_TOKENS", defaul
 # Queued questions waiting or running at once, and per asker.
 AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
 AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
-# IR-850 (ADR-056 §6): what an off-campus read costs. A read reserves its
-# pages x (tier credits + add-on credits) x the credit's price, and settles to
-# the credits reported. Required for extraction only; none has a default.
-AI_ADMISSION_EXTRACTION_CREDIT_USD = config("AI_ADMISSION_EXTRACTION_CREDIT_USD", default="")
-AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", default="")
-AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", default="")
-# IR-846: LlamaExtract's credits per page, on the same credit price. Required
-# for Publish's LlamaExtract reading only; unset refuses it and Publish falls back.
-AI_ADMISSION_METADATA_CREDITS_PER_PAGE = config("AI_ADMISSION_METADATA_CREDITS_PER_PAGE", default="")
+# IR-983 (ADR-041): what an off-campus read costs, Unstructured's flat US$ per
+# page. A read reserves pages x price and settles to the pages reported.
+# Required for extraction only; no default.
+AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE = config(
+    "AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE", default=""
+)
 # Added to an attempt's own timeout to make its lease. Not a spending limit.
 AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
 # IR-717 (ADR-049 §6-7): Django-signed research grants, verified inside
@@ -843,8 +850,19 @@ AI_SECTION_ALIGNED_WINDOWS = config("AI_SECTION_ALIGNED_WINDOWS", default=False,
 # ---- Formulas in the indexed text (IR-1102, ADR-067 §Amendment) ----------
 # Readers always see a transcribed formula's LaTeX. On, it and its description
 # also enter the chunk's embedded and keyword-indexed text. Read at chunking,
-# so moving it needs a re-chunk. Off until eval_retrieval measures it (ADR-033 §5).
-AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=False, cast=bool)
+# so moving it needs a re-chunk. On by owner decision (IR-1149, ADR-067 amendment 2026-11-15).
+AI_FORMULA_TEXT_INDEXED = config("AI_FORMULA_TEXT_INDEXED", default=True, cast=bool)
+
+# Figures as passages of their own in the structural strategy (IR-1054): each
+# captioned or described Figure leaves the text flow and is citable alone.
+# Read at chunking, so moving it needs a re-chunk. On since measured
+# (docs/evaluation/runs/2026-11-15-ir1054-hybrid/, ADR-067 IR-1054 amendment).
+AI_CHUNK_FIGURE_PASSAGES = config("AI_CHUNK_FIGURE_PASSAGES", default=True, cast=bool)
+
+# Structural passages under this many tokens merge with a neighbouring section
+# under the same parent heading (IR-1147). 0 is off. Re-chunk after moving it.
+# 450 since measured (ADR-067 IR-1147 amendment).
+AI_CHUNK_SIBLING_MERGE_FLOOR = config("AI_CHUNK_SIBLING_MERGE_FLOOR", default=450, cast=int)
 
 # ---- What the reranker reads (IR-1125, ADR-033 §5) --------------------
 # Modes in apps/ai/retrieval/reranker_input.py. fallback since IR-1125 (ADR-033).
@@ -972,22 +990,11 @@ AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
 # inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
 # above.
 # Which Extractor reads manuscripts (IR-838); read only in apps.ai.extraction.
-# LlamaParse is the only value (IR-843, ADR-056).
-EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="llamaparse")
-# LlamaParse (IR-841, ADR-056); read only in apps.ai.extraction. With DEBUG
-# off Django refuses to start without a key and a dated version; with DEBUG on
-# it starts, and reads fail as unavailable until both are set (IR-843).
-LLAMAPARSE_API_KEY = config("LLAMAPARSE_API_KEY", default="")
-LLAMAPARSE_TIER = config("LLAMAPARSE_TIER", default="agentic")
-LLAMAPARSE_VERSION = config("LLAMAPARSE_VERSION", default="")
-LLAMAPARSE_BASE_URL = config("LLAMAPARSE_BASE_URL", default="https://api.cloud.llamaindex.ai")
-# One job's budget is base + per page x its page count.
-LLAMAPARSE_TIMEOUT_BASE_SECONDS = config("LLAMAPARSE_TIMEOUT_BASE_SECONDS", default=300, cast=int)
-LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS = config("LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS", default=30, cast=int)
-# Sizes the task's time limit when PDF_VALIDATION_MAX_PAGES is unset.
-LLAMAPARSE_MAX_PAGES = config("LLAMAPARSE_MAX_PAGES", default=1000, cast=int)
+# Unstructured is the only value (IR-988, ADR-067).
+EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="unstructured")
 # Unstructured's Platform API, hi_res (IR-985, ADR-067); read only in
-# apps.ai.extraction. Not selectable until IR-988's cutover.
+# apps.ai.extraction. With DEBUG off Django refuses to start without a key;
+# with DEBUG on it starts, and reads fail as unavailable until one is set.
 UNSTRUCTURED_PLATFORM_API_KEY = config("UNSTRUCTURED_PLATFORM_API_KEY", default="")
 UNSTRUCTURED_BASE_URL = config("UNSTRUCTURED_BASE_URL", default="https://api.unstructuredapp.io")
 # One attempt's timeout is base + per page x its page count; a timeout retries once.
@@ -998,26 +1005,6 @@ UNSTRUCTURED_MAX_PAGES = config("UNSTRUCTURED_MAX_PAGES", default=1000, cast=int
 # Figures kept per read, and pixels per Figure image (IR-987).
 UNSTRUCTURED_MAX_FIGURES = config("UNSTRUCTURED_MAX_FIGURES", default=200, cast=int)
 UNSTRUCTURED_MAX_FIGURE_PIXELS = config("UNSTRUCTURED_MAX_FIGURE_PIXELS", default=16_000_000, cast=int)
-# LlamaExtract (IR-846, ADR-056 §15): Publish suggestions read from the parse
-# job above, with the same key and region. Unset version reads nothing and
-# Publish falls back to the shaped document; "latest" only with DEBUG on.
-LLAMAEXTRACT_TIER = config("LLAMAEXTRACT_TIER", default="agentic")
-LLAMAEXTRACT_VERSION = config("LLAMAEXTRACT_VERSION", default="")
-LLAMAEXTRACT_TIMEOUT_SECONDS = config("LLAMAEXTRACT_TIMEOUT_SECONDS", default=600, cast=int)
-
-def _unit_interval(value):
-    """Empty is unset; anything else must be a number from 0 to 1."""
-    if value in (None, ""):
-        return None
-    number = float(value)
-    if not 0 <= number <= 1:
-        raise ValueError(f"must be between 0 and 1, not {value!r}")
-    return number
-
-# The LlamaExtract confidence at or above which Publish may fill in a title or
-# abstract unasked (IR-846). No default: unset offers every value for the
-# author to accept, until a measured cut-off is chosen.
-PUBLISH_AUTOFILL_MIN_CONFIDENCE = config("PUBLISH_AUTOFILL_MIN_CONFIDENCE", default="", cast=_unit_interval)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
 # path off the gateway — it posted to a route the gateway never registered, at
 # an endpoint returning no vector field — and Django now embeds in-process

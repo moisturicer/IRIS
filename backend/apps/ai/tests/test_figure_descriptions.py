@@ -8,7 +8,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.ai import tasks as ai_tasks
 from apps.ai.composition import CompositionRoot, use_composition_root
-from apps.ai.extraction.tests.llamaparse_fixtures import result_with
+from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
+from apps.ai.extraction import document_to_json
 from apps.ai.figure_descriptions import describe_figures
 from apps.ai.models import DocumentChunk
 from apps.ai.providers.fakes import ScriptedLLM
@@ -34,7 +35,24 @@ class Describer(ScriptedLLM, ImageDescribingLLM):
 
 
 def box(x):
-    return [{"x": x, "y": 300, "w": 200, "h": 100}]
+    return (BoundingBox(page=1, left=x, top=300, right=x + 200, bottom=400),)
+
+
+def structure():
+    return document_to_json(NormalizedDocument(
+        title="Results",
+        elements=(
+            DocumentElement(kind="heading", text="Results", level=1, page=1, source_label="heading"),
+            DocumentElement(kind="text", text="Enrolment grew every year of the study.", page=1,
+                            source_label="text"),
+            DocumentElement(kind="image", text=CAPTION, page=1, bboxes=box(72), source_label="image",
+                            figure="image_0.png"),
+            DocumentElement(kind="image", text="", page=1, bboxes=box(300), source_label="image",
+                            figure="image_1.png"),
+        ),
+        page_sizes={1: (612.0, 792.0)},
+        structure_is_authoritative=True,
+    ))
 
 
 def manuscript():
@@ -45,14 +63,8 @@ def manuscript():
     )
     extraction = PdfExtraction.objects.create(
         record=record, kind=DocumentKind.MANUSCRIPT, source_revision=revision,
-        source_file=record.abstract_file.name, status="done", extractor="llamaparse",
-        content_hash="hash-1",
-        raw_result=result_with([
-            {"type": "heading", "level": 1, "value": "Results"},
-            {"type": "text", "value": "Enrolment grew every year of the study."},
-            {"type": "image", "url": "image_0.png", "caption": CAPTION, "bbox": box(72)},
-            {"type": "image", "url": "image_1.png", "bbox": box(300)},
-        ]),
+        source_file=record.abstract_file.name, status="done", extractor="unstructured",
+        content_hash="hash-1", structure=structure(),
     )
     for sequence, name in enumerate(("image_0.png", "image_1.png"), start=1):
         figure = ExtractionFigure(
@@ -208,6 +220,7 @@ def test_describing_re_embeds_only_the_figure_chunks():
     second = chunk(record, force=True)
 
     assert first["to_embed"] == first["chunk_count"]
-    assert second["chunk_count"] == first["chunk_count"]
+    # An uncaptioned Figure has no passage until it is described (IR-1054).
+    assert second["chunk_count"] == first["chunk_count"] + 1
     assert second["to_embed"] == 2
-    assert second["reused"] == first["chunk_count"] - 2
+    assert second["reused"] == first["chunk_count"] - 1

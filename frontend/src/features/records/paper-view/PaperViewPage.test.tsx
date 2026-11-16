@@ -246,6 +246,13 @@ vi.mock("@/api/library", () => ({
     saves: vi.fn(() => Promise.resolve({ data: { results: [] } })),
     save: vi.fn(),
     unsave: vi.fn(),
+    // The reader's own folders (IR-572): read with the saves by the Save menu.
+    folders: vi.fn(() => Promise.resolve({ data: { results: [], limit: 10 } })),
+    createFolder: vi.fn(),
+    renameFolder: vi.fn(),
+    deleteFolder: vi.fn(),
+    fileInFolder: vi.fn(),
+    removeFromFolder: vi.fn(),
     // Private notes (IR-580): read only once Notes is first opened.
     note: vi.fn(() => Promise.resolve({ data: { body: "", revision: 0, updated_at: null } })),
     saveNote: vi.fn(),
@@ -253,6 +260,9 @@ vi.mock("@/api/library", () => ({
     highlights: vi.fn(() => Promise.resolve({ data: { results: [] } })),
     saveHighlight: vi.fn(),
     deleteHighlight: vi.fn(),
+    // Reading history (IR-756): the page tells the account a paper was opened.
+    preferences: vi.fn(() => Promise.resolve({ data: { keep_history: true } })),
+    visit: vi.fn(() => Promise.resolve({})),
   },
 }));
 
@@ -297,8 +307,10 @@ vi.mock("./PaperPdfReader", () => ({
     highlights,
     selectionActions,
     clearCorner,
+    keepPlace,
   }: {
     clearCorner?: boolean;
+    keepPlace?: boolean;
     scrollToPage: number | null;
     highlightRegions: unknown[];
     toolbarStart?: ReactNode;
@@ -316,6 +328,8 @@ vi.mock("./PaperPdfReader", () => ({
       <p>{highlights?.length ?? 0} saved highlight(s) drawn</p>
       {/* IR-1079: whether the page asked the reader to scroll clear of the corner buttons. */}
       {clearCorner && <p>Reader keeps its last page clear of the corner buttons</p>}
+      {/* IR-573: whether the page asked the reader to keep the reader's place on their account. */}
+      {keepPlace && <p>Reader keeps the reader&apos;s place</p>}
       {(selectionActions ?? []).map((a) => (
         <button key={a.id} type="button" onClick={() => a.run(SELECTED, "rev-1")}>
           Selection: {a.label}
@@ -3138,6 +3152,19 @@ describe("back to the answer after following a citation (IR-578)", () => {
     expect(await screen.findByText(/open at page 14, 2 region\(s\)/i)).toBeInTheDocument();
   });
 
+  it("keeps no place while the citation is re-read, so the old one never lands first (IR-573)", async () => {
+    let answer: (value: unknown) => void = () => {};
+    await conversationReads(() => new Promise((resolve) => { answer = resolve; }));
+
+    renderPaper(ADDRESS);
+
+    expect(await screen.findByText(/open at page none, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.queryByText("Reader keeps the reader's place")).not.toBeInTheDocument();
+    await act(async () => answer(answeredWith([current])));
+    expect(await screen.findByText(/open at page 14, 2 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByText("Reader keeps the reader's place")).toBeInTheDocument();
+  });
+
   it("does not trust the router state a reload kept", async () => {
     await conversationReads(() => Promise.resolve(answeredWith([current])));
     const stale = {
@@ -3701,5 +3728,59 @@ describe("highlights on the paper (IR-583)", () => {
     await waitForRecord(record.title);
 
     expect(libraryApi.highlights).not.toHaveBeenCalled();
+  });
+});
+
+// Reading history follows the account (IR-756, ADR-044 Â§Amendment 2026-11-01):
+// the page sends an explicit visit once the paper has loaded, and nothing at all
+// while the reader has paused history.
+describe("Reading history (IR-756)", () => {
+  beforeEach(() => {
+    shownRecord = record;
+    vi.mocked(libraryApi.visit).mockClear();
+    vi.mocked(libraryApi.preferences).mockClear();
+  });
+
+  /** A signed-in session: history belongs to an account, so a visitor sends nothing. */
+  function signIn() {
+    signInAs(99, "Student");
+    useAuthStore.setState({ isAuthenticated: true, sessionEpoch: useAuthStore.getState().sessionEpoch + 1 });
+  }
+
+  it("sends nothing for a visitor who is not signed in", async () => {
+    useAuthStore.setState({ user: null, isAuthenticated: false });
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(libraryApi.preferences).not.toHaveBeenCalled();
+    expect(libraryApi.visit).not.toHaveBeenCalled();
+  });
+
+  it("records the opened paper on the reader's account", async () => {
+    signIn();
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await waitFor(() => expect(libraryApi.visit).toHaveBeenCalledWith(RECORD_ID));
+    expect(localStorage.getItem("iris_reading_history")).toBeNull();
+  });
+
+  it("asks the reader to keep the reader's place in the paper (IR-573)", async () => {
+    signIn();
+    renderPaperView();
+    await userEvent.click(await screen.findByRole("tab", { name: "Paper" }));
+
+    expect(await screen.findByText(/open at page none/i)).toBeInTheDocument();
+    expect(screen.getByText("Reader keeps the reader's place")).toBeInTheDocument();
+  });
+
+  it("sends nothing while the reader has paused history", async () => {
+    vi.mocked(libraryApi.preferences).mockResolvedValueOnce({ data: { keep_history: false } } as never);
+    signIn();
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    await waitFor(() => expect(libraryApi.preferences).toHaveBeenCalled());
+    expect(libraryApi.visit).not.toHaveBeenCalled();
   });
 });

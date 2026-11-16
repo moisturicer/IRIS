@@ -1,12 +1,11 @@
 """Chunking strategies.
 
-Importing this package registers every strategy it ships, which is what makes
-``registered_strategies()`` meaningful and what lets the shared contract suite
-discover them all.
+Importing this package registers the production strategy, which is what makes
+``registered_strategies()`` meaningful. The fixed-window baseline lives in
+``apps.ai.evaluation.fixed_window`` and registers for measurement only
+(IR-1054).
 """
 
-from . import fixed_window  # noqa: F401  (import registers the strategy)
-from . import labeled  # noqa: F401  (import registers the strategy)
 from . import structural  # noqa: F401  (import registers the strategy)
 
-__all__ = ["fixed_window", "labeled", "structural"]
+__all__ = ["structural"]

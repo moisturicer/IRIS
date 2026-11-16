@@ -296,10 +296,10 @@ class TestBuilder:
         assert adapter.leaves_campus is True
         assert extracted.document.elements[1].text == "1 Introduction"
 
-    def test_it_is_not_a_selectable_backend_before_the_cutover(self, settings):
+    def test_it_is_the_selectable_backend_after_the_cutover(self, settings):
         from apps.ai.extraction.selection import verify_extraction_configuration
 
         settings.EXTRACTION_BACKEND = "unstructured"
+        settings.DEBUG = True
 
-        with pytest.raises(ImproperlyConfigured, match="EXTRACTION_BACKEND"):
-            verify_extraction_configuration()
+        verify_extraction_configuration()

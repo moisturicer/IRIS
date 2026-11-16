@@ -7,19 +7,9 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import type { ReadingStatus } from "@/api/library";
 import { canAuthor } from "@/lib/access";
-import {
-  addCollection,
-  clearReadingHistory,
-  deleteCollection,
-  getCollections,
-  getReadingHistory,
-  removeFromCollections,
-  renameCollection,
-  type Collection,
-  type ReadingVisit,
-} from "@/lib/recordLibrary";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
+import { useHistoryStore } from "@/store/history.store";
 import { READING_STATUSES, useLibraryStore } from "@/store/library.store";
 import type { MyResearchItem } from "@/types/records";
 
@@ -30,20 +20,23 @@ import { MyResearchList } from "./MyResearchList";
 import { FolderPicker, isSameView, viewKey, type LibraryView } from "./ReadingPanel";
 import type { ResearchFilter } from "./researchSections";
 import { isRequestTimeout } from "@/api/requestPolicy";
+import { SavedCallsSection } from "@/features/opportunities/SavedCallsSection";
 import { SavedView } from "./SavedView";
-import { useLibrary } from "./useLibrary";
+import { useLibrary, useReadingHistory } from "./useLibrary";
 
-type Tab = "overview" | "research" | "saved" | "downloads";
+type Tab = "overview" | "research" | "saved" | "calls" | "downloads";
 type SavedViewKind = Exclude<LibraryView, { kind: "research" }>;
 
-const AUTHOR_TABS: { value: Tab; label: string }[] = [
-  { value: "overview",  label: "Overview" },
-  { value: "research",  label: "My submissions" },
-  { value: "saved",     label: "Saved papers" },
-  { value: "downloads", label: "Download requests" },
+/** Every tab, in order. `reader`: every reader has it, author or not (IR-743, IR-766). */
+const AUTHOR_TABS: { value: Tab; label: string; reader: boolean }[] = [
+  { value: "overview",  label: "Overview",          reader: false },
+  { value: "research",  label: "My submissions",    reader: false },
+  { value: "saved",     label: "Saved papers",      reader: true },
+  // Calls for papers the reader saved, apart from papers (IR-766).
+  { value: "calls",     label: "Saved calls",       reader: true },
+  { value: "downloads", label: "Download requests", reader: true },
 ];
-/** Every reader has their saves and their download requests (IR-743). */
-const READER_TABS = AUTHOR_TABS.filter((t) => t.value === "saved" || t.value === "downloads");
+const READER_TABS = AUTHOR_TABS.filter((t) => t.reader);
 
 type StatusFilter = "all" | ReadingStatus;
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -54,7 +47,8 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 const ALL_SAVED: SavedViewKind = { kind: "saved" };
 
 function tabFromSection(section: string | null, canAuthor: boolean): Tab {
-  if (section === "saved" || section === "downloads") return section;
+  const readerTab = READER_TABS.find((t) => t.value === section);
+  if (readerTab) return readerTab.value;
   if (!canAuthor) return "saved";
   return section === "research" ? section : "overview";
 }
@@ -62,14 +56,14 @@ function tabFromSection(section: string | null, canAuthor: boolean): Tab {
 /**
  * My Library (IR-410; spec §4.9 as amended 2026-10-11): an author's own
  * research and their saved reading, in tabs: Overview, My submissions, Saved
- * papers and Download requests. A reader who cannot author sees Saved papers
- * and Download requests (IR-743).
+ * papers, Saved calls (IR-766) and Download requests. A reader who cannot
+ * author sees Saved papers, Saved calls and Download requests (IR-743).
  *
- * Owned research comes from `/records/mine/`, and saves and Reading status
- * from the account library (IR-566, ADR-044). The reader's own folders and
- * history still live in this browser and say so. `?section=research` (where
- * the retired `/workspace` lands), `?section=saved` and `?section=downloads`
- * pick a tab.
+ * Owned research comes from `/records/mine/`; saves, Reading status (IR-566,
+ * ADR-044), the reader's own folders (IR-572, ADR-070) and reading history
+ * (IR-756) from the account. `?section=research` (where
+ * the retired `/workspace` lands), `?section=saved`, `?section=calls` and
+ * `?section=downloads` pick a tab.
  */
 export default function MyLibraryPage() {
   // The server's `can_author` (IR-1096), not the role name.
@@ -81,13 +75,19 @@ export default function MyLibraryPage() {
   const tabs = mayAuthor ? AUTHOR_TABS : READER_TABS;
   const [savedView, setSavedView] = useState<SavedViewKind>(ALL_SAVED);
   const [researchFilter, setResearchFilter] = useState<ResearchFilter>("all");
-  const [collections, setCollections] = useState<Collection[]>(() => getCollections());
-  const [history, setHistory] = useState<ReadingVisit[]>(() => getReadingHistory());
+  useReadingHistory();
+  const history = useHistoryStore((s) => s.items);
 
   const { load: libraryLoad, interrupted: libraryInterrupted, retry: retryLibrary } = useLibrary();
   const library = useLibraryStore((s) => s.items);
+  const folders = useLibraryStore((s) => s.folders);
+  const folderLimit = useLibraryStore((s) => s.folderLimit);
   const failure = useLibraryStore((s) => s.failure);
   const unsave = useLibraryStore((s) => s.unsave);
+  const createFolder = useLibraryStore((s) => s.createFolder);
+  const renameFolder = useLibraryStore((s) => s.renameFolder);
+  const deleteFolder = useLibraryStore((s) => s.deleteFolder);
+  const removeFromFolder = useLibraryStore((s) => s.removeFromFolder);
   const dismissFailure = useLibraryStore((s) => s.dismissFailure);
 
   const [research, setResearch] = useState<MyResearchItem[]>([]);
@@ -133,10 +133,11 @@ export default function MyLibraryPage() {
 
   const removeFromView = (ids: number[]) => {
     if (savedView.kind === "folder") {
-      setCollections(removeFromCollections(collections, ids, savedView.id));
+      // Out of this folder only: the paper stays saved (IR-572).
+      const folderId = savedView.id;
+      ids.forEach((id) => void removeFromFolder(folderId, id));
     } else if (savedView.kind === "saved" || savedView.kind === "status") {
       // Unsaving takes a paper out of the library, folders included.
-      setCollections(removeFromCollections(collections, ids));
       ids.forEach((id) => void unsave(id));
     }
   };
@@ -146,7 +147,7 @@ export default function MyLibraryPage() {
     : savedView.kind === "status" ? savedView.status : null;
 
   /* Tabs follow the ARIA tabs pattern: arrows move between them. */
-  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ overview: null, research: null, saved: null, downloads: null });
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ overview: null, research: null, saved: null, calls: null, downloads: null });
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     const i = tabs.findIndex((t) => t.value === tab);
     const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -170,29 +171,27 @@ export default function MyLibraryPage() {
       <div key={viewKey(savedView)} className="motion-safe:animate-fade-in">
         <SavedView
           view={savedView}
-          collections={collections}
-          history={history}
+          folders={folders}
           library={library}
           libraryLoad={libraryLoad}
           libraryInterrupted={libraryInterrupted}
           onRetryLibrary={retryLibrary}
           onRemove={removeFromView}
-          onRename={(id, name) => setCollections(renameCollection(collections, id, name))}
+          onRename={(id, name) => void renameFolder(id, name)}
           onDelete={(id) => {
-            setCollections(deleteCollection(collections, id));
+            void deleteFolder(id);
             if (isSameView(savedView, { kind: "folder", id })) setSavedView(ALL_SAVED);
           }}
-          onClearHistory={() => { clearReadingHistory(); setHistory([]); }}
           folderControl={
             <FolderPicker
-              collections={collections}
+              folders={folders}
+              limit={folderLimit}
               view={savedView}
               onViewChange={(view) => { if (view.kind !== "research") setSavedView(view); }}
               onCreate={(name) => {
-                const next = addCollection(collections, name);
-                setCollections(next);
-                const made = next.find((c) => !collections.some((old) => old.id === c.id));
-                if (made) setSavedView({ kind: "folder", id: made.id });
+                void createFolder(name).then((made) => {
+                  if (made) setSavedView({ kind: "folder", id: made.id });
+                });
               }}
             />
           }
@@ -205,7 +204,7 @@ export default function MyLibraryPage() {
                 onChange={(value) => setSavedView(value === "all" ? ALL_SAVED : { kind: "status", status: value })}
               />
               <p className="text-label text-stone-500">
-                Saves follow your account. Folders stay in this browser.
+                Saves and folders follow your account.
               </p>
             </div>
           }
@@ -272,7 +271,7 @@ export default function MyLibraryPage() {
             onRetry={() => void loadResearch()}
             library={library}
             history={history}
-            collections={collections}
+            folders={folders}
             onOpenSubmissions={openSubmissions}
             onOpenSaved={openSaved}
           />
@@ -290,6 +289,7 @@ export default function MyLibraryPage() {
           />
         )}
         {tab === "saved" && savedPanel}
+        {tab === "calls" && <SavedCallsSection />}
         {tab === "downloads" && <DownloadRequestsView />}
       </div>
     </div>

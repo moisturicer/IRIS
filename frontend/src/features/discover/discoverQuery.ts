@@ -1,7 +1,9 @@
 import type { FeedQuery, FeedStale } from "@/api/library";
 import { IP_TYPE_LABELS } from "@/types/records";
 
-import { EMPTY_FILTERS, HAS_IP, SORT_OPTIONS, type DiscoverFilters, type DiscoverSort } from "./DiscoverFilterBar";
+import {
+  EMPTY_FILTERS, HAS_IP, SORT_OPTIONS, endsBeforeItStarts, type DiscoverFilters, type DiscoverSort,
+} from "./DiscoverFilterBar";
 import { ALL_VALUE, type FilterOption } from "./DiscoverFilterDropdown";
 import { searchTerms } from "./searchTerms";
 
@@ -25,7 +27,9 @@ export interface DiscoverQuery {
 export const DEFAULT_QUERY: DiscoverQuery = { q: "", filters: EMPTY_FILTERS, sort: "newest", feed: "latest" };
 
 /** The URL keys Discover owns. Any other key (`publish`) is left alone. */
-const KEYS = ["q", "type", "college", "classification", "year", "ip", "sort", "feed"] as const;
+const KEYS = ["q", "type", "college", "classification", "year_from", "year_to", "ip", "sort", "feed"] as const;
+/** Keys Discover once wrote and no longer reads; removed, never carried along (IR-947). */
+const RETIRED_KEYS = ["year"] as const;
 
 const ORDERING: Record<DiscoverSort, string> = {
   newest: "-created_at",
@@ -49,6 +53,14 @@ function isIp(value: string): boolean {
   return value === HAS_IP || Object.prototype.hasOwnProperty.call(IP_TYPE_LABELS, value);
 }
 
+/** A from–to year range, either end open, the right way round (IR-947). */
+function yearRange(params: URLSearchParams): { yearFrom: string; yearTo: string } {
+  const from = single(params.get("year_from"), (v) => YEAR.test(v));
+  const to = single(params.get("year_to"), (v) => YEAR.test(v));
+  if (endsBeforeItStarts(from, to)) return { yearFrom: to, yearTo: from };
+  return { yearFrom: from, yearTo: to };
+}
+
 export function parseDiscoverQuery(params: URLSearchParams): DiscoverQuery {
   const sort = params.get("sort");
   return {
@@ -57,7 +69,7 @@ export function parseDiscoverQuery(params: URLSearchParams): DiscoverQuery {
       recordType: single(params.get("type"), (v) => ID.test(v)),
       colleges: ids(params.get("college")),
       classifications: ids(params.get("classification")),
-      year: single(params.get("year"), (v) => YEAR.test(v)),
+      ...yearRange(params),
       ip: single(params.get("ip"), isIp),
     },
     sort: sort === "viewed" ? "viewed" : "newest",
@@ -73,7 +85,7 @@ export function parseDiscoverQuery(params: URLSearchParams): DiscoverQuery {
  */
 export function writeDiscoverQuery(params: URLSearchParams, query: DiscoverQuery): URLSearchParams {
   const next = new URLSearchParams(params);
-  for (const key of KEYS) next.delete(key);
+  for (const key of [...KEYS, ...RETIRED_KEYS]) next.delete(key);
 
   const { q, filters, sort, feed } = query;
   if (q.trim()) next.set("q", q.trim());
@@ -82,7 +94,8 @@ export function writeDiscoverQuery(params: URLSearchParams, query: DiscoverQuery
   if (filters.classifications.length > 0) {
     next.set("classification", ids(filters.classifications.join(",")).join(","));
   }
-  if (filters.year !== ALL_VALUE) next.set("year", filters.year);
+  if (filters.yearFrom !== ALL_VALUE) next.set("year_from", filters.yearFrom);
+  if (filters.yearTo !== ALL_VALUE) next.set("year_to", filters.yearTo);
   if (filters.ip !== ALL_VALUE) next.set("ip", filters.ip);
   if (sort !== DEFAULT_QUERY.sort) next.set("sort", sort);
   if (feed !== DEFAULT_QUERY.feed) next.set("feed", feed);
@@ -156,6 +169,13 @@ function labelled(list: string, options: FilterOption[]): string {
     .join(", ");
 }
 
+function yearsInWords(from: string | undefined, to: string | undefined): string | null {
+  if (from && to) return from === to ? `Year: ${from}` : `Years: ${from} to ${to}`;
+  if (from) return `Years: ${from} onward`;
+  if (to) return `Years: up to ${to}`;
+  return null;
+}
+
 /** A feed's criteria in words, for the save form and the feed's own header. */
 export function feedCriteria(stored: FeedQuery, options: FeedLabelOptions): string[] {
   const lines: string[] = [];
@@ -163,7 +183,8 @@ export function feedCriteria(stored: FeedQuery, options: FeedLabelOptions): stri
   if (stored.classification) lines.push(`Areas: ${labelled(stored.classification, options.classifications)}`);
   if (stored.college) lines.push(`Colleges: ${labelled(stored.college, options.colleges)}`);
   if (stored.type) lines.push(`Type: ${labelled(stored.type, options.recordTypes)}`);
-  if (stored.year) lines.push(`Year: ${stored.year}`);
+  const years = yearsInWords(stored.year_from, stored.year_to);
+  if (years) lines.push(years);
   if (stored.ip) {
     lines.push(`Intellectual property: ${stored.ip === HAS_IP ? "any" : IP_TYPE_LABELS[stored.ip as keyof typeof IP_TYPE_LABELS] ?? stored.ip}`);
   }
@@ -183,10 +204,8 @@ export function listParams(query: DiscoverQuery): Record<string, unknown> {
   if (filters.recordType !== ALL_VALUE) params.record_type = filters.recordType;
   if (filters.colleges.length > 0) params.college = filters.colleges.join(",");
   if (filters.classifications.length > 0) params.classification = filters.classifications.join(",");
-  if (filters.year !== ALL_VALUE) {
-    params.year_from = filters.year;
-    params.year_to = filters.year;
-  }
+  if (filters.yearFrom !== ALL_VALUE) params.year_from = filters.yearFrom;
+  if (filters.yearTo !== ALL_VALUE) params.year_to = filters.yearTo;
   if (filters.ip === HAS_IP) params.is_ip = true;
   else if (filters.ip !== ALL_VALUE) params.ip_type = filters.ip;
 

@@ -266,6 +266,11 @@ class AccessMatrixTests(APITestCase):
     def test_review_routes(self):
         self.run_app("reviews")
 
+    def test_library_routes(self):
+        # IR-572: the library's rows were declared from IR-566 on and never
+        # fired, so a cell there could say anything and pass.
+        self.run_app("library")
+
     def test_every_role_is_who_the_table_says(self):
         """The columns mean what `table.py` says, or every row means nothing."""
         from apps.reviews.models import ReviewerSeat

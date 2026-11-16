@@ -93,6 +93,7 @@ from core.enums import (
     SeatState,
 )
 from core.permissions import is_office_member
+from core.text_limits import too_long, too_long_message
 
 from . import revisions, routing, seats, threads
 from .models import RecordAssignment, Review, ReviewerSeat
@@ -491,6 +492,8 @@ def decide(record, actor, *, outcome, comment="", token=None, thread_count=0) ->
     comment = comment.strip() if isinstance(comment, str) else ""
     if outcome == REJECT and not comment:
         raise DecisionError("Say why the record is rejected. The owner reads it as written.")
+    if too_long(comment):
+        raise DecisionError(too_long_message("A decision comment"))
 
     seat = _decider_seat(record, actor, party)
     blocked = _blocked_reason(record, seat) or _blocked_outcomes(record, party).get(outcome)

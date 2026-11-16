@@ -51,6 +51,18 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 ## Event types
 
+### Signing in and registering (IR-659)
+
+Account events, excluded from workflow metrics. None has a `record`. No row holds a password, a token or a link (ASVS 7.1.1).
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `LOGIN` | A sign-in succeeds. `user` is the account | `email` |
+| `FAILED_LOGIN` | A sign-in is refused, one row per refused request. `user` is the account only when the password was right (`unverified`, `locked_by_admin`); otherwise `null`, so a guess adds nothing to someone's history | `email` (as typed) and `reason`: `invalid_credentials` (wrong password, unknown or inactive account), `unverified`, `locked_by_admin` (RDCO's lock), `too_many_attempts` (axes refused it: the attempt that trips the lock and every one during it, right password or not). Rows written before IR-659 have only `email`. Rows written between PR #818 and its follow-up also have `ip`; none is written now (decided 2026-11-16: an audit row is never erased, so an address in one could never expire) |
+| `ACCOUNT_REGISTERED` | An account is created through `POST /auth/register/`, in the same transaction. `user` is the new account. A refused registration writes nothing | `requested_role` (`Student`, `Adviser` or `null`) |
+| `EMAIL_VERIFICATION_COMPLETED` | The account's email is verified (IR-643, ADR-045) | `purpose`, `outcome`, `correlation_id` |
+| `LOGOUT` | A person signs out | `email` |
+
 ### Research metadata corrections (IR-563, ADR-046)
 
 `SYSTEM_SETTING_CHANGED` is an administrative event, excluded from workflow metrics. The actor is the System Admin that changed the setting (RDCO before IR-781). Metadata contains `key`, `old_value` and `new_value`. Writing the value a setting already holds records nothing.
@@ -175,9 +187,27 @@ It has no `record`. There is no backfill: accounts that existed before IR-789 st
 
 | Type | Written when | `metadata` |
 |---|---|---|
-| `CALL_DELETED` | A Call is deleted. Today only migration `opportunities/0002` (IR-760) writes it, once per Internal Call, Funding Window or Institutional Grant it deletes (decision 16), with no `user`. IR-763 will write one per deletion from the board, with the deleter as `user` | `reason`, a sentence (from 0002: "Internal Call is no longer a type of Call (ADR-050 decision 16)."), and `call`, a copy of every field the Call had, with `posted_by` as an account id |
+Written by `backend/apps/opportunities/audit.py` inside each act's transaction (IR-763), so a refused or rolled-back act writes nothing. `user` is whoever acted.
 
-It has no `record`. A Call is not a paper.
+**A snapshot** (`call`) holds every field the Call had: Areas as `[{"id", "name"}]`, `posted_by` as an account id, dates and times as ISO strings. Migration 0002's snapshots hold the fields a Call had then, with no Areas.
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `CALL_POSTED` | RDCO or an Adviser posts a Call | `call`, a snapshot. RDCO's is `confirmed`, an Adviser's `pending` |
+| `CALL_EDITED` | A saved edit changes at least one field. A save that changes nothing writes nothing. An Adviser's edit that sends a Call back to RDCO is this one event, with `status` (and a cleared `review_reason`) among the changes | `call_id`, `title` (after the edit), and `changes`: `{field: {"old", "new"}}` for each changed field, Featured (`is_featured`) and Areas included, `updated_at` never |
+| `CALL_DELETED` | A Call is deleted by a person through `DELETE /opportunities/<id>/`, or by migration `opportunities/0002` (IR-760), once per Internal Call, Funding Window or Institutional Grant (decision 16), with no `user` | `reason`: `null` for a person's delete; from 0002 a sentence such as "Internal Call is no longer a type of Call (ADR-050 decision 16)." `call`: a snapshot |
+| `CALL_CONFIRMED` | RDCO confirms a waiting Call | `call_id`, `title` |
+| `CALL_REJECTED` | RDCO rejects a waiting Call | `call_id`, `title`, `reason`, RDCO's reason as the Adviser received it |
+| `CALL_REMOVED` | RDCO removes an Adviser's Call through `POST /opportunities/<id>/remove/` | `reason`, as the Adviser received it, and `call`, a snapshot |
+| `CALL_LAPSED` | The daily job deletes a pending or rejected Call whose paper deadline passed (ADR-050 amendment of 2026-11-15, point 2). No `user`. A seventh type, the owner's choice of 2026-11-15, so the job's deletions are told apart from a person's | `call`, a snapshot |
+
+None has a `record`. A Call is not a paper. A reader saving a Call to their own list (ADR-050 decision 13) isn't audited.
+
+**Following a Call through the log:** its `CALL_POSTED` snapshot, then each `CALL_EDITED`'s new values in order. Some changes write no event:
+- A confirmation or rejection also sets `status`, `review_reason` and `reviewed_at`, which those events don't repeat.
+- A deleted poster's account sets `posted_by` to null.
+- A deleted Classification drops out of the Call's Areas.
+- A Call posted before IR-763 has no `CALL_POSTED`.
 
 ### Withdrawal
 

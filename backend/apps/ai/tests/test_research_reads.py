@@ -138,8 +138,8 @@ def test_django_startup_runs_the_check(settings):
     from django.apps import apps
 
     settings.AI_RESEARCH_READ_POLICY = "nonsense"
-    # Production startup also requires LlamaParse (IR-843).
-    for name, value in {"LLAMAPARSE_API_KEY": "llx-test", "LLAMAPARSE_VERSION": "2026-09-28"}.items():
+    # Production startup also requires Unstructured (IR-988).
+    for name, value in {"UNSTRUCTURED_PLATFORM_API_KEY": "uns-test"}.items():
         setattr(settings, name, value)
     with pytest.raises(ImproperlyConfigured, match="AI_RESEARCH_READ_POLICY"):
         apps.get_app_config("ai").ready()

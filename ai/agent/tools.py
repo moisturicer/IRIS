@@ -18,6 +18,7 @@ from typing import Optional
 
 import asyncpg
 
+from ai.agent.prompts import TOOL_DESCRIPTIONS as _SAYS
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
 from ai.research.tools import (
@@ -45,43 +46,39 @@ def _object(properties: dict, required=()) -> dict:
 
 
 _HANDLE = {"type": "string"}
-SEARCH = ToolSpec("search", "Keyword search over the readable papers' passages.", _object(
+SEARCH = ToolSpec("search", _SAYS["search"], _object(
     {"query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 20}}, ["query"]))
-OPEN_PASSAGE = ToolSpec("open_passage", "Reread one passage by its handle.", _object(
+OPEN_PASSAGE = ToolSpec("open_passage", _SAYS["open_passage"], _object(
     {"passage": _HANDLE}, ["passage"]))
-READ_PAGE = ToolSpec("read_page", "Read the passages on one page of a paper.", _object(
+READ_PAGE = ToolSpec("read_page", _SAYS["read_page"], _object(
     {"paper": _HANDLE, "page": {"type": "integer"}}, ["paper", "page"]))
-OUTLINE = ToolSpec("outline", "List a paper's sections and their pages.", _object(
+OUTLINE = ToolSpec("outline", _SAYS["outline"], _object(
     {"paper": _HANDLE}, ["paper"]))
 UPDATE_PLAN = ToolSpec(
-    "update_plan", "Replace the task list for complex research. Keep every earlier step id.", _object({
+    "update_plan", _SAYS["update_plan"], _object({
         "steps": {"type": "array", "maxItems": PLAN_STEPS, "items": _object({
             "id": {"type": "string"}, "title": {"type": "string"},
             "status": {"type": "string", "enum": list(STEP_STATUS)},
         }, ["id", "title", "status"])},
     }, ["steps"]))
 UPDATE_FOCUS = ToolSpec(
-    "update_focus", "Record which papers the reader selected or excluded.", _object({
+    "update_focus", _SAYS["update_focus"], _object({
         "selected": {"type": "array", "items": _HANDLE, "maxItems": FOCUS_PAPERS},
         "excluded": {"type": "array", "items": _HANDLE, "maxItems": FOCUS_PAPERS},
     }))
 ASK_CLARIFICATION = ToolSpec(
-    "ask_clarification", "Ask the reader one question when ambiguity blocks useful research.",
+    "ask_clarification", _SAYS["ask_clarification"],
     _object({"question": {"type": "string"}}, ["question"]))
 
 RESOLVE_PAPERS = ToolSpec(
-    "resolve_papers",
-    "Turn papers the reader named, by title, short name or Record id, into paper handles. "
-    "Several matches come back as candidates to ask the reader about.", _object({
+    "resolve_papers", _SAYS["resolve_papers"], _object({
         "references": {"type": "array", "maxItems": metadata.MAX_REFERENCES, "items": {"type": "string"}},
         "record_ids": {"type": "array", "maxItems": metadata.MAX_REFERENCES, "items": {"type": "integer"}},
     }))
 _NAME = {"type": "string"}
 _YEAR = {"type": "integer", "minimum": metadata.YEAR_RANGE[0], "maximum": metadata.YEAR_RANGE[1]}
 COUNT_RECORDS = ToolSpec(
-    "count_records",
-    "Exactly how many papers this reader can see match metadata: Area (classification), PSCED "
-    "area, record type, completion years or IP flag, optionally grouped. Cannot count by topic.",
+    "count_records", _SAYS["count_records"],
     _object({
         "classification": _NAME, "psced": _NAME, "record_type": _NAME,
         "year_from": _YEAR, "year_to": _YEAR, "is_ip": {"type": "boolean"},
@@ -89,10 +86,7 @@ COUNT_RECORDS = ToolSpec(
     }))
 
 LIST_RECORDS = ToolSpec(
-    "list_records",
-    "Every paper this reader can see that matches metadata: Area (classification), PSCED area, record "
-    "type, completion years or IP flag, by title, with the exact total. Names at most 50 at a time and says "
-    "when more remain; pass offset to continue from where the last page stopped. Cannot list by topic.",
+    "list_records", _SAYS["list_records"],
     _object({
         "classification": _NAME, "psced": _NAME, "record_type": _NAME,
         "year_from": _YEAR, "year_to": _YEAR, "is_ip": {"type": "boolean"},
@@ -101,10 +95,7 @@ LIST_RECORDS = ToolSpec(
 
 #: research-5's search: keyword and meaning together, narrowed by metadata (IR-886).
 HYBRID_SEARCH = ToolSpec(
-    "search",
-    "Search the readable papers' passages by keyword and by meaning, optionally narrowed by Area "
-    "(classification), PSCED area, record type or completion years. Returns a sample of matching "
-    "passages, never all of them, and says when meaning search was unavailable.",
+    "search", _SAYS["hybrid_search"],
     _object({
         "query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 20},
         "classification": _NAME, "psced": _NAME, "record_type": _NAME,
@@ -114,17 +105,11 @@ HYBRID_SEARCH = ToolSpec(
 SIGNALS = ("ok", "off", "provider_gated", "provider_failed", "embedding_space_changed")
 
 READ_MANUSCRIPT = ToolSpec(
-    "read_manuscript",
-    "Read a paper's extracted text in document order, as much as fits now, with what was not read. "
-    "Pass the continue_after handle a read returned to go on where it stopped.", _object(
+    "read_manuscript", _SAYS["read_manuscript"], _object(
         {"paper": _HANDLE, "continue_after": _HANDLE}, ["paper"]))
 
 RECOVER_TURN = ToolSpec(
-    "recover_turn",
-    "Read one earlier Turn of this conversation again exactly as it was answered, by its number, with "
-    "fresh handles for the passages it cited. Use it when the reader asks for an exact detail from an "
-    "earlier Turn, such as one a compacted summary mentions.", _object({"turn": {"type": "integer", "minimum": 1}},
-                                                                       ["turn"]))
+    "recover_turn", _SAYS["recover_turn"], _object({"turn": {"type": "integer", "minimum": 1}}, ["turn"]))
 
 #: Read-only calls a tool group may fetch together (IR-1003). Not `read_manuscript`,
 #: whose room depends on the results before it, nor plan, focus or clarification.
@@ -511,6 +496,10 @@ class Investigation:
                 "passage": passage.handle, "paper": paper[0] if paper else None,
                 "page": passage.page, "section": passage.section, "text": passage.text[passage.overlap:],
                 **({"repeats_previous_chars": passage.overlap} if passage.overlap else {}),
+                # Read as continuous text with the passage it continues (IR-397).
+                **({"continues": passage.continues} if passage.continues else {}),
+                # Context from the hit's section; search did not rank it (IR-1055).
+                **({"section_context": True} if passage.section_mate else {}),
             })
         if result.turn is not None:
             turn = result.turn

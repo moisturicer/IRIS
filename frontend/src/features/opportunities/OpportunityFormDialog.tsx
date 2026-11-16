@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { failureMessage } from "@/lib/readFailure";
+import { useUIStore } from "@/store/ui.store";
 import type { Opportunity } from "@/types/opportunities";
 import type { Classification } from "@/types/records";
 
@@ -18,8 +19,10 @@ import {
   OPPORTUNITY_TYPES,
   checkDraft,
   draftFrom,
+  hasEvent,
   inputFrom,
   serverErrors,
+  withType,
   type DraftErrors,
   type DraftField,
   type OpportunityDraft,
@@ -31,6 +34,12 @@ interface OpportunityFormDialogProps {
   onClose: () => void;
   /** The saved call as the server returned it. */
   onSaved: (saved: Opportunity, created: boolean) => void;
+  /**
+   * Whether to offer "Feature this call": RDCO alone (ADR-050 decision 12).
+   * The page passes the Call's own `can_feature`, or the board's for a new
+   * one. The server ignores Featured from anyone else either way.
+   */
+  canFeature: boolean;
 }
 
 /** Closing is refused while saving, so a half-sent change is never abandoned. */
@@ -52,14 +61,23 @@ const FIELD_ORDER: DraftField[] = [
  * The browser checks only that the required fields are filled (IR-760). The
  * server decides; whatever it rejects comes back against its field. Whether
  * this viewer may post or edit at all is the server's `can_post` / `can_edit`, read by the page before offering this.
+ *
+ * A Journal or Book Chapter has no event: choosing one hides the start and
+ * end dates and fills an empty location with "Online", which the poster can
+ * change (ADR-050 decision 4, IR-764).
+ *
+ * A field's error sits under the field. A refusal that belongs to no field,
+ * and a save that didn't reach the server, are toasts, so nothing in the
+ * sheet moves; one that can be retried offers Try again, which submits the
+ * still-open form again (IR-764).
  */
-export function OpportunityFormDialog({ opportunity, onClose, onSaved }: OpportunityFormDialogProps) {
+export function OpportunityFormDialog({ opportunity, onClose, onSaved, canFeature }: OpportunityFormDialogProps) {
   const editing = opportunity !== null;
   const [draft, setDraft] = useState<OpportunityDraft>(() =>
     opportunity ? draftFrom(opportunity) : EMPTY_DRAFT,
   );
   const [errors, setErrors] = useState<DraftErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const addToast = useUIStore((s) => s.addToast);
   const [saving, setSaving] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -107,7 +125,6 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
 
     const found = checkDraft(draft);
     setErrors(found);
-    setFormError(null);
     if (Object.keys(found).length > 0) {
       focusFirstError(found);
       return;
@@ -128,18 +145,23 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
       if (status === 400) {
         const { fields, form } = serverErrors(response?.data);
         setErrors(fields);
-        setFormError(form ?? (Object.keys(fields).length > 0 ? null : "The server refused these details."));
+        const loose = form ?? (Object.keys(fields).length > 0 ? null : "The server refused these details.");
+        if (loose) addToast({ type: "error", persist: true, message: loose });
         focusFirstError(fields);
       } else if (status === 403 || status === 404) {
-        setFormError(
-          editing
+        addToast({
+          type: "error",
+          persist: true,
+          message: editing
             ? "You can no longer change this call. It may have been removed, or your role may have changed."
             : "Your account can no longer post calls. If that seems wrong, ask RDCO.",
-        );
+        });
       } else {
-        setFormError(
-          `${failureMessage(err, { lead: `Could not ${editing ? "save your changes" : "post the call"}.` })} Nothing has been lost.`,
-        );
+        addToast({
+          type: "error",
+          message: `${failureMessage(err, { lead: `Could not ${editing ? "save your changes" : "post the call"}.` })} Nothing has been lost.`,
+          action: { label: "Try again", onClick: () => formRef.current?.requestSubmit() },
+        });
       }
     } finally {
       setSaving(false);
@@ -172,10 +194,9 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
         noValidate
         className="space-y-section-sm"
       >
-        {formError && (
-          <p role="alert" className={LOAD_ERROR}>
-            <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-            {formError}
+        {opportunity?.edit_returns_to_pending && (
+          <p className="text-small text-stone-600">
+            Saving sends this call back to RDCO. It leaves the board until RDCO confirms it again.
           </p>
         )}
 
@@ -185,7 +206,12 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           label="Type"
           required
           value={draft.opportunity_type}
-          onChange={(e) => set("opportunity_type", e.target.value as OpportunityDraft["opportunity_type"])}
+          onChange={(e) => {
+            const type = e.target.value as Exclude<OpportunityDraft["opportunity_type"], "">;
+            setDraft((d) => withType(d, type));
+            // Filling the location answers its error, if it had one.
+            setErrors((found) => ({ ...found, opportunity_type: undefined, location: undefined }));
+          }}
           error={errors.opportunity_type}
         >
           <option value="" disabled>Choose a type</option>
@@ -300,6 +326,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           hint="Where to read the full call and submit."
         />
 
+        {hasEvent(draft.opportunity_type) && (
         <div className="grid gap-section-sm sm:grid-cols-2">
           <Input
             id={`${ids.form}-start`}
@@ -320,9 +347,10 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
             value={draft.end_date}
             onChange={(e) => set("end_date", e.target.value)}
             error={errors.end_date}
-            hint="A journal or book chapter keeps no dates."
+            hint="A one-day event needs only its start date."
           />
         </div>
+        )}
 
         <Input
           id={`${ids.form}-fee`}
@@ -336,6 +364,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           error={errors.registration_fee}
         />
 
+        {canFeature && (
         <label className="flex items-start gap-2 min-h-11 sm:min-h-0 text-small text-stone-700">
           <input
             type="checkbox"
@@ -346,9 +375,10 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           />
           <span>
             <span className="font-medium text-stone-900">Feature this call</span>
-            <span className="block text-stone-600">Marks it with a star on the board.</span>
+            <span className="block text-stone-600">Adds a star and the label Featured. It doesn't move the call.</span>
           </span>
         </label>
+        )}
       </form>
     </Modal>
   );

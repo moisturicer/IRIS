@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** — 2026-11-07 (IR-946, under IR-557), awaiting a named approver. Records decisions already built in IR-567, IR-576 and IR-575 (IR-575 is in PR #596, not merged when this was written); it does not authorise anything new. The semantic extension (IR-582) is deliberately out of scope here and stays deferred.
+**Accepted** — 2026-11-16, approved verbally by Ashlee Sean, relayed and recorded by Hermoine Zozobrado. Proposed 2026-11-07 (IR-946, under IR-557). Records decisions already built in IR-567, IR-576 and IR-575 (IR-575 is in PR #596, not merged when this was written); it does not authorise anything new. The semantic extension (IR-582) is deliberately out of scope here and stays deferred.
 
 ## Context
 

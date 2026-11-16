@@ -54,6 +54,7 @@ from core.enums import (
     VersionCause,
 )
 from core.permissions import OFFICE_PARTY_BY_ROLE, holds_seat, is_office_member
+from core.text_limits import too_long, too_long_message
 
 from . import seats
 from .models import RecordAssignment, RecordClearance, Review, ReviewerSeat, RoutingEvent
@@ -321,6 +322,8 @@ def _plan(record, from_party, to, reason) -> _Plan:
     reason = reason.strip() if isinstance(reason, str) else ""
     if not reason:
         raise RoutingError("Give a reason for routing, so the office knows why it was asked.")
+    if too_long(reason):
+        raise RoutingError(too_long_message("A reason for routing"))
     if not isinstance(to, list) or not to:
         raise RoutingError("Choose at least one office to route to.")
 

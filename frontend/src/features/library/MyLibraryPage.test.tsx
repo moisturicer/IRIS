@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { libraryApi, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
+import { libraryApi, type FolderEntry, type ReadingHistoryEntry, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
 import { recordsApi } from "@/api/records";
 import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
+import { useHistoryStore } from "@/store/history.store";
 import { useLibraryStore } from "@/store/library.store";
 import type { User } from "@/types/auth";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -22,6 +23,12 @@ vi.mock("@/api/records", () => ({
   },
 }));
 
+// Saved calls (IR-766) read their own endpoint.
+const savedCalls = vi.fn();
+vi.mock("@/api/opportunities", () => ({
+  opportunitiesApi: { saved: () => savedCalls(), save: vi.fn(), unsave: vi.fn() },
+}));
+
 const downloadBlob = vi.fn();
 vi.mock("@/lib/utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/utils")>()),
@@ -33,10 +40,29 @@ vi.mock("@/api/library", () => ({
     saves: vi.fn(),
     save: vi.fn(),
     unsave: vi.fn(),
+    history: vi.fn(),
+    clearHistory: vi.fn(),
+    preferences: vi.fn(),
+    updatePreferences: vi.fn(),
+    // IR-572: folders are read with the saves, and written one call at a time.
+    folders: vi.fn(),
+    createFolder: vi.fn(),
+    renameFolder: vi.fn(),
+    deleteFolder: vi.fn(),
+    fileInFolder: vi.fn(),
+    removeFromFolder: vi.fn(),
   },
 }));
 
 type SavesResponse = Awaited<ReturnType<typeof libraryApi.saves>>;
+type FoldersResponse = Awaited<ReturnType<typeof libraryApi.folders>>;
+
+const folderEntry = (id: number, name: string, record_ids: number[] = []): FolderEntry => ({
+  id, name, record_ids, created_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z",
+});
+
+const folders = (entries: FolderEntry[], limit = 10) =>
+  vi.mocked(libraryApi.folders).mockResolvedValue({ data: { results: entries, limit } } as FoldersResponse);
 
 const paper = (id: number, title: string): RecordListItem => ({
   id, title, abstract: "An abstract.", year_accomplished: 2026, classification_name: "Applied Research",
@@ -51,6 +77,16 @@ const savedEntry = (record: RecordListItem, reading_status: ReadingStatus | null
 
 const saves = (entries: SavedRecordEntry[]) =>
   vi.mocked(libraryApi.saves).mockResolvedValue({ data: { results: entries } } as SavesResponse);
+
+/** What the account's history answers (IR-756). */
+const history = (entries: ReadingHistoryEntry[], keep_history = true) => {
+  vi.mocked(libraryApi.history).mockResolvedValue({ data: { results: entries } } as Awaited<ReturnType<typeof libraryApi.history>>);
+  vi.mocked(libraryApi.preferences).mockResolvedValue({ data: { keep_history } } as Awaited<ReturnType<typeof libraryApi.preferences>>);
+};
+
+const visitEntry = (record: RecordListItem, viewed_at = "2026-11-02T08:00:00Z"): ReadingHistoryEntry => ({
+  record_id: record.id, available: true, viewed_at, record,
+});
 
 /** A sign-in as `login` does it: a new session, so a new epoch. */
 function signIn(id: number, role = "Student", canAuthor = role === "Student" || role === "Adviser") {
@@ -121,7 +157,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mine([]);
   saves([]);
+  history([]);
+  folders([]);
   myDownloads([]);
+  savedCalls.mockResolvedValue({ data: { results: [] } });
   vi.mocked(libraryApi.unsave).mockResolvedValue({ status: 204 } as Awaited<ReturnType<typeof libraryApi.unsave>>);
   signIn(9);
 });
@@ -418,18 +457,25 @@ describe("My Library: interrupted reads (IR-906)", () => {
 });
 
 describe("My Library: reading", () => {
-  it("keeps search, sort, Folder and Reading status in one toolbar, and says what stays in this browser", async () => {
+  // IR-572 changes this test on purpose: folders follow the account, so the
+  // toolbar no longer says they stay in this browser, and "New folder" asks
+  // the server for the folder rather than writing it to localStorage.
+  it("keeps search, sort, Folder and Reading status in one toolbar, and says saves and folders follow the account", async () => {
     mine([ownRecord({})]);
+    vi.mocked(libraryApi.createFolder).mockResolvedValue({ data: folderEntry(3, "Methods") } as Awaited<ReturnType<typeof libraryApi.createFolder>>);
     renderScreen(<MyLibraryPage />);
 
     await userEvent.click(await screen.findByRole("tab", { name: "Saved papers" }));
-    expect(screen.getByText("Saves follow your account. Folders stay in this browser.")).toBeInTheDocument();
+    expect(screen.getByText("Saves and folders follow your account.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Folders" })).not.toBeInTheDocument();
 
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "History" })).not.toBeInTheDocument();
+    // History is back in the picker (IR-756): it now follows the account, and
+    // its pause switch lives in the History view, which every reader must reach.
+    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "History" })).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "+ New folder…");
     await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Methods{Enter}");
     expect(await screen.findByRole("heading", { name: "Methods" })).toBeInTheDocument();
+    expect(libraryApi.createFolder).toHaveBeenCalledWith("Methods");
     expect(screen.queryByRole("button", { name: /liked/i })).not.toBeInTheDocument();
 
     await userEvent.click(within(screen.getByRole("group", { name: "Reading status" })).getByRole("button", { name: "Want to read" }));
@@ -445,7 +491,7 @@ describe("My Library: reading", () => {
     const { container } = renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Download requests"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Saved calls", "Download requests"]);
     expect(screen.getByRole("tab", { name: "Saved papers" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
@@ -502,6 +548,8 @@ describe("My Library: saves follow the account (IR-566)", () => {
 
   it("never shows one account's saves or history to the next account on the same browser", async () => {
     saves([savedEntry(water, "want_to_read")]);
+    history([visitEntry(water)]);
+    // What an older build kept in this browser is wiped, never read (IR-756).
     localStorage.setItem("iris_reading_history", JSON.stringify([{ recordId: water.id, title: water.title, viewedAt: "2026-10-31T08:00:00Z" }]));
     const first = renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
     expect(await screen.findByRole("link", { name: water.title })).toBeInTheDocument();
@@ -509,19 +557,30 @@ describe("My Library: saves follow the account (IR-566)", () => {
 
     useAuthStore.getState().logout();
     expect(useLibraryStore.getState().items).toEqual({});
+    expect(useHistoryStore.getState().items).toEqual([]);
     expect(localStorage.getItem("iris_reading_history")).toBeNull();
 
     saves([savedEntry(rice)]);
+    history([]);
     signIn(11);
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
 
     expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
-    expect(screen.queryByText("Recently opened")).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "History");
+    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
   });
 
-  it("leaves the old browser saves and stars untouched for the import (IR-579)", async () => {
-    const legacy = JSON.stringify([{ id: "want-to-read", name: "Want to read", recordIds: [water.id] }]);
+  // IR-579 changes this test on purpose: the old browser saves, folders and
+  // stars were left untouched for an import, and IRIS had no readers before
+  // the account library, so they are now deleted instead (ADR-044 amendment
+  // 2026-11-16). They are still never shown, and signing out removes them.
+  it("never shows the old browser saves, folders and stars, and signing out deletes them (IR-579)", async () => {
+    const legacy = JSON.stringify([
+      { id: "want-to-read", name: "Want to read", recordIds: [water.id] },
+      { id: "1730000000000", name: "Old browser folder", recordIds: [rice.id] },
+    ]);
     localStorage.setItem("iris_record_collections", legacy);
     localStorage.setItem("iris_starred_records", JSON.stringify([rice.id]));
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
@@ -530,8 +589,249 @@ describe("My Library: saves follow the account (IR-566)", () => {
     await userEvent.click(within(screen.getByRole("group", { name: "Reading status" })).getByRole("button", { name: "Want to read" }));
 
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
-    expect(localStorage.getItem("iris_record_collections")).toBe(legacy);
-    expect(localStorage.getItem("iris_starred_records")).toBe(JSON.stringify([rice.id]));
+    expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "Old browser folder" })).not.toBeInTheDocument();
+    expect(libraryApi.save).not.toHaveBeenCalled();
+    expect(libraryApi.createFolder).not.toHaveBeenCalled();
+
+    useAuthStore.getState().logout();
+    expect(localStorage.getItem("iris_record_collections")).toBeNull();
+    expect(localStorage.getItem("iris_starred_records")).toBeNull();
+  });
+});
+
+describe("My Library: reading history follows the account (IR-756)", () => {
+  const water = paper(41, "Rainwater Harvesting Survey");
+  const rice = paper(42, "Rice Husk Insulation Panels");
+
+  async function openHistory() {
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Folder" }), "History");
+    return screen.findByRole("heading", { name: "History", level: 2 });
+  }
+
+  it("lists what the reader opened on another device, newest first, and says only they can see it", async () => {
+    history([visitEntry(rice, "2026-11-02T08:00:00Z"), visitEntry(water, "2026-11-01T08:00:00Z")]);
+    await openHistory();
+
+    const links = await screen.findAllByRole("link", { name: /Rainwater|Rice Husk/ });
+    expect(links.map((l) => l.textContent)).toEqual([rice.title, water.title]);
+    expect(recordsApi.list).not.toHaveBeenCalled();
+    expect(screen.getByText(/stored on your account.*only you can see it/i)).toBeInTheDocument();
+    expect(localStorage.getItem("iris_reading_history")).toBeNull();
+  });
+
+  it("shows a paper the reader can no longer read as unavailable and discloses nothing", async () => {
+    history([visitEntry(water), { record_id: 77, available: false }]);
+    await openHistory();
+
+    expect(await screen.findByText(/1 paper in your history is no longer available to you/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Rainwater/ })).toHaveLength(1);
+    expect(recordsApi.list).not.toHaveBeenCalled();
+  });
+
+  it("clears the history on the account", async () => {
+    history([visitEntry(water)]);
+    vi.mocked(libraryApi.clearHistory).mockResolvedValue({} as Awaited<ReturnType<typeof libraryApi.clearHistory>>);
+    await openHistory();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+
+    expect(libraryApi.clearHistory).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+  });
+
+  it("keeps the history and says so when clearing fails", async () => {
+    history([visitEntry(water)]);
+    vi.mocked(libraryApi.clearHistory).mockRejectedValue(new Error("offline"));
+    await openHistory();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not clear your history/i);
+    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+  });
+
+  it("pauses history on the account, keeping what is listed", async () => {
+    history([visitEntry(water)]);
+    vi.mocked(libraryApi.updatePreferences).mockImplementation(async (body) => ({ data: body }) as Awaited<ReturnType<typeof libraryApi.updatePreferences>>);
+    await openHistory();
+
+    const keep = await screen.findByRole("checkbox", { name: "Keep reading history" });
+    expect(keep).toBeChecked();
+    await userEvent.click(keep);
+
+    expect(libraryApi.updatePreferences).toHaveBeenCalledWith({ keep_history: false });
+    expect(keep).not.toBeChecked();
+    expect(screen.getByText(/history is paused/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+  });
+
+  it("opens with history paused when the account says so", async () => {
+    history([], false);
+    await openHistory();
+
+    expect(await screen.findByRole("checkbox", { name: "Keep reading history" })).not.toBeChecked();
+    expect(screen.getByRole("heading", { name: "History is paused" })).toBeInTheDocument();
+  });
+
+  it("says the history is safe when loading it fails, and Try again reads it again", async () => {
+    vi.mocked(libraryApi.history).mockRejectedValueOnce(new Error("offline"));
+    await openHistory();
+
+    expect(await screen.findByText("Your history is safe in your account; only loading it failed.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(libraryApi.history).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+  });
+
+  it("shows the most recent papers on an author's Overview, from the account", async () => {
+    history([visitEntry(rice), { record_id: 77, available: false }, visitEntry(water, "2026-11-01T08:00:00Z")]);
+    renderScreen(<MyLibraryPage />);
+
+    const recent = await screen.findByRole("heading", { name: "Recently opened" });
+    const block = recent.parentElement as HTMLElement;
+    expect(within(block).getAllByRole("link").map((l) => l.textContent)).toEqual([rice.title, water.title]);
+  });
+
+  it("has no blocking accessibility violations in the History view", async () => {
+    history([visitEntry(water)]);
+    await openHistory();
+    await screen.findByRole("link", { name: water.title });
+
+    await expectNoBlockingA11yViolations(document.body);
+  });
+});
+
+describe("My Library: folders follow the account (IR-572)", () => {
+  const water = paper(41, "Rainwater Harvesting Survey");
+  const rice = paper(42, "Rice Husk Insulation Panels");
+  const SAVED = { route: "/records/mine?section=saved" };
+  const pick = (name: string) => userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), name);
+  const failed = () => Promise.reject(new Error("offline"));
+
+  it("reads the account's folders from the server and shows a folder's saves in filing order", async () => {
+    saves([savedEntry(water, "reading"), savedEntry(rice), { record_id: 77, available: false }]);
+    folders([folderEntry(3, "Methods", [rice.id, 77, water.id]), folderEntry(4, "Results")]);
+    const { container } = renderScreen(<MyLibraryPage />, SAVED);
+
+    await screen.findByRole("link", { name: water.title });
+    await pick("Methods");
+
+    expect(await screen.findByRole("heading", { name: "Methods" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Rainwater|Rice Husk/ }).map((l) => l.textContent)).toEqual([rice.title, water.title]);
+    expect(screen.getByText(/1 saved paper is no longer available to you/)).toBeInTheDocument();
+    expect(recordsApi.list).not.toHaveBeenCalled();
+    await expectNoBlockingA11yViolations(container);
+
+    await pick("Results");
+    expect(await screen.findByRole("heading", { name: "Nothing in Results yet" })).toBeInTheDocument();
+  });
+
+  it("creates a folder on the server and opens it; a refusal says why and adds nothing", async () => {
+    folders([folderEntry(3, "Methods")]);
+    vi.mocked(libraryApi.createFolder)
+      .mockResolvedValueOnce({ data: folderEntry(5, "Field work") } as Awaited<ReturnType<typeof libraryApi.createFolder>>)
+      .mockRejectedValueOnce({ response: { status: 400, data: { code: "folder_limit", detail: "You have 10 folders. Delete one to make another." } } });
+    renderScreen(<MyLibraryPage />, SAVED);
+    await screen.findByRole("heading", { name: "No saved papers yet" });
+
+    await pick("+ New folder…");
+    await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Field work{Enter}");
+    expect(await screen.findByRole("heading", { name: "Field work" })).toBeInTheDocument();
+
+    await pick("+ New folder…");
+    await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "One more{Enter}");
+    expect(await screen.findByRole("alert")).toHaveTextContent("You have 10 folders. Delete one to make another.");
+    expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "One more" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer a new folder once the account holds the most it may", async () => {
+    folders([folderEntry(3, "Methods"), folderEntry(4, "Results")], 2);
+    renderScreen(<MyLibraryPage />, SAVED);
+    await screen.findByRole("heading", { name: "No saved papers yet" });
+
+    const folderPicker = screen.getByRole("combobox", { name: "Folder" });
+    expect(within(folderPicker).queryByRole("option", { name: "+ New folder…" })).not.toBeInTheDocument();
+    expect(within(folderPicker).getByRole("option", { name: "No room for a new folder (2 is the most)" })).toBeDisabled();
+  });
+
+  it("takes a paper out of a folder without unsaving it", async () => {
+    saves([savedEntry(water, "reading")]);
+    folders([folderEntry(3, "Methods", [water.id])]);
+    vi.mocked(libraryApi.removeFromFolder).mockResolvedValue({ status: 204 } as Awaited<ReturnType<typeof libraryApi.removeFromFolder>>);
+    renderScreen(<MyLibraryPage />, SAVED);
+    await screen.findByRole("link", { name: water.title });
+    await pick("Methods");
+
+    await userEvent.click(await screen.findByRole("button", { name: `Remove from folder: ${water.title}` }));
+
+    expect(libraryApi.removeFromFolder).toHaveBeenCalledWith(3, water.id);
+    expect(libraryApi.unsave).not.toHaveBeenCalled();
+    expect(await screen.findByRole("heading", { name: "Nothing in Methods yet" })).toBeInTheDocument();
+    await pick("All saved papers");
+    expect(await screen.findByRole("link", { name: water.title })).toBeInTheDocument();
+  });
+
+  it("rolls a failed removal from a folder back where the reader can see it", async () => {
+    saves([savedEntry(water)]);
+    folders([folderEntry(3, "Methods", [water.id])]);
+    vi.mocked(libraryApi.removeFromFolder).mockImplementation(failed);
+    renderScreen(<MyLibraryPage />, SAVED);
+    await screen.findByRole("link", { name: water.title });
+    await pick("Methods");
+
+    await userEvent.click(await screen.findByRole("button", { name: `Remove from folder: ${water.title}` }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not take this paper out of the folder/i);
+    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+  });
+
+  it("renames a folder on the server, and a failed delete brings the folder back visibly", async () => {
+    saves([savedEntry(water)]);
+    folders([folderEntry(3, "Methods", [water.id])]);
+    vi.mocked(libraryApi.renameFolder).mockResolvedValue({ data: folderEntry(3, "Method papers", [water.id]) } as Awaited<ReturnType<typeof libraryApi.renameFolder>>);
+    vi.mocked(libraryApi.deleteFolder).mockImplementationOnce(failed);
+    renderScreen(<MyLibraryPage />, SAVED);
+    await screen.findByRole("link", { name: water.title });
+    await pick("Methods");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Rename" }));
+    const field = screen.getByRole("textbox", { name: "Rename Methods" });
+    await userEvent.clear(field);
+    await userEvent.type(field, "Method papers{Enter}");
+    expect(await screen.findByRole("heading", { name: "Method papers" })).toBeInTheDocument();
+    expect(libraryApi.renameFolder).toHaveBeenCalledWith(3, "Method papers");
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not delete this folder/i);
+    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "Method papers" })).toBeInTheDocument();
+    // The paper was never at risk: deleting a folder never deletes a save.
+    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+    expect(libraryApi.unsave).not.toHaveBeenCalled();
+  });
+
+  it("never shows one account's folders to the next account on the same browser", async () => {
+    saves([savedEntry(water)]);
+    folders([folderEntry(3, "First reader's folder", [water.id])]);
+    const first = renderScreen(<MyLibraryPage />, SAVED);
+    await screen.findByRole("link", { name: water.title });
+    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "First reader's folder" })).toBeInTheDocument();
+    first.unmount();
+
+    useAuthStore.getState().logout();
+    expect(useLibraryStore.getState().folders).toEqual([]);
+
+    saves([savedEntry(rice)]);
+    folders([folderEntry(9, "Second reader's folder", [rice.id])]);
+    signIn(11);
+    renderScreen(<MyLibraryPage />, SAVED);
+
+    await screen.findByRole("link", { name: rice.title });
+    const picker = screen.getByRole("combobox", { name: "Folder" });
+    expect(within(picker).getByRole("option", { name: "Second reader's folder" })).toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: "First reader's folder" })).not.toBeInTheDocument();
+    expect(localStorage.getItem("iris_record_collections")).toBeNull();
   });
 });
 
@@ -641,12 +941,12 @@ describe("My Library: download requests (IR-743)", () => {
 });
 
 describe("My Library follows the server's can_author (IR-1096)", () => {
-  it("gives a Student the server refuses only Saved papers and Download requests, and no Publish", async () => {
+  it("gives a Student the server refuses only Saved papers, Saved calls and Download requests, and no Publish", async () => {
     signIn(12, "Student", false);
     renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Download requests"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Saved calls", "Download requests"]);
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
   });
@@ -655,7 +955,30 @@ describe("My Library follows the server's can_author (IR-1096)", () => {
     signIn(13, "RDCO", true);
     renderScreen(<MyLibraryPage />);
 
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "My submissions", "Saved papers", "Download requests"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "My submissions", "Saved papers", "Saved calls", "Download requests"]);
     expect(screen.getByRole("link", { name: "Publish" })).toBeInTheDocument();
+  });
+});
+
+describe("Saved calls (IR-766)", () => {
+  it("has its own tab, apart from saved papers, at ?section=calls", async () => {
+    savedCalls.mockResolvedValue({ data: { results: [{
+      call_id: 5, available: true, saved_at: "2026-11-15T08:00:00Z",
+      call: {
+        id: 5, opportunity_type: "journal", type_display: "Journal", title: "Energy Letters special issue",
+        description: "", external_url: "https://example.org/si", due_date: "2026-12-01", location: "Online",
+        areas: [], area_names: [], start_date: null, end_date: null, registration_fee: "", is_featured: false,
+        posted_by: 2, posted_by_name: "RDCO", created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z",
+        days_left: 15, is_closed: false, papers_state: "accepting", papers_label: "Accepting papers",
+        event_state: null, event_label: null, status: "confirmed", status_label: "Confirmed", review_reason: "",
+        reviewed_at: null, can_edit: false, can_delete: false, can_remove: false, can_confirm: false,
+        can_reject: false, can_feature: false, edit_returns_to_pending: false,
+      },
+    }] } });
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=calls" });
+
+    expect(await screen.findByRole("article", { name: "Energy Letters special issue" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Saved calls" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("heading", { name: "No saved papers yet" })).toBeNull();
   });
 });

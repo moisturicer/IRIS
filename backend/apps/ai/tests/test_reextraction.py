@@ -1,4 +1,4 @@
-"""The LlamaParse cutover plans, prices and refuses before it reads (IR-842)."""
+"""The Unstructured cutover plans, prices and refuses before it reads (IR-988, ADR-067)."""
 
 import uuid
 from datetime import timedelta
@@ -20,11 +20,8 @@ FIXTURE = next(f for f in FIXTURES.values() if len(f.pages) > 1)
 PDF = pdf_bytes(FIXTURE)
 PAGES = len(FIXTURE.pages)
 
-PRICE = {
-    "AI_ADMISSION_EXTRACTION_CREDIT_USD": "0.00125",
-    "AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE": "10",
-    "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE": "2",
-}
+PRICE = {"AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE": "0.03"}
+PER_PAGE = Decimal("0.03")
 
 
 @pytest.fixture
@@ -58,20 +55,36 @@ def test_the_plan_prices_permitted_papers_and_names_why_the_rest_are_skipped(pri
     _record("No consent", consent=False)
     _record("Embargoed", embargo=date(2030, 1, 1))
     _record("Never released", released=False)
-    _record("Already read", extractor="llamaparse")
+    _record("Already read", extractor="unstructured")
 
     plan = plan_cutover()
 
     assert [item.record_id for item in plan.to_read] == [permitted.pk]
     assert plan.pages == PAGES
-    assert plan.credits == Decimal(PAGES * 12)
-    assert plan.usd == Decimal(PAGES * 12) * Decimal("0.00125")
+    assert plan.usd == PAGES * PER_PAGE
     assert sorted(item.reason for item in plan.skipped) == [
-        "already read by LlamaParse",
+        "already read by Unstructured",
         "awaiting consent or release",
         "awaiting consent or release",
         "awaiting consent or release",
     ]
+
+
+def test_a_llamaparse_read_is_read_again(priced):
+    stale = _record("LlamaParse", extractor="llamaparse")
+
+    plan = plan_cutover()
+
+    assert [item.record_id for item in plan.to_read] == [stale.pk]
+
+
+def test_an_unset_price_refuses_the_plan(settings):
+    from apps.ai.admission.limits import NotConfigured
+
+    settings.AI_ADMISSION_EXTRACTION_UNSTRUCTURED_USD_PER_PAGE = ""
+    _record()
+    with pytest.raises(NotConfigured, match="UNSTRUCTURED_USD_PER_PAGE"):
+        plan_cutover()
 
 
 # -- the command ---------------------------------------------------------
@@ -93,7 +106,7 @@ from apps.documents.phases import ExtractionPhase
 def queued(monkeypatch, settings):
     calls = []
     monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: calls.append(args))
-    setattr(settings, BACKEND, "llamaparse")
+    setattr(settings, BACKEND, "unstructured")
     with use_extractor(InMemoryExtractor(None, leaves_campus=True)):
         yield calls
 
@@ -112,13 +125,15 @@ def test_a_dry_run_prints_the_bill_and_queues_nothing(priced, queued):
 
     assert queued == []
     assert f"pages                {PAGES}" in output
+    assert f"US${PAGES * PER_PAGE:,.2f}" in output
+    assert "Unstructured cutover" in output
     assert "Dry run" in output
 
 
 @pytest.mark.django_db(transaction=True)
 def test_a_real_run_needs_a_stated_ceiling(priced, queued):
     _record()
-    with pytest.raises(CommandError, match="--credit-ceiling"):
+    with pytest.raises(CommandError, match="--max-cost"):
         _run()
     assert queued == []
 
@@ -127,7 +142,7 @@ def test_a_real_run_needs_a_stated_ceiling(priced, queued):
 def test_a_run_over_the_ceiling_sends_nothing(priced, queued):
     _record()
     with pytest.raises(CommandError, match="over the ceiling"):
-        _run("--credit-ceiling", str(PAGES * 12 - 1))
+        _run("--max-cost", str(PAGES * PER_PAGE - Decimal("0.01")))
     assert queued == []
 
 
@@ -140,8 +155,8 @@ def test_a_run_queues_each_permitted_paper_once_and_keeps_the_old_chunks_live(pr
         source_revision=record.manuscript_revision, is_active=True,
     )
 
-    _run("--credit-ceiling", "1000")
-    _run("--credit-ceiling", "1000")
+    _run("--max-cost", "100")
+    _run("--max-cost", "100")
 
     assert queued == [(record.pk, str(record.manuscript_revision))]
     extraction = PdfExtraction.objects.get(record=record)
@@ -152,7 +167,7 @@ def test_a_run_queues_each_permitted_paper_once_and_keeps_the_old_chunks_live(pr
 
 @pytest.mark.django_db(transaction=True)
 def test_rollback_restores_the_previous_chunk_set_and_its_tombstoned_chunks(priced, queued):
-    record = _record(extractor="llamaparse")
+    record = _record(extractor="unstructured")
     previous = ChunkSet.objects.create(
         record=record, extraction_hash="d", strategy_id="s", options={}, content_hash="d",
     )
@@ -176,11 +191,11 @@ def test_rollback_restores_the_previous_chunk_set_and_its_tombstoned_chunks(pric
 
 
 @pytest.mark.django_db(transaction=True)
-def test_rollback_names_its_records_and_leaves_a_docling_read_alone(priced, queued):
+def test_rollback_names_its_records_and_leaves_an_unread_paper_alone(priced, queued):
     with pytest.raises(CommandError, match="--record"):
         _run("--rollback")
 
-    record = _record(extractor="docling")
+    record = _record(extractor="llamaparse")
     ChunkSet.objects.create(record=record, extraction_hash="a", strategy_id="s", options={}, content_hash="a")
     ChunkSet.objects.create(
         record=record, extraction_hash="b", strategy_id="s", options={}, content_hash="b", is_active=True
@@ -193,7 +208,7 @@ def test_rollback_names_its_records_and_leaves_a_docling_read_alone(priced, queu
 
 @pytest.mark.django_db(transaction=True)
 def test_rollback_restores_only_what_the_swap_tombstoned(priced, queued):
-    record = _record(extractor="llamaparse")
+    record = _record(extractor="unstructured")
     long_ago = timezone.now() - timedelta(days=30)
     previous = ChunkSet.objects.create(
         record=record, extraction_hash="d", strategy_id="s", options={}, content_hash="d",
@@ -216,7 +231,7 @@ def test_rollback_restores_only_what_the_swap_tombstoned(priced, queued):
 
 @pytest.mark.django_db(transaction=True)
 def test_rollback_does_not_put_a_paper_back_that_the_gate_refuses(priced, queued):
-    record = _record(extractor="llamaparse", consent=False)
+    record = _record(extractor="unstructured", consent=False)
     ChunkSet.objects.create(record=record, extraction_hash="a", strategy_id="s", options={}, content_hash="a")
     ChunkSet.objects.create(
         record=record, extraction_hash="b", strategy_id="s", options={}, content_hash="b", is_active=True

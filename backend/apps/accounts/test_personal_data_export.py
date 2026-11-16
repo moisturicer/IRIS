@@ -250,6 +250,34 @@ class ExportContentTests(APITestCase):
         self.assertEqual(saved[0]["title"], "Public work")
         self.assertEqual(saved[0]["reading_status"], ReadingStatus.READING)
 
+    def test_saved_calls_are_the_persons_own(self):
+        # IR-649: id and saved time always; the title only while the Call is
+        # still confirmed, as the saved list itself shows it.
+        from apps.opportunities.models import SavedCall
+        from apps.opportunities.tests import make_opportunity
+
+        listed = make_opportunity(title="ICACSIS 2027")
+        SavedCall.objects.create(owner=self.me, call=listed)
+        SavedCall.objects.create(owner=self.stranger, call=make_opportunity(title="Not mine"))
+        [saved] = self.export()["saved_calls"]
+        self.assertEqual(saved["call_id"], listed.pk)
+        self.assertEqual(saved["title"], "ICACSIS 2027")
+        self.assertTrue(saved["available"])
+        self.assertIn("saved_at", saved)
+
+    def test_a_saved_call_no_longer_confirmed_is_listed_without_its_title(self):
+        from apps.opportunities.models import SavedCall
+        from apps.opportunities.tests import make_opportunity
+        from core.enums import CallStatus
+
+        call = make_opportunity(title="Sent back to RDCO")
+        SavedCall.objects.create(owner=self.me, call=call)
+        call.status = CallStatus.PENDING
+        call.save(update_fields=["status"])
+        [saved] = self.export()["saved_calls"]
+        self.assertEqual((saved["call_id"], saved["title"], saved["available"]), (call.pk, None, False))
+        self.assertNotIn("Sent back to RDCO", _text(self.client.get(URL)))
+
     def test_the_optional_profile_is_in_the_account_section(self):
         from apps.accounts import profile
 
@@ -268,6 +296,32 @@ class ExportContentTests(APITestCase):
         SavedFeed.objects.create(owner=self.stranger, name="Not mine", query={"q": "x"})
         feeds = self.export()["saved_feeds"]
         self.assertEqual([(f["name"], f["query"]) for f in feeds], [("Water", {"q": "water"})])
+
+    def test_folders_are_the_persons_own_and_name_a_paper_only_while_readable(self):
+        from apps.library.models import FolderMembership, LibraryFolder
+
+        published = _paper("Public work", self.stranger, status=PipelineStatus.PUBLISHED)
+        hidden = _paper("Someone's draft", self.stranger)
+        mine = LibraryFolder.objects.create(owner=self.me, name="Methods")
+        for record in (published, hidden):
+            save = SavedRecord.objects.create(owner=self.me, record=record)
+            FolderMembership.objects.create(folder=mine, saved_record=save)
+        theirs = LibraryFolder.objects.create(owner=self.stranger, name="Not my folder")
+        FolderMembership.objects.create(
+            folder=theirs, saved_record=SavedRecord.objects.create(owner=self.stranger, record=published),
+        )
+
+        folders = self.export()["folders"]
+
+        self.assertEqual([f["name"] for f in folders], ["Methods"])
+        papers = {p["record_id"]: p for p in folders[0]["papers"]}
+        self.assertEqual(set(papers), {published.pk, hidden.pk})
+        self.assertEqual(papers[published.pk]["title"], "Public work")
+        self.assertIsNone(papers[hidden.pk]["title"])
+        self.assertFalse(papers[hidden.pk]["available"])
+        text = _text(self.client.get(URL))
+        self.assertNotIn("Someone's draft", text)
+        self.assertNotIn("Not my folder", text)
 
     def test_reading_notes_are_the_persons_own_and_keep_their_text_without_the_title(self):
         from apps.library.models import ReadingNote
@@ -288,6 +342,67 @@ class ExportContentTests(APITestCase):
         text = _text(self.client.get(URL))
         self.assertNotIn("Someone's draft", text)
         self.assertNotIn("Not mine.", text)
+
+    def test_reading_history_is_the_persons_own_and_names_a_paper_only_while_readable(self):
+        from django.utils import timezone
+
+        from apps.library.models import ReadingVisit
+
+        published = _paper("Public work", self.stranger, status=PipelineStatus.PUBLISHED)
+        hidden = _paper("Someone's draft", self.stranger)
+        ReadingVisit.objects.create(owner=self.me, record=published, viewed_at=timezone.now())
+        ReadingVisit.objects.create(owner=self.me, record=hidden, viewed_at=timezone.now())
+        ReadingVisit.objects.create(owner=self.stranger, record=published, viewed_at=timezone.now())
+
+        history = {v["record_id"]: v for v in self.export()["reading_history"]}
+
+        self.assertEqual(set(history), {published.pk, hidden.pk})
+        self.assertEqual(history[published.pk]["title"], "Public work")
+        self.assertTrue(history[published.pk]["available"])
+        self.assertIsNotNone(history[published.pk]["viewed_at"])
+        self.assertIsNone(history[hidden.pk]["title"])
+        self.assertFalse(history[hidden.pk]["available"])
+        self.assertNotIn("Someone's draft", _text(self.client.get(URL)))
+
+    def test_library_preferences_say_whether_history_is_kept(self):
+        from apps.library.models import LibraryPreferences
+
+        self.assertEqual(self.export()["library_preferences"], {"keep_history": True})
+
+        LibraryPreferences.objects.create(owner=self.me, keep_history=False)
+        LibraryPreferences.objects.create(owner=self.stranger, keep_history=True)
+
+        self.assertEqual(self.export()["library_preferences"], {"keep_history": False})
+
+    def test_reading_positions_are_the_persons_own_and_name_a_paper_only_while_readable(self):
+        import uuid
+
+        from apps.library.models import ReadingPosition
+
+        published = _paper("Public work", self.stranger, status=PipelineStatus.PUBLISHED)
+        hidden = _paper("Someone's draft", self.stranger)
+
+        def place(owner, record, page):
+            ReadingPosition.objects.create(
+                owner=owner, record=record, manuscript_revision=uuid.uuid4(), manuscript_sha256="a" * 64,
+                page=page, fraction=0.5,
+            )
+
+        place(self.me, published, 12)
+        place(self.me, hidden, 3)
+        place(self.stranger, published, 40)
+
+        positions = {p["record_id"]: p for p in self.export()["reading_positions"]}
+
+        self.assertEqual(set(positions), {published.pk, hidden.pk})
+        self.assertEqual(
+            (positions[published.pk]["title"], positions[published.pk]["page"], positions[published.pk]["fraction"]),
+            ("Public work", 12, 0.5),
+        )
+        self.assertIsNotNone(positions[published.pk]["updated_at"])
+        self.assertEqual((positions[hidden.pk]["title"], positions[hidden.pk]["available"]), (None, False))
+        self.assertEqual(positions[hidden.pk]["page"], 3)
+        self.assertNotIn("Someone's draft", _text(self.client.get(URL)))
 
     def test_highlights_are_the_persons_own_and_keep_their_quote_only_while_readable(self):
         import uuid
@@ -389,6 +504,22 @@ class ExportContentTests(APITestCase):
         self.assertNotIn("Mine, deleted.", str(mine))
         self.assertNotIn("Someone else's.", str(mine))
 
+
+    def test_the_comments_they_reported_are_theirs_without_the_reported_words(self):
+        from apps.records.models import CommentReport, PublicComment
+
+        paper = _paper("Reported in public", self.stranger, status=PipelineStatus.PUBLISHED)
+        theirs = PublicComment.objects.create(record=paper, author=self.stranger, body="SOMEONE ELSE's words.")
+        CommentReport.objects.create(comment=theirs, reporter=self.me, reason="other",
+                                     note="It names a student.", reported_text=theirs.body)
+        CommentReport.objects.create(comment=theirs, reporter=self.stranger, reason="spam",
+                                     reported_text=theirs.body)
+
+        body = self.export()
+
+        [mine] = body["comment_reports"]
+        self.assertEqual((mine["reason"], mine["note"], mine["state"]), ("other", "It names a student.", "open"))
+        self.assertNotIn("SOMEONE ELSE", json.dumps(body))
     def test_a_finished_review_round_is_in_the_acts_of_its_actor_only(self):
         from apps.reviews.models import ReviewRound
 

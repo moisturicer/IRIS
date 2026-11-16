@@ -156,8 +156,8 @@ function RequirementsSection() {
         <InterruptedState what="setup" onRetry={read.retry} framed />
       ) : !types ? (
         read.status === "ready" ? (
-          <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-5">
-            <p role="alert" className="text-small text-stone-700">Setup didn&apos;t load. Check your connection, then try again.</p>
+          <div className="space-y-3 rounded-card border border-stone-200 bg-white p-5">
+            <p role="alert" className="text-small text-stone-700">Setup didn&apos;t load: IRIS sent an answer this page can&apos;t read. Try again.</p>
             <Button type="button" variant="outline" onClick={read.retry}>Try again</Button>
           </div>
         ) : (
@@ -237,7 +237,7 @@ function TypeDescription({ recordType, act }: { recordType: SetupRecordType; act
   };
 
   return (
-    <section aria-labelledby={`${fieldId}-title`} className="rounded-xl border border-stone-200 bg-white p-5">
+    <section aria-labelledby={`${fieldId}-title`} className="rounded-card border border-stone-200 bg-white p-5">
       <h2 id={`${fieldId}-title`} className="text-heading font-semibold text-stone-900">Description</h2>
       <form onSubmit={(e) => void save(e)} className="mt-3 space-y-3">
         <div>
@@ -299,7 +299,7 @@ function Requirements({ recordType, act }: { recordType: SetupRecordType; act: A
   };
 
   return (
-    <section aria-labelledby={titleId} className="rounded-xl border border-stone-200 bg-white p-5">
+    <section aria-labelledby={titleId} className="rounded-card border border-stone-200 bg-white p-5">
       <h2 id={titleId} className="text-heading font-semibold text-stone-900">Requirements &amp; Templates</h2>
       <p className="mt-1 text-small text-stone-600">
         Required and Optional are labels. They tell people what RDCO expects and never stop anyone submitting.
@@ -515,7 +515,7 @@ function TemplateControls({
   };
 
   return (
-    <div className="rounded-lg bg-stone-50 px-3 py-2">
+    <div className="rounded-card bg-stone-50 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2 text-small text-stone-700">
         <i className="fas fa-file-arrow-down text-stone-500" aria-hidden />
         {templateName ? (
@@ -584,7 +584,7 @@ function AddRequirement({ recordType, act }: { recordType: SetupRecordType; act:
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-stone-200 p-4">
+    <div className="mt-4 rounded-card border border-stone-200 p-4">
       <RequirementForm
         title={`Add a requirement to ${recordType.name}`}
         initial={{ name: "", is_required: false, description: "" }}

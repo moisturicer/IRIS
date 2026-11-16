@@ -8,9 +8,9 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { formatAuthorList, recordYearLabel } from "@/features/discover/discoverUtils";
 import { waitingHref } from "@/features/records/waitingOnYou";
-import type { Collection, ReadingVisit } from "@/lib/recordLibrary";
 import { cn, formatDate } from "@/lib/utils";
-import { sortedItems, type LibraryItem } from "@/store/library.store";
+import type { HistoryItem } from "@/store/history.store";
+import { sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
 import type { MyResearchItem } from "@/types/records";
 
 import type { LibraryView } from "./ReadingPanel";
@@ -21,6 +21,7 @@ import { SubmissionPanel, SubmissionRow } from "./SubmissionRow";
 const WAITING_SHOWN = 3;
 const RECENT_SHOWN = 4;
 const SHELF_SHOWN = 2;
+const RECENTLY_OPENED_SHOWN = 3;
 
 const LINK_TEXT = cn(
   "inline-flex min-h-9 items-center gap-2 rounded-control px-2 text-small font-semibold text-brand hover:bg-stone-100",
@@ -38,8 +39,10 @@ interface LibraryOverviewProps {
   interrupted?: boolean;
   onRetry:     () => void;
   library:     Record<number, LibraryItem>;
-  history:     ReadingVisit[];
-  collections: Collection[];
+  /** The account's reading history (IR-756), most recent first. */
+  history:     HistoryItem[];
+  /** The reader's own folders, which follow the account (IR-572). */
+  folders:     LibraryFolder[];
   onOpenSubmissions: (filter: ResearchFilter) => void;
   onOpenSaved: (view: LibraryView) => void;
 }
@@ -47,13 +50,18 @@ interface LibraryOverviewProps {
 /**
  * My Library's Overview for an author: what is waiting on them, their latest
  * records, and the reading they are in the middle of. Every line is a server
- * fact or the reader's own browser data, said as such; no counter appears
+ * fact, said as such; no counter appears
  * except beside Waiting on you, where each one is a thing to do.
  */
 export function LibraryOverview({
-  research, loading, failed, interrupted = false, onRetry, library, history, collections, onOpenSubmissions, onOpenSaved,
+  research, loading, failed, interrupted = false, onRetry, library, history, folders, onOpenSubmissions, onOpenSaved,
 }: LibraryOverviewProps) {
   const waiting = useMemo(() => research.filter(isWaiting), [research]);
+  /* Only papers the reader can still read; an unavailable entry has no title to show. */
+  const recentlyOpened = useMemo(
+    () => history.flatMap((v) => (v.available && v.record && v.viewedAt ? [{ record: v.record, viewedAt: v.viewedAt }] : [])).slice(0, RECENTLY_OPENED_SHOWN),
+    [history],
+  );
   const recent = useMemo(
     () => [...research].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, RECENT_SHOWN),
     [research],
@@ -194,38 +202,38 @@ export function LibraryOverview({
             </ul>
           )}
 
-          {history.length > 0 && (
+          {recentlyOpened.length > 0 && (
             <div className="mt-5 border-t border-stone-200 pt-4">
-              <h3 className="text-label font-semibold text-stone-600">Recently opened in this browser</h3>
+              <h3 className="text-label font-semibold text-stone-600">Recently opened</h3>
               <ul className="mt-2 space-y-2">
-                {history.slice(0, 3).map((visit) => (
-                  <li key={visit.recordId}>
+                {recentlyOpened.map(({ record, viewedAt }) => (
+                  <li key={record.id}>
                     <Link
-                      to={`/records/${visit.recordId}`}
+                      to={`/records/${record.id}`}
                       className={cn("block truncate rounded-control text-small font-semibold text-stone-800 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
                     >
-                      {visit.title}
+                      {record.title}
                     </Link>
-                    <p className="text-label text-stone-500">Opened {formatDate(visit.viewedAt)}</p>
+                    <p className="text-label text-stone-500">Opened {formatDate(viewedAt)}</p>
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          {collections.length > 0 && (
+          {folders.length > 0 && (
             <div className="mt-5 border-t border-stone-200 pt-4">
-              <h3 className="text-label font-semibold text-stone-600">Your folders, in this browser</h3>
+              <h3 className="text-label font-semibold text-stone-600">Your folders</h3>
               <ul className="mt-1 -mx-2">
-                {collections.slice(0, 4).map((c) => (
-                  <li key={c.id}>
+                {folders.slice(0, 4).map((f) => (
+                  <li key={f.id}>
                     <button
                       type="button"
-                      onClick={() => onOpenSaved({ kind: "folder", id: c.id })}
+                      onClick={() => onOpenSaved({ kind: "folder", id: f.id })}
                       className={cn("flex min-h-9 w-full items-center gap-3 rounded-control px-2 text-left text-small text-stone-700 hover:bg-stone-50", COLOUR_TRANSITION, FOCUS_RING)}
                     >
                       <i className="fas fa-folder w-4 text-center text-stone-500" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                      <span className="min-w-0 flex-1 truncate">{f.name}</span>
                     </button>
                   </li>
                 ))}

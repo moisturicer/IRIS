@@ -1,9 +1,9 @@
-"""Planning the corpus cutover to LlamaParse before paying for it (IR-842, ADR-056).
+"""Planning the corpus cutover to Unstructured before paying for it (IR-988, ADR-067).
 
-The plan is a value computed before anything is sent. Credits are an upper
-bound: the price is the tier's dearest rate plus every add-on, as admission
-reserves it. Descriptions cost per Figure and the Figures are not known until a
-paper is read, so they are not estimated here.
+The plan is a value computed before anything is sent, priced at Unstructured's
+flat rate per page, as admission reserves it (IR-983). Descriptions cost per
+Figure and the Figures are not known until a paper is read, so they are not
+estimated here.
 """
 
 from __future__ import annotations
@@ -14,7 +14,8 @@ from typing import Optional, Sequence
 
 from django.db.models import Sum
 
-ALREADY_READ = "already read by LlamaParse"
+EXTRACTOR = "unstructured"
+ALREADY_READ = "already read by Unstructured"
 AWAITING_CONSENT = "awaiting consent or release"
 NO_MANUSCRIPT = "no manuscript to read"
 UNREADABLE = "file missing or not a readable PDF"
@@ -33,8 +34,7 @@ class CutoverItem:
 @dataclass(frozen=True)
 class CutoverPlan:
     items: tuple[CutoverItem, ...]
-    credits_per_page: Decimal
-    credit_usd: Decimal
+    usd_per_page: Decimal
     embed_cost_per_million: float
 
     @property
@@ -50,12 +50,8 @@ class CutoverPlan:
         return sum(i.pages for i in self.to_read)
 
     @property
-    def credits(self) -> Decimal:
-        return self.pages * self.credits_per_page
-
-    @property
     def usd(self) -> Decimal:
-        return self.credits * self.credit_usd
+        return self.pages * self.usd_per_page
 
     @property
     def embed_tokens(self) -> int:
@@ -70,8 +66,8 @@ class CutoverPlan:
         items = tuple(i for i in self.items if i.reason or i.record_id in keep)
         return replace(self, items=items)
 
-    def exceeds(self, ceiling_credits: Decimal) -> bool:
-        return ceiling_credits > 0 and self.credits > ceiling_credits
+    def exceeds(self, ceiling_usd: Decimal) -> bool:
+        return ceiling_usd > 0 and self.usd > ceiling_usd
 
 
 def _page_count(record) -> Optional[int]:
@@ -100,7 +96,7 @@ def _reason(record, extraction) -> str:
     if not record.abstract_file:
         return NO_MANUSCRIPT
     current = extraction is not None and extraction.source_revision == record.manuscript_revision
-    if current and extraction.extractor == "llamaparse" and extraction.status == "done":
+    if current and extraction.extractor == EXTRACTOR and extraction.status == "done":
         return ALREADY_READ
     queued = extraction is not None and extraction.status == "queued" and extraction.phase == ExtractionPhase.QUEUED
     if current and (extraction.status in {"running", "retrying"} or queued):
@@ -137,8 +133,7 @@ def plan_cutover(record_ids: Optional[Sequence[int]] = None) -> CutoverPlan:
         ))
     return CutoverPlan(
         items=tuple(items),
-        credits_per_page=price.credits_per_page + price.addon_credits_per_page,
-        credit_usd=price.credit_usd,
+        usd_per_page=price.credit_usd * (price.credits_per_page + price.addon_credits_per_page),
         embed_cost_per_million=cost_per_million(),
     )
 
@@ -171,7 +166,7 @@ def queue_reads(plan: CutoverPlan) -> int:
 def rollback(record_ids: Sequence[int]) -> int:
     """Make each named record's previous ChunkSet active again.
 
-    Only a live record whose manuscript was read by LlamaParse and that has an
+    Only a live record whose manuscript was read by Unstructured and that has an
     inactive set older than its active one has anything to go back to. Only
     chunks tombstoned by the swap (at or after the active set was made) come
     back. The extraction row is left as read: going forward again means a new
@@ -188,7 +183,7 @@ def rollback(record_ids: Sequence[int]) -> int:
         with transaction.atomic():
             record = Record.objects.select_for_update().filter(pk=record_id, is_deleted=False).first()
             if record is None or not permits(record) or not PdfExtraction.objects.filter(
-                record=record, extractor="llamaparse"
+                record=record, extractor=EXTRACTOR
             ).exists():
                 continue
             active = ChunkSet.objects.filter(record_id=record_id, is_active=True).first()

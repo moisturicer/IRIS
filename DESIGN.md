@@ -308,7 +308,7 @@ Quiet and exact.
 
 ### Save menu (IR-566)
 
-One bookmark control, an outlined icon on a Discover card and a pill on the Record page, filled once the paper is saved. Its menu has three sections divided by Rule Stone lines: **Reading status** (Want to read, Reading, Completed; choosing the checked one clears it but keeps the save), **Save to My Library / Remove from My Library**, and **Your folders**, which closes with one stone-500 line saying that saves follow the account and folders stay in this browser. A failed save or removal returns the previous state and says so in a `role="alert"` line where the reader acted, never silently. There is no Star: Save covers it.
+One bookmark control, an outlined icon on a Discover card and a pill on the Record page, filled once the paper is saved. Its menu has three sections divided by Rule Stone lines: **Reading status** (Want to read, Reading, Completed; choosing the checked one clears it but keeps the save), **Save to My Library / Remove from My Library**, and **Your folders**, which closes with one stone-500 line saying that saves, reading status and folders follow the account (IR-572). Filing a paper in a folder saves it; taking it out of a folder leaves it saved. Once the account holds the most folders it may, the new-folder field is disabled and that line says so instead. A failed save, removal or filing returns the previous state and says so in a `role="alert"` line where the reader acted, never silently. There is no Star: Save covers it.
 
 ### Section tabs
 The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone track in the record bar, with a Binding Maroon thumb that slides to the current one over 300 ms. The current label is white; the others are Quiet Ink and turn maroon on hover.
@@ -324,6 +324,9 @@ In the AI Overview a citation is the page it cites: "p8", 12 px semibold maroon 
 
 ### Inputs / Fields
 A white field with a Rule Stone outline and the control radius. Focus darkens the outline to maroon with a soft maroon ring. A disabled field sits on Endpaper with a not-allowed cursor and says why beside it. Paper Chat's composer holds the scope chip and Send inside its field. The Ask IRIS page's composer is one line that grows with the question up to a cap, over a row of round icon controls (attach, closed until uploads exist; compare) and a Bar Stone settings pill whose menu offers only what the server supports. Send is Bar Stone until there is something to send.
+
+### Toasts (IR-764)
+A toast reports the outcome of something the reader just did, in the bottom-right corner, over the page and never inside it, so nothing on the screen moves. A success leaves after about 4 seconds. An error that offers a way out carries **one action** (such as Try again) beside Dismiss and stays until the reader takes it or dismisses it; taking the action closes the toast. It names what failed ("Could not build the calendar file for ICCE 2027. Try again."). Calls & Conferences reports its calendar failure this way instead of a line that grew inside the row. A decision the reader must make first is a dialog, a field's error stays under its field, and a page that didn't load keeps its own error state.
 
 ### Navigation
 - **Record bar:** 56 px, Bar Stone, a Desk Stone hairline under it. Back (always labelled), a hairline divider, the paper's title on Paper, then the section tabs.

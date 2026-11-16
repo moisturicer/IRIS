@@ -125,6 +125,13 @@ vi.mock("@/api/library", () => ({
       saved_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z", record: { id: recordId, title: "Saved" },
     } })),
     unsave: vi.fn(() => Promise.resolve({ status: 204 })),
+    // The reader's own folders (IR-572): read with the saves.
+    folders: vi.fn(() => Promise.resolve({ data: { results: [], limit: 10 } })),
+    createFolder: vi.fn(),
+    renameFolder: vi.fn(),
+    deleteFolder: vi.fn(),
+    fileInFolder: vi.fn(),
+    removeFromFolder: vi.fn(() => Promise.resolve({ status: 204 })),
     // Saved feeds (IR-577): the menu reads them when Discover mounts.
     feeds: vi.fn(() => Promise.resolve({ data: { results: [], limit: 10 } })),
     createFeed: vi.fn(),
@@ -202,7 +209,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
   localStorage.clear();
-  useLibraryStore.setState({ load: "idle", items: {}, failure: null });
+  useLibraryStore.setState({ load: "idle", items: {}, folders: [], folderLimit: null, failure: null });
   listed = [publishedThesis];
   people = [];
   vi.mocked(peopleApi.search).mockImplementation(() => peoplePage({ results: people, count: people.length, next: null }));
@@ -402,7 +409,7 @@ describe("the toolbar and the result rows (IR-1082)", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     const sheet = await filterSheet();
-    for (const [label, value] of [["Type", "Any type"], ["College", "Any"], ["Classification", "Any"], ["Year (completed)", "Any year"], ["IP & patents", "Any"]]) {
+    for (const [label, value] of [["Type", "Any type"], ["College", "Any"], ["Classification", "Any"], ["Year from", "Any year"], ["Year to", "Any year"], ["IP & patents", "Any"]]) {
       expect(within(sheet).getByText(label)).toBeVisible();
       expect(within(sheet).getByRole("button", { name: `${label} ${value}` })).toBeInTheDocument();
     }
@@ -591,7 +598,7 @@ describe("browsing", () => {
   });
 
   it("keeps filters across feeds, applies them to recommendations, and hides recommendation sorting", async () => {
-    renderDiscover("/?type=1&college=4&year=2026");
+    renderDiscover("/?type=1&college=4&year_from=2026&year_to=2026");
     await screen.findByText(publishedThesis.title);
     await userEvent.click(screen.getByRole("button", { name: "For you" }));
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({
@@ -600,8 +607,8 @@ describe("browsing", () => {
     const forYouFilters = await filterSheet();
     // Recommendations have their own order, so there is no Sort, though the count stays.
     expect(screen.queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
-    await choose(/^Year/, /^2009$/, forYouFilters);
-    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2009" })));
+    await choose(/^Year from/, /^2009$/, forYouFilters);
+    await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, expect.objectContaining({ year_from: "2009", year_to: "2026" })));
     expect(screen.getByRole("button", { name: "For you" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Latest" }));
     await waitFor(() => expect(lastListParams()).toMatchObject({ record_type: "1", college: "4", year_from: "2009" }));
@@ -610,7 +617,7 @@ describe("browsing", () => {
 
   it("offers clearing active For you filters when they match no research", async () => {
     recommended = { mode: "for_you", results: [], next_cursor: null, count: 0 };
-    renderDiscover("/?feed=for_you&year=2009");
+    renderDiscover("/?feed=for_you&year_from=2009");
     expect(await screen.findByRole("heading", { name: "No research matches these filters" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenLastCalledWith(undefined, { ordering: "-created_at" }));
@@ -952,6 +959,83 @@ describe("Not interested, Undo and reset (IR-576)", () => {
   });
 });
 
+describe("folders in the Save menu follow the account (IR-572)", () => {
+  type Folders = Awaited<ReturnType<typeof libraryApi.folders>>;
+  const folder = (id: number, name: string, record_ids: number[] = []) => ({
+    id, name, record_ids, created_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z",
+  });
+  const filed = (folderId: number, name: string, recordId: number) => ({
+    data: {
+      folder: folder(folderId, name, [recordId]),
+      save: {
+        record_id: recordId, available: true, reading_status: null,
+        saved_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z", record: publishedThesis,
+      },
+    },
+  }) as Awaited<ReturnType<typeof libraryApi.fileInFolder>>;
+  const menuOf = async (label: "Save" | "Saved" = "Save") => {
+    const card = await screen.findByRole("article", { name: publishedThesis.title });
+    await userEvent.click(await within(card).findByRole("button", { name: label }));
+    return card;
+  };
+
+  it("files an unsaved paper in one of the account's folders, which saves it", async () => {
+    vi.mocked(libraryApi.folders).mockResolvedValueOnce({ data: { results: [folder(3, "Methods")], limit: 10 } } as Folders);
+    vi.mocked(libraryApi.fileInFolder).mockResolvedValueOnce(filed(3, "Methods", publishedThesis.id));
+    renderDiscover();
+    const card = await menuOf();
+
+    expect(within(card).getByText("Saves, reading status and folders follow your account.")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Methods" }));
+
+    expect(libraryApi.fileInFolder).toHaveBeenCalledWith(3, publishedThesis.id);
+    await waitFor(() => expect(within(card).getByRole("button", { name: "Methods" })).toHaveAttribute("aria-pressed", "true"));
+    expect(within(card).getByRole("button", { name: "Remove from My Library" })).toBeInTheDocument();
+    expect(libraryApi.save).not.toHaveBeenCalled();
+  });
+
+  it("takes a paper out of a folder without unsaving it or counting it as Not interested", async () => {
+    vi.mocked(libraryApi.saves).mockResolvedValueOnce({ data: { results: [{
+      record_id: publishedThesis.id, available: true, reading_status: "reading",
+      saved_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z", record: publishedThesis,
+    }] } } as Awaited<ReturnType<typeof libraryApi.saves>>);
+    vi.mocked(libraryApi.folders).mockResolvedValueOnce({ data: { results: [folder(3, "Methods", [publishedThesis.id])], limit: 10 } } as Folders);
+    renderDiscover("/?feed=for_you");
+    const card = await menuOf("Saved");
+
+    await userEvent.click(await within(card).findByRole("button", { name: "Methods", pressed: true }));
+
+    expect(libraryApi.removeFromFolder).toHaveBeenCalledWith(3, publishedThesis.id);
+    expect(within(card).getByRole("button", { name: "Methods" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(card).getByRole("button", { name: "Reading" })).toHaveAttribute("aria-pressed", "true");
+    expect(libraryApi.unsave).not.toHaveBeenCalled();
+    expect(recordsApi.notInterested).not.toHaveBeenCalled();
+  });
+
+  it("creates a folder on the server from the menu and files the paper in it", async () => {
+    vi.mocked(libraryApi.createFolder).mockResolvedValueOnce({ data: folder(5, "Field work") } as Awaited<ReturnType<typeof libraryApi.createFolder>>);
+    vi.mocked(libraryApi.fileInFolder).mockResolvedValueOnce(filed(5, "Field work", publishedThesis.id));
+    renderDiscover();
+    const card = await menuOf();
+
+    await userEvent.type(within(card).getByRole("textbox", { name: "New folder name" }), "Field work{Enter}");
+
+    await waitFor(() => expect(libraryApi.fileInFolder).toHaveBeenCalledWith(5, publishedThesis.id));
+    expect(libraryApi.createFolder).toHaveBeenCalledWith("Field work");
+    expect(await within(card).findByRole("button", { name: "Field work", pressed: true })).toBeInTheDocument();
+  });
+
+  it("says when the account has no room for another folder, and offers none", async () => {
+    vi.mocked(libraryApi.folders).mockResolvedValueOnce({ data: { results: [folder(3, "Methods")], limit: 1 } } as Folders);
+    renderDiscover();
+    const card = await menuOf();
+
+    expect(await within(card).findByText(/You have 1 folders, the most an account holds/)).toBeInTheDocument();
+    expect(within(card).getByRole("textbox", { name: "New folder name" })).toBeDisabled();
+    expect(within(card).getByRole("button", { name: "Create folder" })).toBeDisabled();
+  });
+});
+
 describe("filtering", () => {
   it("maps each filter to its query param and counts active choices in one control", async () => {
     renderDiscover();
@@ -997,12 +1081,37 @@ describe("filtering", () => {
     expect(lastListParams()).not.toHaveProperty("is_ip");
   });
 
-  it("filters by year through year_from and year_to", async () => {
+  // IR-947: a from–to range replaces the single year; one year is both ends.
+  it("filters by a year range, either end open, through year_from and year_to", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await choose(/^year/i, /^2026$/);
+    await choose(/^Year from/, /^2009$/);
+    await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2009" }));
+    expect(lastListParams()).not.toHaveProperty("year_to");
+    expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent(/^\?year_from=2009$/);
+
+    await choose(/^Year to/, /^2026$/);
+    await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2009", year_to: "2026" }));
+    expect(screen.getByRole("button", { name: "Filters, 1 active" })).toBeInTheDocument();
+  });
+
+  it("never sends a range that ends before it starts", async () => {
+    renderDiscover("/?year_to=2009");
+    await screen.findByText(publishedThesis.title);
+
+    await choose(/^Year from/, /^2026$/);
+
     await waitFor(() => expect(lastListParams()).toMatchObject({ year_from: "2026", year_to: "2026" }));
+  });
+
+  it("does not read the retired single-year key, and takes it out of the address", async () => {
+    renderDiscover("/?year=2026&type=2");
+    await screen.findByText(publishedThesis.title);
+
+    expect(lastListParams()).not.toHaveProperty("year_from");
+    expect(lastListParams()).not.toHaveProperty("year_to");
+    await waitFor(() => expect(screen.getByRole("status", { name: "Current query" })).toHaveTextContent(/^\?type=2$/));
   });
 
   it("does not offer a Proposal type, because Proposals are not in the catalogue", async () => {
@@ -1173,7 +1282,7 @@ describe("continuity", () => {
   });
 
   it("restores the search, filters and sort from the URL", async () => {
-    renderDiscover("/?q=rain&type=2&year=2019&sort=viewed");
+    renderDiscover("/?q=rain&type=2&year_from=2019&year_to=2019&sort=viewed");
 
     await waitFor(() =>
       expect(lastListParams()).toMatchObject({
@@ -1201,7 +1310,7 @@ describe("continuity", () => {
   });
 
   it("falls back to safe defaults for values it does not recognise, and corrects the URL", async () => {
-    renderDiscover("/?sort=bogus&year=19&type=thesis&college=4,x");
+    renderDiscover("/?sort=bogus&year_from=19&type=thesis&college=4,x");
 
     await waitFor(() => expect(lastListParams()).toMatchObject({ ordering: "-created_at", college: "4" }));
     expect(lastListParams()).not.toHaveProperty("year_from");
@@ -1253,7 +1362,7 @@ describe("continuity", () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
 
-    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^year/i }));
+    await userEvent.click(within(await filterSheet()).getByRole("button", { name: /^Year to/ }));
     const options = await screen.findByRole("listbox");
     expect(within(options).getByRole("option", { name: "2009" })).toBeInTheDocument();
   });
@@ -1431,17 +1540,17 @@ describe("saved custom feeds (IR-577)", () => {
   it("offers to save changed filters into the open feed, and only when they differ", async () => {
     const feed = savedFeed({ query: { q: "flood", classification: "7" } });
     withFeeds(feed);
-    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...feed, query: { q: "flood", classification: "7", year: "2026" } } } as never);
+    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...feed, query: { q: "flood", classification: "7", year_from: "2026" } } } as never);
     renderDiscover();
     await screen.findByText(publishedThesis.title);
     await openFeed();
     await screen.findByRole("region", { name: "Feed Coastal hazards" });
     expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument();
 
-    await choose(/^Year/, /2026/);
+    await choose(/^Year from/, /2026/);
 
     await userEvent.click(await screen.findByRole("button", { name: "Save these filters to this feed" }));
-    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { q: "flood", classification: "7", year: "2026" } }));
+    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { q: "flood", classification: "7", year_from: "2026" } }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument());
   });
 

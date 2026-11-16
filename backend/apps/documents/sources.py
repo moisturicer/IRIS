@@ -24,6 +24,23 @@ def manuscript_changes(instance, file):
             "manuscript_filename": file.name[:255]}
 
 
+#: A read whose send failed after its write committed (IR-1049). It is marked
+#: failed, so Publish's Retry and `reextract_manuscripts` send it again; left
+#: `queued`, both would take it for a read still on its way and skip it.
+COULD_NOT_QUEUE = "The read could not be sent: the task queue did not answer. Retry it."
+
+
+def _send_read(task, extraction_id, *args):
+    """Send a read after commit; if the send fails, mark it failed and raise for the log."""
+    try:
+        task.delay(*args)
+    except Exception:
+        PdfExtraction.objects.filter(pk=extraction_id, status="queued").update(
+            status="failed", error=COULD_NOT_QUEUE,
+        )
+        raise
+
+
 def reset_manuscript(record, *, defer=False, retry=False):
     """Under the Record lock: invalidate all current output, then queue after commit."""
     from .tasks import extract_manuscript_text
@@ -57,7 +74,10 @@ def reset_manuscript(record, *, defer=False, retry=False):
         extraction.formulas.exclude(source_revision=revision).delete()
     if not defer and not held:
         pinned = str(revision) if revision else None
-        transaction.on_commit(lambda: extract_manuscript_text.delay(record.pk, pinned))
+        # Robust (IR-1049): the write that asked is saved whatever the queue does.
+        transaction.on_commit(
+            lambda: _send_read(extract_manuscript_text, extraction.pk, record.pk, pinned), robust=True,
+        )
 
 
 def queue_upload_read(upload) -> PdfExtraction:
@@ -72,7 +92,7 @@ def queue_upload_read(upload) -> PdfExtraction:
         upload=upload, kind=DocumentKind.SUPPLEMENTARY, **(HELD if held else {}),
     )
     if not held:
-        transaction.on_commit(lambda: extract_pdf_text.delay(upload.id))
+        transaction.on_commit(lambda: _send_read(extract_pdf_text, extraction.pk, upload.id), robust=True)
     return extraction
 
 
@@ -99,7 +119,10 @@ def read_awaiting(record_id) -> None:
             extraction.phase = ExtractionPhase.QUEUED
             extraction.error = ""
             extraction.save(update_fields=["phase", "error"])
-            transaction.on_commit(lambda upload_id=extraction.upload_id: extract_pdf_text.delay(upload_id))
+            transaction.on_commit(
+                lambda pk=extraction.pk, upload_id=extraction.upload_id: _send_read(extract_pdf_text, pk, upload_id),
+                robust=True,
+            )
 
 
 def current_source(extraction, record):

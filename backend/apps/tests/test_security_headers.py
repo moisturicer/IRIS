@@ -15,11 +15,13 @@ Two servers answer a browser, so two halves:
   IR-628 and IR-662 pins; the Docker Compose CI job also boots the real nginx
   and asks it.
 
-The CSP ships as `Content-Security-Policy-Report-Only` until a manual
-walk-through of the main screens shows no violation (IR-663's acceptance
-criteria). Report-only is not enforcement, and browsers ignore
-`frame-ancestors` in a report-only policy, which is why `X-Frame-Options: DENY`
-stays on both servers.
+The CSP is enforced since IR-823, after `e2e/specs/08-csp-walkthrough.spec.ts`
+walked every main screen, as every role, and the Django admin, with no
+violation. Production enforces on both servers; development reports only
+(`config/settings/development.py`), because the debug toolbar and DRF's
+browsable API carry inline code. These tests run under the development
+settings, so the production value is read from `config.settings.base`.
+`X-Frame-Options: DENY` stays for browsers that predate `frame-ancestors`.
 """
 
 import re
@@ -86,14 +88,24 @@ class DjangoResponseHeaderTests(SimpleTestCase):
     def test_framing_is_denied(self):
         self.assertEqual(self.get()["X-Frame-Options"], "DENY")
 
-    def test_csp_ships_report_only(self):
+    def test_development_only_reports(self):
         response = self.get()
         self.assertIn("Content-Security-Policy-Report-Only", response)
-        self.assertNotIn(
-            "Content-Security-Policy",
-            response,
-            "the CSP is enforced before the IR-663 walk-through found it clean",
-        )
+        self.assertNotIn("Content-Security-Policy", response)
+
+    def test_production_enforces(self):
+        from config.settings import base
+
+        self.assertIs(base.CONTENT_SECURITY_POLICY_REPORT_ONLY, False)
+        production = (REPO_ROOT / "backend" / "config" / "settings" / "production.py") if REPO_ROOT else None
+        if production is not None:
+            self.assertNotIn("CONTENT_SECURITY_POLICY_REPORT_ONLY", production.read_text(encoding="utf-8"),
+                             "production must inherit base.py's enforcing value")
+        with override_settings(CONTENT_SECURITY_POLICY_REPORT_ONLY=base.CONTENT_SECURITY_POLICY_REPORT_ONLY):
+            response = self.get()
+        self.assertIn("Content-Security-Policy", response)
+        self.assertNotIn("Content-Security-Policy-Report-Only", response)
+        assert_policy_is_strict(response["Content-Security-Policy"])
 
     def test_csp_is_strict(self):
         assert_policy_is_strict(self.get()["Content-Security-Policy-Report-Only"])
@@ -149,11 +161,9 @@ def test_the_snippet_sends_every_header():
     assert headers.get("X-Content-Type-Options") == "nosniff"
     assert headers.get("Referrer-Policy") in ACCEPTABLE_REFERRER_POLICIES
     assert headers.get("X-Frame-Options") == "DENY"
-    assert "Content-Security-Policy-Report-Only" in headers, (
-        "the SPA's CSP must ship report-only until the IR-663 walk-through is clean"
-    )
-    assert "Content-Security-Policy" not in headers
-    assert_policy_is_strict(headers["Content-Security-Policy-Report-Only"])
+    assert "Content-Security-Policy" in headers, "the SPA's CSP is enforced (IR-823)"
+    assert "Content-Security-Policy-Report-Only" not in headers
+    assert_policy_is_strict(headers["Content-Security-Policy"])
 
 
 def test_every_location_nginx_answers_itself_includes_the_snippet():

@@ -21,11 +21,11 @@ from apps.accounts.models import (
 )
 from apps.audit.models import AuditEvent
 
+from ..password_validation import MAX_PASSWORD_LENGTH  # one definition (IR-819)
 from . import audit, clock, crypto, limits
 
 logger = logging.getLogger(__name__)
 
-MAX_PASSWORD_LENGTH = 128
 
 
 class InvalidLink(Exception):

@@ -164,7 +164,7 @@ describe("the sidebar's list", () => {
     expect(mainLinks()).not.toContain("My Reviews");
   });
 
-  const queues = (counts: { download_requests: number; delete_requests: number; role_change_requests: number }) =>
+  const queues = (counts: { download_requests?: number; delete_requests?: number; role_change_requests?: number; reported_comments?: number }) =>
     vi.mocked(apiClient.get).mockImplementation(((url: string) =>
       url === "/dashboard/queue-counts/"
         ? Promise.resolve({ data: counts })
@@ -183,6 +183,27 @@ describe("the sidebar's list", () => {
     expect(within(admin).getByRole("link", { name: "Download Requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
     expect(within(admin).getByRole("link", { name: "Delete Requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
     expect(screen.queryByRole("link", { name: "Audit Log" })).not.toBeInTheDocument();
+  });
+
+  // IR-693: the Reported comments queue RDCO shares with the System Admin.
+  it("counts the reported comments beside RDCO's queue link", async () => {
+    queues({ role_change_requests: 0, download_requests: 0, delete_requests: 0, reported_comments: 4 });
+    signIn(ROLES.RDCO, true);
+    renderAt("/records/mine");
+
+    const admin = await screen.findByRole("list", { name: "RDCO" });
+    expect(await within(admin).findByRole("link", { name: "Reported Comments, 4 pending" }))
+      .toHaveAttribute("href", "/moderation/comments");
+  });
+
+  it("gives the System Admin the same page and count, in its own section", async () => {
+    queues({ reported_comments: 2 });
+    signIn(ROLES.SYSTEM_ADMIN, true);
+    renderAt("/records/mine");
+
+    const admin = await screen.findByRole("list", { name: "Administration" });
+    expect(await within(admin).findByRole("link", { name: "Reported Comments, 2 pending" }))
+      .toHaveAttribute("href", "/moderation/comments");
   });
 
   it("shows no count at zero", async () => {
@@ -218,7 +239,8 @@ describe("the sidebar's list", () => {
     expect(await within(admin).findByRole("link", { name: "Download Requests, 1 pending" })).toBeInTheDocument();
   });
 
-  it.each([ROLES.STUDENT, ROLES.ITSO, ROLES.SYSTEM_ADMIN])("never asks %s for the queue counts", async (role) => {
+  // The System Admin asks since IR-693: it shares the Reported comments queue.
+  it.each([ROLES.STUDENT, ROLES.ITSO])("never asks %s for the queue counts", async (role) => {
     signIn(role, true);
     renderAt("/records/mine");
 
@@ -233,7 +255,9 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Retention"]);
+    // IR-693 adds Reported Comments, after Account Deletions; IR-972 moves the Notice onto RDCO's Setup.
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
+      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported Comments", "Retention"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");

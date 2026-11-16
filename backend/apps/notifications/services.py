@@ -597,6 +597,41 @@ def notify_comment_replied(record, comment, *, actor):
         _log_failure("notify_comment_replied", record=record)
 
 
+def notify_comment_reported(record, comment):
+    """
+    A comment entered the Reported comments queue (IR-691): RDCO hears once,
+    on its first open report, bound to the comment so the notice settles when
+    its reports are handled (ADR-069). Never who reported, and never the
+    writer or the paper's owners. In-app only.
+    """
+    try:
+        rdco_role = _role(RoleName.RDCO)
+        if rdco_role:
+            # No sender: a notice shows its sender to everyone it reaches, and a report never names its reader.
+            Notification.objects.create(
+                sender=None, broadcast_to_role=rdco_role, record=record,
+                notif_type=NotificationType.objects.get_or_create(name="Comment Reported")[0],
+                message=f'A comment on "{record.title}" was reported. Review it in Reported comments.',
+                **_task_id(TaskKind.COMMENT_REPORT, comment.pk),
+            )
+    except Exception:
+        _log_failure("notify_comment_reported", record=record)
+
+
+def notify_comment_removed(record, comment, *, actor, reason: str):
+    """A comment's writer hears it was removed, and why (IR-691). In-app only."""
+    try:
+        if comment.author is None:
+            return
+        Notification.objects.create(
+            sender=actor, recipient=comment.author, record=record,
+            notif_type=NotificationType.objects.get_or_create(name="Comment Removed")[0],
+            message=f'Your comment on "{record.title}" was removed: {reason}',
+        )
+    except Exception:
+        _log_failure("notify_comment_removed", record=record)
+
+
 def notify_document_requested(document_request, *, party_label: str):
     """
     Tell every owner that a party has asked for documents (ADR-022 §3.1).
@@ -1231,3 +1266,83 @@ def _email_role_users(role, *, subject, greeting, body):
             message=f"{greeting},\n\n{body}\n\n-- The IRIS Team",
             recipient_list=emails,
         )
+
+
+# ---------------------------------------------------------------------------
+# Calls for papers (IR-762, ADR-050 decisions 8-11). In-app only.
+# ---------------------------------------------------------------------------
+
+# The notice types, by the names migration 0012 seeds. Named once, so the
+# serializer's `target` (IR-765) can't drift from what is sent.
+CALL_REQUEST_SUBMITTED = "Call Request Submitted"
+CALL_CONFIRMED = "Call Confirmed"
+CALL_REJECTED = "Call Rejected"
+CALL_REMOVED = "Call Removed"
+CALL_REQUEST_LAPSED = "Call Request Lapsed"
+
+def notify_call_requested(call, *, resubmitted=False):
+    """
+    Broadcast to RDCO that an Adviser's Call waits for it, bound to the Call
+    so the notice settles once RDCO decides (ADR-069). A resubmission is a
+    new request with a notice of its own.
+    """
+    try:
+        role = _role(RoleName.RDCO)
+        if role is None:
+            return
+        name = _name(call.posted_by)
+        if resubmitted:
+            message = f'{name} changed the call "{call.title}" and asked RDCO to confirm it again.'
+        else:
+            message = f'{name} asked RDCO to confirm the call "{call.title}".'
+        Notification.objects.create(
+            sender=call.posted_by, broadcast_to_role=role,
+            notif_type=_get_type(CALL_REQUEST_SUBMITTED), message=message,
+            **_task(TaskKind.CALL_REQUEST, call),
+        )
+    except Exception:
+        _log_failure("notify_call_requested", user=call.posted_by)
+
+
+def _tell_poster(call, *, type_name, message, sender=None):
+    """An informational notice to a Call's poster. None when their account is gone."""
+    try:
+        if call.posted_by is None:
+            return
+        Notification.objects.create(
+            sender=sender, recipient=call.posted_by,
+            notif_type=_get_type(type_name), message=message,
+        )
+    except Exception:
+        _log_failure(f"notify {type_name}", user=call.posted_by)
+
+
+def notify_call_confirmed(call, *, confirmed_by):
+    _tell_poster(
+        call, type_name=CALL_CONFIRMED, sender=confirmed_by,
+        message=f'RDCO confirmed your call "{call.title}". It is now on Calls & Conferences.',
+    )
+
+
+def notify_call_rejected(call, *, rejected_by, reason):
+    _tell_poster(
+        call, type_name=CALL_REJECTED, sender=rejected_by,
+        message=f'RDCO did not confirm your call "{call.title}". Reason: {reason}',
+    )
+
+
+def notify_call_removed(call, *, removed_by, reason):
+    _tell_poster(
+        call, type_name=CALL_REMOVED, sender=removed_by,
+        message=f'RDCO removed your call "{call.title}". Reason: {reason}',
+    )
+
+
+def notify_call_lapsed(call):
+    _tell_poster(
+        call, type_name=CALL_REQUEST_LAPSED,
+        message=(
+            f'Your call "{call.title}" was removed because its paper deadline passed '
+            "before it was confirmed. You may post a new one."
+        ),
+    )

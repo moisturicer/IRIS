@@ -65,6 +65,7 @@ Shape = Callable[[Mapping[str, Any]], NormalizedDocument]
 
 class UnstructuredExtractor:
     leaves_campus = True
+    extractor_name = EXTRACTOR_NAME
 
     def __init__(
         self,

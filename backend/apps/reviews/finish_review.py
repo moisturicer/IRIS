@@ -51,6 +51,7 @@ from apps.audit import workflow as audit
 from apps.records.versions import latest_version
 from core.enums import OPEN_SEAT_STATES, ReviewVerdict, SeatState, ThreadSeverity
 from core.permissions import may_read_review
+from core.text_limits import too_long, too_long_message
 
 from . import decisions, mentions, office_review, revisions, routing, seats
 from .models import ReviewComment, ReviewerSeat, ReviewRound
@@ -126,6 +127,8 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
     if seat.state == SeatState.ASSIGNED:
         raise FinishError("Open the review first.")
     summary = summary.strip() if isinstance(summary, str) else ""
+    if too_long(summary):
+        raise FinishError(too_long_message("A summary"))
 
     drafts = list(
         ReviewComment.objects.select_for_update()

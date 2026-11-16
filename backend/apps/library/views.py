@@ -19,6 +19,7 @@ double counting.
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Count
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -31,12 +32,18 @@ from apps.records.serializers import RecordListSerializer
 from apps.records.versions import served_manuscript_identity
 from core.enums import ReadingStatus
 
-from . import feeds, highlights
+from . import feeds, folders, highlights, positions
 from .models import (
+    MAX_FOLDERS,
+    MAX_HISTORY_ENTRIES,
     MAX_NOTE_LENGTH,
     MAX_SAVED_FEEDS,
+    FolderMembership,
+    LibraryFolder,
+    LibraryPreferences,
     ReadingHighlight,
     ReadingNote,
+    ReadingVisit,
     SavedFeed,
     SavedRecord,
 )
@@ -94,7 +101,8 @@ class SavedRecordDetailView(APIView):
     """
     PUT /library/saves/<record_id>/ saves the Record, optionally with a
     `reading_status` (one of `ReadingStatus`, or null to clear it).
-    DELETE unsaves it; deleting what is not saved is still a 204.
+    DELETE unsaves it, which takes it out of every folder too (IR-572);
+    deleting what is not saved is still a 204.
     """
 
     permission_classes = [IsAuthenticated]
@@ -145,8 +153,11 @@ class SavedRecordDetailView(APIView):
 
 
 def _readable_or_404(user, record_id):
-    if not Record.objects.visible_to(user).filter(pk=record_id).exists():
+    """The Record, if `user` may read it; else the same 404 as a missing one."""
+    record = Record.objects.visible_to(user).filter(pk=record_id).first()
+    if record is None:
         raise NotFound()
+    return record
 
 
 def _own_note(user, record_id):
@@ -369,8 +380,8 @@ def _feed_entry(feed, stale):
 
 
 def _locked(user):
-    """Serialise one account's feed writes: the limit and the name check both
-    count rows, so two simultaneous saves must not both pass them."""
+    """Serialise one account's feed or folder writes: the limit and the name
+    check both count rows, so two simultaneous saves must not both pass them."""
     return get_user_model().objects.select_for_update().get(pk=user.pk)
 
 
@@ -463,4 +474,267 @@ class SavedFeedDetailView(APIView):
         deleted, _ = SavedFeed.objects.filter(owner=request.user, pk=feed_id).delete()
         if not deleted:
             raise NotFound()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# -- IR-572: the reader's own folders (ADR-070) ----------------------------------
+#
+# The owner is the authenticated user, and every queryset starts from
+# `LibraryFolder.objects.filter(owner=request.user)`: another reader's folder
+# cannot be addressed, and answers the same 404 as one that does not exist.
+# Filing a Record rechecks `Record.objects.visible_to()` and saves it, because a
+# folder holds saved papers. Nothing here is a discovery signal: no folder write
+# invalidates For you or touches "Not interested".
+
+
+class FolderListView(APIView):
+    """
+    GET  /library/folders/ -- the reader's folders, oldest first, each with the
+         ids of the Records filed in it (newest first), and the account limit.
+    POST /library/folders/ -- create one by name. Creating a name the reader
+         already has, ignoring case, returns that folder with a 200, so a retry
+         or a second click never makes two.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        own = LibraryFolder.objects.filter(owner=request.user).order_by("created_at", "pk")
+        return Response({"results": folders.entries(own), "limit": MAX_FOLDERS})
+
+    def post(self, request):
+        name = folders.clean_name(_body(request).get("name"))
+
+        with transaction.atomic():
+            _locked(request.user)
+            existing = folders.folder_named(request.user, name)
+            if existing is not None:
+                return Response(folders.entry(existing), status=status.HTTP_200_OK)
+            if LibraryFolder.objects.filter(owner=request.user).count() >= MAX_FOLDERS:
+                return Response(
+                    {
+                        "code": "folder_limit",
+                        "detail": f"You have {MAX_FOLDERS} folders. Delete one to make another.",
+                        "limit": MAX_FOLDERS,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            folder = LibraryFolder.objects.create(owner=request.user, name=name)
+
+        return Response(folders.entry(folder), status=status.HTTP_201_CREATED)
+
+
+class FolderDetailView(APIView):
+    """
+    PATCH  /library/folders/<id>/ -- rename it. Renaming to its own name, in
+           any case, is a 200; to another of the reader's folders' names, a 400.
+    DELETE /library/folders/<id>/ -- remove it and its filings, never a save.
+           Deleting what is not there, or is not the caller's, is still a 204:
+           it removes nothing and discloses nothing.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, folder_id):
+        name = folders.clean_name(_body(request).get("name"))
+
+        with transaction.atomic():
+            _locked(request.user)
+            folder = LibraryFolder.objects.filter(owner=request.user, pk=folder_id).first()
+            if folder is None:
+                raise NotFound()
+            if folders.folder_named(request.user, name, excluding=folder.pk) is not None:
+                raise folders.duplicate_name()
+            if folder.name != name:
+                folder.name = name
+                folder.save(update_fields=["name", "updated_at"])
+
+        return Response(folders.entry(folder))
+
+    def delete(self, request, folder_id):
+        LibraryFolder.objects.filter(owner=request.user, pk=folder_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FolderRecordView(APIView):
+    """
+    PUT    /library/folders/<id>/records/<record_id>/ -- file a Record in one
+           of the reader's folders. A folder holds saved papers, so an unsaved
+           Record is saved first, with no Reading status. Repeating it changes
+           nothing. Answers the folder and the save.
+    DELETE -- take it out of that folder. The save, its status and every other
+           folder are untouched, and it is not "Not interested". Removing what
+           is not there is still a 204, with no visibility check, so a reader
+           can tidy away a Record they can no longer read.
+
+    A folder that is not the caller's, and a Record they cannot read, are each
+    the same 404 as a missing one, and nothing is written.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, folder_id, record_id):
+        with transaction.atomic():
+            folder = LibraryFolder.objects.select_for_update().filter(owner=request.user, pk=folder_id).first()
+            if folder is None:
+                raise NotFound()
+            record = _readable(request.user).filter(pk=record_id).first()
+            if record is None:
+                raise NotFound()
+            # Locked, so an unsave arriving now waits for this filing and then
+            # cascades it away, rather than leaving a filing with no save.
+            save, saved_now = SavedRecord.objects.select_for_update().get_or_create(
+                owner=request.user, record_id=record.pk,
+            )
+            if saved_now:
+                # A new save is a For you signal (IR-575); the filing is not.
+                invalidate_feed(request.user)
+            _, filed = FolderMembership.objects.get_or_create(folder=folder, saved_record=save)
+
+        return Response(
+            {"folder": folders.entry(folder), "save": _entry(save, record, {"request": request})},
+            status=status.HTTP_201_CREATED if filed else status.HTTP_200_OK,
+        )
+
+    def delete(self, request, folder_id, record_id):
+        FolderMembership.objects.filter(
+            folder__owner=request.user, folder_id=folder_id, saved_record__record_id=record_id,
+        ).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# -- IR-756: reading history (ADR-044 §Amendment 2026-11-01) ---------------------
+#
+# The owner is the authenticated user and every queryset starts from
+# `ReadingVisit.objects.filter(owner=request.user)`; no staff route exists. A
+# visit is recorded only by the paper view's explicit PUT, never by reading a
+# Record, and every list rechecks `Record.objects.visible_to()`.
+
+
+def _visit_entry(visit, record, context):
+    if record is None:
+        return {"record_id": visit.record_id, "available": False}
+    return {
+        "record_id": visit.record_id,
+        "available": True,
+        "viewed_at": visit.viewed_at,
+        "record": RecordListSerializer(record, context=context).data,
+    }
+
+
+class ReadingHistoryView(APIView):
+    """
+    GET /library/history/ -- the papers the reader opened, most recent first.
+    DELETE clears it.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        visits = list(ReadingVisit.objects.filter(owner=request.user).order_by("-viewed_at", "-pk"))
+        records = {r.pk: r for r in _readable(request.user).filter(pk__in=[v.record_id for v in visits])}
+        context = {"request": request}
+        return Response({"results": [_visit_entry(v, records.get(v.record_id), context) for v in visits]})
+
+    def delete(self, request):
+        """Clear history: the rows are deleted, not hidden."""
+        ReadingVisit.objects.filter(owner=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ReadingVisitView(APIView):
+    """
+    PUT /library/history/<record_id>/ -- the paper view says the reader opened
+    this Record. Idempotent: a revisit moves it to the top. A Record the reader
+    cannot read is the same 404 as a missing one. While history is paused the
+    answer is the same 204 and nothing is written, not even `viewed_at`.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, record_id):
+        _readable_or_404(request.user, record_id)
+        if not LibraryPreferences.keeps_history(request.user):
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        with transaction.atomic():
+            ReadingVisit.objects.update_or_create(
+                owner=request.user, record_id=record_id, defaults={"viewed_at": timezone.now()},
+            )
+            stale = ReadingVisit.objects.filter(owner=request.user).order_by("-viewed_at", "-pk")[MAX_HISTORY_ENTRIES:]
+            ReadingVisit.objects.filter(pk__in=list(stale.values_list("pk", flat=True))).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class LibraryPreferencesView(APIView):
+    """
+    GET   /library/preferences/ -- the reader's settings; defaults when none is
+          stored, and reading creates nothing.
+    PATCH /library/preferences/ -- `{"keep_history": true|false}`. Off pauses
+          reading history (ADR-044 §Amendment 2026-11-01, point 7).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"keep_history": LibraryPreferences.keeps_history(request.user)})
+
+    def patch(self, request):
+        value = _body(request).get("keep_history")
+        if not isinstance(value, bool):
+            raise ValidationError({"keep_history": ["Send true to keep reading history or false to pause it."]})
+        LibraryPreferences.objects.update_or_create(owner=request.user, defaults={"keep_history": value})
+        return Response({"keep_history": value})
+
+
+# -- IR-573: resume reading ------------------------------------------------------
+#
+# The rules of notes and highlights. The owner is the authenticated user and
+# every query starts from the reader's own row; a Record they cannot read is the
+# same 404 as a missing one on both read and write. And the place is bound to
+# the Manuscript bytes it was read on: the client only says which revision it
+# was shown, and the server refuses the write unless that is still what the
+# reader is served (`positions`).
+
+
+class ReadingPositionView(APIView):
+    """
+    GET /library/positions/<record_id>/ -- `{position: {page, fraction,
+        manuscript_revision, updated_at}}`, or `{position: null}` when the reader
+        has none on the bytes they are served now. Reading never creates a
+        place; it deletes one left on bytes the reader is no longer served.
+    PUT /library/positions/<record_id>/ -- `{manuscript_revision, page, fraction}`,
+        saved by the paper view as the reader moves. 204; a `409 manuscript_changed`
+        when the revision is no longer the one served, and nothing is stored.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, record_id):
+        row = positions.current(request.user, _readable_or_404(request.user, record_id))
+        if row is None:
+            return Response({"position": None})
+        return Response({"position": {
+            "page": row.page,
+            "fraction": row.fraction,
+            "manuscript_revision": str(row.manuscript_revision),
+            "updated_at": row.updated_at,
+        }})
+
+    def put(self, request, record_id):
+        fields = positions.clean(request.data)
+        _readable_or_404(request.user, record_id)
+        with transaction.atomic():
+            # The Record's row is held until the place is stored, so an upload
+            # replacing these bytes waits, and its receiver then deletes it.
+            record = Record.objects.select_for_update().get(pk=record_id)
+            revision, sha256 = served_manuscript_identity(record, request.user)
+            if revision is None:
+                return _manuscript_conflict(
+                    "manuscript_unavailable", "This paper's Manuscript has no recorded identity, so no place is kept in it.",
+                )
+            if fields["manuscript_revision"] != revision:
+                return _manuscript_conflict(
+                    "manuscript_changed", "This paper's Manuscript was replaced while you were reading it.",
+                )
+            positions.save(request.user, record, (revision, sha256), page=fields["page"], fraction=fields["fraction"])
         return Response(status=status.HTTP_204_NO_CONTENT)

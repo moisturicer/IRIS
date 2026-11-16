@@ -19,6 +19,8 @@ interface ReadingPositionOptions {
    * the pages above the reader may have moved, so their place is put back.
    */
   geometryKey: string | number;
+  /** Told the reader's place each time it is measured (IR-573 saves it). Keep it stable. */
+  onAnchor?: (anchor: ReadingAnchor) => void;
 }
 
 /** Where the reader is: the page under the toolbar, and the last page in view. */
@@ -61,6 +63,7 @@ export function useReadingPosition({
   scrollAreaRef,
   contained,
   geometryKey,
+  onAnchor,
 }: ReadingPositionOptions): ReadingPosition {
   const [position, setPosition] = useState<ReadingPosition>(START);
   const anchorRef = useRef<ReadingAnchor | null>(null);
@@ -99,6 +102,7 @@ export function useReadingPosition({
       const anchor = readingAnchor(boxes, viewTop());
       if (!anchor) return;
       anchorRef.current = anchor;
+      onAnchor?.(anchor);
       const bottom = viewBottom();
       let last = anchor.page;
       while (last < boxes.length && boxes[last].top < bottom) last += 1;
@@ -123,7 +127,7 @@ export function useReadingPosition({
       area?.removeEventListener("scroll", onScroll);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [ready, pageCount, scale, pageRefs, scrollAreaRef, viewTop, viewBottom]);
+  }, [ready, pageCount, scale, pageRefs, scrollAreaRef, viewTop, viewBottom, onAnchor]);
 
   const layoutKey = `${scale}|${contained}|${geometryKey}`;
   const lastLayoutKey = useRef(layoutKey);

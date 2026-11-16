@@ -57,7 +57,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("documents", "0025_setup_requirements"),
-        ("records", "0042_setup_requirements"),
+        ("records", "0043_setup_requirements"),
     ]
 
     operations = [migrations.RunPython(forwards, backwards)]

@@ -6,7 +6,7 @@
 
 **Amended 2026-11-14 (IR-984):** the Extractor is Unstructured's Platform API with `strategy=hi_res`, not Transform, and the spike gate's reading-order rule is judged on real two-column pages. The spike gate passed on that basis; see the amendment at the end.
 
-**Not built.** LlamaParse stays the running Extractor until both gates in decision 2 pass and IR-988 runs. Until then this ADR decides what IRIS is moving to and how the move is judged; it changes no behaviour.
+**Built (IR-988, 2026-11-16):** both gates passed (the quality gate by the owner's decision, amendment of 2026-11-15) and Unstructured is the only Extractor; LlamaParse's code, settings and admission prices are deleted, and so is LlamaExtract, which read LlamaParse's parse jobs (ADR-056 decision 15 was already withdrawn). **The corpus has not been re-read yet:** `reextract_manuscripts` plans and caps that run, and stored LlamaParse Extractions are read from their stored structure until it does.
 
 **Supersedes [ADR-056](056-manuscript-extraction-moves-to-llamaparse.md) decisions 1, 2, 3, 8 and 9** (the vendor, its pinning, what is requested, its labels and its Figure crops) once the cutover runs. **Amends ADR-056 decision 4** (what the stored raw result is). **Replaces ADR-056 decision 14** (LlamaParse's acceptance check against Docling) with this ADR's two gates (decision 2). Decision 15 was already withdrawn. ADR-056 decisions 5–7, 10, 12 and 16 carry over unchanged, decisions 11 and 13 carry over adapted to Unstructured (decision 9), and so do its IR-851, IR-859 and IR-879/IR-883 amendments where they still apply (decision 12). ADR-056 stays `Accepted` until IR-988, then becomes `Superseded by ADR-067`.
 
@@ -367,6 +367,86 @@ Also built:
   report there for transcription against `latex_truth.py` and the retrieval
   comparison.
 
+## Amendment — 2026-11-15 (IR-1054): one strategy, with Figure passages, at 700 tokens
+
+Resolves decisions 11, 12 and 14. Proxy tier only (ADR-023): an engineering
+gate, never a finding about CIT-U research. Measured on a copy of the dev
+database whose 43 papers were read with Unstructured `hi_res` (IR-1054's
+`trial_read_unstructured`). Every number is reranked final-set recall, with
+`AI_RERANKER_READS=fallback` and formulas indexed; run files under
+`docs/evaluation/runs/2026-11-15-ir1054-*`.
+
+**1. Labeled and structural tie; structural stays and labeled is deleted.**
+
+| Strategy | Main set (129 questions) | One-paper slice (37) |
+|---|---|---|
+| `structural-markdown-v1` | 0.573 | 0.649 |
+| `labeled-structure-v1` | 0.567 | 0.622 |
+| `fixed-window` | 0.500 | 0.622 |
+
+The 0.006 gap is under decision 11's 0.01 tie margin; paired, each strategy
+wins two main-set questions the other misses. Jive Tyler Revalde broke the
+tie for structural (2026-11-15): it relies less on the heading levels IRIS
+rebuilds for Unstructured (IR-1057), and where labeled lost, its separate
+Figure chunks had cut the paragraph they sat in short. The override that sent
+authoritative structure (LlamaParse, then Unstructured) to labeled (IR-840)
+is removed with it, so every extractor chunks with structural.
+
+**2. Figures keep their own passages inside structural** (`AI_CHUNK_FIGURE_PASSAGES`, on).
+What labeled offered and structural lacked: structural read only an element's
+text, so a Figure's description was never indexed and an uncaptioned Figure
+vanished. Now each captioned or described Figure leaves the text flow (the
+paragraph around it stays whole) for a passage of its own that embeds caption
+and description, shows only the caption and carries the Figure's box. A
+Figure with neither is skipped until it is described. A transcribed formula
+stays in its paragraph, shown as LaTeX and embedded with its description per
+`AI_FORMULA_TEXT_INDEXED`; an untranscribed one stays as its box, never its
+OCR text.
+
+| | Main set | One-paper slice | Figure set (IR-1125, 29) |
+|---|---|---|---|
+| structural | 0.573 | 0.649 | 0.345 |
+| structural + Figure passages | 0.562 | 0.649 | **0.759** |
+
+One text question is the price of a large gain on Figure questions.
+Structural's set hash now also covers shown and keyword text whenever a set
+has Figure passages or transcribed formulas, so a change only readers see
+(a new transcription) is still saved; text vectors are reused as before.
+
+**3. `fixed-window` moves into the evaluation code** (`apps.ai.evaluation.fixed_window`),
+registered for measurement only. Ingestion refuses it (`EvaluationOnlyStrategy`);
+trial chunk sets and the contract suites still run it.
+
+**4. The target size stays 700 tokens.** Structural, main set: 300 → 0.489,
+400 → 0.517, 550 → 0.539, 700 → 0.573, 1,000 → 0.579. 1,000 leads by 0.006,
+short of decision 14's 0.01, so the default is unchanged. Embedding the whole
+corpus costs about the same at every size (~0.9M tokens).
+
+**Caveats.** When these ran, 286 of 1,355 formulas and 163 of 474 Figures were
+transcribed or described. 36 of the main set's 94 labels do not match
+Unstructured's text as-is (13 only for line-end hyphens Unstructured keeps,
+22 for papers or labels that miss on Docling too), which caps every strategy
+near 0.62 and narrows every gap. Voyage spend for all runs was about $2.20.
+
+**Rerun with fuller transcriptions (2026-11-15, `runs/2026-11-15-ir1054-rerun/`).**
+The same arms after 1,131 of 1,355 formulas and 393 of 474 Figures were
+transcribed or described (Claude Sonnet 5.5 via OpenRouter):
+
+| Strategy | Main set | One-paper slice | Figure set |
+|---|---|---|---|
+| structural | 0.573 | 0.649 | 0.345 |
+| **structural + Figure passages** | 0.551 | **0.649** | **0.931** |
+| labeled | 0.545 | 0.622 | 0.931 |
+| fixed-window (baseline) | **0.618** | 0.622 | 0.379 |
+
+The decisions stand: structural with Figure passages matches or beats labeled
+on every set, and keeps its Figure-set gain for two main-set questions. The
+baseline leads the main set by 0.067 (7 questions to 1, paired, p ≈ 0.07):
+its ~600-token windows cross headings, while structural never merges short
+sections, and the questions it wins need that context (three are follow-ups).
+That is a lead for a later, measured change to structural's merging, not a
+reason to ship the baseline (decision 12).
+
 ## Amendment — 2026-11-15 (IR-1126): Unstructured's image descriptions, data path and measurement
 
 This amendment records facts. It changes no decision: figures are still
@@ -413,7 +493,48 @@ each Figure was built and then removed, because the partition endpoint never
 returns one. Using the enrichment would need a Jobs-API reader first, and the
 measurement in item 3 gives no reason to build one.
 
-## Related Requirements
+## Amendment — 2026-11-15 (IR-989): the quality gate passes by the owner's decision
+
+The rule failed one check as measured. Jive Tyler Revalde, IR-980's owner, decided on 2026-11-15 that the gate passes, because the sample is too small for the gap to count. Proxy tier only (ADR-023). Report: `docs/evaluation/runs/2026-11-15-ir989-extractor-gate/report.md`.
+
+| Rule (decision 2) | LlamaParse | Unstructured | As measured |
+|---|---|---|---|
+| recall@10 with reranking, lower by at most 0.02 | 0.786 | 0.643 | Fail |
+| Wrongly nested numbered headings, at most LlamaParse's + 5 | 0 | 0 | Pass |
+| No paper loses all its LaTeX | — | — | Pass, through IR-1102's transcriptions |
+
+**Why it passes.**
+- **The margin is below one question.** The six-paper set has 14 questions, so one question is worth 0.071 of recall, and the 0.02 margin can only be met by losing none.
+- **Both lost questions share one label.** Its quote cannot match Unstructured's text, because Unstructured keeps the PDF's line-end hyphen ("ex- plicit"). With that quote trimmed past the hyphen, both extractors score 0.786.
+
+**Effect.** Unstructured is eligible, and IR-988 (the cutover) is unblocked. This departs from decision 2's "no sign-off is needed; the measured rule decides" for this gate only. The rule itself is unchanged.
+
+**Carried to the cutover.** Unstructured shaping keeps line-end hyphens (IR-1054 found the same defect), which also blocks some evaluation labels from matching. No Jira issue tracks that fix yet.
+
+## Amendment — 2026-11-15 (IR-1149): formulas enter the indexed text by default
+
+`AI_FORMULA_TEXT_INDEXED` now defaults to on: a transcribed formula's LaTeX and one-line description enter its chunk's embedded and keyword-indexed text. Jive Tyler Revalde decided this on 2026-11-15. It is an exception to ADR-033 §5, made by a person: no `eval_retrieval` run has measured it. The setting is read at chunking, so existing chunk sets change only after a re-chunk. Readers saw the LaTeX before and still do.
+
+Figure descriptions need no change. A described Figure's description already enters its chunk's embedded text (IR-852), and none is written unless `LLM_DESCRIBE_FIGURE_MODEL` is set, because each description is a paid call.
+
+## Amendment — 2026-11-16 (IR-1147): short sections merge with a sibling, floor 450
+
+**Decision.** `AI_CHUNK_SIBLING_MERGE_FLOOR` defaults to **450**. A structural passage under 450 tokens merges with a neighbouring section under the same parent heading, up to the 700-token target, and carries the parent's path. The merge goes forward first, then back for a short last section. It never merges two chapters, a chapter's introduction with its first subsection, or a Figure passage; a merge passes over a Figure. The option is `ChunkingOptions.sibling_merge_floor`, where 0 is off. Jive Tyler Revalde asked for it on by default after the run below. It is read at chunking, so existing chunk sets change only after a re-chunk.
+
+**Why.** On IR-1054's rerun the evaluation-only `fixed-window` baseline led structural on the main set, 0.618 to 0.551. In each question it won, structural's passage was a short section (80–450 tokens), because structural never merged across a heading.
+
+**Measurement.** The run files are in `docs/evaluation/runs/2026-11-16-ir1147-sibling-merge/` (proxy tier, ADR-023; never a finding about CIT-U research). They were run on `iris_ir1054` with reranking, against `g_hybrid` (structural with Figure passages, IR-1054's choice), and are Voyage only. Search was exact (`enable_indexscan=off`). A first pass on the shared HNSW index starved `g_hybrid` and the lower floors of results: about 20 trial sets hold near-identical vectors, and `ef_search` stops at 1,000. Those files are kept in `hnsw-starved/` and are not used. Under exact search `g_hybrid` reproduces IR-1054's 0.551 / 0.649 / 0.931.
+
+| Floor | Main set | One-paper slice | Figure set |
+|---|---|---|---|
+| off (`g_hybrid`) | 0.551 | 0.649 | 0.931 |
+| 150 | 0.539 | 0.649 | 0.931 |
+| 300 | 0.556 | 0.649 | 0.931 |
+| 450 | 0.567 | 0.649 | 0.931 |
+| 600 | 0.567 | 0.649 | 0.931 |
+
+The decision rule was fixed before the run: adopt only if the main set rises by at least 0.01 and neither the slice nor the Figure set falls by more than 0.01. Floor 450 meets it, with +0.017 on the main set and the other two sets unchanged. Paired against `g_hybrid`, it won q25, q34 and q100 and lost q03, so p = 0.625 on a two-sided exact sign test: **the gain is not statistically significant**. Floor 600 gives the same wins and losses, so the smaller floor was chosen. Several floors were tried at the owner's request, so the 450 result is the best of four, which makes it more optimistic. Of the baseline's seven wins over structural in IR-1054, three are recovered (q25, q34, q100); q08, q38, q101 and q102 are not.
+
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 
@@ -437,3 +558,4 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-982: vendor registry, closed as won't do
 - IR-1102: formulas as exact LaTeX, behind a flag
 - IR-1126: Unstructured's image-description enrichment, measured and not adopted
+- IR-1147: short sections merge with a sibling, floor 450

@@ -162,6 +162,21 @@ class IsSystemAdmin(BasePermission):
         return is_system_admin(request.user)
 
 
+#: RDCO and the System Admin: they share the Reported comments queue and remove
+#: Comments (ADR-032 §7, amendment 2026-10-31; IR-691, decision 2026-11-15).
+COMMENT_MODERATOR_ROLES = {ROLE_RDCO, ROLE_SYSTEM_ADMIN}
+
+
+def is_comment_moderator(user) -> bool:
+    return get_role_name(user) in COMMENT_MODERATOR_ROLES
+
+
+class IsCommentModerator(BasePermission):
+    """RDCO or the System Admin: the Reported comments queue and removal (IR-691)."""
+    def has_permission(self, request, view):
+        return is_comment_moderator(request.user)
+
+
 class IsAccountAdmin(BasePermission):
     """RDCO or the System Admin: the Users page and its role changes."""
     def has_permission(self, request, view):
@@ -208,9 +223,22 @@ class IsOpportunityPoster(BasePermission):
         return get_role_name(request.user) in OPPORTUNITY_POSTER_ROLES
 
     def has_object_permission(self, request, view, obj):
-        if get_role_name(request.user) in OPPORTUNITY_MODERATOR_ROLES:
-            return True
-        return obj.posted_by_id == request.user.pk
+        return is_call_moderator(request.user) or obj.posted_by_id == request.user.pk
+
+
+def is_call_moderator(user) -> bool:
+    """RDCO: confirms, rejects, features and removes any Call (ADR-050 decisions 8, 11, 12)."""
+    return get_role_name(user) in OPPORTUNITY_MODERATOR_ROLES
+
+
+class IsCallModerator(BasePermission):
+    """
+    RDCO's acts on Calls (ADR-050 decisions 8-12, IR-762): reading the Call
+    Requests queue, confirming, rejecting and removing. The same role set as
+    `IsOpportunityPoster`'s moderator half, so the two cannot disagree.
+    """
+    def has_permission(self, request, view):
+        return is_call_moderator(request.user)
 
 
 def owns_or_staffs_record(user, record) -> bool:

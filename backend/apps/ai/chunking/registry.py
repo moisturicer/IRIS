@@ -10,15 +10,17 @@ that value says exactly which stored sets need rebuilding.
 
 from typing import Callable, TypeVar
 
-from .ports import Chunker, UnknownChunkingStrategy
+from .ports import Chunker, EvaluationOnlyStrategy, UnknownChunkingStrategy
 from .values import ChunkingOptions
 
 _REGISTRY: dict[str, type] = {}
+# Baselines kept for measurement only, never for ingestion (IR-1054).
+_EVALUATION_ONLY: set[str] = set()
 
 T = TypeVar("T")
 
 
-def register_chunker(strategy_id: str) -> Callable[[type], type]:
+def register_chunker(strategy_id: str, *, evaluation_only: bool = False) -> Callable[[type], type]:
     """Register a chunker class under ``strategy_id``."""
 
     def decorator(cls: type) -> type:
@@ -28,6 +30,8 @@ def register_chunker(strategy_id: str) -> Callable[[type], type]:
                 f"{_REGISTRY[strategy_id].__name__}"
             )
         _REGISTRY[strategy_id] = cls
+        if evaluation_only:
+            _EVALUATION_ONLY.add(strategy_id)
         return cls
 
     return decorator
@@ -36,6 +40,17 @@ def register_chunker(strategy_id: str) -> Callable[[type], type]:
 def registered_strategies() -> list[str]:
     """The strategy ids known to this process."""
     return sorted(_REGISTRY)
+
+
+def ingestion_strategies() -> list[str]:
+    """The strategy ids ingestion may use: every one but the baselines."""
+    return sorted(set(_REGISTRY) - _EVALUATION_ONLY)
+
+
+def require_ingestion_strategy(strategy_id: str) -> None:
+    """Refuse a baseline that is registered for measurement only (IR-1054)."""
+    if strategy_id in _EVALUATION_ONLY:
+        raise EvaluationOnlyStrategy(strategy_id, ingestion_strategies())
 
 
 def build_chunker(options: ChunkingOptions) -> Chunker:

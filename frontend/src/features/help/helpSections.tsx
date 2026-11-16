@@ -106,7 +106,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         <p>
           My Library holds the records you have saved, on every device you sign in on. Nobody else
           can see it. Give a saved record a reading status (Want to read, Reading or Completed), and
-          group saved records into folders, which for now stay in the browser you made them in.
+          group saved records into folders of your own, which follow your account too.
         </p>
         <p>
           Your own research is listed there too. Reading history, the papers you opened recently,
@@ -121,8 +121,11 @@ export const HELP_SECTIONS: HelpSection[] = [
     shownTo: (r) => canAccess(r.role, "opportunities"),
     body: (
       <p>
-        Calls for papers and conferences open to your institution's research community. RDCO and Advisers
-        post them and keep them up to date.
+        Calls for papers from conferences, congresses, symposia, workshops, journals and book chapters,
+        soonest paper deadline first. Each call says whether it is accepting papers, and when its event is
+        happening. Filter by type or Area, and save the ones you want to keep: saved calls follow your
+        account and stay in My Library, under Saved calls, until you remove them. RDCO posts calls, and
+        an Adviser's call appears once RDCO confirms it.
       </p>
     ),
   },

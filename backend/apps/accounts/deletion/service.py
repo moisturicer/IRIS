@@ -17,6 +17,7 @@ from django.utils import timezone
 from apps.audit.models import AuditEvent
 from apps.audit.services import create_audit_event
 from core.enums import PipelineStatus, RequestStatus, SessionEndReason
+from core.text_limits import too_long, too_long_message
 from core.utils import send_email_async
 
 from ..models import AccountDeletionRequest, ResearchInterest, User
@@ -94,6 +95,8 @@ def reject_deletion(request_id: int, actor, reason: str) -> AccountDeletionReque
     reason = (reason or "").strip()
     if not reason:
         raise Refused("A reason is required to reject a deletion request.", status=400)
+    if too_long(reason):
+        raise Refused(too_long_message("A reason"), status=400)
     found = _lock_pending(request_id, actor)
     found.status = RequestStatus.DECLINED
     found.decided_by = actor

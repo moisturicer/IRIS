@@ -29,6 +29,13 @@ const EVERYONE: RoleName[] = [
   ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO, ROLES.SYSTEM_ADMIN,
 ];
 
+/**
+ * Who posts Calls for papers: RDCO and Advisers (`OPPORTUNITY_POSTER_ROLES`,
+ * ADR-050). Only the route to their own Calls uses it; the board's buttons
+ * come from the server's `can_*` flags.
+ */
+const CALL_POSTERS: RoleName[] = [ROLES.RDCO, ROLES.ADVISER];
+
 /** The research navigation; System Admin uses its own Administration section. */
 const RESEARCH_ROLES = EVERYONE.filter((role) => role !== ROLES.SYSTEM_ADMIN);
 
@@ -172,6 +179,8 @@ export const SCREEN_ACCESS = {
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,
                    nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Main", onlyFor: RESEARCH_ROLES } },
+  // A poster's own Calls in every status (IR-765), reached from the board.
+  myCalls:       { path: "/opportunities/mine", roles: CALL_POSTERS },
 
   // --- RDCO coordination (ADR-051, IR-783) ----------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
@@ -182,8 +191,15 @@ export const SCREEN_ACCESS = {
                  nav: { label: "Role Requests", icon: "fa-user-check", section: "RDCO" } },
   downloadRequests: { path: "/rdco/download-requests", roles: COORDINATOR,
                  nav: { label: "Download Requests", icon: "fa-download", section: "RDCO" } },
+  // ADR-050 decision 8 and ADR-051: Advisers' Calls waiting for RDCO (IR-765).
+  callRequests:  { path: "/rdco/call-requests", roles: COORDINATOR,
+                 nav: { label: "Call Requests", icon: "fa-bullhorn", section: "RDCO" } },
   deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
                  nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "RDCO" } },
+  // One page for RDCO and the System Admin (IR-693, decision 2026-11-15), each
+  // reaching it from their own section.
+  reportedComments: { path: "/moderation/comments", roles: COORDINATOR,
+                 nav: { label: "Reported Comments", icon: "fa-flag", section: "RDCO" } },
   // ADR-063 decision 9 (IR-971, IR-972): RDCO's Setup, each record type's
   // Requirements & Templates, and the Notice (`?section=notice`), which was the
   // Notices page (IR-800). Every RDCO account; the server refuses anyone else.
@@ -199,6 +215,9 @@ export const SCREEN_ACCESS = {
   // ADR-051 §8: the System Admin confirms or rejects account deletions (IR-788).
   accountDeletionRequests: { path: "/admin/account-deletion-requests", roles: SYSTEM_ADMIN,
                  nav: { label: "Account Deletions", icon: "fa-user-slash", section: "Administration" } },
+  // The Reported comments page above, shared (IR-693).
+  adminReportedComments: { path: "/moderation/comments", roles: SYSTEM_ADMIN,
+                 nav: { label: "Reported Comments", icon: "fa-flag", section: "Administration" } },
   // ADR-051 §3 and §19: the System Admin sets retention periods (IR-795).
   retention:     { path: "/admin/retention", roles: SYSTEM_ADMIN,
                  nav: { label: "Retention", icon: "fa-clock-rotate-left", section: "Administration" } },

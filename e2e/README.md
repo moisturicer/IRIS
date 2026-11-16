@@ -62,7 +62,7 @@ keys for a later, approved Ask IRIS run go in `e2e/.env.e2e.local`
 
 ## What the journeys use that the application does not offer a screen for
 
-- `seed_demo --accounts-only --force` — the demo accounts (`<role>@cit.edu`).
+- `seed_demo --accounts-only --force` — the demo accounts (`<role>@iris.test` since IR-1067).
 - `review_clock_for_testing --force` — a Turnaround per party (what an
   administrator enters in Django admin, unreachable here because production
   CSRF checks an HTTPS origin), moving an active assignment's Due date into

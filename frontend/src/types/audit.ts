@@ -1,6 +1,6 @@
 export const AUDIT_EVENT_GROUPS = {
   Account: {
-    LOGIN: "Login", LOGOUT: "Logout", FAILED_LOGIN: "Failed Login",
+    LOGIN: "Login", LOGOUT: "Logout", FAILED_LOGIN: "Failed Login", ACCOUNT_REGISTERED: "Account Registered",
     PIN_GENERATED: "PIN Generated", PIN_VERIFIED: "PIN Verified", ROLE_CHANGE: "Role Change",
     ACCOUNT_LOCKED: "Account Locked", ACCOUNT_UNLOCKED: "Account Unlocked", SESSION_REVOKE: "Session Revoked",
     PASSWORD_CHANGED: "Password Changed",
@@ -52,6 +52,12 @@ export const AUDIT_EVENT_GROUPS = {
     SEAT_CLAIMED: "Seat Claimed", SEAT_ASSIGNED: "Seat Assigned", SEAT_NOMINATED: "Seat Nominated",
     SEAT_REASSIGNED: "Seat Reassigned", SEAT_WITHDRAWN: "Seat Withdrawn",
     REVIEWER_ADDED: "Reviewer Added", SEAT_OPENED: "Seat Opened",
+  },
+  // Calls for papers (ADR-050 decision 15, IR-763).
+  Calls: {
+    CALL_POSTED: "Call Posted", CALL_EDITED: "Call Edited", CALL_DELETED: "Call Deleted",
+    CALL_CONFIRMED: "Call Confirmed", CALL_REJECTED: "Call Rejected", CALL_REMOVED: "Call Removed",
+    CALL_LAPSED: "Call Request Lapsed",
   },
   "Ask IRIS": { QUESTION_INJECTION: "Reader Question Injection Flagged" },
 } as const;

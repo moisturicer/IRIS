@@ -32,18 +32,12 @@ from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDo
 FORMAT_VERSION = 1
 
 
-def read_document(*, extractor, structure, raw_result=None):
-    """Read the current document; LlamaParse's persisted raw result is primary.
+def read_document(structure):
+    """The stored structure as a document, or ``None`` when there is none.
 
-    ``raw_result`` is stored by IR-841. Missing raw data must never turn a
-    stale derived structure into an apparently successful LlamaParse read.
+    A LlamaParse Extraction is read from its stored structure too: its raw
+    result is kept but no longer re-shaped (IR-988, ADR-067).
     """
-    if extractor == "llamaparse":
-        if not raw_result:
-            return None
-        from .shaping import shape_llamaparse
-
-        return shape_llamaparse(raw_result)
     return document_from_json(structure) if structure else None
 
 

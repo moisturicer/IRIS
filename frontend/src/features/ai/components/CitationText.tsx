@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef } from "react";
+import { Children, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -107,6 +107,22 @@ function CitationChip({ citation, page = false }: { citation: ChatCitation; page
   );
 }
 
+/**
+ * An outside address, shown as text and never clickable (IR-1172): paper text can
+ * steer the model into writing a link that carries the reader's words off-site.
+ */
+function ExternalAddress({ href, children }: { href: string; children?: ReactNode }) {
+  const label = Children.toArray(children).filter((c) => typeof c === "string").join("");
+  const shown = href.replace(/^mailto:/, "");
+  return (
+    <span>
+      {label === shown ? null : <>{children} (</>}
+      <span className="break-all text-stone-600">{shown}</span>
+      {label === shown ? null : ")"}
+    </span>
+  );
+}
+
 interface CitationTextProps {
   text: string;
   citations: ChatCitation[];
@@ -137,13 +153,7 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
       );
     }
 
-    if (!href.startsWith(CITATION_SCHEME)) {
-      return (
-        <a href={href} target="_blank" rel="noreferrer">
-          {children}
-        </a>
-      );
-    }
+    if (!href.startsWith(CITATION_SCHEME)) return <ExternalAddress href={href}>{children}</ExternalAddress>;
 
     const key = href.slice(CITATION_SCHEME.length);
     if (key === PENDING) return <CitationPlaceholder />;

@@ -112,7 +112,9 @@ def ensure_current(version) -> ReviewText | None:
 def _queue(text_id):
     from ..tasks import read_review_text
 
-    transaction.on_commit(lambda: read_review_text.delay(text_id))
+    # Robust: a queue that is down must not fail the act that asked (IR-1049);
+    # `_requeue_if_lost` sends a lost read again.
+    transaction.on_commit(lambda: read_review_text.delay(text_id), robust=True)
 
 
 def _requeue_if_lost(text):

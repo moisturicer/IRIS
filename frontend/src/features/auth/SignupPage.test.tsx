@@ -459,13 +459,16 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
 
     const password = screen.getByLabelText("Password");
     expect(password).toBeRequired();
-    expect(password).toHaveAccessibleDescription("At least 8 characters");
+    expect(password).toHaveAccessibleDescription("At least 12 characters");
 
     await user.type(password, "short");
-    expect(password).toHaveAccessibleDescription("Password must be at least 8 characters.");
+    expect(password).toHaveAccessibleDescription("Password must be at least 12 characters.");
+
+    expect(screen.getByText("Password strength: Too short")).toBeInTheDocument();
 
     await user.type(password, "-enough");
-    expect(password).toHaveAccessibleDescription("At least 8 characters");
+    expect(password).toHaveAccessibleDescription("At least 12 characters");
+    expect(screen.getByText(/^Password strength: /)).not.toHaveTextContent("Too short");
     expect(password).not.toHaveAttribute("aria-invalid");
 
     const confirm = screen.getByLabelText("Confirm password");
