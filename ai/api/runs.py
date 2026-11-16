@@ -11,6 +11,7 @@ to follow it, and a disconnect never cancels it.
 from __future__ import annotations
 
 import functools
+import re
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -21,12 +22,17 @@ from pydantic import BaseModel, Field
 
 from ai.runs import config as runs_config
 from ai.runs.service import RunService
-from ai.runs.store import Busy, Conflict, NotFound, Unauthorized
+from ai.runs.store import TITLE_MAX, Busy, Conflict, NotFound, Unauthorized
 from ai.runs import public, stream
 
 router = APIRouter()
 
 GRANT_HEADER = "X-IRIS-Reader-Grant"
+
+
+class RenameRequest(BaseModel):
+    #: None or blank restores the first-question title (IR-1160).
+    title: str | None = Field(default=None, max_length=1000)
 
 
 class SubmitRequest(BaseModel):
@@ -272,6 +278,44 @@ async def reopen_conversation(
         return JSONResponse(public.conversation(snapshot, **_meter(s)) if protocol else snapshot)
 
     return await _call(service, act, protocol)
+
+
+@router.patch("/conversations/{conversation_id}")
+async def rename_conversation(
+    conversation_id: uuid.UUID,
+    body: RenameRequest,
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+):
+    if body.title is not None and len(body.title.strip()) > TITLE_MAX:
+        return JSONResponse({"status": "title_too_long", "max_length": TITLE_MAX}, status_code=422)
+
+    async def act(s: RunService):
+        title = await s.store.rename(grant, conversation_id, body.title)
+        return JSONResponse({"protocol": public.PROTOCOL, "id": str(conversation_id), "title": title})
+
+    return await _call(service, act)
+
+
+def _filename(title: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9]+", "-", title).strip("-")[:80].strip("-")
+    return f"{stem or 'conversation'}.md"
+
+
+@router.get("/conversations/{conversation_id}/export")
+async def export_conversation(
+    conversation_id: uuid.UUID,
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+):
+    """The reader's Markdown download (IR-1167): the reopen view, rendered."""
+    async def act(s: RunService):
+        view = public.conversation(await s.store.reopen(grant, conversation_id, include_runs=True))
+        return Response(public.markdown(view), media_type="text/markdown; charset=utf-8", headers={
+            "Content-Disposition": f'attachment; filename="{_filename(view["title"])}"',
+        })
+
+    return await _call(service, act)
 
 
 @router.delete("/conversations/{conversation_id}")

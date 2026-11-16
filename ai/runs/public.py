@@ -202,6 +202,7 @@ def conversation(snapshot, *, manual_compaction=False, reserved_tokens=None, com
     available = {item["id"]: item.get("sources_available", True) for item in snapshot["runs"]}
     return {
         "protocol": PROTOCOL, "id": snapshot["id"], "revision": snapshot["revision"],
+        "title": snapshot["title"],
         "runs": [run(item, manual_compaction=manual_compaction, reserved_tokens=reserved_tokens,
                      compacts_at_tokens=compacts_at_tokens)
                  for item in snapshot["runs"]],
@@ -213,3 +214,20 @@ def conversation(snapshot, *, manual_compaction=False, reserved_tokens=None, com
                 "citations": [], "facts": [], "papers": [],
             })} for turn in snapshot["turns"]],
     }
+
+
+def _quote(text: str) -> str:
+    return "\n".join(f"> {line}" if line else ">" for line in text.splitlines() or [""])
+
+
+def markdown(view) -> str:
+    """The reader's download (IR-1167), built only from `conversation(...)`'s reader view."""
+    lines = [f"# {view['title'] or 'Untitled conversation'}", ""]
+    for turn in view["turns"]:
+        lines += ["## Question", "", turn["question"], "", "## Answer", "", turn["answer"], ""]
+        if turn["citations"]:
+            lines += ["### Sources", ""]
+            for n, c in enumerate(turn["citations"], start=1):
+                title = c.get("title") or f"Record {c['record_id']}"
+                lines += [f"[{n}] {title}, page {c['page']}", "", _quote(c["quote"]), ""]
+    return "\n".join(lines).rstrip() + "\n"

@@ -9,7 +9,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useConsumeHandoff } from "@/lib/askHandoff";
-import { runtimeReader, type ReaderConversationSummary } from "@/api/runtimeReader";
+import { isAxiosError } from "axios";
+import { runtimeReader, TITLE_TOO_LONG, type ReaderConversationSummary } from "@/api/runtimeReader";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { useUIStore } from "@/store/ui.store";
 import { useElementWidth } from "@/hooks/useElementWidth";
@@ -18,11 +19,24 @@ import { RuntimeReader } from "./components/RuntimeReader";
 import { EarlierConversation } from "./components/EarlierConversations";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
-import { ConversationHistoryList, ConversationSidebar, NewChatButton } from "./components/ConversationSidebar";
+import {
+  ConversationHistoryList, ConversationSidebar, NewChatButton, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
+  type RenameConversation,
+} from "./components/ConversationSidebar";
 import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
 import { useConversationHistory } from "./hooks/useConversationHistory";
 
 const RUNTIME_ID = /^[0-9a-f-]{36}$/i;
+const SIDEBAR_KEY = "iris-ask-sidebar-width";
+
+function readSidebarWidth() {
+  try {
+    const stored = Number(localStorage.getItem(SIDEBAR_KEY));
+    return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_DEFAULT;
+  } catch {
+    return SIDEBAR_DEFAULT;
+  }
+}
 const EARLIER_ID = /^[1-9]\d*$/;
 
 type AskPanel = "history";
@@ -48,7 +62,12 @@ function RuntimeAskPage() {
   const recordId = rawRecord && /^[1-9]\d*$/.test(rawRecord) ? Number(rawRecord) : undefined;
   const api = useMemo(() => runtimeReader(), []);
 
-  const { conversations, setConversations, refresh: refreshList, titleOf, search } = useConversationHistory(api, conversationId);
+  const { conversations, setConversations, refresh: refreshList, titleOf, retitle, search } = useConversationHistory(api, conversationId);
+  const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
+  const resizeSidebar = (width: number) => {
+    setSidebarWidth(width);
+    try { localStorage.setItem(SIDEBAR_KEY, String(width)); } catch { /* per-browser convenience */ }
+  };
   const [historyOpen, setHistoryOpen] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ReaderConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -78,6 +97,16 @@ function RuntimeAskPage() {
   const title = titleOf(conversationId) || "New chat";
   const newChat = () => navigate("/ai");
 
+  const rename: RenameConversation = async (id, next) => {
+    try {
+      retitle(id, await api.rename(id, next));
+      return null;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 422) return TITLE_TOO_LONG;
+      return "Could not rename this conversation. Try again.";
+    }
+  };
+
   const remove = async () => {
     if (!deleteTarget || deleting) return;
     setDeleting(true); setDeleteError(null);
@@ -97,14 +126,17 @@ function RuntimeAskPage() {
     <div className="relative flex min-h-0 min-w-0 flex-1" {...(drawer ? { inert: "" } : {})}>
       {!asDrawers && <ConversationSidebar conversations={conversations} activeId={conversationId ?? null}
         open={historyOpen} search={search} onNewChat={newChat} onCollapse={() => toggle("history")}
+        onRename={rename} width={sidebarWidth} onResize={resizeSidebar}
         onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
         <ChatToolbar sessionTitle={title} historyOpen={shown("history")}
-          onToggleHistory={() => toggle("history")} asDrawers={asDrawers} />
+          onToggleHistory={() => toggle("history")} asDrawers={asDrawers}
+          onDownload={conversationId ? () => api.download(conversationId) : undefined} />
         <div className="flex min-h-0 flex-1 flex-col">
           <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
             initialDraft={conversationId ? undefined : draft ?? undefined}
             onAnswered={() => void refreshList()}
+            onTitle={retitle}
             onConversation={id => {
               void refreshList();
               if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true });
@@ -119,7 +151,7 @@ function RuntimeAskPage() {
         <NewChatButton onClick={() => { setDrawer(null); newChat(); }} />
       </div>
       <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={search}
-        onDelete={id => { setDrawer(null); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
+        onRename={rename} onDelete={id => { setDrawer(null); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
     </ChatDrawer>}
     <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"
       message={`Delete “${deleteTarget?.title || "New conversation"}” and its messages? This cannot be undone.`}

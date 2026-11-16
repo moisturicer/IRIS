@@ -122,13 +122,15 @@ interface Props {
   onSelectSources?: (message: ChatMessage) => void;
   /** The newest answer, each time one lands: a page shows its sources. */
   onAnswered?: (message: ChatMessage) => void;
+  /** The Conversation's title as the server holds it, each time it is reopened (IR-1160). */
+  onTitle?: (id: string, title: string) => void;
   /** Paper Chat's this-paper / all-papers switch, shown beside the depth. */
   scopeToggle?: { allPapers: boolean; onChange: (allPapers: boolean) => void; locked?: boolean };
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
-  selectedId = null, onSelectSources, onAnswered, scopeToggle }: Props) {
+  selectedId = null, onSelectSources, onAnswered, onTitle, scopeToggle }: Props) {
   // The research scope: this paper, or every paper once the reader widens. Read on each request, so
   // widening continues the same conversation instead of starting another.
   const scope = scopeToggle?.allPapers ? undefined : recordId;
@@ -151,6 +153,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
+  const reportTitle = useRef(onTitle);
+  reportTitle.current = onTitle;
   // Opening a conversation by its address: loading, then its content or one of the shared read states (IR-906).
   const [opening, setOpening] = useState<ReadFailureKind | "loading">();
   const [openAttempt, setOpenAttempt] = useState(0);
@@ -161,6 +165,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     setConversation(next);
     setRun(next.runs[next.runs.length - 1]);
     setError(undefined);
+    if (next.title) reportTitle.current?.(next.id, next.title);
     return next;
   }, [api]);
 

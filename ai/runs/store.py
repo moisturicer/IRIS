@@ -173,6 +173,14 @@ def regions(bboxes, page_sizes) -> list[dict]:
 READING_TOOLS = ("read_manuscript", "read_page", "open_passage", "outline", "recover_turn")
 
 
+#: The longest title a reader may give a Conversation (IR-1160).
+TITLE_MAX = 200
+
+#: Conversation `c`'s title: the reader's own (IR-1160), else its first question.
+_TITLE = """coalesce(c.title, (SELECT r.question FROM iris_ai.ask_run r
+                            WHERE r.conversation_id = c.id AND r.question <> ''
+                            ORDER BY r.created_at LIMIT 1), '')"""
+
 #: `$4` appears in Conversation `c` as a question, or in an answer whose every source
 #: (cited, or read by a tool) is still readable under the grant.
 _MATCH = """(
@@ -1086,13 +1094,14 @@ class RunStore:
         async with self._connect() as conn:
             async with conn.transaction(isolation="repeatable_read"):
                 reader, scope = await self._principal(conn, grant)
-                revision = await conn.fetchval(
-                    f"""SELECT revision FROM iris_ai.conversation
-                         WHERE id = $1 AND reader_id = $3 AND deleted_at IS NULL AND {IN_SCOPE}""",
+                found = await conn.fetchrow(
+                    f"""SELECT c.revision, {_TITLE} AS title FROM iris_ai.conversation c
+                         WHERE c.id = $1 AND c.reader_id = $3 AND c.deleted_at IS NULL AND {IN_SCOPE}""",
                     conversation_id, scope, reader,
                 )
-                if revision is None:
+                if found is None:
                     raise NotFound
+                revision = found["revision"]
                 turns = await conn.fetch(
                     f"""SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.facts, t.created_at, r.pinned,
                               {CURRENT_SOURCE_TURN} AS sources_available
@@ -1123,6 +1132,11 @@ class RunStore:
                     [n.lower() for n in named],
                 ) if named else []
                 by_title = {row["title"].lower(): row["id"] for row in papers}
+                # Cited papers' titles, readable under the grant only (IR-1167).
+                cited_titles = dict(await conn.fetch(
+                    "SELECT id, title FROM public.records_record WHERE id = ANY($1::bigint[])",
+                    list({c["record_id"] for c in citations}),
+                )) if citations else {}
                 run_ids = await conn.fetch(
                     "SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1 ORDER BY created_at, id",
                     conversation_id,
@@ -1132,11 +1146,13 @@ class RunStore:
         for c in citations:
             by_turn.setdefault(c["turn_id"], []).append(
                 {"record_id": c["record_id"], "page": c["page"], "quote": c["quote"],
-                 "revision": c["revision"], "regions": regions(c["bboxes"], c["page_sizes"])}
+                 "revision": c["revision"], "regions": regions(c["bboxes"], c["page_sizes"]),
+                 "title": cited_titles.get(c["record_id"])}
             )
         return {
             "id": str(conversation_id),
             "revision": revision,
+            "title": found["title"],
             **({"runs": runs} if include_runs else {}),
             "turns": [{
                 "id": str(t["id"]), "run_id": str(t["run_id"]), "ordinal": t["ordinal"],
@@ -1166,9 +1182,9 @@ class RunStore:
                 rows = await conn.fetch(
                     f"""SELECT c.id, c.scope_record_id, c.title, c.updated_at
                           FROM (SELECT cv.id, cv.scope_record_id,
-                                       (SELECT r.question FROM iris_ai.ask_run r
+                                       coalesce(cv.title, (SELECT r.question FROM iris_ai.ask_run r
                                          WHERE r.conversation_id = cv.id AND r.question <> ''
-                                         ORDER BY r.created_at LIMIT 1) AS title,
+                                         ORDER BY r.created_at LIMIT 1)) AS title,
                                        coalesce((SELECT max(r.created_at) FROM iris_ai.ask_run r
                                                   WHERE r.conversation_id = cv.id), cv.created_at) AS updated_at
                                   FROM iris_ai.conversation cv
@@ -1181,6 +1197,24 @@ class RunStore:
                 )
         return [{"id": str(r["id"]), "title": r["title"] or "", "record_id": r["scope_record_id"],
                  "updated_at": r["updated_at"].isoformat()} for r in rows]
+
+    async def rename(self, grant, conversation_id, title: str | None) -> str:
+        """Set the reader's own title; None or blank restores the first question. The title shown."""
+        title = (title or "").strip() or None
+        if title is not None and len(title) > TITLE_MAX:
+            raise ValueError("title too long")
+        async with self._connect() as conn:
+            async with conn.transaction():
+                reader, scope = await self._principal(conn, grant)
+                shown = await conn.fetchval(
+                    f"""UPDATE iris_ai.conversation c SET title = $4
+                         WHERE c.id = $1 AND c.reader_id = $3 AND c.deleted_at IS NULL AND {IN_SCOPE}
+                        RETURNING {_TITLE}""",
+                    conversation_id, scope, reader, title,
+                )
+        if shown is None:
+            raise NotFound
+        return shown
 
     async def delete_conversation(self, grant, conversation_id) -> None:
         async with self._connect() as conn:
@@ -1199,7 +1233,7 @@ class RunStore:
     async def _delete(self, conn, conversation_id) -> None:
         """Fence first, then remove content; the caller holds the Conversation lock."""
         await conn.execute(
-            "UPDATE iris_ai.conversation SET deleted_at = now(), state = '{}' WHERE id = $1",
+            "UPDATE iris_ai.conversation SET deleted_at = now(), state = '{}', title = NULL WHERE id = $1",
             conversation_id,
         )
         active = await conn.fetch(

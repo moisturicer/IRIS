@@ -37,7 +37,7 @@ export const OVERVIEW_MARKDOWN = [
 ].join(" ");
 
 // The thread's width: one literal, so Tailwind sees the whole class.
-const CHAT_MEASURE = "max-w-[min(92vw,68ch)]";
+const CHAT_MEASURE = "max-w-[min(92vw,136ch)]";
 
 /**
  * The chat column, shared by the transcript and the composer below it so the
@@ -45,8 +45,7 @@ const CHAT_MEASURE = "max-w-[min(92vw,68ch)]";
  *
  * Viewport-relative with a cap, never a fixed pixel width: `92vw` keeps a
  * narrow screen usable without a horizontal scrollbar, and the cap is a
- * reading measure of 68 characters (IR-1090; it was 60rem, about 110 characters
- * a line at the answer's 16px, which the audit found too long to read).
+ * measure of 136 characters: twice IR-1090's 68, at the owner's request.
  */
 export const CHAT_COLUMN = `w-full ${CHAT_MEASURE} mx-auto`;
 

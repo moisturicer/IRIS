@@ -1,13 +1,21 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+
+/** A square, label-less action under a message; its name is its `aria-label`. */
+export const MESSAGE_ACTION =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-control text-stone-500 " + COLOUR_TRANSITION + " " +
+  "hover:bg-stone-100 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent " +
+  FOCUS_RING;
 
 interface CopyButtonProps {
   text:  string;
   label: string;
+  className?: string;
 }
 
-/** Copies `text` to the clipboard, with a brief "Copied" confirmation --
- *  shared by any assistant reply that wants a copy affordance. */
-export function CopyButton({ text, label }: CopyButtonProps) {
+/** An icon that copies `text`, confirming with a check. */
+export function CopyButton({ text, label, className }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -21,15 +29,10 @@ export function CopyButton({ text, label }: CopyButtonProps) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      aria-label={label}
-      className="inline-flex items-center gap-1.5 text-small font-medium text-stone-400
-        hover:text-stone-600 transition-colors duration-200"
-    >
+    <button type="button" onClick={handleCopy} aria-label={label} title={copied ? "Copied" : label}
+      className={cn(MESSAGE_ACTION, className)}>
       <i className={`fas ${copied ? "fa-check" : "fa-copy"} text-label`} aria-hidden />
-      {copied ? "Copied" : "Copy"}
+      <span aria-live="polite" className="sr-only">{copied ? "Copied" : ""}</span>
     </button>
   );
 }

@@ -84,6 +84,15 @@ describe("a source under an answer", () => {
     expect(screen.getByRole("link", { name: /at page 4/i })).toHaveAttribute("href", "/records/7?page=4");
   });
 
+  it("shows the opening of a long passage, not the whole of it, with the rest on hover", () => {
+    const long = `We trained a network on hourly gauge data. ${"The procedure is then described at length. ".repeat(20)}`;
+    renderScreen(<SourcePassages citations={[{ ...citation, text: long }]} sources={[card]} answered />);
+    const row = screen.getByRole("link", { name: /at page 4/i });
+    expect(row.textContent!.length).toBeLessThan(260);
+    expect(row).toHaveTextContent("We trained a network on hourly gauge data.");
+    expect(row).toHaveAttribute("title", expect.stringContaining("described at length"));
+  });
+
   it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(<SourcePassages citations={[citation]} sources={[card]} answered />);
 

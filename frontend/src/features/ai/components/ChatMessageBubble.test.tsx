@@ -245,6 +245,18 @@ describe("a cited answer", () => {
       id: "q1", role: "user", content: "What did the flood study find?", createdAt: "2026-09-20T00:00:00.000Z",
     };
 
+    it("shows Ask again, Edit and Copy as named icons with no visible words", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      renderScreen(<ChatMessageBubble message={question} onAskAgain={vi.fn()} onEdit={vi.fn()} />);
+
+      for (const name of ["Ask again", "Edit", "Copy question"]) {
+        expect(screen.getByRole("button", { name })).toHaveTextContent(/^$/);
+      }
+      await userEvent.click(screen.getByRole("button", { name: "Copy question" }));
+      expect(writeText).toHaveBeenCalledWith("What did the flood study find?");
+    });
+
     it("sends the question again when Ask again is used", async () => {
       const onAskAgain = vi.fn();
       renderScreen(<ChatMessageBubble message={question} onAskAgain={onAskAgain} onEdit={vi.fn()} />);

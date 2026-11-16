@@ -152,9 +152,8 @@ describe("answer markdown typography", () => {
   it("sizes the chat column by the viewport, never a fixed width", () => {
     expect(CHAT_COLUMN).toContain("vw");
     expect(CHAT_COLUMN).not.toMatch(/\d+px/);
-    // A reading measure of at most 68 characters (IR-1090, spec §4.11), which at
-    // 1440px is narrower than the viewport cap.
-    expect(CHAT_COLUMN).toMatch(/max-w-\[min\(92vw,68ch\)\]/);
+    // Twice IR-1090's 68-character measure, at the owner's request (IR-1160).
+    expect(CHAT_COLUMN).toMatch(/max-w-\[min\(92vw,136ch\)\]/);
     // The Overview fills the column its page sets (IR-569), not a cap of its own.
     expect(OVERVIEW_MARKDOWN).toContain("max-w-none");
     expect(OVERVIEW_MARKDOWN).not.toMatch(/max-w-\[\d+ch\]/);

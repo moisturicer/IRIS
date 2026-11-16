@@ -35,4 +35,22 @@ describe("Paper Chat", () => {
     expect(post.mock.calls.every(([url]) => String(url).startsWith("/ai/runtime/"))).toBe(true);
     await expectNoBlockingA11yViolations(container);
   });
+
+  it("downloads its conversation as Markdown, scoped to the paper (IR-1167)", async () => {
+    sessionStorage.setItem("iris-runtime-paper:undefined:7", "c");
+    const get = vi.spyOn(apiClient, "get").mockImplementation(async (url) => (String(url).endsWith("/export")
+      ? { data: new Blob(["# Notes"]), headers: { "content-disposition": 'attachment; filename="Notes.md"' } }
+      : String(url).endsWith("/conversations")
+        ? { data: { protocol: "runs-reader-1", conversations: [], next: null } }
+        : { data: { protocol: "runs-reader-1", id: "c", revision: 0, runs: [], turns: [] } }) as never);
+    Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<MemoryRouter><PaperChatPanel record={record} onClose={() => {}} /></MemoryRouter>);
+    await user.click(screen.getByRole("button", { name: "Download conversation as Markdown" }));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+    expect(get).toHaveBeenCalledWith("/ai/runtime/conversations/c/export", expect.objectContaining({
+      responseType: "blob", headers: expect.objectContaining({ "X-IRIS-Record": "7" }) }));
+    sessionStorage.clear();
+  });
 });
