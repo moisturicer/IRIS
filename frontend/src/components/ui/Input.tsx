@@ -20,7 +20,7 @@ const SIZE_CLASSES: Record<Size, string> = {
 type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "required"> & FieldMarker & {
   label?:   string;
   error?:   string;
-  /** Text, or text with a decorative glyph -- "At least 8 characters" with a check. */
+  /** Text, or text with a decorative glyph -- "At least 12 characters" with a check. */
   hint?:    ReactNode;
   size?:    Size;
   leading?: React.ReactNode;

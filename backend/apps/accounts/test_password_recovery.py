@@ -344,12 +344,14 @@ class PasswordPolicyTests(RecoveryTestCase):
     def test_128_characters_is_accepted(self):
         self.assertEqual(self.confirm(self.token, new="Qz7-" + "k" * 124).status_code, 200)
 
-    def test_eight_characters_is_accepted(self):
-        self.assertEqual(self.confirm(self.token, new="Qz7-kpWx").status_code, 200)
+    def test_twelve_characters_is_accepted_and_eleven_refused(self):
+        # ADR-045 §4 amendment, IR-819: the minimum rose from 8 to 12 (ASVS 2.1.1).
+        self.assertIn("new_password", self.errors("Qz7-kpWxRt5"))
+        self.assertEqual(self.confirm(self.token, new="Qz7-kpWxRt5!").status_code, 200)
 
     def test_common_numeric_and_current_passwords(self):
         self.assertIn("new_password", self.errors("password"))
-        self.assertIn("new_password", self.errors("83749201"))
+        self.assertIn("new_password", self.errors("837492016254"))  # 12 digits: refused as numeric, not as short
         self.assertEqual(self.errors(OLD), {"new_password": ["Choose a different password."]})
 
     def test_a_refusal_leaves_the_link_usable_and_the_password_unchanged(self):

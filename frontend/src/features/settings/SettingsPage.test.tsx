@@ -54,6 +54,7 @@ describe("changing your password", () => {
 
     await user.type(screen.getByLabelText("Current password"), "old-Passw0rd");
     await user.type(screen.getByLabelText(/^New password/), "new-Passw0rd");
+    expect(screen.getByText(/^Password strength: /)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change password" })).toBeEnabled();
     expect(screen.queryByText("Enter your current password and a new one.")).not.toBeInTheDocument();
   });
@@ -68,7 +69,8 @@ describe("changing your password", () => {
     });
     const { container } = renderScreen(<SettingsPage />, { route: "/settings" });
 
-    await changePassword(user, "12345678");
+    // Twelve digits: long enough to pass the form (IR-819), so the server decides.
+    await changePassword(user, "123456789012");
 
     expect(await screen.findByRole("status")).toHaveTextContent(
       "This password is too common. This password is entirely numeric.",
