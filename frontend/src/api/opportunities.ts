@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { Opportunity, OpportunityBoard, OpportunityInput } from "@/types/opportunities";
+import type { Opportunity, OpportunityBoard, OpportunityInput, SavedCallEntry } from "@/types/opportunities";
 
 interface OpportunityPage {
   count:    number;
@@ -81,6 +81,15 @@ export const opportunitiesApi = {
   /** RDCO deletes an Adviser's Call with a reason the Adviser receives (decision 11). */
   removeWithReason: (id: number, reason: string) =>
     apiClient.post(`/opportunities/${id}/remove/`, { reason }),
+
+  /** The reader's saved Calls, newest first (IR-649). */
+  saved: () => apiClient.get<{ results: SavedCallEntry[] }>("/opportunities/saved/"),
+
+  /** Save a confirmed Call; idempotent. A Call that isn't confirmed answers 404. */
+  save: (id: number) => apiClient.put<SavedCallEntry>(`/opportunities/${id}/save/`),
+
+  /** Unsave; idempotent, and works for a Call that became unavailable. */
+  unsave: (id: number) => apiClient.delete(`/opportunities/${id}/save/`),
 
   /**
    * The deadline as a calendar file.

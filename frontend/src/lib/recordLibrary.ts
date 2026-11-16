@@ -9,13 +9,17 @@
  * **The old browser copies are deleted, never read, uploaded or imported**
  * (ADR-044 amendments 2026-11-16): history in `iris_reading_history`, the
  * pre-IR-566 status folders and the reader's own folders in
- * `iris_record_collections`, and stars (Likes, retired by ADR-044 Q1) in
- * `iris_starred_records`. IRIS had no readers before the account library, so
+ * `iris_record_collections`, stars (Likes, retired by ADR-044 Q1) in
+ * `iris_starred_records`, and saved Calls in `iris_saved_opportunities`, which
+ * follow the account as of IR-766 (ADR-050 decision 13: "Browser saves are
+ * dropped, not imported"). IRIS had no readers before the account library, so
  * nobody's work is in them, and reading them would hand one browser's data to
  * whoever signs in next.
  */
 
-const OLD_LIBRARY_KEYS = ["iris_reading_history", "iris_record_collections", "iris_starred_records"] as const;
+const OLD_LIBRARY_KEYS = [
+  "iris_reading_history", "iris_record_collections", "iris_starred_records", "iris_saved_opportunities",
+] as const;
 
 /**
  * Delete what an older build kept of the library in this browser. The auth

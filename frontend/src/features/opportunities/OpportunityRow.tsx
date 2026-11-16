@@ -2,19 +2,17 @@ import { useId } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { TONES } from "@/components/ui/statusTones";
 import { cn } from "@/lib/utils";
 import type { Opportunity } from "@/types/opportunities";
 
 import { FeaturedToggle } from "./callActions";
 import { CallDetails } from "./CallDetails";
-import { countdown, dateParts, eventTag, formatDueDate, papersClosed } from "./opportunityUtils";
+import { CallTags } from "./CallTags";
+import { countdown, dateParts, formatDueDate, papersClosed } from "./opportunityUtils";
 
 interface OpportunityRowProps {
   opportunity: Opportunity;
   saved:       boolean;
-  /** The page's sentence saying saves stay in this browser, for the save button to point at. */
-  savedHintId: string;
   icsBusy:     boolean;
   onToggleSave:  () => void;
   onDownloadIcs: () => void;
@@ -32,9 +30,6 @@ const LINK =
   "inline-flex items-center gap-1.5 min-h-11 lg:min-h-8 px-3.5 rounded-full text-small font-semibold " +
   "bg-white text-stone-800 ring-1 ring-stone-300 hover:ring-brand/40 hover:text-brand";
 
-/** A tag: words in a pill, never colour alone. */
-const TAG = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label font-semibold whitespace-nowrap";
-
 /**
  * One call on the deadline board (IR-530, IR-764).
  *
@@ -51,7 +46,6 @@ const TAG = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-labe
 export function OpportunityRow({
   opportunity: o,
   saved,
-  savedHintId,
   icsBusy,
   onToggleSave,
   onDownloadIcs,
@@ -66,7 +60,6 @@ export function OpportunityRow({
   const chip    = countdown(o);
   const date    = dateParts(o.due_date);
   const urgent  = !closed && chip.tone === "attention";
-  const eventLabel = eventTag(o);
 
   return (
     <article
@@ -111,24 +104,7 @@ export function OpportunityRow({
       {/* Under the content until `xl`: the sidebar takes its share from `md`,
           so at `lg` a call with no link still squeezed its title to ~240 px. */}
       <div className="w-full xl:w-auto xl:shrink-0 xl:max-w-xs flex flex-wrap xl:flex-col items-center xl:items-end justify-between xl:justify-start gap-3">
-        <p className="flex flex-wrap items-center gap-2">
-          <span className={cn(TAG, closed ? TONES.quiet : chip.className)}>
-            <i className={cn("fas", closed ? "fa-lock" : "fa-clock")} aria-hidden="true" />
-            <span>{o.papers_label}</span>
-            {!closed && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="font-normal">{chip.label}</span>
-              </>
-            )}
-          </span>
-          {eventLabel && (
-            <span className={cn(TAG, TONES.active)}>
-              <i className="fas fa-circle-play" aria-hidden="true" />
-              {eventLabel}
-            </span>
-          )}
-        </p>
+        <CallTags call={o} />
 
         <div className="flex flex-wrap items-center gap-1">
           <Button
@@ -138,8 +114,7 @@ export function OpportunityRow({
             onClick={onToggleSave}
             aria-pressed={saved}
             aria-label={`Save ${o.title}`}
-            aria-describedby={savedHintId}
-            title={saved ? "Saved in this browser. Select to remove." : "Save in this browser"}
+            title={saved ? "Saved to My Library. Select to remove." : "Save to My Library"}
             className={FOCUS_RING}
           >
             <i className={cn(saved ? "fas" : "far", "fa-bookmark")} aria-hidden="true" />

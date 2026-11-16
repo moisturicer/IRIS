@@ -8,6 +8,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ToastContainer } from "@/components/ui/Toast";
+import { useAuthStore } from "@/store/auth.store";
+import { useSavedCallsStore } from "@/store/savedCalls.store";
 import { useUIStore } from "@/store/ui.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
@@ -22,6 +24,9 @@ const remove = vi.fn();
 const calendar = vi.fn();
 const setFeatured = vi.fn();
 const removeWithReason = vi.fn();
+const saved = vi.fn();
+const saveCall = vi.fn();
+const unsaveCall = vi.fn();
 
 vi.mock("@/api/opportunities", () => ({
   opportunitiesApi: {
@@ -32,6 +37,9 @@ vi.mock("@/api/opportunities", () => ({
     calendar: (id: number) => calendar(id),
     setFeatured: (id: number, featured: boolean) => setFeatured(id, featured),
     removeWithReason: (id: number, reason: string) => removeWithReason(id, reason),
+    saved: () => saved(),
+    save: (id: number) => saveCall(id),
+    unsave: (id: number) => unsaveCall(id),
   },
 }));
 
@@ -107,6 +115,10 @@ async function renderBoard() {
 beforeEach(() => {
   nextId = 1;
   localStorage.clear();
+  // Saves follow the account (IR-766): a signed-in reader, with none yet.
+  useAuthStore.setState({ isAuthenticated: true });
+  useSavedCallsStore.setState({ load: "idle", items: {} });
+  saved.mockResolvedValue({ data: { results: [] } });
   classifications.mockResolvedValue({ data: { count: 2, next: null, previous: null, results: AREAS } });
 });
 
@@ -279,18 +291,21 @@ describe("filters", () => {
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
-  it("keeps saved calls in this browser and can show only them", async () => {
+  it("saves a call to the account and can show only the saved ones", async () => {
     serve([soon(), month()]);
+    saveCall.mockImplementation(async (id: number) => ({
+      data: { call_id: id, available: true, saved_at: "2026-11-16T08:00:00Z", call: month() },
+    }));
     await renderBoard();
     const user = userEvent.setup();
 
     const save = screen.getByRole("button", { name: "Save ICACSIS 2026 paper deadline" });
     await user.click(save);
     expect(save).toHaveAttribute("aria-pressed", "true");
-    expect(JSON.parse(localStorage.getItem("iris_saved_opportunities") ?? "[]")).toEqual([102]);
-    expect(screen.getByRole("status")).toHaveTextContent("Saved calls are kept in this browser only.");
-    // Said to the save control itself, not only in a tooltip.
-    expect(save).toHaveAccessibleDescription("Saved calls are kept in this browser only.");
+    expect(saveCall).toHaveBeenCalledWith(102);
+    // Nothing is kept in the browser, and nothing says it is (IR-766).
+    expect(localStorage.getItem("iris_saved_opportunities")).toBeNull();
+    expect(screen.queryByText(/in this browser/)).toBeNull();
 
     await user.click(screen.getByRole("button", { name: /^Saved\s*1/ }));
     expect(screen.getAllByRole("article")).toHaveLength(1);
@@ -298,14 +313,70 @@ describe("filters", () => {
   });
 });
 
-describe("saved calls", () => {
-  it("forgets saved calls that are no longer on the board, and counts only what is", async () => {
-    localStorage.setItem("iris_saved_opportunities", JSON.stringify([101, 999]));
+describe("saved calls (IR-766)", () => {
+  it("counts and shows only the saved calls still on the board", async () => {
+    // 101 is on the board; 999 is Over, and 7 is unavailable: both stay in My Library only.
+    saved.mockResolvedValue({ data: { results: [
+      { call_id: 101, available: true, saved_at: "2026-11-15T08:00:00Z", call: soon() },
+      { call_id: 999, available: true, saved_at: "2026-11-14T08:00:00Z", call: call({ id: 999, title: "Over" }) },
+      { call_id: 7, available: false },
+    ] } });
     serve([soon(), month()]);
     await renderBoard();
 
-    expect(screen.getByRole("button", { name: /^Saved\s*1/ })).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("iris_saved_opportunities") ?? "[]")).toEqual([101]);
+    const filter = await screen.findByRole("button", { name: /^Saved\s*1$/ });
+    expect(screen.getByRole("button", { name: "Save Workshop on Edge AI" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.setup().click(filter);
+    expect(screen.getAllByRole("article").map((a) => within(a).getByRole("heading").textContent)).toEqual(["Workshop on Edge AI"]);
+  });
+
+  it("keeps the server's saved marks when the account's list can't be read", async () => {
+    saved.mockRejectedValue(new Error("Network Error"));
+    serve([call({ id: 301, title: "Marked saved", is_saved: true }), call({ id: 302, title: "Not saved" })]);
+    await renderBoard();
+
+    expect(screen.getByRole("button", { name: "Save Marked saved" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Save Not saved" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /^Saved\s*1$/ })).toBeInTheDocument();
+  });
+
+  it("rolls a failed save back and says so in a toast with Try again", async () => {
+    serve([month()]);
+    saveCall.mockRejectedValueOnce(new Error("Network Error"));
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "ICACSIS 2026 paper deadline" });
+    const user = userEvent.setup();
+
+    const save = screen.getByRole("button", { name: "Save ICACSIS 2026 paper deadline" });
+    await user.click(save);
+
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("Could not save ICACSIS 2026 paper deadline. Nothing was changed.");
+    expect(save).toHaveAttribute("aria-pressed", "false");
+    expect(within(toast).getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("removes a save", async () => {
+    saved.mockResolvedValue({ data: { results: [
+      { call_id: 102, available: true, saved_at: "2026-11-15T08:00:00Z", call: month() },
+    ] } });
+    unsaveCall.mockResolvedValue({});
+    serve([month()]);
+    await renderBoard();
+    const save = await screen.findByRole("button", { name: "Save ICACSIS 2026 paper deadline", pressed: true });
+    await userEvent.setup().click(save);
+    expect(unsaveCall).toHaveBeenCalledWith(102);
+    expect(save).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("has no serious accessibility violations with a call saved", async () => {
+    saved.mockResolvedValue({ data: { results: [
+      { call_id: 102, available: true, saved_at: "2026-11-15T08:00:00Z", call: month() },
+    ] } });
+    serve([month(), soon()]);
+    const { container } = await renderBoard();
+    await screen.findByRole("button", { name: "Save ICACSIS 2026 paper deadline", pressed: true });
+    await expectNoBlockingA11yViolations(container);
   });
 });
 

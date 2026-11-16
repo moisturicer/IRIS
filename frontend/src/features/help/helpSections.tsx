@@ -123,7 +123,8 @@ export const HELP_SECTIONS: HelpSection[] = [
       <p>
         Calls for papers from conferences, congresses, symposia, workshops, journals and book chapters,
         soonest paper deadline first. Each call says whether it is accepting papers, and when its event is
-        happening. Filter by type or Area, and save the ones you want to keep. RDCO posts calls, and
+        happening. Filter by type or Area, and save the ones you want to keep: saved calls follow your
+        account and stay in My Library, under Saved calls, until you remove them. RDCO posts calls, and
         an Adviser's call appears once RDCO confirms it.
       </p>
     ),

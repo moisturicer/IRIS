@@ -269,7 +269,11 @@ export const SCREENS: Screen[] = [
   },
   {
     id: "opportunities", path: "/opportunities", route: "/opportunities", role: "Student",
-    mocks: wrap("Student", (api) => api.on("GET", "/opportunities/", { count: 1, next: null, previous: null, results: [OPPORTUNITY], can_post: false, can_review_requests: false })),
+    mocks: wrap("Student", (api) => {
+      api.on("GET", "/opportunities/", { count: 1, next: null, previous: null, results: [OPPORTUNITY], can_post: false, can_review_requests: false });
+      // The reader's saved Calls follow the account (IR-766).
+      api.on("GET", "/opportunities/saved/", { results: [] });
+    }),
     heading: "Calls & Conferences",
     primary: (p) => p.getByRole("button", { name: /^All\s*\d*$/ }).first(), primaryLabel: "All (filter)",
   },
