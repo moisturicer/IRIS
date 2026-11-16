@@ -265,7 +265,11 @@ class TheBearerLinkIsGoneTests(Fixtures):
         self.client.force_authenticate(None)
         response = self.client.get("/api/v1/records/download/", {"token": "anything"})
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_404_NOT_FOUND))
-        self.assertFalse(response.has_header("Content-Disposition"))
+        # No file is served. The route is gone, so the answer is Django's own
+        # 404 (HTML, no header) or, when DRF answers, JSON that since IR-821
+        # names itself api.json so a browser never renders it. Either is fine;
+        # a file's name is not.
+        self.assertIn(response.get("Content-Disposition"), (None, 'attachment; filename="api.json"'))
 
 
 class RequestingAgainTests(Fixtures):
