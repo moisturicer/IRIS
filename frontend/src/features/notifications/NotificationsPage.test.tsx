@@ -30,7 +30,7 @@ const at = (id: number, created_at: string, message: string, record: number | nu
   id, notif_type: 1, notif_type_name: "Record Routed", message,
   record, record_title: "T", sender: null, sender_name: null,
   recipient: 1, broadcast_to_role: null, created_at, is_read: false,
-  resolved_at: null, resolved_label: "",
+  resolved_at: null, resolved_label: "", target: null,
 });
 
 describe("Notifications", () => {
@@ -67,6 +67,22 @@ describe("Notifications", () => {
 
     await userEvent.click(link);
     expect(markRead).toHaveBeenCalledWith(7);
+  });
+
+  it("opens a Call's notice where the server says, though it has no record (IR-765)", async () => {
+    list.mockResolvedValueOnce({
+      data: {
+        results: [{
+          ...at(8, new Date().toISOString(), 'RDCO did not confirm your call "ICCE 2027". Reason: Broken link.', null),
+          notif_type_name: "Call Rejected", target: "/opportunities/mine",
+        }],
+      },
+    });
+    renderScreen(<NotificationsPage />);
+
+    const link = await screen.findByRole("link", { name: /Open: RDCO did not confirm your call/ });
+    expect(link).toHaveAttribute("href", "/opportunities/mine");
+    expect(screen.queryByRole("button", { name: "Mark as read" })).toBeNull();
   });
 
   describe("the page (IR-1137)", () => {
@@ -166,7 +182,7 @@ describe("Notifications", () => {
       record: 42, record_title: "Tide Gauge", sender: null, sender_name: null,
       recipient: null, broadcast_to_role: 3,
       created_at: new Date().toISOString(), is_read: false,
-      resolved_at: null, resolved_label: "",
+      resolved_at: null, resolved_label: "", target: null,
     };
     const settled = {
       ...open, id: 2, notif_type_name: "New Version Submitted",

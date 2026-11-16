@@ -11,6 +11,7 @@
 import type { Locator, Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
 import { PAPER, PAPER_DETAIL, paginated, type SmokeRole } from "./fixtures";
+import { OPPORTUNITY } from "./screens";
 
 export interface DialogCase {
   id: string;
@@ -210,6 +211,40 @@ export const DIALOGS: DialogCase[] = [
       api.on("GET", "/records/classifications/", paginated([{ id: 1, name: "Agriculture" }]));
     },
     open: press("Post a call"), dialog: anyDialog,
+  },
+  {
+    // RDCO removes an Adviser's Call with a reason (IR-765).
+    id: "remove an Adviser's call", screen: "opportunities", role: "RDCO",
+    sources: ["features/opportunities/CallsAndConferencesPage.tsx", "features/admin/RdcoNoteDialog.tsx"],
+    override: (api) => {
+      api.on("GET", "/opportunities/", {
+        count: 1, next: null, previous: null, can_post: true, can_review_requests: true,
+        results: [{ ...OPPORTUNITY, posted_by_name: "Ana Reyes", can_edit: true, can_remove: true, can_feature: true }],
+      });
+      // The board's screen signs in a Student; RDCO's sidebar also reads its queues.
+      api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0, reported_comments: 0 });
+    },
+    open: press(/^Remove /), dialog: anyDialog,
+  },
+  {
+    id: "confirm a call request", screen: "call-requests",
+    sources: ["features/opportunities/CallRequestsPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: press(/^Confirm /), dialog: anyDialog,
+  },
+  {
+    id: "reject a call request", screen: "call-requests",
+    sources: ["features/opportunities/CallRequestsPage.tsx", "features/admin/RdcoNoteDialog.tsx"],
+    open: press(/^Reject /), dialog: anyDialog,
+  },
+  {
+    id: "edit and resend my call", screen: "my-calls",
+    sources: ["features/opportunities/MyCallsPage.tsx", "features/opportunities/OpportunityFormDialog.tsx"],
+    open: press(/^Edit and send again/), dialog: anyDialog,
+  },
+  {
+    id: "delete my call", screen: "my-calls",
+    sources: ["features/opportunities/MyCallsPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: press(/^Delete /), dialog: anyDialog,
   },
   {
     id: "change a user's role", screen: "rdco-users", sources: ["features/accounts/UserListPage.tsx"],

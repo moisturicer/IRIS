@@ -20,6 +20,8 @@ const create = vi.fn();
 const update = vi.fn();
 const remove = vi.fn();
 const calendar = vi.fn();
+const setFeatured = vi.fn();
+const removeWithReason = vi.fn();
 
 vi.mock("@/api/opportunities", () => ({
   opportunitiesApi: {
@@ -28,6 +30,8 @@ vi.mock("@/api/opportunities", () => ({
     update: (id: number, input: unknown) => update(id, input),
     remove: (id: number) => remove(id),
     calendar: (id: number) => calendar(id),
+    setFeatured: (id: number, featured: boolean) => setFeatured(id, featured),
+    removeWithReason: (id: number, reason: string) => removeWithReason(id, reason),
   },
 }));
 
@@ -745,5 +749,87 @@ describe("at 360 px", () => {
     // The filter that holds the Area select takes the full width on a phone.
     expect(screen.getByRole("combobox", { name: "Area" }).closest(".w-full")).not.toBeNull();
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+describe("RDCO on the board (IR-765)", () => {
+  const adviserCall = () => call({
+    id: 71, title: "An Adviser's call", posted_by_name: "Ana Reyes",
+    can_edit: true, can_delete: false, can_remove: true, can_feature: true,
+  });
+
+  it("removes an Adviser's call only with a reason, which the Adviser is sent", async () => {
+    serve([adviserCall(), month()], true, true);
+    removeWithReason.mockResolvedValue({});
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "An Adviser's call" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Remove An Adviser's call" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove this call" });
+    const submit = within(dialog).getByRole("button", { name: "Remove call" });
+    // No reason, no removal.
+    expect(submit).toBeDisabled();
+
+    await user.type(within(dialog).getByRole("textbox", { name: "Reason to the Adviser" }), "A duplicate of ICCE.");
+    await user.click(submit);
+
+    await waitFor(() => expect(screen.queryByRole("article", { name: "An Adviser's call" })).toBeNull());
+    expect(removeWithReason).toHaveBeenCalledWith(71, "A duplicate of ICCE.");
+    expect(await screen.findByText("An Adviser's call removed. Its Adviser is told why.")).toBeInTheDocument();
+  });
+
+  it("reports a failed removal in a toast and keeps the reason typed", async () => {
+    serve([adviserCall()], true, true);
+    removeWithReason.mockRejectedValueOnce(new Error("Network Error"));
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "An Adviser's call" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Remove An Adviser's call" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove this call" });
+    await user.type(within(dialog).getByRole("textbox", { name: "Reason to the Adviser" }), "Duplicate.");
+    await user.click(within(dialog).getByRole("button", { name: "Remove call" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not remove An Adviser's call.");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(within(dialog).getByRole("textbox", { name: "Reason to the Adviser" })).toHaveValue("Duplicate.");
+  });
+
+  it("sets and clears Featured on a confirmed call, without moving it", async () => {
+    serve([adviserCall()], true, true);
+    setFeatured.mockImplementation(async (_id: number, featured: boolean) => ({ data: { ...adviserCall(), is_featured: featured } }));
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "An Adviser's call" });
+    const user = userEvent.setup();
+
+    const toggle = screen.getByRole("button", { name: "Featured: An Adviser's call" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await user.click(toggle);
+
+    expect(setFeatured).toHaveBeenCalledWith(71, true);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Featured: An Adviser's call" })).toHaveAttribute("aria-pressed", "true"));
+    expect(within(screen.getByRole("article", { name: "An Adviser's call" })).getByText("Featured", { selector: "span" })).toBeInTheDocument();
+  });
+
+  it("offers neither Remove nor Featured where the server doesn't", async () => {
+    serve([call({ title: "A reader's view" })], false, false);
+    await renderBoard();
+    const row = screen.getByRole("article", { name: "A reader's view" });
+    expect(within(row).queryByRole("button", { name: /^Remove/ })).toBeNull();
+    expect(within(row).queryByRole("button", { name: /^Featured:/ })).toBeNull();
+  });
+
+  it("links a poster to their own calls", async () => {
+    serve([], true);
+    await renderBoard();
+    expect(screen.getByRole("link", { name: "My calls" })).toHaveAttribute("href", "/opportunities/mine");
+  });
+
+  it("has no serious accessibility violations with the reason dialog open", async () => {
+    serve([adviserCall()], true, true);
+    await renderBoard();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Remove An Adviser's call" }));
+    await expectNoBlockingA11yViolations(await screen.findByRole("dialog", { name: "Remove this call" }));
   });
 });

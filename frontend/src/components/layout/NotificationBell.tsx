@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { notificationHref } from "@/features/notifications/notificationHref";
 import { Link } from "react-router-dom";
 import { notificationsApi } from "@/api/notifications";
 import { useNotificationsStore } from "@/store/notifications.store";
@@ -195,12 +196,13 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
                         </>
                       );
                       const rowClass = "flex items-start gap-3 w-full text-left px-4 py-3 hover:bg-stone-50 transition-colors";
+                      const href = notificationHref(n);
                       return (
                         <li key={n.id}>
-                          {/* Only link to a record when there is one -- a broadcast
-                              notification has no record attached. */}
-                          {n.record ? (
-                            <Link to={`/records/${n.record}`} onClick={() => void handleOpenItem(n)} className={rowClass}>
+                          {/* A link only where there is somewhere to go: a Record, or
+                              the page the server names (IR-765). */}
+                          {href ? (
+                            <Link to={href} onClick={() => void handleOpenItem(n)} className={rowClass}>
                               {body}
                             </Link>
                           ) : (

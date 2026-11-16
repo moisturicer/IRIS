@@ -20,6 +20,7 @@ import { AppShell } from "@/components/layout/AppShell";
 // Feature pages
 import HomePage             from "@/features/dashboard/HomePage";
 import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
+import { MyCallsPage } from "@/features/opportunities/MyCallsPage";
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import MyReviewsPage        from "@/features/review/MyReviewsPage";
 import ReviewAnalyticsPage  from "@/features/review/ReviewAnalyticsPage";
@@ -45,6 +46,7 @@ const ImportRecordsPage = lazy(() => import("@/features/records/ImportRecordsPag
 const UserListPage = lazy(() => import("@/features/accounts/UserListPage"));
 const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage"));
 const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
+const CallRequestsPage = lazy(() => import("@/features/opportunities/CallRequestsPage"));
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
 const ReportedCommentsPage = lazy(() => import("@/features/admin/ReportedCommentsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
@@ -101,6 +103,12 @@ export const routes: RouteObject[] = [{
           },
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
           { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
+          {
+            element: <ProtectedRoute allowedRoles={rolesFor("myCalls")} />,
+            children: [
+              { path: pathFor("myCalls"), element: <MyCallsPage />, handle: { crumb: "My Calls" } },
+            ],
+          },
           { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },
           {
             // `/ai` picks a conversation and replaces itself with that
@@ -183,6 +191,11 @@ export const routes: RouteObject[] = [{
                 path: pathFor("downloadRequests"),
                 element: <DeferredPage name="Download Requests"><DownloadRequestsPage /></DeferredPage>,
                 handle: { crumb: "Download Requests", width: "full" },
+              },
+              {
+                path: pathFor("callRequests"),
+                element: <DeferredPage name="Call Requests"><CallRequestsPage /></DeferredPage>,
+                handle: { crumb: "Call Requests" },
               },
               {
                 path: pathFor("deleteRequests"),

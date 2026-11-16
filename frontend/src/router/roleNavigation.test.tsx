@@ -37,6 +37,7 @@ describe("role-owned addresses (IR-783)", () => {
     ["/rdco/users", "Users"],
     ["/rdco/role-requests", "Role Requests"],
     ["/rdco/download-requests", "Download Requests"],
+    ["/rdco/call-requests", "Call Requests"],
     ["/rdco/delete-requests", "Delete Requests"],
   ])("opens %s for RDCO", async (path, title) => {
     visit(path, ROLES.RDCO);

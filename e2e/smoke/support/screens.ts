@@ -85,7 +85,7 @@ const REPORTED_COMMENT = {
 };
 
 /** One open call, so the board draws its filters as it does with data. */
-const OPPORTUNITY = {
+export const OPPORTUNITY = {
   id: 1, opportunity_type: "conference", type_display: "Conference",
   title: "International Conference on Applied Computing", description: "Full papers on applied computing.",
   external_url: "https://example.edu/icac", due_date: "2026-12-15", location: "Cebu City, Philippines",
@@ -98,6 +98,20 @@ const OPPORTUNITY = {
   status: "confirmed", status_label: "Confirmed", review_reason: "", reviewed_at: null,
   can_edit: false, can_delete: false, can_remove: false, can_confirm: false,
   can_reject: false, can_feature: false, edit_returns_to_pending: false,
+};
+
+/** An Adviser's Call waiting for RDCO (IR-765), with what RDCO may do with it. */
+const CALL_REQUEST = {
+  ...OPPORTUNITY, id: 2, title: "Visayas Symposium on Island Energy Grids", posted_by: 7, posted_by_name: "Ana Reyes",
+  status: "pending", status_label: "Waiting for RDCO",
+  can_confirm: true, can_reject: true, can_feature: true,
+};
+
+/** One of the viewer's own Calls, rejected, with RDCO's reason (IR-765). */
+const MY_CALL = {
+  ...OPPORTUNITY, id: 3, title: "Workshop on Edge AI for Agriculture",
+  status: "rejected", status_label: "Rejected", review_reason: "The link goes to last year's call.",
+  can_edit: true, can_delete: true, edit_returns_to_pending: true,
 };
 
 const LONG_TITLE = "A comparative study of low-cost capacitive soil moisture sensing for upland rice in Cebu";
@@ -260,6 +274,16 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: /^All\s*\d*$/ }).first(), primaryLabel: "All (filter)",
   },
   {
+    // A poster's own Calls (IR-765). RDCO and Advisers reach it; the smoke roles have no Adviser.
+    id: "my-calls", path: "/opportunities/mine", route: "/opportunities/mine", role: "RDCO",
+    mocks: wrap("RDCO", (api) => {
+      api.on("GET", "/opportunities/mine/", paginated([MY_CALL]));
+      api.on("GET", "/records/classifications/", paginated([{ id: 1, name: "Agriculture" }]));
+    }),
+    heading: "My Calls",
+    primary: (p) => p.getByRole("button", { name: /^Edit and send again/ }).first(), primaryLabel: "Edit and send again",
+  },
+  {
     id: "notifications", path: "/notifications", route: "/notifications", role: "Student",
     mocks: wrap("Student"),
     heading: "Notifications",
@@ -392,6 +416,12 @@ export const SCREENS: Screen[] = [
     heading: "Role Requests",
     primary: (p) => p.getByRole("button", { name: /Approve/ }).first(), primaryLabel: "Approve",
     table: (p) => p.getByRole("table").first(),
+  },
+  {
+    id: "call-requests", path: "/rdco/call-requests", route: "/rdco/call-requests", role: "RDCO",
+    mocks: wrap("RDCO", (api) => api.on("GET", "/opportunities/requests/", paginated([CALL_REQUEST]))),
+    heading: "Call Requests",
+    primary: (p) => p.getByRole("button", { name: /^Confirm / }).first(), primaryLabel: "Confirm",
   },
   {
     id: "download-requests", path: "/rdco/download-requests", route: "/rdco/download-requests", role: "RDCO",
