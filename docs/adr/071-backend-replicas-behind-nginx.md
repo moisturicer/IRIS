@@ -4,11 +4,11 @@
 
 **Proposed** — 2026-11-15 ([IR-1145](https://citiris.atlassian.net/browse/IR-1145)). Drafted by an AI agent (Claude Code) at Ashlee Sean's request. **Not decided.** AI does not make architecture decisions (CLAUDE.md), so this ADR sets out the options and a recommendation. The Decision section stays empty until a named person accepts one option or rejects them all. Nothing in Compose changes before then.
 
-**Depends on [IR-200](https://citiris.atlassian.net/browse/IR-200), which is not merged yet** (PR [#787](https://github.com/moisturicer/IRIS/pull/787)). Where this ADR says what nginx does "after IR-200", it describes that PR, not `main`.
+**Depends on [IR-200](https://citiris.atlassian.net/browse/IR-200)**, merged 2026-11-16 (PR [#787](https://github.com/moisturicer/IRIS/pull/787)). "After IR-200" below describes `main` since then.
 
 ## Context
 
-**Why this comes up now.** On `main`, `frontend/nginx.conf` proxies to a literal `http://backend:8000`. nginx looks `backend` up once, when it loads, and keeps that address. A second backend container would never get a request, and recreating the one that exists breaks the API until nginx restarts. IR-200 changes that. It gives nginx Docker's resolver and a variable upstream, so nginx reuses an answer for at most 10 seconds and then looks the name up again. When several containers answer to `backend`, nginx takes turns between them. PR #787 adds `scripts/check_nginx_backend_resolution.sh`, which proves both against a real nginx in CI. Once it merges, load balancing between backend containers is one Compose setting away, and the question becomes whether it is worth having.
+**Why this comes up now.** Before IR-200, `frontend/nginx.conf` proxied to a literal `http://backend:8000`. nginx looked `backend` up once, when it loaded, and kept that address. A second backend container would never get a request, and recreating the one that existed broke the API until nginx restarted. IR-200 changed that. It gives nginx Docker's resolver and a variable upstream, so nginx reuses an answer for at most 10 seconds and then looks the name up again. When several containers answer to `backend`, nginx takes turns between them. PR #787 adds `scripts/check_nginx_backend_resolution.sh`, which proves both against a real nginx in CI. Now that it is merged, load balancing between backend containers is one Compose setting away, and the question becomes whether it is worth having.
 
 **The topology today** (`docker-compose.prod.yml` on `main`, 2026-11-15). Everything runs on one host:
 
