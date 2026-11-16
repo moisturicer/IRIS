@@ -217,6 +217,14 @@ PROMPTS = {
 _MARKER = re.compile(r"<\s*/?\s*paper_text", re.IGNORECASE)
 
 
+def unquoted(text: str) -> str:
+    """`text` with any paper-text marker removed, so none reaches the reader (IR-1196)."""
+    return _MARKER_TAG.sub("", text)
+
+
+_MARKER_TAG = re.compile(r"<\s*/?\s*paper_text\s*>", re.IGNORECASE)
+
+
 def quoted(text: str) -> str:
     """`text` between the paper-text markers, with any marker inside it defused (IR-1196)."""
     return PAPER_TEXT_OPEN + _MARKER.sub(lambda m: "‹" + m.group(0)[1:], text) + PAPER_TEXT_CLOSE

@@ -91,7 +91,7 @@ def test_a_paper_chat_title_is_delimited_in_its_note():
     assert json.loads(note[len(PAPER_CHAT_PREFIX):])["title"] == quoted(f"Flood forecasting. {INJECTION}")
 
 
-def test_the_state_note_and_an_earlier_answers_cited_list_delimit_titles():
+def test_the_state_note_delimits_titles_and_the_earlier_answers_list_does_not():
     provider = screened(reply("General background."))
     follow_up(provider, pin=PIN_11, state={"shown": [1, 2], "selected": [], "excluded": []})
     sent = user_texts(provider)
@@ -99,7 +99,8 @@ def test_the_state_note_and_an_earlier_answers_cited_list_delimit_titles():
     assert all(p["title"].startswith(PAPER_TEXT_OPEN) for p in json.loads(state[len(STATE_PREFIX):])["shown"])
     listed = next(m["content"] for m in provider.requests[0]["messages"]
                   if m["role"] == "assistant" and "Papers this answer cited" in (m.get("content") or ""))
-    assert f"«{quoted('Flood forecasting')}»" in listed
+    # An assistant message: quoted titles there would teach the model to copy the markers.
+    assert "«Flood forecasting»" in listed and PAPER_TEXT_OPEN not in listed
 
 
 def test_a_recovered_turn_is_delimited():
@@ -125,3 +126,10 @@ def test_a_handoff_delimits_its_titles_and_findings_only_when_asked():
     assert plain["findings"][0]["text"] == "Approved by the board."
     assert framed["findings"][0]["text"] == quoted("Approved by the board.")
     assert framed["shown"][0]["title"] == quoted("Flood forecasting")
+    assert framed["goal"] == quoted("g")
+
+
+def test_markers_copied_into_an_answer_never_reach_the_reader():
+    copied = f"«{quoted('Flood forecasting')}» predicted 87 floods [{handle('P', 1)}]."
+    result, _ = answer(searched(copied), PIN_11, planted())
+    assert result.answer == "«Flood forecasting» predicted 87 floods [1]."
