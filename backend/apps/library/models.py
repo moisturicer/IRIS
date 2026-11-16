@@ -328,3 +328,60 @@ class LibraryPreferences(models.Model):
         """The reader's `keep_history`, or the default when they never set it."""
         prefs = cls.objects.filter(owner=user).only("keep_history").first()
         return prefs.keep_history if prefs else cls._meta.get_field("keep_history").default
+
+
+#: How many Records keep a reading position per reader (IR-573, decided by the
+#: owner 2026-11-16): the most recently read, as history keeps its 50.
+MAX_READING_POSITIONS = 200
+
+
+class ReadingPosition(models.Model):
+    """
+    Where one reader is in one Record's Manuscript (IR-573, ADR-044 §Amendment
+    2026-11-16, resume): the page, and how far down it the top of their view was.
+
+    **It belongs to the bytes it was read on**, as a highlight does (IR-583):
+    `manuscript_revision` and `manuscript_sha256` are the identity the server was
+    serving that reader (`records.versions.served_manuscript_identity`). It is
+    given back only while that is still what they are served, so a replaced
+    Manuscript never inherits another file's place, and it is deleted once no
+    one is served those bytes (`signals.py`).
+
+    Unique on `(owner, record)`: reading on moves the one position. Only the
+    current paper keeps one -- an earlier Version opened from the picker is a
+    deliberate comparison and is never saved. `MAX_READING_POSITIONS` are kept
+    per reader, the most recently read.
+
+    Both foreign keys cascade. Only its reader sees it: not in Django admin, no
+    `AuditEvent`, and never read by anything that recommends, ranks, discusses
+    or prompts (a guard test enforces it), so draft and review reading is never
+    a discovery signal.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reading_positions"
+    )
+    record = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="+"
+    )
+    manuscript_revision = models.UUIDField()
+    manuscript_sha256 = models.CharField(max_length=64)
+    #: 1-based, as the reader's "Page n / N" counts.
+    page = models.PositiveIntegerField()
+    #: How far down `page` the top of the view was, 0 to 1: a fraction of a page
+    #: survives a change of zoom or layout, a pixel offset does not.
+    fraction = models.FloatField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "record"], name="unique_reading_position"),
+            models.CheckConstraint(condition=models.Q(page__gte=1), name="reading_position_page_from_one"),
+            models.CheckConstraint(
+                condition=models.Q(fraction__gte=0, fraction__lte=1), name="reading_position_fraction_of_page",
+            ),
+        ]
+        indexes = [models.Index(fields=["owner", "-updated_at"], name="library_position_owner_idx")]
+
+    def __str__(self):
+        return f"ReadingPosition(owner={self.owner_id}, record={self.record_id})"

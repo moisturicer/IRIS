@@ -10,6 +10,7 @@ from .views import (
     ReadingHistoryView,
     ReadingVisitView,
     ReadingNoteView,
+    ReadingPositionView,
     RecordHighlightsView,
     SavedFeedDetailView,
     SavedFeedListView,
@@ -36,4 +37,5 @@ urlpatterns = [
     path("history/", ReadingHistoryView.as_view(), name="library-history"),
     path("history/<int:record_id>/", ReadingVisitView.as_view(), name="library-visit"),
     path("preferences/", LibraryPreferencesView.as_view(), name="library-preferences"),
+    path("positions/<int:record_id>/", ReadingPositionView.as_view(), name="library-position"),
 ]

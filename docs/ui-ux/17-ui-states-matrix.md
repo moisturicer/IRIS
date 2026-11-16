@@ -31,6 +31,7 @@ Legend: **✓** already implemented · **●** added by IR-906 · **N/A** with t
 ## Not in this matrix, and why
 
 - **The runtime reader** (`RuntimeReader`, behind `AI_RUNTIME_READER`, off by default) has its own run states from IR-726 (queued, running, interrupted, retry). It is a different protocol, not a read.
+- **Resuming a paper** (IR-573) has no state of its own, by the owner's decision (ADR-044 amendment 2026-11-16, IR-573, point 5): the paper reopens where the reader left off with no notice. A failed read of the place opens the paper at its start, and a failed save changes nothing the reader sees.
 - **Writes.** A timed-out write is never retried by the client and may have been applied (ADR-061). Each form owns how it says so; this matrix covers reads.
 - **Review analytics** (`ReviewAnalyticsPage`) was not audited: it is a coordinator report rather than a work surface, and its states are a follow-up.
 - **Admin, Publish, Settings and the other surfaces.** The ticket names five. IR-895's other children own the rest.

@@ -108,15 +108,19 @@ export function mockShell(
 }
 
 /**
- * Reading history on the account (IR-756): My Library lists it and reads the
- * pause setting; the paper view asks the setting and records a visit to each
- * paper it opens (the smoke papers are `PAPER` and the keyboard suite's 42).
+ * What the account keeps of a reader's own reading. History (IR-756): My
+ * Library lists it and reads the pause setting; the paper view asks the setting
+ * and records a visit to each paper it opens. The reader's place (IR-573): the
+ * paper view asks where they left off -- nowhere yet -- and saves where they
+ * are. The smoke papers are `PAPER` and the keyboard suite's 42.
  */
 export function mockReadingHistory(api: MockApi) {
   api.on("GET", "/library/history/", { results: [] });
   api.on("GET", "/library/preferences/", { keep_history: true });
   for (const id of [PAPER.id, 42]) {
     api.on("PUT", `/library/history/${id}/`, (route: Route) => route.fulfill({ status: 204 }));
+    api.on("GET", `/library/positions/${id}/`, { position: null });
+    api.on("PUT", `/library/positions/${id}/`, (route: Route) => route.fulfill({ status: 204 }));
   }
 }
 
