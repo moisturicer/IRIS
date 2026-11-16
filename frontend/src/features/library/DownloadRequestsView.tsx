@@ -6,6 +6,7 @@ import { DownloadRequestModal } from "@/components/records/DownloadRequestModal"
 import { useCancelDownloadRequest } from "@/components/records/useCancelDownloadRequest";
 import { useDownloadCopy } from "@/components/records/useDownloadCopy";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ButtonLink } from "@/components/ui/Button";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { isRequestTimeout } from "@/api/requestPolicy";
@@ -152,6 +153,8 @@ export function DownloadRequestsView() {
         icon="fa-file-arrow-down"
         title="No download requests yet"
         message="When you ask RDCO for a copy of a paper, the request and its answer appear here."
+        // A copy is asked for from a paper's page, found on Discover (audit LAY-06).
+        action={<ButtonLink to="/" variant="outline">Browse Discover</ButtonLink>}
       />
     );
   }

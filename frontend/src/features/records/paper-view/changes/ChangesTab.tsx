@@ -374,7 +374,7 @@ function Threads({ placed, thread, onOpenThread }: {
           <li key={p.thread}>
             <button type="button" onClick={() => onOpenThread(t)}
               className={cn("review-tag gap-1 hover:border-brand/40 hover:text-brand", FOCUS_RING)}>
-              <i className="fas fa-comment text-2xs" aria-hidden />
+              <i className="fas fa-thumbtack text-2xs" aria-hidden />
               Thread {t.pin}{" "}<span className="text-stone-600">· {words}</span>
             </button>
           </li>

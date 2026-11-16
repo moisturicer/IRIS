@@ -153,7 +153,7 @@ export function WhichPapers({
           onSelect={() => onChange("all")}
           label="All my papers"
           helpId={allHelpId}
-          help="Also every paper you're Contact person of that holds a No. Their text will be sent to AI companies, subject to the embargo and the IP mark, and can't be recalled."
+          help="Also every paper you are the contact person for that holds a No. Their text will be sent to AI companies, subject to the embargo and the IP mark, and can't be recalled."
         />
         <Choice
           name={name}

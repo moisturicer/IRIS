@@ -109,7 +109,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
         </div>
         {canComment && !props.composing && (
           <Button variant="outline" size="sm" onClick={() => props.onCompose({ kind: "general" })}>
-            <i className="fas fa-comment-medical" aria-hidden />
+            <i className="fas fa-note-sticky" aria-hidden />
             New comment
           </Button>
         )}
