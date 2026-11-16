@@ -5,7 +5,6 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { recordsApi } from "@/api/records";
-import { Modal } from "@/components/ui/Modal";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
@@ -32,6 +31,7 @@ import {
   HAS_IP,
   type DiscoverFilters,
 } from "./DiscoverFilterBar";
+import { DiscoverAreas, NO_AREAS, type AreaSelection } from "./DiscoverAreas";
 import { DiscoverOrderSelect } from "./DiscoverOrderSelect";
 import { DiscoverResultCard } from "./DiscoverResultCard";
 import { DiscoverResultsHeader } from "./DiscoverResultsHeader";
@@ -140,8 +140,7 @@ export default function DiscoverPage() {
   const [feedNotice, setFeedNotice] = useState("");
   const [interests, setInterests] = useState<DiscoverInterests>({ classifications: [], psced: [] });
   const [interestOptions, setInterestOptions] = useState<DiscoverInterests>({ classifications: [], psced: [] });
-  const [interestSelection, setInterestSelection] = useState<{ classification_ids: number[]; psced_ids: number[] }>({ classification_ids: [], psced_ids: [] });
-  const [interestOpen, setInterestOpen] = useState(false);
+  const [interestSelection, setInterestSelection] = useState<AreaSelection>(NO_AREAS);
   const [interestLoading, setInterestLoading] = useState(true);
   const [interestLoadFailed, setInterestLoadFailed] = useState<string | null>(null);
   const [interestSaving, setInterestSaving] = useState(false);
@@ -550,10 +549,12 @@ export default function DiscoverPage() {
     [recordTypes, colleges, classifications, years, filters.yearFrom, filters.yearTo],
   );
 
-  /** Areas shape For you. Until there are Areas to choose (or the reader already holds some),
-   *  the button would open a dialog with nothing in it, so it is not drawn (IR-1082). */
+  /** Areas shape Best. Until there are Areas to choose (or the reader already holds some),
+   *  their section of the Filters panel would hold nothing, so it is not drawn (IR-1082, IR-1188). */
   const hasAreas = interestOptions.classifications.length > 0 || interestOptions.psced.length > 0
-    || interests.classifications.length > 0 || interests.psced.length > 0;
+    || interests.classifications.length > 0 || interests.psced.length > 0
+    // A failed read still gets its section, so the reader is told why Areas are missing.
+    || interestLoadFailed !== null;
 
   const openPublish = () =>
     setSearchParams((prev) => {
@@ -617,14 +618,15 @@ export default function DiscoverPage() {
     }
   };
 
-  const resetInterests = async () => {
+  /** Both finish by closing the Filters panel, as the Areas modal they replace did. */
+  const resetInterests = async (closePanel: () => void) => {
     setResetting(true);
     setInterestError("");
     try {
       const { data } = await recordsApi.resetInterests();
       setInterests(data);
-      setInterestSelection({ classification_ids: [], psced_ids: [] });
-      setInterestOpen(false);
+      setInterestSelection(NO_AREAS);
+      closePanel();
       setResetConfirming(false);
       report("Your interests were reset. Your saved papers and folders are unchanged.");
       if (feed === "for_you") setAttempt((n) => n + 1);
@@ -635,14 +637,14 @@ export default function DiscoverPage() {
     }
   };
 
-  const saveInterests = async () => {
+  const saveInterests = async (closePanel: () => void) => {
     setInterestSaving(true);
     setInterestError("");
     try {
       const { data } = await recordsApi.updateInterests(interestSelection);
       setInterests(data);
       setInterestSelection({ classification_ids: data.classifications.map((x) => x.id), psced_ids: data.psced.map((x) => x.id) });
-      setInterestOpen(false);
+      closePanel();
       setFeedNotice("");
       updateQuery((current) => withOrder(current, "best"));
       if (feed === "for_you") setAttempt((n) => n + 1);
@@ -679,14 +681,6 @@ export default function DiscoverPage() {
       <div role="group" aria-label="Discover controls"
         className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
         <DiscoverOrderSelect value={orderOf(query)} onChange={chooseOrder} />
-        {hasAreas && (
-          <button type="button" onClick={() => setInterestOpen(true)}
-            aria-label={interests.classifications.length || interests.psced.length ? "Edit areas" : "Choose areas"}
-            className={cn("inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-control border border-stone-300 bg-white px-3 text-small font-medium text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
-            <i className="fas fa-compass text-label" aria-hidden />
-            <span>Areas</span>
-          </button>
-        )}
         <MyFeeds
           query={query}
           matchCount={loading || holdQuietly ? null : totalCount}
@@ -712,6 +706,22 @@ export default function DiscoverPage() {
           options={filterOptions}
           loading={refLoading}
           resultCount={loading ? null : totalCount}
+          areas={hasAreas ? (closePanel) => (
+            <DiscoverAreas
+              options={interestOptions}
+              selection={interestSelection}
+              onSelectionChange={setInterestSelection}
+              loading={interestLoading}
+              loadFailed={interestLoadFailed}
+              error={interestError}
+              saving={interestSaving}
+              onSave={() => void saveInterests(closePanel)}
+              resetConfirming={resetConfirming}
+              onResetConfirmingChange={setResetConfirming}
+              resetting={resetting}
+              onReset={() => void resetInterests(closePanel)}
+            />
+          ) : undefined}
         />
         {canPublish && (
           <button type="button" onClick={openPublish} aria-label="Publish"
@@ -927,30 +937,6 @@ export default function DiscoverPage() {
         />
       </div>
 
-      <Modal open={interestOpen} onClose={() => { setInterestOpen(false); setResetConfirming(false); }} title="Choose areas for your recommendations" sheet
-        footer={<div className="flex items-center justify-between gap-3">
-          <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setInterestSelection({ classification_ids: [], psced_ids: [] })}>Clear areas</button>
-          <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={interestSaving || interestLoading || Boolean(interestLoadFailed)} onClick={() => void saveInterests()}>{interestLoading ? "Loading…" : interestSaving ? "Saving…" : "Save Areas"}</button>
-        </div>}>
-        <div className="space-y-5 p-5">
-          <p className="text-small text-stone-600">Choose any Areas you’d like to see more often. Leave this blank to browse the latest research.</p>
-          {interestLoadFailed && <p role="alert" className="text-small text-brand">{interestLoadFailed}</p>}
-          {interestError && <p role="alert" className="text-small text-brand">{interestError}</p>}
-          <InterestChoices title="Research classifications" options={interestOptions.classifications} selected={interestSelection.classification_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, classification_ids: ids }))} />
-          <InterestChoices title="PSCED areas" options={interestOptions.psced} selected={interestSelection.psced_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, psced_ids: ids }))} />
-          <div className="border-t border-stone-200 pt-4">
-            <p className="text-small text-stone-600">Resetting clears your Areas and everything you marked Not interested. Your saved papers and folders stay, and the papers you saved still shape Best until you unsave them.</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {resetConfirming ? <>
-                <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={resetting} onClick={() => void resetInterests()}>{resetting ? "Resetting…" : "Reset"}</button>
-                <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} disabled={resetting} onClick={() => setResetConfirming(false)}>Keep my interests</button>
-              </> : (
-                <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setResetConfirming(true)}>Reset my interests</button>
-              )}
-            </div>
-          </div>
-        </div>
-      </Modal>
       <PaperCiteModal record={citeRecord} isOpen={Boolean(citeRecord)} onClose={() => setCiteRecord(null)} />
     </div>
   );
@@ -967,26 +953,6 @@ function describeStale(stale: SavedFeed["stale"]): string {
     });
   const total = Object.values(stale).reduce((sum, ids) => sum + (ids?.length ?? 0), 0);
   return `This feed uses ${parts.join(", ")} that no longer ${total === 1 ? "exists" : "exist"}.`;
-}
-
-function InterestChoices({ title, options, selected, onChange }: {
-  title: string;
-  options: { id: number; name: string }[];
-  selected: number[];
-  onChange: (ids: number[]) => void;
-}) {
-  return <fieldset>
-    <legend className="text-small font-semibold text-stone-800">{title}</legend>
-    {options.length ? <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-      {options.map((option) => {
-        const checked = selected.includes(option.id);
-        return <label key={option.id} className="flex items-start gap-2 rounded-control border border-stone-200 p-2.5 text-small text-stone-700">
-          <input type="checkbox" checked={checked} onChange={() => onChange(checked ? selected.filter((id) => id !== option.id) : [...selected, option.id])} className={cn("mt-0.5 accent-brand", FOCUS_RING)} />
-          <span>{option.name}</span>
-        </label>;
-      })}
-    </div> : <p className="mt-2 text-small text-stone-500">No Areas available.</p>}
-  </fieldset>;
 }
 
 /** Placeholder cards in the grid's own shape, announced once as loading. */
