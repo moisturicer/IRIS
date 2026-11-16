@@ -8,6 +8,8 @@ deploy/**/*.sh text eol=lf
 
 # Contract fixtures are compared byte for byte with what their layout draws (IR-838).
 *.pdf binary
+# The breached-password list is gzip; never touch its bytes (IR-819).
+*.gz binary
 
 # Preserve the audited proxy fixture bytes in Windows checkouts (IR-730).
 docs/evaluation/proxy_starter.json text eol=lf
