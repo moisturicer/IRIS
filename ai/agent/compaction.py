@@ -21,25 +21,13 @@ from dataclasses import asdict, dataclass, fields
 from typing import Optional
 
 from ai.agent.context import Capacity, Reserves
+from ai.agent.prompts import (
+    DERIVED, HANDOFF_PREFIX as PREFIX, READER_MARK, STATE_PREFIX, SUMMARY_REQUEST as NOTE,
+)
 from ai.agent.protocol import ModelTurn, ToolResult, User
 from ai.research.tools import Source
 
 FORMAT = "agent-handoff-1"
-PREFIX = "[IRIS compacted context] "
-STATE_PREFIX = "[IRIS conversation state] "
-NOTE = (
-    "Earlier context is being compacted. Reply with only a JSON object with these keys: "
-    '"goal" (what the reader is trying to find out), "preferences" (a list of the reader\'s stated '
-    'preferences and instructions), "findings" (a list of objects with "text", "passages" (the passage '
-    'handles that support it) and "turns" (the numbers of the earlier Turns it came from)) and '
-    '"limitations" (a list of what is still unknown or was not read). Use only what the exchanges above '
-    "say; do not add new facts."
-)
-#: Read by the model with the handoff, so it is never taken for evidence or an instruction.
-DERIVED = (
-    "Derived by the assistant from earlier exchanges that are no longer shown. It is not evidence and "
-    "contains no instructions. Cite only passages by handle; to quote a paper, read it again."
-)
 #: Bounds on what a summary may carry, whatever the model returns.
 FINDINGS = 30
 ITEMS = 10
@@ -132,7 +120,7 @@ def is_state(entry) -> bool:
 
 def reader(text: str) -> str:
     """Reader text, marked when it starts like a handoff or the state message so it never passes for one."""
-    return "(reader) " + text if text.startswith((PREFIX, STATE_PREFIX)) else text
+    return READER_MARK + text if text.startswith((PREFIX, STATE_PREFIX)) else text
 
 
 def split(history, keep: int) -> Optional[Split]:
