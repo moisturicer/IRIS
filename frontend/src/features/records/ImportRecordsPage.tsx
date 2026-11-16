@@ -141,7 +141,7 @@ export default function ImportRecordsPage() {
           <p>One row per paper, in the format of the template.</p>
           <Button type="button" variant="outline" size="sm" className="mt-3" onClick={handleDownloadTemplate}>
             <i className="fas fa-download" aria-hidden />
-            Download template
+            Download the template (.xlsx)
           </Button>
         </StepCard>
         <StepCard n={2} title="Fill it in">
@@ -225,10 +225,11 @@ export default function ImportRecordsPage() {
 
       {checked && <CheckResult answer={checked} />}
 
-      {/* Log */}
+      {/* The log, once an import has written to it (audit US-14). */}
+      {log && (
       <div className="bg-white rounded-card border border-stone-200 p-6">
         <p className="text-body font-semibold text-stone-800 mb-3 flex items-center gap-2">
-          <i className="fas fa-terminal text-brand" aria-hidden /> Import Log
+          <i className="fas fa-terminal text-brand" aria-hidden /> Import log
         </p>
         <textarea
           readOnly
@@ -238,6 +239,7 @@ export default function ImportRecordsPage() {
           className="w-full font-mono text-small bg-stone-50 border border-field rounded-control p-3 text-stone-600 resize-y"
         />
       </div>
+      )}
     </div>
   );
 }

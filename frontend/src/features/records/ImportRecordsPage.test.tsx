@@ -36,7 +36,7 @@ describe("Import Records", () => {
     const save = vi.spyOn(utils, "downloadBlob").mockImplementation(() => undefined);
     renderScreen(<ImportRecordsPage />);
 
-    const download = screen.getByRole("button", { name: "Download template" });
+    const download = screen.getByRole("button", { name: "Download the template (.xlsx)" });
     expect(download).toHaveClass("rounded-full");
     await user.click(download);
 
@@ -85,11 +85,13 @@ describe("Import Records", () => {
     renderScreen(<ImportRecordsPage />);
     await chooseAndCheck(user);
     await screen.findByRole("status");
+    // Audit US-14 (IR-1098): no empty Import log before there is anything in it.
+    expect(screen.queryByRole("textbox", { name: "Import log" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Generate" }));
 
     expect(importExcel).toHaveBeenLastCalledWith(expect.any(File), { pdfs: [expect.any(File)] });
-    expect(await screen.findByDisplayValue(/1 record\(s\) created/)).toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: "Import log" })).toHaveDisplayValue(/1 record\(s\) created/);
 
     await user.upload(screen.getByLabelText(/Choose the PDFs|PDF.* chosen/), [new File(["%PDF"], "other.pdf", { type: "application/pdf" })]);
     expect(screen.queryByRole("table", { name: /Every row of the file/ })).not.toBeInTheDocument();

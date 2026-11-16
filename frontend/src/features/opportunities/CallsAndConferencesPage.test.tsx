@@ -265,6 +265,18 @@ describe("states", () => {
     expect(screen.getAllByRole("button", { name: "Post a call" })).toHaveLength(2);
   });
 
+  // Audit US-13 (IR-1098): six zero counters and "0 open calls" over an empty
+  // board are numbers with nothing to act on (PRODUCT principle 3).
+  it("shows no type filters, counters or search on an empty board", async () => {
+    serve([], false);
+    await renderBoard();
+    expect(screen.getByRole("heading", { name: "No calls posted yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Filter by type" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Saved/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 open calls/)).not.toBeInTheDocument();
+  });
+
   it("tells a reader who posts calls, and offers no post button", async () => {
     serve([], false);
     await renderBoard();

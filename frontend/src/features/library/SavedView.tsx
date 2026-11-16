@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { ButtonLink } from "@/components/ui/Button";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -309,6 +310,8 @@ export function SavedView({
           icon={query ? "fa-magnifying-glass" : "fa-folder-open"}
           title={query ? "No matches in this folder" : empty.title}
           message={query ? "Search looks at titles and author names." : empty.message}
+          // The next useful step (audit LAY-06): papers are saved from Discover.
+          action={query || historyView ? undefined : <ButtonLink to="/" variant="outline">Browse Discover</ButtonLink>}
         />
       ) : (
         <LibraryRecordTable

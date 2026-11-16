@@ -495,6 +495,8 @@ describe("My Library: reading", () => {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
+    // Audit LAY-06 (IR-1098): an empty page names the next useful step.
+    expect(screen.getByRole("link", { name: "Browse Discover" })).toHaveAttribute("href", "/");
   });
 });
 
@@ -924,6 +926,7 @@ describe("My Library: download requests (IR-743)", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "No download requests yet" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse Discover" })).toHaveAttribute("href", "/");
     expect(recordsApi.myDownloadRequests).toHaveBeenCalledTimes(2);
   });
 });

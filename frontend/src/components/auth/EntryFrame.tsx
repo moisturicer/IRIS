@@ -43,7 +43,8 @@ interface EntryFrameProps {
  * container; on one without, it is the masthead, whose name is the logos' own.
  * Either way the masthead names the system: "IRIS" from the wordmark, the
  * institution from its logo's alt text, read from `config/institution`
- * (IR-768). Both logos keep their natural proportions; on a phone they are only set smaller.
+ * (IR-768). Both logos keep their natural proportions; below 480 px the
+ * institution shows its seal alone, whose words would otherwise be unreadable.
  *
  * On a phone the lede's sentence follows the folder, so the email field stays
  * in the first screenful at 360x640 (IR-704 story 1). The sentence is plain
@@ -110,11 +111,16 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
               </span>
             </span>
             <span className="h-7 shrink-0 border-l border-stone-200 sm:h-9" aria-hidden />
-            <img
-              src={INSTITUTION.logo}
-              alt={INSTITUTION.name}
-              className="h-6 w-auto min-w-0 object-contain sm:h-9"
-            />
+            {/* Below 480 px the full logo's words are about 10 px tall, so
+                only the seal is shown there (audit RES-05). */}
+            <picture className="min-w-0">
+              <source media="(min-width: 480px)" srcSet={INSTITUTION.logo} />
+              <img
+                src={INSTITUTION.seal}
+                alt={INSTITUTION.name}
+                className="h-8 w-auto min-w-0 object-contain sm:h-9"
+              />
+            </picture>
           </Masthead>
           {help && <div className="shrink-0 text-small">{informationLink("Help", "entry-help")}</div>}
         </div>

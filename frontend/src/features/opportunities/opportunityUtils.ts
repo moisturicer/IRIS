@@ -5,7 +5,7 @@ import type { Opportunity, OpportunityInput, OpportunityType } from "@/types/opp
 export const OPPORTUNITY_TYPES: { id: OpportunityType; label: string; icon: string }[] = [
   { id: "conference",   label: "Conference",   icon: "fa-microphone-lines"      },
   { id: "congress",     label: "Congress",     icon: "fa-people-group"          },
-  { id: "symposium",    label: "Symposium",    icon: "fa-comments"              },
+  { id: "symposium",    label: "Symposium",    icon: "fa-chalkboard-user"       },
   { id: "workshop",     label: "Workshop",     icon: "fa-screwdriver-wrench"    },
   { id: "journal",      label: "Journal",      icon: "fa-book-open"             },
   { id: "book_chapter", label: "Book chapter", icon: "fa-book"                  },

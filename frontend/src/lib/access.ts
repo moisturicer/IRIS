@@ -104,12 +104,18 @@ interface ScreenDef {
   };
 }
 
+/**
+ * Ask IRIS's nav icon: not a Font Awesome class but the brand's speech bubble,
+ * which the sidebar draws (IR-1098, audit VIS-08). No other row uses a bubble.
+ */
+export const ASK_IRIS_ICON = "ask-iris";
+
 export const SCREEN_ACCESS = {
   // --- open to every authenticated role ---------------------------------
   discover:      { path: "/",              roles: EVERYONE,
                    nav: { label: "Discover", icon: "fa-compass", section: "Main" } },
   ai:            { path: "/ai",            roles: EVERYONE,
-                   nav: { label: "Ask IRIS", icon: "fa-brain", section: "Main", onlyFor: RESEARCH_ROLES } },
+                   nav: { label: "Ask IRIS", icon: ASK_IRIS_ICON, section: "Main", onlyFor: RESEARCH_ROLES } },
   library:       { path: "/records/mine",  roles: EVERYONE,
                    nav: { label: "My Library", icon: "fa-bookmark", section: "Main", onlyFor: RESEARCH_ROLES } },
   // The bell at the top of the sidebar is the entry; its "View all" opens the
