@@ -790,7 +790,7 @@ function PaperPdfReaderSource({
               aria-keyshortcuts="C"
               title={commentable ? "Comment on this passage (C)" : "Select a passage, or find one, to comment on it"}
             >
-              <i className="fas fa-comment-medical" aria-hidden />
+              <i className="fas fa-note-sticky" aria-hidden />
               Comment
             </Button>
           )}

@@ -22,7 +22,7 @@ describe("DeferredPage", () => {
     vi.useFakeTimers();
     try {
       const PendingPage = lazy(() => new Promise<{ default: ComponentType }>(() => undefined));
-      render(<DeferredPage name="Paper View"><PendingPage /></DeferredPage>);
+      render(<DeferredPage message="Opening the paper"><PendingPage /></DeferredPage>);
 
       act(() => { vi.advanceTimersByTime(2_000); });
       expect(screen.getByText("Still working…")).toBeVisible();
@@ -36,18 +36,18 @@ describe("DeferredPage", () => {
     }
   });
 
-  it("announces an accessible loading state while a route bundle is pending", () => {
+  it("says what is loading in the reader's words, announced once, while a route bundle is pending (US-09)", () => {
     const pendingImport = new Promise<{ default: ComponentType }>(() => undefined);
     const PendingPage = lazy(() => pendingImport);
 
     render(
-      <DeferredPage name="Paper View">
+      <DeferredPage message="Opening the paper">
         <PendingPage />
       </DeferredPage>,
     );
 
-    expect(screen.getByRole("status", { name: "Loading Paper View" })).toBeInTheDocument();
-    expect(screen.getByText("Loading Paper View…")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("status", { name: "Opening the paper" })).toBeInTheDocument();
+    expect(screen.getByText("Opening the paper…")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("lets a failed route chunk reach the recoverable route error screen", async () => {
@@ -61,7 +61,7 @@ describe("DeferredPage", () => {
         path: "/",
         errorElement: <RouteErrorScreen />,
         element: (
-          <DeferredPage name="Ask IRIS">
+          <DeferredPage message="Opening Ask IRIS">
             <BrokenPage />
           </DeferredPage>
         ),

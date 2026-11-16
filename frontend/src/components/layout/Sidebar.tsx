@@ -10,8 +10,8 @@ import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { NotificationBell } from "./NotificationBell";
 import { AccountMenu } from "./AccountMenu";
-import { navFor, canAccess, pathFor, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
-import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
+import { ASK_IRIS_ICON, navFor, canAccess, pathFor, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
+import { AskIrisGlyph, IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { isRail, useSidebarMode } from "@/lib/layout";
 import { HERE } from "@/components/ui/highlightRoles";
@@ -70,16 +70,20 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
           )
         }
       >
-        {({ isActive }) => (
+        {({ isActive }) => {
+          const iconTone = isActive ? "text-brand" : "text-stone-500 group-hover:text-stone-700";
+          return (
           <>
-            <i
-              aria-hidden
-              className={cn(
-                "fas w-5 flex-shrink-0 text-center text-base",
-                item.icon,
-                isActive ? "text-brand" : "text-stone-500 group-hover:text-stone-700",
-              )}
-            />
+            {item.icon === ASK_IRIS_ICON ? (
+              // Ask IRIS is the one row drawn with the brand's speech bubble,
+              // the mark it carries everywhere else (audit VIS-08).
+              <AskIrisGlyph className={cn("h-5 w-5 flex-shrink-0", iconTone)} />
+            ) : (
+              <i
+                aria-hidden
+                className={cn("fas w-5 flex-shrink-0 text-center text-base", item.icon, iconTone)}
+              />
+            )}
             <span className={cn("min-w-0 flex-1 truncate", collapsed && "md:sr-only")}>{item.label}</span>
             {badge != null && (
               <span
@@ -107,7 +111,8 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
               <span aria-hidden className="absolute right-2 top-1.5 hidden h-2 w-2 rounded-full bg-brand ring-2 ring-white md:block" />
             )}
           </>
-        )}
+          );
+        }}
       </NavLink>
       </Tooltip>
       {item.children && item.children.length > 0 && (

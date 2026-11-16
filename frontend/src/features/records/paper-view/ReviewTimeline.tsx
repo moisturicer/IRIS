@@ -37,7 +37,7 @@ const KIND_ICON: Record<TimelineKind, string> = {
   reassignment: "fa-people-arrows",
   extension: "fa-calendar-plus",
   published: "fa-globe",
-  comment: "fa-comment",
+  comment: "fa-note-sticky",
 };
 
 /** What the review discussion lets this viewer do (IR-419). */

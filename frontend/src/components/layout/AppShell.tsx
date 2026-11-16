@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useRef } from "react";
-import { Outlet, useLocation, useMatches } from "react-router-dom";
+import { Link, Outlet, useLocation, useMatches } from "react-router-dom";
+import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Sidebar } from "./Sidebar";
 import { Breadcrumbs, type RouteHandle } from "./Breadcrumbs";
 import { NotificationBell } from "./NotificationBell";
@@ -13,7 +14,8 @@ import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
 
 /**
- * The menu button and the bell, for phones (IR-519).
+ * The menu button, the IRIS mark and the bell, for phones (IR-519). The mark
+ * links to Discover, so the phone has a brand and a way home (audit RES-04).
  *
  * There is no app header any more: on a desktop the bell sits at the top of
  * the sidebar, which is always on screen. Below `md` the sidebar is a hidden
@@ -42,6 +44,14 @@ const PhoneBar = forwardRef<HTMLButtonElement>(function PhoneBar(_props, menuBut
       >
         <i className="fas fa-bars text-base" aria-hidden />
       </Button>
+      <Link
+        to="/"
+        aria-label="IRIS, go to Discover"
+        className={cn("flex min-h-11 items-center gap-2 rounded-control px-1 text-brand", FOCUS_RING)}
+      >
+        <IrisMark className="h-7 w-7" />
+        <IrisWordmark className="h-3.5 w-auto" />
+      </Link>
       <NotificationBell />
     </nav>
   );

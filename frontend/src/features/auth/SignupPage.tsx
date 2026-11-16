@@ -557,10 +557,13 @@ export default function SignupPage() {
           <h2 className="text-balance font-display text-display font-semibold text-stone-900">
             Create an Account
           </h2>
+          {/* The index tabs above already show the steps (audit US-08), so this
+              line is not drawn. It stays as the heading focus moves to on each
+              step, so a screen reader still hears where it is. */}
           <h3
             ref={stepHeadingRef}
             tabIndex={-1}
-            className="mt-1 text-small font-semibold text-brand outline-none"
+            className="sr-only"
           >
             Step {step + 1} of {STEPS.length} · {STEPS[step].name}
           </h3>
