@@ -957,7 +957,11 @@ export interface ReviewComment {
    */
   /** The party it belongs to; null for the authors' own threads. */
   party?:                ThreadParty | null;
-  /** Server-worded party: "The authors", "Adviser", "ITSO"... */
+  /**
+   * Server-worded party: "The authors", "Adviser", "ITSO"... On a reply, who
+   * its writer is in this review ("Author", "IERC"...), or null where the
+   * server can't say (IR-1192).
+   */
   party_label?:          string | null;
   /** A reviewer's thread only; null on an owner's thread and on a reply. */
   severity?:             ThreadSeverity | null;
