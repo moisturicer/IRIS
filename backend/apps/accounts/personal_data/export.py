@@ -314,6 +314,20 @@ def library_preferences(user) -> dict:
     return {"keep_history": LibraryPreferences.keeps_history(user)}
 
 
+def reading_positions(user) -> list[dict]:
+    """Where the person is in each paper they read (IR-573): the page, how far
+    down it, and when. The place is theirs either way; the title is given only
+    while they may still read the paper."""
+    from apps.library.models import ReadingPosition
+
+    rows = list(ReadingPosition.objects.filter(owner=user).order_by("-updated_at", "-id"))
+    titles = _readable_titles(user, [row.record_id for row in rows])
+    return [
+        {**_paper(row.record_id, titles), "page": row.page, "fraction": row.fraction, "updated_at": row.updated_at}
+        for row in rows
+    ]
+
+
 def reading_notes(user) -> list[dict]:
     """
     The person's own private notes (IR-580, ADR-064 §8): the text they typed and
@@ -800,6 +814,7 @@ SECTIONS: dict[str, Callable] = {
     "papers_viewed": papers_viewed,
     "reading_history": reading_history,
     "library_preferences": library_preferences,
+    "reading_positions": reading_positions,
     "saved_feeds": saved_feeds,
     "folders": folders,
     "reading_notes": reading_notes,

@@ -374,6 +374,36 @@ class ExportContentTests(APITestCase):
 
         self.assertEqual(self.export()["library_preferences"], {"keep_history": False})
 
+    def test_reading_positions_are_the_persons_own_and_name_a_paper_only_while_readable(self):
+        import uuid
+
+        from apps.library.models import ReadingPosition
+
+        published = _paper("Public work", self.stranger, status=PipelineStatus.PUBLISHED)
+        hidden = _paper("Someone's draft", self.stranger)
+
+        def place(owner, record, page):
+            ReadingPosition.objects.create(
+                owner=owner, record=record, manuscript_revision=uuid.uuid4(), manuscript_sha256="a" * 64,
+                page=page, fraction=0.5,
+            )
+
+        place(self.me, published, 12)
+        place(self.me, hidden, 3)
+        place(self.stranger, published, 40)
+
+        positions = {p["record_id"]: p for p in self.export()["reading_positions"]}
+
+        self.assertEqual(set(positions), {published.pk, hidden.pk})
+        self.assertEqual(
+            (positions[published.pk]["title"], positions[published.pk]["page"], positions[published.pk]["fraction"]),
+            ("Public work", 12, 0.5),
+        )
+        self.assertIsNotNone(positions[published.pk]["updated_at"])
+        self.assertEqual((positions[hidden.pk]["title"], positions[hidden.pk]["available"]), (None, False))
+        self.assertEqual(positions[hidden.pk]["page"], 3)
+        self.assertNotIn("Someone's draft", _text(self.client.get(URL)))
+
     def test_highlights_are_the_persons_own_and_keep_their_quote_only_while_readable(self):
         import uuid
 

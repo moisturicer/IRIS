@@ -762,6 +762,11 @@ export default function PaperViewPage() {
           recordId={record.id}
           version={viewedVersion?.number ?? null}
           scrollToPage={openedInShown ? openedInShown.page : viewedVersion ? null : landingPage}
+          // Where the reader left off follows their account (IR-573); a citation,
+          // a highlight or `?page=` above still wins, and an earlier Version keeps
+          // none. A citation still being re-read keeps none yet, so the old place
+          // is never put back only to jump to the citation after.
+          keepPlace={resolution.status !== "loading"}
           highlightRegions={highlightRegions}
           navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
           highlights={drawnHighlights}
