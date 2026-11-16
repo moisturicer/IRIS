@@ -163,6 +163,8 @@ UNSEEN_DRAFT = ("The reader never saw that draft: write the answer as if for the
 
 HANDOFF_PREFIX = "[IRIS compacted context] "
 STATE_PREFIX = "[IRIS conversation state] "
+#: Marks the reader's own words that would otherwise pass for derived context.
+READER_MARK = "(reader) "
 SUMMARY_REQUEST = (
     "Earlier context is being compacted. Reply with only a JSON object with these keys: "
     '"goal" (what the reader is trying to find out), "preferences" (a list of the reader\'s stated '
@@ -180,7 +182,7 @@ DERIVED = (
 
 # --- Tools ----------------------------------------------------------------------
 
-#: Each tool's description as the model reads it, by the name `ai.agent.tools` gives its spec.
+#: Each tool's description as the model reads it; research-5's search is "hybrid_search".
 TOOL_DESCRIPTIONS = {
     "search": "Keyword search over the readable papers' passages.",
     "open_passage": "Reread one passage by its handle.",

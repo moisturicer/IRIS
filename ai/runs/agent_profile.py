@@ -75,7 +75,7 @@ def _bounds(values) -> dict[str, Bounds]:
 
 def read(values) -> AgentProfile:
     """The whole profile, or `NotConfigured` naming the first problem."""
-    from ai.agent.executor import EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION
+    from ai.agent.prompts import EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION
     from ai.admission.transport import RESEARCH_LANE
     from ai.infrastructure.openai_adapter import OpenAICompatibleAgentProvider
 

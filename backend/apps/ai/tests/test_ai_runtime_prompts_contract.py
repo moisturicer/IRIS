@@ -98,6 +98,7 @@ def test_the_texts_are_defined_in_the_prompts_module():
     assert compaction.DERIVED is prompts.DERIVED
     assert compaction.PREFIX is prompts.HANDOFF_PREFIX
     assert compaction.STATE_PREFIX is prompts.STATE_PREFIX
+    assert compaction.reader(prompts.STATE_PREFIX) == "(reader) " + prompts.STATE_PREFIX
     every = Investigation(None, clarify=True, metadata=True, manuscripts=True, recovery=True, hybrid=True,
                           listing=True).specs() + toolset.RESEARCH[:1]
     assert {spec.description for spec in every} == set(prompts.TOOL_DESCRIPTIONS.values())

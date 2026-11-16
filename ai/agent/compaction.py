@@ -21,7 +21,9 @@ from dataclasses import asdict, dataclass, fields
 from typing import Optional
 
 from ai.agent.context import Capacity, Reserves
-from ai.agent.prompts import DERIVED, HANDOFF_PREFIX as PREFIX, STATE_PREFIX, SUMMARY_REQUEST as NOTE
+from ai.agent.prompts import (
+    DERIVED, HANDOFF_PREFIX as PREFIX, READER_MARK, STATE_PREFIX, SUMMARY_REQUEST as NOTE,
+)
 from ai.agent.protocol import ModelTurn, ToolResult, User
 from ai.research.tools import Source
 
@@ -118,7 +120,7 @@ def is_state(entry) -> bool:
 
 def reader(text: str) -> str:
     """Reader text, marked when it starts like a handoff or the state message so it never passes for one."""
-    return "(reader) " + text if text.startswith((PREFIX, STATE_PREFIX)) else text
+    return READER_MARK + text if text.startswith((PREFIX, STATE_PREFIX)) else text
 
 
 def split(history, keep: int) -> Optional[Split]:
