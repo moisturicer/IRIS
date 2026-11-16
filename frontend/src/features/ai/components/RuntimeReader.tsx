@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ChatInput } from "./ChatInput";
-import { ANSWER_MARKDOWN, CHAT_COLUMN, CHAT_OPENING, CHAT_STREAM_CARET } from "./answerLayout";
+import { ANSWER_MARKDOWN, CHAT_COLUMN, CHAT_OPENING, CHAT_OPENING_COLUMN, CHAT_STREAM_CARET } from "./answerLayout";
 import { CitationText } from "./CitationText";
 import { ModelPill, type ModelPillOption } from "./ModelPill";
 import { ChatMessageBubble } from "./ChatMessageBubble";
@@ -361,7 +361,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       pinned.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
     }} className={cn(dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
       centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin")}>
-      <div ref={column} className={cn(dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
+      <div ref={column} className={cn(dense ? "space-y-5" : `${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} space-y-6`)}>
         {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
           {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
         {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}
