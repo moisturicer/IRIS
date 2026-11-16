@@ -27,6 +27,8 @@ EXPECTED = {
     "celery-embedding": ["private", "egress"],
     "ai-runs-worker": ["private", "egress"],
     "caddy": ["private", "egress"],
+    # freshclam downloads ClamAV's signatures (IR-666, ADR-072).
+    "clamav": ["private", "egress"],
 }
 
 
