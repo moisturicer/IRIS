@@ -3,13 +3,12 @@ import { Link } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, PasswordStrengthMeter } from "@/components/ui";
+import { PASSWORD_POLICY, passwordLengthError } from "@/lib/passwordPolicy";
 import { classifyRecoveryFailure, retryMessage, useNoReferrer, useSecondsUntil } from "./recovery";
 
 const INVALID_LINK =
   "This link is invalid or no longer available. Request a new email.";
-const POLICY =
-  "At least 8 characters, and not a common or all-numeric password. Spaces count.";
 
 type FieldErrors = Partial<Record<"new_password" | "confirm_password", string>>;
 
@@ -91,6 +90,7 @@ export default function ResetPasswordPage() {
     if (submitting || left > 0) return;
     const missing: FieldErrors = {};
     if (!password) missing.new_password = "Enter a new password.";
+    else if (passwordLengthError(password, "New password")) missing.new_password = passwordLengthError(password, "New password");
     if (!confirm) missing.confirm_password = "Enter the new password again.";
     setProblem(null);
     setErrors(missing);
@@ -185,11 +185,12 @@ export default function ResetPasswordPage() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           error={errors.new_password}
-          hint={POLICY}
+          hint={PASSWORD_POLICY}
           required
           trailing={<PasswordToggle shown={shown.password} label="new password"
             onToggle={() => setShown((s) => ({ ...s, password: !s.password }))} />}
         />
+        <PasswordStrengthMeter password={password} />
         <Input
           id="reset-confirm-password"
           label="Confirm new password"

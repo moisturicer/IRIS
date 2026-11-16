@@ -98,6 +98,7 @@ class Opportunity(models.Model):
     opportunity_type = models.CharField(max_length=32, choices=TYPE_CHOICES)
     title            = models.CharField(max_length=300)
     # "About" on screen.
+    # At most 10,000 characters, checked by OpportunitySerializer (IR-926).
     description      = models.TextField(blank=True)
     # "Link" on screen.
     external_url     = models.URLField(max_length=500, blank=True)

@@ -23,6 +23,7 @@ from core.permissions import (
     role_change_refusal,
 )
 from core.pagination import LargeResultsPagination
+from core.text_limits import too_long, too_long_message
 from core.throttling import UserBurstThrottle
 from apps.audit.services import create_audit_event
 from apps.audit import retention
@@ -426,6 +427,11 @@ class ChangePasswordView(APIView):
             serializer.is_valid(raise_exception=True)
             set_password_and_invalidate(user, serializer.validated_data["new_password"], timezone.now())
             create_audit_event(AuditEvent.PASSWORD_CHANGED, user)
+            # The same non-secret notice a reset sends (IR-820, ASVS 2.2.3 and
+            # 2.5.5), so a change made from a stolen session reaches the owner.
+            # After commit, and best effort: it can never undo the change.
+            user_id = user.pk
+            transaction.on_commit(lambda: recovery_service.notify_password_changed(user_id))
         return Response({"detail": "Password changed. Sign in again with your new password.",
                          "code": SessionEndReason.PASSWORD_CHANGED})
 
@@ -1017,6 +1023,8 @@ class SystemSettingView(APIView):
         value = request.data.get("value")
         if not isinstance(value, str):
             return Response({"value": ["A text value is required."]}, status=400)
+        if too_long(value):
+            return Response({"value": [too_long_message("A setting")]}, status=400)
         # A retention period is whole days, or blank to erase nothing (IR-794).
         if key in retention.setting_keys() and (error := retention.period_error(value)):
             return Response({"value": [error]}, status=400)

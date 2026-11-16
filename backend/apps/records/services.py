@@ -4,6 +4,7 @@ from datetime import date
 import pyexcel
 from django.contrib.postgres.search import SearchVector
 from core.enums import RecordTypeName
+from core.text_limits import too_long, too_long_message
 from .models import Record, RecordOwner, RecordView
 
 
@@ -236,6 +237,8 @@ def check_import_row(row: dict, choices: ImportChoices) -> tuple[dict, list[str]
 
     if not row["title"]:
         problems.append("Title is required")
+    if too_long(row.get("abstract")):
+        problems.append(too_long_message("Abstract").removesuffix("."))
 
     def year(column: str, raw: str | None, earliest: int, last: int) -> int | None:
         if raw is None:

@@ -29,17 +29,20 @@ import {
 import {
   MAX_SCALE,
   MIN_SCALE,
+  anchorDelta,
   citationLandingDelta,
   firstRegionOn,
   fitScale,
   liveWindow,
   regionInView,
   windowReadingBand,
+  type ReadingAnchor,
   type RegionBand,
 } from "./readerGeometry";
 import { usePaperFind } from "./usePaperFind";
 import { usePdfDocument } from "./usePdfDocument";
 import { useReadingPosition } from "./useReadingPosition";
+import { useReadingResume } from "./useReadingResume";
 import { useAuthStore } from "@/store/auth.store";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 
@@ -220,6 +223,13 @@ export interface PaperPdfReaderProps {
   version?: number | null;
   /** The page to scroll to once the document is ready, or `null` for none. */
   scrollToPage: number | null;
+  /**
+   * The reader's place in the current paper follows their account (IR-573):
+   * put back on opening unless `scrollToPage` lands, and saved as they read.
+   * Ignored with a `version` (an earlier Version is a deliberate comparison)
+   * and for a visitor who is not signed in.
+   */
+  keepPlace?: boolean;
   /** Regions to highlight, already page-tagged -- filtered per page below. */
   highlightRegions: Region[];
   /**
@@ -307,6 +317,7 @@ function PaperPdfReaderSource({
   recordId,
   version = null,
   scrollToPage,
+  keepPlace = false,
   highlightRegions,
   navKey,
   contained = false,
@@ -392,6 +403,17 @@ function PaperPdfReaderSource({
   const fitting = zoom === "fit" || (zoom === null && paneWidth > 0 && paneWidth < READING_SPLIT_PX);
   const scale = fitting ? (fitted ?? DEFAULT_SCALE) : (zoom ?? DEFAULT_SCALE);
 
+  // A place belongs to an account: a visitor keeps none.
+  const signedIn = useAuthStore((state) => state.isAuthenticated);
+  const resume = useReadingResume({
+    recordId,
+    enabled: keepPlace && version === null && signedIn,
+    explicitLanding: scrollToPage != null,
+    revision,
+    ready: status === "ready",
+    pageCount,
+  });
+
   const { currentPage, lastVisiblePage } = useReadingPosition({
     ready: status === "ready",
     pageCount,
@@ -401,6 +423,7 @@ function PaperPdfReaderSource({
     scrollAreaRef,
     contained,
     geometryKey,
+    onAnchor: resume.report,
   });
 
   /**
@@ -409,13 +432,21 @@ function PaperPdfReaderSource({
    * is no region (IR-354). With `onlyIfHidden`, a region already in view
    * stays where it is, as a browser's find leaves a match the reader can
    * already see (IR-353). Returns whether there was a page to land on.
+   *
+   * A place the reader left off at (IR-573) is an `anchor` instead: that point
+   * of the page comes back exactly to the top of the view, with no context
+   * above it, so reopening a paper never creeps up it.
    */
   const land = (
     pageNumber: number,
-    region: RegionBand | null,
+    target: RegionBand | { anchor: ReadingAnchor } | null,
     behavior: ScrollBehavior,
     onlyIfHidden = false,
   ): boolean => {
+    const anchor = target && "anchor" in target ? target.anchor : null;
+    const region = target && "anchor" in target ? null : target;
+    const delta = (pageBox: { top: number; height: number }, view: { top: number; bottom: number }) =>
+      anchor ? anchorDelta(pageBox, anchor.fraction, view.top) : citationLandingDelta(pageBox, region, view);
     const page = pageRefs.current.get(pageNumber);
     const toolbar = toolbarRef.current;
     if (!page || !toolbar) return false;
@@ -434,14 +465,14 @@ function PaperPdfReaderSource({
       const atRest = fill || Math.abs(paneTop - PANE_TOP_PX) < 1;
       if (onlyIfHidden && region && atRest && regionInView(pageBox, region, view)) return true;
       if (!fill) window.scrollBy({ top: paneTop - PANE_TOP_PX, behavior });
-      area.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
+      area.scrollBy({ top: delta(pageBox, view), behavior });
     } else {
       // The window scrolls, under a toolbar that sticks below the header.
       // Where it rests once stuck is what counts, not where it is now: a
       // reader at the top of the record has it well below that.
       const view = windowReadingBand(toolbarRect.height, window.innerHeight, bottomInset);
       if (onlyIfHidden && region && regionInView(pageBox, region, view)) return true;
-      window.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
+      window.scrollBy({ top: delta(pageBox, view), behavior });
     }
     return true;
   };
@@ -473,6 +504,16 @@ function PaperPdfReaderSource({
     // (`useReadingPosition`), it does not land again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, scrollToPage, navKey, scale, painted]);
+
+  // Put the reader back where they left off (IR-573), once that page is
+  // painted at this zoom: instantly, as opening a paper there would have been.
+  useEffect(() => {
+    const target = resume.target;
+    if (!target || painted.get(target.page) !== scale) return;
+    if (land(target.page, { anchor: target }, "auto")) resume.landed();
+    // Geometry is read only when the page to land on has painted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume.target, painted, scale]);
 
   const find = usePaperFind({
     ready: status === "ready",
@@ -619,8 +660,10 @@ function PaperPdfReaderSource({
   // loader has not reached them yet.
   const targetPage = find.targetPage;
   const live = useMemo(
-    () => new Set(liveWindow(currentPage, lastVisiblePage, pageCount, [scrollToPage, targetPage, threadLanding?.page ?? null])),
-    [currentPage, lastVisiblePage, pageCount, scrollToPage, targetPage, threadLanding?.page],
+    () => new Set(liveWindow(currentPage, lastVisiblePage, pageCount, [
+      scrollToPage, targetPage, threadLanding?.page ?? null, resume.target?.page ?? null,
+    ])),
+    [currentPage, lastVisiblePage, pageCount, scrollToPage, targetPage, threadLanding?.page, resume.target?.page],
   );
   useEffect(() => {
     live.forEach(prioritize);

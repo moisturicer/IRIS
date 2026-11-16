@@ -19,8 +19,10 @@ export default defineConfig({
       : undefined,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
+        target: process.env.VITE_PROXY_TARGET ?? "http://localhost:8000",
+        // Keep the browser's Host (localhost) so Django's ALLOWED_HOSTS stays
+        // unchanged; rewriting it to "backend:8000" is rejected with a 400.
+        changeOrigin: false,
       },
     },
   },

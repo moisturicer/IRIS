@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from core.text_limits import FREE_TEXT_MAX_LENGTH, too_long_message
+
 from .models import DocumentRequest, DocumentRequestItem
 
 
@@ -144,7 +146,9 @@ class DocumentRequestCreateSerializer(serializers.Serializer):
     """
 
     message = serializers.CharField(
+        max_length=FREE_TEXT_MAX_LENGTH,
         error_messages={
+            "max_length": too_long_message("A request message"),
             "required": "Tell the owner why you need these documents.",
             "blank": "Tell the owner why you need these documents.",
             "null": "Tell the owner why you need these documents.",
@@ -190,7 +194,10 @@ class ItemDecisionSerializer(serializers.Serializer):
         choices=["accept", "reject"],
         error_messages={"invalid_choice": "The action is accept or reject."},
     )
-    reason = serializers.CharField(required=False, allow_blank=True, default="")
+    reason = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=FREE_TEXT_MAX_LENGTH,
+        error_messages={"max_length": too_long_message("A reason")},
+    )
 
     def validate(self, attrs):
         if attrs["action"] == "reject" and not attrs["reason"]:

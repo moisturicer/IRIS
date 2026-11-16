@@ -126,6 +126,8 @@ services:
       # Bind-mounted source on Windows/macOS emits no inotify events — poll instead
       # so edits on the host hot-reload. See frontend/vite.config.ts.
       - VITE_USE_POLLING=1
+      # Inside the container localhost is the container itself; reach the backend by service name.
+      - VITE_PROXY_TARGET=http://backend:8000
 
   # Development edge, the production nginx routing in front of Vite (IR-957).
   # Browse http://localhost:8080. It adds the gateway secret and the reader

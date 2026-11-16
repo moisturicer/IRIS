@@ -565,10 +565,11 @@ describe("My Library: saves follow the account (IR-566)", () => {
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
   });
 
-  // IR-572 widens this test on purpose: the reader's own browser folders are
-  // now left for the import too, so the legacy key also holds one of those,
-  // and it must be neither shown nor rewritten.
-  it("leaves the old browser saves, folders and stars untouched for the import (IR-579)", async () => {
+  // IR-579 changes this test on purpose: the old browser saves, folders and
+  // stars were left untouched for an import, and IRIS had no readers before
+  // the account library, so they are now deleted instead (ADR-044 amendment
+  // 2026-11-16). They are still never shown, and signing out removes them.
+  it("never shows the old browser saves, folders and stars, and signing out deletes them (IR-579)", async () => {
     const legacy = JSON.stringify([
       { id: "want-to-read", name: "Want to read", recordIds: [water.id] },
       { id: "1730000000000", name: "Old browser folder", recordIds: [rice.id] },
@@ -582,8 +583,12 @@ describe("My Library: saves follow the account (IR-566)", () => {
 
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
     expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "Old browser folder" })).not.toBeInTheDocument();
-    expect(localStorage.getItem("iris_record_collections")).toBe(legacy);
-    expect(localStorage.getItem("iris_starred_records")).toBe(JSON.stringify([rice.id]));
+    expect(libraryApi.save).not.toHaveBeenCalled();
+    expect(libraryApi.createFolder).not.toHaveBeenCalled();
+
+    useAuthStore.getState().logout();
+    expect(localStorage.getItem("iris_record_collections")).toBeNull();
+    expect(localStorage.getItem("iris_starred_records")).toBeNull();
   });
 });
 

@@ -8,3 +8,4 @@ export { Modal }          from "./Modal";
 export { Tooltip }        from "./Tooltip";
 export { Card, CardHeader } from "./Card";
 export { ToastContainer } from "./Toast";
+export { PasswordStrengthMeter } from "./PasswordStrengthMeter";

@@ -39,7 +39,7 @@ IR-553's acceptance criteria for IR-572 are: folders are owner-only, and members
 
 7. **The interface reads folders from the server.** Folders join the one account-scoped library store (ADR-044 §6): loaded with the saves in one read, so a reader is never shown their saves with their folders quietly missing; cleared on every session change; and every answer that lands after an account switch is dropped. Renaming, deleting, filing and taking out are optimistic and roll back visibly with a `role="alert"` message. Creating waits for the server, which names the folder. Once the account holds the most folders it may, "New folder" is not offered and the Save menu says why.
 
-   **Folders made in a browser before IR-572 are not shown, and `iris_record_collections` is left byte-for-byte for IR-579's import.** This is ADR-044 §7 applied to folders: reading them would hand one person's browser folders to whoever signs in next.
+   **Folders made in a browser before IR-572 are not shown, and `iris_record_collections` is left byte-for-byte for IR-579's import.** This is ADR-044 §7 applied to folders: reading them would hand one person's browser folders to whoever signs in next. *(Superseded by ADR-044's amendment of 2026-11-16 (IR-579): the key is deleted at sign-in, sign-out and session end, not imported.)*
 
 ## Alternatives Considered
 
@@ -57,8 +57,8 @@ IR-553's acceptance criteria for IR-572 are: folders are owner-only, and members
 
 ## Consequences
 
-- **A reader who made folders in a browser does not see them until IR-579 ships.** Their saves and statuses are already in the account (IR-566); only the grouping waits. IR-579 has to merge browser folders by name, since the account allows one folder per name, and the browser allowed duplicates.
-- **IR-579 must respect the limit.** An import that would exceed 10 folders has to say so and let the reader choose.
+- **A reader who made folders in a browser does not see them until IR-579 ships.** Their saves and statuses are already in the account (IR-566); only the grouping waits. IR-579 has to merge browser folders by name, since the account allows one folder per name, and the browser allowed duplicates. *(Superseded by ADR-044's amendment of 2026-11-16 (IR-579): the key is deleted at sign-in, sign-out and session end, not imported.)*
+- **IR-579 must respect the limit.** An import that would exceed 10 folders has to say so and let the reader choose. *(Superseded by ADR-044's amendment of 2026-11-16 (IR-579): the key is deleted at sign-in, sign-out and session end, not imported.)*
 - **The access matrix now fires the library's cells.** They were declared from IR-566 on but no test ran them (`test_access_matrix.py` had no `library` case). IR-572 adds that case; every declared library cell passed when it was first fired.
 - **The migration only adds two tables.** It was run forward, back and forward on a database seeded by `seed_demo` with saves in it (docs/testing/traceability/IR-572.md).
 
@@ -91,4 +91,4 @@ None on the thesis workflow or retrieval. Folders are not a recommendation signa
 
 ## Related Tasks
 
-- IR-572 (this slice). IR-566 (saves, ADR-044), IR-575 (saves in For you), IR-576 (Not interested), IR-579 (importing old browser saves and folders).
+- IR-572 (this slice). IR-566 (saves, ADR-044), IR-575 (saves in For you), IR-576 (Not interested), IR-579 (old browser saves and folders; deleted, not imported, by ADR-044's amendment of 2026-11-16).

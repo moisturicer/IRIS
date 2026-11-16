@@ -26,7 +26,14 @@ from apps.accounts.models import (
 from apps.accounts.test_system_admin import make
 from apps.ai.models import Conversation
 from apps.audit.models import AuditEvent
-from apps.library.models import LibraryPreferences, ReadingHighlight, ReadingNote, ReadingVisit, SavedRecord
+from apps.library.models import (
+    LibraryPreferences,
+    ReadingHighlight,
+    ReadingNote,
+    ReadingPosition,
+    ReadingVisit,
+    SavedRecord,
+)
 from apps.opportunities.models import SavedCall
 from apps.opportunities.tests import make_opportunity
 from apps.notifications.models import Notification, NotificationType
@@ -339,6 +346,11 @@ class ConfirmTests(DeletionBase):
         )
         ReadingVisit.objects.create(owner=self.person, record=self.published, viewed_at=timezone.now())
         LibraryPreferences.objects.create(owner=self.person, keep_history=False)
+        ReadingPosition.objects.create(
+            owner=self.person, record=self.published, manuscript_revision=uuid.uuid4(),
+            manuscript_sha256="a" * 64, page=4, fraction=0.5,
+        )
+        self.assertTrue(ReadingPosition.objects.filter(owner=self.person).exists())
 
         response, _send = self.confirm(self.sysadmin, self.made.pk)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
@@ -353,6 +365,7 @@ class ConfirmTests(DeletionBase):
         self.assertFalse(ReadingHighlight.objects.filter(owner=self.person).exists())
         self.assertFalse(ReadingVisit.objects.filter(owner=self.person).exists())
         self.assertFalse(LibraryPreferences.objects.filter(owner=self.person).exists())
+        self.assertFalse(ReadingPosition.objects.filter(owner=self.person).exists())
 
     def test_the_row_and_the_history_that_points_at_it_survive(self):
         self.confirm(self.sysadmin, self.made.pk)

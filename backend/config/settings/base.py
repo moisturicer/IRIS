@@ -90,6 +90,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "core.middleware.ContentSecurityPolicyMiddleware",
+    "core.middleware.ApiResponseHeadersMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -158,9 +159,13 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
+# ASVS Level 1 (IR-819): 12 to 128 characters, not common, not breached, not
+# all digits. Registration, change and reset all apply this list.
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    {"NAME": "apps.accounts.password_validation.MaximumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "apps.accounts.password_validation.BreachedPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
@@ -258,8 +263,8 @@ SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30
 # defaults, set here so a change to them is a visible decision.
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
-# Browsers ignore frame-ancestors in a report-only CSP, so this is what denies
-# framing until the CSP is enforced.
+# frame-ancestors denies framing in the enforced CSP; this covers browsers that
+# predate it.
 X_FRAME_OPTIONS = "DENY"
 
 # Django renders no page but the admin, which loads only its own static files.
@@ -276,10 +281,11 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "form-action 'self'",
     "frame-ancestors 'none'",
 ])
-# Report-only until the manual walk-through in docs/testing/traceability/
-# (IR-663) shows no violation. Enforcing is a reviewed change to this line,
-# and to frontend/security-headers.conf, never an environment variable.
-CONTENT_SECURITY_POLICY_REPORT_ONLY = True
+# Enforced since IR-823, after the walk-through (e2e/specs/08-csp-walkthrough.spec.ts)
+# found no violation on 66 screens, the Django admin included. Changing it is a reviewed
+# change to this line and to frontend/security-headers.conf, never an
+# environment variable. development.py keeps it report-only.
+CONTENT_SECURITY_POLICY_REPORT_ONLY = False
 
 # ---- CORS ---------------------------------------------------------------
 

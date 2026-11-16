@@ -32,7 +32,7 @@ from apps.records.serializers import RecordListSerializer
 from apps.records.versions import served_manuscript_identity
 from core.enums import ReadingStatus
 
-from . import feeds, folders, highlights
+from . import feeds, folders, highlights, positions
 from .models import (
     MAX_FOLDERS,
     MAX_HISTORY_ENTRIES,
@@ -153,8 +153,11 @@ class SavedRecordDetailView(APIView):
 
 
 def _readable_or_404(user, record_id):
-    if not Record.objects.visible_to(user).filter(pk=record_id).exists():
+    """The Record, if `user` may read it; else the same 404 as a missing one."""
+    record = Record.objects.visible_to(user).filter(pk=record_id).first()
+    if record is None:
         raise NotFound()
+    return record
 
 
 def _own_note(user, record_id):
@@ -681,3 +684,57 @@ class LibraryPreferencesView(APIView):
             raise ValidationError({"keep_history": ["Send true to keep reading history or false to pause it."]})
         LibraryPreferences.objects.update_or_create(owner=request.user, defaults={"keep_history": value})
         return Response({"keep_history": value})
+
+
+# -- IR-573: resume reading ------------------------------------------------------
+#
+# The rules of notes and highlights. The owner is the authenticated user and
+# every query starts from the reader's own row; a Record they cannot read is the
+# same 404 as a missing one on both read and write. And the place is bound to
+# the Manuscript bytes it was read on: the client only says which revision it
+# was shown, and the server refuses the write unless that is still what the
+# reader is served (`positions`).
+
+
+class ReadingPositionView(APIView):
+    """
+    GET /library/positions/<record_id>/ -- `{position: {page, fraction,
+        manuscript_revision, updated_at}}`, or `{position: null}` when the reader
+        has none on the bytes they are served now. Reading never creates a
+        place; it deletes one left on bytes the reader is no longer served.
+    PUT /library/positions/<record_id>/ -- `{manuscript_revision, page, fraction}`,
+        saved by the paper view as the reader moves. 204; a `409 manuscript_changed`
+        when the revision is no longer the one served, and nothing is stored.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, record_id):
+        row = positions.current(request.user, _readable_or_404(request.user, record_id))
+        if row is None:
+            return Response({"position": None})
+        return Response({"position": {
+            "page": row.page,
+            "fraction": row.fraction,
+            "manuscript_revision": str(row.manuscript_revision),
+            "updated_at": row.updated_at,
+        }})
+
+    def put(self, request, record_id):
+        fields = positions.clean(request.data)
+        _readable_or_404(request.user, record_id)
+        with transaction.atomic():
+            # The Record's row is held until the place is stored, so an upload
+            # replacing these bytes waits, and its receiver then deletes it.
+            record = Record.objects.select_for_update().get(pk=record_id)
+            revision, sha256 = served_manuscript_identity(record, request.user)
+            if revision is None:
+                return _manuscript_conflict(
+                    "manuscript_unavailable", "This paper's Manuscript has no recorded identity, so no place is kept in it.",
+                )
+            if fields["manuscript_revision"] != revision:
+                return _manuscript_conflict(
+                    "manuscript_changed", "This paper's Manuscript was replaced while you were reading it.",
+                )
+            positions.save(request.user, record, (revision, sha256), page=fields["page"], fraction=fields["fraction"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
