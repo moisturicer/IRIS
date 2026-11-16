@@ -290,6 +290,19 @@ describe("the sidebar's list", () => {
     expect(screen.getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
   });
 
+  // Audit VIS-08 (IR-1098): Ask IRIS's nav icon was a brain while its mark
+  // everywhere else is the speech bubble. The glyph is decorative, so there is
+  // no accessible way to ask which it is; the markup is what is checked.
+  it("draws Ask IRIS with its own brand glyph, not a font icon", async () => {
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    const ask = within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Ask IRIS" });
+    expect(ask.querySelector("svg[aria-hidden]")).not.toBeNull();
+    expect(ask.querySelector("i")).toBeNull();
+  });
+
   it("collapses and expands from the logo without a footer control", async () => {
     const user = userEvent.setup();
     signIn(ROLES.STUDENT);

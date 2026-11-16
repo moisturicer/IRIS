@@ -50,7 +50,14 @@ export function DiscoverSearchComposer({ value, onChange }: DiscoverSearchCompos
   }, [value]);
 
   return (
-    <div className={cn("flex min-h-14 items-center gap-3 rounded-card border border-field bg-surface px-4 py-2 focus-within:border-brand", COLOUR_TRANSITION)}>
+    // One focus ring, on the field's frame (audit CMP-03): the standard 2px ring
+    // with its offset (FOCUS_RING's look) while the text is focused, and the text
+    // area draws none of its own. Clear search keeps its own ring when focused.
+    <div className={cn(
+      "flex min-h-14 items-center gap-3 rounded-card border border-field bg-surface px-4 py-2",
+      "has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-brand has-[textarea:focus-visible]:ring-offset-2",
+      COLOUR_TRANSITION,
+    )}>
         <RepositorySearchIcon className="h-5 w-5 shrink-0 text-brand" />
         <div className="relative min-w-0 flex-1">
           {!value && <span aria-hidden="true" className={cn(
@@ -60,7 +67,7 @@ export function DiscoverSearchComposer({ value, onChange }: DiscoverSearchCompos
           <textarea rows={1} value={value} onChange={(e) => onChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) e.preventDefault(); }}
             aria-label="Search records" aria-describedby="discover-search-help"
-            className={cn("block min-h-11 max-h-32 w-full resize-none rounded-control bg-transparent py-2.5 text-body text-stone-900 caret-brand", FOCUS_RING)} />
+            className="block min-h-11 max-h-32 w-full resize-none rounded-control bg-transparent py-2.5 text-body text-stone-900 caret-brand outline-none" />
         </div>
         {value && <button type="button" onClick={() => onChange("")} aria-label="Clear search"
           className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100 hover:text-brand [@media(pointer:fine)]:h-9 [@media(pointer:fine)]:w-9", COLOUR_TRANSITION, FOCUS_RING)}>

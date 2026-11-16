@@ -257,7 +257,12 @@ export function CallsAndConferencesPage() {
 
   const ready = !loading && !loadFailed;
 
-  const summary = !ready
+  // An empty board has nothing to search, filter or count (audit US-13):
+  // its empty state says so instead. While loading or after a failure the
+  // controls stay, without numbers or disabled, as they always did.
+  const emptyBoard = ready && items.length === 0;
+
+  const summary = !ready || emptyBoard
     ? ""
     : filtered
       ? `Showing ${visible.length} of ${items.length} ${items.length === 1 ? "call" : "calls"}.`
@@ -276,6 +281,7 @@ export function CallsAndConferencesPage() {
           a reader reaches for, and at the end of the chip row it was missed.
           Counts appear only once there is a board to count; a 0 before the
           data arrives would be a number IRIS does not know. */}
+      {!emptyBoard && (
       <div className="space-y-3 mb-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="basis-full sm:basis-auto flex-1 min-w-0 sm:max-w-md">
@@ -350,6 +356,7 @@ export function CallsAndConferencesPage() {
           ))}
         </div>
       </div>
+      )}
 
       {/* Always rendered, so a change to it is what a screen reader hears. */}
       <p role="status" aria-live="polite" className="text-small text-stone-600 min-h-5 mb-section">

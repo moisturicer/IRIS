@@ -16,6 +16,12 @@ export interface PaperDownloadControlProps {
   fill?: boolean;
   /** The state may have moved: re-read the record. */
   onChanged?: () => void;
+  /**
+   * Where a pending request is shown. A request waiting on RDCO is the paper's
+   * state, not a reading tool, so the record bar holds it where it has room
+   * and the reader's toolbar then shows nothing for it (IR-1098, audit CMP-06).
+   */
+  pending?: "here" | "elsewhere";
 }
 
 /** The word beside a refused state's "Request again" (ADR-048). */
@@ -37,6 +43,7 @@ export function PaperDownloadControl({
   download,
   fill = false,
   onChanged,
+  pending = "here",
 }: PaperDownloadControlProps) {
   // Refused: the grant ended or was revoked since the page loaded.
   const { saving, download: handleDownload } = useDownloadCopy(onChanged);
@@ -79,6 +86,7 @@ export function PaperDownloadControl({
   }
 
   if (download.state === "pending") {
+    if (pending === "elsewhere") return null;
     const pendingRequest = download.request;
     return (
       <span className="inline-flex items-center gap-2">

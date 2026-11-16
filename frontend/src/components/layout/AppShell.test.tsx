@@ -89,6 +89,14 @@ describe("the app shell", () => {
     expect(within(phoneBar).getByRole("button", { name: /^Notifications/ })).toBeInTheDocument();
   });
 
+  it("puts the IRIS mark in the phone bar, linking to Discover (audit RES-04)", async () => {
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    const phoneBar = screen.getByRole("navigation", { name: "Menu" });
+    expect(within(phoneBar).getByRole("link", { name: "IRIS, go to Discover" })).toHaveAttribute("href", "/");
+  });
+
   it("lists neither Notifications nor Settings among the sidebar's links", async () => {
     // The bell is the notification entry (IR-519); Settings is in the account
     // menu (IR-413).

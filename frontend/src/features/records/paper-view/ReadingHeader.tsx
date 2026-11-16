@@ -26,6 +26,12 @@ interface ReadingHeaderProps {
   /** The paper in one line; null while it loads, absent where the page heads itself. */
   title?: string | null;
   version?: ReactNode;
+  /**
+   * The paper's own state beside the sections, such as a download request
+   * waiting on RDCO (IR-1098). Not drawn below `reading-split`, where the
+   * page hands it to the reader's toolbar instead, as it does the version.
+   */
+  actions?: ReactNode;
   inert?: boolean;
   className?: string;
 }
@@ -49,6 +55,7 @@ export function ReadingHeader({
   onBackToAnswer,
   title,
   version,
+  actions,
   inert = false,
   className,
 }: ReadingHeaderProps) {
@@ -162,6 +169,7 @@ export function ReadingHeader({
           </button>
         ))}
       </div>
+      {actions && <div className="hidden reading-split:flex shrink-0 items-center">{actions}</div>}
     </div>
   );
 }

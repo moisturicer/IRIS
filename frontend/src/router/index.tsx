@@ -99,7 +99,7 @@ export const routes: RouteObject[] = [{
           // The tab reads the paper's own title once it loads (IR-1073).
           {
             path: "records/:id",
-            element: <DeferredPage name="Paper View"><PaperViewPage /></DeferredPage>,
+            element: <DeferredPage message="Opening the paper"><PaperViewPage /></DeferredPage>,
             handle: { title: "Paper", width: "full" },
           },
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
@@ -119,11 +119,11 @@ export const routes: RouteObject[] = [{
             children: [
               {
                 index: true,
-                element: <DeferredPage name="Ask IRIS"><RAGChatPage /></DeferredPage>,
+                element: <DeferredPage message="Opening Ask IRIS"><RAGChatPage /></DeferredPage>,
               },
               {
                 path: "conversations/:conversationId",
-                element: <DeferredPage name="Ask IRIS"><RAGChatPage /></DeferredPage>,
+                element: <DeferredPage message="Opening Ask IRIS"><RAGChatPage /></DeferredPage>,
               },
             ],
           },
@@ -180,27 +180,27 @@ export const routes: RouteObject[] = [{
             children: [
               {
                 path: pathFor("importRecords"),
-                element: <DeferredPage name="Import Records"><ImportRecordsPage /></DeferredPage>,
+                element: <DeferredPage message="Loading the import page"><ImportRecordsPage /></DeferredPage>,
                 handle: { crumb: "Import records" },
               },
               {
                 path: pathFor("roleRequests"),
-                element: <DeferredPage name="Role Requests"><RoleRequestsPage /></DeferredPage>,
+                element: <DeferredPage message="Loading role requests"><RoleRequestsPage /></DeferredPage>,
                 handle: { crumb: "Role Requests", width: "full" },
               },
               {
                 path: pathFor("downloadRequests"),
-                element: <DeferredPage name="Download Requests"><DownloadRequestsPage /></DeferredPage>,
+                element: <DeferredPage message="Loading download requests"><DownloadRequestsPage /></DeferredPage>,
                 handle: { crumb: "Download Requests", width: "full" },
               },
               {
                 path: pathFor("callRequests"),
-                element: <DeferredPage name="Call Requests"><CallRequestsPage /></DeferredPage>,
+                element: <DeferredPage message="Loading call requests"><CallRequestsPage /></DeferredPage>,
                 handle: { crumb: "Call Requests" },
               },
               {
                 path: pathFor("deleteRequests"),
-                element: <DeferredPage name="Delete Requests"><DeleteRequestsPage /></DeferredPage>,
+                element: <DeferredPage message="Loading delete requests"><DeleteRequestsPage /></DeferredPage>,
                 handle: { crumb: "Delete Requests", width: "full" },
               },
               {
@@ -216,7 +216,7 @@ export const routes: RouteObject[] = [{
             children: [
               {
                 path: pathFor("users"),
-                element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
+                element: <DeferredPage message="Loading users"><UserListPage /></DeferredPage>,
                 handle: { crumb: "Users", width: "full" },
               },
             ],
@@ -225,7 +225,7 @@ export const routes: RouteObject[] = [{
             element: <ProtectedRoute allowedRoles={rolesFor("adminUsers")} />,
             children: [{
               path: pathFor("adminUsers"),
-              element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
+              element: <DeferredPage message="Loading users"><UserListPage /></DeferredPage>,
               handle: { crumb: "Users", width: "full" },
             }],
           },
@@ -235,7 +235,7 @@ export const routes: RouteObject[] = [{
             children: [
               {
                 path: pathFor("audit"),
-                element: <DeferredPage name="Audit Log"><AuditLogPage /></DeferredPage>,
+                element: <DeferredPage message="Loading the audit log"><AuditLogPage /></DeferredPage>,
                 handle: { crumb: "Audit Log", width: "full" },
               },
             ],
@@ -245,7 +245,7 @@ export const routes: RouteObject[] = [{
             element: <ProtectedRoute allowedRoles={rolesFor("accountDeletionRequests")} />,
             children: [{
               path: pathFor("accountDeletionRequests"),
-              element: <DeferredPage name="Account Deletion Requests"><AccountDeletionRequestsPage /></DeferredPage>,
+              element: <DeferredPage message="Loading account deletion requests"><AccountDeletionRequestsPage /></DeferredPage>,
               handle: { crumb: "Account Deletions", width: "full" },
             }],
           },
@@ -254,7 +254,7 @@ export const routes: RouteObject[] = [{
             element: <ProtectedRoute allowedRoles={rolesFor("retention")} />,
             children: [{
               path: pathFor("retention"),
-              element: <DeferredPage name="Retention"><RetentionPage /></DeferredPage>,
+              element: <DeferredPage message="Loading retention"><RetentionPage /></DeferredPage>,
               handle: { crumb: "Retention" },
             }],
           },
@@ -263,7 +263,7 @@ export const routes: RouteObject[] = [{
             element: <ProtectedRoute allowedRoles={[...rolesFor("reportedComments"), ...rolesFor("adminReportedComments")]} />,
             children: [{
               path: pathFor("reportedComments"),
-              element: <DeferredPage name="Reported Comments"><ReportedCommentsPage /></DeferredPage>,
+              element: <DeferredPage message="Loading reported comments"><ReportedCommentsPage /></DeferredPage>,
               handle: { crumb: "Reported Comments" },
             }],
           },
@@ -272,7 +272,7 @@ export const routes: RouteObject[] = [{
             element: <ProtectedRoute allowedRoles={[...rolesFor("notices"), ...rolesFor("adminNotices")]} />,
             children: [{
               path: pathFor("notices"),
-              element: <DeferredPage name="Notices"><NoticesPage /></DeferredPage>,
+              element: <DeferredPage message="Loading notices"><NoticesPage /></DeferredPage>,
               handle: { crumb: "Notices" },
             }],
           },

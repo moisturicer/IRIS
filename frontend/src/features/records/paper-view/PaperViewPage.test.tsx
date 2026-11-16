@@ -58,7 +58,7 @@ import { citationNavigationState } from "@/lib/citedPage";
 import { formatDate } from "@/lib/utils";
 
 vi.mock("@/config/institution", () => ({
-  INSTITUTION: { name: "Example Research University", shortName: "ERU", logo: "example.png", emailDomain: "example.edu" },
+  INSTITUTION: { name: "Example Research University", shortName: "ERU", logo: "example.png", seal: "example-seal.png", emailDomain: "example.edu" },
 }));
 
 const RECORD_ID = 7;
@@ -307,9 +307,11 @@ vi.mock("./PaperPdfReader", () => ({
     highlights,
     selectionActions,
     clearCorner,
+    downloadControl,
     keepPlace,
   }: {
     clearCorner?: boolean;
+    downloadControl?: ReactNode;
     keepPlace?: boolean;
     scrollToPage: number | null;
     highlightRegions: unknown[];
@@ -324,6 +326,8 @@ vi.mock("./PaperPdfReader", () => ({
         Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
         highlight{version != null ? `, reading v${version}` : ", reading the current paper"}
       </div>
+      {/* The reader's own toolbar holds the download control it is handed. */}
+      <div role="toolbar" aria-label="Reader toolbar">{downloadControl}</div>
       {/* IR-583: what the page hands the reader to draw and to offer on a selection. */}
       <p>{highlights?.length ?? 0} saved highlight(s) drawn</p>
       {/* IR-1079: whether the page asked the reader to scroll clear of the corner buttons. */}
@@ -3782,5 +3786,44 @@ describe("Reading history (IR-756)", () => {
 
     await waitFor(() => expect(libraryApi.preferences).toHaveBeenCalled());
     expect(libraryApi.visit).not.toHaveBeenCalled();
+  });
+});
+
+// Audit CMP-06: a pending download request is the paper's state, not a
+// reading tool, so it sits in the record bar, not beside zoom (IR-1098). On a
+// phone the bar has no room and it stays in the reader's toolbar, as the
+// version does (IR-1092).
+describe("a pending download request (IR-1098)", () => {
+  const pending = {
+    state: "pending" as const, allowed: false, message: "Your download request is waiting for RDCO's decision.",
+    grant_expires_at: null, request: 3,
+  };
+
+  beforeEach(() => {
+    shownRecord = { ...record, download: pending };
+    signInAs(99, "Student");
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sits in the record bar, out of the reader's toolbar", async () => {
+    workspaceAt(1400);
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open/i);
+
+    const toolbar = screen.getByRole("toolbar", { name: "Reader toolbar" });
+    expect(within(toolbar).queryByText("Request pending")).not.toBeInTheDocument();
+    expect(screen.getByText("Request pending")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
+  });
+
+  it("stays in the reader's toolbar on a phone, where the bar has no room", async () => {
+    workspaceAt(400);
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open/i);
+
+    const toolbar = screen.getByRole("toolbar", { name: "Reader toolbar" });
+    expect(within(toolbar).getByText("Request pending")).toBeInTheDocument();
+    expect(screen.getAllByText("Request pending")).toHaveLength(1);
   });
 });

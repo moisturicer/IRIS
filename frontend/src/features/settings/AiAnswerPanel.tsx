@@ -26,8 +26,8 @@ type Phase = "loading" | "failed" | "ready";
 function papersNote(count: number): string {
   if (count === 0) return "";
   return count === 1
-    ? " 1 paper you're Contact person of now holds your Yes."
-    : ` ${count} papers you're Contact person of now hold your Yes.`;
+    ? " 1 paper you are the contact person for now holds your Yes."
+    : ` ${count} papers you are the contact person for now hold your Yes.`;
 }
 
 export function AiAnswerPanel() {
@@ -103,7 +103,7 @@ export function AiAnswerPanel() {
   return (
     <Panel
       title="May AI use your papers?"
-      caption="Your answer covers the papers you're Contact person of. Each paper keeps the answer it started with, and there is no setting per paper."
+      caption="Your answer covers every paper you are the contact person for. Each paper keeps the answer it started with, and there is no setting per paper."
     >
       {phase === "loading" && (
         <p role="status" className="flex items-center gap-2 text-small text-stone-600">
