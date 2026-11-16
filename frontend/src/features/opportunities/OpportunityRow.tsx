@@ -6,7 +6,7 @@ import { TONES } from "@/components/ui/statusTones";
 import { cn } from "@/lib/utils";
 import type { Opportunity } from "@/types/opportunities";
 
-import { countdown, dateParts, eventDates, eventTag, formatDueDate, typeMeta } from "./opportunityUtils";
+import { countdown, dateParts, eventDates, eventTag, formatDueDate, papersClosed, typeMeta } from "./opportunityUtils";
 
 interface OpportunityRowProps {
   opportunity: Opportunity;
@@ -52,12 +52,12 @@ export function OpportunityRow({
 }: OpportunityRowProps) {
   const titleId = useId();
   const type    = typeMeta(o.opportunity_type);
-  const closed  = o.papers_state === "closed";
+  const closed  = papersClosed(o);
   const chip    = countdown(o);
   const date    = dateParts(o.due_date);
   const urgent  = !closed && chip.tone === "attention";
-  const event   = eventDates(o);
-  const running = eventTag(o);
+  const eventWhen  = eventDates(o);
+  const eventLabel = eventTag(o);
 
   const meta = [o.location, ...(o.area_names ?? [])].filter(Boolean);
 
@@ -131,9 +131,9 @@ export function OpportunityRow({
           </p>
         )}
 
-        {(event || o.registration_fee) && (
+        {(eventWhen || o.registration_fee) && (
           <p className="flex flex-wrap gap-x-4 gap-y-1 text-small text-stone-600 mt-1">
-            {event && <span>Event: {event}</span>}
+            {eventWhen && <span>Event: {eventWhen}</span>}
             {o.registration_fee && <span>Fee: {o.registration_fee}</span>}
           </p>
         )}
@@ -148,7 +148,7 @@ export function OpportunityRow({
       {/* Under the content until `xl`: the sidebar takes its share from `md`,
           so at `lg` a call with no link still squeezed its title to ~240 px. */}
       <div className="w-full xl:w-auto xl:shrink-0 xl:max-w-xs flex flex-wrap xl:flex-col items-center xl:items-end justify-between xl:justify-start gap-3">
-        <p data-tags className="flex flex-wrap items-center gap-2">
+        <p className="flex flex-wrap items-center gap-2">
           <span className={cn(TAG, closed ? TONES.quiet : chip.className)}>
             <i className={cn("fas", closed ? "fa-lock" : "fa-clock")} aria-hidden="true" />
             <span>{o.papers_label}</span>
@@ -159,10 +159,10 @@ export function OpportunityRow({
               </>
             )}
           </span>
-          {running && (
+          {eventLabel && (
             <span className={cn(TAG, TONES.active)}>
               <i className="fas fa-circle-play" aria-hidden="true" />
-              {running}
+              {eventLabel}
             </span>
           )}
         </p>
@@ -209,19 +209,16 @@ export function OpportunityRow({
               <span className="sr-only">(opens in a new tab)</span>
             </a>
           )}
-          {/* Only a Call migrated from a Conference Deadline lacks a link
-              (IR-760); a new Call can't. It shows no link and no fallback (IR-764). */}
         </div>
       </div>
 
       {/* ---- Who posted it, and the poster's own controls ----------------- */}
       {/* Last in the row, so the deadline and "View & apply" come before Delete
           in reading and tab order. From `xl` it lines up under the content. */}
-      {(o.posted_by_name || o.can_edit) && (
+      {(o.posted_by_name || o.can_edit || o.can_delete) && (
         <div className="basis-full xl:pl-20 flex flex-wrap items-center gap-x-1 gap-y-1 text-label text-stone-600">
           {o.posted_by_name && <span className="mr-2">Posted by {o.posted_by_name}</span>}
           {o.can_edit && (
-            <>
               <Button
                 type="button"
                 variant="ghost"
@@ -233,6 +230,10 @@ export function OpportunityRow({
                 <i className="fas fa-pen" aria-hidden="true" />
                 Edit
               </Button>
+          )}
+          {/* Plain delete only. RDCO removes an Adviser's Call with a reason
+              (`can_remove`), which is IR-765's to offer. */}
+          {o.can_delete && (
               <Button
                 type="button"
                 variant="ghost"
@@ -244,7 +245,6 @@ export function OpportunityRow({
                 <i className="fas fa-trash-can" aria-hidden="true" />
                 Delete
               </Button>
-            </>
           )}
         </div>
       )}

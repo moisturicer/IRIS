@@ -76,9 +76,12 @@ describe("areaNames", () => {
 });
 
 describe("withType: Journal and Book Chapter have no event (ADR-050 decision 4)", () => {
-  it("drops the event dates and fills an empty location with Online", () => {
+  it("fills an empty location with Online, and keeps typed dates for a switch back", () => {
     const d = withType({ ...EMPTY_DRAFT, start_date: "2027-01-01", end_date: "2027-01-02" }, "journal");
-    expect(d).toMatchObject({ opportunity_type: "journal", start_date: "", end_date: "", location: "Online" });
+    expect(d).toMatchObject({ opportunity_type: "journal", location: "Online" });
+    // Hidden, never sent (inputFrom), and back if the poster changes their mind.
+    expect(inputFrom(d)).toMatchObject({ start_date: null, end_date: null });
+    expect(withType(d, "conference")).toMatchObject({ start_date: "2027-01-01", end_date: "2027-01-02" });
   });
 
   it("keeps a location the poster typed", () => {

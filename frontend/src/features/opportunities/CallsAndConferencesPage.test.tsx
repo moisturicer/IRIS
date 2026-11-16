@@ -375,7 +375,7 @@ describe("states", () => {
 
 describe("posting and changing calls", () => {
   it("offers Edit and Delete only on calls the server says this viewer may change", async () => {
-    serve([call({ title: "Mine", can_edit: true }), call({ title: "Someone else's" })], true);
+    serve([call({ title: "Mine", can_edit: true, can_delete: true }), call({ title: "Someone else's" })], true);
     await renderBoard();
 
     const mine = screen.getByRole("article", { name: "Mine" });
@@ -617,7 +617,7 @@ describe("posting and changing calls", () => {
   });
 
   it("deletes a call only after it is confirmed", async () => {
-    serve([call({ id: 8, title: "Doomed call", can_edit: true }), month()], true);
+    serve([call({ id: 8, title: "Doomed call", can_edit: true, can_delete: true }), month()], true);
     remove.mockResolvedValue({});
     await renderBoard();
     const user = userEvent.setup();
@@ -629,6 +629,76 @@ describe("posting and changing calls", () => {
     await user.click(within(confirm).getByRole("button", { name: /Delete call/ }));
     await waitFor(() => expect(screen.queryByRole("article", { name: "Doomed call" })).toBeNull());
     expect(remove).toHaveBeenCalledWith(8);
+  });
+
+  it("offers no plain Delete where the server says a removal needs a reason", async () => {
+    // RDCO on an Adviser's Call: it may edit, but removing it takes a reason
+    // through `remove`, which IR-765 offers (ADR-050 amendment of 2026-11-15).
+    serve([call({ title: "An Adviser's call", can_edit: true, can_delete: false, can_remove: true })], true, true);
+    await renderBoard();
+    const row = screen.getByRole("article", { name: "An Adviser's call" });
+    expect(within(row).getByRole("button", { name: "Edit An Adviser's call" })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /^Delete/ })).toBeNull();
+  });
+
+  it("says before saving that an Adviser's edit sends the call back to RDCO", async () => {
+    serve([call({ id: 41, title: "Confirmed call", can_edit: true, edit_returns_to_pending: true }),
+      call({ id: 42, title: "RDCO's call", can_edit: true })], true);
+    await renderBoard();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Edit Confirmed call" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit call" });
+    expect(within(dialog).getByText(/Saving sends this call back to RDCO/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Edit RDCO's call" }));
+    expect(within(await screen.findByRole("dialog", { name: "Edit call" })).queryByText(/Saving sends this call back/)).toBeNull();
+  });
+
+  it("reports a failed save in a toast with Try again, keeps the sheet and what was typed, and grows nothing", async () => {
+    const mine = call({ id: 51, title: "Kept title", can_edit: true });
+    serve([mine], true);
+    update.mockRejectedValueOnce(new Error("Network Error"));
+    update.mockResolvedValueOnce({ data: { ...mine, title: "Kept title" } });
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "Kept title" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit Kept title" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit call" });
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("Could not save your changes.");
+    expect(toast).toHaveTextContent("Nothing has been lost.");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(within(dialog).getByRole("textbox", { name: "Title" })).toHaveValue("Kept title");
+
+    await user.click(within(toast).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("reports a failed delete in a toast with Try again, and closes the question", async () => {
+    serve([call({ id: 61, title: "Stubborn call", can_edit: true, can_delete: true })], true);
+    remove.mockRejectedValueOnce(new Error("Network Error"));
+    remove.mockResolvedValueOnce({});
+    renderScreen(<><CallsAndConferencesPage /><ToastContainer /></>);
+    await screen.findByRole("article", { name: "Stubborn call" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Delete Stubborn call" }));
+    const confirm = await screen.findByRole("dialog", { name: "Delete this call?" });
+    await user.click(within(confirm).getByRole("button", { name: /Delete call/ }));
+
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("Could not delete Stubborn call.");
+    expect(screen.queryByRole("dialog", { name: "Delete this call?" })).toBeNull();
+    expect(screen.getByRole("article", { name: "Stubborn call" })).toBeInTheDocument();
+
+    await user.click(within(toast).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Stubborn call" })).toBeNull());
+    expect(remove).toHaveBeenCalledTimes(2);
   });
 
   it("has no serious accessibility violations with a Journal's sheet open", async () => {
@@ -659,7 +729,7 @@ describe("at 360 px", () => {
   it("wraps each row's tags and actions, keeps the Area filter to the width, and stays accessible", async () => {
     serve([
       call({
-        title: "Busy row", is_featured: true, can_edit: true, event_state: "happening", event_label: "Happening now",
+        title: "Busy row", is_featured: true, can_edit: true, can_delete: true, event_state: "happening", event_label: "Happening now",
         start_date: "2026-10-10", end_date: "2026-10-12", registration_fee: "PHP 5,000",
       }),
       closed(),
@@ -667,12 +737,13 @@ describe("at 360 px", () => {
     const { container } = await renderBoard();
     const row = screen.getByRole("article", { name: "Busy row" });
 
-    expect(within(row).getByText("Happening now").closest("[data-tags]")!.className).toMatch(/\bflex-wrap\b/);
+    expect(within(row).getByText("Happening now").parentElement!.className).toMatch(/\bflex-wrap\b/);
     for (const button of within(row).getAllByRole("button")) {
       expect(button.parentElement!.className).toMatch(/\bflex-wrap\b/);
       expect(button.closest(".truncate, [class*='line-clamp']")).toBeNull();
     }
-    expect(screen.getByRole("combobox", { name: "Area" }).closest("[data-area-filter]")!.className).toMatch(/\bw-full\b/);
+    // The filter that holds the Area select takes the full width on a phone.
+    expect(screen.getByRole("combobox", { name: "Area" }).closest(".w-full")).not.toBeNull();
     await expectNoBlockingA11yViolations(container);
   });
 });

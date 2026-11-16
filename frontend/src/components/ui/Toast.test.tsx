@@ -55,6 +55,14 @@ describe("ToastContainer", () => {
       expect(useUIStore.getState().toasts).toEqual([]);
     });
 
+    it("stays while it offers an action, so the action can be reached (IR-764)", () => {
+      useUIStore.getState().addToast({ type: "error", message: "Not saved", action: { label: "Try again", onClick: () => {} } });
+
+      vi.advanceTimersByTime(60_000);
+
+      expect(useUIStore.getState().toasts).toHaveLength(1);
+    });
+
     it("stays until dismissed when asked to persist", () => {
       useUIStore.getState().addToast({ type: "error", message: "Not saved", persist: true });
 

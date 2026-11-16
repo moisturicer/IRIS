@@ -12,8 +12,8 @@ export interface Toast {
   persist?: boolean;
   /**
    * One thing the reader can do about it, such as Try again (IR-764). Taking
-   * it closes the toast. An error toast with an action should also persist,
-   * so the action doesn't leave before the reader can reach it.
+   * it closes the toast. A toast with an action always persists, so the
+   * action never leaves before the reader can reach it.
    */
   action?: { label: string; onClick: () => void };
 }
@@ -93,7 +93,7 @@ export const useUIStore = create<UIState>((set) => ({
   addToast: (toast) => {
     const id = crypto.randomUUID();
     set((s) => ({ toasts: [...s.toasts, { id, ...toast }] }));
-    if (toast.persist) return;
+    if (toast.persist || toast.action) return;
     setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), TOAST_MS);
   },
 

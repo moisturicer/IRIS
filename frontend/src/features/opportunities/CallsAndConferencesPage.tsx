@@ -27,6 +27,7 @@ import {
   OPPORTUNITY_TYPES,
   areaNames,
   byBoardOrder,
+  papersClosed,
   deadlineGroup,
   matchesQuery,
 } from "./opportunityUtils";
@@ -91,7 +92,6 @@ export function CallsAndConferencesPage() {
   const [formTarget, setFormTarget] = useState<FormTarget>(null);
   const [deleting,   setDeleting]   = useState<Opportunity | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -153,7 +153,7 @@ export function CallsAndConferencesPage() {
     return counts;
   }, [searched]);
 
-  const openCount = useMemo(() => items.filter((o) => o.papers_state === "accepting").length, [items]);
+  const openCount = useMemo(() => items.filter((o) => !papersClosed(o)).length, [items]);
   const filtered  = activeType !== null || query.trim() !== "" || activeArea !== "" || savedOnly;
 
   const clearFilters = () => {
@@ -215,25 +215,36 @@ export function CallsAndConferencesPage() {
     );
   };
 
-  const confirmDelete = async () => {
-    if (!deleting || deleteBusy) return;
+  /**
+   * Delete a call the reader has already confirmed. The outcome is a toast:
+   * the dialog asked the question and closes either way, so no error box grows
+   * inside it. Try again repeats the delete the reader already decided on.
+   */
+  const deleteCall = async (target: Opportunity) => {
     setDeleteBusy(true);
-    setDeleteError(null);
     try {
-      await opportunitiesApi.remove(deleting.id);
-      setItems((current) => current.filter((o) => o.id !== deleting.id));
-      setDeleting(null);
+      await opportunitiesApi.remove(target.id);
+      setItems((current) => current.filter((o) => o.id !== target.id));
       addToast({ type: "success", message: "Call deleted." });
     } catch (err) {
       const status = (err as { response?: { status?: number } })?.response?.status;
-      setDeleteError(
+      addToast(
         status === 403 || status === 404
-          ? "You can no longer delete this call. It may already be gone."
-          : failureMessage(err, { lead: "Could not delete the call." }),
+          ? { type: "error", persist: true, message: `You can no longer delete ${target.title}. It may already be gone.` }
+          : {
+              type: "error",
+              message: failureMessage(err, { lead: `Could not delete ${target.title}.` }),
+              action: { label: "Try again", onClick: () => void deleteCall(target) },
+            },
       );
     } finally {
       setDeleteBusy(false);
+      setDeleting(null);
     }
+  };
+
+  const confirmDelete = () => {
+    if (deleting && !deleteBusy) void deleteCall(deleting);
   };
 
   // ---- Render ------------------------------------------------------------
@@ -281,7 +292,7 @@ export function CallsAndConferencesPage() {
               leading={<SearchGlyph className="h-3 w-3" />}
             />
           </div>
-          <div data-area-filter className="w-full sm:w-auto">
+          <div className="w-full sm:w-auto">
             <Select
               id={`${ids}-area`}
               label="Area"
@@ -416,7 +427,7 @@ export function CallsAndConferencesPage() {
                       onToggleSave={() => handleToggleSave(o.id)}
                       onDownloadIcs={() => void handleDownloadIcs(o)}
                       onEdit={() => setFormTarget(o)}
-                      onDelete={() => { setDeleteError(null); setDeleting(o); }}
+                      onDelete={() => setDeleting(o)}
                     />
                   </li>
                 ))}
@@ -446,8 +457,7 @@ export function CallsAndConferencesPage() {
         confirmLabel="Delete call"
         danger
         confirming={deleteBusy}
-        error={deleteError}
-        onConfirm={() => void confirmDelete()}
+        onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}
       />
     </div>

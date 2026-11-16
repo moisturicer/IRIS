@@ -15,6 +15,11 @@ export function typeMeta(type: OpportunityType) {
   return OPPORTUNITY_TYPES.find((t) => t.id === type) ?? OPPORTUNITY_TYPES[0];
 }
 
+/** Whether the server says submissions have closed (ADR-050 decision 6). */
+export function papersClosed(o: Pick<Opportunity, "papers_state">): boolean {
+  return o.papers_state === "closed";
+}
+
 /** A Journal or Book Chapter has no event, so no start or end date (ADR-050 decision 4). */
 export function hasEvent(type: OpportunityType | ""): boolean {
   return type !== "journal" && type !== "book_chapter";
@@ -40,7 +45,7 @@ export const DEADLINE_GROUPS: { id: DeadlineGroup; title: string }[] = [
 
 /** Uses the server's papers state and `days_left`, never the viewer's clock. */
 export function deadlineGroup(o: Opportunity): DeadlineGroup {
-  if (o.papers_state === "closed") return "closed";
+  if (papersClosed(o)) return "closed";
   if (o.days_left <= 7) return "week";
   if (o.days_left <= 30) return "month";
   return "later";
@@ -54,7 +59,7 @@ export function deadlineGroup(o: Opportunity): DeadlineGroup {
  * or less is `active`, anything further off and anything closed is `quiet`.
  */
 export function countdown(o: Opportunity): { label: string; tone: Tone; className: string } {
-  const closed = o.papers_state === "closed";
+  const closed = papersClosed(o);
   const tone: Tone = closed || o.days_left > 21 ? "quiet" : o.days_left <= 7 ? "attention" : "active";
   let label: string;
   if (closed) label = "Closed";
@@ -160,19 +165,14 @@ export const EMPTY_DRAFT: OpportunityDraft = {
 };
 
 /**
- * The draft with its type changed. A Journal or Book Chapter drops its event
- * dates and, when the location is empty, fills it with "Online", which the
- * poster can change (ADR-050 decision 4). A typed location is never replaced.
+ * The draft with its type changed. A Journal or Book Chapter fills an empty
+ * location with "Online", which the poster can change (ADR-050 decision 4); a
+ * typed location is never replaced. Its event dates stay in the draft, hidden,
+ * so switching back restores what was typed; `inputFrom` never sends them.
  */
 export function withType(d: OpportunityDraft, type: OpportunityType): OpportunityDraft {
   if (hasEvent(type)) return { ...d, opportunity_type: type };
-  return {
-    ...d,
-    opportunity_type: type,
-    start_date: "",
-    end_date: "",
-    location: d.location.trim() ? d.location : "Online",
-  };
+  return { ...d, opportunity_type: type, location: d.location.trim() ? d.location : "Online" };
 }
 
 export function draftFrom(o: Opportunity): OpportunityDraft {
