@@ -253,6 +253,11 @@ describe("where the login screen sends you", () => {
     );
   }
 
+  /** Close the signed-out dialog the way a person does, with its own button (IR-1197). */
+  async function closeSignedOutDialog() {
+    await userEvent.setup().click(screen.getByRole("button", { name: "Sign in again" }));
+  }
+
   async function signIn() {
     const user = userEvent.setup();
     await user.type(screen.getByRole("textbox", { name: "Email address" }), "ktto@cit.edu");
@@ -289,6 +294,7 @@ describe("where the login screen sends you", () => {
     acceptAnyPassword();
     renderLoginAt("/login?reason=session_expired&next=%2Frecords%2F42");
 
+    await closeSignedOutDialog();
     await signIn();
 
     await waitFor(() => {
@@ -364,10 +370,11 @@ describe("where the login screen sends you", () => {
       from: "/review/12/evaluate?status=pending",
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    expect(screen.getByRole("dialog", { name: "Session Ended" })).toHaveTextContent(
       "Your session ended. Sign in to continue where you were.",
     );
 
+    await closeSignedOutDialog();
     await signIn();
 
     await waitFor(() => {
@@ -377,15 +384,14 @@ describe("where the login screen sends you", () => {
     });
   });
 
-  it("keeps the destination when the session-expired banner is dismissed first", async () => {
-    // `dismissSessionAlert` navigates to clear the banner's reason out of
+  it("keeps the destination when the session-ended dialog is closed first", async () => {
+    // `dismissSignedOutNotice` navigates to clear the dialog's reason out of
     // router state. Reading the destination at submit time instead of on mount
-    // would mean dismissing the banner quietly threw the destination away.
+    // would mean closing the dialog quietly threw the destination away.
     acceptAnyPassword();
     renderLoginAt("/login", { reason: "session_expired", from: "/review/12/evaluate" });
 
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /dismiss/i }));
+    await closeSignedOutDialog();
     await signIn();
 
     await waitFor(() => {
@@ -767,14 +773,20 @@ describe("why the session ended", () => {
     { code: "session_ended_revoked", title: "Session Ended", text: /An administrator ended this session/ },
   ];
 
-  it.each(cases)("says why for $code", async ({ code, title, text }) => {
+  it.each(cases)("says why for $code, in a dialog in front of the page (IR-1197)", async ({ code, title, text }) => {
     const { container } = renderScreen(<LoginPage />, {
       route: `/login?reason=session_expired&code=${code}`,
     });
 
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent(title);
-    expect(alert).toHaveTextContent(text);
+    // Named by its title and described by its text, as a screen reader announces it.
+    const dialog = screen.getByRole("dialog", { name: title });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAccessibleDescription(text);
+    // In front of the page, not a box inside the sign-in card.
+    expect(screen.getByRole("heading", { name: "Welcome back" }).closest("[role=dialog]")).toBeNull();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // Focus starts inside it.
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
     await expectNoBlockingA11yViolations(container);
   });
 
@@ -783,7 +795,7 @@ describe("why the session ended", () => {
       const { unmount } = renderScreen(<LoginPage />, {
         route: `/login?reason=session_expired&code=${code}`,
       });
-      const text = screen.getByRole("alert").textContent;
+      const text = screen.getByRole("dialog").textContent;
       unmount();
       return text;
     });
@@ -796,7 +808,7 @@ describe("why the session ended", () => {
   ])("keeps the inactivity message for $label", ({ route }) => {
     renderScreen(<LoginPage />, { route });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/30 minutes of inactivity/);
+    expect(screen.getByRole("dialog", { name: "Session Expired" })).toHaveTextContent(/30 minutes of inactivity/);
   });
 
   it("says the session ended, and that sign-in returns to the page, for a session lost on load (IR-1081)", () => {
@@ -805,9 +817,9 @@ describe("why the session ended", () => {
       state: { reason: "session_expired", code: "session_lost", from: "/review/12/evaluate" },
     });
 
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent("Your session ended. Sign in to continue where you were.");
-    expect(alert).not.toHaveTextContent(/30 minutes/);
+    const dialog = screen.getByRole("dialog", { name: "Session Ended" });
+    expect(dialog).toHaveTextContent("Your session ended. Sign in to continue where you were.");
+    expect(dialog).not.toHaveTextContent(/30 minutes/);
   });
 
   it("reads the reason from router state as well as the address (IR-1081)", () => {
@@ -816,15 +828,54 @@ describe("why the session ended", () => {
       state: { reason: "session_expired", code: "session_ended_revoked" },
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/An administrator ended this session/);
+    expect(screen.getByRole("dialog")).toHaveTextContent(/An administrator ended this session/);
   });
 
-  it("clears the reason from the address when dismissed", async () => {
+  it("closes with its button, clears the reason from the address and starts them on the email field", async () => {
     const user = userEvent.setup();
-    renderScreen(<LoginPage />, { route: "/login?reason=session_expired&code=session_ended" });
+    renderScreen(
+      <Routes>
+        <Route path="/login" element={<><LoginPage /><AddressProbe /></>} />
+      </Routes>,
+      { route: "/login?reason=session_expired&code=session_ended" },
+    );
 
-    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    await user.click(screen.getByRole("button", { name: "Sign in again" }));
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // Cleared, a reload shows no notice.
+    expect(screen.getByRole("heading", { name: "address /login" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Email address" })).toHaveFocus());
+  });
+
+  it("closes on Escape", async () => {
+    const user = userEvent.setup();
+    renderScreen(<LoginPage />, { route: "/login?reason=session_expired&code=session_idle" });
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
+
+/** After changing a password in Settings, every session ends (IR-642); why is a dialog too (IR-1197). */
+describe("after a password change", () => {
+  it("says so in a dialog, which closes", async () => {
+    const user = userEvent.setup();
+    const { container } = renderScreen(<LoginPage />, { route: "/login", state: { reason: "password_changed" } });
+
+    const dialog = screen.getByRole("dialog", { name: "Password Changed" });
+    expect(dialog).toHaveAccessibleDescription(/signed out on every device/);
+    await expectNoBlockingA11yViolations(container);
+
+    await user.click(within(dialog).getByRole("button", { name: "Sign in again" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+/** The address the router holds, so a test can see a query cleared. */
+function AddressProbe() {
+  const location = useLocation();
+  return <h2>{`address ${location.pathname}${location.search}`}</h2>;
+}
