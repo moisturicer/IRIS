@@ -9,6 +9,7 @@ import {
   type PdfPage,
   type TextLayerHandle,
 } from "@/lib/pdf";
+import { bindTextSelection } from "@/lib/textSelection";
 import type { Region } from "@/types/ai";
 import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
 import { CitationOverlay } from "./CitationOverlay";
@@ -132,6 +133,14 @@ function LivePageLayers({ page, scale, hits, onPaint }: {
       setTextReady(false);
     };
   }, [page]);
+
+  // A drag across the gaps between spans stays on the text the reader is
+  // dragging through (IR-1209): bound once the spans are drawn.
+  useEffect(() => {
+    const container = textLayerRef.current;
+    if (!textReady || !container) return;
+    return bindTextSelection(container);
+  }, [textReady]);
 
   useEffect(() => {
     if (textReady) layerRef.current?.update(scale);
