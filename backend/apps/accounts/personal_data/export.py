@@ -696,7 +696,7 @@ def workflow_acts(user) -> dict:
     still read it. Replies others wrote under the person's comments are not
     here, and nor are the decisions others took on the same papers.
     """
-    from apps.documents.models import DocumentRequest, UploadReview
+    from apps.documents.models import DocumentRejection, DocumentRequest, UploadReview
     from apps.reviews.models import (
         RecordClearance, ResubmissionRequest, Review, ReviewComment, ReviewRound, RoutingEvent,
     )
@@ -713,12 +713,18 @@ def workflow_acts(user) -> dict:
     upload_reviews = list(
         UploadReview.objects.filter(reviewed_by=user).select_related("upload", "status").order_by("id")
     )
+    # The reasons the person gave for sending a document back (IR-1201).
+    rejections = list(
+        DocumentRejection.objects.filter(rejected_by=user)
+        .select_related("upload", "item__request").order_by("id")
+    )
     titles = _readable_titles(user, {
         *(r.record_id for r in reviews), *(c.record_id for c in comments),
         *(c.record_id for c in clearances), *(r.record_id for r in revisions),
         *(r.record_id for r in routings), *(r.record_id for r in rounds),
         *(d.record_id for d in doc_requests),
         *(u.upload.record_id for u in upload_reviews),
+        *(r.upload.record_id for r in rejections),
     })
     return {
         "reviews": [
@@ -766,6 +772,11 @@ def workflow_acts(user) -> dict:
             {"paper": _paper(u.upload.record_id, titles), "status": _name(u.status),
              "comment": u.comment, "at": u.created_at}
             for u in upload_reviews
+        ],
+        "document_rejections": [
+            {"paper": _paper(r.upload.record_id, titles), "party": r.item.request.party,
+             "document": r.item.label, "reason": r.reason, "at": r.created_at}
+            for r in rejections
         ],
     }
 

@@ -189,19 +189,32 @@ def latest_version(record) -> Optional[RecordVersion]:
     return record.versions.order_by("-number").first()
 
 
-def versions_payload(record) -> list[dict]:
+def versions_payload(record, *, disclose_requests: bool = False) -> list[dict]:
     """
     The record's versions, oldest first, as the record detail and tracker
     payloads carry them. Callers send it only to a viewer who may read the
     review (`may_read_review`, IR-479), because earlier versions are review
     material (ADR-032 §5 Amendment).
+
+    Each document carries the rejections it received (IR-1201). Those are
+    document-request data, a narrower audience (ADR-022 §Amendment 5), so the
+    caller passes `may_read_requests` as `disclose_requests`; by default each
+    document's `rejections` is `None`, meaning not disclosed.
     """
     from .review_text.store import status as review_text_status
 
     rows = list(
         record.versions.select_related("created_by", "review_text")
-        .prefetch_related("documents__upload__slot").order_by("number")
+        .prefetch_related(
+            "documents__upload__slot",
+            "documents__upload__rejections__rejected_by",
+            "documents__upload__rejections__item__request",
+        ).order_by("number")
     )
+
+    def document(upload):
+        return _document(upload, disclose_requests=disclose_requests)
+
     return [
         {
             "number": v.number,
@@ -215,9 +228,9 @@ def versions_payload(record) -> list[dict]:
             ),
             # ADR-058 §2 (IR-872): what it was submitted with, what arrived
             # while it was the latest, and whether the first list is a guess.
-            "documents": [_document(d.upload) for d in v.documents.all()],
+            "documents": [document(d.upload) for d in v.documents.all()],
             "documents_added": [
-                _document(u) for u in documents_added_during(v, rows[i + 1] if i + 1 < len(rows) else None)
+                document(u) for u in documents_added_during(v, rows[i + 1] if i + 1 < len(rows) else None)
             ],
             "documents_reconstructed": v.documents_reconstructed,
             # ADR-058 §1 as amended (IR-871): whether this Version's text was read.
@@ -227,13 +240,23 @@ def versions_payload(record) -> list[dict]:
     ]
 
 
-def _document(upload) -> dict:
+def _document(upload, *, disclose_requests: bool) -> dict:
     return {
         "upload_id": upload.pk,
         "slot": upload.slot.name,
         "version": upload.version,
         "uploaded_at": upload.created_at.isoformat(),
         "download_url": f"/api/v1/documents/uploads/{upload.pk}/download/",
+        # Oldest first; `None` to a viewer who may not read requests (IR-1201).
+        "rejections": [
+            {
+                "party": r.item.request.party,
+                "reason": r.reason,
+                "rejected_by_name": r.rejected_by.get_full_name() if r.rejected_by else None,
+                "rejected_at": r.created_at.isoformat(),
+            }
+            for r in upload.rejections.all()
+        ] if disclose_requests else None,
     }
 
 
@@ -301,7 +324,11 @@ def documents_added_during(version, next_version=None) -> list:
     )
     if next_version is not None:
         uploads = uploads.filter(created_at__lte=next_version.created_at)
-    return list(uploads.select_related("slot").order_by("created_at", "pk"))
+    return list(
+        uploads.select_related("slot")
+        .prefetch_related("rejections__rejected_by", "rejections__item__request")
+        .order_by("created_at", "pk")
+    )
 
 
 def deletion_refused_reason(upload) -> Optional[str]:
@@ -319,7 +346,7 @@ def deletion_refused_reason(upload) -> Optional[str]:
             f"v{named} was submitted with this file, so it can't be deleted. "
             f"Upload a corrected version instead."
         )
-    if upload.request_items.exists():
+    if upload.request_items.exists() or upload.rejections.exists():
         return (
             "This file answered a document request, so it can't be deleted. "
             "Upload a corrected version instead."

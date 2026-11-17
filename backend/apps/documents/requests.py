@@ -26,7 +26,7 @@ from django.utils import timezone
 from apps.audit import workflow as audit
 from core.enums import DocumentRequestItemState, DocumentRequestState
 
-from .models import DocumentRequest, DocumentRequestItem, UploadSlot
+from .models import DocumentRejection, DocumentRequest, DocumentRequestItem, UploadSlot
 
 
 class DocumentRequestError(Exception):
@@ -339,10 +339,19 @@ def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequ
     """
     with transaction.atomic():
         item, request = _lock_decidable(item)
+        now = timezone.now()
+        # The history (IR-1201): the item forgets its upload below, so this
+        # row is what remembers which file was rejected and why. An uploaded
+        # item whose file a superuser removed in admin has nothing to name.
+        if item.upload_id is not None:
+            DocumentRejection.objects.create(
+                item=item, upload_id=item.upload_id, rejected_by=user, reason=reason,
+                created_at=now,
+            )
         item.state = DocumentRequestItemState.MISSING
         item.upload = None
         item.rejection_reason = reason
-        item.decided_at = timezone.now()
+        item.decided_at = now
         item.save(update_fields=["state", "upload", "rejection_reason", "decided_at"])
         if request.state != DocumentRequestState.OPEN:
             # Resolved is final (ADR-069, IR-1075): the request's notification
