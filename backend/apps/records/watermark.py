@@ -5,6 +5,7 @@ The copy is built per download, in memory, and never stored. Anything that goes
 wrong raises `WatermarkFailed`, and the caller serves nothing.
 """
 import logging
+import math
 from dataclasses import dataclass
 from io import BytesIO
 
@@ -182,6 +183,23 @@ def _line_bands() -> list[tuple[float, float, float, float]]:
     return [(-half, _row_bottom(row) - MARK_STROKE / 2, 2 * half, 1 + MARK_STROKE) for row in range(len(MARK_LINES))]
 
 
+def _tilted_centre() -> tuple[float, float]:
+    """
+    The middle of the box around the tilted mark, from the block's own centre, in
+    letters. The lines differ in length, so the tilted block reaches further to
+    one side, and centring the block itself would leave the mark off-centre.
+    """
+    angle = math.radians(MARK_ANGLE_DEGREES)
+    xs, ys = [], []
+    for text, (_x, y, _width, height) in zip(MARK_LINES, _line_bands()):
+        half = _line_width(text) / 2
+        for cx in (-half, half):
+            for cy in (y, y + height):
+                xs.append(cx * math.cos(angle) - cy * math.sin(angle))
+                ys.append(cx * math.sin(angle) + cy * math.cos(angle))
+    return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+
+
 def _mark_lines(pdf) -> None:
     """
     MARK_LINES as stroked lines and arcs, one unit per letter, each line centred
@@ -214,8 +232,8 @@ def _mark_lines(pdf) -> None:
 
 def _mark_overlay(width: float, height: float):
     """
-    A faint diagonal "PROPERTY OF / CIT-U / DO NOT DISTRIBUTE" across the page,
-    drawn over the content, its longest line as wide as the page's short side.
+    A faint diagonal "PROPERTY OF / CIT-U / DO NOT DISTRIBUTE" across the middle of
+    the page, drawn over the content, its longest line as wide as the page's short side.
 
     Over, not beneath (ADR-048 decision 10, amended for IR-1127): many exported
     papers paint each page white edge to edge, and scanned pages are one opaque
@@ -228,7 +246,8 @@ def _mark_overlay(width: float, height: float):
         pdf.setLineWidth(MARK_STROKE)
         pdf.setLineCap(0)  # Flat ends: strokes stop square where they end
         pdf.setLineJoin(0)
-        pdf.translate(width / 2, height / 2)
+        dx, dy = _tilted_centre()
+        pdf.translate(width / 2 - dx * letter, height / 2 - dy * letter)  # The tilted mark's middle on the page's
         pdf.rotate(MARK_ANGLE_DEGREES)
         pdf.scale(letter, letter)
         _mark_lines(pdf)

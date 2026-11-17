@@ -378,6 +378,12 @@ class MarkWordingTests(SimpleTestCase):
         bands = [(round(y, 6), round(height, 6)) for _x, y, _width, height in watermark._line_bands()]
         self.assertEqual(bands, [(1.08, 1.24), (-0.62, 1.24), (-2.32, 1.24)])
 
+    def test_the_tilted_mark_is_centred_on_the_page(self):
+        # The last line is the longest, so the block's own centre would put the mark low and
+        # to the right. ReaderWatermark.test.ts pins the same offset.
+        dx, dy = watermark._tilted_centre()
+        self.assertEqual((round(dx, 6), round(dy, 6)), (0.883883, -0.883883))
+
     def test_every_letter_fills_its_line_from_bottom_to_top(self):
         # A flat-ended upright stops where its centre line does, half a stroke short of a
         # crossbar's or a curve's outer edge, so it has to run past the edge to be cut there.

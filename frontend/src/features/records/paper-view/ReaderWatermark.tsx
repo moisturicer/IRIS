@@ -153,9 +153,10 @@ export type Band = { x: number; y: number; width: number; height: number };
 
 /**
  * MARK_LINES, each centred on x = 0 and the block on y = 0, y up; the widest line's width; and
- * each line's ink as a band, from the outer edge of its bottom strokes to that of its top ones.
+ * each line's ink as a band, from the outer edge of its bottom strokes to that of its top ones;
+ * and the tilted mark's middle. The lines differ in length, so that is not the block's own centre.
  */
-export function markPath(): { d: string; width: number; bands: Band[] } {
+export function markPath(): { d: string; width: number; bands: Band[]; centre: { x: number; y: number } } {
   const block = MARK_LINES.length + (MARK_LINES.length - 1) * MARK_LINE_GAP;
   const width = Math.max(...MARK_LINES.map(markLineWidth));
   const parts: string[] = [];
@@ -174,7 +175,21 @@ export function markPath(): { d: string; width: number; bands: Band[] } {
       x += glyph.width + ADVANCE;
     }
   });
-  return { d: parts.join(" "), width, bands };
+  // The middle of the box around the tilted mark, y up, as `_tilted_centre` in `watermark.py`.
+  const angle = (MARK_ANGLE_DEGREES * Math.PI) / 180;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  MARK_LINES.forEach((text, row) => {
+    const half = markLineWidth(text) / 2;
+    for (const cx of [-half, half]) {
+      for (const cy of [bands[row].y, bands[row].y + bands[row].height]) {
+        xs.push(cx * Math.cos(angle) - cy * Math.sin(angle));
+        ys.push(cx * Math.sin(angle) + cy * Math.cos(angle));
+      }
+    }
+  });
+  const middle = (values: number[]) => (Math.min(...values) + Math.max(...values)) / 2;
+  return { d: parts.join(" "), width, bands, centre: { x: middle(xs), y: middle(ys) } };
 }
 
 const MARK = markPath();
@@ -208,8 +223,8 @@ export function ReaderWatermark({ width, height, scale }: { width: number; heigh
         <path
           d={MARK.d}
           clipPath={`url(#${bandsId})`} // In the path's own tilted units, so each line is cut flat
-          // To the page's centre, tilted up to the right, y up; the path is already centred.
-          transform={`translate(${width / 2} ${height / 2}) rotate(${-MARK_ANGLE_DEGREES}) scale(${letter} ${-letter})`}
+          // The tilted mark's middle to the page's centre, tilted up to the right, y up.
+          transform={`translate(${width / 2 - MARK.centre.x * letter} ${height / 2 + MARK.centre.y * letter}) rotate(${-MARK_ANGLE_DEGREES}) scale(${letter} ${-letter})`}
           fill="none"
           stroke={MARK_COLOUR}
           strokeOpacity={MARK_OPACITY}

@@ -23,6 +23,12 @@ describe("the reader's mark (IR-1198)", () => {
     ]);
   });
 
+  it("centres the tilted mark, not its block, as the download copy does", () => {
+    // test_download_watermark.MarkWordingTests pins the same offset.
+    const { x, y } = markPath().centre;
+    expect([Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6]).toEqual([0.883883, -0.883883]);
+  });
+
   it("draws the letters only inside those bands", () => {
     const html = renderToStaticMarkup(createElement(ReaderWatermark, { width: 612, height: 792, scale: 1 }));
     const id = /<clipPath id="([^"]+)">(?:<rect [^>]*><\/rect>){3}<\/clipPath>/.exec(html)?.[1];
