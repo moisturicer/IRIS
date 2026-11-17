@@ -268,6 +268,22 @@ def owns_or_staffs_record(user, record) -> bool:
     return record.owners.filter(user=user).exists()
 
 
+def may_read_record_documents(user, record) -> bool:
+    """
+    May `user` open and download `record`'s documents? (IR-1200, ADR-022
+    §Amendment 6)
+
+    `owns_or_staffs_record`, plus the record's Adviser. Reading only: every
+    upload and delete still asks `owns_or_staffs_record`, so an Adviser never
+    writes into the author's slots. It follows `record.adviser`, so access ends
+    when RDCO replaces them (`rdco_acts.replace_adviser` moves the field) and
+    outlasts the review when nobody does.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return record.adviser_id == user.pk or owns_or_staffs_record(user, record)
+
+
 def may_read_embargo(user, record) -> bool:
     """
     May `user` see where `record`'s embargo stands? Owners, the Adviser and
