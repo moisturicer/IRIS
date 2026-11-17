@@ -150,7 +150,7 @@ describe("suggested wording", () => {
     const form = screen.getByRole("form", { name: "New comment" });
     await userEvent.type(within(form).getByRole("textbox", { name: "Comment" }), "Count again.");
     await userEvent.type(within(form).getByRole("textbox", { name: "Suggested wording (optional)" }), "forty-two respondents");
-    await userEvent.click(within(form).getByRole("button", { name: "Add to review" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Save as draft" }));
 
     expect(api.postReviewComment).toHaveBeenCalledWith(9, expect.objectContaining({ suggestion: "forty-two respondents" }));
   });

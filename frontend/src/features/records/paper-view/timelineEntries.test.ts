@@ -46,8 +46,10 @@ const review = (overrides: Partial<TrackerReview>): TrackerReview => ({
   ...overrides,
 });
 
+// A Conversation comment unless a test says otherwise (IR-1194).
 const comment = (overrides: Partial<ReviewComment>): ReviewComment => ({
   id: 1,
+  kind: "discussion",
   author: 3,
   author_name: "Rhea Owner",
   body: "Is the consent form attached?",
@@ -437,27 +439,62 @@ describe("timelineEntries", () => {
     expect(entries.map((e) => e.key)).toEqual(["comment-1"]);
   });
 
-  it("names a thread's party and the page it is on", () => {
-    const [entry] = timelineEntries(tracker({
-      review_comments: [comment({ party: "itso", party_label: "ITSO", anchor: { version: 1, page: 9, quote: "94%" } })],
-    }));
-    expect([entry.party, entry.act]).toEqual(["ITSO", "Commented on p.9"]);
+  it("names a discussion writer's label", () => {
+    const [entry] = timelineEntries(tracker({ review_comments: [comment({ party_label: "ITSO" })] }));
+    expect([entry.party, entry.act]).toEqual(["ITSO", "Commented"]);
   });
 
-  it("records a Comment only review as a review with no decision", () => {
+  it("gives a thread sent outside a review one line pointing to Threads, not its text (IR-1194)", () => {
     const entries = timelineEntries(tracker({
-      review_rounds: [
-        { id: 4, party: "adviser", label: "Adviser", actor_name: "Ana Cruz", version: 3, verdict: "comment_only",
-          summary: "Getting there.", review: null, threads: 3, created_at: "2026-11-05T08:00:00Z" },
-        { id: 5, party: "adviser", label: "Adviser", actor_name: "Ana Cruz", version: 3, verdict: "request_revision",
-          summary: "Revise.", review: 12, threads: 1, created_at: "2026-11-06T08:00:00Z" },
+      review_comments: [
+        comment({ id: 1, kind: "thread", author_name: "Sam Student", party_label: "The authors", body: "Why forty?",
+          anchor: { version: 1, page: 18, quote: "forty" }, round: null }),
+        comment({ id: 2, kind: "thread", reply_to: 1, body: "Power analysis.", created_at: "2026-09-08T08:00:00Z" }),
+        comment({ id: 3, kind: "thread", author_name: "Rita Cruz", party_label: "ITSO", severity: "must_fix", round: null,
+          created_at: "2026-09-09T08:00:00Z" }),
       ],
     }));
-    expect(entries).toHaveLength(1);
+
+    expect(entries.map((e) => e.key)).toEqual(["thread-1", "thread-3"]);
     expect(entries[0]).toMatchObject({
-      key: "round-4", kind: "review", actor: "Ana Cruz", party: "Adviser",
-      act: "Reviewed v3: 3 comments, no decision", note: "Getting there.", version: 3,
+      kind: "thread", actor: "Sam Student", party: "The authors", act: "Commented on p.18", status: null, note: null,
+      toThreads: { thread: 1, name: "Sam Student's comment on p.18" },
     });
+    expect(entries[1]).toMatchObject({ act: "Commented", status: "Must fix", toThreads: { thread: 3 } });
+    expect(JSON.stringify(entries)).not.toContain("Why forty?");
+    expect(JSON.stringify(entries)).not.toContain("Power analysis.");
+  });
+
+  it("leaves a thread a finished review sent to that review's line", () => {
+    const entries = timelineEntries(tracker({
+      review_comments: [comment({ id: 1, kind: "thread", round: 4 })],
+    }));
+    expect(entries).toEqual([]);
+  });
+
+  it("records a Comment only review as one line counting its threads and Must fix", () => {
+    const entries = timelineEntries(tracker({
+      reviews: [review({ id: 12, status_label: "Asked for changes", reviewed_by_name: "Ana Cruz", label: "Adviser",
+        created_at: "2026-11-06T08:00:00Z" })],
+      review_rounds: [
+        { id: 4, party: "adviser", label: "Adviser", actor_name: "Ana Cruz", version: 3, verdict: "comment_only",
+          summary: "Getting there.", review: null, threads: 3, must_fix: 1, created_at: "2026-11-05T08:00:00Z" },
+        { id: 5, party: "adviser", label: "Adviser", actor_name: "Ana Cruz", version: 3, verdict: "request_revision",
+          summary: "Revise.", review: 12, threads: 1, must_fix: 0, created_at: "2026-11-06T08:00:00Z" },
+        { id: 6, party: "adviser", label: "Adviser", actor_name: "Ana Cruz", version: 3, verdict: "comment_only",
+          summary: "Only a summary.", review: null, threads: 0, must_fix: 0, created_at: "2026-11-07T08:00:00Z" },
+      ],
+    }));
+    expect(entries.map((e) => e.key)).toEqual(["round-4", "review-12", "round-6"]);
+    expect(entries[0]).toMatchObject({
+      kind: "review", actor: "Ana Cruz", party: "Adviser",
+      act: "Reviewed v3: 3 threads, 1 Must fix", note: "Getting there.", version: 3,
+      toThreads: { name: "Ana Cruz's review" },
+    });
+    // A verdict's own review carries what it sent.
+    expect(entries[1]).toMatchObject({ act: "Asked for changes", details: ["Sent 1 thread"], toThreads: { name: "Ana Cruz's threads" } });
+    expect(entries[2]).toMatchObject({ act: "Reviewed v3, no decision" });
+    expect(entries[2].toThreads).toBeUndefined();
   });
 });
 

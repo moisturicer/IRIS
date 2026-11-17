@@ -44,8 +44,8 @@ function record(blockedOutcomes: Record<string, string> = {}): RecordDetail {
 const RDCO: Capability[] = ["finish_review", "accept_publish", "keep_unlisted", "request_revision", "reject", "request_document"];
 const OFFICE: Capability[] = ["finish_review", "office_review", "request_revision", "request_document", "add_reviewer"];
 
-function renderFooter(can: Capability[], { held = {}, finishing = true, lead }: {
-  held?: Record<string, string>; finishing?: boolean; lead?: ReactNode;
+function renderFooter(can: Capability[], { held = {}, finishing = true, lead, drafts }: {
+  held?: Record<string, string>; finishing?: boolean; lead?: ReactNode; drafts?: number;
 } = {}) {
   const onFinish = vi.fn();
   const onChanged = vi.fn();
@@ -55,7 +55,7 @@ function renderFooter(can: Capability[], { held = {}, finishing = true, lead }: 
   ];
   const view = renderScreen(
     <ReviewFooterActions record={record(held)} can={new Set(can)} actions={actions} finishing={finishing}
-      onFinish={onFinish} lead={lead} onChanged={onChanged} />,
+      onFinish={onFinish} lead={lead} onChanged={onChanged} drafts={drafts} />,
   );
   return { ...view, onFinish, onChanged };
 }
@@ -118,6 +118,28 @@ describe("ReviewFooterActions", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Finish review…" }));
     expect(onFinish).toHaveBeenCalledWith();
+  });
+
+  it("offers Send N comments while drafts wait, opening Finish review on Comment only (IR-1194)", async () => {
+    const { onFinish } = renderFooter(RDCO, { drafts: 2 });
+
+    expect(toolbar().getAllByRole("button").map((b) => b.textContent))
+      .toEqual(["", "Send 2 comments…", "Keep unlisted…", "Accept & publish…"]);
+    await userEvent.click(screen.getByRole("button", { name: "Send 2 comments…" }));
+    expect(onFinish).toHaveBeenCalledWith("comment_only");
+  });
+
+  it("offers no Send without drafts, or where the viewer may not finish a review", () => {
+    const { unmount } = renderFooter(OFFICE, { drafts: 0 });
+    expect(screen.queryByRole("button", { name: /^Send/ })).not.toBeInTheDocument();
+    unmount();
+    renderFooter(["request_document"], { finishing: false, drafts: 2 });
+    expect(screen.queryByRole("button", { name: /^Send/ })).not.toBeInTheDocument();
+  });
+
+  it("names one draft in the singular", () => {
+    renderFooter(OFFICE, { drafts: 1 });
+    expect(screen.getByRole("button", { name: "Send 1 comment…" })).toBeInTheDocument();
   });
 
   it("keeps Open review or Claim as the primary and puts every granted act in the menu", async () => {

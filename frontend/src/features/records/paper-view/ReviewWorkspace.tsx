@@ -184,7 +184,8 @@ function AuthorReviewWorkspace({
             ))}
           </div>
           <div role="tabpanel" id={`${ids}-conversation`} aria-labelledby={`${ids}-tab-conversation`} hidden={tab !== "conversation"}>
-            <ReviewTimeline key={timelineVersion} recordId={record.id} canComment={can.has("comment_review")} onCommented={tw.threads.reload} />
+            <ReviewTimeline key={timelineVersion} recordId={record.id} canComment={can.has("comment_review")} onCommented={tw.threads.reload}
+              onOpenThreads={tw.openThreads} />
           </div>
           <div role="tabpanel" id={`${ids}-threads`} aria-labelledby={`${ids}-tab-threads`} hidden={tab !== "threads"}>
             <ReviewThreads {...tw.panel} />

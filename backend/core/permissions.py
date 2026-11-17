@@ -549,6 +549,10 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
     # offered a place in it.
     if record.pipeline_status != PipelineStatus.DRAFT and is_record_participant(user, record):
         offered.append("comment_review")
+        # A thread on no passage is a reviewer's: an owner's threads are on a
+        # passage, so the screen offers *New comment* only here (IR-1194).
+        if not is_record_owner(user, record):
+            offered.append("open_general_thread")
 
     # Both role-gated endpoints refuse anyone who is not office staff
     # (`IsStaff`) before any other check, so the offers do too.

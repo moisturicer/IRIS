@@ -21,12 +21,19 @@ is written, and a record with no version yet gets none (spec §4.11).
 joins the thread it is in. **An edit** is the author's alone, and stamps
 `edited_at` only when it changed the body.
 
-**A top-level comment is a thread** (ADR-032 §7, 2026-11-04; IR-874). It
-belongs to its writer's party (blank for an owner), may carry an anchor to a
-passage of one Version, and -- a reviewer's only -- a severity, *Suggestion*
-unless the writer chose *Must fix*. **A reviewer holding an open Seat writes
-drafts**, seen by nobody else until *Finish review* sends them
-(`finish_review.py`); their writer edits or deletes them. Owners' threads,
+**A top-level comment is discussion or a thread** (`kind`; ADR-032 §7 as
+amended 2026-11-16, IR-1194). **Discussion** is Conversation's: it posts at
+once, carries no severity, passage or wording, and nothing in the review
+counts it. A reply takes its parent's kind.
+
+**A thread** (2026-11-04; IR-874) belongs to its writer's party (blank for an
+owner), may carry an anchor to a passage of one Version, and -- a reviewer's
+only -- a severity, *Suggestion* unless the writer chose *Must fix*. An
+owner's thread is on a passage; a remark on the whole paper is discussion. **A
+reviewer holding an open Seat chooses**: post the thread now (`post_now`),
+which tells the authors, or save it as a draft, seen by nobody else until
+*Finish review* sends it (`finish_review.py`) or its writer posts it on its
+own (`post_draft`); its writer edits or deletes it meanwhile. Owners' threads,
 former reviewers' threads and every reply post at once, and a reply to a
 draft is refused. Resolving, answering and severity changes are
 `threads.py`'s.
@@ -44,7 +51,8 @@ from django.utils import timezone
 
 from apps.records.versions import latest_version
 from core.enums import (
-    PipelineStatus, ReviewTextState, ThreadAnswer, ThreadPlaceOutcome, ThreadSeverity, ThreadState,
+    PipelineStatus, ReviewCommentKind, ReviewTextState, ThreadAnswer, ThreadPlaceOutcome,
+    ThreadSeverity, ThreadState,
 )
 from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
 
@@ -59,6 +67,8 @@ MAX_BODY_LENGTH = 10_000
 MAX_QUOTE_LENGTH = 2_000
 MAX_CONTEXT_LENGTH = 500
 MAX_REGIONS = 50
+
+DISCUSSION, THREAD = ReviewCommentKind.DISCUSSION, ReviewCommentKind.THREAD
 
 
 class CommentNotFound(Exception):
@@ -213,17 +223,20 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
     """
     One comment, as the API and the tracker state it to `user`. Every `can_*`
     is the server's answer, so the screen offers an act only where it is true
-    (`threads.py` holds the same rules for the acts). A reply carries the
-    thread fields empty, but for `party_label`, which names its writer (IR-1192).
+    (`threads.py` holds the same rules for the acts). A reply and a discussion
+    carry the thread fields empty, but for `party_label`, which names the
+    writer (IR-1192, IR-1194).
     """
     viewer = viewer or _Viewer(comment.record, user)
     mine = comment.author_id is not None and comment.author_id == viewer.pk
-    top = comment.reply_to_id is None
+    # `top` reads "is a thread" below: a discussion has none of its fields.
+    top = comment.reply_to_id is None and comment.kind == THREAD
     reviewer_thread = top and threads.is_reviewer_thread(comment)
     live = top and viewer.in_review and comment.state == ThreadState.OPEN
     sent = top and not comment.is_draft
     return {
         "id": comment.pk,
+        "kind": comment.kind,
         "author": comment.author_id,
         "author_name": comment.author.get_full_name() if comment.author else None,
         "body": comment.body,
@@ -264,6 +277,8 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
             for e in comment.events.all()
         ] if sent else [],
         "can_delete": mine and comment.is_draft,
+        # Its writer posts a draft on its own, before *Finish review* (IR-1194).
+        "can_post": mine and comment.is_draft and top and viewer.in_review,
         "can_change_severity": live and reviewer_thread and (
             mine if comment.is_draft else viewer.holds(comment.party)
         ),
@@ -435,15 +450,40 @@ def mentionable(record, user) -> list[dict[str, Any]]:
             for u in mentions.candidates(record) if u.pk != user.pk]
 
 
+def _kind(value) -> str:
+    if value in (None, ""):
+        return THREAD
+    if value not in ReviewCommentKind.values:
+        raise CommentError("A comment is discussion or a thread.")
+    return value
+
+
+def _flag(value) -> bool:
+    """A JSON boolean, or the form-encoded words for one."""
+    return value is True or (isinstance(value, str) and value.lower() in ("true", "1"))
+
+
+def _announce(record, actor, thread) -> None:
+    """A reviewer's thread posted outside a review round tells the authors (IR-1194)."""
+    from apps.notifications.services import notify_thread_posted
+
+    label, severity, page = threads.party_label(thread.party), thread.severity, thread.anchor_page
+    transaction.on_commit(lambda: notify_thread_posted(
+        record, actor=actor, party_label=label, severity=severity, page=page,
+    ))
+
+
 @transaction.atomic
-def post_comment(record, user, *, body, reply_to: Optional[int] = None,
-                 severity=None, anchor=None, suggestion=None, mentioned=None) -> ReviewComment:
+def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=None,
+                 post_now=None, severity=None, anchor=None, suggestion=None,
+                 mentioned=None) -> ReviewComment:
     """`POST /records/<id>/review-comments/`: a participant comments."""
     _writer(record, user)
     if record.pipeline_status == PipelineStatus.DRAFT:
         raise CommentError("A draft is not under review. Comments open once it is submitted.")
     text = _body(body)
     people = _mentioned(record, mentioned)
+    kind = _kind(kind)
 
     if reply_to not in (None, ""):
         try:
@@ -463,18 +503,36 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None,
                 "A reply belongs to its thread: it has no severity, anchor or suggested wording."
             )
         # Replies post immediately and are never held (ADR-032 §7). The
-        # writer's party is kept for the reply's label (IR-1192).
+        # writer's party is kept for the reply's label (IR-1192); its kind is
+        # its parent's, wherever it was typed (IR-1194).
         writer, _seated = writer_party(record, user)
         return _with_mentions(ReviewComment.objects.create(
-            record=record, author=user, body=text,
+            record=record, author=user, body=text, kind=parent.kind,
             version=latest_version(record), reply_to=parent, party=writer,
         ), user, people)
 
     party, seated = writer_party(record, user)
+    if kind == DISCUSSION:
+        # Conversation's: posted at once, by anyone who writes here (IR-1194).
+        if severity not in (None, "") or anchor is not None or suggestion not in (None, ""):
+            raise CommentError(
+                "A Conversation comment has no severity, passage or suggested wording. "
+                "Comment in Threads to raise a review item."
+            )
+        return _with_mentions(ReviewComment.objects.create(
+            record=record, author=user, body=text, kind=DISCUSSION,
+            version=latest_version(record), party=party,
+        ), user, people)
+
     wording = _suggestion(suggestion)
     if wording and anchor is None:
         raise CommentError("Suggest wording on a passage: select the text it would replace.")
     if party == threads.OWNER:
+        if anchor is None:
+            raise CommentError(
+                "Your threads are on a passage: select the text you're commenting on. "
+                "A remark on the whole paper goes in Conversation."
+            )
         if severity not in (None, ""):
             raise CommentError("An owner's thread carries no severity.")
         if wording:
@@ -484,11 +542,41 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None,
         severity = severity or ThreadSeverity.SUGGESTION
         if severity not in ThreadSeverity.values:
             raise CommentError("Choose Must fix or Suggestion.")
-    return _with_mentions(ReviewComment.objects.create(
-        record=record, author=user, body=text, version=latest_version(record),
-        party=party, severity=severity, is_draft=seated, suggestion=wording,
+    draft = seated and not _flag(post_now)
+    thread = _with_mentions(ReviewComment.objects.create(
+        record=record, author=user, body=text, version=latest_version(record), kind=THREAD,
+        party=party, severity=severity, is_draft=draft, suggestion=wording,
         **(_anchor(record, anchor) if anchor is not None else {}),
     ), user, people)
+    if party != threads.OWNER and not draft:
+        _announce(record, user, thread)
+    return thread
+
+
+@transaction.atomic
+def post_draft(record, user, comment_id) -> ReviewComment:
+    """
+    `POST /records/<id>/review-comments/<comment_id>/post/`: a writer sends
+    one of their draft threads on its own (IR-1194). It joins no review round,
+    so *Finish review* never sends it again; it is dated now, the people it
+    mentions are told, and so are the authors.
+    """
+    from .routing import is_in_review
+
+    _own(record, user, comment_id)
+    comment = ReviewComment.objects.select_for_update().get(pk=comment_id)
+    if comment.reply_to_id is not None or comment.kind != THREAD:
+        raise CommentError("Only a thread is posted on its own.")
+    if not comment.is_draft:
+        raise CommentError("This thread is already posted.")
+    if not is_in_review(record):
+        raise CommentError("This record is not in review.")
+    comment.is_draft = False
+    comment.created_at = timezone.now()
+    comment.save(update_fields=["is_draft", "created_at"])
+    mentions.tell_finished(record, user, [comment], comment.version)
+    _announce(record, user, comment)
+    return comment
 
 
 def _own(record, user, comment_id) -> ReviewComment:

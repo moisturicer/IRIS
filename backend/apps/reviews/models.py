@@ -10,6 +10,7 @@ from core.enums import (
     Office,
     Party,
     ResubmissionRequestState,
+    ReviewCommentKind,
     ReviewDecision,
     ReviewStage,
     ReviewVerdict,
@@ -473,6 +474,13 @@ class ReviewComment(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     #: Stamped by an edit that changed the body; null until then.
     edited_at  = models.DateTimeField(null=True, blank=True)
+
+    #: A Conversation *discussion* or a review *thread* (ADR-032 §7, 2026-11-16
+    #: amendment; IR-1194). A discussion leaves every thread field below at its
+    #: default; a reply takes its parent's kind.
+    kind       = models.CharField(
+        max_length=12, choices=ReviewCommentKind.choices, default=ReviewCommentKind.THREAD,
+    )
 
     # --- a top-level comment is a thread (ADR-032 §7, 2026-11-04; IR-874) ---------
     # Every field below describes the thread, so a reply leaves them at their

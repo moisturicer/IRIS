@@ -50,10 +50,11 @@ const FILTER_NAMES: Record<ThreadFilter, string> = { open: "Open", yours: "Yours
  * viewer's drafts, and every sent thread under Open / Yours / Resolved / All.
  *
  * **Every control is the server's call.** A thread's Resolve, Reopen, answer,
- * severity and Discard appear exactly where its `can_*` flag is true; the
- * composer's severity choice and its "held as a draft" note appear exactly
- * where `finish_review` is granted, which is when the server holds a new
- * thread as a draft. Nothing here compares a role.
+ * severity, Post and Discard appear exactly where its `can_*` flag is true;
+ * the composer's severity choice and its Post / Save as draft pair appear
+ * exactly where `finish_review` is granted, which is when the server can hold
+ * a new thread as a draft, and *New comment* where `open_general_thread` is.
+ * Nothing here compares a role.
  */
 export function ReviewThreads(props: ReviewThreadsProps) {
   const { threads, viewer, party, focus } = props;
@@ -84,6 +85,8 @@ export function ReviewThreads(props: ReviewThreadsProps) {
   ) as Record<ThreadFilter, Thread[]>;
   const shown = groups[filter];
   const canComment = props.can.has("comment_review");
+  // A thread on no passage is a reviewer's (IR-1194); the authors comment on a passage.
+  const canGeneral = props.can.has("open_general_thread");
 
   return (
     <section aria-labelledby={headingId} className="space-y-4">
@@ -110,7 +113,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
             </button>
           ))}
         </div>
-        {canComment && !props.composing && (
+        {canGeneral && !props.composing && (
           <Button variant="outline" size="sm" onClick={() => props.onCompose({ kind: "general" })}>
             <i className="fas fa-note-sticky" aria-hidden />
             New comment
@@ -123,7 +126,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
           <p className="text-small text-stone-600">
             Select a passage in the paper and press{" "}
             <kbd className="rounded-control border border-stone-300 bg-surface px-1.5 font-mono text-2xs text-stone-700">C</kbd>
-            , or use New comment.
+            {canGeneral ? ", or use New comment." : ". A remark on the whole paper goes in Conversation."}
           </p>
         )}
       {party !== null && (
@@ -148,7 +151,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
         <section aria-label="Your drafts" className="space-y-2">
           <p className="flex flex-wrap items-baseline gap-x-2 text-small">
             <span className="font-semibold text-stone-900">Your drafts</span>
-            <span className="text-2xs text-stone-600">Only you see these until you finish</span>
+            <span className="text-2xs text-stone-600">Only you see these until you post them or finish your review</span>
           </p>
           {threads.drafts.map((t) => <ThreadItem key={t.root.id} thread={t} {...props} />)}
         </section>
@@ -229,7 +232,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
 
   // Whether the foot has anything to hold: the box draws no empty foot.
   const anyAction = root.can_answer || root.can_resolve || root.can_reopen
-    || (root.can_change_severity && Boolean(root.severity)) || canReply || root.can_delete;
+    || (root.can_change_severity && Boolean(root.severity)) || canReply || root.can_post || root.can_delete;
 
   // The same box as the Conversation's comments (IR-1131): who and which
   // party in its head, the passage and what was said in its body, and the
@@ -395,6 +398,13 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
               aria-label={replies.length ? `Reply, ${replies.length} ${replies.length === 1 ? "reply" : "replies"}` : undefined}>
               Reply
               {replies.length > 0 && <span aria-hidden className="review-count ml-0">{replies.length}</span>}
+            </Button>
+          )}
+          {root.can_post && (
+            // One draft sent on its own, before *Finish review* (IR-1194).
+            <Button size="sm" variant="outline" disabled={busy}
+              onClick={() => act(() => recordsApi.postThread(id, root.id), "The draft could not be posted.")}>
+              Post
             </Button>
           )}
           {root.can_delete && (
@@ -633,9 +643,10 @@ function TextForm({ label, submitLabel, hint, required, busy, savedReplies, ment
 
 /**
  * Comment on a passage, or the record as a whole. Where `finish_review` is
- * granted the server holds a new thread as a draft, so the reviewer chooses
- * its severity -- *Suggestion* unless they say *Must fix* (decided for IR-875)
- * -- and is told it waits for *Finish review*.
+ * granted the reviewer chooses its severity -- *Suggestion* unless they say
+ * *Must fix* (decided for IR-875) -- and whether to **Post** it now, which
+ * tells the authors, or **Save as draft** for their next *Finish review*
+ * (ADR-032 §7 as amended 2026-11-16, IR-1194).
  */
 function Composer({ recordId, can, target, onCompose, threads, onChanged }: ReviewThreadsProps & { target: CommentTarget }) {
   const ids = useId();
@@ -651,15 +662,15 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => ref.current?.focus(), [target]);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const send = async (postNow: boolean) => {
     if (!body.trim() || busy) return;
     setBusy(true);
     setError(null);
     try {
       await recordsApi.postReviewComment(recordId, {
         body: body.trim(),
-        ...(drafting ? { severity } : {}),
+        kind: "thread",
+        ...(drafting ? { severity, post_now: postNow } : {}),
         ...(canSuggest && wording.trim() ? { suggestion: wording.trim() } : {}),
         ...(mentioned.length ? { mentions: mentioned.map((p) => p.id) } : {}),
         ...(target.kind === "passage" ? {
@@ -677,6 +688,11 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
     } finally {
       setBusy(false);
     }
+  };
+  // Enter, or the primary button, posts: the comment is meant to be read.
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    void send(true);
   };
 
   return (
@@ -712,16 +728,25 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
           <textarea id={`${ids}-wording`} rows={2} value={wording} onChange={(e) => setWording(e.target.value)}
             aria-describedby={`${ids}-wording-hint`} className={fieldClasses(false)} />
           <p id={`${ids}-wording-hint`} className="text-2xs text-stone-600">
-            The text you&rsquo;d put in its place. You can change it until you finish your review.
+            The text you&rsquo;d put in its place. You can change it while the comment is a draft.
           </p>
         </div>
       )}
       {error && <p role="alert" className="text-small text-brand">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="secondary" onClick={() => onCompose(null)} disabled={busy}>Cancel</Button>
-        <Button type="submit" size="sm" disabled={busy || !body.trim()}>{drafting ? "Add to review" : "Comment"}</Button>
+        {drafting && (
+          <Button type="button" size="sm" variant="outline" disabled={busy || !body.trim()} onClick={() => void send(false)}>
+            Save as draft
+          </Button>
+        )}
+        <Button type="submit" size="sm" disabled={busy || !body.trim()}>{drafting ? "Post" : "Comment"}</Button>
       </div>
-      {drafting && <p className="text-2xs text-stone-600">Held as a draft until you finish your review.</p>}
+      {drafting && (
+        <p className="text-2xs text-stone-600">
+          Post sends it now and tells the authors. A draft is seen only by you until you send it or finish your review.
+        </p>
+      )}
     </form>
   );
 }

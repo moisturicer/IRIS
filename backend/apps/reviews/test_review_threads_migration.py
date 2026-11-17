@@ -157,3 +157,66 @@ def test_existing_replies_keep_the_party_their_writer_held_when_they_wrote_them(
     finally:
         purge_records_at_current_state()
         call_command("migrate", verbosity=0)
+
+
+_KIND_BEFORE = [("reviews", "0031_reviewcomment_kind")]
+_KIND_AFTER = [("reviews", "0032_backfill_discussion")]
+
+
+def test_comments_nobody_treated_as_a_review_item_become_discussion():
+    """IR-1194's backfill, `reviews/0032`: only `kind`, and a discussion's severity, change."""
+    _migrate(_KIND_BEFORE)
+    try:
+        owner = _user("ir1194-owner@iris.test", "Student")
+        adviser = _user("ir1194-adviser@iris.test", "Adviser")
+        thesis = RecordType.objects.get_or_create(name="Thesis / Research")[0]
+        record = model_at_current_state("records", "Record").objects.create(
+            title="Discussion backfilled", record_type_id=thesis.pk, added_by_id=owner.pk,
+            pipeline_status="in_review", adviser_id=adviser.pk,
+        )
+        version = model_at_current_state("records", "RecordVersion").objects.create(
+            record_id=record.pk, number=1, cause="submission", created_by_id=owner.pk,
+        )
+        Round = _model(_KIND_BEFORE, "reviews", "ReviewRound")
+        round_ = Round.objects.create(record_id=record.pk, actor_id=adviser.pk, party="adviser",
+                                      version_id=version.pk, verdict="comment_only")
+        Comment = _model(_KIND_BEFORE, "reviews", "ReviewComment")
+
+        def made(**fields):
+            return Comment.objects.create(record_id=record.pk, body="A comment.", **fields)
+
+        plain_owner = made(author_id=owner.pk, severity="suggestion")
+        plain_reviewer = made(author_id=adviser.pk, party="adviser", severity="suggestion")
+        reply = made(author_id=adviser.pk, party="adviser", reply_to_id=plain_owner.pk)
+        anchored = made(author_id=owner.pk, anchor_version_id=version.pk, anchor_page=2,
+                        anchor_quote="forty respondents")
+        must_fix = made(author_id=adviser.pk, party="adviser", severity="must_fix")
+        in_round = made(author_id=adviser.pk, party="adviser", severity="suggestion",
+                        round_id=round_.pk)
+        answered = made(author_id=adviser.pk, party="adviser", severity="suggestion",
+                        answer="addressed", answer_note="Done.")
+        acted_on = made(author_id=adviser.pk, party="adviser", severity="suggestion")
+        _model(_KIND_BEFORE, "reviews", "ReviewThreadEvent").objects.create(
+            thread_id=acted_on.pk, actor_id=owner.pk, kind="resolved")
+        draft = made(author_id=adviser.pk, party="adviser", severity="suggestion", is_draft=True)
+        thread_reply = made(author_id=owner.pk, reply_to_id=must_fix.pk)
+        before = {c.pk: (c.body, c.created_at, c.author_id, c.party, c.reply_to_id)
+                  for c in Comment.objects.all()}
+
+        _migrate(_KIND_AFTER)
+
+        rows = {c.pk: c for c in _model(_KIND_AFTER, "reviews", "ReviewComment").objects.all()}
+        assert {pk: c.kind for pk, c in rows.items()} == {
+            plain_owner.pk: "discussion", plain_reviewer.pk: "discussion", reply.pk: "discussion",
+            anchored.pk: "thread", must_fix.pk: "thread", in_round.pk: "thread",
+            answered.pk: "thread", acted_on.pk: "thread", draft.pk: "thread",
+            thread_reply.pk: "thread",
+        }
+        assert (rows[plain_owner.pk].severity, rows[plain_reviewer.pk].severity) == (None, None)
+        assert rows[must_fix.pk].severity == "must_fix"
+        assert rows[in_round.pk].severity == "suggestion"
+        assert {pk: (c.body, c.created_at, c.author_id, c.party, c.reply_to_id)
+                for pk, c in rows.items()} == before
+    finally:
+        purge_records_at_current_state()
+        call_command("migrate", verbosity=0)

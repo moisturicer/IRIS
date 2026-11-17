@@ -269,7 +269,12 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             ),
             "open_review": open_review,
             "comment_review": lambda r, u, d: self._call(
-                u, "post", url("record-review-comments", r), {"body": "A question on section 3."},
+                u, "post", url("record-review-comments", r),
+                {"body": "A question on section 3.", "kind": "discussion"},
+            ),
+            # A thread on no passage: a reviewer's alone (ADR-032 §7, IR-1194).
+            "open_general_thread": lambda r, u, d: self._call(
+                u, "post", url("record-review-comments", r), {"body": "Section 3 needs a source."},
             ),
             # Comment only: the one verdict no other key already probes (IR-874).
             "finish_review": lambda r, u, d: self._call(
@@ -318,8 +323,9 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # The review discussion is its participants': the owners and anyone who
     # has ever held a seat, on a submitted record (ADR-032 §7, IR-419). A
     # reviewer whose part is done keeps it, so the Adviser keeps it after
-    # routing and ITSO after clearing.
-    TAKES_PART = {"cite", "comment_review"}
+    # routing and ITSO after clearing. A reviewer may also open a thread on no
+    # passage; an owner's threads are on a passage only (IR-1194).
+    TAKES_PART = {"cite", "comment_review", "open_general_thread"}
     # Every paper starts embargoed (ADR-052, IR-882). Once it is submitted, the
     # Adviser and RDCO may date it, and release it while it is held (§5-6 as
     # amended). Owners and the other offices never do either.
@@ -330,11 +336,11 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     SEATED = {"finish_review"}
     ADVISER_AT_ENTRY = {
         "cite", "open_review", "send_to_rdco", "reject",
-        "request_document", "request_revision", "comment_review",
+        "request_document", "request_revision", "comment_review", "open_general_thread",
     } | EMBARGO_ACTS | SEATED
     ITSO_SEATED = {
         "cite", "tag_ip", "attach_file", "request_document", "open_review",
-        "office_review", "add_reviewer", "route", "comment_review",
+        "office_review", "add_reviewer", "route", "comment_review", "open_general_thread",
     } | SEATED
     # Any owner names the Contact person, on every paper in every state, and
     # nobody else does (ADR-051 decision 27, IR-801; offered since IR-803).
@@ -352,7 +358,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     RDCO_ACTS = {"add_owner", "withdraw_paper"}
     RDCO_ADVISER_OPEN = RDCO_UNSEATED | RDCO_ACTS | {"replace_adviser"}
     RDCO_SEATED = {"cite", "tag_ip", "attach_file", "request_document", "open_review",
-                   "add_reviewer", "route", "comment_review", "request_revision",
+                   "add_reviewer", "route", "comment_review", "open_general_thread", "request_revision",
                    "keep_unlisted", "reject", "accept_publish"} | EMBARGO_ACTS | SEATED | RDCO_ACTS
     EXPECTED = {
         "draft": {
@@ -401,7 +407,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         "published": {
             "owner": OWNER_AFTER_REVIEW,
             "adviser": TAKES_PART | {"set_embargo"},
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review", "set_embargo"},
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review", "open_general_thread", "set_embargo"},
             "stranger": {"cite"},
         },
         # A stranger reading the paper learns nothing of its embargo.
@@ -409,7 +415,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "owner": OWNER_AFTER_REVIEW,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
-            "rdco": OFFICE | {"comment_review"} | EMBARGO_ACTS, "stranger": {"cite"},
+            "rdco": OFFICE | {"comment_review", "open_general_thread"} | EMBARGO_ACTS, "stranger": {"cite"},
         },
         # Unlisted (IR-878): any RDCO member is offered the later publish, held
         # back while the embargo is Active so its reason can be shown.
@@ -417,20 +423,20 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "owner": OWNER_AFTER_REVIEW,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
-            "rdco": OFFICE | {"comment_review", "publish_unlisted"} | EMBARGO_ACTS, "stranger": None,
+            "rdco": OFFICE | {"comment_review", "open_general_thread", "publish_unlisted"} | EMBARGO_ACTS, "stranger": None,
         },
         "unlisted_released": {
             "owner": OWNER_AFTER_REVIEW,
             "adviser": TAKES_PART | {"set_embargo"},
             "itso": OFFICE, "ierc": OFFICE,
-            "rdco": OFFICE | {"comment_review", "set_embargo", "publish_unlisted"}, "stranger": None,
+            "rdco": OFFICE | {"comment_review", "open_general_thread", "set_embargo", "publish_unlisted"}, "stranger": None,
         },
         # A Proposal's Adviser accepts it or rejects it; it is never routed.
         "proposal_with_adviser": {
             "owner": OWNER_IN_REVIEW,
             "adviser": {
                 "cite", "open_review", "accept_proposal", "reject",
-                "request_document", "request_revision", "comment_review",
+                "request_document", "request_revision", "comment_review", "open_general_thread",
             } | EMBARGO_ACTS | SEATED,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_ADVISER_OPEN, "stranger": None,
         },

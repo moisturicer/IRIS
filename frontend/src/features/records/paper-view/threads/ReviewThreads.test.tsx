@@ -27,6 +27,7 @@ const api = vi.hoisted(() => ({
   changeThreadSeverity: vi.fn(),
   deleteReviewComment: vi.fn(),
   editReviewComment: vi.fn(),
+  postThread: vi.fn(),
   reviewMentionable: vi.fn(),
 }));
 vi.mock("@/api/records", () => ({ recordsApi: api }));
@@ -263,12 +264,23 @@ describe("drafts", () => {
       comment({ id: 2, is_draft: true, can_delete: true, anchor: { version: 2, page: 3, quote: "an accuracy of 94%" } }),
     ]);
     const drafts = within(screen.getByRole("region", { name: "Your drafts" }));
-    expect(drafts.getByText("Only you see these until you finish")).toBeInTheDocument();
+    expect(drafts.getByText("Only you see these until you post them or finish your review")).toBeInTheDocument();
     const draft = within(drafts.getByRole("article", { name: /Draft D1/ }));
     // The place is a link to the passage (IR-1139).
     expect(draft.getByRole("button", { name: "Go to page 3 of v2" })).toHaveTextContent("p. 3 · v2");
+    expect(draft.queryByRole("button", { name: "Post" })).toBeNull();
     await user.click(draft.getByRole("button", { name: "Discard" }));
     expect(api.deleteReviewComment).toHaveBeenCalledWith(9, 2);
+  });
+
+  it("posts one draft on its own where the server allows it (IR-1194)", async () => {
+    const user = userEvent.setup();
+    const { reload, onChanged } = setup([comment({ id: 2, is_draft: true, can_post: true, can_delete: true })]);
+    const draft = within(screen.getByRole("article", { name: /Draft D1/ }));
+    await user.click(draft.getByRole("button", { name: "Post" }));
+    expect(api.postThread).toHaveBeenCalledWith(9, 2);
+    expect(reload).toHaveBeenCalled();
+    expect(onChanged).toHaveBeenCalled();
   });
 });
 
@@ -304,7 +316,7 @@ describe("the composer", () => {
     const user = userEvent.setup();
     const { onCompose, reload } = setup([], { composing: passage, caps: ["comment_review", "finish_review"] });
     expect(screen.getByText("“an accuracy of 94%”")).toBeInTheDocument();
-    expect(screen.getByText("Held as a draft until you finish your review.")).toBeInTheDocument();
+    expect(screen.getByText(/Post sends it now and tells the authors/)).toBeInTheDocument();
     const box = screen.getByRole("textbox", { name: "Comment" });
     expect(box).toHaveFocus();
     await user.keyboard("94% of what?");
@@ -323,12 +335,14 @@ describe("the composer", () => {
     expect(screen.getByRole("textbox", { name: "Suggested wording (optional)" })).toHaveFocus();
     await user.tab();
     await user.tab();
-    expect(screen.getByRole("button", { name: "Add to review" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Save as draft" })).toHaveFocus();
     await user.keyboard("{Enter}");
 
     expect(api.postReviewComment).toHaveBeenCalledWith(9, {
       body: "94% of what?",
+      kind: "thread",
       severity: "must_fix",
+      post_now: false,
       anchor: { version: 3, page: 9, quote: "an accuracy of 94%", prefix: "reports ", suffix: " against",
         regions: [{ page: 9, left: 0.1, top: 0.2, right: 0.5, bottom: 0.22 }] },
     });
@@ -342,7 +356,19 @@ describe("the composer", () => {
     expect(screen.queryByRole("radio")).toBeNull();
     await user.keyboard("A question for the panel.");
     await user.click(screen.getByRole("button", { name: "Comment" }));
-    expect(api.postReviewComment).toHaveBeenCalledWith(9, { body: "A question for the panel." });
+    expect(api.postReviewComment).toHaveBeenCalledWith(9, { body: "A question for the panel.", kind: "thread" });
+  });
+
+  it("posts a reviewer's thread now with Post, which Enter in the box also does (IR-1194)", async () => {
+    const user = userEvent.setup();
+    const { onCompose } = setup([], { composing: { kind: "general" }, caps: ["comment_review", "finish_review", "open_general_thread"] });
+    await user.keyboard("Cite the prior patent.");
+    expect(screen.getByRole("button", { name: "Save as draft" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Post" }));
+    expect(api.postReviewComment).toHaveBeenCalledWith(9, {
+      body: "Cite the prior patent.", kind: "thread", severity: "suggestion", post_now: true,
+    });
+    expect(onCompose).toHaveBeenCalledWith(null);
   });
 
   it("keeps the text when the server refuses it", async () => {
@@ -368,9 +394,15 @@ describe("the composer", () => {
 
   it("opens a general thread from New comment", async () => {
     const user = userEvent.setup();
-    const { onCompose } = setup([]);
+    const { onCompose } = setup([], { caps: ["comment_review", "open_general_thread"] });
     await user.click(screen.getByRole("button", { name: "New comment" }));
     expect(onCompose).toHaveBeenCalledWith({ kind: "general" });
+  });
+
+  it("offers no New comment where the server allows only threads on a passage (IR-1194)", () => {
+    setup([]);
+    expect(screen.queryByRole("button", { name: "New comment" })).toBeNull();
+    expect(screen.getByText(/A remark on the whole paper goes in Conversation\./)).toBeInTheDocument();
   });
 });
 
