@@ -19,6 +19,7 @@
  */
 
 import {
+  canOpenPath,
   ALL_SCREENS,
   SCREEN_ACCESS,
   canAccess,
@@ -340,4 +341,39 @@ test("RDCO coordination links use the RDCO section and addresses", () => {
     { label: "Reported Comments", to: "/moderation/comments", section: "RDCO" },
     { label: "Notices", to: "/notices", section: "RDCO" },
   ]);
+});
+
+describe("canOpenPath: may this role open this address? (IR-1207)", () => {
+  test("a role may open a page its screen allows, with query and fragment", () => {
+    expect(canOpenPath(ROLES.RDCO, "/rdco/users?page=2#row-4")).toBe(true);
+    expect(canOpenPath(ROLES.KTTO, "/review")).toBe(true);
+  });
+
+  test("a role may not open a page its screen refuses", () => {
+    expect(canOpenPath(ROLES.STUDENT, "/rdco/users")).toBe(false);
+    expect(canOpenPath(ROLES.KTTO, "/admin/audit")).toBe(false);
+  });
+
+  test("a page's own entry wins over a pattern that also matches it", () => {
+    // `/records/:id` (everyone) matches `/records/import` too; the import
+    // screen is RDCO's alone, and the router sends the address there.
+    expect(canOpenPath(ROLES.STUDENT, "/records/import")).toBe(false);
+    expect(canOpenPath(ROLES.STUDENT, "/records/42")).toBe(true);
+  });
+
+  test("a page two screens share is open to both screens' roles", () => {
+    expect(canOpenPath(ROLES.SYSTEM_ADMIN, "/moderation/comments")).toBe(true);
+    expect(canOpenPath(ROLES.RDCO, "/moderation/comments")).toBe(true);
+    expect(canOpenPath(ROLES.STUDENT, "/moderation/comments")).toBe(false);
+  });
+
+  test("an address no screen names is left to the router", () => {
+    // Retired addresses redirect, and unknown ones show Not Found; neither is
+    // a refusal, so the login screen may still go there.
+    expect(canOpenPath(ROLES.STUDENT, "/review/12/evaluate")).toBe(true);
+  });
+
+  test("no role opens nothing", () => {
+    expect(canOpenPath(null, "/")).toBe(false);
+  });
 });

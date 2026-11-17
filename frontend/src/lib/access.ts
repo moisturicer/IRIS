@@ -1,8 +1,10 @@
 /**
  * Who may reach which screen (IR-160).
  *
- * **One map, two consumers.** `router/index.tsx` reads `rolesFor()` to gate a
- * route; `components/layout/Sidebar.tsx` reads `navFor()` to build the menu.
+ * **One map, three consumers.** `router/index.tsx` reads `rolesFor()` to gate a
+ * route; `components/layout/Sidebar.tsx` reads `navFor()` to build the menu;
+ * and the login screen reads `canOpenPath()` to decide whether the page saved
+ * before sign-in is one the new account may open (IR-1207).
  * Before this file they decided separately -- the sidebar from Django's
  * `is_staff` flag, the router from application role names -- and disagreed:
  * migration `accounts/0005` set `is_staff = True` on all four office roles, so
@@ -23,6 +25,7 @@
  * Source of truth: `docs/ui-ux/02-information-architecture.md` section 5, as
  * amended 2026-09-06. Asserted by `access.test.ts`.
  */
+import { matchPath } from "react-router-dom";
 import { ROLES, type RoleName } from "./constants";
 
 const EVERYONE: RoleName[] = [
@@ -262,6 +265,27 @@ export function personPath(id: number): string {
 export function canAccess(role: RoleName | null | undefined, key: ScreenKey): boolean {
   if (!role) return false;
   return (SCREEN_ACCESS[key].roles as readonly RoleName[]).includes(role);
+}
+
+/**
+ * May this role open this address (IR-1207)? Used by the login screen to
+ * decide whether to send a person back to the page saved before sign-in,
+ * which may be a page of the account that signed out.
+ *
+ * Read from the same table the route guards read, matched the way the router
+ * matches: a screen whose path has no `:param` outranks one that only matches
+ * through a parameter, so `/records/import` is RDCO's import screen, not a
+ * paper whose id is "import". An address no screen names is left to the
+ * router (a retired address redirects, an unknown one says Not Found), so it
+ * answers true. UX only, like every check here: the API decides.
+ */
+export function canOpenPath(role: RoleName | null | undefined, address: string): boolean {
+  if (!role) return false;
+  const pathname = address.split(/[?#]/, 1)[0];
+  const matches = ALL_SCREENS.filter((key) => matchPath({ path: SCREEN_ACCESS[key].path, end: true }, pathname));
+  if (matches.length === 0) return true;
+  const exact = matches.filter((key) => !SCREEN_ACCESS[key].path.includes(":"));
+  return (exact.length > 0 ? exact : matches).some((key) => canAccess(role, key));
 }
 
 export interface NavEntry {
