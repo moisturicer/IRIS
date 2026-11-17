@@ -49,7 +49,7 @@ const refreshToken = vi.fn(async () => {
   spent.add(token);
   issued += 1;
   jar.cookie = `refresh-${issued}`;
-  return { data: { access: `access-${issued}`, remembered } };
+  return { access: `access-${issued}`, remembered };
 });
 
 const me = vi.fn(async () => ({

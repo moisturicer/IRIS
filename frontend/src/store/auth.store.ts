@@ -140,10 +140,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
        * `refreshOnce` joins this tab's calls, and `withRefreshLock` makes tabs
        * take turns, so the cookie is never presented twice.
        */
-      const tokens = await refreshOnce(() => withRefreshLock(async () => {
-        const { data } = await authApi.refreshToken();
-        return { access: data.access, remembered: data.remembered };
-      }));
+      const tokens = await refreshOnce(() => withRefreshLock(() => authApi.refreshToken()));
 
       restored = true;
       set({

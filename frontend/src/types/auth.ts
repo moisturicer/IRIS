@@ -100,12 +100,6 @@ export interface LoginResponse {
   notice_answer_required?: boolean;
 }
 
-/** `POST /auth/token/refresh/`: a new access token; the rotated refresh token is in the cookie (ADR-072). */
-export interface RefreshResponse {
-  access: string;
-  remembered: boolean;
-}
-
 export interface RegisterPayload {
   email:            string;
   first_name:       string;

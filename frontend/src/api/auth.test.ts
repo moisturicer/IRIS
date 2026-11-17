@@ -3,6 +3,7 @@
  * (IR-916). `client.test.ts` covers the refresh interceptor; this covers the
  * calls a screen makes.
  */
+import axios from "axios";
 import { describe, expect, it, vi } from "vitest";
 
 import { authApi } from "./auth";
@@ -59,12 +60,18 @@ describe("authApi", () => {
     expect(call.headers["X-IRIS-Auth"]).toBe("1");
   });
 
-  it("refreshToken sends no token, only the first-party header: the server reads its cookie (ADR-072)", async () => {
-    await authApi.refreshToken();
+  it("refreshToken sends no token, only the first-party header, and bypasses apiClient (ADR-072)", async () => {
+    // Bare axios, not apiClient: a 401 here must not reach the 401 handler,
+    // which would wait on the refresh gate this call holds (a deadlock).
+    const post = vi.spyOn(axios, "post").mockResolvedValue({ data: { access: "a", remembered: true } });
 
-    const call = stub.only();
-    expect(call).toMatchObject({ method: "post", url: "/auth/token/refresh/", body: {} });
-    expect(call.headers["X-IRIS-Auth"]).toBe("1");
+    expect(await authApi.refreshToken()).toEqual({ access: "a", remembered: true });
+
+    expect(stub.calls).toHaveLength(0);
+    expect(post.mock.calls[0][0]).toMatch(/\/auth\/token\/refresh\/$/);
+    expect(post.mock.calls[0][1]).toEqual({});
+    expect(post.mock.calls[0][2]).toMatchObject({ headers: { "X-IRIS-Auth": "1" }, withCredentials: true });
+    post.mockRestore();
   });
 
   it("changePassword posts to /auth/password/change/", async () => {

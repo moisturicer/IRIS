@@ -2,7 +2,8 @@ import axios, { isAxiosError, type InternalAxiosRequestConfig, type AxiosError }
 import { IDLE_HEADER, idleSeconds, markReported } from "@/lib/activity";
 import { API_BASE } from "@/lib/constants";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
-import { FIRST_PARTY, refreshOnce, withRefreshLock, type RefreshedTokens } from "@/lib/tokenRefresh";
+import { refreshOnce, withRefreshLock } from "@/lib/tokenRefresh";
+import { requestNewTokens } from "./sessionRefresh";
 import { useAuthStore } from "@/store/auth.store";
 import { useNoticeStore } from "@/store/notice.store";
 import { isAcceptanceRequired } from "@/lib/noticeErrors";
@@ -33,35 +34,6 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   markReported();
   return config;
 });
-
-/**
- * Ask the server for a new access token (ADR-072).
- *
- * The refresh token is in an HttpOnly cookie the browser sends by itself, so
- * the body is empty and the request says it comes from IRIS (`FIRST_PARTY`).
- * The server sets the rotated token in the same cookie.
- *
- * Uses bare `axios`, not `apiClient`: routing this through the instance would
- * send it back through the interceptor below, so a 401 on the refresh endpoint
- * itself would try to refresh, recursively.
- */
-async function requestNewTokens(): Promise<RefreshedTokens> {
-  // The idle header here too: this refresh is usually caused by a poll's 401,
-  // and counting it as activity would hand the poll the session back.
-  const { data } = await axios.post(
-    `${API_BASE}/auth/token/refresh/`,
-    {},
-    // A refresh that never answers would leave every 401'd request waiting on
-    // it, so it carries the same timeout (IR-914). A timeout here ends the
-    // session like any other failed refresh.
-    {
-      headers: { [IDLE_HEADER]: String(idleSeconds()), ...FIRST_PARTY },
-      timeout: DEFAULT_TIMEOUT_MS,
-      withCredentials: true,
-    },
-  );
-  return { access: data.access, remembered: data.remembered === true };
-}
 
 /**
  * A new access token for a request that just 401'd, or null when the session is

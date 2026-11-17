@@ -80,6 +80,31 @@ describe("refreshSession", () => {
   });
 });
 
+// ADR-072: every page load asks for a session, and a signed-out visitor's
+// answer is 401 no_session. That answer must not reach apiClient's 401 handler,
+// whose own refresh would wait on the gate page load holds: a deadlock that
+// left the sign-in pages on the loading spinner (first CI run of IR-1222).
+describe("page load for a signed-out visitor", () => {
+  afterEach(() => { vi.restoreAllMocks(); redirect.mockClear(); });
+
+  it("settles signed out, asks once, and says nothing about a session ending", async () => {
+    useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false, authReady: false, sessionLost: null });
+    const post = vi.spyOn(axios, "post").mockRejectedValue(Object.assign(new Error("Request failed with status code 401"), {
+      isAxiosError: true,
+      response: { status: 401, data: { detail: "Not signed in.", code: "no_session" } },
+    }));
+
+    await useAuthStore.getState().hydrateAuth();
+
+    const state = useAuthStore.getState();
+    expect(state.authReady).toBe(true);
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.sessionLost).toBeNull();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+});
+
 // A request refused because the current data notice is unanswered brings the
 // person to the notice screen, wherever it was made from (IR-790).
 describe("a notice_acceptance_required refusal", () => {

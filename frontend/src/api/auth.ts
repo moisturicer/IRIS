@@ -1,8 +1,9 @@
 import { apiClient } from "./client";
 import { FIRST_PARTY } from "@/lib/tokenRefresh";
+import { requestNewTokens } from "./sessionRefresh";
 import type {
   LoginPayload, LoginResponse, RegisterPayload, ChangePasswordPayload, User,
-  PasswordResetConfirmPayload, RecoveryAcknowledgement, RefreshResponse,
+  PasswordResetConfirmPayload, RecoveryAcknowledgement,
 } from "@/types/auth";
 
 export const authApi = {
@@ -11,8 +12,8 @@ export const authApi = {
   // ADR-072: the refresh token travels in its HttpOnly cookie, never the body,
   // and both requests say they come from IRIS itself.
   logout:         ()                            => apiClient.post("/auth/logout/", {}, { headers: FIRST_PARTY }),
-  refreshToken:   ()                            =>
-    apiClient.post<RefreshResponse>("/auth/token/refresh/", {}, { headers: FIRST_PARTY }),
+  // Not through `apiClient`: see `requestNewTokens` for the deadlock that avoids.
+  refreshToken:   ()                            => requestNewTokens(),
   changePassword: (data: ChangePasswordPayload) => apiClient.post("/auth/password/change/", data),
   // ADR-045 (IR-642). Anonymous: neither sends nor needs a session.
   requestPasswordReset: (email: string) =>
