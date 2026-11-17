@@ -10,7 +10,8 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 
 from apps.accounts.models import Role, User
-from apps.accounts.test_sessions import LOGIN, PASSWORD, REFRESH, SessionTestBase
+from apps.accounts.test_sessions import LOGIN, PASSWORD, SessionTestBase
+from apps.accounts.testing_auth import post_refresh, refresh_from
 from core.enums import RoleName
 
 
@@ -42,7 +43,7 @@ class AccountSessionTestBase(SessionTestBase):
         response = self.get_me(access=access)
         self.assertEqual(response.status_code, 401, response.content)
         self.assertEqual(response.data["code"], code)
-        response = self.client.post(REFRESH, {"refresh": refresh}, format="json")
+        response = post_refresh(refresh)
         self.assertEqual(response.status_code, 401, response.content)
         self.assertEqual(response.data["code"], code)
 
@@ -157,7 +158,7 @@ class PasswordChangeEndsEverySessionTests(AccountSessionTestBase):
         self.assertEqual(self.get_me().status_code, 200)
         self.assertEqual(self.refresh_tokens().status_code, 200)
         self.assertEqual(self.get_me(access=other[0]).status_code, 200)
-        response = self.client.post(REFRESH, {"refresh": other[1]}, format="json")
+        response = post_refresh(other[1])
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(self.audit_events("PASSWORD_CHANGED"), [])
 
@@ -174,7 +175,7 @@ class PasswordChangeEndsEverySessionTests(AccountSessionTestBase):
         self.sign_in()
         response = self.refresh_tokens()
         self.assertEqual(response.status_code, 200, response.content)
-        self.access, self.refresh = response.data["access"], response.data["refresh"]
+        self.access, self.refresh = response.data["access"], refresh_from(response)
         self.assertEqual(self.change_password().status_code, 200)
         for tokens in ((self.access, self.refresh), other):
             self.assert_refused(*tokens, "session_ended_password_changed")
