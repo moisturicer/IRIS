@@ -191,7 +191,7 @@ class CommentRecordsItsVersionTests(ReviewCommentTestBase):
     def test_comments_read_back_oldest_first(self):
         record = self.at_adviser_open()
         for body in ("First.", "Second.", "Third."):
-            self.commented(record, self.owner if body != "Second." else self.adviser, body)
+            self.discussed(record, self.owner if body != "Second." else self.adviser, body)
 
         response = self.listed(record, self.adviser)
 
