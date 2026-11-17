@@ -1798,6 +1798,127 @@ describe("the Review section (IR-412)", () => {
     return screen.getByRole("tabpanel", { name: "Details" });
   };
 
+  // IR-1206: the paper's owners get the frame reviewers have. Nothing above
+  // the reader but Back and the title; what the header held moved to tabs.
+  describe("the author's Review uses the reviewers' frame (IR-1206)", () => {
+    const authorReview: RecordDetail = {
+      ...inReview,
+      adviser_name: "Ada Adviser",
+      capabilities: ["cite", "edit_details", "continue_as"],
+      lineage: { derived_from: { id: 123, title: "Proposal", record_type_name: "Proposal" }, continued_as: null },
+    };
+    const paneTabs = () => within(screen.getByRole("tablist", { name: "Review pane sections" }))
+      .getAllByRole("tab").map((t) => t.textContent?.replace(/\s*\d+$/, "").trim());
+
+    it("puts only Back and the title above the reader", async () => {
+      workspaceAt(1600);
+      shownRecord = authorReview;
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      expect(await screen.findByRole("region", { name: "Review pane content" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+      // The title is the bar's, once; the editorial header's is gone.
+      expect(screen.getAllByRole("heading", { level: 1 }).map((h) => h.textContent)).toEqual([inReview.title]);
+      expect(screen.queryByRole("list", { name: "Authors" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("list", { name: "Adviser" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Completed 2026")).not.toBeInTheDocument();
+      for (const name of ["View", "Cite", "Share", /^Save/]) {
+        expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+      }
+    });
+
+    it("opens on Readiness, with the status at its top, then Conversation, Threads and Details", async () => {
+      workspaceAt(1600);
+      shownRecord = authorReview;
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const readiness = await screen.findByRole("tabpanel", { name: "Readiness" });
+      expect(paneTabs()).toEqual(["Readiness", "Conversation", "Threads", "Details"]);
+      expect(screen.getByRole("tab", { name: "Readiness" })).toHaveAttribute("aria-selected", "true");
+      expect(within(readiness).getByText("In review")).toBeInTheDocument();
+      expect(within(readiness).getByRole("button", { name: "Documents" })).toBeInTheDocument();
+    });
+
+    it("moves Edit details, the lineage and Continue as into Details", async () => {
+      workspaceAt(1600);
+      shownRecord = authorReview;
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const details = await openDetails();
+      expect(within(details).getByRole("button", { name: "Edit details" })).toBeInTheDocument();
+      expect(within(details).getByRole("link", { name: "Developed from Proposal #123 — View proposal" }))
+        .toHaveAttribute("href", "/records/123");
+      expect(within(details).getByRole("button", { name: "Continue as Thesis" })).toBeInTheDocument();
+      expect(await within(details).findByRole("heading", { name: "Reviewers" })).toBeInTheDocument();
+      // Readiness is a tab of its own for the author, not repeated here.
+      expect(within(details).queryByRole("heading", { name: "Readiness" })).not.toBeInTheDocument();
+    });
+
+    it("offers no Edit details in Details when the server does not grant it", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...authorReview, capabilities: ["cite"] };
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const details = await openDetails();
+      expect(within(details).queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
+      expect(within(details).queryByRole("button", { name: "Continue as Thesis" })).not.toBeInTheDocument();
+    });
+
+    it("keeps the reviewers' own tabs and nothing of the author's", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "edit_details"] };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      await screen.findByRole("region", { name: "Review pane content" });
+      expect(paneTabs()).toEqual(["Conversation", "Threads", "Changes", "Details"]);
+      const details = await openDetails();
+      expect(within(details).queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
+    });
+
+    it("moves between the author's tabs with the arrow keys, Home and End", async () => {
+      workspaceAt(1600);
+      shownRecord = authorReview;
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const readiness = await screen.findByRole("tab", { name: "Readiness" });
+      readiness.focus();
+      await userEvent.keyboard("{ArrowRight}");
+      expect(screen.getByRole("tab", { name: "Conversation" })).toHaveFocus();
+      await userEvent.keyboard("{End}");
+      expect(screen.getByRole("tab", { name: "Details", selected: true })).toHaveFocus();
+      await userEvent.keyboard("{Home}");
+      expect(screen.getByRole("tab", { name: "Readiness", selected: true })).toHaveFocus();
+    });
+
+    it("keeps the paper first at 320px, its pane one tap away and free of serious axe violations", async () => {
+      workspaceAt(320);
+      shownRecord = authorReview;
+      signInAs(OWNER_ID, "Student");
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Open review pane" }));
+      const pane = screen.getByRole("dialog", { name: "Review pane" });
+      expect(within(pane).getByRole("tab", { name: "Readiness", selected: true })).toBeInTheDocument();
+      await expectNoBlockingA11yViolations(container);
+    });
+
+    it("leaves Overview's header as it was", async () => {
+      shownRecord = authorReview;
+      signInAs(OWNER_ID, "Student");
+      renderPaperView();
+
+      expect(await screen.findByRole("heading", { level: 1, name: inReview.title })).toBeInTheDocument();
+      expect(screen.getByRole("list", { name: "Authors" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit details" })).toBeInTheDocument();
+    });
+  });
+
   it("makes the office review body a named keyboard-scrollable region (IR-774)", async () => {
     workspaceAt(800);
     shownRecord = { ...inReview, ...reviewing };
@@ -2624,6 +2745,8 @@ describe("the Review section (IR-412)", () => {
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
+    // Changed deliberately by IR-1206: an owner's Review opens on Readiness.
+    await userEvent.click(await screen.findByRole("tab", { name: "Conversation" }));
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("toolbar", { name: "Review actions" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
@@ -2634,12 +2757,15 @@ describe("the Review section (IR-412)", () => {
     signInAs(OWNER_ID, "Student");
     const { unmount } = renderPaper(`/records/${RECORD_ID}?section=review`);
 
+    // Changed deliberately by IR-1206: an owner's Review opens on Readiness.
+    await userEvent.click(await screen.findByRole("tab", { name: "Conversation" }));
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.getByRole("textbox", { name: "Comment" })).toBeInTheDocument();
     unmount();
 
     shownRecord = inReview;
     renderPaper(`/records/${RECORD_ID}?section=review`);
+    await userEvent.click(await screen.findByRole("tab", { name: "Conversation" }));
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("textbox", { name: "Comment" })).not.toBeInTheDocument();
   });

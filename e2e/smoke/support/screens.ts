@@ -257,6 +257,36 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: /Cite/ }).first(), primaryLabel: "Cite",
   },
   {
+    // IR-1206: the owner's Review is the reviewers' frame -- Back and the title
+    // above the reader, the Readiness tab first. Its own row, since the same
+    // route draws a different screen for the paper's owner.
+    id: "paper-view-author-review", path: `/records/${PAPER.id}?section=review`, route: "/records/:id", role: "Student",
+    mocks: wrap("Student", (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
+      api.on("GET", `/records/${PAPER.id}/tracker/`, {
+        record_id: PAPER.id, record_type: "Thesis / Research", workflow_state: "in_review", workflow_state_label: "In review",
+        current_holders: [], parties: [], routing_history: [], routing_recorded_from: null,
+        reviews: [], versions: [], review_comments: [], resubmissions: [],
+      });
+      api.on("GET", "/library/saves/", { results: [] });
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
+      api.on("GET", `/library/highlights/${PAPER.id}/`, { results: [] });
+      api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
+      api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
+    }),
+    heading: PAPER.title,
+    // Wide, the Readiness tab is in reach; narrower, the pane is a drawer and
+    // its launcher is what the owner reaches first.
+    primary: (p) => p.getByRole("tab", { name: "Readiness" }).or(p.getByRole("button", { name: "Open review pane" }))
+      .filter({ visible: true }).first(),
+    primaryLabel: "Readiness (tab) or Open review pane",
+  },
+  {
     id: "my-library", path: "/records/mine", route: "/records/mine", role: "Student",
     mocks: wrap("Student", (api) => {
       api.on("GET", "/library/saves/", { results: [] });

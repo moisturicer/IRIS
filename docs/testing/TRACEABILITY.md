@@ -360,6 +360,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1192** | A thread reply shows its writer's avatar, name, party label (stored when written, backfilled by `reviews/0030`) and date; Reply counts replies; a ⋯ menu edits the viewer's own reply; backend tests and the migration await CI — ADR-032 §7, epic IR-920; no FR- id | [details](traceability/IR-1192.md) | **PARTIAL** |
 | **IR-1194** | Conversation comments are discussion (`ReviewComment.kind`, backfilled by `reviews/0032`), threads are review items a reviewer posts now or saves as a draft; Send N comments; owners' threads on a passage only; backend tests and the migrations await CI — ADR-032 §7 amendment 2026-11-16; no FR- id | [details](traceability/IR-1194.md) | **PARTIAL** |
 | **IR-1197** | Why a person was signed out (a session ended, or a password changed in Settings) is a dialog in front of the sign-in page, not a banner in the form — extends IR-645, IR-1081, IR-642; no FR- id | [details](traceability/IR-1197.md) | **IMPLEMENTED** |
+| **IR-1206** | On Review the paper's owners get the reviewers' frame: Back and the title above the reader, tabs Readiness · Conversation · Threads · Details, and Edit details, lineage and Continue as moved into Details — IR-1199; no FR- id | [details](traceability/IR-1206.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
