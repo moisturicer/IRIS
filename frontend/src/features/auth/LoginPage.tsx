@@ -22,6 +22,7 @@ import {
   setLockoutUntil,
 } from "@/lib/authSession";
 import { canOpenPath } from "@/lib/access";
+import type { User } from "@/types/auth";
 import { landingPathFor } from "@/lib/landing";
 import { safeRedirectPath } from "@/lib/redirectTarget";
 import { classifyLoginFailure, type AccountLock, type LoginFailure } from "./loginFailure";
@@ -35,6 +36,17 @@ const CLIENT_LOCKOUT_MS = 15 * 60 * 1000;
 
 /** Every failure but a lock, which opens its own dialog instead. */
 type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
+
+/**
+ * May this account be sent back to the page saved before sign-in (IR-1207)?
+ * Often the saved page belongs to the account that signed out before them.
+ * Django staff with no IRIS role pass every route guard (`ProtectedRoute`), so
+ * they may return anywhere; everyone else only where their role may go.
+ */
+function mayReturnTo(user: User, path: string): boolean {
+  if ((user.is_staff || user.is_superuser) && !user.role_name) return true;
+  return canOpenPath(user.role_name, path);
+}
 
 export default function LoginPage() {
   // The submitting button may lose focus when the form disables it, before the
@@ -184,8 +196,7 @@ export default function LoginPage() {
       // otherwise Discover (IR-534). A page typed while signed in still meets
       // the guard's "not for you" screen; only this return trip skips it.
       const user = res.data.user;
-      const back = redirectTo && canOpenPath(user.role_name, redirectTo) ? redirectTo : null;
-      navigate(back ?? landingPathFor(user), { replace: true });
+      navigate(redirectTo && mayReturnTo(user, redirectTo) ? redirectTo : landingPathFor(user), { replace: true });
     } catch (err: unknown) {
       const failure = classifyLoginFailure(err);
 

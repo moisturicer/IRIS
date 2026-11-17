@@ -1,8 +1,10 @@
 /**
  * Who may reach which screen (IR-160).
  *
- * **One map, two consumers.** `router/index.tsx` reads `rolesFor()` to gate a
- * route; `components/layout/Sidebar.tsx` reads `navFor()` to build the menu.
+ * **One map, three consumers.** `router/index.tsx` reads `rolesFor()` to gate a
+ * route; `components/layout/Sidebar.tsx` reads `navFor()` to build the menu;
+ * and the login screen reads `canOpenPath()` to decide whether the page saved
+ * before sign-in is one the new account may open (IR-1207).
  * Before this file they decided separately -- the sidebar from Django's
  * `is_staff` flag, the router from application role names -- and disagreed:
  * migration `accounts/0005` set `is_staff = True` on all four office roles, so

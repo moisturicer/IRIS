@@ -301,6 +301,27 @@ describe("where the login screen sends you", () => {
     expect(screen.queryByRole("heading", { name: /rdco/ })).not.toBeInTheDocument();
   });
 
+  it("still follows a saved page the role may open, after a real sign-in (IR-1207)", async () => {
+    acceptAnyPassword();
+    renderLoginAt("/login", { from: "/review?status=pending" });
+
+    await signIn();
+
+    expect(await screen.findByRole("heading", { name: "landed on /review?status=pending" })).toBeInTheDocument();
+  });
+
+  it("lets Django staff with no IRIS role return anywhere, as the route guard does (IR-1207)", async () => {
+    const staff = makeUser({ role: null, role_name: null, is_staff: true });
+    vi.spyOn(authApi, "login").mockResolvedValue({
+      data: { access: "access-token", refresh: "refresh-token", user: staff },
+    } as Awaited<ReturnType<typeof authApi.login>>);
+    renderLoginAt("/login", { from: "/rdco/users" });
+
+    await signIn();
+
+    expect(await screen.findByRole("heading", { name: "landed on /rdco/users" })).toBeInTheDocument();
+  });
+
   it("skips a page the role may not open in the query string as well (IR-1207)", async () => {
     acceptAnyPassword();
     renderLoginAt("/login?next=%2Fadmin%2Faudit");
