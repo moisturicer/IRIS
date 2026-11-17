@@ -206,6 +206,8 @@ test.describe("Paper View · review timeline", () => {
         a.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER);
       },
     });
+    // A participant's Review opens on Documents (IR-1203); the timeline is the Conversation tab.
+    await page.getByRole("tab", { name: "Conversation" }).click();
     await expect(page.getByText("Nothing has happened in this review yet.")).toBeVisible();
     await expect(retryControl(page)).toHaveCount(0);
   });

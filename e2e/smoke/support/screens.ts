@@ -30,6 +30,8 @@ export interface Screen {
   primaryLabel: string;
   /** A table (or table-like list) that gets wider than a phone. Documented in TABLE_BEHAVIOUR. */
   table?: (page: Page) => Locator;
+  /** A step after the page loads that reaches the view under test, e.g. a tab it does not open on. */
+  open?: (page: Page) => Promise<void>;
 }
 
 /** The table-heavy screens' small-screen behaviour. The matrix checks it still holds. */
@@ -252,6 +254,10 @@ export const SCREENS: Screen[] = [
       api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
       // The response to reviewers (IR-876), read beside the threads.
       api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
+      // A participant's Review opens on its Documents tab (IR-1203), which reads these.
+      api.on("GET", `/documents/records/${PAPER.id}/slots/`, []);
+      api.on("GET", "/documents/files/", []);
+      api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
     }),
     heading: PAPER.title,
     primary: (p) => p.getByRole("button", { name: /Cite/ }).first(), primaryLabel: "Cite",
@@ -285,6 +291,47 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("tab", { name: "Readiness" }).or(p.getByRole("button", { name: "Open review pane" }))
       .filter({ visible: true }).first(),
     primaryLabel: "Readiness (tab) or Open review pane",
+  },
+  {
+    // IR-1203: documents are a Review tab, which replaced the "All documents"
+    // drawer. An old `?documents=open` link opens the owner's Review on that
+    // tab, and a narrow window opens the pane to it.
+    id: "paper-view-review-documents", path: `/records/${PAPER.id}?section=review&documents=open`, route: "/records/:id",
+    role: "Student",
+    mocks: wrap("Student", (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
+      api.on("GET", `/records/${PAPER.id}/tracker/`, {
+        record_id: PAPER.id, record_type: "Thesis / Research", workflow_state: "in_review", workflow_state_label: "In review",
+        current_holders: [], parties: [], routing_history: [], routing_recorded_from: null,
+        reviews: [], versions: [], review_comments: [], resubmissions: [],
+      });
+      api.on("GET", `/documents/records/${PAPER.id}/slots/`, [{
+        id: 2, name: "Ethics clearance", record_type: 1, is_required: true, uploads: [{
+          id: 9, record: PAPER.id, slot: 2, slot_name: "Ethics clearance", file: "ethics.pdf", version: 1, status: null,
+          status_name: null, uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00",
+          reviews: [], delete_refused: null,
+        }],
+      }]);
+      // One long, unbroken file name: it must wrap in its row, never run off it (the Full Text Rule, IR-1218).
+      api.on("GET", "/documents/files/", [{
+        id: 31, record: PAPER.id, file: "x.pdf", filename: "Final_Thesis_Manuscript_Revised_Signed_Adviser_Copy_v3.pdf",
+        uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
+      }]);
+      api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
+      api.on("GET", "/library/saves/", { results: [] });
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
+      api.on("GET", `/library/highlights/${PAPER.id}/`, { results: [] });
+      api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
+      api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
+    }),
+    heading: PAPER.title,
+    primary: (p) => p.getByRole("tab", { name: "Documents", selected: true }).filter({ visible: true }).first(),
+    primaryLabel: "Documents (tab, selected)",
   },
   {
     id: "my-library", path: "/records/mine", route: "/records/mine", role: "Student",

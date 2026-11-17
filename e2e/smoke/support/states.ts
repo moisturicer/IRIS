@@ -31,6 +31,8 @@ export interface UiState {
   /** What this variant is, when a surface has more than one view or refusal. */
   variant?: string;
   override: (api: MockApi) => void;
+  /** A step after the page loads that reaches the state's view, e.g. a tab it does not open on. */
+  open?: (page: Page) => Promise<void>;
   /** Reads the test never answers time out (the interrupted state). */
   timeOut?: boolean;
   shows: (page: Page) => Locator;
@@ -68,6 +70,8 @@ function reads(
     recovered: (page: Page) => Locator;
     /** Mocks that put the screen where the read happens, applied before the read's own. */
     also?: (api: MockApi) => void;
+    /** A step after the page loads that reaches the view the read draws into. */
+    open?: (page: Page) => Promise<void>;
     /** What an interrupted read says, when it is not the shared "This took too long". */
     interrupted?: string;
     /** What the reader can do from an empty or a refused screen, when it offers anything. */
@@ -77,7 +81,7 @@ function reads(
 ): UiState[] {
   const also = options.also ?? (() => undefined);
   const base = {
-    screen, path: options.path, variant: options.variant,
+    screen, path: options.path, variant: options.variant, open: options.open,
     read: { method, path }, ok: options.ok, recovered: options.recovered,
   };
   const states: UiState[] = [
@@ -106,6 +110,8 @@ function reads(
  * panels that read the tracker. Only the read under test is mocked after it.
  */
 const asParticipant = (api: MockApi) => api.on("GET", `/records/${PAPER.id}/`, { ...PAPER_DETAIL, is_participant: true });
+/** A participant's Review opens on Documents (IR-1203); the timeline is the Conversation tab. */
+const toConversation = (page: Page) => page.getByRole("tab", { name: "Conversation" }).click();
 
 /** The tracker as the review panels read it: nobody has acted yet, a viewer who may not read the review gets nulls. */
 export const TRACKER = {
@@ -155,7 +161,7 @@ export const STATES: UiState[] = [
   ...reads("paper-view", "GET", "/records/101/tracker/", {
     error: "Could not load the review timeline.",
   }, {
-    variant: "review timeline", path: "/records/101?section=review", also: asParticipant,
+    variant: "review timeline", path: "/records/101?section=review", also: asParticipant, open: toConversation,
     interrupted: "The review timeline took too long to load.",
     ok: TRACKER, recovered: text("Nothing has happened in this review yet."),
     loading: announced("Loading the review timeline"),
@@ -309,6 +315,7 @@ export const AXE_STATES: AxeState[] = [
   {
     id: "review timeline · empty", screen: "paper-view", path: "/records/101?section=review",
     override: (api) => { asParticipant(api); api.on("GET", "/records/101/tracker/", TRACKER); },
+    prepare: toConversation,
     shows: (page) => page.getByText("Nothing has happened in this review yet."),
   },
 ];

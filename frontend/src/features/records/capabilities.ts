@@ -17,8 +17,9 @@ export type { Capability } from "@/types/records";
 /**
  * Paper View's sections, in tab order (spec §4.6). Participants see Overview ·
  * Review; everyone else Overview · Paper (ADR-032 §10, 2026-11-04; IR-879).
- * Files lives in Review's Documents drawer now, so it is no section: an old
- * `?section=files` link is a participant's Review with the drawer open.
+ * Files lives in Review's Documents tab now (IR-1203; a drawer from IR-879),
+ * so it is no section: an old `?section=files` link is a participant's Review
+ * on that tab.
  */
 export const PAPER_SECTIONS = ["overview", "paper", "review"] as const;
 export type PaperSection = (typeof PAPER_SECTIONS)[number];

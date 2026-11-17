@@ -73,11 +73,11 @@ import { UnlistedCard } from "./UnlistedCard";
 import { RdcoPaperControls } from "./RdcoPaperControls";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
-import { FilesSection } from "./FilesSection";
+import { DocumentsTab } from "./DocumentsTab";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
-import { ReviewWorkspace } from "./ReviewWorkspace";
+import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
@@ -381,8 +381,9 @@ export default function PaperViewPage() {
       ? "review"
       : "overview";
   const section: PaperSection = landing?.section ?? (openAtPage != null ? readerSection : "overview");
-  // Review's Documents drawer (ADR-032 §10, IR-879): `?documents=open`, or an old `?section=files`.
-  const documentsOpen = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
+  // Review's Documents tab (IR-1203; the drawer it replaced was IR-879):
+  // `?documents=open`, or an old `?section=files`, opens it.
+  const documentsWanted = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
   // Still on the record being left while the next one loads.
   const arriving = loading || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
@@ -1311,7 +1312,7 @@ export default function PaperViewPage() {
             )}
 
             {section === "review" && (
-              <ReviewWorkspace
+              <ReviewWorkspaceLayout
                 record={record}
                 authorView={userIsOwner}
                 authorDetails={userIsOwner ? authorDetails : undefined}
@@ -1322,10 +1323,11 @@ export default function PaperViewPage() {
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
                 // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
-                documentsOpen={documentsOpen}
-                onDocuments={(open) => setViewParams({ documents: open ? "open" : null, section: "review" })}
+                showDocuments={documentsWanted}
+                // Once shown, the request is spent: the tab is the reviewer's to change.
+                onDocumentsShown={() => setViewParams({ documents: null, section: "review" })}
                 documents={
-                  <FilesSection
+                  <DocumentsTab
                     record={record}
                     owner={userIsOwner}
                     editable={can.has("edit_details")}

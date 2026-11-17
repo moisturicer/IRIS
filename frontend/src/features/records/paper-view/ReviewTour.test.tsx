@@ -14,7 +14,7 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, within } from "@/test/render";
 import type { RecordDetail } from "@/types/records";
 
-import { ReviewWorkspace } from "./ReviewWorkspace";
+import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 
 const api = vi.hoisted(() => ({
   tracker: vi.fn(() => new Promise(() => {})),
@@ -53,8 +53,8 @@ function widthOf(width: number) {
 
 function openWorkspace({ versions = 2, reader = true, caps = ["comment_review"] as Capability[] } = {}) {
   return renderScreen(
-    <ReviewWorkspace record={record(versions)} can={new Set(caps)} reader={reader ? <div>The paper</div> : null}
-      timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false} onDocuments={() => {}} />,
+    <ReviewWorkspaceLayout record={record(versions)} can={new Set(caps)} reader={reader ? <div>The paper</div> : null}
+      timelineVersion={0} onChanged={() => {}} documents={null} />,
   );
 }
 
