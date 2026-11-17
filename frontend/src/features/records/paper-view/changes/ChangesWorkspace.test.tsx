@@ -66,7 +66,7 @@ function openWorkspace(versions: number) {
   const onShowVersion = vi.fn();
   renderScreen(
     <ReviewWorkspace record={record(versions)} can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
-      timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false} onDocuments={() => {}}
+      timelineVersion={0} onChanged={() => {}} documents={null}
       onShowVersion={onShowVersion} />,
   );
   return { onShowVersion };

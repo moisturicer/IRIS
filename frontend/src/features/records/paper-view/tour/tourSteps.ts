@@ -7,7 +7,7 @@
  * right, whether a narrow window keeps the pane behind its launcher -- so the
  * tour never describes something that is not there.
  */
-export type TourTab = "conversation" | "threads" | "changes" | "details";
+export type TourTab = "documents" | "conversation" | "threads" | "changes" | "details";
 
 /**
  * The DOM ids the tour points at. The layout puts these on its landmarks and
@@ -31,6 +31,7 @@ export interface TourStep {
 }
 
 const TAB_ABOUT: Record<TourTab, { name: string; text: string }> = {
+  documents: { name: "Documents", text: "Every document filed with the record: the manuscript, each document with its versions, and what has been asked for." },
   conversation: { name: "Conversation", text: "The timeline of what has happened in this review." },
   threads: { name: "Threads", text: "Comments anchored to a place in the paper or to the record as a whole, with their pins on the paper." },
   changes: { name: "Changes", text: "What changed between two Versions of the paper." },

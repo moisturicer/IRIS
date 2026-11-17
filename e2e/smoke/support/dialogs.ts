@@ -548,7 +548,7 @@ export const DIALOGS: DialogCase[] = [
   {
     id: "remove an attached file", screen: "paper-view", role: "Student",
     path: `/records/${PAPER.id}?section=review&documents=open`,
-    sources: ["features/records/paper-view/FilesSection.tsx"],
+    sources: ["features/records/paper-view/DocumentsTab.tsx"],
     override: (api) => {
       api.on("GET", `/records/${PAPER.id}/`, {
         ...PAPER_DETAIL, owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],

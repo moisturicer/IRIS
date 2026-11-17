@@ -46,8 +46,6 @@ function openReviewTab(granted: Capability[]) {
       timelineVersion={0}
       onChanged={() => {}}
       documents={<p>Every document</p>}
-      documentsOpen={false}
-      onDocuments={() => {}}
     />,
   );
 }

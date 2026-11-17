@@ -54,14 +54,16 @@ const FOOTER_ACTIONS = [
   ...REVIEW_ACTIONS.filter((a) => a.capability !== "route" && a.capability !== "add_reviewer"),
   ...ADD_COLLEAGUE,
 ];
-/** The author's tabs add Readiness, first (IR-1206); reviewers keep the tour's four. */
+/** The author's tabs add Readiness, first (IR-1206); reviewers keep the tour's. */
 type Tab = TourTab | "readiness";
 
 const TAB_NAMES: Record<Tab, string> = {
-  readiness: "Readiness", conversation: "Conversation", threads: "Threads", changes: "Changes", details: "Details",
+  readiness: "Readiness", documents: "Documents", conversation: "Conversation", threads: "Threads", changes: "Changes",
+  details: "Details",
 };
-const REVIEWER_TABS: Tab[] = ["conversation", "threads", "changes", "details"];
-const AUTHOR_TABS: Tab[] = ["readiness", "conversation", "threads", "details"];
+// Documents is the reviewers' first tab and the author's second (IR-1203).
+const REVIEWER_TABS: Tab[] = ["documents", "conversation", "threads", "changes", "details"];
+const AUTHOR_TABS: Tab[] = ["readiness", "documents", "conversation", "threads", "details"];
 function readWidths(): Widths {
   try {
     const value = JSON.parse(localStorage.getItem(WIDTHS_KEY) ?? "null");
@@ -99,13 +101,16 @@ function SentBy({ version }: { version: RecordVersion }) {
 }
 
 export function ReviewWorkspaceLayout({
-  record, can, reader, timelineVersion, onChanged, onDocuments, onOpenReview, onShowVersion, authorView = false, authorDetails,
+  record, can, reader, timelineVersion, onChanged, documents, showDocuments = false, onDocumentsShown, onOpenReview,
+  onShowVersion, authorView = false, authorDetails,
 }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
   const [statusTarget, setStatusTarget] = useState<HTMLDivElement | null>(null);
-  // The author opens on what waits on them (IR-1206); a reviewer on the conversation.
-  const [tab, setTab] = useState<Tab>(authorView ? "readiness" : "conversation");
+  // The author opens on what waits on them (IR-1206); a reviewer on the
+  // conversation, though Documents comes first in the row (IR-1203).
+  const home: Tab = authorView ? "readiness" : "conversation";
+  const [tab, setTab] = useState<Tab>(home);
   const [sideChoice, setSideChoice] = useState(readSideTab);
   // Narrow, the workspace starts on the paper, its pins in view; the pane
   // opens from its launcher, a pin, Comment or Readiness (IR-875).
@@ -192,7 +197,8 @@ export function ReviewWorkspaceLayout({
   const chooseSide = (next: Tab | null) => {
     // The tab that moves out of the row must not stay "selected" behind it, or
     // closing the column would silently bring it back as the shown tab.
-    if (next !== null && next === shown) setTab(allTabs.find((t) => t !== next)!);
+    // It falls back to the tab the pane opens on, else the first other one.
+    if (next !== null && next === shown) setTab(home !== next ? home : allTabs.find((t) => t !== next)!);
     if (next !== null) focusLater(`${ids}-side-close`);
     else if (sideTab) focusLater(`${ids}-tab-${sideTab}`);
     setSideChoice(next);
@@ -223,6 +229,13 @@ export function ReviewWorkspaceLayout({
   useEffect(() => {
     if (changesVisible) setChangesOpened(true);
   }, [changesVisible]);
+  // Documents loads itself too, so it mounts only once shown, as the drawer it
+  // replaced did (IR-1203), and stays so an upload under way survives a switch.
+  const [documentsOpened, setDocumentsOpened] = useState(false);
+  const documentsVisible = shown === "documents" || sideTab === "documents";
+  useEffect(() => {
+    if (documentsVisible) setDocumentsOpened(true);
+  }, [documentsVisible]);
   const showChange = (place: ShowPlace) => {
     onShowVersion?.(place.version === latest ? null : place.version);
     tw.showPlace(place);
@@ -319,11 +332,32 @@ export function ReviewWorkspaceLayout({
       el?.focus({ preventScroll: true });
     });
   };
+  // Documents is a tab (IR-1203): a document request's link, and the page
+  // asking for the documents, open it, and the pane with it when narrow.
+  const showDocumentsTab = () => {
+    reveal("documents");
+    if (drawer) setOpen(true);
+  };
+  // The page's request is taken at once; opening a narrow window's pane waits
+  // for the first measure, which says whether there is a pane to open.
+  const [paneForDocuments, setPaneForDocuments] = useState(false);
+  const measured = width > 0;
+  useEffect(() => {
+    if (!showDocuments) return;
+    reveal("documents");
+    setPaneForDocuments(true);
+    onDocumentsShown?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per request, not per render
+  }, [showDocuments]);
+  useEffect(() => {
+    if (!paneForDocuments || !measured) return;
+    setPaneForDocuments(false);
+    if (drawer) setOpen(true);
+  }, [paneForDocuments, measured, drawer]);
   const onReadinessAction = (action: { kind: string; target: string | null }) => {
     if (action.kind === "open_review") void onOpenReview?.();
     else if (action.kind === "claim") void claim();
-    // Documents moved into a drawer (IR-879): a document request's link opens it.
-    else if (action.kind === "open_documents") onDocuments(true);
+    else if (action.kind === "open_documents") showDocumentsTab();
     else if (action.kind === "show_party") goTo(action.target ?? "reviewers");
     // An open thread's item shows that party's open threads (IR-875).
     else if (action.kind === "show_threads") tw.showParty(action.target);
@@ -369,17 +403,10 @@ export function ReviewWorkspaceLayout({
   const submission = first ? { author: first.created_by_name, at: first.created_at, abstract: record.abstract ?? "" } : undefined;
   const body: Record<Tab, ReactNode> = {
     // The author's first tab (IR-1206): where the record stands, then what
-    // waits on them. The Documents drawer opens from here until IR-1203
-    // gives documents a tab of their own.
+    // waits on them. Their documents are the next tab (IR-1203).
     readiness: authorView ? (
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />
-          <button type="button" onClick={() => onDocuments(true)} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-11 px-4")}>
-            <i className="fas fa-folder-open text-xs" aria-hidden />
-            Documents
-          </button>
-        </div>
+        <StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />
         {record.readiness
           ? <ReadinessPanel readiness={record.readiness} onAction={onReadinessAction} />
           : <p className="text-small text-stone-600">Nothing is waiting on you.</p>}
@@ -390,6 +417,7 @@ export function ReviewWorkspaceLayout({
         onCommented={tw.threads.reload} onOpenThreads={tw.openThreads} renderStatus={renderDetails} submission={submission} statusBox
         onLoaded={(data) => setCommentCount((data.review_comments ?? []).filter((c) => !c.is_draft && isDiscussion(c)).length)} />
     ),
+    documents: documentsOpened || documentsVisible ? documents : null,
     threads: <ReviewThreads {...tw.panel} />,
     changes: !comparable ? (
       <div className="rounded-card border border-stone-200 px-4 py-6 text-center">

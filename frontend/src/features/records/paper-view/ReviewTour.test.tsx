@@ -54,7 +54,7 @@ function widthOf(width: number) {
 function openWorkspace({ versions = 2, reader = true, caps = ["comment_review"] as Capability[] } = {}) {
   return renderScreen(
     <ReviewWorkspace record={record(versions)} can={new Set(caps)} reader={reader ? <div>The paper</div> : null}
-      timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false} onDocuments={() => {}} />,
+      timelineVersion={0} onChanged={() => {}} documents={null} />,
   );
 }
 

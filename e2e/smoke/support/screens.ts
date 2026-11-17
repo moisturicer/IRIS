@@ -287,6 +287,43 @@ export const SCREENS: Screen[] = [
     primaryLabel: "Readiness (tab) or Open review pane",
   },
   {
+    // IR-1203: documents are a Review tab, which replaced the "All documents"
+    // drawer. An old `?documents=open` link opens the owner's Review on that
+    // tab, and a narrow window opens the pane to it.
+    id: "paper-view-review-documents", path: `/records/${PAPER.id}?section=review&documents=open`, route: "/records/:id",
+    role: "Student",
+    mocks: wrap("Student", (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
+      api.on("GET", `/records/${PAPER.id}/tracker/`, {
+        record_id: PAPER.id, record_type: "Thesis / Research", workflow_state: "in_review", workflow_state_label: "In review",
+        current_holders: [], parties: [], routing_history: [], routing_recorded_from: null,
+        reviews: [], versions: [], review_comments: [], resubmissions: [],
+      });
+      api.on("GET", `/documents/records/${PAPER.id}/slots/`, [{
+        id: 2, name: "Ethics clearance", record_type: 1, is_required: true, uploads: [{
+          id: 9, record: PAPER.id, slot: 2, slot_name: "Ethics clearance", file: "ethics.pdf", version: 1, status: null,
+          status_name: null, uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00",
+          reviews: [], delete_refused: null,
+        }],
+      }]);
+      api.on("GET", "/documents/files/", []);
+      api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
+      api.on("GET", "/library/saves/", { results: [] });
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
+      api.on("GET", `/library/highlights/${PAPER.id}/`, { results: [] });
+      api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
+      api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
+    }),
+    heading: PAPER.title,
+    primary: (p) => p.getByRole("tab", { name: "Documents", selected: true }).filter({ visible: true }).first(),
+    primaryLabel: "Documents (tab, selected)",
+  },
+  {
     id: "my-library", path: "/records/mine", route: "/records/mine", role: "Student",
     mocks: wrap("Student", (api) => {
       api.on("GET", "/library/saves/", { results: [] });

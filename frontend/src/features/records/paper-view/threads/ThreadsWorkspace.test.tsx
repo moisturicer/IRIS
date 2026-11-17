@@ -99,7 +99,7 @@ function StandInReader() {
 function openWorkspace(caps: Capability[] = ["comment_review", "finish_review", "office_review", "request_revision"]) {
   return renderScreen(
     <ReviewWorkspace record={record} can={new Set(caps)} reader={<StandInReader />} timelineVersion={0}
-      onChanged={() => {}} documents={null} documentsOpen={false} onDocuments={() => {}} />,
+      onChanged={() => {}} documents={null} />,
   );
 }
 
@@ -179,8 +179,8 @@ describe("threads in the review workspace", () => {
     const assigned = { ...record, my_seats: [{ ...record.my_seats[0], state: "assigned" }] } as RecordDetail;
     renderScreen(
       <ReviewWorkspace record={assigned} can={new Set<Capability>(["open_review", "finish_review", "office_review"])}
-        reader={<StandInReader />} timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false}
-        onDocuments={() => {}} />,
+        reader={<StandInReader />} timelineVersion={0} onChanged={() => {}} documents={null}
+        />,
     );
     const footer = within(await screen.findByRole("contentinfo", { name: "Your part" }));
     expect(footer.getByRole("button", { name: "Open review" })).toBeInTheDocument();
@@ -197,7 +197,7 @@ describe("threads in the review workspace", () => {
     const user = userEvent.setup();
     renderScreen(
       <ReviewWorkspace record={record} authorView can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
-        timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false} onDocuments={() => {}} />,
+        timelineVersion={0} onChanged={() => {}} documents={null} />,
     );
     await user.click(await screen.findByRole("button", { name: "Show threads" }));
     expect(screen.getByRole("tab", { name: /Threads/ })).toHaveAttribute("aria-selected", "true");

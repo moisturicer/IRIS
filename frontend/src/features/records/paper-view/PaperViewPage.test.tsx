@@ -43,6 +43,7 @@ import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import type { User } from "@/types/auth";
 import type { PaperDetails, PaperPerson, Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
 
+import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { libraryApi } from "@/api/library";
 import { RequestTimeoutError } from "@/api/requestPolicy";
@@ -230,7 +231,7 @@ vi.mock("@/api/records", () => ({
   },
 }));
 
-// The Files section loads itself; its behaviour is `FilesSection.test.tsx`'s.
+// The Documents tab loads itself; its behaviour is `DocumentsTab.test.tsx`'s.
 vi.mock("@/api/documents", () => ({
   documentsApi: {
     downloadFile: vi.fn(() => Promise.resolve({ data: new Blob(["attachment"]) })),
@@ -1590,26 +1591,16 @@ describe("the sections follow the capabilities (IR-411)", () => {
     expect(tabNames()).toEqual(["Overview"]);
   });
 
-  it("opens an old Files link as Review with the Documents drawer open (IR-879)", async () => {
+  // Changed on purpose by IR-1203: the drawer is gone, so an old Files link
+  // opens Review on its Documents tab ("the Documents tab (IR-1203)").
+  it("opens an old Files link as Review on its Documents tab (IR-879, IR-1203)", async () => {
     shownRecord = inReview;
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?section=files`);
 
     expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
-    const drawer = await screen.findByRole("dialog", { name: "All documents" });
-    expect(await within(drawer).findByRole("heading", { name: "Supporting documents" })).toBeInTheDocument();
-
-    await userEvent.click(within(drawer).getByRole("button", { name: /close/i }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument());
-  });
-
-  it("opens the Documents drawer from the author's Review pane", async () => {
-    shownRecord = inReview;
-    signInAs(OWNER_ID, "Student");
-    renderPaper(`/records/${RECORD_ID}?section=review`);
-
-    await userEvent.click(await screen.findByRole("button", { name: "Documents" }));
-    expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
   });
 
   it("shows Overview, not the section, to a viewer who may not open it", async () => {
@@ -1826,17 +1817,19 @@ describe("the Review section (IR-412)", () => {
       }
     });
 
-    it("opens on Readiness, with the status at its top, then Conversation, Threads and Details", async () => {
+    // Changed on purpose by IR-1203: Documents is the author's second tab, and
+    // Readiness no longer carries a Documents button.
+    it("opens on Readiness, with the status at its top, then Documents, Conversation, Threads and Details", async () => {
       workspaceAt(1600);
       shownRecord = authorReview;
       signInAs(OWNER_ID, "Student");
       renderPaper(`/records/${RECORD_ID}?section=review`);
 
       const readiness = await screen.findByRole("tabpanel", { name: "Readiness" });
-      expect(paneTabs()).toEqual(["Readiness", "Conversation", "Threads", "Details"]);
+      expect(paneTabs()).toEqual(["Readiness", "Documents", "Conversation", "Threads", "Details"]);
       expect(screen.getByRole("tab", { name: "Readiness" })).toHaveAttribute("aria-selected", "true");
       expect(within(readiness).getByText("In review")).toBeInTheDocument();
-      expect(within(readiness).getByRole("button", { name: "Documents" })).toBeInTheDocument();
+      expect(within(readiness).queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
     });
 
     it("moves Edit details, the lineage and Continue as into Details", async () => {
@@ -1873,7 +1866,8 @@ describe("the Review section (IR-412)", () => {
       renderPaper(`/records/${RECORD_ID}?section=review`);
 
       await screen.findByRole("region", { name: "Review pane content" });
-      expect(paneTabs()).toEqual(["Conversation", "Threads", "Changes", "Details"]);
+      // Changed on purpose by IR-1203: Documents is the reviewers' first tab.
+      expect(paneTabs()).toEqual(["Documents", "Conversation", "Threads", "Changes", "Details"]);
       const details = await openDetails();
       expect(within(details).queryByRole("button", { name: "Edit details" })).not.toBeInTheDocument();
     });
@@ -1887,7 +1881,8 @@ describe("the Review section (IR-412)", () => {
       const readiness = await screen.findByRole("tab", { name: "Readiness" });
       readiness.focus();
       await userEvent.keyboard("{ArrowRight}");
-      expect(screen.getByRole("tab", { name: "Conversation" })).toHaveFocus();
+      // Changed on purpose by IR-1203: Documents follows Readiness.
+      expect(screen.getByRole("tab", { name: "Documents" })).toHaveFocus();
       await userEvent.keyboard("{End}");
       expect(screen.getByRole("tab", { name: "Details", selected: true })).toHaveFocus();
       await userEvent.keyboard("{Home}");
@@ -2153,7 +2148,7 @@ describe("the Review section (IR-412)", () => {
       expect(screen.getByRole("tab", { name: /Threads/, selected: false })).toBeInTheDocument();
     });
 
-    it("can open Conversation on the right too, leaving Threads and Details in the row", async () => {
+    it("can open Conversation on the right too, leaving the other tabs in the row", async () => {
       workspaceAt(1600);
       shownRecord = { ...inReview, ...reviewing };
       signInAs(2, "ITSO");
@@ -2162,14 +2157,17 @@ describe("the Review section (IR-412)", () => {
 
       await userEvent.click(await findColumns());
       expect(screen.getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
-        // Changes is a tab on the first version too (IR-1139).
-        "Conversation on the right", "Threads on the right", "Changes on the right", "Details on the right",
+        // Changes is a tab on the first version too (IR-1139). Changed on
+        // purpose by IR-1203: Documents leads the row, so it leads the menu.
+        "Documents on the right", "Conversation on the right", "Threads on the right", "Changes on the right",
+        "Details on the right",
       ]);
       await userEvent.click(screen.getByRole("menuitem", { name: "Conversation on the right" }));
 
       expect(screen.getByRole("complementary", { name: "Conversation on the right" })).toBeInTheDocument();
       expect(screen.queryByRole("tab", { name: "Conversation" })).not.toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: /Threads/, selected: true })).toBeInTheDocument();
+      // Changed on purpose by IR-1203: the first tab left in the row is Documents.
+      expect(screen.getByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
     });
 
     it("closes the menu with Escape, returning focus to the columns button, and with Tab", async () => {
@@ -2729,6 +2727,115 @@ describe("the Review section (IR-412)", () => {
     expect(within(section).getByText("ITSO is due Fri 11 Sep.")).toBeInTheDocument();
   });
 
+  // IR-1203: documents are a tab of their own, for authors and reviewers. The
+  // "All documents" drawer is gone; everything that opened it opens the tab.
+  describe("the Documents tab (IR-1203)", () => {
+    const paneTabs = () => within(screen.getByRole("tablist", { name: "Review pane sections" }))
+      .getAllByRole("tab").map((t) => t.textContent?.replace(/\s*\d+$/, "").trim());
+    const upload = (id: number, version: number, created_at: string) => ({
+      id, record: RECORD_ID, slot: 3, slot_name: "Consent Paper", file: `consent-v${version}.pdf`, version,
+      status: null, status_name: null, uploaded_by: OWNER_ID, uploaded_by_name: "Rhea Owner", created_at,
+      reviews: [], delete_refused: null,
+    });
+    beforeEach(() => {
+      vi.mocked(documentsApi.slotsForRecord).mockResolvedValue({ data: [
+        // Newest first, as the server orders them.
+        { id: 3, name: "Consent Paper", record_type: 1, is_required: false,
+          uploads: [upload(12, 2, "2026-11-03T08:00:00Z"), upload(11, 1, "2026-10-08T08:00:00Z")] },
+      ] } as never);
+    });
+    afterEach(() => {
+      vi.mocked(documentsApi.slotsForRecord).mockResolvedValue({ data: [] } as never);
+    });
+
+    it("is the reviewers' first tab, with one row per document", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      await screen.findByRole("region", { name: "Review pane content" });
+      expect(paneTabs()).toEqual(["Documents", "Conversation", "Threads", "Changes", "Details"]);
+      // Read only once shown, as the drawer was: a reviewer who never opens it fetches nothing.
+      expect(documentsApi.slotsForRecord).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("tab", { name: "Documents" }));
+      const panel = screen.getByRole("tabpanel", { name: "Documents" });
+      const consent = await within(panel).findByRole("group", { name: "Consent Paper" });
+      expect(consent).toHaveTextContent(`v2 · Rhea Owner · ${formatDate("2026-11-03T08:00:00Z")}`);
+      expect(within(panel).getByRole("group", { name: "Manuscript" })).toBeInTheDocument();
+      // A reviewer downloads; only an owner uploads.
+      expect(within(consent).getByRole("button", { name: "Download Consent Paper version 2" })).toBeInTheDocument();
+      expect(within(consent).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
+    });
+
+    it("keeps older versions one click away", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+
+      const consent = await within(await screen.findByRole("tabpanel", { name: "Documents" }))
+        .findByRole("group", { name: "Consent Paper" });
+      expect(within(consent).queryByRole("list", { name: "Versions of Consent Paper" })).not.toBeInTheDocument();
+      await userEvent.click(within(consent).getByRole("button", { name: "2 versions of Consent Paper" }));
+      const versions = within(consent).getByRole("list", { name: "Versions of Consent Paper" });
+      expect(within(versions).getAllByRole("listitem").map((li) => li.textContent?.match(/^Version \d/)?.[0]))
+        .toEqual(["Version 2", "Version 1"]);
+      expect(within(versions).getByRole("button", { name: "Download Consent Paper version 1" })).toBeInTheDocument();
+    });
+
+    it("comes second for the author, after Readiness, which has no Documents button", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, capabilities: ["cite", "edit_details"] };
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const readiness = await screen.findByRole("tabpanel", { name: "Readiness" });
+      expect(paneTabs()).toEqual(["Readiness", "Documents", "Conversation", "Threads", "Details"]);
+      expect(within(readiness).queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("tab", { name: "Documents" }));
+      const consent = await within(screen.getByRole("tabpanel", { name: "Documents" }))
+        .findByRole("group", { name: "Consent Paper" });
+      // The owner of an editable record may add a version to any slot.
+      expect(within(consent).getByRole("button", { name: /^Upload Consent Paper/ })).toBeInTheDocument();
+    });
+
+    it.each([
+      ["an old Documents link", `?section=review&documents=open`],
+      ["an old Files link", `?section=files`],
+    ])("opens %s on the Documents tab, with no drawer", async (_, search) => {
+      workspaceAt(1600);
+      shownRecord = inReview;
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}${search}`);
+
+      expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+      expect(await screen.findByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
+      expect(await within(screen.getByRole("tabpanel", { name: "Documents" })).findByRole("group", { name: "Consent Paper" }))
+        .toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
+    });
+
+    it("opens the pane on Documents at 320px, reached by keyboard, with no serious axe violations", async () => {
+      workspaceAt(320);
+      shownRecord = inReview;
+      signInAs(OWNER_ID, "Student");
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+
+      const pane = await screen.findByRole("dialog", { name: "Review pane" });
+      const tab = within(pane).getByRole("tab", { name: "Documents", selected: true });
+      expect(await within(within(pane).getByRole("tabpanel", { name: "Documents" })).findByRole("group", { name: "Consent Paper" }))
+        .toBeInTheDocument();
+      tab.focus();
+      await userEvent.keyboard("{Home}");
+      expect(within(pane).getByRole("tab", { name: "Readiness", selected: true })).toHaveFocus();
+      await userEvent.keyboard("{ArrowRight}");
+      expect(within(pane).getByRole("tab", { name: "Documents", selected: true })).toHaveFocus();
+      await expectNoBlockingA11yViolations(container);
+    });
+  });
+
   describe("document requests and the viewer's due date (IR-684)", () => {
     const documentsAndDue = () => readinessFor([
       { kind: "document_request", severity: "blocker", label: "ITSO asked the author for a document.", party: "itso",
@@ -2737,7 +2844,7 @@ describe("the Review section (IR-412)", () => {
         label: "ITSO is due Fri 11 Sep. The clock is paused while ITSO's document request is open." },
     ]);
 
-    it("renders both kinds in the server's words, and Open Documents opens the drawer", async () => {
+    it("renders both kinds in the server's words, and Open Documents opens the Documents tab", async () => {
       workspaceAt(1600);
       shownRecord = { ...inReview, ...reviewing, readiness: documentsAndDue() };
       signInAs(2, "ITSO");
@@ -2755,19 +2862,20 @@ describe("the Review section (IR-412)", () => {
       expect(due).not.toHaveTextContent("Blocker");
       expect(within(due).queryByRole("button")).not.toBeInTheDocument();
 
-      // Changed on purpose by IR-879: Documents is a drawer, not a sidebar target.
+      // Changed on purpose by IR-879, then IR-1203: Documents is a tab, not a drawer.
       await userEvent.click(within(request).getByRole("button", { name: "Open Documents" }));
-      expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
     });
 
-    it("opens the Documents drawer from a narrow workspace too", async () => {
+    it("opens the Documents tab from a narrow workspace too", async () => {
       workspaceAt(1100);
       shownRecord = { ...inReview, ...reviewing, readiness: documentsAndDue() };
       signInAs(2, "ITSO");
       renderPaper(`/records/${RECORD_ID}?section=review`);
       await openDetails();
       await userEvent.click(await screen.findByRole("button", { name: "Open Documents" }));
-      expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
     });
 
   });
