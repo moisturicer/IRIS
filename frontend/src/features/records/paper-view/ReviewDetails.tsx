@@ -35,9 +35,9 @@ const SEAT_ICON: Record<TrackerSeat["state"], string> = {
 };
 
 /** "October 7, 2026", as Version history reads (IR-1202). */
-const SUBMITTED = "MMMM d, yyyy";
+const HISTORY_DATE_FORMAT = "MMMM d, yyyy";
 
-/** Where a Readiness link lands: a party's reviewers, Documents, or the facts themselves. */
+/** Where a Readiness link lands: a party's reviewers, or the facts themselves. */
 export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`;
 
 /**
@@ -141,7 +141,7 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
           </ul>
         ) : <p className="text-small text-stone-600">Nothing flagged</p>}
       </Section>
-      <Section id={detailsTarget(ids, "versions")} title="Version history">
+      <Section title="Version history">
         <VersionHistory versions={record.versions}
           partyLabel={(party) => tracker.parties.find((p) => p.party === party)?.label ?? party.toUpperCase()} />
       </Section>
@@ -176,25 +176,26 @@ function VersionHistory({ versions, partyLabel }: {
   // unchanged upload recurs under each later Version. Each is listed once,
   // under the first Version that has it, so nothing reads as submitted twice.
   const seen = new Set<number>();
+  const firstListed = versions.map((v) => [...(v.documents ?? []), ...(v.documents_added ?? [])].filter((d) => {
+    if (seen.has(d.upload_id)) return false;
+    seen.add(d.upload_id);
+    return true;
+  }));
   return (
     <ol aria-label="Manuscript versions, oldest first" className="space-y-3 text-small text-stone-700">
-      {versions.map((v) => {
-        const documents = [...(v.documents ?? []), ...(v.documents_added ?? [])].filter((d) => {
-          if (seen.has(d.upload_id)) return false;
-          seen.add(d.upload_id);
-          return true;
-        });
+      {versions.map((v, i) => {
+        const documents = firstListed[i];
         return (
           <li key={v.number} className="space-y-1">
-            <p><span className="font-semibold text-stone-900">Manuscript v{v.number}</span> · submitted {formatDate(v.created_at, SUBMITTED)}</p>
+            <p><span className="font-semibold text-stone-900">Manuscript v{v.number}</span> · submitted {formatDate(v.created_at, HISTORY_DATE_FORMAT)}</p>
             {documents.length > 0 && (
               <ul aria-label={`Documents with v${v.number}`} className="space-y-1 border-l border-stone-200 pl-3">
                 {documents.map((d) => (
                   <li key={d.upload_id}>
-                    {d.slot} v{d.version} · submitted {formatDate(d.uploaded_at, SUBMITTED)}
+                    {d.slot} v{d.version} · submitted {formatDate(d.uploaded_at, HISTORY_DATE_FORMAT)}
                     {/* Why it was replaced (IR-1201); absent where requests are not disclosed. */}
-                    {(d.rejections ?? []).map((r) => (
-                      <p key={r.rejected_at} className="text-stone-600">Replacement asked by {partyLabel(r.party)}: {r.reason}</p>
+                    {(d.rejections ?? []).map((r, n) => (
+                      <p key={n} className="text-stone-600">Replacement asked by {partyLabel(r.party)}: {r.reason}</p>
                     ))}
                   </li>
                 ))}
@@ -294,8 +295,8 @@ function PartyReviewers({ row, ids, readable, people, due, revision }: {
  * The server decides which card fields are readable. Never reconstruct an
  * affiliation from classification or another person's card.
  */
-function Person({ person, name = person?.name ?? "A reviewer", role = person?.role ?? null, compact }: {
-  person?: PaperPerson; name?: string; role?: string | null; compact?: boolean;
+function Person({ person, name = person?.name ?? "A reviewer", role = person?.role ?? null }: {
+  person?: PaperPerson; name?: string; role?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -304,8 +305,8 @@ function Person({ person, name = person?.name ?? "A reviewer", role = person?.ro
   const [position, setPosition] = useState({ left: 16, top: 16 });
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
-  // The sidebar scrolls and participants wrap. Keep the card out of its
-  // clipping ancestor and inside the viewport, including the last avatar.
+  // The sidebar scrolls. Keep the card out of its clipping ancestor and
+  // inside the viewport.
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
@@ -348,12 +349,11 @@ function Person({ person, name = person?.name ?? "A reviewer", role = person?.ro
     <span className="relative inline-flex">
       <button
         ref={button} type="button" aria-expanded={open} aria-controls={open ? cardId : undefined}
-        aria-label={compact ? name : undefined} title={compact ? name : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn("review-control inline-flex items-center gap-2 text-small text-stone-900 hover:underline", FOCUS_RING)}
       >
         <span aria-hidden className="review-avatar review-avatar-brand">{initials}</span>
-        {!compact && name}
+        {name}
       </button>
       {open && createPortal(
         <div ref={card} id={cardId} role="dialog" aria-label={name} tabIndex={-1}

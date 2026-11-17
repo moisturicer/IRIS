@@ -2504,6 +2504,116 @@ describe("the Review section (IR-412)", () => {
     expect(ierc).toHaveTextContent("Reviewing");
   });
 
+  // IR-1202: Details keeps only who and what. Version and Documents become one
+  // plain-text Version history; files, requests and downloads are the Documents
+  // tab's (IR-1203), and comparing versions is the Changes tab's.
+  describe("Version history (IR-1202)", () => {
+    const v = (number: number, created_at: string, extra: Partial<NonNullable<RecordDetail["versions"]>[number]> = {}) => ({
+      number, cause: number === 1 ? "submission" as const : "revision" as const, cause_label: number === 1 ? "Submission" : "Revision",
+      created_at, created_by_name: "Rhea Owner", manuscript_url: PAPER_URL, ...extra,
+    });
+    const doc = (upload_id: number, slot: string, version: number, uploaded_at: string, rejections: unknown = []) => ({
+      upload_id, slot, version, uploaded_at, download_url: `/api/v1/documents/uploads/${upload_id}/download/`, rejections,
+    }) as NonNullable<NonNullable<RecordDetail["versions"]>[number]["documents"]>[number];
+    const ethics = doc(10, "Ethics Clearance", 1, "2026-10-06T08:00:00Z");
+    const consent1 = doc(11, "Consent Paper", 1, "2026-10-08T08:00:00Z");
+    const consent2 = doc(12, "Consent Paper", 2, "2026-11-03T08:00:00Z");
+    const history = async () => {
+      const side = await openDetails();
+      return within(await within(side).findByRole("list", { name: "Manuscript versions, oldest first" }));
+    };
+    const lines = (list: HTMLElement) => within(list).getAllByRole("listitem").map((li) => li.textContent);
+
+    it("keeps only who and what in Details", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing, versions: [v(1, "2026-10-07T08:00:00Z"), v(2, "2026-11-01T08:00:00Z")],
+        files: [{ id: 88, filename: "consent.pdf", url: "/api/v1/files/88/download/" } as RecordDetail["files"][number]] };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+      const side = await openDetails();
+      await within(side).findByRole("heading", { name: "Researchers" });
+
+      expect(within(side).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+        "Reviewers", "Researchers", "Adviser", "Classification", "Flagged by the authors", "Version history",
+      ]);
+      for (const gone of ["Copy link to this review", "All documents", "Compare 2 versions", "consent.pdf", "Manuscript · v2"]) {
+        expect(within(side).queryByRole("button", { name: gone })).not.toBeInTheDocument();
+      }
+    });
+
+    it("lists each Version oldest first, with what was submitted under it, as text", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing, versions: [
+        // v2's documents repeat v1's unchanged uploads: each is listed once, under the first Version that has it.
+        v(1, "2026-10-07T08:00:00Z", { documents: [ethics], documents_added: [consent1] }),
+        v(2, "2026-11-01T08:00:00Z", { documents: [ethics, consent1], documents_added: [consent2] }),
+      ] };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+      const list = await history();
+
+      const versionLine = (_: string, el: Element | null) => el?.tagName === "P" && /^Manuscript v/.test(el.textContent ?? "");
+      expect(list.getAllByText(versionLine).map((el) => el.textContent))
+        .toEqual(["Manuscript v1 · submitted October 7, 2026", "Manuscript v2 · submitted November 1, 2026"]);
+      expect(lines(list.getByRole("list", { name: "Documents with v1" }))).toEqual([
+        "Ethics Clearance v1 · submitted October 6, 2026", "Consent Paper v1 · submitted October 8, 2026",
+      ]);
+      expect(lines(list.getByRole("list", { name: "Documents with v2" }))).toEqual(["Consent Paper v2 · submitted November 3, 2026"]);
+      expect(list.queryAllByRole("button")).toEqual([]);
+      expect(list.queryAllByRole("link")).toEqual([]);
+    });
+
+    it("gives a replaced document its rejection reason, and none where requests are not disclosed", async () => {
+      workspaceAt(1600);
+      const rejected = doc(11, "Consent Paper", 1, "2026-10-08T08:00:00Z", [{
+        party: "ierc", reason: "The signature page is missing.", rejected_by_name: "Marco Lim", rejected_at: "2026-10-09T08:00:00Z",
+      }]);
+      shownRecord = { ...inReview, ...reviewing, versions: [
+        v(1, "2026-10-07T08:00:00Z", { documents: [rejected], documents_added: [consent2] }),
+      ] };
+      signInAs(2, "ITSO");
+      const { unmount } = renderPaper(`/records/${RECORD_ID}?section=review`);
+      const [first, second] = (await history()).getByRole("list", { name: "Documents with v1" }).children;
+      expect(first).toHaveTextContent("Consent Paper v1 · submitted October 8, 2026");
+      expect(first).toHaveTextContent("Replacement asked by IERC: The signature page is missing.");
+      expect(second).not.toHaveTextContent("Replacement asked");
+      unmount();
+
+      // Reject reasons are document-request data (ADR-022 §Amendment 5): `null` to a reader who may not read requests.
+      shownRecord = { ...inReview, ...reviewing, versions: [v(1, "2026-10-07T08:00:00Z", { documents: [{ ...rejected, rejections: null }] })] };
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+      expect((await history()).getByRole("list", { name: "Documents with v1" })).not.toHaveTextContent("Replacement asked");
+    });
+
+    it("shows a Version from before IR-872 its reconstructed list with no note", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing, versions: [
+        v(1, "2026-10-07T08:00:00Z", { documents: [ethics], documents_reconstructed: true }),
+      ] };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+      const list = await history();
+      expect(lines(list.getByRole("list", { name: "Documents with v1" }))).toEqual(["Ethics Clearance v1 · submitted October 6, 2026"]);
+      expect(screen.queryByText(/best guess/)).not.toBeInTheDocument();
+    });
+
+    it("gives the owner the same history at 320px, reached by keyboard, with no serious axe violations", async () => {
+      workspaceAt(320);
+      shownRecord = { ...inReview, versions: [v(1, "2026-10-07T08:00:00Z", { documents: [ethics] })] };
+      signInAs(OWNER_ID, "Student");
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Open review pane" }));
+      const pane = screen.getByRole("dialog", { name: "Review pane" });
+      within(pane).getByRole("tab", { name: "Readiness", selected: true }).focus();
+      await userEvent.keyboard("{End}");
+      const details = within(pane).getByRole("tabpanel", { name: "Details" });
+      const list = within(await within(details).findByRole("list", { name: "Manuscript versions, oldest first" }));
+      expect(lines(list.getByRole("list", { name: "Documents with v1" }))).toEqual(["Ethics Clearance v1 · submitted October 6, 2026"]);
+      await expectNoBlockingA11yViolations(container);
+    });
+  });
+
   it("withholds who reviews, due dates and participants when the review is not readable (IR-681)", async () => {
     workspaceAt(1600);
     vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, reviews: null, review_comments: null,

@@ -614,7 +614,7 @@ export interface RecordVersion {
   documents?:               VersionDocument[];
   /** Uploads made while it was the latest version: "added during vN". */
   documents_added?:         VersionDocument[];
-  /** True when `documents` is a best guess, for versions older than IR-872. */
+  /** True when `documents` was reconstructed, for versions older than IR-872. Not shown since IR-1202. */
   documents_reconstructed?: boolean;
   /** Its review text's state (ADR-058 §1 as amended, IR-871). Null with no manuscript. */
   review_text?:             VersionReviewText | null;
