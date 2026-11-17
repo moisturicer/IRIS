@@ -4,7 +4,7 @@
   "as": "anon",
   "sample": {
     "access": "<redacted>",
-    "refresh": "<redacted>",
+    "remembered": false,
     "user": {
       "id": 1,
       "email": "student@cit.edu",
