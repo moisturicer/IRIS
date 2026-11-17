@@ -1,17 +1,15 @@
-import type { FeedQuery, FeedStale } from "@/api/library";
 import { IP_TYPE_LABELS } from "@/types/records";
 
 import {
   EMPTY_FILTERS, HAS_IP, SORT_OPTIONS, endsBeforeItStarts, type DiscoverFilters, type DiscoverSort,
 } from "./DiscoverFilterBar";
-import { ALL_VALUE, type FilterOption } from "./DiscoverFilterDropdown";
+import { ALL_VALUE } from "./DiscoverFilterDropdown";
 import { searchTerms } from "./searchTerms";
 
 /**
  * Discover's query -- search text, filters and sort -- in one parsed shape
  * that round-trips through the URL (IR-560). The URL is the only copy, so Back,
- * reload and a copied link all restore the same catalogue view, and IR-557's
- * saved feeds can store exactly this.
+ * reload and a copied link all restore the same catalogue view.
  *
  * Anything the parser does not recognise falls back to that field's default
  * rather than reaching the API: a hand-edited `?sort=bogus` means Newest, and
@@ -137,91 +135,6 @@ export function writeDiscoverQuery(params: URLSearchParams, query: DiscoverQuery
 /** One string per query: what every page fetch is fenced by. */
 export function discoverQueryKey(query: DiscoverQuery): string {
   return writeDiscoverQuery(new URLSearchParams(), query).toString();
-}
-
-/* ── Saved feeds (IR-577) ────────────────────────────────────────────────
-   A saved feed is this same query under a name, so nothing below is a second
-   filter representation: it is the URL spelling, with the tab left out. */
-
-/**
- * `query` as a saved feed stores it: Discover's URL keys, ids sorted, the
- * default sort omitted. The tab is not stored (it is not a criterion), and
- * Trending, which is the catalogue by views, is saved as that sort.
- */
-export function feedQueryOf(query: DiscoverQuery): FeedQuery {
-  const sort = query.feed === "trending" ? "viewed" : query.sort;
-  return Object.fromEntries(writeDiscoverQuery(new URLSearchParams(), { ...query, sort, feed: "latest" })) as FeedQuery;
-}
-
-function without(list: string, gone: number[]): string {
-  return list.split(",").filter((id) => !gone.includes(Number(id))).join(",");
-}
-
-/**
- * The URL that opens `stored`. A taxonomy value the server reports stale is
- * left out, so it is never queried: the page holds the results back until the
- * reader corrects the feed, and nothing widens by itself.
- */
-export function feedSearchParams(stored: FeedQuery, stale: FeedStale): URLSearchParams {
-  const raw = new URLSearchParams();
-  for (const [key, value] of Object.entries(stored)) {
-    if (!value) continue;
-    if (key === "type") {
-      if (!stale.type?.includes(Number(value))) raw.set(key, value);
-    } else if (key === "college" || key === "classification") {
-      const kept = without(value, stale[key] ?? []);
-      if (kept) raw.set(key, kept);
-    } else {
-      raw.set(key, value);
-    }
-  }
-  return writeDiscoverQuery(new URLSearchParams(), parseDiscoverQuery(raw));
-}
-
-const entriesOf = (stored: FeedQuery) => JSON.stringify(Object.entries(stored).sort(([a], [b]) => (a < b ? -1 : 1)));
-
-/** Are the filters on screen exactly the feed's own? */
-export function sameFeedQuery(stored: FeedQuery, query: DiscoverQuery): boolean {
-  const normal = feedQueryOf(parseDiscoverQuery(new URLSearchParams(stored as Record<string, string>)));
-  return entriesOf(normal) === entriesOf(feedQueryOf(query));
-}
-
-export interface FeedLabelOptions {
-  classifications: FilterOption[];
-  colleges:        FilterOption[];
-  recordTypes:     FilterOption[];
-}
-
-const UNAVAILABLE = "no longer available";
-
-function labelled(list: string, options: FilterOption[]): string {
-  return list
-    .split(",")
-    .map((id) => options.find((o) => o.value === id)?.label ?? (options.length ? UNAVAILABLE : id))
-    .join(", ");
-}
-
-function yearsInWords(from: string | undefined, to: string | undefined): string | null {
-  if (from && to) return from === to ? `Year: ${from}` : `Years: ${from} to ${to}`;
-  if (from) return `Years: ${from} onward`;
-  if (to) return `Years: up to ${to}`;
-  return null;
-}
-
-/** A feed's criteria in words, for the save form and the feed's own header. */
-export function feedCriteria(stored: FeedQuery, options: FeedLabelOptions): string[] {
-  const lines: string[] = [];
-  if (stored.q) lines.push(`Keywords: ${stored.q}`);
-  if (stored.classification) lines.push(`Areas: ${labelled(stored.classification, options.classifications)}`);
-  if (stored.college) lines.push(`Colleges: ${labelled(stored.college, options.colleges)}`);
-  if (stored.type) lines.push(`Type: ${labelled(stored.type, options.recordTypes)}`);
-  const years = yearsInWords(stored.year_from, stored.year_to);
-  if (years) lines.push(years);
-  if (stored.ip) {
-    lines.push(`Intellectual property: ${stored.ip === HAS_IP ? "any" : IP_TYPE_LABELS[stored.ip as keyof typeof IP_TYPE_LABELS] ?? stored.ip}`);
-  }
-  if (stored.sort) lines.push(`Sorted by: ${SORT_OPTIONS.find((o) => o.value === stored.sort)?.label ?? stored.sort}`);
-  return lines;
 }
 
 /** The list endpoint's params for `query`, before paging. */
