@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { seatsApi } from "@/api/reviews";
@@ -10,6 +11,7 @@ import { seatToOpen } from "@/features/records/capabilities";
 import { cn, formatDate } from "@/lib/utils";
 import type { RecordTracker, RecordVersion } from "@/types/records";
 
+import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
@@ -52,11 +54,14 @@ const FOOTER_ACTIONS = [
   ...REVIEW_ACTIONS.filter((a) => a.capability !== "route" && a.capability !== "add_reviewer"),
   ...ADD_COLLEAGUE,
 ];
-type Tab = TourTab;
+/** The author's tabs add Readiness, first (IR-1206); reviewers keep the tour's four. */
+type Tab = TourTab | "readiness";
 
 const TAB_NAMES: Record<Tab, string> = {
-  conversation: "Conversation", threads: "Threads", changes: "Changes", details: "Details",
+  readiness: "Readiness", conversation: "Conversation", threads: "Threads", changes: "Changes", details: "Details",
 };
+const REVIEWER_TABS: Tab[] = ["conversation", "threads", "changes", "details"];
+const AUTHOR_TABS: Tab[] = ["readiness", "conversation", "threads", "details"];
 function readWidths(): Widths {
   try {
     const value = JSON.parse(localStorage.getItem(WIDTHS_KEY) ?? "null");
@@ -93,11 +98,14 @@ function SentBy({ version }: { version: RecordVersion }) {
   );
 }
 
-export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, onChanged, onDocuments, onOpenReview, onShowVersion }: ReviewWorkspaceProps) {
+export function ReviewWorkspaceLayout({
+  record, can, reader, timelineVersion, onChanged, onDocuments, onOpenReview, onShowVersion, authorView = false, authorDetails,
+}: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
   const [statusTarget, setStatusTarget] = useState<HTMLDivElement | null>(null);
-  const [tab, setTab] = useState<Tab>("conversation");
+  // The author opens on what waits on them (IR-1206); a reviewer on the conversation.
+  const [tab, setTab] = useState<Tab>(authorView ? "readiness" : "conversation");
   const [sideChoice, setSideChoice] = useState(readSideTab);
   // Narrow, the workspace starts on the paper, its pins in view; the pane
   // opens from its launcher, a pin, Comment or Readiness (IR-875).
@@ -116,7 +124,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const target = tourTargets(ids);
   // The guided tour (IR-997): offered once per browser, startable any time. It
   // holds only its own opener; it reads and changes nothing about the review.
-  const [offered, setOffered] = useState(() => !tourSeen());
+  // The tour walks a reviewer's tabs, so it is not offered to the author (IR-1206).
+  const [offered, setOffered] = useState(() => !authorView && !tourSeen());
   const [tour, setTour] = useState<{ opener: HTMLElement | null } | null>(null);
   // Narrow, with the pane closed, the pane's own button is out of reach.
   const tourOpener = () => (drawer && !open ? footTour.current : tourButton.current);
@@ -172,7 +181,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   // narrower, it returns to the row, and the choice is kept for next time.
   // Changes is always a tab, as in the prototype (IR-1139): on the first
   // version it says there is nothing to compare yet, instead of vanishing.
-  const allTabs: Tab[] = ["conversation", "threads", "changes", "details"];
+  const allTabs = authorView ? AUTHOR_TABS : REVIEWER_TABS;
   const sideTab = roomy && sideChoice !== null && allTabs.includes(sideChoice) ? sideChoice : null;
   const tabs = allTabs.filter((t) => t !== sideTab);
   const shown: Tab = tabs.includes(tab) ? tab : tabs[0]!;
@@ -296,6 +305,12 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   // Details opens that tab first (unless it is already on the right), then
   // takes focus.
   const goTo = (to: string) => {
+    // The author's Readiness is a tab of its own, not a section of Details.
+    if (authorView && to === "readiness") {
+      reveal("readiness");
+      if (drawer) setOpen(true);
+      return;
+    }
     reveal("details");
     if (drawer) setOpen(true);
     requestAnimationFrame(() => {
@@ -323,12 +338,15 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const targets = record.routing.targets;
   const mayRequest = can.has("route") && targets.length > 0 && ROUTE !== undefined;
   const renderDetails = (tracker: RecordTracker) => (
+    <div className="space-y-5">
+    {authorView && authorDetails}
     <ReviewDetails record={record} tracker={tracker} ids={ids}
-      readiness={record.readiness} onReadinessAction={onReadinessAction}
+      readiness={authorView ? null : record.readiness} onReadinessAction={authorView ? undefined : onReadinessAction}
       requestReview={mayRequest ? { targets: targets.map((t) => t.label), onOpen: () => { setRouted(""); setRequesting(true); } } : undefined}
       addColleague={<ReviewActionBar record={record} can={can} actions={ADD_COLLEAGUE} label="Reviewer actions"
         primary={false} onChanged={onChanged} className="pt-1" />}
-      onAllDocuments={() => onDocuments(true)} onCompare={comparable ? () => reveal("changes") : undefined} />
+      onAllDocuments={() => onDocuments(true)} onCompare={comparable && !authorView ? () => reveal("changes") : undefined} />
+    </div>
   );
   const RouteDialog = ROUTE?.Dialog;
   const ownSeat = record.my_seats.find((s) => s.state === "assigned" || s.state === "in_review") ?? record.my_seats[record.my_seats.length - 1];
@@ -351,6 +369,23 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const first = versions[0];
   const submission = first ? { author: first.created_by_name, at: first.created_at, abstract: record.abstract ?? "" } : undefined;
   const body: Record<Tab, ReactNode> = {
+    // The author's first tab (IR-1206): where the record stands, then what
+    // waits on them. The Documents drawer opens from here until IR-1203
+    // gives documents a tab of their own.
+    readiness: authorView ? (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />
+          <button type="button" onClick={() => onDocuments(true)} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-11 px-4")}>
+            <i className="fas fa-folder-open text-xs" aria-hidden />
+            Documents
+          </button>
+        </div>
+        {record.readiness
+          ? <ReadinessPanel readiness={record.readiness} onAction={onReadinessAction} />
+          : <p className="text-small text-stone-600">Nothing is waiting on you.</p>}
+      </div>
+    ) : null,
     conversation: (
       <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
         onCommented={tw.threads.reload} onOpenThreads={tw.openThreads} renderStatus={renderDetails} submission={submission} statusBox
@@ -394,11 +429,11 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           <header className="review-pane-head">
             <div className="-mr-2 flex items-center gap-1">
               <h2 className="mr-auto font-display text-xl font-semibold text-stone-900">Review</h2>
-              <button ref={tourButton} type="button"
+              {!authorView && <button ref={tourButton} type="button"
                 className={cn("review-control inline-flex items-center gap-1.5 whitespace-nowrap font-semibold text-stone-700 hover:text-brand", FOCUS_RING)}
                 onClick={(e) => startTour(e.currentTarget)}>
                 <i className="fas fa-circle-question text-xs" aria-hidden />Take a tour
-              </button>
+              </button>}
               {drawer && <button type="button"
                 className={cn("review-control inline-flex items-center gap-1.5 whitespace-nowrap font-semibold text-stone-700 hover:text-brand", FOCUS_RING)}
                 onClick={closeDrawer}><i className="fas fa-arrow-left text-xs" aria-hidden />Back to paper</button>}
@@ -451,6 +486,15 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           >
             {allTabs.map(panel)}
           </div>
+          {/* The author's part is the Readiness tab, so their foot holds only
+              the review actions the server grants them, if any (IR-1206). */}
+          {authorView ? (
+            REVIEW_ACTIONS.some((a) => can.has(a.capability)) && (
+              <footer className="review-pane-foot" aria-label="Your actions">
+                <ReviewActionBar record={record} can={can} onChanged={onChanged} />
+              </footer>
+            )
+          ) : (
           <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}>
             <ReviewFooterActions record={record} can={can} actions={FOOTER_ACTIONS} onChanged={onChanged}
               finishing={finishing && !record.review_claim && !unopened} onFinish={tw.finish} drafts={tw.threads.drafts.length}
@@ -459,6 +503,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
                 : unopened ? <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button> : undefined} />
             {claimError && <p role="alert" className="basis-full text-small text-brand">{claimError}</p>}
           </YourPartFooter>
+          )}
         </section>
         {sideTab && (
           <aside aria-label={`${TAB_NAMES[sideTab]} on the right`} className="review-side">
@@ -486,13 +531,14 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           <div className="review-paper-foot">
             {!open && offered && offer}
             {/* The pane's own Take a tour is out of reach while it is closed. */}
-            {!open && <button ref={footTour} type="button" className={cn("review-control text-brand", FOCUS_RING)} onClick={(e) => startTour(e.currentTarget)}>Take a tour</button>}
+            {!open && !authorView && <button ref={footTour} type="button" className={cn("review-control text-brand", FOCUS_RING)} onClick={(e) => startTour(e.currentTarget)}>Take a tour</button>}
             <button ref={launcher} id={target.launcher} type="button" className={cn("review-control text-brand font-semibold", FOCUS_RING)} onClick={() => setOpen(true)}>Open review pane</button>
           </div>
         )}
         {tour && (
           <GuidedTour opener={tour.opener} onClose={closeTour}
-            steps={reviewTourSteps({ ids, hasPaper: Boolean(reader), drawer, paneOpen: open, tabs: allTabs, beside: roomy })} />
+            steps={reviewTourSteps({ ids, hasPaper: Boolean(reader), drawer, paneOpen: open,
+              tabs: allTabs.filter((t): t is TourTab => t !== "readiness"), beside: roomy })} />
         )}
       </div>
     </div>

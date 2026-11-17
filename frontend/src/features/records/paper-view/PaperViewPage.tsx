@@ -283,7 +283,6 @@ export default function PaperViewPage() {
   const [trackerVersion, setTrackerVersion] = useState(0);
   // The author's Review tab action bar, stuck over the bottom of the screen
   // below `reading-wide`: the reader lands citations above it (IR-477).
-  const [reviewBarInset, setReviewBarInset] = useState(0);
   // A My Library link names the request it answers as `#fragment` (IR-625).
   useFragmentFocus(location.hash, record != null);
 
@@ -626,7 +625,9 @@ export default function PaperViewPage() {
 
   const can = capabilitiesFor(record);
   const userIsOwner = isOwner(record, viewer);
-  const reviewerWorkspace = onReviewTab && !userIsOwner;
+  // Review is one full-height workspace for everyone (IR-1206): the owners'
+  // editorial header left it, so Back and the title are all above the reader.
+  const reviewWorkspace = onReviewTab;
   const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
 
@@ -719,7 +720,7 @@ export default function PaperViewPage() {
   // shows the paper and has room: on a phone it stays in the reader's toolbar,
   // as the version does. An earlier version offers no download at all.
   const pendingInBar =
-    (onPaperTab || reviewerWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && record.download?.state === "pending";
+    (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && record.download?.state === "pending";
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = () => (
@@ -777,14 +778,13 @@ export default function PaperViewPage() {
           navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
           highlights={drawnHighlights}
           selectionActions={selectionActions}
-          contained={onPaperTab || reviewerWorkspace || tier === "wide"}
-          fill={onPaperTab || reviewerWorkspace}
+          contained={onPaperTab || reviewWorkspace || tier === "wide"}
+          fill={onPaperTab || reviewWorkspace}
           // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
           clearCorner={onPaperTab}
           // On a phone's one-row bar there is no room for the version, so it
           // sits at the start of the reader's toolbar (IR-1092).
-          toolbarStart={(onPaperTab || reviewerWorkspace) && tier === "single" ? paperVersion : undefined}
-          bottomInset={onReviewTab ? reviewBarInset : 0}
+          toolbarStart={(onPaperTab || reviewWorkspace) && tier === "single" ? paperVersion : undefined}
           downloadControl={
             // An earlier version is not offered as a copy: the download route
             // serves only the current paper, and every copy must be marked.
@@ -793,7 +793,7 @@ export default function PaperViewPage() {
                 recordId={record.id}
                 recordTitle={record.title}
                 download={record.download}
-                fill={onPaperTab || reviewerWorkspace}
+                fill={onPaperTab || reviewWorkspace}
                 onChanged={reloadRecord}
                 pending={pendingInBar ? "elsewhere" : "here"}
               />
@@ -883,6 +883,36 @@ export default function PaperViewPage() {
     </button>
   );
 
+  // What left the owners' header for their Review's Details tab (IR-1206):
+  // fixing the title or abstract during a revision, and where the paper
+  // came from or went next. Each only where the server offers it.
+  const lineageLinks = (
+    <>
+      {record.lineage?.derived_from && (
+        <Link to={`/records/${record.lineage.derived_from.id}`} className="text-small underline">
+          Developed from Proposal #{record.lineage.derived_from.id} — View proposal
+        </Link>
+      )}
+      {record.lineage?.continued_as && (
+        <Link to={`/records/${record.lineage.continued_as.id}`} className="text-small underline">
+          Continued as {record.lineage.continued_as.record_type_name} #{record.lineage.continued_as.id}
+        </Link>
+      )}
+    </>
+  );
+  const authorDetails = (can.has("edit_details") || can.has("continue_as") || record.lineage?.derived_from || record.lineage?.continued_as) ? (
+    <div className="flex flex-col items-start gap-3">
+      {can.has("edit_details") && (
+        <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
+          <i className="fas fa-pen text-2xs" aria-hidden />
+          Edit details
+        </button>
+      )}
+      {lineageLinks}
+      {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
+    </div>
+  ) : null;
+
   const saveCiteShareActions = (
     <>
       <PaperSaveDropdown
@@ -925,12 +955,12 @@ export default function PaperViewPage() {
       ref={observeWorkspace}
       className={cn(
         "relative [container-type:inline-size] [container-name:reading]",
-        (onPaperTab || reviewerWorkspace) && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
+        (onPaperTab || reviewWorkspace) && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
       )}
     >
       <ReadingHeader
         inert={chatModal}
-        className={cn(!onPaperTab && !reviewerWorkspace && "sticky top-0 z-30")}
+        className={cn(!onPaperTab && !reviewWorkspace && "sticky top-0 z-30")}
         sections={sections}
         section={section}
         onSelect={(s) => setViewParam("section", s)}
@@ -939,9 +969,9 @@ export default function PaperViewPage() {
         panelId={arriving ? undefined : `${tabsId}-panel`}
         onBack={() => navigate(-1)}
         onBackToAnswer={backToAnswer}
-        title={!onPaperTab && !reviewerWorkspace ? undefined : arriving ? null : record.title}
+        title={!onPaperTab && !reviewWorkspace ? undefined : arriving ? null : record.title}
         // Not in the bar below 640px, where the reader's toolbar holds it.
-        version={(onPaperTab || reviewerWorkspace) && tier !== "single" ? paperVersion : undefined}
+        version={(onPaperTab || reviewWorkspace) && tier !== "single" ? paperVersion : undefined}
         actions={pendingInBar ? (
           <PaperDownloadControl
             recordId={record.id}
@@ -954,7 +984,7 @@ export default function PaperViewPage() {
       />
       <div
         className={cn(
-          onPaperTab || reviewerWorkspace
+          onPaperTab || reviewWorkspace
             ? "flex-1 min-h-0 flex"
             : onReviewTab
               ? "px-4 sm:px-7 pt-6 pb-7"
@@ -965,7 +995,7 @@ export default function PaperViewPage() {
           {...(chatModal ? { inert: "" } : {})}
           className={cn(
             "min-w-0",
-            (onPaperTab || reviewerWorkspace) && "flex-1 min-h-0 flex flex-col",
+            (onPaperTab || reviewWorkspace) && "flex-1 min-h-0 flex flex-col",
             // Its own container, so the rail and the page read the room the
             // panel leaves them (IR-569), as the reader reads the paper's.
             !onPaperTab && !onReviewTab && "flex-1 [container-type:inline-size] [container-name:overview]",
@@ -974,7 +1004,7 @@ export default function PaperViewPage() {
 
           <div
             className={cn(
-              onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
+              onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
               !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", CORNER_CLEARANCE_CLASS, PAGE_WIDTH[showRail ? "wide-left" : "standard"]),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
@@ -998,7 +1028,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               "min-w-0",
-              onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
+              onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
               // The Overview reads in one column, up to 60rem, flush left with
               // the rail beside it; spare room falls to the right, so the
               // page keeps its place whether Ask IRIS is open or not.
@@ -1008,7 +1038,7 @@ export default function PaperViewPage() {
             {/* Editorial header (IR-356): what it is, who wrote it, then
                 what to do with it. Not in Paper mode, where the record bar
                 holds the paper in one line (IR-569). */}
-            {!onPaperTab && !reviewerWorkspace && (
+            {!onPaperTab && !reviewWorkspace && (
             <header className={cn("space-y-5", section === "overview" && "pb-1")}>
               <h1 className="font-display font-semibold text-4xl sm:text-5xl leading-[1.08] tracking-tight text-stone-900 text-balance">
                 {record.title}
@@ -1060,16 +1090,7 @@ export default function PaperViewPage() {
                 </div>
               </div>
 
-              {record.lineage?.derived_from && (
-                <Link to={`/records/${record.lineage.derived_from.id}`} className="text-small underline">
-                  Developed from Proposal #{record.lineage.derived_from.id} — View proposal
-                </Link>
-              )}
-              {record.lineage?.continued_as && (
-                <Link to={`/records/${record.lineage.continued_as.id}`} className="text-small underline">
-                  Continued as {record.lineage.continued_as.record_type_name} #{record.lineage.continued_as.id}
-                </Link>
-              )}
+              {lineageLinks}
               {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
               {/* The version picker (IR-416)
                   only with two or more versions to choose between, or one
@@ -1118,7 +1139,7 @@ export default function PaperViewPage() {
               id={`${tabsId}-panel`}
               role="tabpanel"
               aria-labelledby={tabId(section)}
-              className={onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
+              className={onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
             >
             {section === "paper" && reader()}
 
@@ -1293,8 +1314,8 @@ export default function PaperViewPage() {
               <ReviewWorkspace
                 record={record}
                 authorView={userIsOwner}
+                authorDetails={userIsOwner ? authorDetails : undefined}
                 onOpenReview={openReview}
-                onBarInset={setReviewBarInset}
                 onShowVersion={chooseVersion}
                 can={can}
                 reader={recordHasPaper(record) ? reader() : null}

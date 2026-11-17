@@ -362,6 +362,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1197** | Why a person was signed out (a session ended, or a password changed in Settings) is a dialog in front of the sign-in page, not a banner in the form — extends IR-645, IR-1081, IR-642; no FR- id | [details](traceability/IR-1197.md) | **IMPLEMENTED** |
 | **IR-1200** | The record's Adviser reads and downloads its documents (four listings, two downloads) and still uploads and deletes nothing; a replaced Adviser is refused — ADR-022 §Amendment 6, IR-1199; no FR- id (NFR-S4) | [details](traceability/IR-1200.md) | **IMPLEMENTED** |
 | **IR-1201** | Every rejection of a requested document is kept on the upload it rejected (who, when, why) and served in each Version's documents to readers of the requests; a rejected upload can no longer be deleted — ADR-022 §3.4, §Amendment 5, IR-1199; no FR- id | [details](traceability/IR-1201.md) | **IMPLEMENTED** |
+| **IR-1206** | On Review the paper's owners get the reviewers' frame: Back and the title above the reader, tabs Readiness · Conversation · Threads · Details, and Edit details, lineage and Continue as moved into Details — IR-1199; no FR- id | [details](traceability/IR-1206.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
