@@ -77,7 +77,7 @@ import { DocumentsTab } from "./DocumentsTab";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
-import { ReviewWorkspace } from "./ReviewWorkspace";
+import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
@@ -1312,7 +1312,7 @@ export default function PaperViewPage() {
             )}
 
             {section === "review" && (
-              <ReviewWorkspace
+              <ReviewWorkspaceLayout
                 record={record}
                 authorView={userIsOwner}
                 authorDetails={userIsOwner ? authorDetails : undefined}

@@ -231,6 +231,13 @@ export function DocumentsTab({
   const download = (fetch: () => Promise<{ data: unknown }>, filename: string) =>
     saveBlob(fetch, filename).catch(() => setNotice(`Could not download ${filename}. Please try again.`));
   const manuscript = record.versions?.[record.versions.length - 1] ?? null;
+  /** A row's compact PDF upload, keeping its progress and retry under `key`. */
+  const pdfUpload = (key: string, label: string, post: (file: File, onProgress: (p: number) => void) => Promise<unknown>) => (
+    <UploadDropzone compact label={label} accept=".pdf" validate maxBytes={PDF_LIMIT} upload={uploads[key]}
+      onFiles={([file]) => void send(key, file, (onProgress) => post(file, onProgress))} />
+  );
+  const downloadVersion = (name: string, u: RecordUpload) =>
+    download(() => documentsApi.downloadUpload(u.id), `${name} v${u.version}.${extensionOf(u.file)}`);
 
   return (
     <div className="space-y-section">
@@ -261,15 +268,8 @@ export function DocumentsTab({
                   the submitted one until the owner submits; the server allows
                   the replacement only to an owner, only while a revision is
                   asked for. */}
-              {replaceManuscript && (
-                <UploadDropzone compact label="Upload revised manuscript" accept=".pdf" validate maxBytes={PDF_LIMIT}
-                  upload={uploads.manuscript}
-                  onFiles={([file]) =>
-                    void send("manuscript", file, (onProgress) =>
-                      recordsApi.uploadManuscript(record.id, file, { onProgress }),
-                    )
-                  } />
-              )}
+              {replaceManuscript && pdfUpload("manuscript", "Upload revised manuscript",
+                (file, onProgress) => recordsApi.uploadManuscript(record.id, file, { onProgress }))}
             </>
           )}
         />
@@ -289,37 +289,29 @@ export function DocumentsTab({
               actions={(latest || canUpload) && (
                 <>
                   {latest && (
-                    <DownloadButton name={`${slot.name} version ${latest.version}`}
-                      onClick={() => download(() => documentsApi.downloadUpload(latest.id), `${slot.name} v${latest.version}.pdf`)} />
+                    <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
                   )}
-                  {canUpload && (
-                    <UploadDropzone compact label={`Upload ${slot.name}`} accept=".pdf" validate maxBytes={PDF_LIMIT}
-                      upload={uploads[key]}
-                      onFiles={([file]) =>
-                        void send(key, file, (onProgress) =>
-                          documentsApi.upload(record.id, slot.id, file, { onProgress }),
-                        )
-                      } />
-                  )}
+                  {canUpload && pdfUpload(key, `Upload ${slot.name}`,
+                    (file, onProgress) => documentsApi.upload(record.id, slot.id, file, { onProgress }))}
                 </>
               )}
-              versionCount={slot.uploads.length}
-              versions={
-                <Versions
-                  name={slot.name}
-                  uploads={slot.uploads}
-                  removable={owner && editable}
-                  onDownload={(u) =>
-                    download(() => documentsApi.downloadUpload(u.id), `${slot.name} v${u.version}.pdf`)
-                  }
-                  onRemove={(u) =>
-                    askToRemove(`${slot.name} version ${u.version}`, async () => {
-                      await documentsApi.deleteUpload(u.id);
-                      await changed();
-                    })
-                  }
-                />
-              }
+              versions={{
+                count: slot.uploads.length,
+                list: (
+                  <Versions
+                    name={slot.name}
+                    uploads={slot.uploads}
+                    removable={owner && editable}
+                    onDownload={(u) => downloadVersion(slot.name, u)}
+                    onRemove={(u) =>
+                      askToRemove(`${slot.name} version ${u.version}`, async () => {
+                        await documentsApi.deleteUpload(u.id);
+                        await changed();
+                      })
+                    }
+                  />
+                ),
+              }}
             />
           );
         })}
@@ -329,19 +321,12 @@ export function DocumentsTab({
             <DocumentRow
               key={key}
               name={asked.item.label}
-              latest={null}
-              empty={itemStatus(asked.item) === "requested" ? "Not uploaded yet" : "Uploaded"}
+              // An Other item keeps no versions of its own: only whether it was answered.
+              latest={itemStatus(asked.item) === "requested" ? null : "Uploaded"}
               status={<ItemStatusChip item={asked.item} />}
               note={<AskedNote asked={asked} />}
-              actions={owner && needsUpload(asked) && (
-                <UploadDropzone compact label={`Upload ${asked.item.label}`} accept=".pdf" validate maxBytes={PDF_LIMIT}
-                  upload={uploads[key]}
-                  onFiles={([file]) =>
-                    void send(key, file, (onProgress) =>
-                      documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress }),
-                    )
-                  } />
-              )}
+              actions={owner && needsUpload(asked) && pdfUpload(key, `Upload ${asked.item.label}`,
+                (file, onProgress) => documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress }))}
             />
           );
         })}
@@ -415,6 +400,17 @@ export function DocumentsTab({
       />
     </div>
   );
+}
+
+/**
+ * The stored file's extension, lower-cased, so a version saves as what it is
+ * ("png" for a scan, IR-1203). Slots took only PDFs until IR-1220, so a name
+ * with none is a PDF.
+ */
+function extensionOf(path: string): string {
+  const name = path.split("/").pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : "pdf";
 }
 
 /** A version in words, "v2 · Ana Cruz · Nov 3, 2026", leaving out a name the server did not give. */

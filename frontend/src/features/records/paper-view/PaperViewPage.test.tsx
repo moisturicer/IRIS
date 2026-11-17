@@ -1781,6 +1781,8 @@ describe("the Review section (IR-412)", () => {
   });
 
   const bar = () => screen.getByRole("toolbar", { name: "Review actions" });
+  /** A reviewer opens on Documents (IR-1203): open Conversation, where the timeline and comment box are. */
+  const openConversation = async () => userEvent.click(await screen.findByRole("tab", { name: "Conversation" }));
   /** Details is a tab at every width now (IR-1094): open it and return its panel. */
   const openDetails = async () => {
     await userEvent.click(await screen.findByRole("tab", { name: "Details" }));
@@ -2050,6 +2052,8 @@ describe("the Review section (IR-412)", () => {
     shownRecord = { ...inReview, ...reviewing, capabilities: ["comment_review"] };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
+    // Changed on purpose by IR-1203: a reviewer opens on Documents, so Conversation is a click away.
+    await openConversation();
     await userEvent.type(await screen.findByRole("textbox", { name: "Comment" }), "Keep this draft");
     await userEvent.click(screen.getByRole("tab", { name: "Details" }));
     expect(screen.getByRole("heading", { name: "Reviewers" })).toBeInTheDocument();
@@ -2083,7 +2087,8 @@ describe("the Review section (IR-412)", () => {
       .toHaveAttribute("aria-valuenow", "520");
     expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "People & details" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
+    // Changed on purpose by IR-1203: a reviewer opens on Documents.
+    expect(screen.getByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
     // What the column held is the Details tab, whatever the width.
     const details = await openDetails();
     expect(await within(details).findByRole("heading", { name: "Reviewers" })).toBeInTheDocument();
@@ -2122,7 +2127,8 @@ describe("the Review section (IR-412)", () => {
       const side = screen.getByRole("complementary", { name: "Threads on the right" });
       expect(within(side).getByRole("heading", { level: 2, name: "Threads" })).toBeInTheDocument();
       expect(screen.queryByRole("tab", { name: /Threads/ })).not.toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
+      // Changed on purpose by IR-1203: a reviewer opens on Documents, and stays there.
+      expect(screen.getByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
       expect(screen.getByRole("separator", { name: "Resize the right column" })).toHaveAttribute("aria-valuenow", "320");
 
       // Focus follows the tab to its new place, and back to it on close.
@@ -2144,7 +2150,8 @@ describe("the Review section (IR-412)", () => {
       await userEvent.click(screen.getByRole("menuitem", { name: "Threads on the right" }));
       await userEvent.click(screen.getByRole("button", { name: "Close Threads on the right" }));
 
-      expect(screen.getByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
+      // Changed on purpose by IR-1203: the tab a reviewer opens on, Documents, takes its place.
+      expect(screen.getByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: /Threads/, selected: false })).toBeInTheDocument();
     });
 
@@ -2230,6 +2237,8 @@ describe("the Review section (IR-412)", () => {
       shownRecord = { ...inReview, ...reviewing, capabilities: ["comment_review"] };
       signInAs(2, "ITSO");
       renderPaper(`/records/${RECORD_ID}?section=review`);
+      // Changed on purpose by IR-1203: a reviewer opens on Documents, so Conversation is a click away.
+      await openConversation();
       await userEvent.type(await screen.findByRole("textbox", { name: "Comment" }), "Keep this draft");
 
       await userEvent.click(await findColumns());
@@ -2267,6 +2276,8 @@ describe("the Review section (IR-412)", () => {
     expect(within(foot).getAllByRole("button").filter((b) => b.classList.contains("bg-brand")))
       .toEqual([within(foot).getByRole("button", { name: "Open review" })]);
     // The card is gone from Conversation, which is the timeline and the comment box.
+    // Changed on purpose by IR-1203: a reviewer opens on Documents, so Conversation is a click away.
+    await openConversation();
     expect(screen.getByRole("textbox", { name: "Comment" })).toBeInTheDocument();
 
     // The facts are in Details; "IERC is reviewing." is Reviewers' to say, once.
@@ -2350,6 +2361,8 @@ describe("the Review section (IR-412)", () => {
     shownRecord = { ...inReview, ...reviewing, readiness: null };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
+    // Changed on purpose by IR-1203: a reviewer opens on Documents, so Conversation is a click away.
+    await openConversation();
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("heading", { name: "Readiness" })).not.toBeInTheDocument();
   });
@@ -2746,9 +2759,10 @@ describe("the Review section (IR-412)", () => {
     });
     afterEach(() => {
       vi.mocked(documentsApi.slotsForRecord).mockResolvedValue({ data: [] } as never);
+      documentRequests.mockResolvedValue({ data: [] });
     });
 
-    it("is the reviewers' first tab, with one row per document", async () => {
+    it("is the reviewers' first tab, where they open, with one row per document", async () => {
       workspaceAt(1600);
       shownRecord = { ...inReview, ...reviewing };
       signInAs(2, "ITSO");
@@ -2756,9 +2770,7 @@ describe("the Review section (IR-412)", () => {
 
       await screen.findByRole("region", { name: "Review pane content" });
       expect(paneTabs()).toEqual(["Documents", "Conversation", "Threads", "Changes", "Details"]);
-      // Read only once shown, as the drawer was: a reviewer who never opens it fetches nothing.
-      expect(documentsApi.slotsForRecord).not.toHaveBeenCalled();
-      await userEvent.click(screen.getByRole("tab", { name: "Documents" }));
+      expect(screen.getByRole("tab", { name: "Documents", selected: true })).toBeInTheDocument();
       const panel = screen.getByRole("tabpanel", { name: "Documents" });
       const consent = await within(panel).findByRole("group", { name: "Consent Paper" });
       expect(consent).toHaveTextContent(`v2 · Rhea Owner · ${formatDate("2026-11-03T08:00:00Z")}`);
@@ -2794,6 +2806,8 @@ describe("the Review section (IR-412)", () => {
       const readiness = await screen.findByRole("tabpanel", { name: "Readiness" });
       expect(paneTabs()).toEqual(["Readiness", "Documents", "Conversation", "Threads", "Details"]);
       expect(within(readiness).queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
+      // Read only once shown, as the drawer was: an author who stays on Readiness fetches nothing.
+      expect(documentsApi.slotsForRecord).not.toHaveBeenCalled();
       await userEvent.click(screen.getByRole("tab", { name: "Documents" }));
       const consent = await within(screen.getByRole("tabpanel", { name: "Documents" }))
         .findByRole("group", { name: "Consent Paper" });
@@ -2817,7 +2831,51 @@ describe("the Review section (IR-412)", () => {
       expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
     });
 
-    it("opens the pane on Documents at 320px, reached by keyboard, with no serious axe violations", async () => {
+    it("offers the owner Upload on a requested slot while the record is in review, and on no other", async () => {
+      workspaceAt(1600);
+      documentRequests.mockResolvedValue({ data: [{
+        id: 1, party: "ierc", label: "IERC", state: "open", state_label: "Open", message: "The signed form, please.",
+        requested_by: null, created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
+        items: [{ id: 11, slot: 3, label: "Consent Paper", state: "missing", state_label: "Missing", upload: null,
+          uploaded_at: null, rejection_reason: null, decided_at: null }],
+      }] });
+      vi.mocked(documentsApi.slotsForRecord).mockResolvedValue({ data: [
+        { id: 3, name: "Consent Paper", record_type: 1, is_required: false, uploads: [upload(11, 1, "2026-10-08T08:00:00Z")] },
+        { id: 4, name: "Ethics Clearance", record_type: 1, is_required: false, uploads: [upload(13, 1, "2026-10-06T08:00:00Z")] },
+      ] } as never);
+      // In review, and not editable: no `edit_details`.
+      shownRecord = { ...inReview, capabilities: ["cite"] };
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+
+      const panel = await screen.findByRole("tabpanel", { name: "Documents" });
+      const consent = await within(panel).findByRole("group", { name: "Consent Paper" });
+      expect(await within(consent).findByText("Requested by IERC.")).toBeInTheDocument();
+      expect(within(consent).getByRole("button", { name: /^Upload Consent Paper/ })).toBeInTheDocument();
+      expect(within(within(panel).getByRole("group", { name: "Ethics Clearance" })).queryByRole("button", { name: /^Upload/ }))
+        .not.toBeInTheDocument();
+    });
+
+    it("opens a reviewer's pane on Documents at 320px, reached by keyboard, with no serious axe violations", async () => {
+      workspaceAt(320);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Open review pane" }));
+      const pane = screen.getByRole("dialog", { name: "Review pane" });
+      const tab = within(pane).getByRole("tab", { name: "Documents", selected: true });
+      expect(await within(within(pane).getByRole("tabpanel", { name: "Documents" })).findByRole("group", { name: "Consent Paper" }))
+        .toBeInTheDocument();
+      tab.focus();
+      await userEvent.keyboard("{End}");
+      expect(within(pane).getByRole("tab", { name: "Details", selected: true })).toHaveFocus();
+      await userEvent.keyboard("{Home}");
+      expect(within(pane).getByRole("tab", { name: "Documents", selected: true })).toHaveFocus();
+      await expectNoBlockingA11yViolations(container);
+    });
+
+    it("opens the author's pane on Documents at 320px, reached by keyboard, with no serious axe violations", async () => {
       workspaceAt(320);
       shownRecord = inReview;
       signInAs(OWNER_ID, "Student");
@@ -2886,6 +2944,8 @@ describe("the Review section (IR-412)", () => {
     const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
 
     expect(await screen.findByText(/paper reader open at page none/i)).toBeInTheDocument();
+    // Changed on purpose by IR-1203: a reviewer opens on Documents, so Conversation is a click away.
+    await openConversation();
     const timeline = await screen.findByRole("list", { name: "Review timeline" });
     expect(within(timeline).getByText("Submitted to ITSO")).toBeInTheDocument();
     expect(recordsApi.tracker).toHaveBeenCalledWith(RECORD_ID);
@@ -2966,6 +3026,8 @@ describe("the Review section (IR-412)", () => {
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
+    // Changed on purpose by IR-1203: a reviewer opens on Documents, so Conversation is a click away.
+    await openConversation();
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
@@ -2977,6 +3039,8 @@ describe("the Review section (IR-412)", () => {
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
+    // Changed on purpose by IR-1203: a reviewer opens on Documents, so Conversation is a click away.
+    await openConversation();
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByText(/paper reader open/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask about this paper" })).not.toBeInTheDocument();

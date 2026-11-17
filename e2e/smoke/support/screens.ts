@@ -30,6 +30,8 @@ export interface Screen {
   primaryLabel: string;
   /** A table (or table-like list) that gets wider than a phone. Documented in TABLE_BEHAVIOUR. */
   table?: (page: Page) => Locator;
+  /** A step after the page loads that reaches the view under test, e.g. a tab it does not open on. */
+  open?: (page: Page) => Promise<void>;
 }
 
 /** The table-heavy screens' small-screen behaviour. The matrix checks it still holds. */
@@ -252,6 +254,10 @@ export const SCREENS: Screen[] = [
       api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
       // The response to reviewers (IR-876), read beside the threads.
       api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
+      // A participant's Review opens on its Documents tab (IR-1203), which reads these.
+      api.on("GET", `/documents/records/${PAPER.id}/slots/`, []);
+      api.on("GET", "/documents/files/", []);
+      api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
     }),
     heading: PAPER.title,
     primary: (p) => p.getByRole("button", { name: /Cite/ }).first(), primaryLabel: "Cite",

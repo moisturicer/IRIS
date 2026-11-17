@@ -23,42 +23,38 @@ export interface DocumentRowProps {
   name: string;
   /** The latest version in words, e.g. "v2 · Ana Cruz · Nov 3, 2026"; null when nothing is uploaded. */
   latest: string | null;
-  /** Said instead of `latest` when nothing is uploaded. */
-  empty?: string;
   /** Where a request for it stands, e.g. an `ItemStatusChip`. */
   status?: ReactNode;
   /** A line under the version: who asked, or why the last upload was refused. */
   note?: ReactNode;
   /** The row's controls: Download, Upload, Remove. */
   actions?: ReactNode;
-  /** How many versions `versions` holds; the toggle shows only with one to show. */
-  versionCount?: number;
-  /** Every version, newest first, shown when the toggle is open. */
-  versions?: ReactNode;
+  /** Every version, newest first, behind the row's toggle, and how many there are. */
+  versions?: { count: number; list: ReactNode };
 }
 
 export function DocumentRow({
-  name, latest, empty = "Not uploaded yet", status, note, actions, versionCount = 0, versions,
+  name, latest, status, note, actions, versions,
 }: DocumentRowProps) {
   const ids = useId();
   const [open, setOpen] = useState(false);
-  const toggles = versions != null && versionCount > 0;
-  const countWords = `${versionCount} version${versionCount === 1 ? "" : "s"}`;
+  const hasVersions = versions != null && versions.count > 0;
+  const countWords = hasVersions ? `${versions.count} version${versions.count === 1 ? "" : "s"}` : "";
   return (
     <li>
       <div role="group" aria-labelledby={`${ids}-name`} className="space-y-1.5 px-card-compact py-3">
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
           <div className="min-w-0">
             <h3 id={`${ids}-name`} className="text-body font-semibold text-stone-900">{name}</h3>
-            <p className="text-small text-stone-600">{latest ?? empty}</p>
+            <p className="text-small text-stone-600">{latest ?? "Not uploaded yet"}</p>
           </div>
           {status}
         </div>
         {note && <div className="text-small text-stone-600">{note}</div>}
-        {(actions || toggles) && (
+        {(actions || hasVersions) && (
           <div className="flex flex-wrap items-start gap-2">
             {actions}
-            {toggles && (
+            {hasVersions && (
               // The drawn words lead the name (WCAG 2.5.3), the document's name tells rows apart.
               <button type="button" aria-expanded={open} aria-controls={`${ids}-versions`}
                 aria-label={`${countWords} of ${name}`} onClick={() => setOpen((o) => !o)}
@@ -69,7 +65,7 @@ export function DocumentRow({
             )}
           </div>
         )}
-        {toggles && open && <div id={`${ids}-versions`}>{versions}</div>}
+        {hasVersions && open && <div id={`${ids}-versions`}>{versions.list}</div>}
       </div>
     </li>
   );

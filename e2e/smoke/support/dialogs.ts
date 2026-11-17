@@ -112,9 +112,10 @@ const reviewAction = (
   /** The reviewer's sidebar is a "Details" tab when the workspace is narrow, so a control that lives there opens it first. */
   inDetails = false,
 ): DialogCase => ({
-  // The bar and the workspace host every review action's dialog.
+  // The bar hosts every review action's dialog. The workspace no longer
+  // draws one of its own: the documents drawer became a tab (IR-1203).
   id, screen: "paper-view", path: `/records/${PAPER.id}?section=review`,
-  sources: [source, "features/records/paper-view/ReviewActionBar.tsx", "features/records/paper-view/ReviewWorkspace.tsx"],
+  sources: [source, "features/records/paper-view/ReviewActionBar.tsx"],
   viewport: inDetails ? { width: 820, height: 900 } : undefined,
   override: (api) => { reviewing(capability)(api); api.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER); more?.(api); },
   open: async (page) => {
@@ -476,6 +477,8 @@ export const DIALOGS: DialogCase[] = [
       });
     },
     open: async (page) => {
+      // A reviewer's Review opens on Documents (IR-1203): the comment box is the Conversation tab's.
+      await page.getByRole("tab", { name: "Conversation" }).click();
       await page.getByRole("button", { name: "Saved replies" }).first().click();
       await page.getByRole("button", { name: "Manage saved replies" }).click();
     },

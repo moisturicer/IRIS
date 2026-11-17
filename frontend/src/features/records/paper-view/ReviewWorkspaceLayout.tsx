@@ -8,8 +8,9 @@ import { seatsApi } from "@/api/reviews";
 import { errorDetail } from "@/lib/errorDetail";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { seatToOpen } from "@/features/records/capabilities";
+import type { Capability } from "@/features/records/capabilities";
 import { cn, formatDate } from "@/lib/utils";
-import type { RecordTracker, RecordVersion } from "@/types/records";
+import type { RecordDetail, RecordTracker, RecordVersion } from "@/types/records";
 
 import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
@@ -27,7 +28,6 @@ import { DRAWER_BELOW_PX, fitWidths, maxWidth, minWidth, SIDE_TAB_MIN_PX, type W
 import { GuidedTour } from "./tour/GuidedTour";
 import { markTourSeen, tourSeen } from "./tour/tourStorage";
 import { reviewTourSteps, tourTargets, type TourTab } from "./tour/tourSteps";
-import type { ReviewWorkspaceProps } from "./ReviewWorkspace";
 import { YourPartFooter } from "./YourPartFooter";
 import { readinessFacts, yourPartSummary } from "./yourPart";
 import "./reviewWorkspace.css";
@@ -85,6 +85,63 @@ function readSideTab(): Tab | null {
 }
 
 /**
+ * The review workspace: one frame for authors and reviewers (IR-1206), with
+ * documents as one of its tabs (IR-1203). The page imports it directly; the
+ * `ReviewWorkspace` wrapper that drew the documents drawer over it is gone.
+ */
+export interface ReviewWorkspaceProps {
+  record: RecordDetail;
+  /** What the capabilities adapter grants this viewer. */
+  can: ReadonlySet<Capability>;
+  /** The paper, as the Paper tab's reader; null when there is none to read. */
+  reader: ReactNode;
+  /** Bumped when the review changed, so the timeline re-reads the tracker. */
+  timelineVersion: number;
+  /** Something changed: re-read the record and the timeline. */
+  onChanged: () => void;
+  /**
+   * The Documents tab's body (IR-1203): every document filed with the record.
+   * It replaced the "All documents" drawer (IR-879). There is no Ask IRIS in
+   * Review (IR-372).
+   */
+  documents: ReactNode;
+  /**
+   * The page was asked to show the documents -- `?documents=open`, or an old
+   * `?section=files` link -- so the workspace opens its Documents tab, and
+   * says so through `onDocumentsShown` so the page can drop the request.
+   */
+  showDocuments?: boolean;
+  onDocumentsShown?: () => void;
+  /**
+   * The viewer owns the paper (IR-1206): the same workspace as reviewers,
+   * with the author's tabs -- Readiness first, then Documents, Conversation,
+   * Threads and Details -- and no tour and no Changes.
+   */
+  authorView?: boolean;
+  /**
+   * What left the owners' editorial header, shown at the top of their Details
+   * (IR-1206): Edit details, the Proposal lineage and Continue as, each only
+   * where the server offers it. Null when there is none.
+   */
+  authorDetails?: ReactNode;
+  onOpenReview?: () => Promise<void>;
+  /**
+   * Show Version `n` in the reader, or the current paper for null (IR-873):
+   * the Changes tab's *Show in paper* opens the Version a change is in.
+   */
+  onShowVersion?: (n: number | null) => void;
+}
+
+/** True from the first render `shown` is true, and from then on. */
+function useShownOnce(shown: boolean): boolean {
+  const [once, setOnce] = useState(shown);
+  useEffect(() => {
+    if (shown) setOnce(true);
+  }, [shown]);
+  return once || shown;
+}
+
+/**
  * Who sent the Version under review, and when, as a pull request says who
  * opened it (IR-1131): "Ana Cruz sent v2 · Nov 3, 2026". The name and date
  * are the server's; with no name, the Version alone.
@@ -107,9 +164,9 @@ export function ReviewWorkspaceLayout({
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
   const [statusTarget, setStatusTarget] = useState<HTMLDivElement | null>(null);
-  // The author opens on what waits on them (IR-1206); a reviewer on the
-  // conversation, though Documents comes first in the row (IR-1203).
-  const home: Tab = authorView ? "readiness" : "conversation";
+  // Each opens on their first tab: the author on what waits on them (IR-1206),
+  // a reviewer on the documents (IR-1203, decided 2026-11-17).
+  const home: Tab = authorView ? "readiness" : "documents";
   const [tab, setTab] = useState<Tab>(home);
   const [sideChoice, setSideChoice] = useState(readSideTab);
   // Narrow, the workspace starts on the paper, its pins in view; the pane
@@ -222,20 +279,12 @@ export function ReviewWorkspaceLayout({
     ledWithLetter.current = letterVersion;
     setTab("threads");
   }, [reviewing, letterVersion, latest]);
-  // Fetched only once opened, then kept, so its choices survive a tab switch
-  // (moving it to the right column mounts it again, and it starts afresh).
-  const [changesOpened, setChangesOpened] = useState(false);
-  const changesVisible = shown === "changes" || sideTab === "changes";
-  useEffect(() => {
-    if (changesVisible) setChangesOpened(true);
-  }, [changesVisible]);
-  // Documents loads itself too, so it mounts only once shown, as the drawer it
-  // replaced did (IR-1203), and stays so an upload under way survives a switch.
-  const [documentsOpened, setDocumentsOpened] = useState(false);
-  const documentsVisible = shown === "documents" || sideTab === "documents";
-  useEffect(() => {
-    if (documentsVisible) setDocumentsOpened(true);
-  }, [documentsVisible]);
+  // Changes is fetched only once opened, then kept, so its choices survive a
+  // tab switch (moving it to the right column mounts it again, and it starts
+  // afresh). Documents loads itself too, so it mounts once shown, as the drawer
+  // it replaced did (IR-1203), and stays so an upload under way survives a switch.
+  const changesOpened = useShownOnce(shown === "changes" || sideTab === "changes");
+  const documentsOpened = useShownOnce(shown === "documents" || sideTab === "documents");
   const showChange = (place: ShowPlace) => {
     onShowVersion?.(place.version === latest ? null : place.version);
     tw.showPlace(place);
@@ -417,7 +466,7 @@ export function ReviewWorkspaceLayout({
         onCommented={tw.threads.reload} onOpenThreads={tw.openThreads} renderStatus={renderDetails} submission={submission} statusBox
         onLoaded={(data) => setCommentCount((data.review_comments ?? []).filter((c) => !c.is_draft && isDiscussion(c)).length)} />
     ),
-    documents: documentsOpened || documentsVisible ? documents : null,
+    documents: documentsOpened ? documents : null,
     threads: <ReviewThreads {...tw.panel} />,
     changes: !comparable ? (
       <div className="rounded-card border border-stone-200 px-4 py-6 text-center">

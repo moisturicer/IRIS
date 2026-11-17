@@ -27,6 +27,10 @@ import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types
 
 import { DocumentsTab } from "./DocumentsTab";
 
+// Saving is the browser's; what is checked is the name the file is saved under.
+const downloadBlob = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/utils", async (actual) => ({ ...(await actual<typeof import("@/lib/utils")>()), downloadBlob }));
+
 const RECORD_ID = 9;
 const ETHICS = 3;
 const PATENT = 4;
@@ -72,7 +76,7 @@ vi.mock("@/api/documents", () => ({
       uploadForRequestItem(recordId, itemId, file, options),
     uploadRecordFile: (recordId: number, file: File, options: unknown) => uploadRecordFile(recordId, file, options),
     deleteFile: (fileId: number) => deleteFile(fileId),
-    downloadUpload: vi.fn(),
+    downloadUpload: () => Promise.resolve({ data: new Blob(["file"]) }),
     downloadFile: vi.fn(),
     deleteUpload: (uploadId: number) => deleteUpload(uploadId),
   },
@@ -451,4 +455,33 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
     expect(screen.queryByRole("button", { name: /^Upload revised manuscript/ })).not.toBeInTheDocument();
   });
 
+});
+
+// IR-1203: a slot's file is saved under its own type, not always as .pdf.
+describe("downloading a document version", () => {
+  it("saves it under the stored file's own extension", async () => {
+    requests = [];
+    slots = [{ ...slot(ETHICS, "Ethics Clearance"), uploads: [{
+      id: 310, record: RECORD_ID, slot: ETHICS, slot_name: "Ethics Clearance", file: "/media/uploads/9/ethics_scan.PNG",
+      version: 2, status: null, status_name: null, uploaded_by: 50, uploaded_by_name: "Sam Student",
+      created_at: "2026-09-22T02:00:00Z", reviews: [], delete_refused: null,
+    }] }];
+    renderFiles({ owner: false, reviewing: true });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 2" }));
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v2.png"));
+  });
+
+  it("falls back to .pdf when the stored name has no extension", async () => {
+    requests = [];
+    slots = [{ ...slot(ETHICS, "Ethics Clearance"), uploads: [{
+      id: 311, record: RECORD_ID, slot: ETHICS, slot_name: "Ethics Clearance", file: "/media/uploads/9/ethics",
+      version: 1, status: null, status_name: null, uploaded_by: 50, uploaded_by_name: "Sam Student",
+      created_at: "2026-09-22T02:00:00Z", reviews: [], delete_refused: null,
+    }] }];
+    renderFiles({ owner: false, reviewing: true });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 1" }));
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v1.pdf"));
+  });
 });

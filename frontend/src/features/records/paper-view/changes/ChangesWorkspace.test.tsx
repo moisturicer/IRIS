@@ -13,7 +13,7 @@ import type { Capability } from "@/features/records/capabilities";
 import { renderScreen, screen, waitFor } from "@/test/render";
 import type { RecordDetail, VersionComparisonPayload } from "@/types/records";
 
-import { ReviewWorkspace } from "../ReviewWorkspace";
+import { ReviewWorkspaceLayout } from "../ReviewWorkspaceLayout";
 import { useReaderAnnotations } from "../threads/readerAnnotations";
 import { comment } from "../threads/threadFixtures";
 
@@ -65,7 +65,7 @@ function StandInReader() {
 function openWorkspace(versions: number) {
   const onShowVersion = vi.fn();
   renderScreen(
-    <ReviewWorkspace record={record(versions)} can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
+    <ReviewWorkspaceLayout record={record(versions)} can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
       timelineVersion={0} onChanged={() => {}} documents={null}
       onShowVersion={onShowVersion} />,
   );
