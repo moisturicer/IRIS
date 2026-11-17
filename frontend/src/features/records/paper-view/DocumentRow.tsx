@@ -45,7 +45,7 @@ export function DocumentRow({
       <div role="group" aria-labelledby={`${ids}-name`} className="space-y-1.5 px-card-compact py-3">
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
           <div className="min-w-0">
-            <h3 id={`${ids}-name`} className="text-body font-semibold text-stone-900">{name}</h3>
+            <h3 id={`${ids}-name`} className="break-words text-body font-semibold text-stone-900">{name}</h3>
             <p className="text-small text-stone-600">{latest ?? "Not uploaded yet"}</p>
           </div>
           {status}

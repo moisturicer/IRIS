@@ -317,7 +317,11 @@ export const SCREENS: Screen[] = [
           reviews: [], delete_refused: null,
         }],
       }]);
-      api.on("GET", "/documents/files/", []);
+      // One long, unbroken file name: it must wrap in its row, never run off it (the Full Text Rule, IR-1218).
+      api.on("GET", "/documents/files/", [{
+        id: 31, record: PAPER.id, file: "x.pdf", filename: "Final_Thesis_Manuscript_Revised_Signed_Adviser_Copy_v3.pdf",
+        uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
+      }]);
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
       api.on("GET", "/library/saves/", { results: [] });
       api.on("GET", "/library/folders/", { results: [], limit: 10 });
