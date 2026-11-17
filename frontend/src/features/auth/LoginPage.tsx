@@ -8,6 +8,7 @@ import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import { AccountLockedModal } from "@/components/auth/AccountLockedModal";
+import { SessionNoticeDialog } from "@/components/auth/SessionNoticeDialog";
 import { LoginForm, type LoginFormValues } from "@/components/auth/LoginForm";
 import {
   clearLockout,
@@ -53,9 +54,9 @@ export default function LoginPage() {
    * use the normal landing page (IR-236, IR-534).
    *
    * **Captured once, on mount, on purpose.** The guard passes it in router
-   * state, and `dismissSessionAlert` below navigates to clear that state — so
+   * state, and `dismissSignedOutNotice` below navigates to clear that state — so
    * reading it at submit time would mean a visitor who dismisses the
-   * "session expired" banner before signing in silently loses their
+   * "session expired" dialog before signing in silently loses their
    * destination. It is also validated once here rather than at the point of
    * navigation, so there is no path from an unchecked string to `navigate`.
    *
@@ -69,7 +70,7 @@ export default function LoginPage() {
   });
   // IR-642: Settings sends a person here after changing their password,
   // which ends every session. Read once, like `redirectTo`.
-  const [passwordChanged] = useState(
+  const [passwordChanged, setPasswordChanged] = useState(
     () => (location.state as { reason?: string } | null)?.reason === "password_changed",
   );
   const sessionExpiredFromState =
@@ -104,19 +105,34 @@ export default function LoginPage() {
     setFailedAttempts(getLoginAttempts(identifier));
   }, [identifier]);
 
-  const dismissSessionAlert = () => {
+  // Why they were signed out, as a dialog in front of the page (IR-1197).
+  const signedOutNotice = passwordChanged
+    ? {
+        title: "Password Changed",
+        text: "You were signed out on every device. Sign in again with your new password.",
+      }
+    : sessionAlert
+      ? sessionEnd
+      : null;
+
+  const dismissSignedOutNotice = () => {
+    setPasswordChanged(false);
     setSessionAlert(false);
     if (searchParams.get("reason") || searchParams.get("code")) {
       searchParams.delete("reason");
       searchParams.delete("code");
       setSearchParams(searchParams, { replace: true });
     }
-    if ((location.state as { reason?: string } | null)?.reason === "session_expired") {
+    const reason = (location.state as { reason?: string } | null)?.reason;
+    if (reason === "session_expired" || reason === "password_changed") {
       // Clearing the state wholesale is safe: `redirectTo` was captured on
       // mount, so the destination does not live here any more. Writing it back
-      // would only look like it mattered.
+      // would only look like it mattered. Cleared, a reload shows no notice.
       navigate("/login", { replace: true, state: null });
     }
+    // Nothing opened the dialog, so its focus has nowhere to return: start
+    // them on the form they came to fill in.
+    globalThis.setTimeout(() => document.getElementById("login-identifier")?.focus());
   };
 
   const openLockout = (forIdentifier: string, next: AccountLock) => {
@@ -210,30 +226,17 @@ export default function LoginPage() {
       }}
       tabs={<EntryTab>Sign in</EntryTab>}
       before={
-        <AccountLockedModal
-          open={lockoutOpen}
-          onClose={closeLockout}
-          lock={lock}
-          returnTo={signInRef.current}
-        />
+        <>
+          <SessionNoticeDialog notice={signedOutNotice} onClose={dismissSignedOutNotice} />
+          <AccountLockedModal
+            open={lockoutOpen}
+            onClose={closeLockout}
+            lock={lock}
+            returnTo={signInRef.current}
+          />
+        </>
       }
     >
-
-      {passwordChanged && (
-        <AuthAlert variant="warning" title="Password changed">
-          You were signed out on every device. Sign in again with your new password.
-        </AuthAlert>
-      )}
-
-      {sessionAlert && (
-        <AuthAlert
-          variant="session"
-          title={sessionEnd.title}
-          onDismiss={dismissSessionAlert}
-        >
-          {sessionEnd.text}
-        </AuthAlert>
-      )}
 
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">Welcome back</h2>
       <p className="mt-2 mb-section text-body text-stone-600">

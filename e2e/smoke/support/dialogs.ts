@@ -328,6 +328,13 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog"),
   },
   {
+    // Why the session ended opens by itself on arrival (IR-1197).
+    id: "session ended on arrival at sign-in", screen: "login", path: "/login?reason=session_expired&code=session_idle",
+    sources: ["components/auth/SessionNoticeDialog.tsx"],
+    open: async () => {},
+    dialog: (page) => page.getByRole("dialog", { name: "Session Expired" }),
+  },
+  {
     id: "ask again for a download", screen: "my-library", path: "/records/mine?section=downloads",
     sources: ["components/records/DownloadRequestModal.tsx"],
     override: (api) => api.on("GET", "/records/download-requests/mine/", [{

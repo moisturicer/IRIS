@@ -107,9 +107,9 @@ describe("changing your password", () => {
 
     await changePassword(user, "Kalamansi-Tide-42");
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Password changed");
-    expect(alert).toHaveTextContent("Sign in again with your new password.");
+    // Said in a dialog in front of the sign-in page (IR-1197).
+    const dialog = await screen.findByRole("dialog", { name: "Password Changed" });
+    expect(dialog).toHaveTextContent("Sign in again with your new password.");
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
