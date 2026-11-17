@@ -39,7 +39,7 @@ describe("LoginForm", () => {
     await user.click(signIn());
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    expect(onSubmit.mock.calls[0][0]).toEqual({ identifier: "kay@cit.edu", password: "hunter2" });
+    expect(onSubmit.mock.calls[0][0]).toEqual({ identifier: "kay@cit.edu", password: "hunter2", remember: false }); // ADR-072: off unless ticked
   });
 
   it("submits from the keyboard", async () => {

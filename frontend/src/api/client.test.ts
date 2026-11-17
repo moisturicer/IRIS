@@ -12,16 +12,16 @@ describe("refreshSession", () => {
   let post: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: "old", refreshToken: "r1", isAuthenticated: true });
+    useAuthStore.setState({ accessToken: "old", remembered: false, isAuthenticated: true });
     post = vi.spyOn(axios, "post");
   });
   afterEach(() => { vi.restoreAllMocks(); redirect.mockClear(); });
 
-  it("stores and returns the new tokens", async () => {
-    post.mockResolvedValue({ data: { access: "a2", refresh: "r2" } });
+  it("stores and returns the new access token", async () => {
+    post.mockResolvedValue({ data: { access: "a2", remembered: true } });
 
     expect(await refreshSession()).toBe("a2");
-    expect(useAuthStore.getState()).toMatchObject({ accessToken: "a2", refreshToken: "r2" });
+    expect(useAuthStore.getState()).toMatchObject({ accessToken: "a2", remembered: true });
     expect(post.mock.calls[0][2]).toMatchObject({ headers: { "X-IRIS-Idle-Seconds": expect.any(String) } });
     // IR-914: a refresh that never answers must not hang every 401'd request.
     expect(post.mock.calls[0][2]).toMatchObject({ timeout: 30_000 });
@@ -46,18 +46,33 @@ describe("refreshSession", () => {
     expect(redirect).toHaveBeenCalledWith("session_ended");
   });
 
-  it("logs out and redirects with no refresh token to spend", async () => {
-    useAuthStore.setState({ refreshToken: null });
+  it("sends no token: the browser sends the cookie, and the request says it is from IRIS (ADR-072)", async () => {
+    post.mockResolvedValue({ data: { access: "a2", remembered: false } });
+
+    await refreshSession();
+
+    expect(post.mock.calls[0][1]).toEqual({});
+    expect(post.mock.calls[0][2]).toMatchObject({
+      headers: { "X-IRIS-Auth": "1" },
+      withCredentials: true,
+    });
+  });
+
+  it("logs out and redirects when there is no session to refresh, as after signing out in another tab", async () => {
+    post.mockRejectedValue(Object.assign(new Error("Request failed with status code 401"), {
+      isAxiosError: true,
+      response: { status: 401, data: { detail: "Not signed in.", code: "no_session" } },
+    }));
 
     expect(await refreshSession()).toBeNull();
-    expect(post).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(redirect).toHaveBeenCalledTimes(1);
   });
 
   it("discards a refresh that finishes after the user logged out", async () => {
     post.mockImplementation(async () => {
       useAuthStore.getState().logout();
-      return { data: { access: "a2", refresh: "r2" } };
+      return { data: { access: "a2", remembered: false } };
     });
 
     expect(await refreshSession()).toBeNull();

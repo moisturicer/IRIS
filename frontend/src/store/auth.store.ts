@@ -3,21 +3,24 @@ import { useNoticeStore } from "./notice.store";
 import { isAcceptanceRequired } from "@/lib/noticeErrors";
 import type { User } from "@/types/auth";
 import { authApi } from "@/api/auth";
-import {
-  clearAuthSession,
-  getStoredRefreshToken,
-  setStoredRefreshToken,
-} from "@/lib/authStorage";
-import { __resetRefreshState, refreshOnce } from "@/lib/tokenRefresh";
+import { clearAuthSession } from "@/lib/authStorage";
+import { __resetRefreshState, refreshOnce, withRefreshLock } from "@/lib/tokenRefresh";
 import { clearOldBrowserLibrary } from "@/lib/recordLibrary";
 import { REVIEWER_ROLES, STAFF_ROLES, type RoleName } from "@/lib/constants";
+
+/** The server's answer to a refresh with no cookie: signed out, not a session that ended (ADR-072). */
+export const NO_SESSION = "no_session";
 
 interface AuthState {
   user:            User | null;
   accessToken:     string | null;
-  refreshToken:    string | null;
   isAuthenticated: boolean;
-  /** False until we have checked sessionStorage for a refresh token on load. */
+  /**
+   * "Keep me signed in" (ADR-072): the session lasts 30 days from sign-in and
+   * the idle rule doesn't end it, so the browser's idle watch stays off.
+   */
+  remembered:      boolean;
+  /** False until we have asked the server for a session on load (ADR-072). */
   authReady:       boolean;
   /**
    * Bumped by `login`/`logout`/`clearTokens`. `client.ts` captures this before starting a
@@ -30,17 +33,17 @@ interface AuthState {
    */
   sessionEpoch: number;
   /**
-   * Set when a session stored in this tab could not be restored on load
+   * Set when a session this browser held could not be restored on load
    * (IR-1081, audit FB-01), with the server's reason if it gave one. Without
    * it the route guard cannot tell that from never having signed in, and a
    * reload that ended on sign-in said nothing. Cleared by the next sign-in.
    */
   sessionLost: { code: string | null } | null;
 
-  login:      (user: User, access: string, refresh: string) => void;
+  login:      (user: User, access: string, remembered?: boolean) => void;
   logout:     () => void;
   updateUser: (user: User) => void;
-  setTokens:  (access: string, refresh?: string) => void;
+  setTokens:  (access: string, remembered?: boolean) => void;
   clearTokens: () => void;
   hydrateAuth: () => Promise<void>;
 }
@@ -48,14 +51,16 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()((set, get) => ({
   user:            null,
   accessToken:     null,
-  refreshToken:    null,
   isAuthenticated: false,
+  remembered:      false,
   authReady:       false,
   sessionEpoch:    0,
   sessionLost:     null,
 
-  login: (user, access, refresh) => {
-    setStoredRefreshToken(refresh);
+  login: (user, access, remembered = false) => {
+    // The refresh token is in the server's HttpOnly cookie (ADR-072); this only
+    // clears keys earlier versions stored.
+    clearAuthSession();
     // Delete what an older build kept of the library in this browser (history,
     // folders, stars; the account holds the library now, IR-566/572/756/579).
     // A sign-in may follow someone who closed the tab without signing out, so
@@ -68,7 +73,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set((s) => ({
       user,
       accessToken: access,
-      refreshToken: refresh,
+      remembered,
       isAuthenticated: true,
       sessionLost: null,
       sessionEpoch: s.sessionEpoch + 1,
@@ -88,7 +93,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set((s) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
+      remembered: false,
       isAuthenticated: false,
       sessionEpoch: s.sessionEpoch + 1,
     }));
@@ -96,11 +101,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   updateUser: (user) => set({ user }),
 
-  setTokens: (access, refresh) => {
-    if (refresh) setStoredRefreshToken(refresh);
+  setTokens: (access, remembered) => {
     set((s) => ({
       accessToken: access,
-      refreshToken: refresh ?? s.refreshToken,
+      remembered: remembered ?? s.remembered,
       isAuthenticated: true,
     }));
   },
@@ -111,51 +115,37 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     clearOldBrowserLibrary();
     set((s) => ({
       accessToken: null,
-      refreshToken: null,
+      remembered: false,
       isAuthenticated: false,
       sessionEpoch: s.sessionEpoch + 1,
     }));
   },
 
   hydrateAuth: async () => {
-    const refresh = getStoredRefreshToken();
-    if (!refresh) {
-      set({ authReady: true });
-      return;
-    }
-
+    // Keys an earlier version kept in this browser's own storage (ADR-072).
+    clearAuthSession();
     try {
       /**
-       * Through the gate, not around it (IR-238).
+       * Always asked, never assumed (ADR-072 decision 2).
        *
-       * `AuthBootstrap` calls this from an effect, and `React.StrictMode`
-       * double-invokes effects in development, so two calls read the same
-       * stored token in the same tick. The server rotates on refresh and
-       * blacklists what it rotated away, so presenting that token twice means
-       * the second attempt 401s, falls into the `catch` below, and logs out a
-       * session the first attempt had just restored -- the user reloads a page
-       * and finds themselves at the login screen.
+       * The refresh token is in an HttpOnly cookie this code can't see, so the
+       * only way to know whether this browser is signed in is to ask. The
+       * browser sends the cookie; with none, the server answers `no_session`.
        *
-       * `refreshOnce` makes the second caller wait on the first's promise, so
-       * the token is spent exactly once. This is the same gate `api/client.ts`
-       * uses; `hydrateAuth` was the only refresh path that had been left
-       * outside it. Note the token is read from storage *per call*, so a later,
-       * non-overlapping load still picks up the rotated one.
+       * Through the gate and the lock, not around them (IR-238, decision 6).
+       * `React.StrictMode` double-invokes effects in development, and every tab
+       * presents the same cookie, which the server rotates and blacklists:
+       * `refreshOnce` joins this tab's calls, and `withRefreshLock` makes tabs
+       * take turns, so the cookie is never presented twice.
        */
-      const tokens = await refreshOnce(async () => {
-        const { data } = await authApi.refreshToken(refresh);
-        return {
-          access: data.access as string,
-          refresh: (data as { refresh?: string }).refresh,
-        };
-      });
+      const tokens = await refreshOnce(() => withRefreshLock(async () => {
+        const { data } = await authApi.refreshToken();
+        return { access: data.access, remembered: data.remembered };
+      }));
 
-      const newRefresh = tokens.refresh ?? refresh;
-
-      setStoredRefreshToken(newRefresh);
       set({
         accessToken: tokens.access,
-        refreshToken: newRefresh,
+        remembered: tokens.remembered,
         isAuthenticated: true,
       });
 
@@ -170,8 +160,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         return;
       }
       get().logout();
-      // After `logout`, which would otherwise be read as an ordinary sign-out.
       const code = (err as { response?: { data?: { code?: unknown } } })?.response?.data?.code;
+      // No session at all: this browser was never signed in, or signed out,
+      // which says nothing about a session ending.
+      if (code === NO_SESSION) return;
+      // After `logout`, which would otherwise be read as an ordinary sign-out.
       set({ sessionLost: { code: typeof code === "string" ? code : null } });
     } finally {
       set({ authReady: true });

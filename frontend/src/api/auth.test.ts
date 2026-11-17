@@ -14,14 +14,14 @@ const stub = installApiStub();
 
 describe("authApi", () => {
   it("login posts the credentials to /auth/login/ and returns the response body", async () => {
-    stub.reply({ data: { access: "a", refresh: "r", user: { id: 1 } } });
+    stub.reply({ data: { access: "a", remembered: false, user: { id: 1 } } });
 
     const res = await authApi.login({ email: "a@cit.edu", password: "pw" });
 
     expect(stub.only()).toMatchObject({
       method: "post", url: "/auth/login/", body: { email: "a@cit.edu", password: "pw" },
     });
-    expect(res.data).toMatchObject({ access: "a", refresh: "r" });
+    expect(res.data).toMatchObject({ access: "a", remembered: false });
   });
 
   it("register posts the form to /auth/register/", async () => {
@@ -51,20 +51,20 @@ describe("authApi", () => {
     });
   });
 
-  it("logout sends the refresh token to /auth/logout/ so the server can blacklist it", async () => {
-    await authApi.logout("refresh-1");
+  it("logout sends no token, only the first-party header: the server reads its cookie (ADR-072)", async () => {
+    await authApi.logout();
 
-    expect(stub.only()).toMatchObject({
-      method: "post", url: "/auth/logout/", body: { refresh: "refresh-1" },
-    });
+    const call = stub.only();
+    expect(call).toMatchObject({ method: "post", url: "/auth/logout/", body: {} });
+    expect(call.headers["X-IRIS-Auth"]).toBe("1");
   });
 
-  it("refreshToken sends only the refresh token", async () => {
-    await authApi.refreshToken("refresh-1");
+  it("refreshToken sends no token, only the first-party header: the server reads its cookie (ADR-072)", async () => {
+    await authApi.refreshToken();
 
-    expect(stub.only()).toMatchObject({
-      method: "post", url: "/auth/token/refresh/", body: { refresh: "refresh-1" },
-    });
+    const call = stub.only();
+    expect(call).toMatchObject({ method: "post", url: "/auth/token/refresh/", body: {} });
+    expect(call.headers["X-IRIS-Auth"]).toBe("1");
   });
 
   it("changePassword posts to /auth/password/change/", async () => {

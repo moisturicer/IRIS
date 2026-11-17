@@ -58,7 +58,7 @@ async function openMenu() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useAuthStore.getState().login({ id: 1, email: "r1@cit.edu", role_name: "Student" } as unknown as User, "a", "r");
+  useAuthStore.getState().login({ id: 1, email: "r1@cit.edu", role_name: "Student" } as unknown as User, "a");
   useFeedsStore.setState({ load: "idle", feeds: [], limit: 10, interrupted: false });
   vi.mocked(libraryApi.feeds).mockResolvedValue(answer({ results: [], limit: 10 }));
 });
@@ -109,7 +109,7 @@ describe("My feeds menu", () => {
     show();
     await waitFor(() => expect(libraryApi.feeds).toHaveBeenCalledTimes(1));
 
-    useAuthStore.getState().login({ id: 2, email: "r2@cit.edu", role_name: "Student" } as unknown as User, "a", "r");
+    useAuthStore.getState().login({ id: 2, email: "r2@cit.edu", role_name: "Student" } as unknown as User, "a");
 
     await waitFor(() => expect(libraryApi.feeds).toHaveBeenCalledTimes(2));
   });

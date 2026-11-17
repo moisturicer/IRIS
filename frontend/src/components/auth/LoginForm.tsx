@@ -8,6 +8,11 @@ import { Button, Input } from "@/components/ui";
 export interface LoginFormValues {
   identifier: string;
   password: string;
+  /**
+   * "Keep me signed in" (ADR-072): off by default, so a shared lab PC keeps the
+   * 30-minute idle sign-out unless someone chooses otherwise.
+   */
+  remember: boolean;
 }
 
 const loginSchema = z.object({
@@ -17,6 +22,7 @@ const loginSchema = z.object({
     .min(1, "Email is required.")
     .email("Enter a valid email address."),
   password: z.string().min(1, "Password is required."),
+  remember: z.boolean(),
 });
 
 interface LoginFormProps {
@@ -42,7 +48,7 @@ export function LoginForm({
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { identifier: "", password: "" },
+    defaultValues: { identifier: "", password: "", remember: false },
     // An error shows once its field was left, and is re-checked as it is typed;
     // submitting checks both at once. An untouched field shows none.
     mode: "onTouched",
@@ -104,7 +110,21 @@ export function LoginForm({
       {/* Self-service recovery (IR-642, ADR-045 §7). IR-536's disclosure
           naming RDCO answered a dead end; there is a journey now, and RDCO
           stays as support guidance in its email and confirmation. */}
-      <div className="-mt-1 flex justify-end">
+      <div className="-mt-1 flex flex-wrap items-center justify-between gap-x-4">
+        {/* ADR-072 decision 3. Off by default: unticked, the session ends after
+            30 idle minutes; ticked, it lasts 30 days from sign-in. */}
+        <div className="flex items-center gap-2.5">
+          <input
+            {...register("remember")}
+            type="checkbox"
+            id="login-remember"
+            disabled={disabled}
+            className="h-4 w-4 shrink-0 cursor-pointer accent-brand"
+          />
+          <label htmlFor="login-remember" className="flex min-h-11 cursor-pointer items-center text-small text-stone-700">
+            Keep me signed in for 30 days
+          </label>
+        </div>
         <Link
           to="/password/forgot"
           // The same 44px target as the Show toggle above (2.5.5).

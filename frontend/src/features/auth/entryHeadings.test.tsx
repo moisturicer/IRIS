@@ -37,7 +37,6 @@ function renderStanding(roleRequest: OwnRoleRequest) {
   useAuthStore.setState({
     user: makeUser({ role: null, role_name: null, role_request: roleRequest }),
     accessToken: "access",
-    refreshToken: "refresh",
     isAuthenticated: true,
   });
   renderScreen(<PendingApprovalPage />);
@@ -129,7 +128,7 @@ function headingLevel(heading: HTMLElement): number {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+  useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false });
 });
 
 describe.each(SCREENS)("the $name screen", ({ render, title, headline }) => {
