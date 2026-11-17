@@ -72,6 +72,10 @@ OWNS_SAVED_REPLY = OWNS_FEED
 OWNS_FOLDER = OWNS_FEED
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY, DENY)
+#: Reading them: the same, plus the record's Adviser, who reads and downloads
+#: but never uploads or deletes (`may_read_record_documents`, IR-1200,
+#: ADR-022 §Amendment 6).
+READS_DOCUMENTS = row(ANON, DENY, OK, OK, OK, OK, OK, OK, DENY, DENY)
 
 #: ADR-022 Â§Amendment 4 point 4, recorded 2026-09-24: `authorize_record_documents`
 #: answers 403 even to a caller who cannot see the Record, because the Record id
@@ -476,17 +480,17 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
         {"POST": _case(DOCUMENTS, data=SLOT_UPLOAD, format="multipart")},
         waiver=DOCUMENTS_EXCEPTION,
     ),
-    "record-slot-list": Entry({"GET": _case(DOCUMENTS, kwargs={"pk": Ref("record")})},
+    "record-slot-list": Entry({"GET": _case(READS_DOCUMENTS, kwargs={"pk": Ref("record")})},
                               waiver=DOCUMENTS_EXCEPTION),
-    "record-uploads": Entry({"GET": _case(DOCUMENTS, query=ON_RECORD)}, waiver=DOCUMENTS_EXCEPTION),
-    "record-files": Entry({"GET": _case(DOCUMENTS, query=ON_RECORD)}, waiver=DOCUMENTS_EXCEPTION),
-    "record-files-download-all": Entry({"GET": _case(DOCUMENTS, query=ON_RECORD)},
+    "record-uploads": Entry({"GET": _case(READS_DOCUMENTS, query=ON_RECORD)}, waiver=DOCUMENTS_EXCEPTION),
+    "record-files": Entry({"GET": _case(READS_DOCUMENTS, query=ON_RECORD)}, waiver=DOCUMENTS_EXCEPTION),
+    "record-files-download-all": Entry({"GET": _case(READS_DOCUMENTS, query=ON_RECORD)},
                                        waiver=DOCUMENTS_EXCEPTION),
 
     # -- one upload or file, named by its own id: the 404 convention ------
     "record-upload-download": Entry({
         "GET": _case(
-            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE, HIDE),
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE),
             kwargs=UPLOAD,
         ),
     }),
@@ -498,7 +502,7 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     }),
     "record-file-download": Entry({
         "GET": _case(
-            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE, HIDE),
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE),
             kwargs=RECORD_FILE,
         ),
     }),

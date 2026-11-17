@@ -248,7 +248,7 @@ The Documents page offered owners an upload only while a Record is `draft` or `d
 
 **2. The requesting party cannot fulfil its own request.** It amends §3. Fulfilment is by the Record owner or an authorised submitter. A reviewer or office that asked for a document may accept, reject or withdraw (§3.4, §4). It may **not** answer its own request by uploading the file just because staff have generic document-upload permission (`authorize_record_documents` admits every office). As implemented in IR-262, any staff upload against an item fulfils it. **Built for `request_item` uploads in [IR-263](https://citiris.atlassian.net/browse/IR-263)** (`requests.may_fulfil`: a Record owner, otherwise 403 with the item left `missing` and nobody notified). **Slot uploads: built in IR-346** — a staff or reviewer upload into a requested slot is stored as before and answers nothing.
 
-**3. The picklist route.** It adds to §5. `GET /api/v1/records/<id>/document-requests/slots/` serves the record type's upload slots, excluding any ad-hoc slot. It is served per Record because Record detail names its type rather than giving its id, and because Advisers cannot use the documents app's per-record slot listing. Record detail also carries `can_request_document`, the parties the viewer may ask as. Both shipped in IR-262, and **both are retained as intentional additions to this ADR's API**. The picklist serves slot names only, not request data, so point 5 does not restrict it.
+**3. The picklist route.** It adds to §5. `GET /api/v1/records/<id>/document-requests/slots/` serves the record type's upload slots, excluding any ad-hoc slot. It is served per Record because Record detail names its type rather than giving its id, and because Advisers cannot use the documents app's per-record slot listing (no longer true since Amendment 6, which lets the Adviser read it; the picklist route stays). Record detail also carries `can_request_document`, the parties the viewer may ask as. Both shipped in IR-262, and **both are retained as intentional additions to this ADR's API**. The picklist serves slot names only, not request data, so point 5 does not restrict it.
 
 **4. 404 versus 403. The convention is kept, and so is one existing exception.**
 
@@ -317,6 +317,27 @@ Uninvolved offices and public readers may not.
 - any other request metadata.
 
 This includes the tracker's per-party `awaiting_document` flag, because it names the requesting party. For such a viewer the flag is `null`, meaning "not disclosed". Owners and participating parties see everything.
+
+## Amendment 6 — 2026-11-17: the Adviser reads the documents of the papers they advise
+
+Decided by Hermoine Zozobrado on 2026-11-17 for [IR-1200](https://citiris.atlassian.net/browse/IR-1200), part of the review-page cleanup (IR-1199). **Security review: approved verbally by Ashlee, relayed by Hermoine Zozobrado on 2026-11-17.** The project lead accepts it by merging this amendment.
+
+**The problem.** The documents app's listing routes refused the record's Adviser with 403, because `authorize_record_documents` asked `owns_or_staffs_record`, and an Adviser is neither an owner nor office staff. Point 3 above already worked around it for the picklist ("Advisers cannot use the documents app's per-record slot listing"). The Adviser reviews the paper first, but on the review page saw "Could not load this record's files" and could not open an Ethics Clearance or a Consent Paper the owner had uploaded.
+
+**The rule.** The record's Adviser (`record.adviser`) may **read and download** its documents, and may not write any of them:
+
+| Route | Owner | Office staff | The record's Adviser | Anyone else |
+|---|---|---|---|---|
+| `GET documents/records/<id>/slots/`, `GET documents/uploads/?record=`, `GET documents/files/?record=`, `GET documents/files/download-all/?record=` | Yes | Yes | **Yes** (was 403) | 403 |
+| `GET documents/uploads/<id>/download/`, `GET documents/files/<id>/download/` | Yes | Yes | **Yes** (was 403) | 404 or 403, as before |
+| `POST documents/submit/`, `POST documents/uploads/create/`, `DELETE documents/uploads/<id>/`, `DELETE documents/files/<id>/` | as before | as before | **No** (403) | as before |
+
+- **Who counts.** Whoever `record.adviser` names right now. RDCO's replacement (`rdco_acts.replace_adviser`) changes the field, so a replaced Adviser loses access at once. When nobody replaces them, access continues after the review ends, the same as an owner's.
+- **One predicate.** `core.permissions.may_read_record_documents` is `owns_or_staffs_record` plus the Adviser. `authorize_record_documents(..., reading=True)` uses it on the four listing routes, and the two download views call it directly. The upload and delete routes keep `owns_or_staffs_record`, so this amendment admits no new writer.
+- **Request data is unchanged.** Reading a file is not reading the requests around it. Who asked for a document, its messages and reject reasons stay under point 5 (`may_read_requests`), which already admits an Adviser who took part.
+- **The 403 exception in point 4 still covers these routes.** An Adviser of some other paper is "anyone else".
+
+The access matrix declares it (`apps/tests/access/table.py`, `READS_DOCUMENTS`), and `apps/documents/tests/test_record_document_authorization.py::AdviserReadsDocumentsTests` proves the Adviser, a replaced Adviser, an unrelated Adviser and a finished review at the HTTP routes.
 
 ## Alternatives Considered
 

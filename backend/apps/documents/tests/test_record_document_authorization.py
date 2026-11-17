@@ -662,3 +662,78 @@ class RecordFileAdminTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertTrue(RecordFile.objects.filter(pk=self.record_file.pk).exists())
         self.assertTrue(default_storage.exists(self.record_file.file.name))
+
+
+class AdviserReadsDocumentsTests(RecordDocumentAuthorizationTests):
+    """
+    IR-1200 (ADR-022 §Amendment 6): the record's Adviser reads and downloads
+    its documents, and writes none of them. Access follows `record.adviser`,
+    so it ends when RDCO replaces them and outlasts the review otherwise.
+
+    Inherits the IR-153 fixture and its tests, so the owner/staff/stranger
+    guarantees are rechecked on a record that now has an Adviser.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.adviser = self.make_user("doc-adviser@cit.edu", "Adviser")
+        self.other_adviser = self.make_user("doc-other-adviser@cit.edu", "Adviser")
+        self.record.adviser = self.adviser
+        self.record.save(update_fields=["adviser"])
+        self.record_file = RecordFile.objects.get(record=self.record)
+
+    def _reads(self):
+        return {
+            "GET  /documents/records/<id>/slots/":   self._slots,
+            "GET  /documents/uploads/?record=":      self._uploads,
+            "GET  /documents/files/?record=":        self._files,
+            "GET  /documents/files/download-all/":   self._download_all,
+            "GET  /documents/uploads/<id>/download/": lambda: self.client.get(
+                f"/api/v1/documents/uploads/{self.upload.pk}/download/"),
+            "GET  /documents/files/<id>/download/":  lambda: self.client.get(
+                f"/api/v1/documents/files/{self.record_file.pk}/download/"),
+        }
+
+    def test_the_adviser_reads_and_downloads_every_document(self):
+        self.client.force_authenticate(self.adviser)
+        for label, call in self._reads().items():
+            with self.subTest(endpoint=label):
+                self.assertEqual(call().status_code, status.HTTP_200_OK, f"{label} refused the Adviser")
+
+    def test_the_adviser_uploads_nothing_and_deletes_nothing(self):
+        self.client.force_authenticate(self.adviser)
+        before = RecordUpload.objects.filter(record=self.record).count()
+        self.assertEqual(self._submit().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._upload_create().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            self.client.delete(f"/api/v1/documents/uploads/{self.upload.pk}/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/v1/documents/files/{self.record_file.pk}/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(RecordUpload.objects.filter(record=self.record).count(), before)
+        self.assertTrue(RecordFile.objects.filter(pk=self.record_file.pk).exists())
+
+    def test_a_replaced_adviser_is_refused(self):
+        self.record.adviser = self.other_adviser
+        self.record.save(update_fields=["adviser"])
+        self.client.force_authenticate(self.adviser)
+        for label, call in self._reads().items():
+            with self.subTest(endpoint=label):
+                self.assertGreaterEqual(call().status_code, 400, f"{label} served a replaced Adviser")
+
+    def test_an_adviser_of_other_papers_is_refused(self):
+        self.client.force_authenticate(self.other_adviser)
+        for label, call in self._reads().items():
+            with self.subTest(endpoint=label):
+                self.assertGreaterEqual(call().status_code, 400, f"{label} served an unrelated Adviser")
+
+    def test_the_adviser_keeps_access_after_the_review_ends(self):
+        self.record.pipeline_status = "published"
+        self.record.save(update_fields=["pipeline_status"])
+        self.client.force_authenticate(self.adviser)
+        for label, call in self._reads().items():
+            with self.subTest(endpoint=label):
+                self.assertEqual(call().status_code, status.HTTP_200_OK, f"{label} refused the Adviser")
