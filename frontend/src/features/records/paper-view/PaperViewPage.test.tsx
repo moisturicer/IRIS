@@ -46,8 +46,6 @@ import type { PaperDetails, PaperPerson, Readiness, ReadinessItem, RecordDetail,
 import { recordsApi } from "@/api/records";
 import { libraryApi } from "@/api/library";
 import { RequestTimeoutError } from "@/api/requestPolicy";
-import { documentsApi } from "@/api/documents";
-import * as utils from "@/lib/utils";
 import { seatsApi } from "@/api/reviews";
 
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
@@ -2397,8 +2395,8 @@ describe("the Review section (IR-412)", () => {
     expect(screen.queryByRole("button", { name: /Add a colleague/ })).not.toBeInTheDocument();
     expect(within(side).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
       // IR-1193: keywords are pills under Classification; due dates sit on each reviewer's line.
-      "Reviewers", "Researchers", "Adviser", "Classification", "Flagged by the authors",
-      "Version", "Documents", expect.stringMatching(/participants?$/),
+      // Changed deliberately by IR-1202: Version and Documents are one Version history; Participants is gone.
+      "Reviewers", "Researchers", "Adviser", "Classification", "Flagged by the authors", "Version history",
     ]);
 
     const adviser = within(side).getAllByRole("button", { name: /Ada Adviser/ })[0];
@@ -2473,11 +2471,10 @@ describe("the Review section (IR-412)", () => {
     expect(within(side).getByRole("button", { name: /Add a colleague/ })).toBeInTheDocument();
   });
 
-  it("draws one row per reviewer with Kept, a revision request, Compare and Copy link (IR-1193)", async () => {
+  // Changed deliberately by IR-1202: Compare (the Changes tab's) and Copy link left Details,
+  // and the Version line is Version history's, tested in "Version history (IR-1202)".
+  it("draws one row per reviewer with Kept and a revision request (IR-1193)", async () => {
     workspaceAt(1600);
-    const writeText = vi.fn(() => Promise.resolve());
-    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload,
       resubmissions: [{ id: 5, party: "ierc", label: "IERC", state: "open", state_label: "Open", reason: "Assent form", review: 1,
         version: 1, requested_by: "Marco Lim", created_at: "2026-09-30T08:00:00Z", resolved_at: null }],
@@ -2494,37 +2491,17 @@ describe("the Review section (IR-412)", () => {
       { number: 1, cause: "submission", cause_label: "Submission", created_at: "2026-09-05T08:00:00Z", created_by_name: "Rhea Owner", manuscript_url: PAPER_URL },
       { number: 2, cause: "revision", cause_label: "Revision", created_at: "2026-10-07T08:00:00Z", created_by_name: "Rhea Owner", manuscript_url: PAPER_URL },
     ] };
-    try {
-      signInAs(2, "ITSO");
-      renderPaper(`/records/${RECORD_ID}?section=review`);
-      const side = await openDetails();
-      const itso = within(await within(side).findByRole("list", { name: "Reviewing for ITSO" })).getByRole("listitem");
-      // A clearance kept through the resubmission says so, with the server's words on hover.
-      expect(within(itso).getByText("Kept")).toHaveAttribute("title", "Cleared on v1, preserved");
-      expect(itso).toHaveTextContent(/Irene VillanuevaITSO · Sep 2, 2026Kept$/);
-      const ierc = within(within(side).getByRole("list", { name: "Reviewing for IERC" })).getByRole("listitem");
-      expect(ierc).toHaveTextContent(/IERC · Since /);
-      expect(ierc).toHaveTextContent("Requested revision on v1");
-      expect(ierc).toHaveTextContent("Reviewing");
-
-      const version = within(within(side).getByRole("heading", { name: "Version" }).closest("section")!);
-      expect(version.getByText((_, el) => el?.tagName === "P" && /^v2 · Revision · /.test(el.textContent ?? ""))).toBeInTheDocument();
-      expect(version.getByText(/^First sent /)).toBeInTheDocument();
-
-      await userEvent.click(within(side).getByRole("button", { name: "Copy link to this review" }));
-      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/records/${RECORD_ID}?section=review`);
-      expect(within(side).getByRole("status")).toHaveTextContent("Link copied");
-
-      // Changes loads its comparison once shown; this test only needs to see it open.
-      const api = recordsApi as unknown as { compareVersions?: unknown };
-      api.compareVersions = vi.fn(() => new Promise(() => {}));
-      await userEvent.click(version.getByRole("button", { name: "Compare 2 versions" }));
-      expect(screen.getByRole("tab", { name: "Changes" })).toHaveAttribute("aria-selected", "true");
-    } finally {
-      delete (recordsApi as unknown as { compareVersions?: unknown }).compareVersions;
-      if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
-      else delete (navigator as { clipboard?: unknown }).clipboard;
-    }
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const side = await openDetails();
+    const itso = within(await within(side).findByRole("list", { name: "Reviewing for ITSO" })).getByRole("listitem");
+    // A clearance kept through the resubmission says so, with the server's words on hover.
+    expect(within(itso).getByText("Kept")).toHaveAttribute("title", "Cleared on v1, preserved");
+    expect(itso).toHaveTextContent(/Irene VillanuevaITSO · Sep 2, 2026Kept$/);
+    const ierc = within(within(side).getByRole("list", { name: "Reviewing for IERC" })).getByRole("listitem");
+    expect(ierc).toHaveTextContent(/IERC · Since /);
+    expect(ierc).toHaveTextContent("Requested revision on v1");
+    expect(ierc).toHaveTextContent("Reviewing");
   });
 
   it("withholds who reviews, due dates and participants when the review is not readable (IR-681)", async () => {
@@ -2567,8 +2544,8 @@ describe("the Review section (IR-412)", () => {
     await within(side).findByRole("heading", { name: "Researchers" });
     expect(within(side).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
       // IR-685: the heading no longer counts parties; every party is listed.
-      "Reviewers", "Researchers", "Adviser", "Classification", "Flagged by the authors",
-      "Version", "Documents", "3 participants",
+      // Changed deliberately by IR-1202: Version history replaces Version and Documents; Participants is gone.
+      "Reviewers", "Researchers", "Adviser", "Classification", "Flagged by the authors", "Version history",
     ]);
     const section = (name: string) => within(within(side).getByRole("heading", { name }).closest("section")!);
     expect(section("Researchers").getByRole("button", { name: "Rhea Owner" })).toBeInTheDocument();
@@ -2577,21 +2554,14 @@ describe("the Review section (IR-412)", () => {
     expect(section("Classification").getByText("BS Computer Science")).toBeInTheDocument();
     expect(section("Classification").getByText("0613")).toBeInTheDocument();
     expect(section("Flagged by the authors").getByText("KTTO")).toHaveAttribute("title", "The author flagged possible commercialisation.");
-    // IR-1193 bolds the version number, so the line is matched whole.
-    expect(section("Version").getByText((_, el) => el?.tagName === "P" && /^v1 · /.test(el.textContent ?? ""))).toBeInTheDocument();
+    expect(within(side).getByRole("heading", { name: "Version history" }).closest("section")).toHaveTextContent("Manuscript v1 · submitted October 30, 2026");
     // IR-1193: the due date is on the reviewer's own line, overdue emphasised; IERC asks for nobody here.
     expect(section("Classification").getByRole("list", { name: "Type, area and keywords" })).toHaveTextContent("groundwater");
     const ianRow = within(section("Reviewers").getByRole("list", { name: "Reviewing for ITSO" })).getByRole("listitem");
     expect(within(ianRow).getByText(/Overdue: was due/)).toHaveClass("text-brand");
     expect(side).not.toHaveTextContent("Clock paused while waiting on the submitter");
-    const saved = vi.spyOn(utils, "downloadBlob").mockImplementation(() => {});
-    vi.mocked(recordsApi.versionManuscriptBlob).mockResolvedValueOnce({ data: new Blob(["manuscript"]) } as never);
-    await userEvent.click(within(side).getByRole("button", { name: "consent.pdf" }));
-    expect(documentsApi.downloadFile).toHaveBeenCalledWith(88);
-    expect(saved).toHaveBeenCalledWith(expect.any(Blob), "consent.pdf");
-    await userEvent.click(within(side).getByRole("button", { name: "Manuscript · v1" }));
-    expect(recordsApi.versionManuscriptBlob).toHaveBeenCalledWith(RECORD_ID, 1);
-    expect(saved).toHaveBeenCalledWith(expect.any(Blob), "manuscript.pdf");
+    // Changed deliberately by IR-1202: Details no longer downloads; files are the Documents tab's (IR-1203).
+    expect(side).not.toHaveTextContent("consent.pdf");
     const adviser = section("Adviser").getByRole("button", { name: "Ada Adviser" });
     await userEvent.click(adviser);
     const profile = screen.getByRole("dialog", { name: "Ada Adviser" });
@@ -2631,23 +2601,9 @@ describe("the Review section (IR-412)", () => {
     expect(within(profile).queryByText("Program")).not.toBeInTheDocument();
   });
 
-  it("reports an authenticated document download failure and allows retry (IR-686)", async () => {
-    workspaceAt(1600);
-    shownRecord = { ...inReview, ...reviewing };
-    vi.mocked(recordsApi.manuscriptBlob).mockRejectedValueOnce(new Error("unavailable"));
-    signInAs(2, "ITSO");
-    renderPaper(`/records/${RECORD_ID}?section=review`);
-    const side = await openDetails();
-    const manuscript = await within(side).findByRole("button", { name: "Manuscript" });
-    await userEvent.click(manuscript);
-    expect(await within(side).findByRole("alert")).toHaveTextContent("Could not download Manuscript. Please try again.");
-    expect(manuscript).toBeEnabled();
-    const saved = vi.spyOn(utils, "downloadBlob").mockImplementation(() => {});
-    vi.mocked(recordsApi.manuscriptBlob).mockResolvedValueOnce({ data: new Blob(["pdf"]) } as never);
-    await userEvent.click(manuscript);
-    expect(saved).toHaveBeenCalledWith(expect.any(Blob), "manuscript.pdf");
-    expect(within(side).queryByRole("alert")).not.toBeInTheDocument();
-  });
+  // IR-686's "reports an authenticated document download failure and allows
+  // retry" was removed deliberately by IR-1202: Details no longer downloads
+  // anything. The documents drawer keeps its own download tests.
 
   it("takes See what it depends on to Details and focuses the facts, in a narrow workspace too (IR-1094)", async () => {
     workspaceAt(1000);

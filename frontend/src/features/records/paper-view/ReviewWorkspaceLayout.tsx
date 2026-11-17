@@ -344,8 +344,7 @@ export function ReviewWorkspaceLayout({
       readiness={authorView ? null : record.readiness} onReadinessAction={authorView ? undefined : onReadinessAction}
       requestReview={mayRequest ? { targets: targets.map((t) => t.label), onOpen: () => { setRouted(""); setRequesting(true); } } : undefined}
       addColleague={<ReviewActionBar record={record} can={can} actions={ADD_COLLEAGUE} label="Reviewer actions"
-        primary={false} onChanged={onChanged} className="pt-1" />}
-      onAllDocuments={() => onDocuments(true)} onCompare={comparable && !authorView ? () => reveal("changes") : undefined} />
+        primary={false} onChanged={onChanged} className="pt-1" />} />
     </div>
   );
   const RouteDialog = ROUTE?.Dialog;

@@ -637,6 +637,19 @@ export interface VersionDocument {
   version:      number;
   uploaded_at:  string;
   download_url: string;
+  /**
+   * Each time this upload was rejected, oldest first (IR-1201). Null to a
+   * viewer who may not read document requests (ADR-022 §Amendment 5).
+   */
+  rejections?:  VersionDocumentRejection[] | null;
+}
+
+/** A requesting party's rejection of one upload, with its reason (IR-1201). */
+export interface VersionDocumentRejection {
+  party:            string;
+  reason:           string;
+  rejected_by_name: string | null;
+  rejected_at:      string;
 }
 
 /**
