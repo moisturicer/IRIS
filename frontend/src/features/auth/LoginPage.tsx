@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useNoticeStore } from "@/store/notice.store";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
@@ -55,7 +55,12 @@ export default function LoginPage() {
   const navigate       = useNavigate();
   const location       = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { login }      = useAuth();
+  const { login, user: signedInUser, isAuthenticated } = useAuth();
+  /**
+   * Set while this screen's own sign-in is completing, so the signed-in
+   * redirect below does not race `handleLogin`'s own navigation (IR-1215).
+   */
+  const signingIn = useRef(false);
   const [loginAlert, setLoginAlert]     = useState<LoginAlert | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutOpen, setLockoutOpen]   = useState(false);
@@ -81,6 +86,15 @@ export default function LoginPage() {
     const fromState = (location.state as { from?: unknown } | null)?.from;
     return safeRedirectPath(fromState) ?? safeRedirectPath(searchParams.get("next"));
   });
+  /**
+   * Where a signed-in person goes from here: the saved page when their role may
+   * open it, else their landing page (IR-1207). A saved page is often one of
+   * the account that signed out before them, which this account may not open.
+   * A page typed while signed in still meets the guard's "not for you" screen;
+   * only this return trip skips it.
+   */
+  const destinationFor = (user: User) =>
+    redirectTo && mayReturnTo(user, redirectTo) ? redirectTo : landingPathFor(user);
   // IR-642: Settings sends a person here after changing their password,
   // which ends every session. Read once, like `redirectTo`.
   const [passwordChanged, setPasswordChanged] = useState(
@@ -185,18 +199,15 @@ export default function LoginPage() {
       const res = await authApi.login({ email: loginId, password: data.password });
       resetLoginAttempts(loginId);
       clearLockout(loginId);
+      signingIn.current = true;
       login(res.data.user, res.data.access, res.data.refresh);
       // Every other request is refused until they answer, so the guard shows
       // the notice before the page loads (IR-790).
       if (res.data.notice_answer_required) useNoticeStore.getState().require();
       // Back to the page they asked for, or -- when they simply came to sign
-      // in, asked for somewhere `safeRedirectPath` refused, or asked for a page
-      // this account's role may not open (IR-1207: often a page of the account
-      // that signed out before them) -- My Reviews when they have review work,
-      // otherwise Discover (IR-534). A page typed while signed in still meets
-      // the guard's "not for you" screen; only this return trip skips it.
-      const user = res.data.user;
-      navigate(redirectTo && mayReturnTo(user, redirectTo) ? redirectTo : landingPathFor(user), { replace: true });
+      // in, or asked for somewhere `safeRedirectPath` or their role refused --
+      // My Reviews when they have review work, otherwise Discover (IR-534).
+      navigate(destinationFor(res.data.user), { replace: true });
     } catch (err: unknown) {
       const failure = classifyLoginFailure(err);
 
@@ -232,6 +243,13 @@ export default function LoginPage() {
   // than just tinting a border, as it did before IR-204.
   const showFieldError = loginAlert?.kind === "credentials" && !lockoutOpen;
   const attemptsLeft = LOGIN_FAILURE_LIMIT - failedAttempts;
+
+  // Someone whose session is still valid has nothing to do here (IR-1215).
+  // `AuthBootstrap` renders no page until the session is restored, so this
+  // reads the settled answer, never the moment before a refresh completes.
+  if (isAuthenticated && signedInUser && !signingIn.current) {
+    return <Navigate to={destinationFor(signedInUser)} replace />;
+  }
 
   return (
     <EntryFrame

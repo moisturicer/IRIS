@@ -20,6 +20,7 @@ import { noticeApi } from "@/api/notice";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { landingPathFor } from "@/lib/landing";
+import { setStoredRefreshToken } from "@/lib/authStorage";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
@@ -331,6 +332,50 @@ describe("where the login screen sends you", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
     });
+  });
+
+  it("sends someone already signed in straight to their home page, without the form (IR-1215)", async () => {
+    useAuthStore.setState({ user: KTTO_USER, accessToken: "access-token", isAuthenticated: true });
+    renderLoginAt("/login");
+
+    expect(await screen.findByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
+  });
+
+  it("sends someone already signed in to the page they asked for, when their role may open it (IR-1215)", async () => {
+    useAuthStore.setState({ user: KTTO_USER, accessToken: "access-token", isAuthenticated: true });
+    renderLoginAt("/login?next=%2Frecords%2F42");
+
+    expect(await screen.findByRole("heading", { name: "landed on /records/42" })).toBeInTheDocument();
+  });
+
+  it("still shows the form to someone whose session has ended (IR-1215)", () => {
+    useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false });
+    renderLoginAt("/login");
+
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("shows the form when the silent refresh on load fails, and does not redirect (IR-1215)", async () => {
+    // The real restore path: a stored refresh token the server now refuses.
+    setStoredRefreshToken("revoked-refresh-token");
+    vi.spyOn(authApi, "refreshToken").mockRejectedValue({ response: { status: 401, data: {} } });
+    await useAuthStore.getState().hydrateAuth();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+
+    renderLoginAt("/login");
+
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /landed on/ })).not.toBeInTheDocument();
+  });
+
+  it("still shows why a password change signed someone out, with the redirect in place (IR-1215)", () => {
+    // Settings signs the person out before it sends them here, so the store is
+    // signed out and the dialog, not the redirect, is what they see.
+    renderLoginAt("/login", { reason: "password_changed" });
+
+    expect(screen.getByRole("dialog", { name: "Password Changed" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /landed on/ })).not.toBeInTheDocument();
   });
 
   it("honours a destination that survived a full page load in the query string", async () => {
