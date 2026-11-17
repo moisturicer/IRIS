@@ -28,7 +28,7 @@ JWT through SimpleJWT, with rotation and blacklist after rotation.
 | Control | How it works today |
 |---|---|
 | Access token | 30 minutes by default |
-| Refresh token | 7 days by default, the absolute limit on a session. Used once, then blacklisted. Only the refresh token is stored in the browser, in `sessionStorage` (`frontend/src/lib/authStorage.ts`) |
+| Refresh token | 7 days by default, counted from the last refresh: rotation gives each new token a fresh 7 days (simplejwt `set_exp`), so this is not an absolute limit on a session; the 30-minute inactivity rule ends sessions long before it (ADR-072 §Context). Used once, then blacklisted. Only the refresh token is stored in the browser, in `sessionStorage` (`frontend/src/lib/authStorage.ts`) |
 | Refresh in the client | `refreshOnce` shares one refresh between concurrent 401s, and the new pair goes through `setTokens` (`frontend/src/api/client.ts`) |
 | Inactivity | A session idle for 30 minutes is ended on the server for good, and polling doesn't count as activity ([IR-166](https://citiris.atlassian.net/browse/IR-166), `apps/accounts/sessions.py`) |
 | Failed sign-ins | **Switched off by default for now** ([IR-865](https://citiris.atlassian.net/browse/IR-865)); `AXES_ENABLED=True` turns it on. When on, `django-axes` locks a username and client address pair after 3 failures for 10 minutes by default, answering 429 with `unlock_at`. The address comes from `TRUSTED_PROXY_COUNT`, so it is the real client behind nginx ([IR-656](https://citiris.atlassian.net/browse/IR-656)) |
