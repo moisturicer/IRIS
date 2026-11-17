@@ -566,7 +566,7 @@ class SessionEndReason(models.TextChoices):
     PASSWORD_CHANGED = "password_changed", "Password changed"
     REVOKED = "revoked", "Revoked by an administrator"
     #: A remembered sign-in reached its fixed end, 30 days after sign-in (ADR-072 decision 4).
-    EXPIRED = "expired", "Remembered sign-in ran out"
+    EXPIRED = "remembered_expired", "Remembered sign-in ran out"
     #: The account was deleted (ADR-051 §11, IR-785).
     DELETED = "deleted", "Account deleted"
 

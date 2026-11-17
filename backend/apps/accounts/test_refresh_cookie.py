@@ -174,7 +174,7 @@ class KeepMeSignedInTests(CookieTestBase):
         me = self.get_me()
         self.assertEqual(me.status_code, 401)
         self.assertEqual(me.data["code"], "session_expired")
-        self.assertEqual(UserSession.objects.get(user=self.user).ended_reason, "expired")
+        self.assertEqual(UserSession.objects.get(user=self.user).ended_reason, "remembered_expired")
 
     def test_a_rotated_token_and_its_cookie_keep_the_sessions_end(self):
         self.sign_in(remember=True)

@@ -124,6 +124,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   hydrateAuth: async () => {
     // Keys an earlier version kept in this browser's own storage (ADR-072).
     clearAuthSession();
+    // Whether the server gave this browser a session before anything failed.
+    let restored = false;
     try {
       /**
        * Always asked, never assumed (ADR-072 decision 2).
@@ -143,6 +145,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         return { access: data.access, remembered: data.remembered };
       }));
 
+      restored = true;
       set({
         accessToken: tokens.access,
         remembered: tokens.remembered,
@@ -160,10 +163,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         return;
       }
       get().logout();
-      const code = (err as { response?: { data?: { code?: unknown } } })?.response?.data?.code;
-      // No session at all: this browser was never signed in, or signed out,
-      // which says nothing about a session ending.
-      if (code === NO_SESSION) return;
+      const response = (err as { response?: { status?: number; data?: { code?: unknown } } })?.response;
+      const code = response?.data?.code;
+      // Say a session ended only when one did: the server refused this
+      // browser's session (a 401 naming why), or restored it and the account
+      // then failed to load. No cookie (`no_session`) is a signed-out visitor,
+      // and a server that couldn't be reached says nothing either way: the
+      // cookie can't be read here, so there may never have been a session.
+      const refused = response?.status === 401 && code !== NO_SESSION;
+      if (!restored && !refused) return;
       // After `logout`, which would otherwise be read as an ordinary sign-out.
       set({ sessionLost: { code: typeof code === "string" ? code : null } });
     } finally {

@@ -23,6 +23,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='usersession',
             name='ended_reason',
-            field=models.CharField(blank=True, choices=[('logout', 'Signed out'), ('idle', 'Inactive too long'), ('locked', 'Account locked'), ('password_changed', 'Password changed'), ('revoked', 'Revoked by an administrator'), ('expired', 'Remembered sign-in ran out'), ('deleted', 'Account deleted')], max_length=32, null=True),
+            field=models.CharField(blank=True, choices=[('logout', 'Signed out'), ('idle', 'Inactive too long'), ('locked', 'Account locked'), ('password_changed', 'Password changed'), ('revoked', 'Revoked by an administrator'), ('remembered_expired', 'Remembered sign-in ran out'), ('deleted', 'Account deleted')], max_length=32, null=True),
         ),
     ]

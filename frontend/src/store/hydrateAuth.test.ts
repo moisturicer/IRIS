@@ -25,6 +25,9 @@ import { useAuthStore } from "./auth.store";
 import { useNoticeStore } from "./notice.store";
 import { __resetRefreshState } from "@/lib/tokenRefresh";
 
+/** The `sessionStorage` key ADR-072 retires. */
+const LEGACY_KEY = "iris_refresh_token";
+
 /** The browser's cookie jar: the refresh token the server last set, or none. */
 const jar: { cookie: string | null } = { cookie: null };
 /** Refresh tokens already exchanged, and therefore blacklisted. */
@@ -130,11 +133,11 @@ describe("hydrateAuth", () => {
   });
 
   it("deletes a token an earlier version stored in sessionStorage", async () => {
-    sessionStorage.setItem("iris_refresh_token", "from-before-ADR-072");
+    sessionStorage.setItem(LEGACY_KEY, "x"); // Any value: only its removal matters
 
     await useAuthStore.getState().hydrateAuth();
 
-    expect(sessionStorage.getItem("iris_refresh_token")).toBeNull();
+    expect(sessionStorage.getItem(LEGACY_KEY)).toBeNull();
   });
 
   it("signs out when the cookie is genuinely rejected", async () => {
@@ -215,6 +218,25 @@ describe("hydrateAuth", () => {
       await useAuthStore.getState().hydrateAuth();
 
       expect(useAuthStore.getState().sessionLost).toEqual({ code: null });
+    });
+
+    it("stays silent when the server can't be reached: there may never have been a session", async () => {
+      jar.cookie = "refresh-0";
+      refreshToken.mockRejectedValueOnce(new Error("Network Error"));
+
+      await useAuthStore.getState().hydrateAuth();
+
+      expect(useAuthStore.getState().isAuthenticated).toBe(false);
+      expect(useAuthStore.getState().sessionLost).toBeNull();
+    });
+
+    it("stays silent when the server answers with an error that isn't a refusal", async () => {
+      jar.cookie = "refresh-0";
+      refreshToken.mockRejectedValueOnce({ response: { status: 502, data: {} } });
+
+      await useAuthStore.getState().hydrateAuth();
+
+      expect(useAuthStore.getState().sessionLost).toBeNull();
     });
 
     it("clears the memory on the next sign-in", () => {

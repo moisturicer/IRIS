@@ -17,6 +17,9 @@ import { clearAuthSession } from "./authStorage";
 import { useAuthStore } from "@/store/auth.store";
 import { makeUser } from "@/test/authFixtures";
 
+/** The `sessionStorage` key ADR-072 retires. */
+const LEGACY_KEY = "iris_refresh_token";
+
 // Every key a refresh or access token was ever stored under: the
 // `sessionStorage` key ADR-072 retires, and two older orphans.
 const TOKEN_KEYS = ["iris_refresh_token", "refresh_token", "access_token"];
@@ -86,11 +89,11 @@ describe("a sign-in stores no token in the browser", () => {
   });
 
   it("deletes a token an earlier version stored", () => {
-    sessionStorage.setItem("iris_refresh_token", "from-before-ADR-072");
+    sessionStorage.setItem(LEGACY_KEY, "x"); // Any value: only its removal matters
 
     useAuthStore.getState().login(makeUser(), "access-1");
 
-    expect(sessionStorage.getItem("iris_refresh_token")).toBeNull();
+    expect(sessionStorage.getItem(LEGACY_KEY)).toBeNull();
   });
 
   it("deletes what an older build kept of the library in this browser", () => {
