@@ -1,8 +1,8 @@
 """
 IR-676: every copy saved through the download route is marked, or not served.
 
-The footer names the downloader on every page, a faint "CIT-U" is drawn over the
-content (IR-1127), and the PDF's metadata says the same (ADR-048, decisions 10
+The footer names the downloader on every page, a faint "PROPERTY OF / CIT-U / DO
+NOT DISTRIBUTE" is drawn over the content (IR-1127, IR-1198), and the PDF's metadata says the same (ADR-048, decisions 10
 and 11).
 
 **Seam: the API.** Pages are read back out of the response with pypdf.
@@ -12,6 +12,7 @@ from io import BytesIO
 from unittest import mock
 
 from django.core.files.base import ContentFile
+from django.test import SimpleTestCase
 from django.utils import timezone
 from pypdf import PdfReader, PdfWriter
 from reportlab.lib.utils import ImageReader
@@ -19,6 +20,7 @@ from reportlab.pdfgen import canvas
 from rest_framework import status
 
 from apps.audit.models import AuditEvent
+from apps.records import watermark
 from apps.records.test_download_grant import Fixtures, _user
 from core.enums import RequestStatus
 
@@ -158,8 +160,11 @@ class MarkedCopyTests(WatermarkFixtures):
         self.request_by()
 
         for page in self.copy().pages:
+            text = page.extract_text()
             # Once, in the footer's "via CIT-U IRIS"; the mark itself is drawn as shapes.
-            self.assertEqual(page.extract_text().count("CIT-U"), 1)
+            self.assertEqual(text.count("CIT-U"), 1)
+            self.assertNotIn("PROPERTY", text)
+            self.assertNotIn("DISTRIBUTE", text)
 
     def test_an_exempt_copy_says_why_in_place_of_a_request(self):
         self.use_manuscript(_text_pdf(pages=1))
@@ -351,3 +356,18 @@ class NoStoredCopyTests(WatermarkFixtures):
 
         with mock.patch("django.core.files.storage.base.Storage.save", side_effect=AssertionError("stored a copy")):
             self.copy()
+
+
+class MarkWordingTests(SimpleTestCase):
+    """IR-1198: the mark reads PROPERTY OF / CIT-U / DO NOT DISTRIBUTE, centred."""
+
+    def test_the_mark_has_three_lines_and_a_shape_for_every_letter(self):
+        self.assertEqual(watermark.MARK_LINES, ("PROPERTY OF", "CIT-U", "DO NOT DISTRIBUTE"))
+        for line in watermark.MARK_LINES:
+            for char in line.replace(" ", ""):
+                self.assertIn(char, watermark.MARK_GLYPHS)
+
+    def test_line_widths_match_the_readers_mark(self):
+        # ReaderWatermark.test.ts pins the same numbers, so the two marks stay one shape.
+        widths = [round(watermark._line_width(line), 6) for line in watermark.MARK_LINES]
+        self.assertEqual(widths, [11.6, 4.5, 16.6])
