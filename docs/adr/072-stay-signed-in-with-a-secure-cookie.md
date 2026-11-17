@@ -2,10 +2,10 @@
 
 ## Status
 
-**Proposed**, 2026-11-18 ([IR-1222](https://citiris.atlassian.net/browse/IR-1222)).
-- **Who decided what.** The choices in §Decision were made by Ashlee Sean on 2026-11-18: storage, the "Keep me signed in" checkbox and the 30-day limit. The ADR was drafted by an AI agent (Claude Code) at Ashlee's request.
-- **Awaiting acceptance** from the project lead on the PR. AI does not make architecture decisions (CLAUDE.md), so this ADR records a person's decisions. The two questions the first draft left open were settled by Ashlee on 2026-11-18 (§Questions settled while drafting).
-- **Not built.** IR-1222 builds it only after this ADR is accepted.
+**Accepted**, 2026-11-18, by Lee Jasmin Adolfo ([IR-1222](https://citiris.atlassian.net/browse/IR-1222)).
+- **How it was accepted:** verbally, to Ashlee Sean, who recorded it here the same day. There is no written approval on the PR.
+- **Who decided what.** The choices in §Decision were made by Ashlee Sean on 2026-11-18: storage, the "Keep me signed in" checkbox and the 30-day limit. The ADR was drafted by an AI agent (Claude Code) at Ashlee's request. AI does not make architecture decisions (CLAUDE.md). The two questions the first draft left open were settled by Ashlee (§Questions settled while drafting).
+- **Not built yet.** IR-1222 builds it.
 
 Amends [IR-166](https://citiris.atlassian.net/browse/IR-166)'s inactivity rule for remembered sessions only. Corrects `docs/security/SECURITY.md` §2 (see §Context, "The 7-day limit is not absolute").
 
