@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from django.db import transaction
-from core.permissions import IsStaff, owns_or_staffs_record
+from core.permissions import IsStaff, may_read_record_documents, owns_or_staffs_record
 from core.text_limits import too_long, too_long_message
 from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
@@ -13,7 +13,7 @@ from apps.audit.services import create_audit_event
 from .validators import is_pdf_upload, pdf_upload_problem
 
 
-def authorize_record_documents(request, record_id):
+def authorize_record_documents(request, record_id, *, reading=False):
     """
     Resolve `record_id` and confirm the caller may reach that record's documents.
 
@@ -36,6 +36,10 @@ def authorize_record_documents(request, record_id):
     is deliberate: the caller named the record id themselves, so a 404 would
     hide nothing, and 403 says what actually happened. `RecordViewSet` has the
     opposite problem -- there, the id is the thing being probed.
+
+    `reading=True` is for the listing routes only: it also admits the record's
+    Adviser, who reads and downloads but never writes (IR-1200, ADR-022
+    §Amendment 6). Every upload route leaves it off.
     """
     from apps.records.models import Record
 
@@ -51,7 +55,8 @@ def authorize_record_documents(request, record_id):
             {"detail": "Record not found."},
             status=status.HTTP_404_NOT_FOUND,
         )
-    if not owns_or_staffs_record(request.user, record):
+    allowed = may_read_record_documents if reading else owns_or_staffs_record
+    if not allowed(request.user, record):
         return None, Response(
             {"detail": "Permission denied."},
             status=status.HTTP_403_FORBIDDEN,
@@ -250,7 +255,7 @@ class RecordSlotListView(APIView):
 
         # IR-153: this returned the full upload history of any record to any
         # authenticated caller -- the serializer embeds every upload per slot.
-        record, denied = authorize_record_documents(request, pk)
+        record, denied = authorize_record_documents(request, pk, reading=True)
         if denied:
             return denied
         from django.db.models import Q
@@ -273,7 +278,9 @@ class RecordUploadListView(generics.ListAPIView):
         # because get_queryset() can only narrow rows, and narrowing to nothing
         # would answer a stranger with an empty 200 -- indistinguishable from a
         # record that genuinely has no uploads. A refusal should say so.
-        _, denied = authorize_record_documents(request, request.query_params.get("record"))
+        _, denied = authorize_record_documents(
+            request, request.query_params.get("record"), reading=True,
+        )
         if denied:
             return denied
         return super().list(request, *args, **kwargs)
@@ -379,7 +386,7 @@ class RecordUploadDownloadView(APIView):
     GET /documents/uploads/<id>/download/
     GET /documents/uploads/<id>/download/?inline=true  -- serve for in-browser viewing
 
-    Permission: any record owner OR staff (KTTO, RDCO, ITSO, IERC, Django staff).
+    Permission: any record owner, staff (KTTO, RDCO, ITSO, IERC), or its Adviser (IR-1200).
     Refusals follow ADR-022 §Amendment 4 (IR-627): see `_on_visible_record`.
     """
     permission_classes = [IsAuthenticated]
@@ -391,7 +398,7 @@ class RecordUploadDownloadView(APIView):
         if upload is None:
             return Response({"detail": "Upload not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not owns_or_staffs_record(request.user, upload.record):
+        if not may_read_record_documents(request.user, upload.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
@@ -419,7 +426,9 @@ class RecordFileListView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         # IR-153, same reasoning as RecordUploadListView.list().
-        _, denied = authorize_record_documents(request, request.query_params.get("record"))
+        _, denied = authorize_record_documents(
+            request, request.query_params.get("record"), reading=True,
+        )
         if denied:
             return denied
         return super().list(request, *args, **kwargs)
@@ -524,7 +533,7 @@ class RecordFileDownloadView(APIView):
     GET /documents/files/<id>/download/
     GET /documents/files/<id>/download/?inline=true  -- serve for in-browser viewing
 
-    Permission: any record owner OR staff.
+    Permission: any record owner, staff, or its Adviser (IR-1200).
     Refusals follow ADR-022 §Amendment 4 (IR-627): see `_on_visible_record`.
     """
     permission_classes = [IsAuthenticated]
@@ -534,7 +543,7 @@ class RecordFileDownloadView(APIView):
         if record_file is None:
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not owns_or_staffs_record(request.user, record_file.record):
+        if not may_read_record_documents(request.user, record_file.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
@@ -610,7 +619,7 @@ class RecordFileDownloadAllView(APIView):
         # old best-effort lookup that logged the audit event with record=None
         # when the id did not resolve.
         record_id = request.query_params.get("record")
-        record, denied = authorize_record_documents(request, record_id)
+        record, denied = authorize_record_documents(request, record_id, reading=True)
         if denied:
             return denied
 
