@@ -55,8 +55,9 @@ export function withOrder(query: DiscoverQuery, order: DiscoverOrder): DiscoverQ
 
 /** The URL keys Discover owns. Any other key (`publish`) is left alone. */
 const KEYS = ["q", "type", "college", "classification", "year_from", "year_to", "ip", "sort", "feed"] as const;
-/** Keys Discover once wrote and no longer reads; removed, never carried along (IR-947). */
-const RETIRED_KEYS = ["year"] as const;
+/** Keys Discover once wrote and no longer reads; removed, never carried along:
+ *  the single `year` (IR-947) and an open saved feed's id, `myfeed` (IR-1189). */
+const RETIRED_KEYS = ["year", "myfeed"] as const;
 
 const ORDERING: Record<DiscoverSort, string> = {
   newest: "-created_at",

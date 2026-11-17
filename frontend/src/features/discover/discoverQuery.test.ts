@@ -113,6 +113,11 @@ describe("writeDiscoverQuery", () => {
     expect(writeDiscoverQuery(new URLSearchParams("year=2026&q=rain"), parse("q=rain")).toString()).toBe("q=rain");
   });
 
+  it("removes an old saved-feed id, keeping that link's filters (IR-1189)", () => {
+    const old = new URLSearchParams("q=flood&classification=7&myfeed=5");
+    expect(writeDiscoverQuery(old, parseDiscoverQuery(old)).toString()).toBe("q=flood&classification=7");
+  });
+
     it("leaves keys it does not own, such as the Publish dialog's", () => {
     const written = writeDiscoverQuery(new URLSearchParams("publish=new&sort=bogus"), DEFAULT_QUERY);
     expect(written.toString()).toBe("publish=new");

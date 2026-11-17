@@ -52,8 +52,6 @@ import { looksLikeQuestion, searchTerms } from "./searchTerms";
 
 const PAGE_SIZE = 12;
 const COLUMNS_KEY = "iris.discover.columns";
-/** Named an open saved feed until IR-1189; removed from an old link on arrival. */
-const RETIRED_FEED_PARAM = "myfeed";
 
 type ColumnCount = 1 | 2 | 3;
 
@@ -192,12 +190,9 @@ export default function DiscoverPage() {
 
   const [citeRecord, setCiteRecord] = useState<RecordListItem | null>(null);
 
-  /* A hand-edited or stale URL is corrected to what was understood. `myfeed`
-     named an open saved feed, which Discover no longer offers (IR-1189): an old
-     link keeps its filters as plain ones and loses the id. */
+  /* A hand-edited or stale URL is corrected to what was understood. */
   useEffect(() => {
     const canonical = writeDiscoverQuery(searchParams, query);
-    canonical.delete(RETIRED_FEED_PARAM);
     if (canonical.toString() !== searchParams.toString()) {
       setSearchParams(canonical, { replace: true });
     }
