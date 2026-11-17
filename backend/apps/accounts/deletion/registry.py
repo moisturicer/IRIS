@@ -100,6 +100,7 @@ RELATIONS: dict[str, Rule] = {
     "documents.UploadReview.reviewed_by":   Rule(KEEP, "Review history"),
     "documents.RecordFile.uploaded_by":     Rule(KEEP, "A paper's files belong to the paper"),
     "documents.DocumentRequest.requested_by": Rule(KEEP, "Review history"),
+    "documents.DocumentRejection.rejected_by": Rule(KEEP, "Review history"),
     # --- notifications
     "notifications.Notification.sender":    Rule(KEEP, "A notice someone else received"),
     "notifications.Notification.recipient": Rule(DELETE, "The person's own notifications"),

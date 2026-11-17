@@ -821,7 +821,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
         ],
         # Each version is a timeline entry of its own (ADR-032 §5, IR-416).
         # Review material, so `None` to a viewer who may not read the review.
-        "versions": versions_payload(record) if readable else None,
+        "versions": versions_payload(record, disclose_requests=disclose_requests) if readable else None,
         # The review discussion (ADR-032 §7, IR-419), oldest first. `None`,
         # as `reviews` is, to a viewer who may not read the review.
         "review_comments": comments_payload(record, user) if readable else None,

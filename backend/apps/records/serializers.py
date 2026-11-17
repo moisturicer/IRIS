@@ -473,11 +473,14 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         material: `None` -- not disclosed, which is not `[]` -- to a viewer
         who may not read the review (IR-479).
         """
+        from apps.documents.requests import may_read_requests
+
         from .versions import versions_payload
 
         if not self._readable(obj):
             return None
-        return versions_payload(obj)
+        # Each document's rejections are request data (IR-1201, ADR-022 §Amendment 5).
+        return versions_payload(obj, disclose_requests=may_read_requests(obj, self._viewer()))
 
     def get_paper_details(self, obj):
         from .paper_details import paper_details
