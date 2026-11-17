@@ -1,7 +1,7 @@
 // IR-1209: selecting text in the paper reader must not jump to unrelated text.
-// jsdom has no layout, so this is the one place a real drag is checked: a
-// two-column page, a drag along one line that ends over the gap between the
-// columns, and the selection must hold only that line's text.
+// jsdom has no layout, so this is the one place a real drag is checked: drags
+// on a two-column and a single-column page that end over a gap or a margin
+// must hold only the text dragged through.
 import type { Page, Route } from "@playwright/test";
 import { expect, test } from "./support/mock-api";
 import { PAPER, PAPER_DETAIL } from "./support/fixtures";
@@ -15,7 +15,7 @@ const RIGHT = ["Right column line one", "Right column line two", "Right column l
 
 const paperView = SCREENS.find((entry) => entry.id === "paper-view")!;
 
-async function openTwoColumnPaper(page: Page, api: MockApi) {
+async function openPaper(page: Page, api: MockApi, right: string[] = RIGHT) {
   await openScreen(page, api, { ...paperView, path: `/records/${PAPER.id}?section=paper` }, {
     override: (mock) => {
       mock.on("GET", `/records/${PAPER.id}/`, {
@@ -24,11 +24,12 @@ async function openTwoColumnPaper(page: Page, api: MockApi) {
       // The Paper section's Ask IRIS panel lists the reader's conversations.
       mock.on("GET", "/ai/runtime/conversations", { protocol: "runs-reader-1", conversations: [] });
       mock.on("GET", `/records/${PAPER.id}/manuscript/`, (route: Route) => route.fulfill({
-        status: 200, headers: { "content-type": "application/pdf" }, body: twoColumnPdf(LEFT, RIGHT),
+        status: 200, headers: { "content-type": "application/pdf" }, body: twoColumnPdf(LEFT, right),
       }));
     },
   });
-  const span = (text: string) => page.locator(".textLayer span", { hasText: text }).first();
+  // Each line is one span of the text layer, found by its exact text.
+  const span = (text: string) => page.getByText(text, { exact: true });
   await expect(span(LEFT[0])).toBeVisible({ timeout: 20_000 });
   return { span: async (text: string) => (await span(text).boundingBox())! };
 }
@@ -47,7 +48,7 @@ async function drag(page: Page, from: { x: number; y: number }, ...through: { x:
 const words = (text: string) => text.replace(/\s+/g, " ").trim();
 
 test("a drag along one line that ends over the gap selects only that line", async ({ page, api }) => {
-  const { span } = await openTwoColumnPaper(page, api);
+  const { span } = await openPaper(page, api);
   const line = await span(LEFT[0]);
   const other = await span(RIGHT[0]);
   const y = line.y + line.height / 2;
@@ -61,7 +62,7 @@ test("a drag along one line that ends over the gap selects only that line", asyn
 });
 
 test("a drag across two lines of one column that ends over the gap selects only those lines", async ({ page, api }) => {
-  const { span } = await openTwoColumnPaper(page, api);
+  const { span } = await openPaper(page, api);
   const first = await span(LEFT[0]);
   const second = await span(LEFT[1]);
   const other = await span(RIGHT[1]);
@@ -72,5 +73,18 @@ test("a drag across two lines of one column that ends over the gap selects only 
     expect(text).toContain(LEFT[0]);
     expect(text).toContain("Left column line");
     for (const unrelated of [LEFT[2], ...RIGHT]) expect(text).not.toContain(unrelated);
+  }
+});
+
+test("on a single-column page, a drag along one line that ends in the margin selects only that line", async ({ page, api }) => {
+  const { span } = await openPaper(page, api, []);
+  const line = await span(LEFT[0]);
+  const y = line.y + line.height / 2;
+  const margin = line.x + line.width + 60;
+
+  for (const text of await drag(page, { x: line.x + 1, y }, { x: line.x + line.width / 2, y }, { x: margin, y }, { x: margin + 2, y: y + 1 })) {
+    expect(words(text).length).toBeGreaterThan(0);
+    expect(LEFT[0]).toContain(words(text));
+    for (const unrelated of LEFT.slice(1)) expect(text).not.toContain(unrelated);
   }
 });

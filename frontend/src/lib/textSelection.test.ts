@@ -10,7 +10,12 @@ import { bindTextSelection } from "./textSelection";
  * class; `bindTextSelection` is that fix for IRIS's text layers.
  *
  * jsdom has real ranges and selections but no layout, so these tests pin the
- * DOM the fix depends on; the drag itself is a manual check (IR-1209.md).
+ * DOM the fix depends on; the drag itself is checked in a real browser by
+ * e2e/smoke/text-selection.spec.ts.
+ *
+ * These tests find the end element and the spans by class and position, not
+ * by role and name as the frontend's tests otherwise do (CLAUDE.md): the
+ * element has no role or name, and its place in the DOM is what is tested.
  */
 
 const unbinds: Array<() => void> = [];
@@ -126,13 +131,33 @@ describe("bindTextSelection (IR-1209)", () => {
 
   it("leaves the element in place in a browser that resolves the gaps itself (Chromium 148+)", () => {
     vi.stubGlobal("navigator", { ...navigator, userAgentData: undefined, userAgent: "Mozilla/5.0 Chrome/150.0 Safari/537.36" });
-    const layer = page("One", "Two");
+    const layer = page("One", "Two", "Three");
     const [one, two] = spans(layer);
 
     select(one.firstChild!, 0, two.firstChild!, 2);
 
     expect(layer).toHaveClass("selecting");
     expect(layer.lastElementChild).toBe(end(layer));
+  });
+
+  it("leaves the element in place in Firefox, which resolves the gaps itself", () => {
+    // Firefox reports the end element's own `user-select: none` (index.css)
+    // as `-moz-user-select`; the layer's text is selectable, so the check is
+    // made on the end element, as pdf.js makes it.
+    const real = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudo) => {
+      const style = real(element, pseudo);
+      if (!(element as Element).classList.contains("endOfContent")) return style;
+      return { ...style, getPropertyValue: (name: string) => (name === "-moz-user-select" ? "none" : style.getPropertyValue(name)) } as CSSStyleDeclaration;
+    });
+    const layer = page("One", "Two", "Three");
+    const [one, two] = spans(layer);
+
+    select(one.firstChild!, 0, two.firstChild!, 2);
+
+    expect(layer).toHaveClass("selecting");
+    expect(layer.lastElementChild).toBe(end(layer));
+    vi.restoreAllMocks();
   });
 
   it("unbinding removes the element and stops reacting", () => {

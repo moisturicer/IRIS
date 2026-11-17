@@ -30,7 +30,8 @@
 
 const layers = new Map<HTMLElement, HTMLElement>();
 let listeners: AbortController | null = null;
-let movesEndElement: boolean | undefined;
+/** Does this browser need the end element moved? Measured once per binding run. */
+let endMoveNeeded: boolean | undefined;
 let previous: Range | null = null;
 
 function reset(end: HTMLElement, layer: HTMLElement) {
@@ -45,9 +46,13 @@ function resetAll() {
   layers.forEach(reset);
 }
 
-/** Firefox and Chromium 148+ resolve a gap without help (pdf.js's own test). */
-function browserMovesEnd(sample: HTMLElement): boolean {
-  if (getComputedStyle(sample).getPropertyValue("-moz-user-select") === "none") return false;
+/**
+ * True unless the browser resolves a gap without help: Firefox, which reports
+ * the end element's `user-select: none` as `-moz-user-select`, and Chromium
+ * 148+. pdf.js's own test, made on an end element as pdf.js makes it.
+ */
+function needsEndMove(end: HTMLElement): boolean {
+  if (getComputedStyle(end).getPropertyValue("-moz-user-select") === "none") return false;
   const data = (navigator as Navigator & { userAgentData?: { brands: { brand: string; version: string }[] } }).userAgentData;
   const version = data
     ? data.brands.find(({ brand }) => brand === "Chromium")?.version
@@ -92,8 +97,8 @@ function onSelectionChange() {
     else reset(end, layer);
   });
 
-  if (movesEndElement === undefined) movesEndElement = browserMovesEnd(layers.keys().next().value!);
-  if (!movesEndElement) return;
+  if (endMoveNeeded === undefined) endMoveNeeded = needsEndMove(layers.values().next().value!);
+  if (!endMoveNeeded) return;
 
   const range = selection.getRangeAt(0);
   const modifyStart = previous !== null && (
@@ -146,7 +151,7 @@ export function bindTextSelection(layer: HTMLElement): () => void {
     if (layers.size === 0) {
       listeners?.abort();
       listeners = null;
-      movesEndElement = undefined;
+      endMoveNeeded = undefined;
       previous = null;
     }
   };
