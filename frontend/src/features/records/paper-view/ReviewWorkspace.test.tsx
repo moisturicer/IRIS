@@ -14,7 +14,7 @@ import { renderScreen, screen, within } from "@/test/render";
 import type { Capability } from "@/features/records/capabilities";
 import type { RecordDetail } from "@/types/records";
 
-import { ReviewWorkspace } from "./ReviewWorkspace";
+import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
@@ -38,7 +38,7 @@ const record = {
 
 function openReviewTab(granted: Capability[]) {
   return renderScreen(
-    <ReviewWorkspace
+    <ReviewWorkspaceLayout
       record={record}
       authorView
       can={new Set(granted)}
@@ -46,8 +46,6 @@ function openReviewTab(granted: Capability[]) {
       timelineVersion={0}
       onChanged={() => {}}
       documents={<p>Every document</p>}
-      documentsOpen={false}
-      onDocuments={() => {}}
     />,
   );
 }

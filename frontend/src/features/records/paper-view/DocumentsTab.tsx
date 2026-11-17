@@ -1,15 +1,16 @@
 /**
- * Paper View's Files section (IR-411; spec §4.6, §4.10). It replaces the
- * Documents page.
+ * The review page's Documents tab (IR-1203), for authors and reviewers. It
+ * replaces the "All documents" drawer (IR-879), which held the Files section
+ * (IR-411) as it was.
  *
- * Everything filed with the record in one place: the manuscript, each
- * supporting document with its versions, what reviewers have asked for, and
- * any supplementary attachment.
+ * Everything filed with the record, one compact `DocumentRow` each: the
+ * manuscript, each document slot with its versions, what reviewers have asked
+ * for, and any supplementary attachment.
  *
  * - **One upload path.** Every upload goes through `UploadDropzone`. A request
  *   for a slot is answered by uploading into that slot (IR-346), so a
  *   requested slot takes an upload even while the record is in review. An
- *   "Other" item has no slot, so it gets a dropzone of its own.
+ *   "Other" item has no slot, so it gets an upload of its own.
  * - **One vocabulary.** Each requested document reads Requested → Uploaded ·
  *   awaiting review → Accepted, or Replacement needed with the reviewer's
  *   reason (`document-requests/itemStatus`).
@@ -21,8 +22,7 @@
  * server-computed `can_remove` (IR-476). This component decides nothing by
  * role. The server re-checks every upload and removal.
  */
-import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
 
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
@@ -39,14 +39,15 @@ import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { ItemStatusChip, itemStatus } from "@/features/document-requests/itemStatus";
 import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerDocumentRequests";
 
+import { DocumentRow } from "./DocumentRow";
 import { SectionHeading } from "./headings";
 
 const PDF_LIMIT = 50 * 1024 * 1024;
 
-interface FilesSectionProps {
+interface DocumentsTabProps {
   record:    Pick<
     RecordDetail,
-    "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted"
+    "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted" | "versions"
   >;
   /** The viewer owns the record: they upload what is asked for. */
   owner:     boolean;
@@ -118,7 +119,7 @@ function uploadRefusal(err: unknown): string {
   return errorDetail(err, "") || fieldError(err, "abstract_file", "file") || "Please try again.";
 }
 
-export function FilesSection({
+export function DocumentsTab({
   record,
   owner,
   editable,
@@ -126,7 +127,7 @@ export function FilesSection({
   attach,
   replaceManuscript = false,
   onChanged,
-}: FilesSectionProps) {
+}: DocumentsTabProps) {
   const [slots, setSlots] = useState<SlotWithUploads[] | null>(null);
   const [files, setFiles] = useState<RecordFile[]>([]);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
@@ -229,97 +230,79 @@ export function FilesSection({
   const shownSlots = slots.filter((s) => editable || s.uploads.length > 0 || bySlot.has(s.id));
   const download = (fetch: () => Promise<{ data: unknown }>, filename: string) =>
     saveBlob(fetch, filename).catch(() => setNotice(`Could not download ${filename}. Please try again.`));
+  const manuscript = record.versions?.[record.versions.length - 1] ?? null;
+  /** A row's compact PDF upload, keeping its progress and retry under `key`. */
+  const pdfUpload = (key: string, label: string, post: (file: File, onProgress: (p: number) => void) => Promise<unknown>) => (
+    <UploadDropzone compact label={label} accept=".pdf" validate maxBytes={PDF_LIMIT} upload={uploads[key]}
+      onFiles={([file]) => void send(key, file, (onProgress) => post(file, onProgress))} />
+  );
+  const downloadVersion = (name: string, u: RecordUpload) =>
+    download(() => documentsApi.downloadUpload(u.id), `${name} v${u.version}.${extensionOf(u.file)}`);
 
   return (
-    <div className="space-y-section-lg">
+    <div className="space-y-section">
       {reviewing && (
         <ReviewerDocumentRequests record={record} reviewing onChanged={() => void changed()} />
       )}
 
-      <section>
-        <SectionHeading>Manuscript</SectionHeading>
-        {record.manuscript_unsubmitted && (
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-small font-semibold text-brand-dark ring-1 ring-stone-300">
-            <i className="fas fa-file-pen text-2xs" aria-hidden />
-            Revised, not yet submitted
-          </p>
-        )}
-        {record.abstract_file ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-body text-stone-700">
-              The manuscript is the paper itself.{" "}
-              <Link
-                to={`/records/${record.id}?section=review`}
-                className={cn("font-semibold text-brand hover:underline", FOCUS_RING)}
-              >
-                Read it beside the review
-              </Link>
-            </p>
-            <DownloadButton
-              name="the manuscript"
-              onClick={() => download(() => recordsApi.manuscriptBlob(record.id), "manuscript.pdf")}
-            />
-          </div>
-        ) : (
-          <p className="text-body text-stone-600">No manuscript has been uploaded yet.</p>
-        )}
-        {/* A revision request is answered with a new version, which may carry
-            a revised manuscript (IR-273). Reviewers keep reading the submitted
-            one until the owner submits; the server allows the replacement
-            only to an owner, only while a revision is asked for. */}
-        {replaceManuscript && (
-          <div className="mt-3">
-            <UploadDropzone
-              label="Upload revised manuscript"
-              accept=".pdf"
-              validate
-              maxBytes={PDF_LIMIT}
-              upload={uploads.manuscript}
-              onFiles={([file]) =>
-                void send("manuscript", file, (onProgress) =>
-                  recordsApi.uploadManuscript(record.id, file, { onProgress }),
-                )
-              }
-            />
-          </div>
-        )}
-      </section>
-
-      <section>
-        <SectionHeading>Supporting documents</SectionHeading>
-        {shownSlots.length === 0 ? (
-          <p className="text-body text-stone-600">
-            None yet. A document appears here once it is uploaded or a reviewer asks for it.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {shownSlots.map((slot) => {
-              const asked = bySlot.get(slot.id);
-              const key = `slot:${slot.id}`;
-              const canUpload = owner && (editable || (asked != null && needsUpload(asked)));
-              return (
-                <DocumentCard key={slot.id} name={slot.name} asked={asked}>
-                  {canUpload && (
-                    <UploadDropzone
-                      label={`Upload ${slot.name}`}
-                      accept=".pdf"
-                      validate
-                      maxBytes={PDF_LIMIT}
-                      upload={uploads[key]}
-                      onFiles={([file]) =>
-                        void send(key, file, (onProgress) =>
-                          documentsApi.upload(record.id, slot.id, file, { onProgress }),
-                        )
-                      }
-                    />
+      <ul aria-label="Documents" className="divide-y divide-stone-200 rounded-card border border-stone-200 bg-white">
+        <DocumentRow
+          name="Manuscript"
+          latest={record.abstract_file
+            ? manuscript ? byline(manuscript.number, manuscript.created_by_name, manuscript.created_at) : "Uploaded"
+            : null}
+          note={record.manuscript_unsubmitted && (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-brand-dark">
+              <i className="fas fa-file-pen text-2xs" aria-hidden />
+              Revised, not yet submitted
+            </span>
+          )}
+          actions={(record.abstract_file || replaceManuscript) && (
+            <>
+              {record.abstract_file && (
+                <DownloadButton name="the manuscript"
+                  onClick={() => download(() => recordsApi.manuscriptBlob(record.id), "manuscript.pdf")} />
+              )}
+              {/* A revision request is answered with a new version, which may
+                  carry a revised manuscript (IR-273). Reviewers keep reading
+                  the submitted one until the owner submits; the server allows
+                  the replacement only to an owner, only while a revision is
+                  asked for. */}
+              {replaceManuscript && pdfUpload("manuscript", "Upload revised manuscript",
+                (file, onProgress) => recordsApi.uploadManuscript(record.id, file, { onProgress }))}
+            </>
+          )}
+        />
+        {shownSlots.map((slot) => {
+          const asked = bySlot.get(slot.id);
+          const key = `slot:${slot.id}`;
+          const canUpload = owner && (editable || (asked != null && needsUpload(asked)));
+          // Newest first, as the server lists them.
+          const [latest] = slot.uploads;
+          return (
+            <DocumentRow
+              key={slot.id}
+              name={slot.name}
+              latest={latest ? byline(latest.version, latest.uploaded_by_name, latest.created_at) : null}
+              status={asked && <ItemStatusChip item={asked.item} />}
+              note={asked && <AskedNote asked={asked} />}
+              actions={(latest || canUpload) && (
+                <>
+                  {latest && (
+                    <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
                   )}
+                  {canUpload && pdfUpload(key, `Upload ${slot.name}`,
+                    (file, onProgress) => documentsApi.upload(record.id, slot.id, file, { onProgress }))}
+                </>
+              )}
+              versions={{
+                count: slot.uploads.length,
+                list: (
                   <Versions
                     name={slot.name}
                     uploads={slot.uploads}
                     removable={owner && editable}
-                    onDownload={(u) =>
-                      download(() => documentsApi.downloadUpload(u.id), `${slot.name} v${u.version}.pdf`)
-                    }
+                    onDownload={(u) => downloadVersion(slot.name, u)}
                     onRemove={(u) =>
                       askToRemove(`${slot.name} version ${u.version}`, async () => {
                         await documentsApi.deleteUpload(u.id);
@@ -327,40 +310,31 @@ export function FilesSection({
                       })
                     }
                   />
-                </DocumentCard>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {other.length > 0 && (
-        <section>
-          <SectionHeading>Other requested documents</SectionHeading>
-          <div className="space-y-3">
-            {other.map((asked) => {
-              const key = `item:${asked.item.id}`;
-              return (
-                <DocumentCard key={asked.item.id} name={asked.item.label} asked={asked}>
-                  {owner && needsUpload(asked) && (
-                    <UploadDropzone
-                      label={`Upload ${asked.item.label}`}
-                      accept=".pdf"
-                      validate
-                      maxBytes={PDF_LIMIT}
-                      upload={uploads[key]}
-                      onFiles={([file]) =>
-                        void send(key, file, (onProgress) =>
-                          documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress }),
-                        )
-                      }
-                    />
-                  )}
-                </DocumentCard>
-              );
-            })}
-          </div>
-        </section>
+                ),
+              }}
+            />
+          );
+        })}
+        {other.map((asked) => {
+          const key = `item:${asked.item.id}`;
+          return (
+            <DocumentRow
+              key={key}
+              name={asked.item.label}
+              // An Other item keeps no versions of its own: only whether it was answered.
+              latest={itemStatus(asked.item) === "requested" ? null : "Uploaded"}
+              status={<ItemStatusChip item={asked.item} />}
+              note={<AskedNote asked={asked} />}
+              actions={owner && needsUpload(asked) && pdfUpload(key, `Upload ${asked.item.label}`,
+                (file, onProgress) => documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress }))}
+            />
+          );
+        })}
+      </ul>
+      {shownSlots.length === 0 && other.length === 0 && (
+        <p className="text-small text-stone-600">
+          No other documents yet. A document appears here once it is uploaded or a reviewer asks for it.
+        </p>
       )}
 
       {(files.length > 0 || attach) && (
@@ -379,30 +353,29 @@ export function FilesSection({
             />
           )}
           {files.length > 0 && (
-            <ul className="divide-y divide-stone-200 rounded-card border border-stone-200 bg-white">
+            <ul aria-label="Supplementary attachments" className="divide-y divide-stone-200 rounded-card border border-stone-200 bg-white">
               {files.map((f) => (
-                <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 px-card-compact py-3">
-                  <span className="min-w-0">
-                    <span className="block truncate text-body font-medium text-stone-800">{f.filename}</span>
-                    <span className="block text-small text-stone-600">
-                      {[f.uploaded_by_name, formatDate(f.created_at)].filter(Boolean).join(" · ")}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <DownloadButton name={f.filename} onClick={() => download(() => documentsApi.downloadFile(f.id), f.filename)} />
-                    {f.can_remove && (
-                      <RemoveButton
-                        name={f.filename}
-                        onClick={() =>
-                          askToRemove(f.filename, async () => {
-                            await documentsApi.deleteFile(f.id);
-                            await changed();
-                          })
-                        }
-                      />
-                    )}
-                  </span>
-                </li>
+                <DocumentRow
+                  key={f.id}
+                  name={f.filename}
+                  latest={[f.uploaded_by_name, formatDate(f.created_at)].filter(Boolean).join(" · ")}
+                  actions={
+                    <>
+                      <DownloadButton name={f.filename} onClick={() => download(() => documentsApi.downloadFile(f.id), f.filename)} />
+                      {f.can_remove && (
+                        <RemoveButton
+                          name={f.filename}
+                          onClick={() =>
+                            askToRemove(f.filename, async () => {
+                              await documentsApi.deleteFile(f.id);
+                              await changed();
+                            })
+                          }
+                        />
+                      )}
+                    </>
+                  }
+                />
               ))}
             </ul>
           )}
@@ -429,30 +402,34 @@ export function FilesSection({
   );
 }
 
-/** One document: its name, where any request for it stands, and what can be done. */
-function DocumentCard({ name, asked, children }: { name: string; asked?: Asked; children: ReactNode }) {
-  const headingId = useId();
+/**
+ * The stored file's extension, lower-cased, so a version saves as what it is
+ * ("png" for a scan, IR-1203). Slots took only PDFs until IR-1220, so a name
+ * with none is a PDF.
+ */
+function extensionOf(path: string): string {
+  const name = path.split("/").pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : "pdf";
+}
+
+/** A version in words, "v2 · Ana Cruz · Nov 3, 2026", leaving out a name the server did not give. */
+function byline(version: number, by: string | null | undefined, at: string): string {
+  return [`v${version}`, by, formatDate(at)].filter(Boolean).join(" · ");
+}
+
+/** Who asked for a document, and why its last upload was not accepted. */
+function AskedNote({ asked }: { asked: Asked }) {
   return (
-    <section aria-labelledby={headingId} className="rounded-card border border-stone-200 bg-white p-card-compact sm:p-card space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={headingId} className="text-heading font-semibold text-stone-900">
-          {name}
-        </h3>
-        {asked && <ItemStatusChip item={asked.item} />}
-      </div>
-      {asked && (
-        <p className="text-small text-stone-600">
-          Requested by {asked.asker}.
-          {itemStatus(asked.item) === "replacement_needed" && asked.item.rejection_reason && (
-            <>
-              {" "}
-              {asked.asker} did not accept the last upload: “{asked.item.rejection_reason}”
-            </>
-          )}
-        </p>
+    <p>
+      Requested by {asked.asker}.
+      {itemStatus(asked.item) === "replacement_needed" && asked.item.rejection_reason && (
+        <>
+          {" "}
+          {asked.asker} did not accept the last upload: “{asked.item.rejection_reason}”
+        </>
       )}
-      {children}
-    </section>
+    </p>
   );
 }
 

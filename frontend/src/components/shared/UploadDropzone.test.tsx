@@ -197,4 +197,37 @@ describe("UploadDropzone", () => {
     expect(zone).toHaveAttribute("aria-disabled", "true");
     expect(onFiles).not.toHaveBeenCalled();
   });
+
+  // IR-1203: a Documents-tab row has no room for a drop area.
+  describe("compact, as one Upload button", () => {
+    it("is named by its label, which starts with the one word drawn, and opens the chooser from the keyboard", async () => {
+      const click = vi.spyOn(HTMLInputElement.prototype, "click");
+      const { container } = renderScreen(
+        <UploadDropzone compact label="Upload Consent Paper" onFiles={vi.fn()} accept=".pdf" validate />,
+      );
+
+      const zone = screen.getByRole("button", { name: "Upload Consent Paper" });
+      expect(zone).toHaveTextContent(/^Upload/);
+      expect(screen.queryByText(/Drag and drop/)).not.toBeInTheDocument();
+      zone.focus();
+      await userEvent.keyboard("{Enter}");
+      expect(click).toHaveBeenCalledTimes(1);
+      await expectNoBlockingA11yViolations(container);
+      click.mockRestore();
+    });
+
+    it("still checks what is dropped on it, and hands on what passes", () => {
+      const onFiles = vi.fn();
+      renderScreen(<UploadDropzone compact label="Upload Consent Paper" onFiles={onFiles} accept=".pdf" validate />);
+      const zone = screen.getByRole("button", { name: "Upload Consent Paper" });
+
+      drop(zone, [docx()]);
+      expect(screen.getByRole("alert")).toHaveTextContent("thesis.docx is not an accepted file. Accepted: PDF.");
+      expect(onFiles).not.toHaveBeenCalled();
+
+      const file = pdf();
+      drop(zone, [file]);
+      expect(onFiles).toHaveBeenCalledWith([file]);
+    });
+  });
 });

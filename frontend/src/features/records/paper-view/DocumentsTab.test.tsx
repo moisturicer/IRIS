@@ -1,6 +1,9 @@
 /**
- * Paper View's Files section (IR-411; spec §4.6, §4.10). It replaces the
- * Documents page, and carries over that page's IR-346 tests.
+ * The review page's Documents tab (IR-1203). It was Paper View's Files section
+ * (IR-411; spec §4.6, §4.10), which replaced the Documents page and carried
+ * over that page's IR-346 tests. IR-1203 draws each document as one row: a
+ * row is a group named by its document (it was a region), and a slot's
+ * versions open from the row's versions toggle.
  *
  * **One upload path.** Every upload goes through `UploadDropzone`. A
  * reviewer's request for a slot is answered by uploading into that slot the
@@ -22,7 +25,11 @@ import { fireEvent, renderScreen, screen, waitFor, within } from "@/test/render"
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
-import { FilesSection } from "./FilesSection";
+import { DocumentsTab } from "./DocumentsTab";
+
+// Saving is the browser's; what is checked is the name the file is saved under.
+const downloadBlob = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/utils", async (actual) => ({ ...(await actual<typeof import("@/lib/utils")>()), downloadBlob }));
 
 const RECORD_ID = 9;
 const ETHICS = 3;
@@ -69,7 +76,7 @@ vi.mock("@/api/documents", () => ({
       uploadForRequestItem(recordId, itemId, file, options),
     uploadRecordFile: (recordId: number, file: File, options: unknown) => uploadRecordFile(recordId, file, options),
     deleteFile: (fileId: number) => deleteFile(fileId),
-    downloadUpload: vi.fn(),
+    downloadUpload: () => Promise.resolve({ data: new Blob(["file"]) }),
     downloadFile: vi.fn(),
     deleteUpload: (uploadId: number) => deleteUpload(uploadId),
   },
@@ -150,22 +157,22 @@ function renderFiles(
   shown: RecordDetail = record,
 ) {
   return renderScreen(
-    <FilesSection record={shown} owner editable={false} reviewing={false} attach={false} {...props} />,
+    <DocumentsTab record={shown} owner editable={false} reviewing={false} attach={false} {...props} />,
   );
 }
 
 const pdf = (name: string) => new File(["%PDF-1.4"], name, { type: "application/pdf" });
 
-describe("the Files section, for the owner of a record in review", () => {
+describe("the Documents tab, for the owner of a record in review", () => {
   it("offers an upload on the requested slot only, and says who asked", async () => {
     const { container } = renderFiles();
 
-    const ethics = await screen.findByRole("region", { name: "Ethics Clearance" });
+    const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
     expect(within(ethics).getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
     expect(within(ethics).getByText(/Requested by IERC/)).toBeInTheDocument();
     expect(within(ethics).getByText("Requested")).toBeInTheDocument();
     // Nothing asked for, nothing uploaded, and not editable: not listed at all.
-    expect(screen.queryByRole("region", { name: "Patent Draft" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Patent Draft" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Upload Patent Draft/ })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
@@ -178,7 +185,7 @@ describe("the Files section, for the owner of a record in review", () => {
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
     await waitFor(() => expect(upload).toHaveBeenCalledWith(RECORD_ID, ETHICS, file, expect.any(Object)));
-    const ethics = screen.getByRole("region", { name: "Ethics Clearance" });
+    const ethics = screen.getByRole("group", { name: "Ethics Clearance" });
     await waitFor(() => expect(within(ethics).getByText("Uploaded · awaiting review")).toBeInTheDocument());
     expect(within(ethics).queryByRole("button", { name: /^Upload Ethics Clearance/ })).not.toBeInTheDocument();
   });
@@ -191,7 +198,7 @@ describe("the Files section, for the owner of a record in review", () => {
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
     await waitFor(() => expect(uploadForRequestItem).toHaveBeenCalledWith(RECORD_ID, 12, file, expect.any(Object)));
-    const consent = screen.getByRole("region", { name: "Consent form" });
+    const consent = screen.getByRole("group", { name: "Consent form" });
     await waitFor(() => expect(within(consent).getByText("Uploaded · awaiting review")).toBeInTheDocument());
   });
 
@@ -199,7 +206,7 @@ describe("the Files section, for the owner of a record in review", () => {
     requests = [openRequest([item({ state: "accepted", state_label: "Accepted", upload: 500 })])];
     renderFiles();
 
-    const ethics = await screen.findByRole("region", { name: "Ethics Clearance" });
+    const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
     expect(await within(ethics).findByText("Accepted")).toBeInTheDocument();
     expect(within(ethics).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
   });
@@ -208,7 +215,7 @@ describe("the Files section, for the owner of a record in review", () => {
     requests = [openRequest([item({ rejection_reason: "The scan is unreadable." })])];
     renderFiles();
 
-    const ethics = await screen.findByRole("region", { name: "Ethics Clearance" });
+    const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
     expect(await within(ethics).findByText("Replacement needed")).toBeInTheDocument();
     expect(within(ethics).getByText(/The scan is unreadable\./)).toBeInTheDocument();
     expect(within(ethics).getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
@@ -218,7 +225,7 @@ describe("the Files section, for the owner of a record in review", () => {
     requests = [openRequest([item({ state: "rejected", state_label: "Rejected", rejection_reason: "Wrong form." })])];
     renderFiles();
 
-    const ethics = await screen.findByRole("region", { name: "Ethics Clearance" });
+    const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
     expect(await within(ethics).findByText("Replacement needed")).toBeInTheDocument();
     expect(within(ethics).getByText(/Wrong form\./)).toBeInTheDocument();
   });
@@ -240,7 +247,7 @@ describe("the Files section, for the owner of a record in review", () => {
   });
 });
 
-describe("the Files section, for the owner of an editable record", () => {
+describe("the Documents tab, for the owner of an editable record", () => {
   it("offers an upload on every slot", async () => {
     requests = [];
     renderFiles({ editable: true });
@@ -273,8 +280,13 @@ describe("removing a document version", () => {
     }];
   });
 
+  // The versions are one click away (IR-1203).
+  const openVersions = async () =>
+    fireEvent.click(await screen.findByRole("button", { name: "2 versions of Ethics Clearance" }));
+
   it("offers no Remove on a kept version, and says why", async () => {
     const { container } = renderFiles({ editable: true });
+    await openVersions();
 
     const versions = await screen.findByRole("list", { name: "Versions of Ethics Clearance" });
     expect(within(versions).queryByRole("button", { name: "Remove Ethics Clearance version 1" })).not.toBeInTheDocument();
@@ -285,6 +297,7 @@ describe("removing a document version", () => {
 
   it("asks before removing, and Cancel removes nothing", async () => {
     renderFiles({ editable: true });
+    await openVersions();
     fireEvent.click(await screen.findByRole("button", { name: "Remove Ethics Clearance version 2" }));
 
     const dialog = await screen.findByRole("dialog", { name: "Remove Ethics Clearance version 2?" });
@@ -302,6 +315,7 @@ describe("removing a document version", () => {
       response: { status: 400, data: { detail: "This file answered a document request, so it can't be deleted." } },
     });
     renderFiles({ editable: true });
+    await openVersions();
     fireEvent.click(await screen.findByRole("button", { name: "Remove Ethics Clearance version 2" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
@@ -310,11 +324,11 @@ describe("removing a document version", () => {
   });
 });
 
-describe("the Files section, for a reviewer", () => {
+describe("the Documents tab, for a reviewer", () => {
   it("offers no upload, and shows each requested document's state", async () => {
     renderFiles({ owner: false, reviewing: true });
 
-    const ethics = await screen.findByRole("region", { name: "Ethics Clearance" });
+    const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
     expect(await within(ethics).findByText("Requested")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
   });
@@ -372,7 +386,7 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
   it("lets the owner upload a revised manuscript for the new version", async () => {
     const onChanged = vi.fn();
     renderScreen(
-      <FilesSection
+      <DocumentsTab
         record={revising}
         owner
         editable
@@ -400,7 +414,7 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
       response: { status: 400, data: { abstract_file: ["This PDF contains unsupported active content."] } },
     });
     renderScreen(
-      <FilesSection record={revising} owner editable reviewing={false} attach={false} replaceManuscript />,
+      <DocumentsTab record={revising} owner editable reviewing={false} attach={false} replaceManuscript />,
     );
 
     fireEvent.drop(await screen.findByRole("button", { name: /^Upload revised manuscript/ }), {
@@ -415,7 +429,7 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
   it("still says Please try again when the upload fails with no reason, as a dropped connection does", async () => {
     uploadManuscript.mockReset().mockRejectedValueOnce(new Error("Network Error"));
     renderScreen(
-      <FilesSection record={revising} owner editable reviewing={false} attach={false} replaceManuscript />,
+      <DocumentsTab record={revising} owner editable reviewing={false} attach={false} replaceManuscript />,
     );
 
     fireEvent.drop(await screen.findByRole("button", { name: /^Upload revised manuscript/ }), {
@@ -441,4 +455,33 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
     expect(screen.queryByRole("button", { name: /^Upload revised manuscript/ })).not.toBeInTheDocument();
   });
 
+});
+
+// IR-1203: a slot's file is saved under its own type, not always as .pdf.
+describe("downloading a document version", () => {
+  it("saves it under the stored file's own extension", async () => {
+    requests = [];
+    slots = [{ ...slot(ETHICS, "Ethics Clearance"), uploads: [{
+      id: 310, record: RECORD_ID, slot: ETHICS, slot_name: "Ethics Clearance", file: "/media/uploads/9/ethics_scan.PNG",
+      version: 2, status: null, status_name: null, uploaded_by: 50, uploaded_by_name: "Sam Student",
+      created_at: "2026-09-22T02:00:00Z", reviews: [], delete_refused: null,
+    }] }];
+    renderFiles({ owner: false, reviewing: true });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 2" }));
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v2.png"));
+  });
+
+  it("falls back to .pdf when the stored name has no extension", async () => {
+    requests = [];
+    slots = [{ ...slot(ETHICS, "Ethics Clearance"), uploads: [{
+      id: 311, record: RECORD_ID, slot: ETHICS, slot_name: "Ethics Clearance", file: "/media/uploads/9/ethics",
+      version: 1, status: null, status_name: null, uploaded_by: 50, uploaded_by_name: "Sam Student",
+      created_at: "2026-09-22T02:00:00Z", reviews: [], delete_refused: null,
+    }] }];
+    renderFiles({ owner: false, reviewing: true });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 1" }));
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v1.pdf"));
+  });
 });
