@@ -614,7 +614,7 @@ export interface RecordVersion {
   documents?:               VersionDocument[];
   /** Uploads made while it was the latest version: "added during vN". */
   documents_added?:         VersionDocument[];
-  /** True when `documents` is a best guess, for versions older than IR-872. */
+  /** True when `documents` was reconstructed, for versions older than IR-872. Not shown since IR-1202. */
   documents_reconstructed?: boolean;
   /** Its review text's state (ADR-058 §1 as amended, IR-871). Null with no manuscript. */
   review_text?:             VersionReviewText | null;
@@ -637,6 +637,19 @@ export interface VersionDocument {
   version:      number;
   uploaded_at:  string;
   download_url: string;
+  /**
+   * Each time this upload was rejected, oldest first (IR-1201). Null to a
+   * viewer who may not read document requests (ADR-022 §Amendment 5).
+   */
+  rejections?:  VersionDocumentRejection[] | null;
+}
+
+/** A requesting party's rejection of one upload, with its reason (IR-1201). */
+export interface VersionDocumentRejection {
+  party:            string;
+  reason:           string;
+  rejected_by_name: string | null;
+  rejected_at:      string;
 }
 
 /**

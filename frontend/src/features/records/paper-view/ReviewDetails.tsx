@@ -1,10 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import { documentsApi } from "@/api/documents";
-import { recordsApi } from "@/api/records";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { cn, downloadBlob, formatDate, joinLabels } from "@/lib/utils";
+import { cn, formatDate, joinLabels } from "@/lib/utils";
 import type { PaperDueDate, PaperPerson, Readiness, ReadinessItem, RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState, TrackerResubmission, TrackerSeat } from "@/types/records";
 
 import { ReadinessFacts } from "./ReadinessPanel";
@@ -36,18 +34,22 @@ const SEAT_ICON: Record<TrackerSeat["state"], string> = {
   withdrawn: "fa-circle-minus",
 };
 
-/** Where a Readiness link lands: a party's reviewers, Documents, or the facts themselves. */
+/** "October 7, 2026", as Version history reads (IR-1202). */
+const HISTORY_DATE_FORMAT = "MMMM d, yyyy";
+
+/** Where a Readiness link lands: a party's reviewers, or the facts themselves. */
 export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`;
 
 /**
  * The review workspace's Details tab (ADR-032 §10 Amendment, IR-681; the
  * third column that repeated it is gone, IR-1094): Readiness's facts, then
  * Reviewers (one row per person, due dates on their line), Researchers,
- * Adviser, Classification (keywords as pills), Flagged by the authors,
- * Version, Documents, Participants and Copy link (IR-1193).
+ * Adviser, Classification (keywords as pills), Flagged by the authors and
+ * Version history (IR-1202: who and what only; Participants, Copy link and
+ * the document list left).
  *
  * Built from record detail's permission-filtered paper_details and the tracker.
- * Who is reviewing, due dates and participants are review content: the
+ * Who is reviewing and due dates are review content: the
  * tracker sends seats and reviews as null to a viewer who may not read the
  * review (IR-479), and then those sections are withheld, not shown empty.
  *
@@ -57,7 +59,7 @@ export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`
  * targets) and `addColleague` only when the viewer may take them; the two
  * stay separate controls.
  */
-export function ReviewDetails({ record, tracker, ids, readiness, onReadinessAction, requestReview, addColleague, onAllDocuments, onCompare }: {
+export function ReviewDetails({ record, tracker, ids, readiness, onReadinessAction, requestReview, addColleague }: {
   record: RecordDetail;
   tracker: RecordTracker;
   ids: string;
@@ -69,10 +71,6 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
   onReadinessAction?: (action: NonNullable<ReadinessItem["action"]>) => void;
   requestReview?: { targets: string[]; onOpen: () => void };
   addColleague?: ReactNode;
-  /** Open the Documents drawer, which replaced the Files section (IR-879). */
-  onAllDocuments?: () => void;
-  /** Open the Changes tab, offered once there are two versions to compare. */
-  onCompare?: () => void;
 }) {
   const requestNoteId = useId();
   const readable = tracker.reviews !== null;
@@ -81,9 +79,6 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
   // Review content (IR-681): shown on each party's line, never to a viewer who may not read the review.
   const dues = readable ? details?.due_dates : null;
   const flags = details?.author_flags ?? [];
-  const versions = record.versions ?? [];
-  const latest = versions[versions.length - 1];
-  const openRequests = (tracker.document_requests ?? []).filter((r) => r.state === "open");
   const participants = readable ? details?.participants : null;
   const facts = readinessFacts(readiness);
 
@@ -146,101 +141,10 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
           </ul>
         ) : <p className="text-small text-stone-600">Nothing flagged</p>}
       </Section>
-      <Section title="Version">
-        {latest ? (
-          <div className="space-y-1 text-small text-stone-700">
-            <p><strong className="font-semibold text-stone-900">v{latest.number}</strong> · {latest.cause_label} · {formatDate(latest.created_at)}</p>
-            <p className="text-stone-600">First sent {formatDate(versions[0].created_at)}</p>
-            {onCompare && versions.length >= 2 && (
-              <button type="button" onClick={onCompare}
-                className={cn("review-control -mx-2 inline-flex items-center gap-2 font-semibold text-stone-900 hover:text-brand", FOCUS_RING)}>
-                <i className="fas fa-clock-rotate-left text-stone-600" aria-hidden />
-                Compare {versions.length} versions
-              </button>
-            )}
-          </div>
-        ) : <p className="text-small text-stone-600">{record.versions === null ? "Not disclosed" : "No version recorded"}</p>}
+      <Section title="Version history">
+        <VersionHistory versions={record.versions}
+          partyLabel={(party) => tracker.parties.find((p) => p.party === party)?.label ?? party.toUpperCase()} />
       </Section>
-      <Section id={detailsTarget(ids, "documents")} title="Documents">
-        <ul className="space-y-1.5 text-small text-stone-700">
-          <li className="flex items-start gap-2"><i className="fas fa-file-lines mt-1 text-stone-500" aria-hidden />
-            {(latest?.manuscript_url ?? record.abstract_file)
-              ? <DocumentDownload name={`Manuscript${latest ? ` · v${latest.number}` : ""}`} filename="manuscript.pdf" strong
-                fetch={() => latest?.manuscript_url
-                  ? recordsApi.versionManuscriptBlob(record.id, latest.number)
-                  : recordsApi.manuscriptBlob(record.id)} />
-              : "No manuscript recorded"}
-          </li>
-          {/* The latest version's documents, and what arrived since (IR-872). */}
-          {[...(latest?.documents ?? []), ...(latest?.documents_added ?? [])].map((d) => (
-            <li key={`upload-${d.upload_id}`} className="flex items-start gap-2">
-              <i className="fas fa-file-lines mt-1 text-stone-500" aria-hidden />
-              <DocumentDownload name={`${d.slot} · v${d.version}`} filename={`${d.slot} v${d.version}.pdf`}
-                fetch={() => documentsApi.downloadUpload(d.upload_id)} />
-            </li>
-          ))}
-          {record.files.map((f) => (
-            <li key={f.id} className="flex items-start gap-2">
-              <i className="fas fa-file-lines mt-1 text-stone-500" aria-hidden />
-              {f.url ? <DocumentDownload name={f.filename} filename={f.filename} fetch={() => documentsApi.downloadFile(f.id)} /> : f.filename}
-            </li>
-          ))}
-          {openRequests.map((r) => (
-            <li key={`request-${r.id}`} className="flex items-start gap-2">
-              <i className="fas fa-file-circle-question mt-1 text-stone-500" aria-hidden />
-              Requested by {r.label} · {r.state_label}
-            </li>
-          ))}
-        </ul>
-        {latest?.documents_reconstructed && (latest.documents?.length ?? 0) > 0 && (
-          <p className="text-small text-stone-600">
-            <i className="fas fa-circle-info mr-1.5" aria-hidden />
-            v{latest.number} was submitted before IRIS kept each version&rsquo;s documents, so this list is a best guess.
-          </p>
-        )}
-        {onAllDocuments && (
-          <button type="button" onClick={onAllDocuments}
-            className={cn("review-control -mx-2 text-small font-semibold text-stone-900 hover:text-brand", FOCUS_RING)}>
-            All documents
-          </button>
-        )}
-      </Section>
-      {participants != null && (
-        <Section title={`${participants.length} ${participants.length === 1 ? "participant" : "participants"}`}>
-          {participants.length ? <ul className="flex flex-wrap gap-1.5">
-            {participants.map((p) => <li key={p.id}><Person person={p} compact /></li>)}
-          </ul> : <p className="text-small text-stone-600">None listed</p>}
-        </Section>
-      )}
-      <CopyReviewLink recordId={record.id} />
-    </div>
-  );
-}
-
-/** The review's own address, for a colleague, as Share copies the paper's (IR-356). */
-function CopyReviewLink({ recordId }: { recordId: number }) {
-  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
-  const copy = async () => {
-    let outcome: "copied" | "failed" = "copied";
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/records/${recordId}?section=review`);
-    } catch {
-      // No clipboard (plain http, or permission refused): say so, claim nothing.
-      outcome = "failed";
-    }
-    setState(outcome);
-    window.setTimeout(() => setState("idle"), 2500);
-  };
-  return (
-    <div className="border-t border-stone-200 pt-4">
-      <button type="button" onClick={copy}
-        className={cn("review-control -mx-2 inline-flex items-center gap-2 text-small font-semibold text-stone-900 hover:text-brand", FOCUS_RING)}>
-        <i className={cn("fas text-stone-600", state === "copied" ? "fa-check" : "fa-link")} aria-hidden />
-        Copy link to this review
-      </button>
-      <p role="status" className="text-2xs text-stone-600">
-        {state === "copied" ? "Link copied" : state === "failed" ? "Could not copy. The address bar has the link." : ""}
-      </p>
     </div>
   );
 }
@@ -257,31 +161,51 @@ function Section({ id, title, action, children }: { id?: string; title: string; 
   );
 }
 
-/** Protected files need the API client's bearer header before a blob download. */
-function DocumentDownload({ name, filename, fetch, strong }: {
-  name: string; filename: string; fetch: () => Promise<{ data: Blob }>; strong?: boolean;
+/**
+ * Each manuscript Version, oldest first, as plain text (IR-1202): what was
+ * submitted and when. Downloads and the files themselves are the Documents
+ * tab's (IR-1203); comparing two Versions is the Changes tab's.
+ */
+function VersionHistory({ versions, partyLabel }: {
+  versions: RecordDetail["versions"];
+  partyLabel: (party: string) => string;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-  const download = async () => {
-    setBusy(true);
-    setError(false);
-    try {
-      const { data } = await fetch();
-      downloadBlob(data, filename);
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return <>
-    <button type="button" disabled={busy} aria-busy={busy} onClick={download}
-      className={cn("text-left hover:text-brand hover:underline disabled:opacity-60", strong && "font-semibold text-stone-900", FOCUS_RING)}>
-      {name}{busy && <span className="sr-only"> · Downloading</span>}
-    </button>
-    {error && <span role="alert" className="block text-small text-brand">Could not download {name}. Please try again.</span>}
-  </>;
+  if (versions == null) return <p className="text-small text-stone-600">Not disclosed</p>;
+  if (versions.length === 0) return <p className="text-small text-stone-600">No version recorded</p>;
+  // A Version's `documents` names every slot's file as it was submitted, so an
+  // unchanged upload recurs under each later Version. Each is listed once,
+  // under the first Version that has it, so nothing reads as submitted twice.
+  const seen = new Set<number>();
+  const firstListed = versions.map((v) => [...(v.documents ?? []), ...(v.documents_added ?? [])].filter((d) => {
+    if (seen.has(d.upload_id)) return false;
+    seen.add(d.upload_id);
+    return true;
+  }));
+  return (
+    <ol aria-label="Manuscript versions, oldest first" className="space-y-3 text-small text-stone-700">
+      {versions.map((v, i) => {
+        const documents = firstListed[i];
+        return (
+          <li key={v.number} className="space-y-1">
+            <p><span className="font-semibold text-stone-900">Manuscript v{v.number}</span> · submitted {formatDate(v.created_at, HISTORY_DATE_FORMAT)}</p>
+            {documents.length > 0 && (
+              <ul aria-label={`Documents with v${v.number}`} className="space-y-1 border-l border-stone-200 pl-3">
+                {documents.map((d) => (
+                  <li key={d.upload_id}>
+                    {d.slot} v{d.version} · submitted {formatDate(d.uploaded_at, HISTORY_DATE_FORMAT)}
+                    {/* Why it was replaced (IR-1201); absent where requests are not disclosed. */}
+                    {(d.rejections ?? []).map((r, n) => (
+                      <p key={n} className="text-stone-600">Replacement asked by {partyLabel(r.party)}: {r.reason}</p>
+                    ))}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 function affiliationText(values: string[] | null | undefined): string {
@@ -371,8 +295,8 @@ function PartyReviewers({ row, ids, readable, people, due, revision }: {
  * The server decides which card fields are readable. Never reconstruct an
  * affiliation from classification or another person's card.
  */
-function Person({ person, name = person?.name ?? "A reviewer", role = person?.role ?? null, compact }: {
-  person?: PaperPerson; name?: string; role?: string | null; compact?: boolean;
+function Person({ person, name = person?.name ?? "A reviewer", role = person?.role ?? null }: {
+  person?: PaperPerson; name?: string; role?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -381,8 +305,8 @@ function Person({ person, name = person?.name ?? "A reviewer", role = person?.ro
   const [position, setPosition] = useState({ left: 16, top: 16 });
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 
-  // The sidebar scrolls and participants wrap. Keep the card out of its
-  // clipping ancestor and inside the viewport, including the last avatar.
+  // The sidebar scrolls. Keep the card out of its clipping ancestor and
+  // inside the viewport.
   useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
@@ -425,12 +349,11 @@ function Person({ person, name = person?.name ?? "A reviewer", role = person?.ro
     <span className="relative inline-flex">
       <button
         ref={button} type="button" aria-expanded={open} aria-controls={open ? cardId : undefined}
-        aria-label={compact ? name : undefined} title={compact ? name : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn("review-control inline-flex items-center gap-2 text-small text-stone-900 hover:underline", FOCUS_RING)}
       >
         <span aria-hidden className="review-avatar review-avatar-brand">{initials}</span>
-        {!compact && name}
+        {name}
       </button>
       {open && createPortal(
         <div ref={card} id={cardId} role="dialog" aria-label={name} tabIndex={-1}
