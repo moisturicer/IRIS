@@ -8,6 +8,7 @@ and 11).
 **Seam: the API.** Pages are read back out of the response with pypdf.
 """
 
+import math
 from io import BytesIO
 from unittest import mock
 
@@ -371,3 +372,43 @@ class MarkWordingTests(SimpleTestCase):
         # ReaderWatermark.test.ts pins the same numbers, so the two marks stay one shape.
         widths = [round(watermark._line_width(line), 6) for line in watermark.MARK_LINES]
         self.assertEqual(widths, [11.6, 4.5, 16.6])
+
+    def test_every_line_is_cut_to_one_height(self):
+        # ReaderWatermark.test.ts pins the same bands. Each is a letter and a stroke tall.
+        bands = [(round(y, 6), round(height, 6)) for _x, y, _width, height in watermark._line_bands()]
+        self.assertEqual(bands, [(1.08, 1.24), (-0.62, 1.24), (-2.32, 1.24)])
+
+    def test_every_letter_fills_its_line_from_bottom_to_top(self):
+        # A flat-ended upright stops where its centre line does, half a stroke short of a
+        # crossbar's or a curve's outer edge, so it has to run past the edge to be cut there.
+        half = watermark.MARK_STROKE / 2
+        for char, (_width, strokes) in watermark.MARK_GLYPHS.items():
+            if char == "-":
+                continue
+            lowest, highest = _ink_extent(strokes, half)
+            with self.subTest(letter=char):
+                self.assertLessEqual(lowest, -half + 1e-3)  # A curve is measured along short chords
+                self.assertGreaterEqual(highest, 1 + half - 1e-3)
+
+
+def _ink_extent(strokes, half):
+    """The lowest and highest y a glyph's strokes ink, flat ends, joins left out."""
+    ys = []
+    for stroke in strokes:
+        points = []
+        for command, *args in stroke:
+            if command in ("M", "L"):
+                points.append((args[0], args[1]))
+            elif command == "A":
+                cx, cy, rx, ry, start, extent = args
+                for step in range(91):
+                    angle = math.radians(start + extent * step / 90)
+                    points.append((cx + rx * math.cos(angle), cy + ry * math.sin(angle)))
+            else:
+                points.append(points[0])
+        for (x0, y0), (x1, y1) in zip(points, points[1:]):
+            length = math.hypot(x1 - x0, y1 - y0)
+            if length:
+                reach = half * abs(x1 - x0) / length  # How far the stroke's edge is above its centre line
+                ys += [y0 - reach, y0 + reach, y1 - reach, y1 + reach]
+    return min(ys), max(ys)

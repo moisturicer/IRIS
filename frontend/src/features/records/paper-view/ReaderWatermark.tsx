@@ -17,6 +17,8 @@
  * The letters are the download copy's (`apps/records/watermark.py`), stroked
  * lines and arcs with flat ends, so the two marks look the same.
  */
+import { useId } from "react";
+
 import { useAuthStore } from "@/store/auth.store";
 
 /** Mirrors `watermark.py`: grey 0.45 at opacity 0.18, 45 degrees, the longest line as wide as the page's short side. */
@@ -39,7 +41,11 @@ type Command =
   | ["A", number, number, number, number, number, number]
   | ["Z"];
 
-/** Each letter as strokes, one unit tall, y up, from x = 0. Mirrors `MARK_GLYPHS` in `watermark.py`. */
+/**
+ * Each letter as strokes, one unit tall, y up, from x = 0. Mirrors `MARK_GLYPHS` in `watermark.py`.
+ * A stroke that ends open at the top or the bottom runs past it (y = 1.2 or -0.2) and
+ * `MARK.bands` cuts it flat at the ink's edge, which makes every letter the same height.
+ */
 const GLYPHS: Record<string, { width: number; strokes: Command[][] }> = {
   B: {
     width: 0.7,
@@ -60,26 +66,26 @@ const GLYPHS: Record<string, { width: number; strokes: Command[][] }> = {
   F: {
     width: 0.6,
     strokes: [
-      [["M", 0.6, 1], ["L", 0, 1], ["L", 0, 0]],
+      [["M", 0.6, 1], ["L", 0, 1], ["L", 0, -0.2]],
       [["M", 0, 0.5], ["L", 0.5, 0.5]],
     ],
   },
-  I: { width: 0, strokes: [[["M", 0, 0], ["L", 0, 1]]] },
+  I: { width: 0, strokes: [[["M", 0, -0.2], ["L", 0, 1.2]]] },
   N: {
     width: 0.7,
     strokes: [
-      [["M", 0, 0], ["L", 0, 1]],
+      [["M", 0, -0.2], ["L", 0, 1.2]],
       [["M", 0, 1], ["L", 0.7, 0]],
-      [["M", 0.7, 0], ["L", 0.7, 1]],
+      [["M", 0.7, -0.2], ["L", 0.7, 1.2]],
     ],
   },
   O: { width: 0.7, strokes: [[["M", 0.7, 0.5], ["A", 0.35, 0.5, 0.35, 0.5, 0, 360], ["Z"]]] },
-  P: { width: 0.7, strokes: [[["M", 0, 0], ["L", 0, 1], ["L", 0.4, 1], ["A", 0.4, 0.725, 0.3, 0.275, 90, -180], ["L", 0, 0.45]]] },
+  P: { width: 0.7, strokes: [[["M", 0, -0.2], ["L", 0, 1], ["L", 0.4, 1], ["A", 0.4, 0.725, 0.3, 0.275, 90, -180], ["L", 0, 0.45]]] },
   R: {
     width: 0.7,
     strokes: [
-      [["M", 0, 0], ["L", 0, 1], ["L", 0.4, 1], ["A", 0.4, 0.725, 0.3, 0.275, 90, -180], ["L", 0, 0.45]],
-      [["M", 0.35, 0.45], ["L", 0.7, 0]],
+      [["M", 0, -0.2], ["L", 0, 1], ["L", 0.4, 1], ["A", 0.4, 0.725, 0.3, 0.275, 90, -180], ["L", 0, 0.45]],
+      [["M", 0.36, 0.45], ["L", 0.724, -0.2]],
     ],
   },
   S: {
@@ -96,15 +102,15 @@ const GLYPHS: Record<string, { width: number; strokes: Command[][] }> = {
     width: 0.7,
     strokes: [
       [["M", 0, 1], ["L", 0.7, 1]],
-      [["M", 0.35, 1], ["L", 0.35, 0]],
+      [["M", 0.35, 1], ["L", 0.35, -0.2]],
     ],
   },
-  U: { width: 0.7, strokes: [[["M", 0, 1], ["L", 0, 0.35], ["A", 0.35, 0.35, 0.35, 0.35, 180, 180], ["L", 0.7, 1]]] },
+  U: { width: 0.7, strokes: [[["M", 0, 1.2], ["L", 0, 0.35], ["A", 0.35, 0.35, 0.35, 0.35, 180, 180], ["L", 0.7, 1.2]]] },
   Y: {
     width: 0.7,
     strokes: [
-      [["M", 0, 1], ["L", 0.35, 0.5], ["L", 0.7, 1]],
-      [["M", 0.35, 0.5], ["L", 0.35, 0]],
+      [["M", -0.025, 1.2], ["L", 0.35, 0.45], ["L", 0.725, 1.2]],
+      [["M", 0.35, 0.45], ["L", 0.35, -0.2]],
     ],
   },
   "-": { width: 0.4, strokes: [[["M", 0, 0.45], ["L", 0.4, 0.45]]] },
@@ -143,12 +149,20 @@ function strokeData(stroke: Command[], dx: number, dy: number): string {
   return out.join(" ");
 }
 
-/** MARK_LINES, each centred on x = 0 and the block on y = 0, y up; and the widest line's width. */
-function markPath(): { d: string; width: number } {
+export type Band = { x: number; y: number; width: number; height: number };
+
+/**
+ * MARK_LINES, each centred on x = 0 and the block on y = 0, y up; the widest line's width; and
+ * each line's ink as a band, from the outer edge of its bottom strokes to that of its top ones.
+ */
+export function markPath(): { d: string; width: number; bands: Band[] } {
   const block = MARK_LINES.length + (MARK_LINES.length - 1) * MARK_LINE_GAP;
+  const width = Math.max(...MARK_LINES.map(markLineWidth));
   const parts: string[] = [];
+  const bands: Band[] = [];
   MARK_LINES.forEach((text, row) => {
     const y = block / 2 - 1 - row * (1 + MARK_LINE_GAP);
+    bands.push({ x: round(-width / 2 - 1), y: round(y - MARK_STROKE / 2), width: round(width + 2), height: 1 + MARK_STROKE });
     let x = -markLineWidth(text) / 2 + MARK_STROKE / 2;
     for (const char of text) {
       if (char === " ") {
@@ -160,7 +174,7 @@ function markPath(): { d: string; width: number } {
       x += glyph.width + ADVANCE;
     }
   });
-  return { d: parts.join(" "), width: Math.max(...MARK_LINES.map(markLineWidth)) };
+  return { d: parts.join(" "), width, bands };
 }
 
 const MARK = markPath();
@@ -176,6 +190,7 @@ export function readerWatermarkLine(user: { first_name: string; last_name: strin
 
 export function ReaderWatermark({ width, height, scale }: { width: number; height: number; scale: number }) {
   const user = useAuthStore((state) => state.user);
+  const bandsId = `mark-bands-${useId().replace(/:/g, "")}`; // One per page, and safe inside url(#...)
   const letter = Math.min(width, height) / MARK.width;
 
   return (
@@ -185,8 +200,14 @@ export function ReaderWatermark({ width, height, scale }: { width: number; heigh
       style={{ pointerEvents: "none", userSelect: "none", WebkitUserSelect: "none" }}
     >
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="absolute inset-0">
+        <clipPath id={bandsId}>
+          {MARK.bands.map((band) => (
+            <rect key={band.y} {...band} />
+          ))}
+        </clipPath>
         <path
           d={MARK.d}
+          clipPath={`url(#${bandsId})`} // In the path's own tilted units, so each line is cut flat
           // To the page's centre, tilted up to the right, y up; the path is already centred.
           transform={`translate(${width / 2} ${height / 2}) rotate(${-MARK_ANGLE_DEGREES}) scale(${letter} ${-letter})`}
           fill="none"

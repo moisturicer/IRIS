@@ -76,7 +76,13 @@ MARK_LINES = ("PROPERTY OF", "CIT-U", "DO NOT DISTRIBUTE")
 MARK_WORD_GAP = 0.6  # A space between words, of a letter's height
 MARK_LINE_GAP = 0.7  # Clear space between lines, of a letter's height
 
+MARK_OVERSHOOT = 0.2  # How far an open stroke runs past its line's edge, to be cut flat there
+
 #: Each letter as strokes, one unit tall, y up, from x = 0: (width, strokes).
+#: The unit is between the centres of a letter's top and bottom strokes, so its
+#: ink is one unit and a stroke tall. A stroke that ends open at the top or the
+#: bottom runs MARK_OVERSHOOT past it (y = 1.2 or -0.2) and `_line_bands` cuts
+#: it flat at the ink's edge, which makes every letter the same height.
 #: A stroke is ("M", x, y) then ("L", x, y) lines and ("A", cx, cy, rx, ry,
 #: start, extent) elliptical arcs in degrees, counterclockwise when positive,
 #: each beginning where the one before it ended; ("Z",) closes it. Mirrored in
@@ -93,20 +99,20 @@ MARK_GLYPHS: dict[str, tuple[float, tuple[tuple, ...]]] = {
         (("M", 0, 0.5), ("L", 0.5, 0.5)),
     )),
     "F": (0.6, (
-        (("M", 0.6, 1), ("L", 0, 1), ("L", 0, 0)),
+        (("M", 0.6, 1), ("L", 0, 1), ("L", 0, -0.2)),
         (("M", 0, 0.5), ("L", 0.5, 0.5)),
     )),
-    "I": (0.0, ((("M", 0, 0), ("L", 0, 1)),)),
+    "I": (0.0, ((("M", 0, -0.2), ("L", 0, 1.2)),)),
     "N": (0.7, (
-        (("M", 0, 0), ("L", 0, 1)),
+        (("M", 0, -0.2), ("L", 0, 1.2)),
         (("M", 0, 1), ("L", 0.7, 0)),
-        (("M", 0.7, 0), ("L", 0.7, 1)),
+        (("M", 0.7, -0.2), ("L", 0.7, 1.2)),
     )),
     "O": (0.7, ((("M", 0.7, 0.5), ("A", 0.35, 0.5, 0.35, 0.5, 0, 360), ("Z",)),)),
-    "P": (0.7, ((("M", 0, 0), ("L", 0, 1), ("L", 0.4, 1), ("A", 0.4, 0.725, 0.3, 0.275, 90, -180), ("L", 0, 0.45)),)),
+    "P": (0.7, ((("M", 0, -0.2), ("L", 0, 1), ("L", 0.4, 1), ("A", 0.4, 0.725, 0.3, 0.275, 90, -180), ("L", 0, 0.45)),)),
     "R": (0.7, (
-        (("M", 0, 0), ("L", 0, 1), ("L", 0.4, 1), ("A", 0.4, 0.725, 0.3, 0.275, 90, -180), ("L", 0, 0.45)),
-        (("M", 0.35, 0.45), ("L", 0.7, 0)),
+        (("M", 0, -0.2), ("L", 0, 1), ("L", 0.4, 1), ("A", 0.4, 0.725, 0.3, 0.275, 90, -180), ("L", 0, 0.45)),
+        (("M", 0.36, 0.45), ("L", 0.724, -0.2)),
     )),
     "S": (0.7, ((
         ("M", 0.35 + 0.35 * 0.8660254, 0.75 + 0.25 * 0.5),
@@ -115,12 +121,12 @@ MARK_GLYPHS: dict[str, tuple[float, tuple[tuple, ...]]] = {
     ),)),
     "T": (0.7, (
         (("M", 0, 1), ("L", 0.7, 1)),
-        (("M", 0.35, 1), ("L", 0.35, 0)),
+        (("M", 0.35, 1), ("L", 0.35, -0.2)),
     )),
-    "U": (0.7, ((("M", 0, 1), ("L", 0, 0.35), ("A", 0.35, 0.35, 0.35, 0.35, 180, 180), ("L", 0.7, 1)),)),
+    "U": (0.7, ((("M", 0, 1.2), ("L", 0, 0.35), ("A", 0.35, 0.35, 0.35, 0.35, 180, 180), ("L", 0.7, 1.2)),)),
     "Y": (0.7, (
-        (("M", 0, 1), ("L", 0.35, 0.5), ("L", 0.7, 1)),
-        (("M", 0.35, 0.5), ("L", 0.35, 0)),
+        (("M", -0.025, 1.2), ("L", 0.35, 0.45), ("L", 0.725, 1.2)),
+        (("M", 0.35, 0.45), ("L", 0.35, -0.2)),
     )),
     "-": (0.4, ((("M", 0, 0.45), ("L", 0.4, 0.45)),)),
 }
@@ -162,20 +168,39 @@ def _draw_glyph(path, strokes, dx: float, dy: float) -> None:
                 path.close()
 
 
+def _row_bottom(row: int) -> float:
+    """Where a line's bottom strokes are centred, with the block centred on y = 0."""
+    return _block_height() / 2 - 1 - row * (1 + MARK_LINE_GAP)
+
+
+def _line_bands() -> list[tuple[float, float, float, float]]:
+    """
+    Each line's ink as (x, y, width, height): from the outer edge of its bottom
+    strokes to the outer edge of its top ones, wide enough for any line.
+    """
+    half = _mark_width() / 2 + 1
+    return [(-half, _row_bottom(row) - MARK_STROKE / 2, 2 * half, 1 + MARK_STROKE) for row in range(len(MARK_LINES))]
+
+
 def _mark_lines(pdf) -> None:
     """
     MARK_LINES as stroked lines and arcs, one unit per letter, each line centred
-    on the origin and the block centred on it vertically. Every stroke ends flat.
+    on the origin and the block centred on it vertically. Every stroke ends flat,
+    and nothing is drawn outside `_line_bands`, so every letter is one height.
 
     Shapes rather than a font, so the mark adds no text to the copy: copying or
     searching it finds only the paper and its footer. One path, stroked once, so
     where strokes cross the translucent grey is not laid down twice.
     """
+    bands = pdf.beginPath()
+    for band in _line_bands():
+        bands.rect(*band)
+    pdf.clipPath(bands, stroke=0, fill=0)
+
     advance = MARK_STROKE + MARK_GAP
     path = pdf.beginPath()
-    top = _block_height() / 2
     for row, text in enumerate(MARK_LINES):
-        y = top - 1 - row * (1 + MARK_LINE_GAP)
+        y = _row_bottom(row)
         x = -_line_width(text) / 2 + MARK_STROKE / 2
         for char in text:
             if char == " ":
