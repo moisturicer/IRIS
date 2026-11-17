@@ -254,7 +254,7 @@ Gold and cream are gone (IR-1097): the thumbnail ring and the other decoration w
 - **Shared app roles:** `text-display` 28/34, `text-title` 20/28, `text-heading` 16/24, `text-body` 15/24, `text-small` 13/20 and `text-label` 12/16 come from `frontend/tailwind.config.js`. Display and title use EB Garamond 600; the other roles use Inter. The record page below has documented reading-specific sizes.
 - **Display** (EB Garamond 600, 36 px on a phone and 48 px from `sm`, line-height 1.08, tight tracking, balanced wrap): a record's title on the Overview. The one line the page exists to name.
 - **Headline** (EB Garamond 600, 20/28 px): section headings on the Overview (Abstract, AI Overview, Related works, Comments) and the Ask IRIS heading. Ink, never maroon.
-- **Title** (EB Garamond 600, 20/28 px): the paper's title in the record bar, on one truncated line; dialog and card titles.
+- **Title** (EB Garamond 600, 20/28 px): the paper's title in the record bar, wrapping onto as many lines as it needs (the Full Text Rule; it was one truncated line before IR-1218); dialog and card titles.
 - **Reading** (Inter 400, 16 px, line-height 1.8): the AI Overview's prose, filling the Overview column. The first paragraph is the lead at 17 px, darker. Markdown section headings inside it are Ink Garamond with space above and no rule; list markers are maroon. The Abstract reads at 17 px with 1.75 leading.
 - **Body** (Inter 400, 15/24 px): interface text.
 - **Label** (Inter 600, 13/20 px): every control's text. Metadata is the 13 px `small` role at weight 400; field labels are 12/16 px.
@@ -280,6 +280,25 @@ The record page is a container named `reading`, and the Overview column is its o
 **The Container Rule.** Read the container, never the window. A `lg:` breakpoint on a reading surface is a bug: the sidebar and Ask IRIS change the room without changing the window.
 
 **The Flush Column Rule.** Reading text fills its column and meets what is beside it; the column, not the text, sets the measure.
+
+**The Full Text Rule (IR-1218).** Text is given its whole box, reflows with it, and is never cut. It holds for every paragraph, title, label, name and message, in every surface.
+
+1. **Text fills the width it is given.** It runs to the end of its box (a column, a card, a cell, a dialog) or the screen before it breaks. No width cap narrower than the box (`max-w-*`, a fixed `w-*`, a `ch` measure) stops it early and leaves empty space beside it. A narrow box is fine; a narrow cap inside a wider box is not.
+   - Good: a card's title wraps at the card's edge.
+   - Bad: an abstract capped at 65 characters in a 900 px column, with the right third empty.
+2. **Text re-wraps only when its space changes.** Narrow the window or the box and lines break sooner; widen it and they spread back out. No `<br>`, fixed line count or per-breakpoint text written for one screen size.
+   - Good: a heading on two lines at 360 px and one line at 1280 px.
+   - Bad: a heading hand-broken after its third word, which leaves a short ragged line on a wide screen.
+3. **Text is never cut off or hidden.** No ellipsis (`truncate`, `text-ellipsis`, `line-clamp-*`), and nothing that hides the end of text: a fixed height or `overflow-hidden` on text, or `whitespace-nowrap` on text that can be long. Long unbroken strings (an email, a URL, a file name) break with `break-words`; they do not spill out or get cut.
+   - Good: a long paper title wraps onto three lines in the record bar.
+   - Bad: `Rainwater Harvesting in Urban Ce…` with the rest unreachable.
+
+**The two allowed cuts.** These, and only these, may end in an ellipsis. Anything else needs this rule changed first.
+- **A long file name in a table cell** may stay on one line, so one name does not make its row tall. Its full name is shown on hover and on keyboard focus (a `title` alone is not enough: it does not show on focus), and is read in full by screen readers.
+  - Good: `Final_Thesis_Manuscript_Revi…` whose cell shows the whole name when hovered or focused, and is announced whole.
+- **An abstract's preview in a list card** (Discover, a person's profile) may be clamped to its few lines. The card links to the paper's page, where the whole abstract is shown, never cut.
+  - Good: Discover's card ends its abstract in `…`; opening the paper shows all of it.
+  - Bad: the same clamp on the paper's own page, in review, or anywhere that is not a preview with a link to the full text.
 
 ## Elevation & Depth
 
@@ -375,5 +394,6 @@ The same typeset entry as your own, at `/people/:id`, with a second column. **Co
 - **Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.
 - **Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.
 - **Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.
+- **Don't** cut text off with an ellipsis, a line clamp or a fixed height, or cap it narrower than its box. The two allowed cuts are named in the Full Text Rule.
 - **Don't** add a label explaining how AI text was made, or an outlined button where a ghost one is enough.
 - **Don't** put a thick accent border on a rounded shape. The one recorded exception is the entry folder's tab joined to the sheet (`EntryTab`, and register's current step), whose 2 px maroon top edge is the approved Dossier direction (the `border-accent-on-rounded` exception in `.impeccable/config.json`).
