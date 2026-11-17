@@ -21,6 +21,7 @@ import {
   sessionEndMessage,
   setLockoutUntil,
 } from "@/lib/authSession";
+import { canOpenPath } from "@/lib/access";
 import { landingPathFor } from "@/lib/landing";
 import { safeRedirectPath } from "@/lib/redirectTarget";
 import { classifyLoginFailure, type AccountLock, type LoginFailure } from "./loginFailure";
@@ -177,9 +178,14 @@ export default function LoginPage() {
       // the notice before the page loads (IR-790).
       if (res.data.notice_answer_required) useNoticeStore.getState().require();
       // Back to the page they asked for, or -- when they simply came to sign
-      // in, or asked for somewhere `safeRedirectPath` refused -- My Reviews
-      // when they have review work, otherwise Discover (IR-534).
-      navigate(redirectTo ?? landingPathFor(res.data.user), { replace: true });
+      // in, asked for somewhere `safeRedirectPath` refused, or asked for a page
+      // this account's role may not open (IR-1207: often a page of the account
+      // that signed out before them) -- My Reviews when they have review work,
+      // otherwise Discover (IR-534). A page typed while signed in still meets
+      // the guard's "not for you" screen; only this return trip skips it.
+      const user = res.data.user;
+      const back = redirectTo && canOpenPath(user.role_name, redirectTo) ? redirectTo : null;
+      navigate(back ?? landingPathFor(user), { replace: true });
     } catch (err: unknown) {
       const failure = classifyLoginFailure(err);
 

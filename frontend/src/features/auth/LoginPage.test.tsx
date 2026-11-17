@@ -287,6 +287,31 @@ describe("where the login screen sends you", () => {
     });
   });
 
+  it("skips a saved page this account's role may not open, and lands on its own home page (IR-1207)", async () => {
+    // The page an RDCO account was on when it signed out. A KTTO account
+    // signing in next must not be sent to "this page is not for you".
+    acceptAnyPassword();
+    renderLoginAt("/login", { from: "/rdco/users" });
+
+    await signIn();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: /rdco/ })).not.toBeInTheDocument();
+  });
+
+  it("skips a page the role may not open in the query string as well (IR-1207)", async () => {
+    acceptAnyPassword();
+    renderLoginAt("/login?next=%2Fadmin%2Faudit");
+
+    await signIn();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+    });
+  });
+
   it("honours a destination that survived a full page load in the query string", async () => {
     // The idle-timeout path is a `window.location` assignment, so router state
     // is gone by the time the login screen mounts. `?next=` is how the
