@@ -499,3 +499,38 @@ class DocumentRequestItem(models.Model):
 
     def __str__(self):
         return f"Request {self.request_id} | {self.label} | {self.state}"
+
+
+class DocumentRejection(models.Model):
+    """
+    One rejection of one upload, kept for good (IR-1201, ADR-022 §3.4).
+
+    `reject_item` sends the item back to `missing`, forgets its upload and
+    overwrites `item.rejection_reason`, which the owner's panel reads as "why
+    it was sent back". This row is the history: which file was rejected, by
+    whom, when and why, however many times the item goes round. Request data
+    (ADR-022 §Amendment 5), so it is served only under `may_read_requests`.
+    """
+
+    item        = models.ForeignKey(
+        DocumentRequestItem, on_delete=models.CASCADE, related_name="rejections"
+    )
+    #: `RESTRICT`: a rejected file is not deleted on its own, as one that
+    #: answered a request is not (`versions.deletion_refused_reason`), but it
+    #: goes when its Record does, through the cascade that removes the item.
+    upload      = models.ForeignKey(
+        RecordUpload, on_delete=models.RESTRICT, related_name="rejections"
+    )
+    rejected_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="document_rejections",
+    )
+    #: The requesting party's reason, as written. Plain text, never markup.
+    reason      = models.TextField()
+    created_at  = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+
+    def __str__(self):
+        return f"Upload {self.upload_id} | rejected {self.created_at:%Y-%m-%d}"
