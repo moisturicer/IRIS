@@ -3599,6 +3599,25 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.queryByRole("region", { name: "Record details" })).not.toBeInTheDocument();
   });
 
+  // jsdom does no layout, so this pins the rule that keeps the panel whole
+  // while it scrolls, not the pixels (IR-1178). The panel's own scrollbar
+  // takes ~23px from the scroller; an aside fixed at the column's full width
+  // overflowed by that much and the scroller clipped the right edge of every
+  // row. The aside may still not fall below the width it holds while the
+  // column folds, and must never outgrow what the scroller leaves it.
+  it("keeps every Record details row inside the panel when the panel scrolls (IR-1178)", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    const scroller = details.parentElement as HTMLElement;
+    expect(scroller).toHaveClass("overview-wide:overflow-y-auto", "overview-wide:overflow-x-hidden");
+    expect(scroller).toHaveClass("overview-wide:grid-cols-[minmax(0,1fr)]");
+    expect(details).toHaveClass("overview-wide:w-[clamp(17rem,25cqw,22rem)]");
+    expect(details).toHaveClass("overview-wide:max-w-full");
+    expect(details).toHaveClass("overview-wide:min-w-[15rem]");
+  });
+
   it("sets the reading sections apart with spacing, and draws Comments last (IR-569)", async () => {
     renderPaperView();
     await waitForRecord(record.title);
