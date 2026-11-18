@@ -172,6 +172,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   }, [selection]);
   // Only within its own paper, and only with the revision the paper was opened at.
   const unsendable = !selection ? undefined
+    : selection.unsubmitted
+      ? "Ask IRIS reads the submitted version of this paper, not your unsubmitted upload, so this selection won't be sent."
     : !selection.manuscriptRevision ? "IRIS can't check this selection against the paper, so it won't be sent."
     : scope !== selection.recordId ? (scopeToggle?.locked
       ? "This chat is across all papers. Start a new chat to ask about the selection."

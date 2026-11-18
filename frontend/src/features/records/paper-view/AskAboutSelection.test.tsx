@@ -94,6 +94,18 @@ describe("Ask about a selection", () => {
     expect(box).toBeEnabled();
   });
 
+  it("says an owner's unsubmitted upload can't be asked about, and sends the question without it", async () => {
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: queued });
+    vi.spyOn(apiClient, "get").mockResolvedValue({ data: empty });
+    const user = userEvent.setup();
+    render(<Page initial={{ ...chosen, versionLabel: "Unsubmitted upload", unsubmitted: true }} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("not your unsubmitted upload");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    expect(post.mock.calls[0][1]).not.toHaveProperty("selection");
+  });
+
   it("replays the passage a question was asked about, or that it is gone", async () => {
     sessionStorage.setItem("iris-runtime-paper:undefined:7", "c");
     const run = (id: string, selection: unknown) => ({ ...queued, id, state: "completed", question: `Q ${id}`,

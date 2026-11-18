@@ -36,15 +36,6 @@ class RenameRequest(BaseModel):
     title: str | None = Field(default=None, max_length=1000)
 
 
-class SelectionRequest(BaseModel):
-    """The passage the reader asked about (IR-581); checked against the indexed text, never trusted."""
-    record_id: int
-    #: The `X-Manuscript-Revision` the paper was opened at.
-    manuscript_revision: str
-    page: int
-    quote: str = Field(max_length=anchor.MAX_QUOTE * 2)
-
-
 class SubmitRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
@@ -52,8 +43,9 @@ class SubmitRequest(BaseModel):
     base_revision: int | None = Field(default=None, ge=0)
     #: The larger configured profile unless the reader chooses "ordinary" (ADR-049 §16 as amended).
     depth: Literal["ordinary", "deep"] = runs_config.DEFAULT_DEPTH
-    #: Paper Chat only: a selected passage of the paper the question is about.
-    selection: SelectionRequest | None = None
+    #: Paper Chat only: `{record_id, manuscript_revision, page, quote}`, the passage the question is
+    #: about (IR-581). Shape is checked by `anchor.parse`, so every malformed one is `invalid_selection`.
+    selection: dict | None = None
 
 
 @functools.cache
@@ -156,7 +148,7 @@ async def submit_run(
     protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
 ):
     try:
-        selection = anchor.parse(body.selection.model_dump()) if body.selection else None
+        selection = anchor.parse(body.selection) if body.selection is not None else None
     except ValueError:
         return JSONResponse({"status": "invalid_selection"}, status_code=422)
 

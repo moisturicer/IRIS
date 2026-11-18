@@ -19,6 +19,8 @@ export interface AskSelection {
   title: string;
   /** How the reader knows the version, e.g. "Version 3". */
   versionLabel: string;
+  /** The owner's own upload, not yet submitted: Ask IRIS reads only the submitted version. */
+  unsubmitted?: boolean;
   /** The `X-Manuscript-Revision` the paper was opened at; null where the server named none. */
   manuscriptRevision: string | null;
   page: number;
@@ -47,8 +49,6 @@ export function selectionRefusal(failure: unknown): string | null {
   return typeof code === "string" && code in SELECTION_REFUSALS ? code : null;
 }
 
-const clip = (text: string, n = 140) => (text.length > n ? `${text.slice(0, n - 1).trimEnd()}…` : text);
-
 export function SelectionChip({ selection, onRemove, note }: {
   selection: AskSelection;
   onRemove: () => void;
@@ -62,8 +62,8 @@ export function SelectionChip({ selection, onRemove, note }: {
       <div className="flex items-start gap-2">
         <i aria-hidden className="fas fa-quote-left mt-1 text-label text-brand" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-label text-stone-600" title={where}>{where}</p>
-          <p className="mt-0.5 text-stone-800">“{clip(selection.quote)}”</p>
+          <p className="break-words text-small text-stone-600">{where}</p>
+          <p className="mt-0.5 break-words text-stone-800">“{selection.quote}”</p>
         </div>
         <button type="button" onClick={onRemove} aria-label="Remove selection" title="Remove selection"
           className={cn("inline-flex size-8 shrink-0 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
@@ -77,12 +77,13 @@ export function SelectionChip({ selection, onRemove, note }: {
 
 export function AskedPassage({ selection }: { selection: ReaderSelection }) {
   if (!selection.available) {
-    return <p className="text-right text-label text-stone-600">Asked about a passage that is no longer available.</p>;
+    return <p className="text-right text-small text-stone-600">Asked about a passage that is no longer available.</p>;
   }
   return (
+    // As wide as the question it sits over (ChatMessageBubble's 85%).
     <figure className="ml-auto max-w-[85%] border-l-2 border-brand/40 pl-3 text-sm text-stone-700">
-      <blockquote>“{clip(selection.quote, 280)}”</blockquote>
-      <figcaption className="mt-1 text-label text-stone-600">
+      <blockquote className="break-words">“{selection.quote}”</blockquote>
+      <figcaption className="mt-1 text-small text-stone-600">
         Page {selection.page}{selection.current ? "" : " · selected on an earlier version"}
       </figcaption>
     </figure>

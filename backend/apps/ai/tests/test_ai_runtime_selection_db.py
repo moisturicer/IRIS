@@ -151,17 +151,23 @@ def test_each_refusal_names_what_the_reader_can_do(api, runtime):
     unscoped = {**as_reader(issue.reader_session_grant(user).token), **PUBLIC}
     assert ask(client, unscoped, "selection-code-9", selected(record, revision)).json() == {
         "status": "selection_out_of_scope"}
-    assert ask(client, headers, "selection-code-8", {**selected(record, revision), "page": 0}).json() == {
-        "status": "invalid_selection"}
+    # Every malformed shape is the one named refusal, never a framework error the page cannot read.
+    for n, bad in enumerate(({"page": 0}, {"page": "3"}, {"quote": "x" * 5000}, {"record_id": None})):
+        response = ask(client, headers, f"selection-shape-{n}", {**selected(record, revision), **bad})
+        assert response.status_code == 422 and response.json() == {"status": "invalid_selection"}, bad
 
 
 def test_an_unindexed_or_unreadable_paper_is_refused(api, runtime):
     client, holder = api
     holder["service"] = chat_service(runtime, recording(reply("Never sent.")))
+    user = make_user("selection-hidden@cit.edu")
     record, revision = indexed()
-    headers = scoped(make_user("selection-hidden@cit.edu"), record)
     Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.DRAFT)
-    assert ask(client, headers, "selection-0003", selected(record, revision)).json() == {
+    assert ask(client, scoped(user, record), "selection-0003", selected(record, revision)).json() == {
+        "status": "selection_unavailable"}
+    # Readable, but nothing indexed: there is no text to check the quote against.
+    unindexed = Record.objects.create(title="Not yet read", abstract="", pipeline_status=PipelineStatus.PUBLISHED)
+    assert ask(client, scoped(user, unindexed), "selection-0007", selected(unindexed, revision)).json() == {
         "status": "selection_unavailable"}
     assert stored_runs() == 0
 
@@ -204,7 +210,9 @@ def test_a_revoked_paper_withholds_the_passage_from_the_model_and_the_replay(api
     while run(service.run_next()):
         pass
 
-    assert "rose by forty percent" not in sent(provider)
+    text = sent(provider)
+    assert SELECTION_WITHDRAWN in text, "the run reached the model, told the passage is gone"
+    assert "rose by forty percent" not in text
     status = client.get(f"/api/v1/ai/runs/{queued.json()['id']}", headers=headers).json()
     assert status["selection"] == {"available": False}
 

@@ -166,9 +166,9 @@ class RunService:
         """Commit a compact handoff under the claim's fence (IR-734)."""
         return await self.store.commit_handoff(claim.run_id, claim.fence, handoff)
 
-    def _context(self, claim: Claim, bounds, selection=None) -> RunContext:
+    def _context(self, claim: Claim, bounds, asked=None) -> RunContext:
         return RunContext(
-            selection=selection, selection_withdrawn=claim.selection is not None and selection is None,
+            selection=asked, selection_withdrawn=claim.selection is not None and asked is None,
             allowance=claim.allowance, remaining_seconds=claim.remaining_seconds,
             depth=claim.depth, prior=claim.prior, state=claim.state or {},
             bounds=bounds, checkpoint=claim.checkpoint, spent=claim.spent or {},
@@ -206,14 +206,14 @@ class RunService:
                                   cache_query_vectors=getattr(self.cfg, "query_vector_cache", False),
                                   selection=getattr(self.cfg, "selection", None))
             # Rechecked under the grant the run reads with now, before any model call (IR-581).
-            selection = await tools.anchor(claim.selection) if claim.selection is not None else None
+            asked = await tools.recheck_selection(claim.selection) if claim.selection is not None else None
             # Every provider attempt inside is admitted against this run (IR-725).
             with admission.bound(admission.RunBinding(run_id, claim.fence)), stream.bound(sink):
                 if compacting:
                     result = await executor.compact(tools, self._context(claim, bounds))
                 elif getattr(executor, "takes_context", False):
                     result = await executor.answer(claim.question, tools,
-                                                   context=self._context(claim, bounds, selection))
+                                                   context=self._context(claim, bounds, asked))
                 else:
                     result = await executor.answer(claim.question, tools)
         except Unavailable as refused:
