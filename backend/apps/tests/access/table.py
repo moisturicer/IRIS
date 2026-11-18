@@ -692,7 +692,8 @@ REVIEWS = {
     }),
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
-    "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
+    # IR-1216: Workflow analytics moved to RDCO's section, for RDCO alone.
+    "reviews-analytics": Entry({"GET": _case(RDCO_ONLY)}),
     "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE), kwargs=ASSIGNMENT, data={})}),
     "assignment-assign": Entry({m: _case(COORDINATOR, kwargs=ASSIGNMENT,
                                        **({} if m == "GET" else {"data": {"reviewer": Ref("reviewer_target")}}))

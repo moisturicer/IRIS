@@ -1,6 +1,6 @@
 # Workflow analytics and the ADR-011 evaluation
 
-**Purpose.** What the Workflow Analytics page (`/review/analytics`,
+**Purpose.** What the Workflow Analytics page (`/rdco/analytics`,
 `GET /api/v1/reviews/analytics/`) reports, how each figure is computed, and how
 those figures relate to the [ADR-011](../adr/011-evaluation-framework.md)
 evaluation, so that **neither is cited as the other**.
@@ -21,7 +21,7 @@ changes. Change that file and this one in the same PR.
 | **Data** | Every workflow event the live system logged | Phase 3 sessions: SME participants walking pre-built scenarios under both arms, counterbalanced |
 | **Time** | Elapsed time in stage, nights and waits on the author included | Time-on-task, measured by the session protocol |
 | **Preserved clearances** | An operational count of what happened | Not primary evidence. ADR-004 rejects counting them as a finding: given which office asked, the count is an arithmetic identity |
-| **Who sees it** | An office its own figures, RDCO every party's | The researchers, anonymised under RA 10173 |
+| **Who sees it** | RDCO alone, every party's figures (IR-1216) | The researchers, anonymised under RA 10173 |
 
 So:
 
@@ -66,8 +66,10 @@ over turns: a record reopened under restart-all adds a second turn to its cell.
 
 ## Scope
 
-An ITSO, IERC or KTTO account reads its own office; RDCO reads every
-assignable party, the Adviser stage included. Scope is applied in the
+Only RDCO opens the page and the endpoint since IR-1216 (ADR-043 amendment
+2026-11-18); it reads every assignable party, the Adviser stage included, and
+may narrow to one. The computation still keeps an ITSO, IERC or KTTO caller to
+its own office, as a second layer under the endpoint's RDCO gate. Scope is applied in the
 queryset (`analytics.scoped_events`, `scoped_open_assignments`), so a row about
 only another office never leaves the database. A new Version's row names every
 party it touched and is read whole, but only the scoped parties' counts reach

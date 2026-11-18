@@ -128,51 +128,48 @@ test("every role shares one short main list, in the spec's order", () => {
   expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
   ]);
-  // An office member also has its Workflow analytics, nested under My Reviews
-  // (IR-1085, D5); the console is the coordinator's alone.
+  // An office member has the same list: Workflow analytics is RDCO's alone
+  // since IR-1216, and the console is the coordinator's alone.
   for (const role of [ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
     expect(labels(role, REVIEW_WORK)).toEqual([
-      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
-      "Main: Workflow analytics", "Main: Calls & Conferences",
+      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
     ]);
   }
 });
 
 test("RDCO's coordination screens, Import Records included, are one RDCO group", () => {
+  // Workflow analytics is in this group since IR-1216, not under My Reviews.
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
-    "Main: Workflow analytics", "Main: Calls & Conferences",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
     "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
     "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments", "RDCO: Notices",
+    "RDCO: Workflow analytics",
   ]);
 });
 
-// IR-1085, D5: Office console and Workflow analytics nest under My Reviews, for
-// the roles that already have them, and keep the addresses they had.
+// IR-1085, D5: Office console nests under My Reviews for coordinators, at the
+// address it had. Workflow analytics nested here too until IR-1216 moved it to
+// RDCO's group (below).
 describe("the pages nested under My Reviews (IR-1085, D5)", () => {
   const nested = (role: RoleName, access?: { my_reviews: boolean; is_coordinator?: boolean } | null) =>
     navFor(role, access)
       .filter((item) => item.parent === "reviewQueue")
       .map(({ label, to }) => ({ label, to }));
 
-  test("a coordinator reaches the console and analytics at their existing addresses", () => {
+  test("a coordinator reaches the console at its existing address, and nothing else nests", () => {
     expect(nested(ROLES.ITSO, COORDINATOR_WORK)).toEqual([
       { label: "Office console", to: "/review/office" },
-      { label: "Workflow analytics", to: "/review/analytics" },
     ]);
   });
 
-  test("RDCO's coordinator gets them too, and a missing flag is not a coordinator", () => {
-    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label))
-      .toEqual(["Office console", "Workflow analytics"]);
-    expect(nested(ROLES.RDCO, { my_reviews: true, is_coordinator: undefined }).map((i) => i.label))
-      .toEqual(["Workflow analytics"]);
+  test("RDCO's coordinator gets it too, and a missing flag is not a coordinator", () => {
+    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label)).toEqual(["Office console"]);
+    expect(nested(ROLES.RDCO, { my_reviews: true, is_coordinator: undefined })).toEqual([]);
   });
 
-  test("an office member who is not a coordinator sees analytics but not the console", () => {
-    expect(nested(ROLES.IERC, REVIEW_WORK).map((i) => i.label)).toEqual(["Workflow analytics"]);
-    expect(nested(ROLES.IERC, { my_reviews: true, is_coordinator: false }).map((i) => i.label))
-      .toEqual(["Workflow analytics"]);
+  test("an office member who is not a coordinator has nothing nested", () => {
+    expect(nested(ROLES.IERC, REVIEW_WORK)).toEqual([]);
+    expect(nested(ROLES.IERC, { my_reviews: true, is_coordinator: false })).toEqual([]);
   });
 
   test("roles without the screens see neither, even with the flags set", () => {
@@ -237,8 +234,11 @@ test("the review queue is every reviewer, and excludes Student", () => {
   only("reviewQueue", [ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
 });
 
-test("workflow analytics is the four offices, not the Adviser (IR-626)", () => {
-  only("reviewAnalytics", [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
+test("workflow analytics is RDCO's alone, in its own section at /rdco/analytics (IR-626, IR-1216)", () => {
+  only("reviewAnalytics", [ROLES.RDCO]);
+  expect(navFor(ROLES.RDCO, REVIEW_WORK).filter((item) => item.key === "reviewAnalytics"))
+    .toMatchObject([{ section: "RDCO", to: "/rdco/analytics" }]);
+  expect(navFor(ROLES.RDCO, REVIEW_WORK).find((item) => item.key === "reviewAnalytics")?.parent).toBeUndefined();
 });
 
 test("My Reviews is listed only when the server says the user has review work", () => {
@@ -340,6 +340,7 @@ test("RDCO coordination links use the RDCO section and addresses", () => {
     { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
     { label: "Reported Comments", to: "/moderation/comments", section: "RDCO" },
     { label: "Notices", to: "/notices", section: "RDCO" },
+    { label: "Workflow analytics", to: "/rdco/analytics", section: "RDCO" },
   ]);
 });
 

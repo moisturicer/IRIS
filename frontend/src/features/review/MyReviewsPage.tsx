@@ -13,8 +13,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage, readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
-import { canAccess, isCoordinator, pathFor } from "@/lib/access";
-import type { RoleName } from "@/lib/constants";
+import { isCoordinator, pathFor } from "@/lib/access";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import type { MyReviewsPage as Page, MyReviewsRow, MyReviewsTab } from "@/types/reviews";
@@ -194,12 +193,6 @@ export default function MyReviewsPage() {
               <ButtonLink to={pathFor("reviewOffice")} variant="secondary">
                 <i className="fas fa-table-cells-large" aria-hidden />
                 Office console
-              </ButtonLink>
-            )}
-            {canAccess(viewer?.role_name as RoleName | undefined, "reviewAnalytics") && (
-              <ButtonLink to={pathFor("reviewAnalytics")} variant="secondary">
-                <i className="fas fa-chart-column" aria-hidden />
-                Workflow analytics
               </ButtonLink>
             )}
           </>
