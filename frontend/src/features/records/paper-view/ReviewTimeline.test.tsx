@@ -178,7 +178,7 @@ describe("ReviewTimeline", () => {
     respond(payload);
     renderScreen(<ReviewTimeline recordId={7} submission={{ author: null, at: "2026-09-01T09:00:00Z" }} />);
 
-    const box = await screen.findByRole("article", { name: "Submission by The authors" });
+    const box = await screen.findByRole("article", { name: "Submission" });
     expect(box).toHaveTextContent(/^Submitted on Sep 1, 2026$/);
   });
 

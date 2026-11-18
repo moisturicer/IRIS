@@ -244,14 +244,15 @@ function Avatar({ name, large = false }: { name: string | null; large?: boolean 
  * repeating it here pushed the discussion down (IR-1212).
  */
 function SubmissionBox({ submission }: { submission: TimelineSubmission }) {
-  const who = submission.author ?? "The authors";
-  const when = submission.at && <> on <time dateTime={submission.at}>{formatDate(submission.at)}</time></>;
+  const { author, at } = submission;
+  const when = at && <> on <time dateTime={at}>{formatDate(at)}</time></>;
+  const line = author ? <><b>{author}</b> submitted{when}</> : <>Submitted{when}</>;
   return (
     <div className="review-tl-cmt">
-      <Avatar name={submission.author} large />
-      <article className="review-box" aria-label={`Submission by ${who}`}>
+      <Avatar name={author} large />
+      <article className="review-box" aria-label={author ? `Submission by ${author}` : "Submission"}>
         <header className="review-box-head">
-          <p>{submission.author ? <><b>{submission.author}</b> submitted{when}</> : <>Submitted{when}</>}</p>
+          <p>{line}</p>
         </header>
       </article>
     </div>
