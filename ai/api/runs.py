@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Header, Query
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from ai.runs import anchor
 from ai.runs import config as runs_config
 from ai.runs.service import RunService
 from ai.runs.store import TITLE_MAX, Busy, Conflict, NotFound, Unauthorized
@@ -35,6 +36,15 @@ class RenameRequest(BaseModel):
     title: str | None = Field(default=None, max_length=1000)
 
 
+class SelectionRequest(BaseModel):
+    """The passage the reader asked about (IR-581); checked against the indexed text, never trusted."""
+    record_id: int
+    #: The `X-Manuscript-Revision` the paper was opened at.
+    manuscript_revision: str
+    page: int
+    quote: str = Field(max_length=anchor.MAX_QUOTE * 2)
+
+
 class SubmitRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
@@ -42,6 +52,8 @@ class SubmitRequest(BaseModel):
     base_revision: int | None = Field(default=None, ge=0)
     #: The larger configured profile unless the reader chooses "ordinary" (ADR-049 §16 as amended).
     depth: Literal["ordinary", "deep"] = runs_config.DEFAULT_DEPTH
+    #: Paper Chat only: a selected passage of the paper the question is about.
+    selection: SelectionRequest | None = None
 
 
 @functools.cache
@@ -83,6 +95,9 @@ async def _call(service, action, protocol=None):
         return JSONResponse({"status": conflict.code, **conflict.detail}, status_code=409)
     except Busy as busy:
         return JSONResponse({"status": "busy", **({} if protocol else {"reason": busy.reason})}, status_code=503)
+    except anchor.Refused as refused:
+        # The reader is told why, in both protocols: there is something they can do about each.
+        return JSONResponse({"status": refused.code}, status_code=422)
 
 
 def _meter(s) -> dict:
@@ -140,11 +155,16 @@ async def submit_run(
     service: RunService | None = Depends(_service),
     protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
 ):
+    try:
+        selection = anchor.parse(body.selection.model_dump()) if body.selection else None
+    except ValueError:
+        return JSONResponse({"status": "invalid_selection"}, status_code=422)
+
     async def act(s: RunService):
         run, created = await s.submit(
             grant, key=idempotency_key, question=body.question,
             conversation_id=body.conversation_id, base_revision=body.base_revision,
-            depth=body.depth,
+            depth=body.depth, selection=selection,
         )
         if protocol:
             run = await s.store.status(grant, run["id"], reader_projection=True)

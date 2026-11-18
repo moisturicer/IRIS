@@ -679,11 +679,26 @@ export default function PaperViewPage() {
   const drawnHighlights = highlights.items
     .filter((h) => (viewedVersion ? h.state === "stale" && h.open_version === viewedVersion.number : h.state === "current"))
     .map((h) => ({ key: h.id, regions: h.regions }));
+  // The menu is offered on the current paper only (ADR-065 §8), so this names the current version.
+  const currentVersionLabel = record.manuscript_unsubmitted
+    ? "Unsubmitted upload"
+    : latestVersion ? `Version ${latestVersion.number}` : "Current version";
   const selectionActions: SelectionAction[] = [
     {
       id: "save-highlight", label: "Save highlight", icon: "fa-highlighter",
       run: (passage, manuscriptRevision) => void highlights.save(passage, manuscriptRevision),
     },
+    // Wherever Ask IRIS is offered (IR-581): fills an editable question; nothing is sent until Send.
+    ...(onReviewTab ? [] : [{
+      id: "ask-selection", label: "Ask about selection", icon: "fa-comment-dots",
+      run: (passage, manuscriptRevision) => {
+        focusPanel.current = true;
+        chat.askAbout({
+          recordId: record.id, title: record.title, versionLabel: currentVersionLabel, manuscriptRevision,
+          page: passage.page, quote: passage.quote,
+        });
+      },
+    } satisfies SelectionAction]),
   ];
   const openHighlight = (h: ReadableHighlight) => {
     const version = h.state === "stale" ? h.open_version : null;
@@ -1472,6 +1487,8 @@ export default function PaperViewPage() {
           viewingVersion={viewedVersion?.number ?? null}
           returnTo={chatReturn}
           onOpenNotes={onReviewTab ? undefined : openNotes}
+          selection={chat.selection}
+          onSelectionChange={chat.setSelection}
           className={chatPanelClass}
         />
       )}

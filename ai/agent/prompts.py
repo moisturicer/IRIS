@@ -186,6 +186,18 @@ EARLIER_TURN = "[IRIS earlier Turn {n}] "
 CITED_NOTE = "\n\nPapers this answer cited: "
 #: Opens a Paper Chat under research-7: the one paper every question is about (IR-995).
 PAPER_CHAT_PREFIX = "[IRIS paper chat] This conversation is about one paper: "
+#: Names the passage a reader selected in the paper and asks about (IR-581). Verified on that page
+#: of the indexed text before it is sent; the model still reads the page to cite it.
+SELECTION_PREFIX = (
+    "[IRIS selection] The reader selected this passage of the paper and is asking about it. It is on the "
+    "page named; read that page to cite it: "
+)
+#: Sent instead when the passage no longer holds: the paper was replaced, or the reader lost access (IR-581).
+SELECTION_WITHDRAWN = (
+    "[IRIS selection] The reader asked about a passage they had selected, but it can no longer be read as "
+    "they selected it: the paper has changed or is no longer available to them. Do not guess what it said. "
+    "Answer what you can without it, and say that the selected passage could not be used."
+)
 #: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
 COMPACT_REQUEST = (
     "The reader asked to condense this conversation now. This is not a question and not the reader's "

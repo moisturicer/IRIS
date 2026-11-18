@@ -22,6 +22,7 @@ import asyncpg
 from ai.infrastructure import db
 from ai.research import metadata
 from ai.research.selection import Hit, Policy, choose, neighbour_positions, select
+from ai.runs import anchor as anchoring
 from ai.runs.store import CURRENT_HANDOFF, CURRENT_SOURCE_TURN, RunStore
 
 log = logging.getLogger(__name__)
@@ -469,6 +470,18 @@ class ResearchTools:
                         or run["reader_id"] != int(claims["sub"])):
                     raise _Refused("run_ended")
                 yield conn
+
+    async def anchor(self, selection):
+        """`selection` if it still holds for this reader now, else None (IR-581).
+
+        Visibility, the Paper Chat scope and the indexed revision are checked
+        exactly as at admission, under the grant the run reads with today.
+        """
+        try:
+            async with self._session() as conn:
+                return await anchoring.verify(conn, selection, self.scope)
+        except (_Refused, anchoring.Refused):
+            return None
 
     async def _call(self, name: str, body) -> ToolResult:
         try:

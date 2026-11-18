@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
+import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun, type SelectionRequest } from "@/api/runtimeReader";
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { failureMessage, readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
@@ -20,6 +20,7 @@ import { ReasoningBar } from "./ReasoningBar";
 import { StarterQuestions } from "./StarterQuestions";
 import { ASK_STARTERS, PAPER_STARTERS } from "./askStarters";
 import { TokenUsageMeter } from "./TokenUsageMeter";
+import { AskedPassage, SELECTION_QUESTION, SELECTION_REFUSALS, SelectionChip, selectionRefusal, type AskSelection } from "./SelectionChip";
 import { conversationTotals, toMessages, useCitedRecords } from "../runtime/messages";
 import { useDraft } from "../runtime/useDraft";
 import { useTypewriter } from "../runtime/useTypewriter";
@@ -126,11 +127,15 @@ interface Props {
   onTitle?: (id: string, title: string) => void;
   /** Paper Chat's this-paper / all-papers switch, shown beside the depth. */
   scopeToggle?: { allPapers: boolean; onChange: (allPapers: boolean) => void; locked?: boolean };
+  /** A passage the reader chose to ask about (IR-581): sent with the next question, never on its own. */
+  selection?: AskSelection | null;
+  /** The reader removed the selection, or a question carrying it was admitted. */
+  onSelectionChange?: (next: AskSelection | null) => void;
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
-  selectedId = null, onSelectSources, onAnswered, onTitle, scopeToggle }: Props) {
+  selectedId = null, onSelectSources, onAnswered, onTitle, scopeToggle, selection = null, onSelectionChange }: Props) {
   // The research scope: this paper, or every paper once the reader widens. Read on each request, so
   // widening continues the same conversation instead of starting another.
   const scope = scopeToggle?.allPapers ? undefined : recordId;
@@ -147,12 +152,35 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Trouble>();
   const generation = useRef(0);
-  const pending = useRef<{ question: string; depth: Depth; key: string; conversation?: ReaderConversation }>();
+  const pending = useRef<{ question: string; depth: Depth; key: string; conversation?: ReaderConversation;
+    selection?: SelectionRequest }>();
   const pendingRetry = useRef<{ key: string; run: ReaderRun }>();
   const sending = useRef(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
+  // Why the chosen passage was refused; the question stays editable and nothing else is blocked (IR-581).
+  const [selectionNote, setSelectionNote] = useState<string>();
+  const draftNow = useRef(draft);
+  draftNow.current = draft;
+  useEffect(() => {
+    setSelectionNote(undefined);
+    if (!selection) return;
+    // An editable question, never sent until the reader presses Send.
+    if (!draftNow.current.trim()) setDraft(SELECTION_QUESTION);
+    composerRef.current?.focus();
+  }, [selection]);
+  // Only within its own paper, and only with the revision the paper was opened at.
+  const unsendable = !selection ? undefined
+    : !selection.manuscriptRevision ? "IRIS can't check this selection against the paper, so it won't be sent."
+    : scope !== selection.recordId ? (scopeToggle?.locked
+      ? "This chat is across all papers. Start a new chat to ask about the selection."
+      : "Switch to This paper to ask about the selection.")
+    : undefined;
+  const asked: SelectionRequest | undefined = selection && !unsendable && selection.manuscriptRevision
+    ? { record_id: selection.recordId, manuscript_revision: selection.manuscriptRevision, page: selection.page,
+        quote: selection.quote }
+    : undefined;
   const reportTitle = useRef(onTitle);
   reportTitle.current = onTitle;
   // Opening a conversation by its address: loading, then its content or one of the shared read states (IR-906).
@@ -206,22 +234,31 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
 
   const send = async (question: string, retry = false) => {
     if (sending.current) return;
-    const request = retry ? pending.current : { question, depth, key: crypto.randomUUID(), conversation };
+    const request = retry ? pending.current : { question, depth, key: crypto.randomUUID(), conversation, selection: asked };
     if (!request) return;
     pending.current = request;
     sending.current = true;
     setBusy(true); setError(undefined);
     const version = generation.current;
     try {
-      const next = await api.submit(request.question, request.depth, request.key, request.conversation);
+      const next = await api.submit(request.question, request.depth, request.key, request.conversation,
+        request.selection);
       if (version !== generation.current) return;
       pending.current = undefined;
+      if (request.selection) onSelectionChange?.(null);
       setRun(next);
       await reopen(next.conversation_id, version);
       if (version !== generation.current) return;
       onConversation?.(next.conversation_id);
     } catch (failure) {
       if (version !== generation.current) return;
+      const refusal = request.selection ? selectionRefusal(failure) : null;
+      if (refusal) {
+        pending.current = undefined;
+        setDraft(request.question);
+        setSelectionNote(SELECTION_REFUSALS[refusal]);
+        return;
+      }
       if (isAxiosError(failure) && failure.response?.status === 409) {
         pending.current = undefined;
         setDraft(request.question);
@@ -379,6 +416,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
           const current = item.id === run?.id ? run : item;
           if (compactionRun(item)) return <CompactionStatus key={item.id} run={current} />;
           return <div key={item.id} className="space-y-5">
+            {current.selection && <AskedPassage selection={current.selection} />}
             {messages.filter(m => m.id === `q:${item.id}` || (m.id === `a:${item.id}` && !(writing && item.id === run?.id))).map(m => <div key={m.id}>
               <ChatMessageBubble message={m} compact={dense} inlineSources
                 sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources}
@@ -429,6 +467,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       </div>
     </div>
     <ChatInput centered={centered} textareaRef={composerRef} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
+      above={selection && <SelectionChip selection={selection} onRemove={() => onSelectionChange?.(null)}
+        note={selectionNote ?? unsendable} />}
       beside={usage.latest && <TokenUsageMeter usage={usage.latest} />}
       onStop={run && activeRun(run) && !compactionRun(run) && !busy ? () => void stop() : undefined}
       maxLength={4000}

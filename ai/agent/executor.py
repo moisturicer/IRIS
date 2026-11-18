@@ -43,7 +43,8 @@ from ai.agent.prompts import (  # noqa: F401 -- re-exported: callers and pinned 
     MANUSCRIPT_INSTRUCTIONS, MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION, METADATA_INSTRUCTIONS,
     METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION, PAPER_CHAT_PREFIX, PROMPT_VERSION, PROMPTS,
     RECOVERY_INSTRUCTIONS, RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION, RESEARCH_INSTRUCTIONS,
-    RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, TOOL_VERSION, quoted, unquoted,
+    RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, SELECTION_PREFIX, SELECTION_WITHDRAWN, TOOL_VERSION, quoted,
+    unquoted,
 )
 from ai.agent.tools import (
     ASK_CLARIFICATION, ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded,
@@ -358,7 +359,10 @@ class _Run:
         self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0),
                             attempts=spent.get("attempts", 0))
         self.task = checkpoint.task_key(question, context.prior, context.state or {},
-                                        handoff=(context.handoff or {}).get("revision"))
+                                        handoff=(context.handoff or {}).get("revision"),
+                                        selection=(context.selection.to_json() if context.selection
+                                                   else {"withdrawn": True} if context.selection_withdrawn
+                                                   else None))
         # The compact handoff the history now opens with, and the original Turns still carried whole (IR-734).
         self.handoff = (context.handoff or {}).get("body")
         self.handoff_revision = (context.handoff or {}).get("revision")
@@ -545,10 +549,21 @@ class _Run:
                                                        ensure_ascii=False),
                         self.investigation.recalled_sources)
             history.append(note)
+        history += self._selection(scope)
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history
 
+
+    def _selection(self, scope) -> list:
+        """The passage the reader asked about, rechecked at this claim; or that it is gone (IR-581)."""
+        chosen = self.context.selection
+        if chosen is None:
+            return [User(SELECTION_WITHDRAWN)] if self.context.selection_withdrawn else []
+        body = {"page": chosen.page, "quote": quoted(chosen.quote) if self.delimit else chosen.quote}
+        if scope is not None and scope in self.investigation.papers:
+            body = {"paper": self.investigation.papers[scope][0], **body}
+        return [User(SELECTION_PREFIX + json.dumps(body, ensure_ascii=False), self.investigation.recalled_sources)]
 
     async def _resume(self) -> Optional[tuple[list, int]]:
         """The Conversation an earlier fence completed, verified now; None to start afresh (IR-724).

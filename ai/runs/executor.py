@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Optional, Protocol
 
 if TYPE_CHECKING:
     from ai.agent.budget import Bounds
+    from ai.runs.anchor import Selection
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,10 @@ class RunContext:
     committed: frozenset = frozenset()
     #: `await commit_handoff(handoff)` returns ("committed", revision), ("stale", None) or ("fenced", None).
     commit_handoff: Optional[Callable[..., Awaitable[tuple]]] = None
+    #: The passage the reader asked about, rechecked at this claim; only then may a model see it (IR-581).
+    selection: Optional["Selection"] = None
+    #: The reader asked about a passage that no longer holds: replaced, revoked or unindexed since.
+    selection_withdrawn: bool = False
 
 
 class Unavailable(Exception):

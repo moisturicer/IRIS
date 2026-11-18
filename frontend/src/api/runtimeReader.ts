@@ -3,6 +3,15 @@ import { apiClient } from "./client";
 export const READER_PROTOCOL = "runs-reader-1";
 
 export type Depth = "ordinary" | "deep";
+/**
+ * The passage a question was asked about, as the server shows it (IR-581): whole while the
+ * paper is readable, `current` false once it was replaced; only `available: false` otherwise.
+ */
+export type ReaderSelection =
+  | { available: true; record_id: number; page: number; quote: string; manuscript_revision: string; current: boolean }
+  | { available: false };
+/** What a question about a selection sends; the server verifies every field (IR-581). */
+export interface SelectionRequest { record_id: number; manuscript_revision: string; page: number; quote: string }
 export interface ReaderRun {
   protocol: typeof READER_PROTOCOL;
   id: string;
@@ -34,6 +43,8 @@ export interface ReaderRun {
   /** Older context condensed into a summary; the original Turns stay (IR-735). Absent from older servers. */
   compaction?: null | { compactions: number; turns_compacted: number; last: "compacted" | "kept" };
   capabilities: { manual_compaction: boolean };
+  /** The passage this question was asked about, if any (IR-581). Absent from older servers. */
+  selection?: ReaderSelection | null;
 }
 export interface ReaderActivity {
   phase: "waiting" | "working";
@@ -104,9 +115,11 @@ export function runtimeReader(scope?: number | (() => number | undefined)) {
   };
   const base = "/ai/runtime";
   return {
-    async submit(question: string, depth: Depth, key: string, conversation?: ReaderConversation) {
+    async submit(question: string, depth: Depth, key: string, conversation?: ReaderConversation,
+      selection?: SelectionRequest) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs`, {
         question, depth, ...(conversation ? { conversation_id: conversation.id, base_revision: conversation.revision } : {}),
+        ...(selection ? { selection } : {}),
       }, { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },
