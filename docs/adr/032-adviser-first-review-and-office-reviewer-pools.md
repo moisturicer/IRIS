@@ -61,6 +61,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Corrected 2026-11-06 (Hermoine Zozobrado, IR-874): §7's review threads.** Only the parties that asked hold a Version with their open *Must fix* threads, every Decision closes open threads with its comment as the reason, and the Adviser's *Accept* of a Proposal is blocked like *Accept & send to RDCO*. See the *Correction, 2026-11-06* note under §7.
 
+**Amended 2026-11-18 (Hermoine Zozobrado, IR-1204 design session): §7's review threads.** A reviewer may open a thread on a supporting document, one uploaded version in one of the record's slots, as a whole and never a passage. It is a thread in every other respect, read by whoever reads the review. Its answers block the next Version and go in the response to reviewers, and its *Must fix* blocks its own party's approval. A newer upload labels it "from an earlier upload", and an upload with a thread is kept. See the *Amendment, 2026-11-18* note under §7.
+
 **Clarified 2026-11-14 (project lead, IR-1072; Accepted): §9's word "Accepted".** It names an act, not only a record state. A record is *Accepted* only when it is a Proposal; an Adviser's or RDCO's *accept* of a Thesis/Research or Project reads "Accepted" on that reviewer's own Done row, and the record itself reads by where it rests. No behaviour changes. See the *Clarification, 2026-11-14* note under §9.
 
 **Amended 2026-11-18 (Hermoine Zozobrado, IR-1220; security review by Ashlee Sean): §10 and Security Impact.** An office's supplementary file (`attach_file`) is PDF, Word (`.docx`), PNG or JPG, by its name and its first bytes, where it was any type. See the *Amendment, 2026-11-18* note under §10.
@@ -528,6 +530,41 @@ Moving an anchor never resolves a thread, and a removed passage still needs reso
 5. **Sending the drafts is in reach.** While a reviewer has drafts, the footer offers **Send N comments**, which opens *Finish review* on *Comment only*, so sending them never requires choosing a verdict first.
 6. **Conversation and Threads are two places, not two views.** Conversation shows discussion in full, with its replies; one line per finished review that sent threads ("Rita Cruz reviewed v2: 2 threads, 1 Must fix"); and one line per thread sent outside a review ("Sam Student commented on p. 18"), each linking to Threads. Thread bodies and their replies live only in Threads. *Rejected: showing each thread in both.* The same review said twice, in two shapes.
 7. **The same controls in both.** A ⋯ menu with *Edit* on one's own comments and replies, mentions, saved replies and one level of replies, in Conversation and Threads alike.
+
+**Amendment, 2026-11-18 (Hermoine Zozobrado, IR-1204 design session): a review thread on a supporting document.** Decided by Hermoine Zozobrado on 2026-11-17 and 2026-11-18, and transcribed by an agent. Where it differs from IR-1204's description, this amendment wins, and the ticket is updated to match.
+
+*Why.* A reviewer reading the Documents tab (IR-1203) could say what is wrong with a document only in Conversation or in a manuscript thread, for example "the consent form isn't signed". It was neither a review item nor tied to the document, so it blocked nothing and was easy to miss.
+
+*The rule:* a supporting document is reviewed the way the manuscript is. Its threads are threads in every respect except the two that need a passage of text.
+
+1. **A thread may name a document upload.** That is one uploaded version of a document in one of the record's slots (`RecordUpload`, ADR-022), for example *Consent form, v1*.
+    - It names the **whole document**, never a passage, so it works on a scan that has no text.
+    - A thread names a manuscript passage, a document upload or neither, never two of them.
+    - *Rejected: an office's own attachment* (`attach_file`, §10). The author cannot replace it, so a *Must fix* on it could never be fixed. An office raises it in Conversation.
+2. **Everything else is a thread's.**
+    - It has its severity, *Must fix* or *Suggestion*.
+    - It is posted at once or saved as a draft for *Finish review* (IR-1194).
+    - It belongs to its writer's party.
+    - It has replies, mentions, saved replies and edits.
+    - It is resolved and reopened.
+    - The owner answers it with *Addressed*, saying how, or *Declined*, with a required reason. A reviewer checks the answer and resolves it.
+3. **A reviewer opens it, and the author answers it.** Who may open one is the same as for a general thread (IR-1194 point 3). An owner does not open a document thread. An owner's question about a document is discussion, in Conversation.
+4. **Who reads it is who reads the review** (`may_read_review`, IR-479), as for every thread.
+    - Someone who reads the review but may not open the document still reads the thread. An example is an earlier Adviser, since documents are read by the current Adviser only (ADR-022 §Amendment 6).
+    - *Rejected: also requiring the document rule* (`may_read_record_documents`), as IR-1204's description first asked. Review content would then have two reading rules to keep in step, and a thread would vanish from a reviewer who lost document access mid-review.
+5. **A newer upload does not move the thread.** When the author uploads a new version of that document, earlier threads stay on the upload they name and read **"from an earlier upload"**. Nothing is carried over to the new upload. There is no Outdated search (2026-11-04), because a document has no passage to look for.
+6. **It blocks what a manuscript thread blocks** (§7's 2026-11-04 amendment as corrected on 2026-11-06).
+    - **The owner's next Version.** *Submit vN* is refused until every open *Must fix* document thread owned by a party with an open Revision request has an *Addressed* or *Declined* answer, as manuscript threads are. A document is fixed by uploading a new version, but the answer is still what the reviewer reads with the Version.
+    - **Its own party's approval.** *Accept & send to RDCO* or *Clear* is refused while the party has an open *Must fix* document thread.
+    - **Counts.** It is counted wherever open threads are counted: the Threads tab, the Readiness panel's `open_thread` item, and the *Finish review* and Decision dialogs.
+    - **A *Suggestion* blocks nothing.**
+7. **The response to reviewers includes it.**
+    - The answers to document threads go in the letter attached to the Version (2026-11-09 build note 7), each labelled with its document and upload, for example *"Consent form, v1"*.
+    - This reverses IR-1204's description, which left document threads out of the letter.
+    - *Rejected: answers shown only on the thread.* The author gives them to submit the Version, so a letter without them would not be the whole response.
+8. **A Decision closes it**, as it closes every open thread, with the Decision's comment as its reason (2026-11-06).
+9. **Opening it shows its document** in the review reader (IR-1203). The reader shows PDFs; PNG and JPG wait on IR-1203's image half.
+10. **An upload with a thread is kept.** Nobody may delete it, staff included, so no thread loses the document it names. This joins the review history that already keeps an upload (`records.versions.deletion_refused_reason`: one a Version was submitted with, or one that answered a document request; ADR-058 §2, IR-872, IR-1201). Only a superuser in Django admin can remove it, as with those. *A default chosen in transcription, not discussed in the session:* the alternative, deleting the threads with the upload, would erase review content. This point can be overturned without reopening the rest.
 
 ### 8. Discover: research, and Discoverable Proposals
 
