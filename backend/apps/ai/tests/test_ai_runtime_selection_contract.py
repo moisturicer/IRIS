@@ -32,9 +32,17 @@ def test_a_well_formed_selection_parses():
     assert Selection.from_json(s.to_json()) == s
 
 
+def test_a_selection_whose_version_the_page_did_not_name_parses():
+    # The runtime tells the model the version is unknown; it is never refused for it (IR-581).
+    for raw in (body(manuscript_revision=None), {k: v for k, v in body().items() if k != "manuscript_revision"}):
+        s = parse(raw)
+        assert s.revision is None
+        assert Selection.from_json(s.to_json()) == s
+
+
 @pytest.mark.parametrize("over", [
     {"record_id": "x"}, {"record_id": 0}, {"page": 0}, {"page": "2"}, {"quote": " a "},
-    {"quote": "x" * (MAX_QUOTE + 1)}, {"manuscript_revision": "not-a-uuid"}, {"manuscript_revision": None},
+    {"quote": "x" * (MAX_QUOTE + 1)}, {"manuscript_revision": "not-a-uuid"},
 ])
 def test_a_malformed_selection_is_refused(over):
     with pytest.raises(ValueError):

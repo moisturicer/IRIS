@@ -695,7 +695,6 @@ export default function PaperViewPage() {
         focusPanel.current = true;
         chat.askAbout({
           recordId: record.id, title: record.title, versionLabel: currentVersionLabel, manuscriptRevision,
-          unsubmitted: !!record.manuscript_unsubmitted,
           page: passage.page, quote: passage.quote,
         });
       },

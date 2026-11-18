@@ -11,7 +11,7 @@ export type ReaderSelection =
   | { available: true; record_id: number; page: number; quote: string; manuscript_revision: string; current: boolean }
   | { available: false };
 /** What a question about a selection sends; the server verifies every field (IR-581). */
-export interface SelectionRequest { record_id: number; manuscript_revision: string; page: number; quote: string }
+export interface SelectionRequest { record_id: number; manuscript_revision: string | null; page: number; quote: string }
 export interface ReaderRun {
   protocol: typeof READER_PROTOCOL;
   id: string;

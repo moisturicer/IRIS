@@ -472,15 +472,15 @@ class ResearchTools:
                 yield conn
 
     async def recheck_selection(self, selection):
-        """`selection` if it still holds for this reader now, else None (IR-581).
+        """What this run's grant finds about `selection` now, or None if its paper may not be read (IR-581).
 
-        Visibility, the Paper Chat scope and the indexed revision are checked
-        exactly as at admission, under the grant the run reads with today.
+        Read under the grant the run reads with today, so visibility, the
+        disclosure gate and a Paper Chat scope are exactly the tools'.
         """
         try:
             async with self._session() as conn:
-                return await anchor.verify(conn, selection, self.scope)
-        except (_Refused, anchor.Refused):
+                return await anchor.assess(conn, selection)
+        except _Refused:
             return None
 
     async def _call(self, name: str, body) -> ToolResult:

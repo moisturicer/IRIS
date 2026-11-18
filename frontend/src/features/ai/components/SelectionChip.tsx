@@ -19,8 +19,6 @@ export interface AskSelection {
   title: string;
   /** How the reader knows the version, e.g. "Version 3". */
   versionLabel: string;
-  /** The owner's own upload, not yet submitted: Ask IRIS reads only the submitted version. */
-  unsubmitted?: boolean;
   /** The `X-Manuscript-Revision` the paper was opened at; null where the server named none. */
   manuscriptRevision: string | null;
   page: number;
@@ -30,15 +28,11 @@ export interface AskSelection {
 /** The question a selection fills in when the reader has not started one. Editable. */
 export const SELECTION_QUESTION = "What does this passage mean?";
 
-/** What the reader is told for each refusal, and what they can do about it. */
+/**
+ * What the reader is told when a question carrying a selection is not admitted, and what they can do.
+ * Nothing about the passage itself is refused: IRIS looks for it and says what it found (IR-581).
+ */
 export const SELECTION_REFUSALS: Record<string, string> = {
-  selection_unverified:
-    "IRIS couldn't find this text on that page of the paper it has read. Select it again, or remove it to ask without it.",
-  selection_version:
-    "This passage is from a different version than the one IRIS has read. Reload the paper and select it again, or remove it.",
-  selection_unavailable:
-    "IRIS hasn't read this paper yet, so it can't use the selection. Remove it to ask without it.",
-  selection_out_of_scope: "A selection can only be asked about within this paper.",
   selection_unsupported: "Ask IRIS can't use a selection right now. Remove it to ask without it.",
   invalid_selection: "This selection can't be sent. Select the passage again, or remove it.",
 };

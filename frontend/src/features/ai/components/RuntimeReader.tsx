@@ -170,16 +170,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     if (!draftNow.current.trim()) setDraft(SELECTION_QUESTION);
     composerRef.current?.focus();
   }, [selection]);
-  // Only within its own paper, and only with the revision the paper was opened at.
-  const unsendable = !selection ? undefined
-    : selection.unsubmitted
-      ? "Ask IRIS reads the submitted version of this paper, not your unsubmitted upload, so this selection won't be sent."
-    : !selection.manuscriptRevision ? "IRIS can't check this selection against the paper, so it won't be sent."
-    : scope !== selection.recordId ? (scopeToggle?.locked
-      ? "This chat is across all papers. Start a new chat to ask about the selection."
-      : "Switch to This paper to ask about the selection.")
-    : undefined;
-  const asked: SelectionRequest | undefined = selection && !unsendable && selection.manuscriptRevision
+  // Always sent with the question: the runtime finds the passage, or tells the model it could not (IR-581).
+  const asked: SelectionRequest | undefined = selection
     ? { record_id: selection.recordId, manuscript_revision: selection.manuscriptRevision, page: selection.page,
         quote: selection.quote }
     : undefined;
@@ -470,7 +462,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     </div>
     <ChatInput centered={centered} textareaRef={composerRef} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
       above={selection && <SelectionChip selection={selection} onRemove={() => onSelectionChange?.(null)}
-        note={selectionNote ?? unsendable} />}
+        note={selectionNote} />}
       beside={usage.latest && <TokenUsageMeter usage={usage.latest} />}
       onStop={run && activeRun(run) && !compactionRun(run) && !busy ? () => void stop() : undefined}
       maxLength={4000}

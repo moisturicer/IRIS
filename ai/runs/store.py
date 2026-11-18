@@ -447,9 +447,6 @@ class RunStore:
             if existing["request_hash"] != digest:
                 raise Conflict("request_mismatch")
             return dict(existing), False
-        if selection is not None:
-            # Under this grant, before anything is stored; anchor.Refused rolls the admission back.
-            await anchor.verify(conn, selection, scope)
         if conversation_id is None:
             if compaction:
                 # There is nothing to condense in a Conversation that does not exist.

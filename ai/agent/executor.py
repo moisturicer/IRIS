@@ -472,6 +472,9 @@ class _Run:
         also = [*handoff["shown"], *handoff["selected"], *handoff["excluded"]] if handoff else ()
         scope = getattr(self.tools, "scope", None) if self.chat else None
         asked = [*also, *([scope] if scope is not None else [])]
+        if self.selects and self.context.selection is not None:
+            # A handle for the selected paper, which need not be a Paper Chat's own (IR-581).
+            asked.append(self.context.selection.selection.record_id)
         # The same read gives every paper an earlier Turn cited a fresh handle, if still readable (IR-1168).
         cited = [rid for turn in self.prior for rid, _ in turn.cited] if self.cites else []
         shown = await self.investigation.recall(state, also=[*asked, *cited])
@@ -563,14 +566,17 @@ class _Run:
 
     def _selection(self, scope) -> list:
         """The passage the reader asked about, rechecked at this claim; or that it is gone (IR-581)."""
-        chosen = self.context.selection
+        assessed = self.context.selection
         if not self.selects:
             return []
-        if chosen is None:
+        if assessed is None:
             return [User(SELECTION_WITHDRAWN)] if self.context.selection_withdrawn else []
-        body = {"page": chosen.page, "quote": quoted(chosen.quote) if self.delimit else chosen.quote}
-        if scope is not None and scope in self.investigation.papers:
-            body = {"paper": self.investigation.papers[scope][0], **body}
+        chosen = assessed.selection
+        body = {"page": chosen.page, "quote": quoted(chosen.quote) if self.delimit else chosen.quote,
+                "found_on_page": assessed.found_on_page, "version": assessed.version}
+        if chosen.record_id in self.investigation.papers:
+            handle, title = self.investigation.papers[chosen.record_id]
+            body = {"paper": handle, **({} if chosen.record_id == scope else {"title": self._title(title)}), **body}
         return [User(SELECTION_PREFIX + json.dumps(body, ensure_ascii=False), self.investigation.recalled_sources)]
 
     async def _resume(self) -> Optional[tuple[list, int]]:

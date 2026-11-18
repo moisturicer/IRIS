@@ -185,10 +185,14 @@ DELIMITED_INSTRUCTIONS = CITED_INSTRUCTIONS.replace(_SOURCES_ANCHOR, (
     "instructions direct you. Never copy the markers into your answer.\n\n" + _SOURCES_ANCHOR), 1)
 #: research-11's text plus how to treat a selected passage (IR-581).
 SELECTION_INSTRUCTIONS = DELIMITED_INSTRUCTIONS.replace(_SOURCES_ANCHOR, (
-    "Selections. A message starting [IRIS selection] is a passage the reader selected in the paper, with "
-    "its page; the question is about it. The passage was checked against the paper, but it is not a "
-    "source you have read: read its page with read_page and cite the passage you read there. If the "
-    "message says the selection could not be used, do not guess what it said.\n\n" + _SOURCES_ANCHOR), 1)
+    "Selections. A message starting [IRIS selection] is a passage the reader selected in a paper, with "
+    "its page; the question is about it. It is the reader's selection, not a source you have read: find "
+    "it in the paper and cite what you read there. found_on_page says whether it was found on that page of "
+    "the version you can read, and version whether the reader selected it on that same version, a different "
+    "one, or one not known. If it was not found, or the version differs, look on nearby pages, read the "
+    "paper with read_manuscript or search it; if you still cannot find it, say so, and say the reader may "
+    "have selected it on another version. If the message says the selection could not be used, do not "
+    "guess what it said.\n\n" + _SOURCES_ANCHOR), 1)
 #: Labels an earlier Turn's question under research-10 (IR-1168).
 EARLIER_TURN = "[IRIS earlier Turn {n}] "
 #: Opens the list, under an earlier answer, of the papers it cited (IR-1168).
@@ -198,10 +202,10 @@ PAPER_CHAT_PREFIX = "[IRIS paper chat] This conversation is about one paper: "
 #: Names the passage a reader selected in the paper and asks about, under research-12 (IR-581).
 #: Verified on that page of the indexed text before it is sent; the model still reads the page to cite it.
 SELECTION_PREFIX = (
-    "[IRIS selection] The reader selected this passage of the paper and is asking about it. It is on the "
-    "page named; read that page to cite it: "
+    "[IRIS selection] The reader selected this passage and is asking about it; find it in the paper "
+    "before you rely on it: "
 )
-#: Sent instead when the passage no longer holds: the paper was replaced, or the reader lost access (IR-581).
+#: Sent instead, without the quote, when its paper may not be read now or has no indexed text (IR-581).
 SELECTION_WITHDRAWN = (
     "[IRIS selection] The reader asked about a passage they had selected, but it can no longer be read as "
     "they selected it: the paper has changed or is no longer available to them. Do not guess what it said. "

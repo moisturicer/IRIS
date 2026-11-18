@@ -79,31 +79,32 @@ describe("Ask about a selection", () => {
     expect(post.mock.calls[0][1]).not.toHaveProperty("selection");
   });
 
-  it("explains a refused selection and keeps the question and the chip", async () => {
+  it("explains a question the runtime could not take with its selection, and keeps the question and the chip", async () => {
     vi.spyOn(apiClient, "post").mockRejectedValue(Object.assign(new Error("422"), {
-      isAxiosError: true, response: { status: 422, data: { status: "selection_version" } } }));
+      isAxiosError: true, response: { status: 422, data: { status: "selection_unsupported" } } }));
     const user = userEvent.setup();
     render(<Page />);
 
     await user.click(screen.getByRole("button", { name: "Send message" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(SELECTION_REFUSALS.selection_version);
+    expect(await screen.findByRole("alert")).toHaveTextContent(SELECTION_REFUSALS.selection_unsupported);
     expect(screen.getByRole("group", { name: /Asking about a selection/ })).toBeInTheDocument();
     const box = screen.getByRole("textbox", { name: "Ask about this paper" });
     expect(box).toHaveValue(SELECTION_QUESTION);
     expect(box).toBeEnabled();
   });
 
-  it("says an owner's unsubmitted upload can't be asked about, and sends the question without it", async () => {
+  it("sends a selection whose version the page could not name, for IRIS to look for", async () => {
     const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: queued });
     vi.spyOn(apiClient, "get").mockResolvedValue({ data: empty });
     const user = userEvent.setup();
-    render(<Page initial={{ ...chosen, versionLabel: "Unsubmitted upload", unsubmitted: true }} />);
+    render(<Page initial={{ ...chosen, versionLabel: "Unsubmitted upload", manuscriptRevision: null }} />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent("not your unsubmitted upload");
+    expect(screen.queryByRole("alert")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Send message" }));
     await waitFor(() => expect(post).toHaveBeenCalled());
-    expect(post.mock.calls[0][1]).not.toHaveProperty("selection");
+    expect(post.mock.calls[0][1]).toHaveProperty("selection", {
+      record_id: 7, manuscript_revision: null, page: 4, quote: "Rainfall rose by forty percent." });
   });
 
   it("replays the passage a question was asked about, or that it is gone", async () => {
