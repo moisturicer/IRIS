@@ -20,7 +20,6 @@ import { noticeApi } from "@/api/notice";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { landingPathFor } from "@/lib/landing";
-import { setStoredRefreshToken } from "@/lib/authStorage";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
@@ -234,7 +233,7 @@ describe("where the login screen sends you", () => {
 
   function acceptAnyPassword() {
     return vi.spyOn(authApi, "login").mockResolvedValue({
-      data: { access: "access-token", refresh: "refresh-token", user: KTTO_USER },
+      data: { access: "access-token", remembered: false, user: KTTO_USER },
     } as Awaited<ReturnType<typeof authApi.login>>);
   }
 
@@ -270,7 +269,6 @@ describe("where the login screen sends you", () => {
     useAuthStore.setState({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
     });
   });
@@ -314,7 +312,7 @@ describe("where the login screen sends you", () => {
   it("lets Django staff with no IRIS role return anywhere, as the route guard does (IR-1207)", async () => {
     const staff = makeUser({ role: null, role_name: null, is_staff: true });
     vi.spyOn(authApi, "login").mockResolvedValue({
-      data: { access: "access-token", refresh: "refresh-token", user: staff },
+      data: { access: "access-token", remembered: false, user: staff },
     } as Awaited<ReturnType<typeof authApi.login>>);
     renderLoginAt("/login", { from: "/rdco/users" });
 
@@ -357,8 +355,7 @@ describe("where the login screen sends you", () => {
   });
 
   it("shows the form when the silent refresh on load fails, and does not redirect (IR-1215)", async () => {
-    // The real restore path: a stored refresh token the server now refuses.
-    setStoredRefreshToken("revoked-refresh-token");
+    // The real restore path: the browser's cookie, which the server now refuses.
     vi.spyOn(authApi, "refreshToken").mockRejectedValue({ response: { status: 401, data: {} } });
     await useAuthStore.getState().hydrateAuth();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
@@ -376,6 +373,29 @@ describe("where the login screen sends you", () => {
 
     expect(screen.getByRole("dialog", { name: "Password Changed" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /landed on/ })).not.toBeInTheDocument();
+  });
+
+  it("sends Keep me signed in only when it is ticked, and remembers the answer (ADR-072)", async () => {
+    const login = acceptAnyPassword();
+    renderLoginAt("/login");
+
+    const box = screen.getByRole("checkbox", { name: "Keep me signed in for 30 days" });
+    expect(box).not.toBeChecked();
+    await userEvent.setup().click(box);
+    await signIn();
+
+    await waitFor(() => expect(login).toHaveBeenCalled());
+    expect(login.mock.calls[0][0]).toMatchObject({ remember: true });
+  });
+
+  it("leaves Keep me signed in off unless someone ticks it (ADR-072)", async () => {
+    const login = acceptAnyPassword();
+    renderLoginAt("/login");
+
+    await signIn();
+
+    await waitFor(() => expect(login).toHaveBeenCalled());
+    expect(login.mock.calls[0][0]).toMatchObject({ remember: false });
   });
 
   it("honours a destination that survived a full page load in the query string", async () => {

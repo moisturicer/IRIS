@@ -12,7 +12,7 @@ import { ROLES, type RoleName } from "@/lib/constants";
 import { makeUser } from "@/test/authFixtures";
 
 beforeEach(() => {
-  useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+  useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false });
 });
 
 function roleFlags(user: ReturnType<typeof makeUser> | null) {

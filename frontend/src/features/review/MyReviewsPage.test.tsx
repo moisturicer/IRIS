@@ -157,7 +157,9 @@ describe("MyReviewsPage", () => {
 
   it("opens a review in Paper View, never on the old decision form", async () => {
     show();
-    const open = await screen.findByRole("link", { name: "Open review: Smart Campus Energy Monitor" });
+    // IR-1211: "Examine review" here, so it isn't confused with the review
+    // page's own Open review act, which records when the review starts.
+    const open = await screen.findByRole("link", { name: "Examine review: Smart Campus Energy Monitor" });
     expect(open).toHaveAttribute("href", "/records/7?section=review");
     for (const link of screen.getAllByRole("link")) {
       expect(link.getAttribute("href")).not.toContain("/evaluate");
@@ -418,6 +420,22 @@ describe("MyReviewsPage due dates (IR-622)", () => {
     );
     expect(screen.getByLabelText("Location")).toHaveValue("/review?sort=waiting&overdue=1");
     expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("clears Overdue only when the tab changes, as leaving Done clears its outcome (IR-1210)", async () => {
+    show();
+    const overdueOnly = await screen.findByRole("button", { name: "Overdue only" });
+    await userEvent.click(overdueOnly);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true"));
+
+    await userEvent.click(screen.getByRole("tab", { name: /In review/ }));
+
+    // The highlight and the list agree: neither filters by overdue any more.
+    await waitFor(() =>
+      expect(mine).toHaveBeenLastCalledWith({ tab: "in_review", outcome: null, office: null, cursor: null, sort: "due", overdue: false }),
+    );
+    expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByLabelText("Location")).not.toHaveValue(expect.stringContaining("overdue=1"));
   });
 
   it("comes back to the sort and filter it left, from the URL", async () => {

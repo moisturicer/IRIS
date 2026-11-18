@@ -501,7 +501,7 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
   },
   {
-    id: "workflow-analytics", path: "/review/analytics", route: "/review/analytics", role: "RDCO",
+    id: "workflow-analytics", path: "/rdco/analytics", route: "/rdco/analytics", role: "RDCO",
     mocks: wrap("RDCO", (api) =>
       api.on("GET", "/reviews/analytics/", {
         parties: [{ party: "rdco", label: "RDCO" }], data_since: null, generated_at: when("11-05"),

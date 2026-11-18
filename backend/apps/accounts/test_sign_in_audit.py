@@ -29,6 +29,7 @@ from apps.accounts.recovery.delivery import deliver_recovery_intent
 from apps.accounts.test_email_verification import LINK
 from apps.accounts.test_password_policy import registration
 from apps.audit.models import AuditEvent
+from apps.accounts.testing_auth import refresh_from
 
 PASSWORD = "Correct-horse-1!"
 ADDRESS = "sign.in@cit.edu"
@@ -100,7 +101,7 @@ class RefusalTests(SignInAuditCase):
 
         self.assertEqual(self.refusals(), [])
         self.assertTrue(AuditEvent.objects.filter(event_type=AuditEvent.LOGIN).exists())
-        self.assertHoldsNoSecret(PASSWORD, response.json()["access"], response.json()["refresh"])
+        self.assertHoldsNoSecret(PASSWORD, response.json()["access"], refresh_from(response))
 
     @override_settings(TRUSTED_PROXY_COUNT=1)
     def test_no_refusal_stores_the_client_address(self):

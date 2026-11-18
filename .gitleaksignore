@@ -16,3 +16,8 @@ ea1f922a0d5524d7601f52ca73f6c6eb1b349cd3:backend/apps/ai/tests/test_ir886_hybrid
 ea1f922a0d5524d7601f52ca73f6c6eb1b349cd3:backend/apps/ai/tests/test_ir886_hybrid_search_db.py:generic-api-key:191
 ea1f922a0d5524d7601f52ca73f6c6eb1b349cd3:backend/apps/ai/tests/test_ir886_hybrid_search_db.py:generic-api-key:210
 ea1f922a0d5524d7601f52ca73f6c6eb1b349cd3:backend/apps/ai/tests/test_ir886_hybrid_search_db.py:generic-api-key:308
+# IR-1222: test fixtures that set a placeholder in the retired sessionStorage key
+# to prove it gets cleared. Not credentials: the value was the placeholder text
+# "from-before-ADR-072", replaced by "x" in later commits.
+c22dd2f874b3be444672ce9d1bbe3c7f91d08243:frontend/src/lib/authStorage.test.ts:generic-api-key:89
+c22dd2f874b3be444672ce9d1bbe3c7f91d08243:frontend/src/store/hydrateAuth.test.ts:generic-api-key:133

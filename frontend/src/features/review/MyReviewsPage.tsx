@@ -13,8 +13,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage, readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
-import { canAccess, isCoordinator, pathFor } from "@/lib/access";
-import type { RoleName } from "@/lib/constants";
+import { isCoordinator, pathFor } from "@/lib/access";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import type { MyReviewsPage as Page, MyReviewsRow, MyReviewsTab } from "@/types/reviews";
@@ -122,6 +121,9 @@ export default function MyReviewsPage() {
 
   const go = (next: Partial<MyReviewsView>) => {
     const merged: MyReviewsView = { ...view, ...next };
+    // A filter belongs to the tab it was set on (IR-1210): a new tab starts
+    // without Overdue only, as leaving Done drops its outcome below.
+    if (merged.tab !== view.tab) merged.overdue = false;
     // Each tab keeps only its own controls: outcome on Done, sort and overdue elsewhere.
     if (merged.tab === "done") {
       merged.sort = "due";
@@ -191,12 +193,6 @@ export default function MyReviewsPage() {
               <ButtonLink to={pathFor("reviewOffice")} variant="secondary">
                 <i className="fas fa-table-cells-large" aria-hidden />
                 Office console
-              </ButtonLink>
-            )}
-            {canAccess(viewer?.role_name as RoleName | undefined, "reviewAnalytics") && (
-              <ButtonLink to={pathFor("reviewAnalytics")} variant="secondary">
-                <i className="fas fa-chart-column" aria-hidden />
-                Workflow analytics
               </ButtonLink>
             )}
           </>
@@ -495,8 +491,9 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
       </>
     );
   } else {
-    // A link, not a button: *Open review* is recorded in Paper View alone.
-    const label = tab === "in_review" ? "Continue review" : "Open review";
+    // A link, not a button: *Open review* is recorded in Paper View alone, so
+    // this link says "Examine review" and the two never share a name (IR-1211).
+    const label = tab === "in_review" ? "Continue review" : "Examine review";
     actions = (
       <Link
         to={href}

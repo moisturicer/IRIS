@@ -574,7 +574,9 @@ ACCOUNTS = {
     "auth-register": Entry({"POST": _case(PUBLIC, data={})}),
     # Missing credentials are rejected for every caller, including signed-in users.
     "auth-login": Entry({"POST": _case(row(*([ANON]*10)), data={})}),
-    "auth-logout": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # ADR-072: logout and refresh are first-party only (X-IRIS-Auth); the
+    # header is sent so the cell measures who may call them, not the header.
+    "auth-logout": Entry({"POST": _case(SIGNED_IN, data={}, headers={"HTTP_X_IRIS_AUTH": "1"})}),
     # ADR-054 (IR-789): the notice is public (registration shows it) and answering
     # is every signed-in account's own act, office staff and System Admin included.
     # An empty body is refused as invalid, which is not an access denial.
@@ -594,7 +596,9 @@ ACCOUNTS = {
         "PUT": _case(RDCO_ONLY, data={}),
         "DELETE": _case(RDCO_ONLY),
     }),
-    "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
+    # ADR-072: the token is read from the cookie, never the body; with no cookie
+    # every caller is answered 401 no_session, signed in or not.
+    "token-refresh": Entry({"POST": _case(row(*([ANON]*10)), data={}, headers={"HTTP_X_IRIS_AUTH": "1"})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),
     "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),
@@ -688,7 +692,8 @@ REVIEWS = {
     }),
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
-    "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
+    # IR-1216: Workflow analytics moved to RDCO's section, for RDCO alone.
+    "reviews-analytics": Entry({"GET": _case(RDCO_ONLY)}),
     "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE), kwargs=ASSIGNMENT, data={})}),
     "assignment-assign": Entry({m: _case(COORDINATOR, kwargs=ASSIGNMENT,
                                        **({} if m == "GET" else {"data": {"reviewer": Ref("reviewer_target")}}))

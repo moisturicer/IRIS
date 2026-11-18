@@ -39,7 +39,7 @@ function deferred<T>() {
 }
 
 function signIn(id: number) {
-  useAuthStore.getState().login({ id, email: `r${id}@cit.edu`, role_name: "Student" } as unknown as User, "a", "r");
+  useAuthStore.getState().login({ id, email: `r${id}@cit.edu`, role_name: "Student" } as unknown as User, "a");
 }
 
 const folder = (id: number, name: string, record_ids: number[] = []): FolderEntry => ({

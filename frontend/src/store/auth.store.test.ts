@@ -66,7 +66,7 @@ function assertEqual<T>(actual: T, expected: T, what: string) {
 test("logout bumps sessionEpoch even while a refresh is in flight", async () => {
   const epochBefore = useAuthStore.getState().sessionEpoch;
 
-  let release!: (v: { access: string }) => void;
+  let release!: (v: { access: string; remembered: boolean }) => void;
   const pending = refreshOnce(
     () => new Promise((resolve) => { release = resolve; })
   );
@@ -75,7 +75,7 @@ test("logout bumps sessionEpoch even while a refresh is in flight", async () => 
   // here, exactly as client.ts does, before its `await` below settles.
   useAuthStore.getState().logout();
 
-  release({ access: "resolved-after-logout" });
+  release({ access: "resolved-after-logout", remembered: false });
   await pending;
 
   const epochAfter = useAuthStore.getState().sessionEpoch;
@@ -99,11 +99,11 @@ test("a refresh started after logout is not flagged stale", async () => {
   useAuthStore.getState().logout();
   const epochBefore = useAuthStore.getState().sessionEpoch;
 
-  let release!: (v: { access: string }) => void;
+  let release!: (v: { access: string; remembered: boolean }) => void;
   const pending = refreshOnce(
     () => new Promise((resolve) => { release = resolve; })
   );
-  release({ access: "fresh-session-token" });
+  release({ access: "fresh-session-token", remembered: false });
   await pending;
 
   assertEqual(
