@@ -122,6 +122,9 @@ export default function MyReviewsPage() {
 
   const go = (next: Partial<MyReviewsView>) => {
     const merged: MyReviewsView = { ...view, ...next };
+    // A filter belongs to the tab it was set on (IR-1210): a new tab starts
+    // without Overdue only, as leaving Done drops its outcome below.
+    if (merged.tab !== view.tab) merged.overdue = false;
     // Each tab keeps only its own controls: outcome on Done, sort and overdue elsewhere.
     if (merged.tab === "done") {
       merged.sort = "due";
