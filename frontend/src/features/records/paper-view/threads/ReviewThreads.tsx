@@ -314,7 +314,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       {root.suggestion && <SuggestedWording root={root} />}
 
       <div className="text-small text-stone-800">
-        <p className="text-reading whitespace-pre-wrap break-words">{root.body}</p>
+        <p className="text-justified whitespace-pre-wrap break-words">{root.body}</p>
         <MentionedPeople people={root.mentions} />
       </div>
 
@@ -462,7 +462,7 @@ function SuggestedWording({ root }: { root: ReviewComment }) {
   return (
     <section aria-labelledby={`${ids}-wording`} className="rounded-control bg-stone-50 px-2 py-1.5 space-y-0.5">
       <p id={`${ids}-wording`} className="text-2xs font-semibold text-stone-600">Suggested wording</p>
-      <p className="text-reading text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
+      <p className="text-justified text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
       {check && (
         <p className="text-2xs text-stone-700">
           {check.page != null
@@ -539,7 +539,7 @@ function AnswerRow({ answer, at }: { answer: ThreadAnswer; at: string | null }) 
           {addressed ? <>marked this <b className="font-semibold text-stone-900">Addressed</b></> : "declined this"}
           {at && <> <time dateTime={at} className="text-2xs text-stone-600">{formatDate(at)}</time></>}
         </p>
-        <p className="text-reading whitespace-pre-wrap break-words text-small text-stone-800">
+        <p className="text-justified whitespace-pre-wrap break-words text-small text-stone-800">
           {answer.note || <span className="italic text-stone-600">No answer given.</span>}
         </p>
       </div>
@@ -603,7 +603,7 @@ function Reply({ reply, recordId, canComment, onEdited }: {
           />
         ) : (
           <>
-            <p className="text-reading whitespace-pre-wrap break-words text-small text-stone-800">{reply.body}</p>
+            <p className="text-justified whitespace-pre-wrap break-words text-small text-stone-800">{reply.body}</p>
             <MentionedPeople people={reply.mentions} />
           </>
         )}

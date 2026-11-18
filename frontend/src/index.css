@@ -102,13 +102,13 @@
 }
 
 @layer utilities {
-  /* Long reading text: both edges straight, like a printed paper (IR-1221,
-     DESIGN.md's Full Text Rule). Hyphenation keeps the word gaps small, and
-     needs the page's `lang="en"`. Justified at every width, phones too, by
-     Hermoine Zozobrado's choice (2026-11-18): the text fills whatever box it
-     has. A paragraph's last line stays left, so a one-line comment reads as
-     before. Never on titles, labels, buttons, table cells or form fields. */
-  .text-reading {
+  /* Long reading text: both edges straight, like a printed paper, at every
+     width (IR-1221; DESIGN.md's Full Text Rule, point 4). Hyphenation keeps
+     the word gaps small, and needs the page's `lang="en"`. A paragraph's last
+     line stays left, so a one-line comment reads as before. Never on titles,
+     labels, buttons, table cells, form fields, or text clamped to a few lines,
+     whose last visible line would be stretched. */
+  .text-justified {
     text-align: justify;
     -webkit-hyphens: auto;
     hyphens: auto;

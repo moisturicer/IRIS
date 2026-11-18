@@ -26,8 +26,8 @@ export function LetterEntries({ entries }: { entries: ResponseLetterEntry[] }) {
             {/* A document thread's upload (IR-1204). */}
             {e.document ? ` · ${e.document}` : ""}
           </p>
-          <p className="text-reading whitespace-pre-wrap break-words">{e.comment}</p>
-          <p className={cn("text-reading whitespace-pre-wrap", e.answer ? "font-semibold" : "italic text-stone-600")}>{answerWords(e)}</p>
+          <p className="text-justified whitespace-pre-wrap break-words">{e.comment}</p>
+          <p className={cn("text-justified whitespace-pre-wrap", e.answer ? "font-semibold" : "italic text-stone-600")}>{answerWords(e)}</p>
         </li>
       ))}
     </ol>

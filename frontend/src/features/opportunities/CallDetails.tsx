@@ -70,8 +70,10 @@ export function CallDetails({ call: o, titleId, muted = false, clampAbout = true
         </p>
       )}
 
+      {/* Justified only when whole: clamped, its last visible line is not the
+          paragraph's last, and justifying would stretch it (IR-1221). */}
       {o.description && (
-        <p className={cn("text-reading text-small text-stone-600 mt-2 max-w-prose whitespace-pre-line", clampAbout && "line-clamp-2")}>
+        <p className={cn("text-small text-stone-600 mt-2 max-w-prose whitespace-pre-line", clampAbout ? "line-clamp-2" : "text-justified")}>
           {o.description}
         </p>
       )}

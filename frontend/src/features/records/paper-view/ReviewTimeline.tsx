@@ -323,7 +323,7 @@ function TimelineItem({ entry, discussion, onOpenThreads }: {
           {entry.at ? <time dateTime={entry.at}>{formatDate(entry.at)}</time> : "Date not recorded"}
         </p>
         {entry.note && (
-          <p className="text-small text-stone-700 leading-relaxed mt-1 break-words">“{entry.note}”</p>
+          <p className="text-justified text-small text-stone-700 leading-relaxed mt-1 break-words">“{entry.note}”</p>
         )}
         {/* By position: two items can read the same (one label, one state). */}
         {entry.details.map((line, i) => (
@@ -488,7 +488,7 @@ function VersionTag({ version }: { version: number | null }) {
 
 /** What someone wrote, verbatim, as plain text with its line breaks. */
 function CommentBody({ body }: { body: string }) {
-  return <p className="text-reading text-small text-stone-800 leading-relaxed mt-1 whitespace-pre-wrap break-words">{body}</p>;
+  return <p className="text-justified text-small text-stone-800 leading-relaxed mt-1 whitespace-pre-wrap break-words">{body}</p>;
 }
 
 interface CommentFormProps {

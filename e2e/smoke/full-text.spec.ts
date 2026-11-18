@@ -28,8 +28,8 @@ test.describe("the Full Text Rule", () => {
   });
 });
 
-// Long reading text is justified, with hyphenation, at every width (IR-1221).
-// Hermoine Zozobrado chose phones too, on 2026-11-18, after looking at 360 px.
+// Long reading text is justified, with hyphenation, at every width, phones
+// included (IR-1221; DESIGN.md's Full Text Rule, point 4).
 test.describe("justified reading text", () => {
   for (const width of [360, 1280]) {
     test(`the Overview's abstract is justified and hyphenated at ${width} px`, async ({ page, api }) => {

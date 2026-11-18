@@ -133,7 +133,7 @@ export function CommentItem({ comment, size, answering, showRail, ctx }: Comment
                     <span className="rounded-full bg-stone-100 px-2 py-0.5 text-3xs font-semibold text-stone-700">Author</span>
                   )}
                 </header>
-                <p className="text-reading mt-0.5 whitespace-pre-wrap break-words text-sm text-stone-800">
+                <p className="text-justified mt-0.5 whitespace-pre-wrap break-words text-sm text-stone-800">
                   {answering && (
                     <>
                       <a
