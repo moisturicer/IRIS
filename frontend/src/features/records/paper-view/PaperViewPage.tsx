@@ -839,6 +839,7 @@ export default function PaperViewPage() {
           // is never put back only to jump to the citation after.
           keepPlace={resolution.status !== "loading"}
           highlightRegions={highlightRegions}
+          landingLook={openedInShown ? "highlight" : "citation"}
           navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
           highlights={drawnHighlights}
           selectionActions={selectionActions}

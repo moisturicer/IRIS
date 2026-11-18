@@ -286,8 +286,14 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   useEffect(() => {
     const question = autoSend.current;
     if (!question || opening || busy || error || (run && activeRun(run))) return;
-    autoSend.current = undefined;
-    void sendNow.current(question);
+    // After the mount settles: a remount (React's development double mount, or a
+    // conversation opening) restarts this reader and would orphan a request sent now.
+    const timer = setTimeout(() => {
+      if (autoSend.current !== question) return;
+      autoSend.current = undefined;
+      void sendNow.current(question);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [selection, opening, busy, error, run]);
 
   /** The reader asks the same question again: a new run linked to this one, however many times it is clicked. */

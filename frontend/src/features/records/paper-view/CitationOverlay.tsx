@@ -14,7 +14,13 @@ import type { Region } from "@/types/ai";
  * a passage extraction recovered no rectangle for — the page still opens,
  * nothing is drawn on it (see `apps/ai/regions.py`'s withholding rules).
  */
-export function CitationOverlay({ regions }: { regions: Region[] }) {
+/**
+ * How the landing is drawn: a citation is outlined in maroon and flashes; the
+ * reader's own highlight only flashes into its wash, with no outline (IR-581).
+ */
+export type LandingLook = "citation" | "highlight";
+
+export function CitationOverlay({ regions, look = "citation" }: { regions: Region[]; look?: LandingLook }) {
   if (regions.length === 0) return null;
 
   return (
@@ -22,7 +28,9 @@ export function CitationOverlay({ regions }: { regions: Region[] }) {
       {regions.map((region, index) => (
         <div
           key={index}
-          className="absolute rounded-none ring-2 ring-brand motion-safe:animate-citation-flash"
+          className={look === "highlight"
+            ? "absolute rounded-[2px] motion-safe:animate-citation-flash"
+            : "absolute rounded-none ring-2 ring-brand motion-safe:animate-citation-flash"}
           style={{
             left:   `${region.left * 100}%`,
             top:    `${region.top * 100}%`,

@@ -1407,6 +1407,21 @@ describe("selected text actions (IR-583)", () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  it("opens the composer only once the mouse button is released (IR-581)", async () => {
+    await openWith({ selectionActions: [{ id: "save-highlight", label: "Save highlight", icon: "fa-highlighter", run: vi.fn() }] });
+    await userEvent.click(screen.getByRole("button", { name: "Find in this paper" }));
+    const input = await screen.findByRole("searchbox", { name: "Find in this paper" });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.pointerDown(document.body, { button: 0 });
+    // Typed without clicking the field first, which would release the button.
+    await userEvent.type(input, "robot arm", { skipClick: true });
+    expect(menu()).not.toBeInTheDocument();
+
+    fireEvent.pointerUp(document.body, { button: 0 });
+    expect(await screen.findByRole("group", { name: "Selected text actions" })).toBeInTheDocument();
+  });
+
   it("hides the saved highlights on a plain click on the paper, and the toolbar shows them again (IR-581)", async () => {
     const shown = vi.fn();
     const highlights = [{ key: 1, regions: [{ page: 1, left: 0.1, top: 0.1, right: 0.3, bottom: 0.12 }] }];
