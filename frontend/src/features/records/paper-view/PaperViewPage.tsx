@@ -848,20 +848,18 @@ export default function PaperViewPage() {
     setViewParam("section", "review");
   };
 
-  // Paper mode's version: a compact picker where there is a choice, else
-  // the version's number, else nothing to a reader shown none (IR-416).
-  const paperVersion =
-    versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1) ? (
-      <VersionPicker
-        compact
-        unsubmitted={record.manuscript_unsubmitted}
-        versions={versions}
-        viewing={viewedVersion?.number ?? null}
-        onChoose={chooseVersion}
-      />
-    ) : latestVersion ? (
-      <span className="shrink-0 text-small font-semibold text-stone-600">v{latestVersion.number}</span>
-    ) : null;
+  // Paper mode's version: a compact picker whenever there is a version, v1
+  // alone included, so every paper's header looks alike (IR-1214); nothing
+  // to a reader shown none (IR-416, IR-479).
+  const paperVersion = latestVersion ? (
+    <VersionPicker
+      compact
+      unsubmitted={record.manuscript_unsubmitted}
+      versions={versions}
+      viewing={viewedVersion?.number ?? null}
+      onChoose={chooseVersion}
+    />
+  ) : null;
 
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -1093,10 +1091,10 @@ export default function PaperViewPage() {
 
               {lineageLinks}
               {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
-              {/* The version picker (IR-416)
-                  only with two or more versions to choose between, or one
-                  beside the owner's unsubmitted revision (IR-273). */}
-              {(versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1)) && (
+              {/* The version picker (IR-416) whenever there is a version,
+                  v1 alone included (IR-1214), and beside the owner's
+                  unsubmitted revision (IR-273). */}
+              {latestVersion && (
                 <VersionPicker
                   unsubmitted={record.manuscript_unsubmitted}
                   versions={versions}

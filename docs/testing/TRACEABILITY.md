@@ -48,6 +48,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | FR-M2-02/03 | Download and delete request queues | [details](traceability/FR-M2-02-03.md) | **PARTIAL** |
 | FR-M2-04 | Bulk import from a template | [details](traceability/FR-M2-04.md) | **IMPLEMENTED** |
 | FR-M3-01 | PDF text extraction | [details](traceability/FR-M3-01.md) | **IMPLEMENTED** |
+| **IR-1214** | A paper's version menu shows whenever it has a version, listing v1 alone when that is all there is, so every paper's header looks alike — bug; no FR- id | [details](traceability/IR-1214.md) | **IMPLEMENTED** |
 | **IR-1209** | Selecting text in the paper reader stays on the text dragged through: each text layer gets pdf.js's `endOfContent` and `selecting` handling, so a drag over a gap no longer jumps to other text — bug; no FR- id | [details](traceability/IR-1209.md) | **IMPLEMENTED** |
 | **IR-116** | End-to-end ingestion on a real thesis — its exit criterion (fifty chunks from a real submission, read by a person) | [details](traceability/IR-116.md) | **IMPLEMENTED** |
 | **IR-290** | Formulas recovered as LaTeX — extends FR-M3-01 (stable label only, per the frozen-SRS rule) | [details](traceability/IR-290.md) | **PARTIAL** |
