@@ -44,8 +44,9 @@ SUPPLEMENTARY_TYPES_PROBLEM = "Only PDF, Word, PNG or JPG files are accepted."
 # What each accepted extension's first bytes begin with (IR-1220, ADR-032 §10
 # as amended 2026-11-18). A PDF may carry a few bytes before its header, so its
 # header is looked for anywhere in the first PDF_SIGNATURE_WINDOW bytes.
+# Word is .docx only: a Word 97-2003 .doc shares its first bytes with .xls, .ppt
+# and Windows installers (.msi), so its bytes cannot show what it is.
 _LEADING_BYTES = {
-    "doc": b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",  # Word 97-2003: an OLE2 compound file
     "docx": b"PK\x03\x04",  # Office Open XML: a zip, opened below
     "png": b"\x89PNG\r\n\x1a\n",
     "jpg": b"\xff\xd8\xff",
@@ -53,8 +54,8 @@ _LEADING_BYTES = {
 }
 
 
-def _docx_problem(file) -> bool:
-    """True unless the zip is a Word document with no macros in it.
+def _is_safe_docx(file) -> bool:
+    """Whether the zip is a Word document with no macros in it.
 
     Only the zip's directory is read; nothing is decompressed. A plain ZIP
     renamed `.docx` has no `word/document.xml`, and a macro-carrying document
@@ -65,17 +66,17 @@ def _docx_problem(file) -> bool:
         with zipfile.ZipFile(file) as archive:
             names = set(archive.namelist())
     except (zipfile.BadZipFile, ValueError, OSError):
-        return True
+        return False
     finally:
         file.seek(0)
-    return "word/document.xml" not in names or "word/vbaProject.bin" in names
+    return "word/document.xml" in names and "word/vbaProject.bin" not in names
 
 
 def supplementary_file_problem(file) -> Optional[str]:
     """Why an office's supplementary file is refused, or None (IR-1220).
 
-    PDF, Word (.doc, .docx), PNG and JPG only, the types every other upload in
-    IRIS keeps to, judged by the extension and by the file's first bytes, so a
+    PDF, Word (.docx), PNG and JPG only, the types every other stored upload
+    in IRIS keeps to, judged by the extension and by the file's first bytes, so a
     renamed file (an SVG called `.png`, a PNG called `.pdf`) is refused. A PDF
     then has the same safety check as every other PDF upload.
     """
@@ -91,7 +92,7 @@ def supplementary_file_problem(file) -> Optional[str]:
     leading = _LEADING_BYTES.get(extension)
     if leading is None or not head.startswith(leading):
         return SUPPLEMENTARY_TYPES_PROBLEM
-    if extension == "docx" and _docx_problem(file):
+    if extension == "docx" and not _is_safe_docx(file):
         return SUPPLEMENTARY_TYPES_PROBLEM
     return None
 

@@ -342,10 +342,13 @@ describe("supplementary attachments", () => {
   it("offers only PDF, Word, PNG or JPG, and refuses another type before sending it", async () => {
     renderFiles({ owner: false, reviewing: true, attach: true });
     const zone = await screen.findByRole("button", { name: /^Attach a supplementary file/ });
-    expect(zone).toHaveAccessibleName(expect.stringContaining("PDF, Word, PNG or JPG"));
+    expect(zone).toHaveAccessibleName(expect.stringContaining("PDF, Word (.docx), PNG or JPG"));
 
     fireEvent.drop(zone, { dataTransfer: { files: [new File(["<svg/>"], "diagram.svg", { type: "image/svg+xml" })] } });
     expect(await screen.findByText(/diagram\.svg is not an accepted file/)).toBeInTheDocument();
+    // Word 97-2003 is re-saved as .docx: a .doc's bytes look like an installer's.
+    fireEvent.drop(zone, { dataTransfer: { files: [new File(["ole2"], "minutes.doc", { type: "application/msword" })] } });
+    expect(await screen.findByText(/minutes\.doc is not an accepted file/)).toBeInTheDocument();
     expect(uploadRecordFile).not.toHaveBeenCalled();
 
     const scan = new File(["jpeg"], "signed consent.JPG", { type: "image/jpeg" });

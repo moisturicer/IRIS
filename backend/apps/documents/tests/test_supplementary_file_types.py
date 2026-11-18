@@ -1,4 +1,4 @@
-"""IR-1220: an office's supplementary file is PDF, Word, PNG or JPG, by name and by bytes.
+"""IR-1220: an office's supplementary file is PDF, Word (.docx), PNG or JPG, by name and by bytes.
 
 `POST /documents/files/upload/` (`attach_file`, ADR-032 §10 as amended
 2026-11-18) was the one upload in IRIS that took any type. It now takes the
@@ -24,8 +24,10 @@ REFUSED = "Only PDF, Word, PNG or JPG files are accepted."
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + b"\x00" * 32
 JPG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"\x00" * 32
-# The Word 97-2003 container (an OLE2 compound file) begins with this header.
-DOC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 504
+# Word 97-2003 (.doc), Excel's .xls, PowerPoint's .ppt and a Windows installer
+# (.msi) are all OLE2 compound files, which begin with this one header. So the
+# first bytes cannot tell a .doc from an installer, and .doc is not accepted.
+OLE2 = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 504
 SVG = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
 EXE = b"MZ\x90\x00\x03\x00\x00\x00" + b"\x00" * 56
 
@@ -76,13 +78,12 @@ def attach(client, record, name, content, content_type="application/octet-stream
 
 
 @pytest.mark.parametrize("name, content", [
-    ("Survey results.doc", DOC),
     ("Survey results.docx", DOCX),
     ("Signed consent.png", PNG),
     ("Signed consent.jpg", JPG),
     ("Signed consent.JPEG", JPG),
 ])
-def test_word_png_and_jpg_are_accepted(office, name, content):
+def test_docx_png_and_jpg_are_accepted(office, name, content):
     client, record = office
     response = attach(client, record, name, content)
     assert response.status_code == 201, response.data
@@ -102,12 +103,16 @@ def test_a_pdf_is_accepted_after_its_safety_check(office):
     ("all files.zip", ZIP),
     ("notes.txt", b"office notes"),
     ("no extension", PNG),
+    # Word 97-2003 is re-saved as .docx (ADR-032 §10 as amended 2026-11-18).
+    ("Survey results.doc", OLE2),
+    ("installer.msi", OLE2),
     # Renamed: the bytes are not what the name says.
     ("scan.pdf", PNG),
     ("scan.png", real_pdf_bytes()),
     ("diagram.png", SVG),
     ("archive.docx", ZIP),
     ("archive.doc", ZIP),
+    ("setup.docx", OLE2),
     ("photo.jpg", PNG),
     ("macros.docx", DOCX_WITH_MACROS),
 ])
