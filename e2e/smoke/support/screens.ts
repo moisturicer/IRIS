@@ -11,7 +11,7 @@
 //   - for table-heavy screens, the small-screen behaviour (see TABLE_BEHAVIOUR).
 import type { Locator, Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
-import { mockReadingHistory, PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
+import { mockReadingHistory, PAPER, PAPER_DETAIL, SCAN_PNG, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
 
 export interface Screen {
   /** Stable name in the results table. */
@@ -365,6 +365,35 @@ export const SCREENS: Screen[] = [
     }),
     open: async (page) => {
       await page.getByRole("button", { name: "Open Ethics clearance version 1" }).filter({ visible: true }).first().click();
+    },
+    heading: PAPER.title,
+    primary: (p) => p.getByRole("button", { name: "Back to the manuscript" }).filter({ visible: true }).first(),
+    primaryLabel: "Back to the manuscript",
+  },
+  {
+    // IR-1203's image half: a scanned PNG opens in the reader as an image,
+    // with zoom and the watermark, where a PDF would get pages.
+    id: "paper-view-review-image-open", path: `/records/${PAPER.id}?section=review&documents=open`, route: "/records/:id",
+    role: "Student",
+    mocks: wrap("Student", (api) => {
+      reviewDocumentsMocks(api);
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        abstract_file: "/media/manuscript.pdf",
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("GET", `/records/${PAPER.id}/manuscript/`, pdfReply);
+      api.on("GET", "/documents/files/", [{
+        id: 32, record: PAPER.id, file: "x.png", filename: "Signed consent form.png",
+        uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
+      }]);
+      api.on("GET", "/documents/files/32/download/", (route: Route) =>
+        route.fulfill({ status: 200, headers: { "content-type": "image/png" }, body: SCAN_PNG }));
+    }),
+    open: async (page) => {
+      await page.getByRole("button", { name: "Open Signed consent form.png" }).filter({ visible: true }).first().click();
+      await page.getByRole("img", { name: "Signed consent form.png" }).waitFor();
     },
     heading: PAPER.title,
     primary: (p) => p.getByRole("button", { name: "Back to the manuscript" }).filter({ visible: true }).first(),

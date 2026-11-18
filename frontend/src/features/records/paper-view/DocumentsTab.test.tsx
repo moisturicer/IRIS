@@ -26,6 +26,7 @@ import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/document
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
 import { DocumentsTab } from "./DocumentsTab";
+import type { ReaderDocument } from "./readerDocument";
 
 // Saving is the browser's; what is checked is the name the file is saved under.
 const downloadBlob = vi.hoisted(() => vi.fn());
@@ -153,7 +154,10 @@ function attachment(id: number, filename: string, canRemove = false): RecordFile
 }
 
 function renderFiles(
-  props: Partial<{ owner: boolean; editable: boolean; reviewing: boolean; attach: boolean; replaceManuscript: boolean }> = {},
+  props: Partial<{
+    owner: boolean; editable: boolean; reviewing: boolean; attach: boolean; replaceManuscript: boolean;
+    onOpen: (document: ReaderDocument, opener: HTMLElement) => void;
+  }> = {},
   shown: RecordDetail = record,
 ) {
   return renderScreen(
@@ -485,10 +489,12 @@ describe("downloading a document version", () => {
       version: 2, status: null, status_name: null, uploaded_by: 50, uploaded_by_name: "Sam Student",
       created_at: "2026-09-22T02:00:00Z", reviews: [], delete_refused: null,
     }] }];
-    renderFiles({ owner: false, reviewing: true });
+    renderFiles({ owner: false, reviewing: true, onOpen: vi.fn() });
 
     fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 2" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v2.png"));
+    // A slot's upload is served as a PDF (IR-1203's image half covers attachments only), so no image Open.
+    expect(screen.queryByRole("button", { name: "Open Ethics Clearance version 2" })).not.toBeInTheDocument();
   });
 
   it("falls back to .pdf when the stored name has no extension", async () => {

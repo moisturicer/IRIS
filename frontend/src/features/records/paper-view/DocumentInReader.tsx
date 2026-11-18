@@ -5,8 +5,9 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, downloadBlob } from "@/lib/utils";
 import { CONTROL_SIZE } from "./controls";
+import { ImageReader } from "./ImageReader";
 import { PaperPdfReader } from "./lazyReader";
-import { DOCUMENT_ROUTES, readerDocumentKey, type ReaderDocument } from "./readerDocument";
+import { DOCUMENT_ROUTES, readerDocumentKey, readerFormat, type ReaderDocument } from "./readerDocument";
 
 /**
  * The document shown, the address it was opened at (a change of view brings
@@ -75,6 +76,20 @@ export function DocumentInReader({
       .catch(() => setFailed(true))
       .finally(() => setSaving(false));
   };
+  // The manuscript's control, as the reader's toolbar draws it (PaperDownloadControl).
+  const downloadControl = (
+    <Button
+      variant="ghost"
+      size={fill ? "sm" : "icon"}
+      onClick={save}
+      loading={saving}
+      aria-label={`Download ${doc.label}`}
+      className={cn(fill && "text-stone-600", fill && CONTROL_SIZE)}
+    >
+      <i className="fas fa-download" aria-hidden />
+      {fill && <span aria-hidden className="hidden reading-split:inline">Download</span>}
+    </Button>
+  );
 
   return (
     <>
@@ -102,31 +117,22 @@ export function DocumentInReader({
       <p role="status" className="text-small font-semibold text-brand empty:hidden">
         {failed ? `Could not download ${doc.fileName}. Please try again.` : ""}
       </p>
-      <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
-        <PaperPdfReader
-          recordId={recordId}
-          document={doc}
-          scrollToPage={null}
-          highlightRegions={NO_REGIONS}
-          navKey={`document-${readerDocumentKey(doc)}`}
-          contained={contained}
-          fill={fill}
-          downloadControl={
-            // The manuscript's control, as the reader's toolbar draws it (PaperDownloadControl).
-            <Button
-              variant="ghost"
-              size={fill ? "sm" : "icon"}
-              onClick={save}
-              loading={saving}
-              aria-label={`Download ${doc.label}`}
-              className={cn(fill && "text-stone-600", fill && CONTROL_SIZE)}
-            >
-              <i className="fas fa-download" aria-hidden />
-              {fill && <span aria-hidden className="hidden reading-split:inline">Download</span>}
-            </Button>
-          }
-        />
-      </Suspense>
+      {readerFormat(doc.fileName) === "image" ? (
+        <ImageReader document={doc} downloadControl={downloadControl} />
+      ) : (
+        <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
+          <PaperPdfReader
+            recordId={recordId}
+            document={doc}
+            scrollToPage={null}
+            highlightRegions={NO_REGIONS}
+            navKey={`document-${readerDocumentKey(doc)}`}
+            contained={contained}
+            fill={fill}
+            downloadControl={downloadControl}
+          />
+        </Suspense>
+      )}
     </>
   );
 }
