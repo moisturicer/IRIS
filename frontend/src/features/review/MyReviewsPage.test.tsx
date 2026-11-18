@@ -157,7 +157,9 @@ describe("MyReviewsPage", () => {
 
   it("opens a review in Paper View, never on the old decision form", async () => {
     show();
-    const open = await screen.findByRole("link", { name: "Open review: Smart Campus Energy Monitor" });
+    // IR-1211: "Examine review" here, so it isn't confused with the review
+    // page's own Open review act, which records when the review starts.
+    const open = await screen.findByRole("link", { name: "Examine review: Smart Campus Energy Monitor" });
     expect(open).toHaveAttribute("href", "/records/7?section=review");
     for (const link of screen.getAllByRole("link")) {
       expect(link.getAttribute("href")).not.toContain("/evaluate");

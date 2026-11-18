@@ -498,8 +498,9 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
       </>
     );
   } else {
-    // A link, not a button: *Open review* is recorded in Paper View alone.
-    const label = tab === "in_review" ? "Continue review" : "Open review";
+    // A link, not a button: *Open review* is recorded in Paper View alone, so
+    // this link says "Examine review" and the two never share a name (IR-1211).
+    const label = tab === "in_review" ? "Continue review" : "Examine review";
     actions = (
       <Link
         to={href}
