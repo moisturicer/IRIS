@@ -235,6 +235,8 @@ vi.mock("@/api/records", () => ({
 vi.mock("@/api/documents", () => ({
   documentsApi: {
     downloadFile: vi.fn(() => Promise.resolve({ data: new Blob(["attachment"]) })),
+    // An image in the reader reads its bytes itself (IR-1203); a PDF's go to the reader stand-in.
+    viewFile: vi.fn(),
     slotsForRecord: vi.fn(() => Promise.resolve({ data: [] })),
     files:          vi.fn(() => Promise.resolve({ data: [] })),
   },
@@ -2945,6 +2947,44 @@ describe("the Review section (IR-412)", () => {
       const notes = screen.getByRole("group", { name: "Interview notes.docx" });
       expect(within(notes).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
       expect(within(notes).getByRole("button", { name: "Download Interview notes.docx" })).toBeInTheDocument();
+      vi.mocked(documentsApi.files).mockResolvedValue({ data: [] } as never);
+    });
+
+    // The image half (IR-1203, after IR-1220): a scan opens as an image; an SVG, which can carry script, never does.
+    it("opens a PNG or JPG attachment as an image in the reader, and never an SVG", async () => {
+      workspaceAt(1600);
+      shownRecord = inReview;
+      signInAs(OWNER_ID, "Student");
+      URL.createObjectURL = vi.fn(() => "blob:scan");
+      URL.revokeObjectURL = vi.fn();
+      vi.mocked(documentsApi.viewFile).mockResolvedValue({ data: new Blob(["png"], { type: "image/png" }) } as never);
+      const file = (id: number, filename: string) => ({
+        id, record: RECORD_ID, file: `x/${id}`, filename, uploaded_by: OWNER_ID,
+        uploaded_by_name: "Rhea Owner", created_at: "2026-11-03T08:00:00Z", can_remove: false,
+      });
+      vi.mocked(documentsApi.files).mockResolvedValue({ data: [
+        file(33, "Signed consent.JPG"), file(34, "diagram.svg"),
+      ] } as never);
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+
+      await screen.findByRole("group", { name: "Consent Paper" });
+      const diagram = await screen.findByRole("group", { name: "diagram.svg" });
+      expect(within(diagram).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
+
+      const consent = screen.getByRole("group", { name: "Signed consent.JPG" });
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Signed consent.JPG" }));
+      expect(await screen.findByRole("img", { name: "Signed consent.JPG" })).toHaveAttribute("src", "blob:scan");
+      expect(documentsApi.viewFile).toHaveBeenCalledWith(33, expect.anything());
+      // Not the PDF reader: an image has no pages to read.
+      expect(screen.queryByText(/reading file 33/)).not.toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toHaveTextContent("Signed consent.JPG");
+      expect(within(screen.getByRole("toolbar", { name: "Image tools" }))
+        .getByRole("button", { name: "Download Signed consent.JPG" })).toBeInTheDocument();
+      await expectNoBlockingA11yViolations(container);
+
+      await userEvent.click(screen.getByRole("button", { name: "Back to the manuscript" }));
+      expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
+      expect(screen.queryByRole("img", { name: "Signed consent.JPG" })).not.toBeInTheDocument();
       vi.mocked(documentsApi.files).mockResolvedValue({ data: [] } as never);
     });
 

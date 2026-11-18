@@ -12,6 +12,14 @@ from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
 from .validators import pdf_upload_problem, supplementary_file_problem
 
+#: An office file's type, by extension, for the types the reader shows (IR-1203).
+SHOWN_INLINE = {
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+}
+
 
 def authorize_record_documents(request, record_id, *, reading=False):
     """
@@ -547,24 +555,27 @@ class RecordFileDownloadView(APIView):
         if not may_read_record_documents(request.user, record_file.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
-        inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
         filename = record_file.filename or record_file.file.name.split("/")[-1]
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-        content_type = "application/pdf" if ext == "pdf" else "application/octet-stream"
+        # Only these are ever shown in the browser (IR-1203): Review's reader
+        # draws a PDF or an image. Anything else, an SVG stored before IR-1220
+        # included, is an attachment of no renderable type, and nosniff
+        # (SECURE_CONTENT_TYPE_NOSNIFF) keeps the browser from guessing one.
+        shown_as = SHOWN_INLINE.get(ext)
+        inline = shown_as is not None and (
+            request.query_params.get("inline", "").lower() in ("1", "true", "yes")
+        )
 
         create_audit_event(
             "DOWNLOAD", request.user, record=record_file.record,
             metadata={"file_id": pk, "filename": filename},
         )
-        response = FileResponse(
+        return FileResponse(
             record_file.file.open(),
-            content_type=content_type,
+            content_type=shown_as or "application/octet-stream",
             as_attachment=not inline,
             filename=filename,
         )
-        if inline and ext == "pdf":
-            response["Content-Disposition"] = f'inline; filename="{filename}"'
-        return response
 
 
 class RecordFileDeleteView(APIView):

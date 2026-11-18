@@ -9,6 +9,7 @@
 //   - its PRIMARY ACTION: the one control a visitor came to this screen to use.
 //     "Reachable" is judged on that control at every width (see checkReachable),
 //   - for table-heavy screens, the small-screen behaviour (see TABLE_BEHAVIOUR).
+import { deflateSync } from "node:zlib";
 import type { Locator, Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
 import { mockReadingHistory, PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
@@ -107,6 +108,40 @@ const ONE_PAGE_PDF = Buffer.from(
 );
 const pdfReply = (route: Route) =>
   route.fulfill({ status: 200, headers: { "content-type": "application/pdf" }, body: ONE_PAGE_PDF });
+
+/** A white 600 x 800 PNG, a scanned form's shape, built here rather than stored as base64. */
+const SCAN_PNG = (() => {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (bytes: Buffer) => {
+    let c = 0xffffffff;
+    for (const byte of bytes) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const check = Buffer.alloc(4);
+    check.writeUInt32BE(crc(body));
+    return Buffer.concat([length, body, check]);
+  };
+  const [width, height] = [600, 800];
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8); // 8-bit RGB
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3, 0xff)]);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+})();
 
 const USERS = Array.from({ length: 6 }, (_, i) => ({
   id: 10 + i,
@@ -365,6 +400,35 @@ export const SCREENS: Screen[] = [
     }),
     open: async (page) => {
       await page.getByRole("button", { name: "Open Ethics clearance version 1" }).filter({ visible: true }).first().click();
+    },
+    heading: PAPER.title,
+    primary: (p) => p.getByRole("button", { name: "Back to the manuscript" }).filter({ visible: true }).first(),
+    primaryLabel: "Back to the manuscript",
+  },
+  {
+    // IR-1203's image half: a scanned PNG opens in the reader as an image,
+    // with zoom and the watermark, where a PDF would get pages.
+    id: "paper-view-review-image-open", path: `/records/${PAPER.id}?section=review&documents=open`, route: "/records/:id",
+    role: "Student",
+    mocks: wrap("Student", (api) => {
+      reviewDocumentsMocks(api);
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        abstract_file: "/media/manuscript.pdf",
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("GET", `/records/${PAPER.id}/manuscript/`, pdfReply);
+      api.on("GET", "/documents/files/", [{
+        id: 32, record: PAPER.id, file: "x.png", filename: "Signed consent form.png",
+        uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
+      }]);
+      api.on("GET", "/documents/files/32/download/", (route: Route) =>
+        route.fulfill({ status: 200, headers: { "content-type": "image/png" }, body: SCAN_PNG }));
+    }),
+    open: async (page) => {
+      await page.getByRole("button", { name: "Open Signed consent form.png" }).filter({ visible: true }).first().click();
+      await page.getByRole("img", { name: "Signed consent form.png" }).waitFor();
     },
     heading: PAPER.title,
     primary: (p) => p.getByRole("button", { name: "Back to the manuscript" }).filter({ visible: true }).first(),

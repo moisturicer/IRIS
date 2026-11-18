@@ -3,8 +3,8 @@ import { documentsApi } from "@/api/documents";
 /**
  * A supporting document that Review's reader shows instead of the manuscript
  * (IR-1203): a version of a document slot (`upload`) or a supplementary
- * attachment (`file`). Only PDFs open in the reader; Word and other files are
- * download-only. Highlights, Ask IRIS and review threads stay on the manuscript.
+ * attachment (`file`). PDFs, PNGs and JPGs open in the reader; Word and other
+ * files are download-only. Highlights, Ask IRIS and review threads stay on the manuscript.
  */
 export interface ReaderDocument {
   kind: "upload" | "file";
@@ -42,5 +42,15 @@ export const DOCUMENT_ROUTES: Record<ReaderDocument["kind"], {
   file: { view: (id, options) => documentsApi.viewFile(id, options), download: (id) => documentsApi.downloadFile(id) },
 };
 
-/** The reader opens PDFs; anything else is downloaded. */
-export const opensInReader = (path: string, fallback?: string) => extensionOf(path, fallback) === "pdf";
+const FORMATS: Record<string, "pdf" | "image"> = { pdf: "pdf", png: "image", jpg: "image", jpeg: "image" };
+
+/**
+ * How the reader shows a file, by its extension: as a PDF, as an image, or
+ * not at all (`null`, download-only). The server serves only these three
+ * types inline (IR-1203), so an SVG, which can carry script, is never shown.
+ */
+export const readerFormat = (path: string, fallback?: string): "pdf" | "image" | null =>
+  FORMATS[extensionOf(path, fallback)] ?? null;
+
+/** The reader opens PDFs, PNGs and JPGs; anything else is downloaded. */
+export const opensInReader = (path: string, fallback?: string) => readerFormat(path, fallback) !== null;
