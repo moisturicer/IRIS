@@ -1354,7 +1354,10 @@ export default function PaperViewPage() {
               {...(railHidden ? { inert: "" } : {})}
               className={cn(
                 "grid min-w-0 transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
+                // The track is the scroller's content box, so the aside can
+                // fit what its own scrollbar leaves rather than the full
+                // column (IR-1178).
+                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:grid-cols-[minmax(0,1fr)] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
                 OVERVIEW_ASIDE_TOP,
                 OVERVIEW_ASIDE_MAX_HEIGHT,
                 railHidden ? "grid-rows-[0fr] opacity-0 invisible" : "grid-rows-[1fr] opacity-100",
@@ -1362,7 +1365,10 @@ export default function PaperViewPage() {
             >
               <aside
                 aria-labelledby={`${tabsId}-details`}
-                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible"
+                // The column's width, held while the column folds, but never
+                // wider than the scroller leaves it: its scrollbar takes ~23px
+                // and the scroller clipped every row's right edge (IR-1178).
+                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:min-w-[15rem] overview-wide:max-w-full overview-wide:overflow-visible"
               >
                 <h2 id={`${tabsId}-details`} className="font-display text-section font-semibold text-stone-900">
                   Record details
