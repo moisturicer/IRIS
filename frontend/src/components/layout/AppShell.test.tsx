@@ -147,17 +147,23 @@ describe("the app shell", () => {
       expect(screen.getByRole("main")).toHaveFocus();
     });
 
-    it("comes before the sidebar, so the sidebar's stops are skipped", async () => {
+    it("comes before the sidebar, so Enter spares the reader its stops", async () => {
       const user = userEvent.setup();
       renderAt("/records/mine");
       await screen.findByRole("heading", { name: "My Library" });
+      const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
 
+      // Without Enter, the second stop is the sidebar's first...
+      await user.tab();
+      await user.tab();
+      expect(sidebar).toContainElement(document.activeElement as HTMLElement);
+
+      // ...and with it, focus is already in main, past all of them.
+      (document.activeElement as HTMLElement).blur();
       await user.tab();
       await user.keyboard("{Enter}");
-      // The next stop is inside the page, not the sidebar.
-      const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
-      await user.tab();
       expect(sidebar).not.toContainElement(document.activeElement as HTMLElement);
+      expect(screen.getByRole("main")).toHaveFocus();
     });
 
     it("still works after a route change", async () => {
