@@ -1,5 +1,5 @@
 /**
- * RDCO's Call Requests (IR-765). Every query goes through the accessible
+ * RDCO's Call requests (IR-765). Every query goes through the accessible
  * tree; every control is fed from the Call's own `can_*` flags.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -42,12 +42,12 @@ const waiting = (o: Partial<Opportunity> = {}) => callFixture({
 async function open(rows: Opportunity[]) {
   requests.mockResolvedValue(rows);
   const view = renderScreen(<><CallRequestsPage /><ToastContainer /></>);
-  await screen.findByRole("heading", { level: 1, name: "Call Requests" });
+  await screen.findByRole("heading", { level: 1, name: "Call requests" });
   await waitFor(() => expect(screen.queryByRole("status", { busy: true })).toBeNull());
   return view;
 }
 
-describe("Call Requests", () => {
+describe("Call requests", () => {
   it("lists each waiting call with every field", async () => {
     await open([waiting()]);
     const row = screen.getByRole("article", { name: "ICCE 2027" });

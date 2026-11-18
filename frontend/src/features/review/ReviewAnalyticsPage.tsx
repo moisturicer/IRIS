@@ -168,7 +168,7 @@ export default function ReviewAnalyticsPage() {
   return (
     <div>
       <PageHeader
-        title="Workflow Analytics"
+        title="Workflow analytics"
         description="How long each office holds a record, what is open and overdue now, and how many new versions kept a clearance."
       />
 

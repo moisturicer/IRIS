@@ -310,6 +310,13 @@ describe("MyReviewsPage", () => {
     expect(await screen.findByRole("link", { name: "Office console" })).toHaveAttribute("href", "/review/office");
   });
 
+  it("does not repeat Workflow analytics, which the sidebar lists under My Reviews (IR-1180)", async () => {
+    signIn(true);
+    show();
+    await screen.findByRole("link", { name: "Office console" });
+    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+  });
+
   it("says, from the viewer's seat, what the page lists (IR-1135)", async () => {
     show();
     expect(await screen.findByText("Papers routed to ITSO. Claim one, or let your coordinator assign it."))

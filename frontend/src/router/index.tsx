@@ -185,22 +185,22 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("roleRequests"),
                 element: <DeferredPage message="Loading role requests"><RoleRequestsPage /></DeferredPage>,
-                handle: { crumb: "Role Requests", width: "full" },
+                handle: { crumb: "Role requests", width: "full" },
               },
               {
                 path: pathFor("downloadRequests"),
                 element: <DeferredPage message="Loading download requests"><DownloadRequestsPage /></DeferredPage>,
-                handle: { crumb: "Download Requests", width: "full" },
+                handle: { crumb: "Download requests", width: "full" },
               },
               {
                 path: pathFor("callRequests"),
                 element: <DeferredPage message="Loading call requests"><CallRequestsPage /></DeferredPage>,
-                handle: { crumb: "Call Requests" },
+                handle: { crumb: "Call requests" },
               },
               {
                 path: pathFor("deleteRequests"),
                 element: <DeferredPage message="Loading delete requests"><DeleteRequestsPage /></DeferredPage>,
-                handle: { crumb: "Delete Requests", width: "full" },
+                handle: { crumb: "Delete requests", width: "full" },
               },
             ],
           },
@@ -258,7 +258,7 @@ export const routes: RouteObject[] = [{
             children: [{
               path: pathFor("reportedComments"),
               element: <DeferredPage message="Loading reported comments"><ReportedCommentsPage /></DeferredPage>,
-              handle: { crumb: "Reported Comments" },
+              handle: { crumb: "Reported comments" },
             }],
           },
           {

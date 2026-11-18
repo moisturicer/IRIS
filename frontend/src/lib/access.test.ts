@@ -9,7 +9,7 @@
  *
  * Why this file exists: the defect IR-160 closes is that `Sidebar` and the router
  * each decided access independently -- the sidebar from `is_staff`, the router
- * from role names -- so ITSO and IERC were shown Role Requests and Audit Log and
+ * from role names -- so ITSO and IERC were shown Role requests and Audit Log and
  * then bounced by a 403. A menu item the user cannot open is a bug that only
  * appears for the roles you don't happen to test as, and there are six of them.
  * Asserting the matrix here is what stops it recurring silently.
@@ -138,12 +138,12 @@ test("every role shares one short main list, in the spec's order", () => {
   }
 });
 
-test("RDCO's coordination screens, Import Records included, are one RDCO group", () => {
+test("RDCO's coordination screens, Import records included, are one RDCO group", () => {
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
     "Main: Workflow analytics", "Main: Calls & Conferences",
-    "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
-    "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments", "RDCO: Notices",
+    "RDCO: Import records", "RDCO: Users", "RDCO: Role requests", "RDCO: Download requests",
+    "RDCO: Call requests", "RDCO: Delete requests", "RDCO: Reported comments", "RDCO: Notices",
   ]);
 });
 
@@ -191,11 +191,11 @@ describe("the pages nested under My Reviews (IR-1085, D5)", () => {
   });
 });
 
-test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Reported Comments, Retention and Notices (IR-783, IR-788, IR-693, IR-795, IR-800)", () => {
+test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Reported comments, Retention and Notices (IR-783, IR-788, IR-693, IR-795, IR-800)", () => {
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
     "Main: Discover",
     "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
-    "Administration: Reported Comments", "Administration: Retention", "Administration: Notices",
+    "Administration: Reported comments", "Administration: Retention", "Administration: Notices",
   ]);
 });
 
@@ -203,7 +203,7 @@ test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, R
 // System Admin's navigation and nobody else's.
 test("the Reported comments page is RDCO's and the System Admin's alone, at /moderation/comments", () => {
   for (const role of Object.values(ROLES)) {
-    const page = navFor(role).filter((item) => item.label === "Reported Comments");
+    const page = navFor(role).filter((item) => item.label === "Reported comments");
     const allowed = role === ROLES.RDCO || role === ROLES.SYSTEM_ADMIN;
     expect(page.map((item) => item.to), role).toEqual(allowed ? ["/moderation/comments"] : []);
   }
@@ -332,13 +332,13 @@ test("Student sees no administration section at all", () => {
 // IR-783: each office has its own addresses and named section.
 test("RDCO coordination links use the RDCO section and addresses", () => {
   expect(navFor(ROLES.RDCO).filter((item) => item.section !== "Main").map(({ label, to, section }) => ({ label, to, section }))).toEqual([
-    { label: "Import Records", to: "/records/import", section: "RDCO" },
+    { label: "Import records", to: "/records/import", section: "RDCO" },
     { label: "Users", to: "/rdco/users", section: "RDCO" },
-    { label: "Role Requests", to: "/rdco/role-requests", section: "RDCO" },
-    { label: "Download Requests", to: "/rdco/download-requests", section: "RDCO" },
-    { label: "Call Requests", to: "/rdco/call-requests", section: "RDCO" },
-    { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
-    { label: "Reported Comments", to: "/moderation/comments", section: "RDCO" },
+    { label: "Role requests", to: "/rdco/role-requests", section: "RDCO" },
+    { label: "Download requests", to: "/rdco/download-requests", section: "RDCO" },
+    { label: "Call requests", to: "/rdco/call-requests", section: "RDCO" },
+    { label: "Delete requests", to: "/rdco/delete-requests", section: "RDCO" },
+    { label: "Reported comments", to: "/moderation/comments", section: "RDCO" },
     { label: "Notices", to: "/notices", section: "RDCO" },
   ]);
 });
