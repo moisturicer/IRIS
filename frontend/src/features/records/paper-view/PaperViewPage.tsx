@@ -1,5 +1,5 @@
 import { INSTITUTION } from "@/config/institution";
-import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { failureMessage, readFailureKind } from "@/lib/readFailure";
@@ -74,6 +74,8 @@ import { RdcoPaperControls } from "./RdcoPaperControls";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { DocumentsTab } from "./DocumentsTab";
+import { DocumentInReader, type ShownDocumentState } from "./DocumentInReader";
+import type { ReaderDocument } from "./readerDocument";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
@@ -88,16 +90,11 @@ import { useCitationReference, type CitationResolution } from "./useCitationRefe
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PaperDownloadControl } from "./PaperDownloadControl";
+import { PaperPdfReader } from "./lazyReader";
 import { PersonChip } from "./PersonLink";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
-// Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
-// and most visits to this screen never open the Paper tab at all. Splitting
-// it out of the main bundle means only a reader who actually opens the
-// reader pays for it.
-const PaperPdfReader = lazy(() =>
-  import("./PaperPdfReader").then((m) => ({ default: m.PaperPdfReader })),
-);
+
 
 // ---------------------------------------------------------------------------
 // IP classification tagger -- offered under the `tag_ip` capability
@@ -256,6 +253,8 @@ export default function PaperViewPage() {
     focusPanel.current = true;
     chat.setOpen(true);
   };
+  // The supporting document Review's reader shows (IR-1203); see `shownDocument`.
+  const [documentShown, setDocumentShown] = useState<ShownDocumentState | null>(null);
   // The highlight the reader asked to open from Notes (IR-583): where to land,
   // in which version, and the navigation it belongs to, so a later arrival
   // (a citation, Back) is not held to it.
@@ -720,8 +719,17 @@ export default function PaperViewPage() {
   // record bar, not beside zoom (IR-1098, audit CMP-06). Only where the bar
   // shows the paper and has room: on a phone it stays in the reader's toolbar,
   // as the version does. An earlier version offers no download at all.
+  // A supporting document opened from Documents (IR-1203), shown in Review's
+  // reader instead of the manuscript. It holds only for the address it was
+  // opened at: any change of view (a Version, a section, a citation) brings
+  // the manuscript back, and so does a thread or Changes' *Show in paper*.
+  const shown = section === "review" && documentShown?.at === location.search ? documentShown : null;
+  const openDocument = (document: ReaderDocument, opener: HTMLElement) =>
+    setDocumentShown({ document, at: location.search, opener });
+  const showManuscript = () => setDocumentShown(null);
   const pendingInBar =
-    (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && record.download?.state === "pending";
+    (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && !shown &&
+    record.download?.state === "pending";
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = () => (
@@ -971,8 +979,10 @@ export default function PaperViewPage() {
         onBack={() => navigate(-1)}
         onBackToAnswer={backToAnswer}
         title={!onPaperTab && !reviewWorkspace ? undefined : arriving ? null : record.title}
-        // Not in the bar below 640px, where the reader's toolbar holds it.
-        version={(onPaperTab || reviewWorkspace) && tier !== "single" ? paperVersion : undefined}
+        // Not in the bar below 640px, where the reader's toolbar holds it. Not
+        // while a supporting document is shown: the bar would describe the
+        // manuscript, and the document's strip names what is shown (IR-1203).
+        version={(onPaperTab || reviewWorkspace) && tier !== "single" && !shown ? paperVersion : undefined}
         actions={pendingInBar ? (
           <PaperDownloadControl
             recordId={record.id}
@@ -1319,7 +1329,13 @@ export default function PaperViewPage() {
                 onOpenReview={openReview}
                 onShowVersion={chooseVersion}
                 can={can}
-                reader={recordHasPaper(record) ? reader() : null}
+                reader={recordHasPaper(record)
+                  ? shown
+                    ? <DocumentInReader recordId={record.id} shown={shown} onBack={showManuscript}
+                        fill={reviewWorkspace} contained={reviewWorkspace || tier === "wide"} />
+                    : reader()
+                  : null}
+                onShowManuscript={showManuscript}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
                 // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
@@ -1335,6 +1351,7 @@ export default function PaperViewPage() {
                     attach={can.has("attach_file")}
                     replaceManuscript={can.has("replace_manuscript")}
                     onChanged={handleDocumentRequestChanged}
+                    onOpen={recordHasPaper(record) ? openDocument : undefined}
                   />
                 }
               />

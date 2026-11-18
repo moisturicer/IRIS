@@ -2,7 +2,7 @@
 // jsdom has no layout, so this is the one place a real drag is checked: drags
 // on a two-column and a single-column page that end over a gap or a margin
 // must hold only the text dragged through.
-import type { Page, Route } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 import { expect, test } from "./support/mock-api";
 import { PAPER, PAPER_DETAIL } from "./support/fixtures";
 import { openScreen } from "./support/open-screen";
@@ -31,7 +31,23 @@ async function openPaper(page: Page, api: MockApi, right: string[] = RIGHT) {
   // Each line is one span of the text layer, found by its exact text.
   const span = (text: string) => page.getByText(text, { exact: true });
   await expect(span(LEFT[0])).toBeVisible({ timeout: 20_000 });
+  await untilStill(page, span(LEFT[0]));
   return { span: async (text: string) => (await span(text).boundingBox())! };
+}
+
+/**
+ * Wait until a line stops moving. The reader fits its zoom to its pane, and
+ * refits 120ms after the pane's width changes (`REFIT_DELAY_MS`), so on a
+ * slow machine the text can show at one zoom and move to another a moment
+ * later. A drag aimed at where the line was then presses on blank page and
+ * selects nothing (IR-1225, seen on CI at 101% then 140%).
+ */
+async function untilStill(page: Page, line: Locator) {
+  await expect.poll(async () => {
+    const before = await line.boundingBox();
+    await page.waitForTimeout(300);
+    return JSON.stringify(before) === JSON.stringify(await line.boundingBox());
+  }, { timeout: 10_000, intervals: [0] }).toBe(true);
 }
 
 /** Press at (x, y), drag through the given points, and return the selection while dragging and after. */

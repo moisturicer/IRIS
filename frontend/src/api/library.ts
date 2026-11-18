@@ -38,26 +38,6 @@ export interface FilingEntry {
   save:   SavedRecordEntry;
 }
 
-/** The keys of a saved feed's query: exactly the ones Discover writes into its URL. */
-export type FeedQueryKey = "q" | "type" | "college" | "classification" | "year_from" | "year_to" | "ip" | "sort";
-export type FeedQuery = Partial<Record<FeedQueryKey, string>>;
-/** Taxonomy ids a saved feed names that no longer exist, by key (IR-577). */
-export type FeedStale = Partial<Record<"type" | "college" | "classification", number[]>>;
-
-/**
- * One private custom feed (IR-577): Discover's own query under a name. `stale`
- * is reported, never repaired: the stored `query` still names the lost values,
- * so nothing widens by itself.
- */
-export interface SavedFeed {
-  id:         number;
-  name:       string;
-  query:      FeedQuery;
-  stale:      FeedStale;
-  created_at: string;
-  updated_at: string;
-}
-
 /**
  * The reader's private note on one Record (IR-580, ADR-064). `revision` is 0
  * for a Record they have not written on yet; a write names the revision it
@@ -175,15 +155,6 @@ export const libraryApi = {
   /** Idempotent: 204 whether or not it was filed. Never unsaves. */
   removeFromFolder: (folderId: number, recordId: number) =>
     apiClient.delete(`/library/folders/${folderId}/records/${recordId}/`),
-
-  /** The reader's saved feeds, with the account limit (IR-577). */
-  feeds: () => apiClient.get<{ results: SavedFeed[]; limit: number }>("/library/feeds/"),
-  createFeed: (body: { name: string; query: FeedQuery }) =>
-    apiClient.post<SavedFeed>("/library/feeds/", body),
-  /** Rename it, replace its criteria, or both. Renaming leaves the criteria alone. */
-  updateFeed: (id: number, body: { name?: string; query?: FeedQuery }) =>
-    apiClient.patch<SavedFeed>(`/library/feeds/${id}/`, body),
-  deleteFeed: (id: number) => apiClient.delete(`/library/feeds/${id}/`),
 
   /** The papers the reader opened, most recent first, at most 50 (IR-756). */
   history: () => apiClient.get<{ results: ReadingHistoryEntry[] }>("/library/history/"),
