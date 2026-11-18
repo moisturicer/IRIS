@@ -688,7 +688,11 @@ export interface DecisionCloses {
   revision_requests?: { id: number; party: Party; label: string; reason: string }[];
   findings?: { party: Party; label: string; comment: string }[];
   /** The open threads deciding closes, the decider's own drafts included (IR-874). */
-  threads?: { id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean }[];
+  threads?: {
+    id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean;
+    /** The supporting document a thread is on, "Consent form, v1" (IR-1204). */
+    document?: string | null;
+  }[];
 }
 
 export interface OfficeReviewFlags {

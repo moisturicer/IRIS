@@ -18,7 +18,7 @@ export interface ReaderDocument {
    * (IR-1204), named as the thread names it: "Consent form, v1". Absent on an
    * older upload and an attachment, which take none.
    */
-  threadLabel?: string;
+  commentLabel?: string;
 }
 
 /**
@@ -32,7 +32,9 @@ export function slotUploadDocument(
   return {
     kind: "upload", id: upload.id, label: `${slot} · version ${upload.version}`,
     fileName: `${slot} v${upload.version}.${extension}`,
-    ...(newest ? { threadLabel: `${slot}, v${upload.version}` } : {}),
+    // The server's `threads.document_label` names a posted thread the same way;
+    // this one is needed before the thread exists, for the composer.
+    ...(newest ? { commentLabel: `${slot}, v${upload.version}` } : {}),
   };
 }
 

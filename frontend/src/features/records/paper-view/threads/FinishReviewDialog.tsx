@@ -205,6 +205,10 @@ function closingName(
   sent: Thread[],
 ): string {
   const known = sent.find((s) => s.root.id === t.id);
-  const where = known?.root.anchor ? `: “${known.root.anchor.quote}”` : t.anchored ? ", on a passage" : ", on the record";
+  // Its passage's quote, else its document (IR-1204), else where it sits.
+  const document = known?.root.document?.label ?? t.document;
+  const where = known?.root.anchor ? `: “${known.root.anchor.quote}”`
+    : document ? `, on ${document}`
+    : t.anchored ? ", on a passage" : ", on the record";
   return `${known ? `Thread ${known.pin}, ` : ""}${t.label}${where}`;
 }

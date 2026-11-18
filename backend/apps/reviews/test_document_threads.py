@@ -11,6 +11,8 @@ deleted. Pinned at the REST seam (ADR-032 §12), one class per point.
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 
@@ -172,6 +174,23 @@ class ANewerUploadTests(DocumentThreadTestBase):
         )
         self.assertEqual(listed["state"], ThreadState.OPEN)
 
+    def test_listing_reads_which_uploads_are_newest_once_not_per_thread(self):
+        record = self.at_adviser_open()
+        consent = self.consent(record)
+        self.document_thread(record, self.adviser, consent, post_now=True)
+        with CaptureQueriesContext(connection) as one:
+            self.listed(record, self.owner)
+
+        ethics = self.upload(record, self.slot(record, "Ethics clearance"), when(5))
+        self.document_thread(record, self.adviser, consent, "Page 2 is blank.", post_now=True)
+        self.document_thread(record, self.adviser, ethics, "Unsigned.", post_now=True)
+        with CaptureQueriesContext(connection) as three:
+            listed = self.listed(record, self.owner).data
+
+        self.assertEqual(len(three), len(one))
+        self.assertEqual(sorted(c["document"]["label"] for c in listed),
+                         ["Consent form, v1", "Consent form, v1", "Ethics clearance, v1"])
+
 
 # --- point 6: it blocks what a manuscript thread blocks -------------------------------
 
@@ -187,6 +206,16 @@ class WhatItBlocksTests(DocumentThreadTestBase):
         self.assertEqual(clear.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("ITSO has 1 open Must fix thread", clear.data["detail"])
         self.assertEqual(len(self.thread_items(record, self.itso)), 1)
+
+    def test_the_adviser_s_must_fix_holds_accept_and_send_to_rdco(self):
+        record = self.at_adviser_open()
+        self.document_thread(record, self.adviser, self.consent(record), severity=FIX)
+        self.sent(record, self.adviser)
+
+        send = self.accept(record, [{"party": Party.RDCO}])
+
+        self.assertEqual(send.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("1 open Must fix thread", send.data["detail"])
 
     def test_the_next_version_waits_for_an_answer_which_goes_in_the_letter(self):
         record = self.itso_open()
@@ -212,6 +241,9 @@ class WhatItBlocksTests(DocumentThreadTestBase):
         record = self.at_adviser_open()
         made = self.document_thread(record, self.adviser, self.consent(record), severity=FIX)
         self.sent(record, self.adviser)
+        # The Decision's dialog names what it closes by its document, as the card does.
+        closes = self.detail(record, self.adviser)["decision"]["closes"]["threads"]
+        self.assertEqual([(t["id"], t["document"]) for t in closes], [(made["id"], "Consent form, v1")])
 
         self.decided(record, self.adviser, "reject", "Out of scope for this programme.")
 

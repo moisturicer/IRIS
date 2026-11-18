@@ -549,8 +549,14 @@ def notify_thread_posted(record, *, actor, party_label: str, severity, page, doc
     """
     try:
         what = "Must fix" if severity == "must_fix" else "Suggestion"
-        # A document thread names its document (IR-1204): "on Consent form, v1 of".
-        where = f" on p. {page} of" if page else f" on {document} of" if document else " on"
+        # A passage names its page; a document thread its document (IR-1204):
+        # "on p. 4 of", "on Consent form, v1 of", else "on" the record.
+        if page:
+            where = f" on p. {page} of"
+        elif document:
+            where = f" on {document} of"
+        else:
+            where = " on"
         message = f'{party_label} posted a {what}{where} "{record.title}".'
         notif_type = NotificationType.objects.get_or_create(name="Review Thread Posted")[0]
         for owner in record.owners.select_related("user"):

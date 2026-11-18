@@ -102,7 +102,7 @@ def _anchor_payload(comment) -> Optional[dict]:
     }
 
 
-def _document_payload(comment) -> Optional[dict]:
+def _document_payload(comment, viewer: "_Viewer") -> Optional[dict]:
     """
     The document upload a thread names (IR-1204), and whether a newer upload of
     that document has replaced it: the thread stays on the upload it names and
@@ -111,15 +111,11 @@ def _document_payload(comment) -> Optional[dict]:
     upload = comment.anchor_upload
     if upload is None:
         return None
-    from apps.documents.models import RecordUpload
-
-    newer = RecordUpload.objects.filter(
-        record_id=upload.record_id, slot_id=upload.slot_id, version__gt=upload.version,
-    ).exists()
     name = upload.file.name.rsplit("/", 1)[-1]
     return {
         "upload": upload.pk, "slot": upload.slot.name, "version": upload.version,
-        "label": threads.document_label(upload), "earlier": newer,
+        "label": threads.document_label(upload),
+        "earlier": viewer.newest_upload_versions.get(upload.slot_id, upload.version) > upload.version,
         # How the reader opens it; a stored name with no extension is a PDF, as slots were.
         "extension": name.rsplit(".", 1)[-1].lower() if "." in name else "pdf",
     }
@@ -204,6 +200,7 @@ class _Viewer:
         self._seats: dict[str, bool] = {}
         self._versions: Optional[list] = None
         self._owner_ids: Optional[set] = None
+        self._newest_uploads: Optional[dict] = None
 
     @property
     def versions(self) -> list:
@@ -221,6 +218,20 @@ class _Viewer:
         if self._owner_ids is None:
             self._owner_ids = set(self.record.owners.values_list("user_id", flat=True))
         return self._owner_ids
+
+    @property
+    def newest_upload_versions(self) -> dict:
+        """Each slot document's newest upload version, by slot id, read once (IR-1204)."""
+        if self._newest_uploads is None:
+            from django.db.models import Max
+
+            from apps.documents.models import RecordUpload
+
+            self._newest_uploads = dict(
+                RecordUpload.objects.filter(record=self.record)
+                .values("slot_id").annotate(newest=Max("version")).values_list("slot_id", "newest")
+            )
+        return self._newest_uploads
 
     def holds(self, party) -> bool:
         if party not in self._seats:
@@ -278,7 +289,7 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "round": comment.round_id,
         "anchor": _anchor_payload(comment) if top else None,
         # The supporting document it is about, as a whole (IR-1204).
-        "document": _document_payload(comment) if top else None,
+        "document": _document_payload(comment, viewer) if top else None,
         # Its suggested wording, where its passage is now, and whether it is
         # Outdated (IR-876).
         "suggestion": comment.suggestion if top else "",

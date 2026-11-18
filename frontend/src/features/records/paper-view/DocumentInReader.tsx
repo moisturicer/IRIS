@@ -59,7 +59,7 @@ export function DocumentInReader({
   const [failed, setFailed] = useState(false);
   // Where the workspace lets this viewer open a thread on it (IR-1204).
   const commentOnDocument = useReaderAnnotations()?.onCommentDocument;
-  const threadLabel = doc.kind === "upload" ? doc.threadLabel : undefined;
+  const commentLabel = doc.kind === "upload" ? doc.commentLabel : undefined;
 
   useEffect(() => {
     strip.current?.focus();
@@ -115,8 +115,8 @@ export function DocumentInReader({
           {" · a supporting document, not the manuscript"}
         </p>
         <div className="flex flex-wrap gap-2">
-          {commentOnDocument && threadLabel && (
-            <button type="button" onClick={() => commentOnDocument(doc.id, threadLabel)}
+          {commentOnDocument && commentLabel && (
+            <button type="button" onClick={() => commentOnDocument(doc.id, commentLabel)}
               className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3")}>
               <i className="fas fa-comment text-2xs" aria-hidden />
               Comment on this document

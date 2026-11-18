@@ -40,9 +40,9 @@ export interface ReaderAnnotations {
   onComment:      ((passage: Passage, version: number) => void) | null;
   /**
    * Open a thread on the supporting document shown, as a whole (IR-1204): its
-   * upload and its name, "Consent form, v1". Absent where the viewer may not.
+   * upload and its name, "Consent form, v1". Null where the viewer may not.
    */
-  onCommentDocument?: ((upload: number, label: string) => void) | null;
+  onCommentDocument: ((upload: number, label: string) => void) | null;
   /** A passage to show: outlined, centred and focused. A new key lands again. */
   landing:        ReaderLanding | null;
 }

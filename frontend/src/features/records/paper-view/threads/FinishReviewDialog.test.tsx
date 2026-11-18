@@ -138,6 +138,8 @@ describe("a Decision with open threads", () => {
         threads: [
           { id: 1, party: "itso", label: "ITSO", severity: "must_fix", anchored: true },
           { id: 2, party: "adviser", label: "Adviser", severity: "suggestion", anchored: false },
+          // A thread on a supporting document is named by it (IR-1204).
+          { id: 3, party: "ierc", label: "IERC", severity: "must_fix", anchored: false, document: "Consent form, v1" },
         ],
       },
     },
@@ -149,8 +151,9 @@ describe("a Decision with open threads", () => {
     await user.click(screen.getByRole("radio", { name: /Keep unlisted/ }));
     const closes = screen.getByRole("region", { name: "What this Decision closes" });
     expect(closes).toHaveTextContent("IERC's review in progress (Elena Reyes)");
-    expect(closes).toHaveTextContent("2 open threads, 1 Must fix:");
+    expect(closes).toHaveTextContent("3 open threads, 2 Must fix:");
     expect(closes).toHaveTextContent("ITSO, on a passage");
+    expect(closes).toHaveTextContent("IERC, on Consent form, v1");
     expect(closes).toHaveTextContent("Your summary is the reason each open Must fix thread closes with.");
 
     const send = screen.getByRole("button", { name: "Keep unlisted" });
