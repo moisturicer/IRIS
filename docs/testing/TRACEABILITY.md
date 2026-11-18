@@ -48,6 +48,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | FR-M2-02/03 | Download and delete request queues | [details](traceability/FR-M2-02-03.md) | **PARTIAL** |
 | FR-M2-04 | Bulk import from a template | [details](traceability/FR-M2-04.md) | **IMPLEMENTED** |
 | FR-M3-01 | PDF text extraction | [details](traceability/FR-M3-01.md) | **IMPLEMENTED** |
+| **IR-1214** | A paper's version menu shows whenever it has a version, listing v1 alone when that is all there is, so every paper's header looks alike — bug; no FR- id | [details](traceability/IR-1214.md) | **IMPLEMENTED** |
 | **IR-1212** | The review page's Conversation tab opens with who submitted and when ("Ana Cruz submitted on Sep 1, 2026"), without repeating the abstract the Overview shows — no FR- id | [details](traceability/IR-1212.md) | **IMPLEMENTED** |
 | **IR-1209** | Selecting text in the paper reader stays on the text dragged through: each text layer gets pdf.js's `endOfContent` and `selecting` handling, so a drag over a gap no longer jumps to other text — bug; no FR- id | [details](traceability/IR-1209.md) | **IMPLEMENTED** |
 | **IR-116** | End-to-end ingestion on a real thesis — its exit criterion (fifty chunks from a real submission, read by a person) | [details](traceability/IR-116.md) | **IMPLEMENTED** |
@@ -371,6 +372,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1210** | My Reviews' "Overdue only" clears when the tab changes, so its highlight always matches the list — no FR- id | [details](traceability/IR-1210.md) | **PARTIAL** |
 | **IR-1211** | My Reviews' row link reads "Examine review", apart from the review page's own Open review act — no FR- id | [details](traceability/IR-1211.md) | **PARTIAL** |
 | **IR-1216** | Workflow analytics is RDCO's alone, in the sidebar's RDCO section at `/rdco/analytics`; offices see no link and the API refuses them — ADR-043 amendment 2026-11-18; no FR- id | [details](traceability/IR-1216.md) | **IMPLEMENTED** |
+| **IR-1217** | Help leaves the sidebar and opens from a labelled link in Settings; `/help` and the sign-in pages' Help are unchanged — no FR- id | [details](traceability/IR-1217.md) | **PARTIAL** |
 | **IR-1215** | A person whose session is still valid who opens the login page goes straight to their landing page (or the saved page their role may open) — extends IR-1207; no FR- id | [details](traceability/IR-1215.md) | **PARTIAL** |
 | **IR-1222** | Staying signed in across tabs and restarts: the refresh token only in an HttpOnly cookie; "Keep me signed in" lasts 30 days from sign-in outside the idle rule; refresh and logout check Origin and `X-IRIS-Auth`; tabs refresh in turn — ADR-072; no FR- id (NFR-S2 label) | [details](traceability/IR-1222.md) | **PARTIAL** |
 | **IR-1206** | On Review the paper's owners get the reviewers' frame: Back and the title above the reader, tabs Readiness · Conversation · Threads · Details, and Edit details, lineage and Continue as moved into Details — IR-1199; no FR- id | [details](traceability/IR-1206.md) | **IMPLEMENTED** |

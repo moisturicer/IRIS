@@ -470,56 +470,26 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
   });
 });
 
-describe("Help in the sidebar footer (IR-1085, NAV-04)", () => {
-  const footerHelp = () =>
-    within(screen.getByRole("complementary", { name: "Sidebar" })).getByRole("link", { name: "Help" });
-
-  it.each(Object.values(ROLES))("is there for %s, outside the main list", async (role) => {
+// IR-1217: Help left the sidebar for Settings, which every role can open. The
+// sign-in pages keep their own Help link, since a signed-out person has no Settings.
+describe("Help is not in the sidebar (IR-1217)", () => {
+  it.each(Object.values(ROLES))("is not there for %s, expanded or collapsed", async (role) => {
     signIn(role as RoleName, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(footerHelp()).toHaveAttribute("href", "/help");
-    expect(within(screen.getByRole("navigation", { name: "Main" })).queryByRole("link", { name: "Help" }))
-      .not.toBeInTheDocument();
+    const sidebar = within(screen.getByRole("complementary", { name: "Sidebar" }));
+    expect(sidebar.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
   });
 
-  it("opens the Help page and marks it as the current page", async () => {
-    const user = userEvent.setup();
-    signIn(ROLES.STUDENT);
-    renderAt("/records/mine");
-
-    await screen.findByRole("heading", { name: "My Library" });
-    expect(footerHelp()).not.toHaveAttribute("aria-current");
-    await user.click(footerHelp());
-
-    expect(await screen.findByRole("heading", { name: "Help" })).toBeInTheDocument();
-    expect(footerHelp()).toHaveAttribute("aria-current", "page");
-  });
-
-  it("keeps its name, with a tooltip, on the collapsed rail", async () => {
-    const user = userEvent.setup();
+  it("is not on the collapsed rail either", async () => {
     useUIStore.setState({ sidebarCollapsed: true });
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(within(footerHelp()).getByText("Help")).toHaveClass("md:sr-only");
-    await user.hover(footerHelp());
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Help");
-  });
-
-  it("closes the phone drawer when chosen", async () => {
-    const user = userEvent.setup();
-    atPhoneWidth();
-    signIn(ROLES.STUDENT);
-    renderAt("/records/mine");
-
-    await user.click(await screen.findByRole("button", { name: "Open menu" }));
-    await user.click(footerHelp());
-
-    expect(await screen.findByRole("heading", { name: "Help" })).toBeInTheDocument();
-    expect(useUIStore.getState().sidebarOpen).toBe(false);
+    expect(within(screen.getByRole("complementary", { name: "Sidebar" })).queryByRole("link", { name: "Help" }))
+      .not.toBeInTheDocument();
   });
 });
 
@@ -539,13 +509,13 @@ describe("the account menu", () => {
     expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     expect(screen.queryByRole("link", { name: "Settings & Profile" })).not.toBeInTheDocument();
-    // The one Help link is the footer's, outside the menu the trigger controls.
+    // Help is in Settings since IR-1217: not in this menu, nor anywhere in the sidebar.
     const menu = document.getElementById(trigger.getAttribute("aria-controls")!)!;
     // IR-1137: Notifications is reachable from the account menu too.
     expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings", "Notifications"]);
     expect(within(menu).getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
     expect(within(menu).queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Help" })).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
 
@@ -661,13 +631,11 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
     expect(screen.getByRole("button", { name: "Open menu", hidden: true })).toHaveClass("w-11", "h-11");
   });
 
-  it("makes every navigation link and Help at least 44px tall, and compact again from md", async () => {
+  it("makes every navigation link at least 44px tall, and compact again from md", async () => {
     const { sidebar } = await openDrawer();
 
-    const links = [
-      ...within(within(sidebar).getByRole("navigation", { name: "Main" })).getAllByRole("link"),
-      within(sidebar).getByRole("link", { name: "Help" }),
-    ];
+    // Help left the sidebar for Settings (IR-1217); the nav links remain.
+    const links = within(within(sidebar).getByRole("navigation", { name: "Main" })).getAllByRole("link");
     expect(links.length).toBeGreaterThan(2);
     for (const link of links) expect(link).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
   });
