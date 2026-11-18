@@ -148,7 +148,7 @@ function ManagedRequest({
         {request.label} · {request.state_label} · {formatDate(request.created_at, "MMM d")}
       </p>
       {/* A text node, never innerHTML (ADR-022 §Security). */}
-      <p className="text-sm text-stone-700 leading-relaxed mt-1 whitespace-pre-line break-words">
+      <p className="text-reading text-sm text-stone-700 leading-relaxed mt-1 whitespace-pre-line break-words">
         {request.message}
       </p>
       <p id={listId} className="sr-only">

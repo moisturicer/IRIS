@@ -71,7 +71,7 @@ export function CallDetails({ call: o, titleId, muted = false, clampAbout = true
       )}
 
       {o.description && (
-        <p className={cn("text-small text-stone-600 mt-2 max-w-prose whitespace-pre-line", clampAbout && "line-clamp-2")}>
+        <p className={cn("text-reading text-small text-stone-600 mt-2 max-w-prose whitespace-pre-line", clampAbout && "line-clamp-2")}>
           {o.description}
         </p>
       )}

@@ -157,7 +157,7 @@ function RequestEntry({
         </p>
       )}
       {/* A text node, never innerHTML: the reviewer's words, exactly (ADR-022 §Security). */}
-      <p className="text-sm text-stone-700 leading-relaxed mt-2 whitespace-pre-line break-words">
+      <p className="text-reading text-sm text-stone-700 leading-relaxed mt-2 whitespace-pre-line break-words">
         {request.message}
       </p>
       <p id={listId} className="sr-only">

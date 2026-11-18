@@ -488,7 +488,7 @@ function VersionTag({ version }: { version: number | null }) {
 
 /** What someone wrote, verbatim, as plain text with its line breaks. */
 function CommentBody({ body }: { body: string }) {
-  return <p className="text-small text-stone-800 leading-relaxed mt-1 whitespace-pre-wrap break-words">{body}</p>;
+  return <p className="text-reading text-small text-stone-800 leading-relaxed mt-1 whitespace-pre-wrap break-words">{body}</p>;
 }
 
 interface CommentFormProps {

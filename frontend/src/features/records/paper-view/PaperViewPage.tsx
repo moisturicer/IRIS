@@ -1193,7 +1193,7 @@ export default function PaperViewPage() {
                             {r.version != null && <span className="font-normal text-stone-600"> · on v{r.version}</span>}
                           </p>
                           {r.reason && (
-                            <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
+                            <p className="text-reading mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
                               {r.reason}
                             </p>
                           )}
@@ -1288,7 +1288,7 @@ export default function PaperViewPage() {
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="text-lg text-stone-700 leading-7">
+                    <p className="text-reading text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (

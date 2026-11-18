@@ -34,6 +34,8 @@ export const OVERVIEW_MARKDOWN = [
   "prose-h3:mt-[1.5em] prose-h3:mb-[0.3em]",
   "prose-p:leading-[1.8] prose-li:leading-[1.75] prose-li:my-[0.35em] prose-li:marker:text-brand",
   "[&>p:first-child]:text-lg [&>p:first-child]:leading-[1.7] [&>p:first-child]:text-stone-800",
+  // Its paragraphs are reading text, justified like the abstract (IR-1221).
+  "[&_p]:text-reading",
 ].join(" ");
 
 // The thread's width: one literal, so Tailwind sees the whole class.
