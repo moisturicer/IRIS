@@ -92,6 +92,11 @@ def party_label(party: str) -> str:
 
 # --- which threads ----------------------------------------------------------------
 
+def document_label(upload) -> str:
+    """A document thread's upload as people name it: "Consent form, v1" (IR-1204)."""
+    return f"{upload.slot.name}, v{upload.version}"
+
+
 def all_threads(record):
     """Every thread on `record`, drafts included: no replies, no discussion (IR-1194)."""
     return ReviewComment.objects.filter(

@@ -53,6 +53,7 @@ import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
 import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
+import { comment } from "./threads/threadFixtures";
 import { citationNavigationState } from "@/lib/citedPage";
 import { formatDate } from "@/lib/utils";
 
@@ -228,6 +229,10 @@ vi.mock("@/api/records", () => ({
     update:           vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
     pscedList:        vi.fn(() => Promise.resolve(page([]))),
+    // Review threads load themselves; their behaviour is `ReviewThreads.test.tsx`'s.
+    // Unread here unless a test says so (IR-1204's document threads do).
+    reviewComments:    vi.fn(() => Promise.reject(new Error("not under test"))),
+    postReviewComment: vi.fn(() => Promise.resolve({ data: {} })),
   },
 }));
 
@@ -2948,6 +2953,57 @@ describe("the Review section (IR-412)", () => {
       expect(within(notes).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
       expect(within(notes).getByRole("button", { name: "Download Interview notes.docx" })).toBeInTheDocument();
       vi.mocked(documentsApi.files).mockResolvedValue({ data: [] } as never);
+    });
+
+    // ADR-032 §7, Amendment 2026-11-18 (IR-1204): a reviewer comments on the document in the reader,
+    // as they do on the manuscript, and a thread's document opens there again.
+    it("comments on the document shown, its newest upload only, and opens a thread's document", async () => {
+      workspaceAt(1600);
+      shownRecord = {
+        ...inReview, ...reviewing,
+        capabilities: [...(inReview.capabilities ?? []), "comment_review", "finish_review", "open_general_thread"],
+      };
+      signInAs(2, "ITSO");
+      const consent = { upload: 12, slot: "Consent Paper", version: 2, label: "Consent Paper, v2", earlier: false, extension: "pdf" };
+      vi.mocked(recordsApi.reviewComments).mockResolvedValue({ data: [comment({
+        id: 70, party: "itso", party_label: "ITSO", severity: "must_fix", body: "The consent form isn't signed.", document: consent,
+      })] } as never);
+      onTestFinished(() => {
+        vi.mocked(recordsApi.reviewComments).mockImplementation(() => Promise.reject(new Error("not under test")));
+      });
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      // An older upload takes no new thread (decided 2026-11-18).
+      const row = await screen.findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(row).getByRole("button", { name: "2 versions of Consent Paper" }));
+      await userEvent.click(within(row).getByRole("button", { name: "Open Consent Paper version 1" }));
+      expect(await screen.findByText(/reading upload 11/)).toBeInTheDocument();
+      expect(within(screen.getByRole("group", { name: "Shown in the reader" }))
+        .queryByRole("button", { name: "Comment on this document" })).not.toBeInTheDocument();
+
+      // The row's own Open, the first; the versions list repeats it.
+      await userEvent.click(within(row).getAllByRole("button", { name: "Open Consent Paper version 2" })[0]);
+      expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
+      await userEvent.click(within(screen.getByRole("group", { name: "Shown in the reader" }))
+        .getByRole("button", { name: "Comment on this document" }));
+
+      expect(screen.getByRole("tab", { name: /^Threads/, selected: true })).toBeInTheDocument();
+      const form = screen.getByRole("form", { name: "New comment" });
+      expect(form).toHaveTextContent("Comment on Consent Paper, v2");
+      await userEvent.type(within(form).getByRole("textbox", { name: "Comment" }), "Sign page 2 as well.");
+      await userEvent.click(within(form).getByRole("button", { name: "Post" }));
+      expect(recordsApi.postReviewComment).toHaveBeenCalledWith(RECORD_ID, expect.objectContaining({
+        body: "Sign page 2 as well.", kind: "thread", document: 12,
+      }));
+      await expectNoBlockingA11yViolations(container);
+
+      // Back to the manuscript, then the thread's link brings the document back.
+      await userEvent.click(screen.getByRole("button", { name: "Back to the manuscript" }));
+      expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
+      const card = screen.getByRole("article", { name: /Thread 1, ITSO/ });
+      await userEvent.click(within(card).getByRole("button", { name: "Open Consent Paper, v2" }));
+      expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toHaveTextContent("Consent Paper · version 2");
     });
 
     // The image half (IR-1203, after IR-1220): a scan opens as an image; an SVG, which can carry script, never does.

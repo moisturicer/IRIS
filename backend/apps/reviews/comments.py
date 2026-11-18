@@ -102,6 +102,29 @@ def _anchor_payload(comment) -> Optional[dict]:
     }
 
 
+def _document_payload(comment) -> Optional[dict]:
+    """
+    The document upload a thread names (IR-1204), and whether a newer upload of
+    that document has replaced it: the thread stays on the upload it names and
+    reads "from an earlier upload" (ADR-032 §7, Amendment 2026-11-18, point 5).
+    """
+    upload = comment.anchor_upload
+    if upload is None:
+        return None
+    from apps.documents.models import RecordUpload
+
+    newer = RecordUpload.objects.filter(
+        record_id=upload.record_id, slot_id=upload.slot_id, version__gt=upload.version,
+    ).exists()
+    name = upload.file.name.rsplit("/", 1)[-1]
+    return {
+        "upload": upload.pk, "slot": upload.slot.name, "version": upload.version,
+        "label": threads.document_label(upload), "earlier": newer,
+        # How the reader opens it; a stored name with no extension is a PDF, as slots were.
+        "extension": name.rsplit(".", 1)[-1].lower() if "." in name else "pdf",
+    }
+
+
 def _places(comment) -> list:
     """The thread's places, oldest Version first (`ThreadPlace`, IR-876)."""
     return sorted(comment.places.all(), key=lambda p: p.version.number)
@@ -254,6 +277,8 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "is_draft": comment.is_draft,
         "round": comment.round_id,
         "anchor": _anchor_payload(comment) if top else None,
+        # The supporting document it is about, as a whole (IR-1204).
+        "document": _document_payload(comment) if top else None,
         # Its suggested wording, where its passage is now, and whether it is
         # Outdated (IR-876).
         "suggestion": comment.suggestion if top else "",
@@ -303,7 +328,10 @@ def comments_payload(record, user) -> list[dict[str, Any]]:
     """
     rows = (
         _visible(record, user)
-        .select_related("author", "version", "anchor_version", "resolved_by", "answered_by", "record")
+        .select_related(
+            "author", "version", "anchor_version", "anchor_upload__slot",
+            "resolved_by", "answered_by", "record",
+        )
         .prefetch_related("events__actor", "places__version", "mentions__user")
     )
     viewer = _Viewer(record, user)
@@ -372,6 +400,32 @@ def _anchor(record, value) -> dict:
         "anchor_prefix": context["prefix"], "anchor_suffix": context["suffix"],
         "anchor_regions": _regions(value.get("regions", [])),
     }
+
+
+def _document(record, value):
+    """
+    The upload a document thread names, validated, or `CommentError`: one of
+    this record's slot documents, and its newest upload, so a new thread is
+    never born "from an earlier upload" (decided 2026-11-18, IR-1204). An
+    office's own attachment is a different file and can't be named (point 1).
+    """
+    from apps.documents.models import RecordUpload
+
+    missing = CommentError("That is not one of this record's documents.")
+    if not _is_int(value):
+        raise missing
+    upload = RecordUpload.objects.select_related("slot").filter(record=record, pk=int(value)).first()
+    if upload is None:
+        raise missing
+    newest = (
+        RecordUpload.objects.filter(record=record, slot_id=upload.slot_id)
+        .order_by("-version", "-pk").values_list("pk", flat=True).first()
+    )
+    if newest != upload.pk:
+        raise CommentError(
+            "Comment on the newest upload of this document: a newer one has replaced it."
+        )
+    return upload
 
 
 def _regions(value) -> list[dict]:
@@ -468,15 +522,16 @@ def _announce(record, actor, thread) -> None:
     from apps.notifications.services import notify_thread_posted
 
     label, severity, page = threads.party_label(thread.party), thread.severity, thread.anchor_page
+    document = threads.document_label(thread.anchor_upload) if thread.anchor_upload_id else None
     transaction.on_commit(lambda: notify_thread_posted(
-        record, actor=actor, party_label=label, severity=severity, page=page,
+        record, actor=actor, party_label=label, severity=severity, page=page, document=document,
     ))
 
 
 @transaction.atomic
 def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=None,
                  post_now=None, severity=None, anchor=None, suggestion=None,
-                 mentioned=None) -> ReviewComment:
+                 mentioned=None, document=None) -> ReviewComment:
     """`POST /records/<id>/review-comments/`: a participant comments."""
     _writer(record, user)
     if record.pipeline_status == PipelineStatus.DRAFT:
@@ -484,6 +539,7 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
     text = _body(body)
     people = _mentioned(record, mentioned)
     kind = _kind(kind)
+    names_document = document not in (None, "")
 
     if reply_to not in (None, ""):
         try:
@@ -498,9 +554,11 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
                 # Someone else's draft does not exist, as far as this caller knows.
                 raise CommentError("That comment is not in this record's review discussion.")
             raise CommentError("Finish your review to send this thread before replying to it.")
-        if severity not in (None, "") or anchor is not None or suggestion not in (None, ""):
+        if (severity not in (None, "") or anchor is not None or suggestion not in (None, "")
+                or names_document):
             raise CommentError(
-                "A reply belongs to its thread: it has no severity, anchor or suggested wording."
+                "A reply belongs to its thread: it has no severity, anchor, document "
+                "or suggested wording."
             )
         # Replies post immediately and are never held (ADR-032 §7). The
         # writer's party is kept for the reply's label (IR-1192); its kind is
@@ -514,10 +572,11 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
     party, seated = writer_party(record, user)
     if kind == DISCUSSION:
         # Conversation's: posted at once, by anyone who writes here (IR-1194).
-        if severity not in (None, "") or anchor is not None or suggestion not in (None, ""):
+        if (severity not in (None, "") or anchor is not None or suggestion not in (None, "")
+                or names_document):
             raise CommentError(
-                "A Conversation comment has no severity, passage or suggested wording. "
-                "Comment in Threads to raise a review item."
+                "A Conversation comment has no severity, passage, document or suggested "
+                "wording. Comment in Threads to raise a review item."
             )
         return _with_mentions(ReviewComment.objects.create(
             record=record, author=user, body=text, kind=DISCUSSION,
@@ -527,6 +586,16 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
     wording = _suggestion(suggestion)
     if wording and anchor is None:
         raise CommentError("Suggest wording on a passage: select the text it would replace.")
+    upload = None
+    if names_document:
+        # A reviewer's, on the whole document (ADR-032 §7, Amendment 2026-11-18).
+        if party == threads.OWNER:
+            raise CommentError(
+                "A thread on a document is a reviewer's. Ask about a document in Conversation."
+            )
+        if anchor is not None:
+            raise CommentError("A thread is on a passage or a document, not both.")
+        upload = _document(record, document)
     if party == threads.OWNER:
         if anchor is None:
             raise CommentError(
@@ -545,7 +614,7 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
     draft = seated and not _flag(post_now)
     thread = _with_mentions(ReviewComment.objects.create(
         record=record, author=user, body=text, version=latest_version(record), kind=THREAD,
-        party=party, severity=severity, is_draft=draft, suggestion=wording,
+        party=party, severity=severity, is_draft=draft, suggestion=wording, anchor_upload=upload,
         **(_anchor(record, anchor) if anchor is not None else {}),
     ), user, people)
     if party != threads.OWNER and not draft:

@@ -400,6 +400,48 @@ export const SCREENS: Screen[] = [
     primaryLabel: "Back to the manuscript",
   },
   {
+    // IR-1204: a reviewer's Must fix on a supporting document, as the author
+    // reads it in Threads. The document's long name wraps in the card, and its
+    // link opens the document in the reader.
+    id: "paper-view-review-document-thread", path: `/records/${PAPER.id}?section=review`, route: "/records/:id",
+    role: "Student",
+    mocks: wrap("Student", (api) => {
+      reviewDocumentsMocks(api);
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        abstract_file: "/media/manuscript.pdf",
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("GET", `/records/${PAPER.id}/manuscript/`, pdfReply);
+      api.on("GET", "/documents/uploads/9/download/", pdfReply);
+      api.on("GET", `/records/${PAPER.id}/review-comments/`, [{
+        id: 70, kind: "thread", author: 2, author_name: "Ina Ercilla", body: "The consent form isn't signed on page 2.",
+        version: 1, reply_to: null, created_at: "2026-11-05T08:00:00+08:00", edited_at: null, can_edit: false, mentions: [],
+        party: "ierc", party_label: "IERC", severity: "must_fix", is_draft: false, round: null, anchor: null,
+        document: {
+          upload: 9, slot: "Certificate of Informed Consent and Ethics Clearance", version: 1,
+          label: "Certificate of Informed Consent and Ethics Clearance, v1", earlier: true, extension: "pdf",
+        },
+        suggestion: "", place: null, outdated_since: null, wording_check: null, not_followed: null,
+        state: "open", resolved_by: null, resolved_at: null, closed_by_decision: null, closed_reason: null,
+        answer: null, events: [], can_delete: false, can_post: false, can_change_severity: false,
+        can_resolve: false, can_reopen: false, can_answer: true,
+      }]);
+    }),
+    open: async (page) => {
+      // Narrower than the side-by-side workspace, the pane is a drawer: open it first.
+      const drawer = page.getByRole("button", { name: "Open review pane" }).filter({ visible: true });
+      if (await drawer.count()) await drawer.first().click();
+      await page.getByRole("tab", { name: /^Threads/ }).filter({ visible: true }).first().click();
+      await page.getByText("From an earlier upload").filter({ visible: true }).first().waitFor();
+    },
+    heading: PAPER.title,
+    primary: (p) => p.getByRole("button", { name: "Open Certificate of Informed Consent and Ethics Clearance, v1" })
+      .filter({ visible: true }).first(),
+    primaryLabel: "Open Certificate of Informed Consent and Ethics Clearance, v1",
+  },
+  {
     id: "my-library", path: "/records/mine", route: "/records/mine", role: "Student",
     mocks: wrap("Student", (api) => {
       api.on("GET", "/library/saves/", { results: [] });

@@ -351,4 +351,11 @@ def deletion_refused_reason(upload) -> Optional[str]:
             "This file answered a document request, so it can't be deleted. "
             "Upload a corrected version instead."
         )
+    # A review thread names it, a draft included (ADR-032 §7, Amendment
+    # 2026-11-18, point 10; IR-1204).
+    if upload.review_threads.exists():
+        return (
+            "A review thread is about this file, so it can't be deleted. "
+            "Upload a corrected version instead."
+        )
     return None

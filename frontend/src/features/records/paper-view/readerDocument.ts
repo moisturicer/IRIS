@@ -13,6 +13,27 @@ export interface ReaderDocument {
   label: string;
   /** The name a download of it is saved under. */
   fileName: string;
+  /**
+   * A slot document's newest upload, which a reviewer may open a thread on
+   * (IR-1204), named as the thread names it: "Consent form, v1". Absent on an
+   * older upload and an attachment, which take none.
+   */
+  threadLabel?: string;
+}
+
+/**
+ * One upload of a slot's document as the reader shows it, from the Documents
+ * tab or a thread on it: "Consent form · version 2", saved as
+ * "Consent form v2.pdf". Only the newest takes a new thread (IR-1204).
+ */
+export function slotUploadDocument(
+  slot: string, upload: { id: number; version: number }, extension: string, newest: boolean,
+): ReaderDocument {
+  return {
+    kind: "upload", id: upload.id, label: `${slot} · version ${upload.version}`,
+    fileName: `${slot} v${upload.version}.${extension}`,
+    ...(newest ? { threadLabel: `${slot}, v${upload.version}` } : {}),
+  };
 }
 
 /**

@@ -23,6 +23,8 @@ export function LetterEntries({ entries }: { entries: ResponseLetterEntry[] }) {
             {e.party_label}
             {e.severity ? ` · ${SEVERITY_WORDS[e.severity]}` : ""}
             {e.page != null && e.version != null ? ` · p.${e.page}, v${e.version}` : ""}
+            {/* A document thread's upload (IR-1204). */}
+            {e.document ? ` · ${e.document}` : ""}
           </p>
           <p className="whitespace-pre-wrap break-words">{e.comment}</p>
           <p className={cn("whitespace-pre-wrap", e.answer ? "font-semibold" : "italic text-stone-600")}>{answerWords(e)}</p>
