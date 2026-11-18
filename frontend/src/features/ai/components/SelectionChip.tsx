@@ -23,6 +23,10 @@ export interface AskSelection {
   manuscriptRevision: string | null;
   page: number;
   quote: string;
+  /** What the reader typed in the selection composer, if anything. */
+  question?: string;
+  /** Send `question` with the passage as soon as the conversation is ready: the reader already pressed Send. */
+  send?: boolean;
 }
 
 /** The question a selection fills in when the reader has not started one. Editable. */

@@ -242,6 +242,20 @@ export default function PaperViewPage() {
   // draft, and read only once Notes is first opened.
   const [notesWanted, setNotesWanted] = useState(false);
   const note = useReadingNote(Number(id), notesWanted);
+  // Saved highlights are drawn until a plain click on the paper hides them (IR-581).
+  const [highlightsShown, setHighlightsShown] = useState(true);
+  // Lines a Highlight's note adds to the reader's Notes once their note has loaded (IR-581).
+  const pendingNote = useRef<string[]>([]);
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const appendPendingNote = () => {
+    const current = noteRef.current;
+    if (current.phase !== "ready" || pendingNote.current.length === 0) return;
+    const lines = pendingNote.current;
+    pendingNote.current = [];
+    current.setText([current.text.trimEnd(), ...lines].filter(Boolean).join("\n\n"));
+  };
+  useEffect(appendPendingNote, [note.phase]);
   // Focus follows a swap of Ask IRIS and Notes into the new panel, in every
   // layout: the control that was clicked is gone with the old panel.
   const focusPanel = useRef(false);
@@ -685,23 +699,39 @@ export default function PaperViewPage() {
     ? "Unsubmitted upload"
     : latestVersion ? `Version ${latestVersion.number}` : "Current version";
   const selectionActions: SelectionAction[] = [
-    {
-      id: "save-highlight", label: "Save highlight", icon: <HighlightSwatch />,
-      run: (passage, manuscriptRevision) => void highlights.save(passage, manuscriptRevision),
-    },
-    // Wherever Ask IRIS is offered (IR-581): fills an editable question; nothing is sent until Send.
+    // Wherever Ask IRIS is offered (IR-581). A typed question is sent with the passage at once,
+    // from the composer's own Send; with nothing typed, Paper Chat opens on an editable question.
     ...(onReviewTab ? [] : [{
-      id: "ask-selection", label: "Ask about selection", icon: <AskIrisMark className="size-4 text-brand" />,
-      run: (passage, manuscriptRevision) => {
+      id: "ask-selection", label: "Ask about selection", short: "Ask IRIS",
+      placeholder: "Ask IRIS about this passage…",
+      icon: <AskIrisMark className="size-4" />,
+      run: (passage, manuscriptRevision, question) => {
         focusPanel.current = true;
         chat.askAbout({
           recordId: record.id, title: record.title, versionLabel: currentVersionLabel, manuscriptRevision,
           page: passage.page, quote: passage.quote,
+          ...(question ? { question, send: true } : {}),
         });
       },
     } satisfies SelectionAction]),
+    {
+      id: "save-highlight", label: "Save highlight", short: "Highlight", sendIcon: "fa-check",
+      placeholder: "Add a note to your Notes (optional)…",
+      icon: <HighlightSwatch />,
+      run: (passage, manuscriptRevision, text) => {
+        setHighlightsShown(true);
+        void highlights.save(passage, manuscriptRevision);
+        // The reader's own words go to their Notes, never into the highlight (ADR-065 §1).
+        if (text) {
+          pendingNote.current = [...pendingNote.current, `Page ${passage.page}: ${text}`];
+          setNotesWanted(true);
+          appendPendingNote();
+        }
+      },
+    },
   ];
   const openHighlight = (h: ReadableHighlight) => {
+    setHighlightsShown(true);
     const version = h.state === "stale" ? h.open_version : null;
     setOpened((last) => ({
       key: (last?.key ?? 0) + 1, page: h.page, regions: h.regions, version, arrival: arrivalKey.current,
@@ -812,6 +842,8 @@ export default function PaperViewPage() {
           navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
           highlights={drawnHighlights}
           selectionActions={selectionActions}
+          highlightsShown={highlightsShown}
+          onHighlightsShownChange={setHighlightsShown}
           contained={onPaperTab || reviewWorkspace || tier === "wide"}
           fill={onPaperTab || reviewWorkspace}
           // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).

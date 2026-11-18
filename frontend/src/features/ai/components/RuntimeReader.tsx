@@ -163,11 +163,17 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const [selectionNote, setSelectionNote] = useState<string>();
   const draftNow = useRef(draft);
   draftNow.current = draft;
+  // A question the reader already sent from the selection composer, waiting for the conversation (IR-581).
+  const autoSend = useRef<string>();
   useEffect(() => {
     setSelectionNote(undefined);
     if (!selection) return;
+    if (selection.send && selection.question) {
+      autoSend.current = selection.question;
+      return;
+    }
     // An editable question, never sent until the reader presses Send.
-    if (!draftNow.current.trim()) setDraft(SELECTION_QUESTION);
+    if (!draftNow.current.trim()) setDraft(selection.question || SELECTION_QUESTION);
     composerRef.current?.focus();
   }, [selection]);
   // Always sent with the question: the runtime finds the passage, or tells the model it could not (IR-581).
@@ -274,6 +280,15 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       if (version === generation.current) setBusy(false);
     }
   };
+
+  const sendNow = useRef(send);
+  sendNow.current = send;
+  useEffect(() => {
+    const question = autoSend.current;
+    if (!question || opening || busy || error || (run && activeRun(run))) return;
+    autoSend.current = undefined;
+    void sendNow.current(question);
+  }, [selection, opening, busy, error, run]);
 
   /** The reader asks the same question again: a new run linked to this one, however many times it is clicked. */
   const retryRun = async (again = false) => {
