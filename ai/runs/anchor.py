@@ -5,9 +5,12 @@ and the quoted text. None of it is taken as evidence on the reader's word:
 the quote must occur in the indexed text of the current Manuscript, on that
 page, read under the reader's own grant. Only then may it reach a model.
 
-The comparison is on a canonical form that ignores layout (line breaks,
-spacing, a word split at a line end, ligatures) and nothing else, so the
-words and numbers are the paper's. It is as precise as chunks are: a chunk
+The comparison is on the quote's letters and digits, in order: case,
+spacing, punctuation and layout are ignored, because the PDF's text layer
+and the indexed text disagree on them ("ad-dresses" against "addresses",
+"TPS20,21" against "TPS 20,21", curly against straight quotes). The words and
+numbers must still be the paper's, and a decimal point or digit group inside a
+number is kept, so "1.5" never passes for "15". It is as precise as chunks are: a chunk
 is labelled by the page it starts on, so the chunk that runs onto a page
 counts for that page too.
 """
@@ -74,14 +77,16 @@ def parse(raw: dict) -> Selection:
     return Selection(record_id, revision, page, quote)
 
 
-_SPLIT_WORD = re.compile(r"(?<=\w)-\s+(?=\w)")
-_SPACE = re.compile(r"\s+")
+#: A "." or "," between two digits: part of the number, so kept.
+_IN_NUMBER = re.compile(r"(?<=\d)[.,](?=\d)")
 
 
 def canonical(text: str) -> str:
-    """`text` without its layout: ligatures expanded, line-end hyphens joined, no whitespace."""
-    text = unicodedata.normalize("NFKC", text).replace("­", "")
-    return _SPACE.sub("", _SPLIT_WORD.sub("", text))
+    """`text`'s letters and digits in order, casefolded, with the separators inside numbers kept."""
+    text = unicodedata.normalize("NFKC", text).casefold()
+    # One stand-in each, so "1.5" and "15" stay different while other punctuation goes.
+    text = _IN_NUMBER.sub(lambda m: "\x01" if m.group(0) == "." else "\x02", text)
+    return "".join(ch for ch in text if ch.isalnum() or ch in "\x01\x02")
 
 
 def anchored(quote: str, page: int, chunks) -> bool:

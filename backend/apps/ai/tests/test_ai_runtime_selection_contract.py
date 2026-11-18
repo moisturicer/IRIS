@@ -48,6 +48,20 @@ def test_canonical_form_ignores_layout_not_words():
     assert canonical("forty percent") != canonical("fifty percent")
 
 
+def test_canonical_form_matches_a_pdf_text_layer_to_the_indexed_text():
+    # As a PDF's own text layer gives them, against the extracted text (a dev paper, IR-581).
+    assert canonical("TPS20,21 ad-dresses the time-scale separation") == canonical(
+        "TPS 20,21 addresses the time-scale separation")
+    assert canonical("the “committor” is ‘learned’") == canonical("the \"committor\" is 'learned'")
+    assert canonical("Rare Events") == canonical("rare events")
+
+
+def test_canonical_form_keeps_the_numbers():
+    assert canonical("a rise of 1.5 m") != canonical("a rise of 15 m")
+    assert canonical("2,500 households") != canonical("2500 households")
+    assert canonical("a rise of 1.5 m") == canonical("a rise of 1.5m")
+
+
 CHUNKS = [
     (1, "Abstract. A study of flooding in Cebu."),
     (2, "Methods. We surveyed 200 households near the river."),
