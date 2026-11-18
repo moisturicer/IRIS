@@ -63,6 +63,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Clarified 2026-11-14 (project lead, IR-1072; Accepted): §9's word "Accepted".** It names an act, not only a record state. A record is *Accepted* only when it is a Proposal; an Adviser's or RDCO's *accept* of a Thesis/Research or Project reads "Accepted" on that reviewer's own Done row, and the record itself reads by where it rests. No behaviour changes. See the *Clarification, 2026-11-14* note under §9.
 
+**Amended 2026-11-18 (Hermoine Zozobrado, IR-1220; security review by Ashlee Sean): §10 and Security Impact.** An office's supplementary file (`attach_file`) is PDF, Word (`.docx`), PNG or JPG, by its name and its first bytes, where it was any type. See the *Amendment, 2026-11-18* note under §10.
+
 **Corrected 2026-11-04: the IR-767 paragraph below.** Its last sentence, "Proposals and the Adviser's direct publication path remain", is wrong about the second half. The Adviser has no publication path. `OUTCOMES_FOR` gives the Adviser `REJECT` only on a Thesis/Research or Project (`apps/reviews/decisions.py:115-118`), as ADR-047's amendment decided. Proposals remain.
 
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
@@ -698,6 +700,18 @@ readiness: null | {
 - **Refusals follow ADR-022 §Amendment 4:** 404 for a file that does not exist or is on a record the caller cannot see, 403 for one they can see but may not remove.
 - **Out of scope:** KTTO filing on a published record (for example a patent receipt). If needed, it becomes its own capability.
 
+**Amendment, 2026-11-18 (Hermoine Zozobrado, IR-1220; security review by Ashlee Sean): an office's file is PDF, Word (.docx), PNG or JPG.** Decided by Hermoine Zozobrado on 2026-11-17, while planning IR-1203's reader. `attach_file` took a file of any type, the one upload in IRIS that did. Only a PDF had the PDF safety check, so an SVG, which can carry script, or an executable was stored as uploaded. Every other upload already keeps to a type: the manuscript and slot documents are PDF, and a profile photo is an image.
+
+- **The types are PDF, Word (`.docx`), PNG and JPG (`.jpg`, `.jpeg`), for every file IRIS stores.** Anything else is refused with a 400, *"Only PDF, Word, PNG or JPG files are accepted."*, and nothing is stored. The one other type IRIS takes is RDCO's import spreadsheet (`.xls`, `.xlsx`), which is read and never stored.
+- **Word is `.docx` only** (Hermoine Zozobrado, 2026-11-18, after the code review). A Word 97-2003 `.doc` begins with the same OLE2 header as an Excel `.xls`, a PowerPoint `.ppt` and a Windows installer (`.msi`), so its first bytes cannot show it is a document, and it can carry macros. An office re-saves a `.doc` as `.docx`, which Word has saved by default since 2007.
+    - *Rejected:* reading a `.doc`'s OLE2 directory for its `WordDocument` stream. It needs a new dependency or a hand-written parser, for a format offices rarely produce now.
+- **The name and the first bytes must agree** (`documents.validators.supplementary_file_problem`). A PDF's header must be in its first kilobyte; PNG and JPG must open with their signatures. A `.docx` must be a zip that holds `word/document.xml` and no `word/vbaProject.bin`, so a plain ZIP or a document carrying macros under a `.docx` name is refused. Only the zip's directory is read; nothing is decompressed. A renamed file, such as a PNG called `.pdf` or an SVG called `.png`, is refused.
+- **A PDF then has the PDF safety check** every PDF upload has (`pdf_upload_problem`). A type check is not a malware scan: scanning every upload is IR-666's, separate from this.
+- **ZIP is not an upload type.** The *Download all* ZIP is built by IRIS from stored files and is unaffected.
+- **Stored files are not touched.** The rule applies when a file is uploaded. The dev database held only PDFs when this was decided.
+- **The attach control offers only these types**, and refuses another before sending it. The server's check is the one that counts.
+- **Why these four:** they are what an office files, such as a memo, a signed form or a scan, and PNG and JPG are what IR-1203's reader can show. A type an office needs that is not here is a further amendment, not an exception.
+
 **The party status strip** follows ADR-021 §14, with two changes. The Intake row is gone. The RDCO row reads **"Not required"** on a record no office was routed to, instead of "awaiting".
 
 **Amendment, 2026-10-08 (project lead, IR-269): the strip, settled in a design grilling.**
@@ -949,6 +963,8 @@ Each authority is a named predicate in `core.permissions`, checked at the endpoi
 - **Public comments.** Stored text, rendered escaped, and hideable.
 
 **Review discussion** is record data gated by `is_record_participant`. It refuses with a 404, per IR-153. *Amended 2026-10-30 (IR-419, under §10): read under `may_read_review`, written under `is_record_participant`. The refusal is the same 404 as a missing record.*
+
+**Office attachments** are PDF, Word (`.docx`), PNG or JPG, checked by name and by their first bytes. *Amended 2026-11-18 (IR-1220, under §10): they took any type until then, so an SVG or an executable could be stored.*
 
 **No change** to `visible_to()` or to Ask IRIS retrieval.
 

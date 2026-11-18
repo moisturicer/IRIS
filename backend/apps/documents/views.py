@@ -10,7 +10,7 @@ from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, Record
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
-from .validators import is_pdf_upload, pdf_upload_problem
+from .validators import pdf_upload_problem, supplementary_file_problem
 
 
 def authorize_record_documents(request, record_id, *, reading=False):
@@ -471,10 +471,11 @@ class RecordFileUploadView(APIView):
                 {"detail": "Only an office taking part in this record's review may attach a file."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if is_pdf_upload(file):
-            problem = pdf_upload_problem(file)
-            if problem:
-                return Response({"file": [problem], "detail": problem}, status=400)
+        # PDF, Word, PNG or JPG, by name and by bytes, and a PDF's safety check
+        # (IR-1220, ADR-032 §10 as amended 2026-11-18).
+        problem = supplementary_file_problem(file)
+        if problem:
+            return Response({"file": [problem], "detail": problem}, status=400)
         record_file = RecordFile.objects.create(
             record=record,
             file=file,

@@ -337,7 +337,26 @@ describe("the Documents tab, for a reviewer", () => {
 // An office files its own supplementary document (decided 2026-10-06, IR-411):
 // offered under `attach_file`, which the adapter grants an office taking part.
 describe("supplementary attachments", () => {
-  it("lets an office attach a file of any type, and remove it", async () => {
+  // Renamed on purpose (IR-1220): "of any type" until supplementary files became
+  // PDF, Word, PNG or JPG. The server's check is the one that counts.
+  it("offers only PDF, Word, PNG or JPG, and refuses another type before sending it", async () => {
+    renderFiles({ owner: false, reviewing: true, attach: true });
+    const zone = await screen.findByRole("button", { name: /^Attach a supplementary file/ });
+    expect(zone).toHaveAccessibleName(expect.stringContaining("PDF, Word (.docx), PNG or JPG"));
+
+    fireEvent.drop(zone, { dataTransfer: { files: [new File(["<svg/>"], "diagram.svg", { type: "image/svg+xml" })] } });
+    expect(await screen.findByText(/diagram\.svg is not an accepted file/)).toBeInTheDocument();
+    // Word 97-2003 is re-saved as .docx: a .doc's bytes look like an installer's.
+    fireEvent.drop(zone, { dataTransfer: { files: [new File(["ole2"], "minutes.doc", { type: "application/msword" })] } });
+    expect(await screen.findByText(/minutes\.doc is not an accepted file/)).toBeInTheDocument();
+    expect(uploadRecordFile).not.toHaveBeenCalled();
+
+    const scan = new File(["jpeg"], "signed consent.JPG", { type: "image/jpeg" });
+    fireEvent.drop(zone, { dataTransfer: { files: [scan] } });
+    await waitFor(() => expect(uploadRecordFile).toHaveBeenCalledWith(RECORD_ID, scan, expect.any(Object)));
+  });
+
+  it("lets an office attach a Word file, and remove it", async () => {
     renderFiles({ owner: false, reviewing: true, attach: true });
     const zone = await screen.findByRole("button", { name: /^Attach a supplementary file/ });
     const file = new File(["minutes"], "ierc-minutes.docx");
