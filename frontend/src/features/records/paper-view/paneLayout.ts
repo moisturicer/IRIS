@@ -34,6 +34,10 @@ export const OVERVIEW_ASIDE_MAX_HEIGHT = "overview-wide:max-h-[calc(100vh-96px)]
 export const READING_PANE_TOP = "reading-wide:top-[68px]";
 export const READING_PANE_HEIGHT = "reading-wide:h-[calc(100vh-96px)]";
 
+/** A reader's toolbar where it fills the Review workspace's reading side: the PDF reader's and the image reader's. */
+export const READER_TOOLBAR_FILL =
+  "shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-stone-100 border-b border-stone-200";
+
 /** Below `reading-wide` the reader's toolbar sticks 8px under the header. */
 export const READER_TOOLBAR_TOP = "top-[64px]";
 

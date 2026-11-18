@@ -42,7 +42,7 @@ import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerD
 import { CONTROL_SIZE } from "./controls";
 import { DocumentRow } from "./DocumentRow";
 import { useReviewPane } from "./reviewPane";
-import { extensionOf, opensInReader, type ReaderDocument } from "./readerDocument";
+import { extensionOf, opensInReader, readerFormat, type ReaderDocument } from "./readerDocument";
 import { SectionHeading } from "./headings";
 
 const PDF_LIMIT = 50 * 1024 * 1024;
@@ -258,7 +258,8 @@ export function DocumentsTab({
     pane?.showReader();
   };
   /** A slot version's Open, when there is a reader and the version is a PDF. */
-  const openVersion = (name: string, u: RecordUpload) => onOpen && opensInReader(u.file) && (
+  // A slot's upload is a PDF, served as one, so only a PDF version opens (images are attachments only).
+  const openVersion = (name: string, u: RecordUpload) => onOpen && readerFormat(u.file) === "pdf" && (
     <RowAction icon="fa-book-open" verb="Open" name={`${name} version ${u.version}`} onClick={(opener) => open({
       kind: "upload", id: u.id, label: `${name} · version ${u.version}`,
       fileName: `${name} v${u.version}.${extensionOf(u.file)}`,

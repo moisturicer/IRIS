@@ -118,7 +118,7 @@ export function DocumentInReader({
         {failed ? `Could not download ${doc.fileName}. Please try again.` : ""}
       </p>
       {readerFormat(doc.fileName) === "image" ? (
-        <ImageReader document={doc} fill={fill} downloadControl={downloadControl} />
+        <ImageReader document={doc} downloadControl={downloadControl} />
       ) : (
         <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
           <PaperPdfReader

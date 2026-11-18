@@ -12,8 +12,10 @@ from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
 from .validators import pdf_upload_problem, supplementary_file_problem
 
-#: An office file's type, by extension, for the types the reader shows (IR-1203).
-SHOWN_INLINE = {
+#: The type an office file is served as, by extension, for the types Review's
+#: reader shows (IR-1203); the frontend's ``readerFormat`` lists the same ones.
+#: Any other file is served as ``application/octet-stream``, and never inline.
+READER_CONTENT_TYPES = {
     "pdf": "application/pdf",
     "png": "image/png",
     "jpg": "image/jpeg",
@@ -561,7 +563,7 @@ class RecordFileDownloadView(APIView):
         # draws a PDF or an image. Anything else, an SVG stored before IR-1220
         # included, is an attachment of no renderable type, and nosniff
         # (SECURE_CONTENT_TYPE_NOSNIFF) keeps the browser from guessing one.
-        shown_as = SHOWN_INLINE.get(ext)
+        shown_as = READER_CONTENT_TYPES.get(ext)
         inline = shown_as is not None and (
             request.query_params.get("inline", "").lower() in ("1", "true", "yes")
         )

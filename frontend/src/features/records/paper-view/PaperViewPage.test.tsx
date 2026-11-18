@@ -32,7 +32,7 @@
  * Every query goes through the accessible tree, by role and accessible name.
  */
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { importedReference } from "@/test/fixtures/importedReference";
 import { Route, Routes, useLocation } from "react-router-dom";
 
@@ -2955,8 +2955,14 @@ describe("the Review section (IR-412)", () => {
       workspaceAt(1600);
       shownRecord = inReview;
       signInAs(OWNER_ID, "Student");
+      // jsdom has no object URLs; stubbed for this test and restored after it.
+      const { createObjectURL, revokeObjectURL } = URL;
       URL.createObjectURL = vi.fn(() => "blob:scan");
       URL.revokeObjectURL = vi.fn();
+      onTestFinished(() => {
+        URL.createObjectURL = createObjectURL;
+        URL.revokeObjectURL = revokeObjectURL;
+      });
       vi.mocked(documentsApi.viewFile).mockResolvedValue({ data: new Blob(["png"], { type: "image/png" }) } as never);
       const file = (id: number, filename: string) => ({
         id, record: RECORD_ID, file: `x/${id}`, filename, uploaded_by: OWNER_ID,

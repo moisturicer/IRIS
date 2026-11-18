@@ -23,9 +23,11 @@ import {
 import type { FindHit } from "./findInPaper";
 import { readerDocumentKey, type ReaderDocument } from "./readerDocument";
 import { PaperFind } from "./PaperFind";
+import { ReaderLoadError, ZoomControls } from "./ReaderControls";
 import { ReaderWatermark } from "./ReaderWatermark";
 import {
   PANE_TOP_PX,
+  READER_TOOLBAR_FILL,
   READER_TOOLBAR_TOP,
   READING_PANE_HEIGHT,
   READING_SPLIT_PX,
@@ -33,6 +35,7 @@ import {
 import {
   MAX_SCALE,
   MIN_SCALE,
+  SCALE_STEP,
   anchorDelta,
   centredLandingDelta,
   citationLandingDelta,
@@ -53,7 +56,6 @@ import { useReadingResume } from "./useReadingResume";
 import { useAuthStore } from "@/store/auth.store";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 
-const SCALE_STEP = 0.2;
 /**
  * The zoom a paper opens at (IR-569), and what an unmeasured pane uses. A
  * pane narrower than `READING_SPLIT_PX` -- a phone -- opens fitted instead,
@@ -725,17 +727,11 @@ function PaperPdfReaderSource({
 
   if (status === "error") {
     return (
-      <div className="flex flex-col items-center gap-3 py-16 px-6 text-center rounded-card border border-stone-200 bg-stone-50">
-        <i className="fas fa-file-circle-exclamation text-2xl text-stone-300" aria-hidden />
-        <p className="text-sm font-semibold text-stone-700">Could not load the paper</p>
-        <p className="text-xs text-stone-500 max-w-sm">
-          The file could not be read. Try again, or open it from Documents on the record.
-        </p>
-        <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>
-          <i className="fas fa-rotate-right" aria-hidden />
-          Try again
-        </Button>
-      </div>
+      <ReaderLoadError
+        title="Could not load the paper"
+        hint="The file could not be read. Try again, or open it from Documents on the record."
+        onRetry={() => setAttempt((n) => n + 1)}
+      />
     );
   }
 
@@ -761,7 +757,7 @@ function PaperPdfReaderSource({
         aria-label="Paper tools"
         className={cn(
           fill
-            ? "shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-stone-100 border-b border-stone-200"
+            ? READER_TOOLBAR_FILL
             : cn(
                 "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
                 "rounded-card bg-overlay border border-stone-200",
@@ -779,40 +775,15 @@ function PaperPdfReaderSource({
         )}
         {fill && <span aria-hidden className="w-px h-5 bg-stone-300 mx-1" />}
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={zoomOut}
-            disabled={!ready || scale <= MIN_SCALE}
-            aria-label="Zoom out"
-          >
-            <i className="fas fa-minus" aria-hidden />
-          </Button>
-          {/* The percentage gives way below `sm`, so the toolbar keeps its
-              44px controls on one row at 360px. */}
-          <span className={cn("text-2xs font-semibold text-stone-600 w-10 text-center tabular-nums", !fill && "hidden sm:inline")}>
-            {Math.round(scale * 100)}%
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={zoomIn}
-            disabled={!ready || scale >= MAX_SCALE}
-            aria-label="Zoom in"
-          >
-            <i className="fas fa-plus" aria-hidden />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setZoom("fit")}
-            disabled={!ready}
-            aria-label="Fit to width"
-            aria-pressed={fitting}
-            title="Fit to width"
-          >
-            <i className="fas fa-arrows-left-right-to-line" aria-hidden />
-          </Button>
+          <ZoomControls
+            scale={scale}
+            ready={ready}
+            fitting={fitting}
+            onZoomOut={zoomOut}
+            onZoomIn={zoomIn}
+            onFit={() => setZoom("fit")}
+            compactPercent={!fill}
+          />
           <Button
             ref={find.toggleRef}
             variant="ghost"

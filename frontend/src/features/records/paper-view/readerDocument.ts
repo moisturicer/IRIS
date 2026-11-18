@@ -42,14 +42,19 @@ export const DOCUMENT_ROUTES: Record<ReaderDocument["kind"], {
   file: { view: (id, options) => documentsApi.viewFile(id, options), download: (id) => documentsApi.downloadFile(id) },
 };
 
-const FORMATS: Record<string, "pdf" | "image"> = { pdf: "pdf", png: "image", jpg: "image", jpeg: "image" };
+/** How the reader shows a document: as PDF pages, or as one image. */
+export type ReaderFormat = "pdf" | "image";
+
+// The server serves exactly these inline, with their own type
+// (`documents.views.READER_CONTENT_TYPES`); anything else is a download.
+const FORMATS: Record<string, ReaderFormat> = { pdf: "pdf", png: "image", jpg: "image", jpeg: "image" };
 
 /**
  * How the reader shows a file, by its extension: as a PDF, as an image, or
  * not at all (`null`, download-only). The server serves only these three
  * types inline (IR-1203), so an SVG, which can carry script, is never shown.
  */
-export const readerFormat = (path: string, fallback?: string): "pdf" | "image" | null =>
+export const readerFormat = (path: string, fallback?: string): ReaderFormat | null =>
   FORMATS[extensionOf(path, fallback)] ?? null;
 
 /** The reader opens PDFs, PNGs and JPGs; anything else is downloaded. */
