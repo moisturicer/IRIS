@@ -65,7 +65,7 @@ export function SelectionMenu({ actions, position, onChoose }: {
       role="group"
       aria-label="Selected text actions"
       className={cn(
-        "selection-menu z-20 flex items-center gap-0.5 rounded-pill bg-white p-1",
+        "selection-menu z-20 flex items-center gap-0.5 rounded-full bg-white p-1",
         // Beside the passage when it is placed; otherwise a plain row under the toolbar.
         position ? "fixed" : "sticky top-2 mx-auto w-fit",
       )}
@@ -80,7 +80,7 @@ export function SelectionMenu({ actions, position, onChoose }: {
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onChoose(action)}
             className={cn(
-              "inline-flex items-center gap-2 rounded-pill px-3.5 text-small font-semibold text-stone-800",
+              "inline-flex items-center gap-2 rounded-full px-3.5 text-small font-semibold text-stone-800",
               "transition-colors duration-150 hover:bg-stone-100 hover:text-stone-900 active:bg-stone-200",
               "motion-reduce:transition-none",
               CONTROL_SIZE, FOCUS_RING,
