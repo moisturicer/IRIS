@@ -471,14 +471,14 @@ export const SCREENS: Screen[] = [
         range: { from: null, to: null }, thresholds: { median: 5, p90: 5 },
         open_now: [], time_in_stage: [], unmeasured: [], throughput: [], revision_cycles: [], preserved_by_office: [],
       })),
-    heading: "Workflow Analytics",
+    heading: "Workflow analytics",
     // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
     primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
   },
   {
     id: "import-records", path: "/records/import", route: "/records/import", role: "RDCO",
     mocks: wrap("RDCO"),
-    heading: "Import Records",
+    heading: "Import records",
     primary: (p) => p.getByRole("button", { name: "Generate" }), primaryLabel: "Generate",
   },
   {
@@ -494,20 +494,20 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/users/role-requests/", paginated([
         { id: 1, user: 11, user_name: "Maria Cristina Dela Cruz-Santos", requested_role: 2, role_name: "Adviser", status: "pending", created_at: when("11-04") },
       ]))),
-    heading: "Role Requests",
+    heading: "Role requests",
     primary: (p) => p.getByRole("button", { name: /Approve/ }).first(), primaryLabel: "Approve",
     table: (p) => p.getByRole("table").first(),
   },
   {
     id: "call-requests", path: "/rdco/call-requests", route: "/rdco/call-requests", role: "RDCO",
     mocks: wrap("RDCO", (api) => api.on("GET", "/opportunities/requests/", paginated([CALL_REQUEST]))),
-    heading: "Call Requests",
+    heading: "Call requests",
     primary: (p) => p.getByRole("button", { name: /^Confirm / }).first(), primaryLabel: "Confirm",
   },
   {
     id: "download-requests", path: "/rdco/download-requests", route: "/rdco/download-requests", role: "RDCO",
     mocks: wrap("RDCO", (api) => api.on("GET", "/records/download-requests/", paginated([DOWNLOAD_REQUEST]))),
-    heading: "Download Requests",
+    heading: "Download requests",
     primary: (p) => p.getByRole("button", { name: "Refresh" }), primaryLabel: "Refresh",
     table: (p) => p.getByRole("table").first(),
   },
@@ -517,7 +517,7 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/records/delete-requests/", paginated([DELETE_REQUEST]));
       api.on("GET", "/records/delete-requests/counts/", { pending: 1, approved: 0, declined: 0, all: 1 });
     }),
-    heading: "Delete Requests",
+    heading: "Delete requests",
     primary: (p) => p.getByRole("button", { name: "Refresh" }), primaryLabel: "Refresh",
     table: (p) => p.getByRole("table").first(),
   },
