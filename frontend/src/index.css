@@ -179,6 +179,24 @@
   display: contents;
 }
 
+/* Selection over the gaps between spans (IR-1209; lib/textSelection.ts):
+   below the page normally, and stretched over the whole layer, behind the
+   spans, while a selection is being made, so a drag across a margin or the
+   space between columns lands here instead of on unrelated text. From
+   pdf.js's `web/pdf_viewer.css`. */
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+
 .textLayer ::selection {
   background: rgb(107 15 18 / 0.25);
   color: transparent;

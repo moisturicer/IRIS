@@ -233,7 +233,6 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/library/saves/", { results: [] });
       // IR-572: folders are read with the saves.
       api.on("GET", "/library/folders/", { results: [], limit: 10 });
-      api.on("GET", "/library/feeds/", { results: [], limit: 10 });
     },
     heading: "Discover",
     primary: (p) => p.getByRole("button", { name: "Publish" }), primaryLabel: "Publish",
