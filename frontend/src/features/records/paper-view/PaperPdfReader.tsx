@@ -21,7 +21,7 @@ import {
   LandingMark, ThreadMarks, useReaderAnnotations, type ReaderLanding, type ReaderMark,
 } from "./threads/readerAnnotations";
 import type { FindHit } from "./findInPaper";
-import type { ReaderDocument } from "./readerDocument";
+import { readerDocumentKey, type ReaderDocument } from "./readerDocument";
 import { PaperFind } from "./PaperFind";
 import { ReaderWatermark } from "./ReaderWatermark";
 import {
@@ -340,7 +340,7 @@ export interface PaperPdfReaderProps {
  */
 export function PaperPdfReader(props: PaperPdfReaderProps) {
   const epoch = useAuthStore((state) => state.sessionEpoch);
-  const shows = props.document ? `${props.document.kind}-${props.document.id}` : props.version ?? "current";
+  const shows = props.document ? readerDocumentKey(props.document) : props.version ?? "current";
   return <PaperPdfReaderSource key={`${epoch}:${props.recordId}:${shows}`} {...props} />;
 }
 

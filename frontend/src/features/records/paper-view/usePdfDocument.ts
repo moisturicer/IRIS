@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { loadPdfDocument, type PdfPage } from "@/lib/pdf";
-import type { ReaderDocument } from "./readerDocument";
+import { DOCUMENT_ROUTES, type ReaderDocument } from "./readerDocument";
 
 /** How many pages the background loader asks pdf.js for at once, and per re-render. */
 const PAGE_CHUNK = 8;
@@ -90,13 +89,11 @@ export function usePdfDocument({ recordId, version, document: shown = null, atte
     (async () => {
       try {
         const options = { signal: controller.signal };
-        const { data, headers } = documentKind === "upload" && documentId != null
-          ? await documentsApi.viewUpload(documentId, options)
-          : documentKind === "file" && documentId != null
-            ? await documentsApi.viewFile(documentId, options)
-            : version == null
-              ? await recordsApi.manuscriptBlob(recordId, options)
-              : await recordsApi.versionManuscriptBlob(recordId, version, options);
+        const { data, headers } = documentKind !== null && documentId !== null
+          ? await DOCUMENT_ROUTES[documentKind].view(documentId, options)
+          : version == null
+            ? await recordsApi.manuscriptBlob(recordId, options)
+            : await recordsApi.versionManuscriptBlob(recordId, version, options);
         if (cancelled) return;
         // The identity of these bytes, named by the server (IR-583). Only the
         // current paper's response carries one.

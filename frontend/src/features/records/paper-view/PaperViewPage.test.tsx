@@ -2928,7 +2928,7 @@ describe("the Review section (IR-412)", () => {
         { id: 32, record: RECORD_ID, file: "x/notes.docx", filename: "Interview notes.docx", uploaded_by: OWNER_ID,
           uploaded_by_name: "Rhea Owner", created_at: "2026-11-03T08:00:00Z", can_remove: false },
       ] } as never);
-      renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
 
       const consent = await screen.findByRole("group", { name: "Consent Paper" });
       await userEvent.click(within(consent).getByRole("button", { name: "2 versions of Consent Paper" }));
@@ -2939,6 +2939,7 @@ describe("the Review section (IR-412)", () => {
       const survey = await screen.findByRole("group", { name: "Survey results.pdf" });
       await userEvent.click(within(survey).getByRole("button", { name: "Open Survey results.pdf" }));
       expect(await screen.findByText(/reading file 31/)).toBeInTheDocument();
+      await expectNoBlockingA11yViolations(container);
 
       const notes = screen.getByRole("group", { name: "Interview notes.docx" });
       expect(within(notes).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
@@ -2959,7 +2960,57 @@ describe("the Review section (IR-412)", () => {
 
       await waitFor(() => expect(screen.queryByRole("dialog", { name: "Review pane" })).not.toBeInTheDocument());
       expect(screen.getByText(/reading upload 12/)).toBeInTheDocument();
-      expect(screen.getByRole("group", { name: "Shown in the reader" })).toBeInTheDocument();
+      // The pane that held Open is closed: focus is on what the reader now shows.
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toHaveFocus();
+    });
+
+    it("is reached and left by keyboard, focus going to the document and back to Open, with no serious axe violations", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      const open = within(consent).getByRole("button", { name: "Open Consent Paper version 2" });
+      open.focus();
+      await userEvent.keyboard("{Enter}");
+
+      const shown = await screen.findByRole("group", { name: "Shown in the reader" });
+      // Focus says what the reader now shows: the strip's description names the document.
+      expect(shown).toHaveFocus();
+      expect(shown).toHaveAccessibleDescription("Consent Paper · version 2 · a supporting document, not the manuscript");
+      await expectNoBlockingA11yViolations(container);
+
+      await userEvent.tab();
+      expect(within(shown).getByRole("button", { name: "Back to the manuscript" })).toHaveFocus();
+      await userEvent.keyboard("{Enter}");
+      expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
+      await waitFor(() => expect(within(screen.getByRole("group", { name: "Consent Paper" }))
+        .getByRole("button", { name: "Open Consent Paper version 2" })).toHaveFocus());
+    });
+
+    it("opens the document's latest version over an earlier manuscript Version, and Back returns to that Version", async () => {
+      workspaceAt(1600);
+      const versionOf = (number: number) => ({
+        number, cause: number === 1 ? "submission" : "revision", cause_label: number === 1 ? "Submission" : "Revision",
+        created_at: `2026-09-0${number}T08:00:00Z`, created_by_name: "Rhea Owner",
+        manuscript_url: `/api/v1/records/${RECORD_ID}/versions/${number}/manuscript/`,
+      });
+      shownRecord = { ...inReview, ...reviewing, versions: [versionOf(1), versionOf(2)] } as RecordDetail;
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review&version=1`);
+      expect(await screen.findByText(/reading v1/)).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Version" })).toBeInTheDocument();
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+      expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
+      // The bar would describe the manuscript, so it says nothing of it while a document is shown.
+      expect(screen.queryByRole("combobox", { name: "Version" })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Back to the manuscript" }));
+      expect(await screen.findByText(/reading v1/)).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Version" })).toBeInTheDocument();
     });
   });
 

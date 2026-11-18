@@ -62,13 +62,13 @@ function StandInReader() {
   return <p>{l ? `Landed on page ${l.page} of v${l.version}: ${l.label}` : "Not landed"}</p>;
 }
 
-function openWorkspace(versions: number, readerShows?: string) {
+function openWorkspace(versions: number) {
   const onShowVersion = vi.fn();
   const onShowManuscript = vi.fn();
   renderScreen(
     <ReviewWorkspaceLayout record={record(versions)} can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
       timelineVersion={0} onChanged={() => {}} documents={null}
-      onShowVersion={onShowVersion} readerShows={readerShows} onShowManuscript={onShowManuscript} />,
+      onShowVersion={onShowVersion} onShowManuscript={onShowManuscript} />,
   );
   return { onShowVersion, onShowManuscript };
 }
@@ -114,7 +114,7 @@ describe("the Changes tab in the review workspace", () => {
   // Changes compares manuscripts only (IR-1203): a document in the reader steps aside for the change.
   it("puts the manuscript back in the reader when a document was shown there", async () => {
     const user = userEvent.setup();
-    const { onShowManuscript } = openWorkspace(2, "upload-12");
+    const { onShowManuscript } = openWorkspace(2);
     await user.click(await screen.findByRole("tab", { name: "Changes" }));
     expect(onShowManuscript).not.toHaveBeenCalled();
     await user.click(await screen.findByRole("button", { name: "Show in v1, p. 4" }));

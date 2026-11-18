@@ -24,6 +24,7 @@ import { TabBesideMenu } from "./TabBesideMenu";
 import { ReviewThreads } from "./threads/ReviewThreads";
 import { isDiscussion } from "./threads/threadModel";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
+import { ReviewPaneContext, type ReviewPane } from "./reviewPane";
 import { DRAWER_BELOW_PX, fitWidths, maxWidth, minWidth, SIDE_TAB_MIN_PX, type Widths } from "./reviewGeometry";
 import { GuidedTour } from "./tour/GuidedTour";
 import { markTourSeen, tourSeen } from "./tour/tourStorage";
@@ -130,12 +131,6 @@ export interface ReviewWorkspaceProps {
    * the Changes tab's *Show in paper* opens the Version a change is in.
    */
   onShowVersion?: (n: number | null) => void;
-  /**
-   * What the reader shows: "manuscript", or a key for the supporting document
-   * opened from Documents (IR-1203). When it changes on a narrow workspace,
-   * the pane steps aside so the reader is seen.
-   */
-  readerShows?: string;
   /** Put the manuscript back in the reader: a thread or a change is shown there (IR-1203). */
   onShowManuscript?: () => void;
 }
@@ -167,7 +162,7 @@ function SentBy({ version }: { version: RecordVersion }) {
 
 export function ReviewWorkspaceLayout({
   record, can, reader, timelineVersion, onChanged, documents, showDocuments = false, onDocumentsShown, onOpenReview,
-  onShowVersion, authorView = false, authorDetails, readerShows = "manuscript", onShowManuscript,
+  onShowVersion, authorView = false, authorDetails, onShowManuscript,
 }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
@@ -226,14 +221,6 @@ export function ReviewWorkspaceLayout({
     setOpen(false);
     requestAnimationFrame(() => launcher.current?.focus());
   };
-
-  // A document opened from the pane is read beside it, or, narrow, instead of it (IR-1203).
-  const lastShown = useRef(readerShows);
-  useEffect(() => {
-    if (lastShown.current === readerShows) return;
-    lastShown.current = readerShows;
-    if (drawer && open) closeDrawer();
-  });
 
   const update = (next: Widths) => {
     setWanted(next);
@@ -505,11 +492,15 @@ export function ReviewWorkspaceLayout({
   );
 
   // Your part: the server's words, and the controls the server grants.
+  // A document opened from the Documents tab is read beside the pane or, narrow,
+  // instead of it (IR-1203). The opener moves focus to it, so the launcher is not focused here.
+  const paneForTabs: ReviewPane = { showReader: () => { if (drawer) setOpen(false); } };
   const draftCount = finishing ? tw.threads.drafts.length : 0;
   const part = yourPartSummary({ readiness: record.readiness, seat: ownSeat, draftCount });
   const hasFacts = readinessFacts(record.readiness).length > 0;
 
   return (
+    <ReviewPaneContext.Provider value={paneForTabs}>
     <div ref={observe} className="review-workspace-container">
       <div className={cn("review-workspace", !reader && "review-without-paper", sideTab && "review-has-side")}
         style={{ "--mid-w": `${sizes.mid}px`, "--side-w": `${sizes.side}px` } as CSSProperties}>
@@ -635,5 +626,6 @@ export function ReviewWorkspaceLayout({
         )}
       </div>
     </div>
+    </ReviewPaneContext.Provider>
   );
 }

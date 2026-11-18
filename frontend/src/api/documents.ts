@@ -59,14 +59,14 @@ export const documentsApi = {
     documentsApi.upload(recordId, slotId, file),
 
   downloadUpload: (uploadId: number) =>
-    apiClient.get(`/documents/uploads/${uploadId}/download/`, { responseType: "blob" }),
+    apiClient.get<Blob>(`/documents/uploads/${uploadId}/download/`, { responseType: "blob" }),
 
   // Read in Review's reader (IR-1203): the bytes, for pdf.js, not a saved copy.
   viewUpload: (uploadId: number, options?: { signal?: AbortSignal }) =>
     apiClient.get<Blob>(`/documents/uploads/${uploadId}/download/?inline=true`, { responseType: "blob", ...options }),
 
   downloadFile: (fileId: number) =>
-    apiClient.get(`/documents/files/${fileId}/download/`, { responseType: "blob" }),
+    apiClient.get<Blob>(`/documents/files/${fileId}/download/`, { responseType: "blob" }),
 
   viewFile: (fileId: number, options?: { signal?: AbortSignal }) =>
     apiClient.get<Blob>(`/documents/files/${fileId}/download/?inline=true`, { responseType: "blob", ...options }),
