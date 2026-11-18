@@ -7,6 +7,7 @@ checks again before any model call: the recording provider shows a passage
 that stopped holding in between never reaches it.
 """
 
+import dataclasses
 import uuid
 
 import pytest
@@ -48,10 +49,14 @@ class Quiet:
         pass
 
 
-def chat_service(dsn, provider, *, drain=True):
+#: The pin that can be sent a selection (IR-581).
+PIN_12 = dataclasses.replace(PIN, prompt_version="agent-research-12", tool_version="research-12")
+
+
+def chat_service(dsn, provider, *, drain=True, pin=PIN_12):
     cfg = runs_config.RunsConfig(database_url=dsn, executor="deterministic", limits=LIMITS,
                                  dispatch=runs_db.DISPATCH)
-    executor = AgentExecutor(provider, PIN, RESERVES, profiles=PROFILES)
+    executor = AgentExecutor(provider, pin, RESERVES, profiles=PROFILES)
     built = RunService(RunStore(dsn), cfg, executor, runs_db.Drain() if drain else Quiet())
     if drain:
         built.notifier.service = built
@@ -155,6 +160,17 @@ def test_each_refusal_names_what_the_reader_can_do(api, runtime):
     for n, bad in enumerate(({"page": 0}, {"page": "3"}, {"quote": "x" * 5000}, {"record_id": None})):
         response = ask(client, headers, f"selection-shape-{n}", {**selected(record, revision), **bad})
         assert response.status_code == 422 and response.json() == {"status": "invalid_selection"}, bad
+
+
+def test_a_runtime_on_an_earlier_pin_refuses_a_selection_rather_than_drop_it(api, runtime):
+    client, holder = api
+    provider = recording(reply("Never sent."))
+    holder["service"] = chat_service(runtime, provider, pin=PIN)
+    record, revision = indexed()
+    headers = scoped(make_user("selection-old-pin@cit.edu"), record)
+    assert ask(client, headers, "selection-0008", selected(record, revision)).json() == {
+        "status": "selection_unsupported"}
+    assert stored_runs() == 0 and provider.requests == []
 
 
 def test_an_unindexed_or_unreadable_paper_is_refused(api, runtime):

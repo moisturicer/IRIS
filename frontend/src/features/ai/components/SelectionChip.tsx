@@ -39,6 +39,7 @@ export const SELECTION_REFUSALS: Record<string, string> = {
   selection_unavailable:
     "IRIS hasn't read this paper yet, so it can't use the selection. Remove it to ask without it.",
   selection_out_of_scope: "A selection can only be asked about within this paper.",
+  selection_unsupported: "Ask IRIS can't use a selection right now. Remove it to ask without it.",
   invalid_selection: "This selection can't be sent. Select the passage again, or remove it.",
 };
 

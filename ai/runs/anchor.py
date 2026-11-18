@@ -27,6 +27,8 @@ OUT_OF_SCOPE = "selection_out_of_scope"
 UNAVAILABLE = "selection_unavailable"
 VERSION = "selection_version"
 UNVERIFIED = "selection_unverified"
+#: The runtime answers with a pin that cannot be sent a selection (before research-12).
+UNSUPPORTED = "selection_unsupported"
 
 
 class Refused(Exception):

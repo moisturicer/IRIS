@@ -15,7 +15,9 @@ import asyncpg
 
 from ai.admission import scope as admission
 from ai.agent.budget import Bounds
+from ai.agent.executor import SELECTION_TOOL_VERSIONS
 from ai.research.tools import ResearchTools
+from ai.runs import anchor
 from ai.runs import config as runs_config
 from ai.runs import stream
 from ai.runs.dispatch import Notifier, PollingNotifier
@@ -98,8 +100,12 @@ class RunService:
     async def submit(self, grant, *, key, question, conversation_id, base_revision,
                      depth=runs_config.DEFAULT_DEPTH, selection=None):
         """The run's projection, and whether this submission admitted it."""
+        pinned = self.pinned(depth)
+        if selection is not None and (pinned.get("agent") or {}).get("tool_version") not in SELECTION_TOOL_VERSIONS:
+            # Admitted, it would be answered without the passage the reader asked about (IR-581).
+            raise anchor.Refused(anchor.UNSUPPORTED)
         return await self._enqueue(grant, key=key, question=question, conversation_id=conversation_id,
-                                   base_revision=base_revision, depth=depth, pinned=self.pinned(depth),
+                                   base_revision=base_revision, depth=depth, pinned=pinned,
                                    selection=selection)
 
     async def _enqueue(self, grant, *, key, question, conversation_id, base_revision, depth, pinned,
