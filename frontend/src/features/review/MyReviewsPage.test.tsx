@@ -388,6 +388,8 @@ describe("MyReviewsPage", () => {
     mine.mockResolvedValue(page([
       row({ clearance_strip: [RESET, { ...KEPT, party: "itso", kind: "reviewing", text: "Reviewing v2", note: null }] }),
       row({ key: "seat:2", record: 9, title: "No Strip Paper" }),
+      // A strip that names only another office does not say who holds this one.
+      row({ key: "seat:3", record: 10, title: "Other Office Paper", clearance_strip: [RESET] }),
     ]));
     show();
 
@@ -399,6 +401,8 @@ describe("MyReviewsPage", () => {
     // With no strip the holder line is the only place the office is named.
     const bare = screen.getByRole("article", { name: "No Strip Paper" });
     expect(within(bare).getByText("ITSO · You")).toBeInTheDocument();
+    const other = screen.getByRole("article", { name: "Other Office Paper" });
+    expect(within(other).getByText("ITSO · You")).toBeInTheDocument();
   });
 
   it("offers Mine / All of the office to a coordinator, on the toolbar's right (IR-1135)", async () => {
