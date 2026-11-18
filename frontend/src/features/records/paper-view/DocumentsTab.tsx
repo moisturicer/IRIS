@@ -46,6 +46,8 @@ import { extensionOf, opensInReader, type ReaderDocument } from "./readerDocumen
 import { SectionHeading } from "./headings";
 
 const PDF_LIMIT = 50 * 1024 * 1024;
+/** What an office may attach (IR-1220, ADR-032 §10 as amended 2026-11-18). */
+const SUPPLEMENTARY_TYPES = ".pdf,.doc,.docx,.png,.jpg,.jpeg";
 
 interface DocumentsTabProps {
   record:    Pick<
@@ -369,7 +371,10 @@ export function DocumentsTab({
           {attach && (
             <UploadDropzone
               label="Attach a supplementary file"
-              hint="Any file type. Filed by your office, alongside the author's documents."
+              // The server checks the name and the first bytes too (IR-1220); this only spares a wasted upload.
+              accept={SUPPLEMENTARY_TYPES}
+              validate
+              hint="PDF, Word, PNG or JPG. Filed by your office, alongside the author's documents."
               upload={uploads.attachment}
               onFiles={([file]) =>
                 void send("attachment", file, (onProgress) =>

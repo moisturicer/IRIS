@@ -270,7 +270,13 @@ def test_unauthorized_uploader_is_refused_before_parsing(manuscript, monkeypatch
     assert response.status_code in {403, 404}
 
 
-def test_general_attachment_non_pdf_policy_is_unchanged(manuscript):
+def test_general_attachment_non_pdf_policy_is_word_png_or_jpg(manuscript):
+    """An office's own file need not be a PDF, but it is Word, PNG or JPG.
+
+    Changed deliberately by IR-1220: this asserted that a .txt file was
+    accepted, the "any type" ADR-032 §10 allowed until its 2026-11-18
+    amendment. test_supplementary_file_types.py covers the types in full.
+    """
     from django.core.files.uploadedfile import SimpleUploadedFile
     from apps.reviews.models import RecordAssignment
 
@@ -278,9 +284,14 @@ def test_general_attachment_non_pdf_policy_is_unchanged(manuscript):
     client.force_authenticate(make_user("office@cit.edu", "RDCO"))
     RecordAssignment.objects.create(record=record, party="rdco")
     response = client.post(reverse("record-file-upload"), {
-        "record": record.pk, "file": SimpleUploadedFile("notes.txt", b"Office notes", content_type="text/plain"),
+        "record": record.pk,
+        "file": SimpleUploadedFile("notes.png", b"\x89PNG\r\n\x1a\nOffice notes", content_type="image/png"),
     }, format="multipart")
     assert response.status_code == 201, response.data
+    response = client.post(reverse("record-file-upload"), {
+        "record": record.pk, "file": SimpleUploadedFile("notes.txt", b"Office notes", content_type="text/plain"),
+    }, format="multipart")
+    assert response.status_code == 400, response.data
 
 
 def test_different_original_bytes_with_identical_text_get_current_source_chunks(manuscript, monkeypatch):
