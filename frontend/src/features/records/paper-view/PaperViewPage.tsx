@@ -74,6 +74,8 @@ import { RdcoPaperControls } from "./RdcoPaperControls";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { DocumentsTab } from "./DocumentsTab";
+import { DocumentInReader, type ShownDocumentState } from "./DocumentInReader";
+import type { ReaderDocument } from "./readerDocument";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
@@ -256,6 +258,8 @@ export default function PaperViewPage() {
     focusPanel.current = true;
     chat.setOpen(true);
   };
+  // The supporting document Review's reader shows (IR-1203); see `shownDocument`.
+  const [documentShown, setDocumentShown] = useState<ShownDocumentState | null>(null);
   // The highlight the reader asked to open from Notes (IR-583): where to land,
   // in which version, and the navigation it belongs to, so a later arrival
   // (a citation, Back) is not held to it.
@@ -724,6 +728,14 @@ export default function PaperViewPage() {
     (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && record.download?.state === "pending";
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
+  // A supporting document opened from Documents (IR-1203), shown in Review's
+  // reader instead of the manuscript. It holds only for the address it was
+  // opened at: any change of view (a Version, a section, a citation) brings
+  // the manuscript back, and so does a thread or Changes' *Show in paper*.
+  const shownDocument = section === "review" && documentShown?.at === location.search ? documentShown.document : null;
+  const openDocument = (document: ReaderDocument | null) =>
+    setDocumentShown(document ? { document, at: location.search } : null);
+
   const reader = () => (
     <>
       {(viewedVersion || record.manuscript_unsubmitted) && (
@@ -1319,7 +1331,14 @@ export default function PaperViewPage() {
                 onOpenReview={openReview}
                 onShowVersion={chooseVersion}
                 can={can}
-                reader={recordHasPaper(record) ? reader() : null}
+                reader={recordHasPaper(record)
+                  ? shownDocument
+                    ? <DocumentInReader recordId={record.id} document={shownDocument} onBack={() => openDocument(null)}
+                        fill={reviewWorkspace} contained={reviewWorkspace || tier === "wide"} />
+                    : reader()
+                  : null}
+                readerShows={shownDocument ? `${shownDocument.kind}-${shownDocument.id}` : "manuscript"}
+                onShowManuscript={() => openDocument(null)}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
                 // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
@@ -1335,6 +1354,7 @@ export default function PaperViewPage() {
                     attach={can.has("attach_file")}
                     replaceManuscript={can.has("replace_manuscript")}
                     onChanged={handleDocumentRequestChanged}
+                    onOpen={recordHasPaper(record) ? openDocument : undefined}
                   />
                 }
               />

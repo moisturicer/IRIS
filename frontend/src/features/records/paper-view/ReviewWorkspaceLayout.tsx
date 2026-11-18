@@ -130,6 +130,14 @@ export interface ReviewWorkspaceProps {
    * the Changes tab's *Show in paper* opens the Version a change is in.
    */
   onShowVersion?: (n: number | null) => void;
+  /**
+   * What the reader shows: "manuscript", or a key for the supporting document
+   * opened from Documents (IR-1203). When it changes on a narrow workspace,
+   * the pane steps aside so the reader is seen.
+   */
+  readerShows?: string;
+  /** Put the manuscript back in the reader: a thread or a change is shown there (IR-1203). */
+  onShowManuscript?: () => void;
 }
 
 /** True from the first render `shown` is true, and from then on. */
@@ -159,7 +167,7 @@ function SentBy({ version }: { version: RecordVersion }) {
 
 export function ReviewWorkspaceLayout({
   record, can, reader, timelineVersion, onChanged, documents, showDocuments = false, onDocumentsShown, onOpenReview,
-  onShowVersion, authorView = false, authorDetails,
+  onShowVersion, authorView = false, authorDetails, readerShows = "manuscript", onShowManuscript,
 }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
@@ -219,6 +227,14 @@ export function ReviewWorkspaceLayout({
     requestAnimationFrame(() => launcher.current?.focus());
   };
 
+  // A document opened from the pane is read beside it, or, narrow, instead of it (IR-1203).
+  const lastShown = useRef(readerShows);
+  useEffect(() => {
+    if (lastShown.current === readerShows) return;
+    lastShown.current = readerShows;
+    if (drawer && open) closeDrawer();
+  });
+
   const update = (next: Widths) => {
     setWanted(next);
     try { localStorage.setItem(WIDTHS_KEY, JSON.stringify(next)); } catch { /* Defaults still render. */ }
@@ -227,7 +243,8 @@ export function ReviewWorkspaceLayout({
   const tw = useThreadsWorkspace({
     record, can, onChanged,
     showThreads: () => { reveal("threads"); if (drawer) setOpen(true); },
-    showPaper: () => { if (drawer && open) closeDrawer(); },
+    // Threads and Changes point into the manuscript, so a document steps aside for it (IR-1203).
+    showPaper: () => { onShowManuscript?.(); if (drawer && open) closeDrawer(); },
     announce: setRouted,
   });
   const finishing = can.has("finish_review");

@@ -308,7 +308,9 @@ vi.mock("./PaperPdfReader", () => ({
     clearCorner,
     downloadControl,
     keepPlace,
+    document: shownDocument,
   }: {
+    document?: { kind: string; id: number } | null;
     clearCorner?: boolean;
     downloadControl?: ReactNode;
     keepPlace?: boolean;
@@ -323,7 +325,8 @@ vi.mock("./PaperPdfReader", () => ({
       <div>
         {toolbarStart}
         Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
-        highlight{version != null ? `, reading v${version}` : ", reading the current paper"}
+        highlight{shownDocument ? `, reading ${shownDocument.kind} ${shownDocument.id}`
+          : version != null ? `, reading v${version}` : ", reading the current paper"}
       </div>
       {/* The reader's own toolbar holds the download control it is handed. */}
       <div role="toolbar" aria-label="Reader toolbar">{downloadControl}</div>
@@ -2891,6 +2894,72 @@ describe("the Review section (IR-412)", () => {
       await userEvent.keyboard("{ArrowRight}");
       expect(within(pane).getByRole("tab", { name: "Documents", selected: true })).toHaveFocus();
       await expectNoBlockingA11yViolations(container);
+    });
+
+    // Part (b): a document opens in the reader on the left.
+    it("opens a reviewer's document in the reader, with nothing to highlight, and goes back", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+
+      expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
+      const shown = screen.getByRole("group", { name: "Shown in the reader" });
+      expect(shown).toHaveTextContent("Consent Paper · version 2");
+      // Highlights and Ask IRIS belong to the manuscript only.
+      expect(screen.queryByRole("button", { name: /^Selection:/ })).not.toBeInTheDocument();
+
+      await userEvent.click(within(shown).getByRole("button", { name: "Back to the manuscript" }));
+      expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Shown in the reader" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Selection: Save highlight" })).toBeInTheDocument();
+    });
+
+    it("opens an author's older version and PDF attachment, while a Word file only downloads", async () => {
+      workspaceAt(1600);
+      shownRecord = inReview;
+      signInAs(OWNER_ID, "Student");
+      vi.mocked(documentsApi.files).mockResolvedValue({ data: [
+        { id: 31, record: RECORD_ID, file: "x/survey.pdf", filename: "Survey results.pdf", uploaded_by: OWNER_ID,
+          uploaded_by_name: "Rhea Owner", created_at: "2026-11-03T08:00:00Z", can_remove: false },
+        { id: 32, record: RECORD_ID, file: "x/notes.docx", filename: "Interview notes.docx", uploaded_by: OWNER_ID,
+          uploaded_by_name: "Rhea Owner", created_at: "2026-11-03T08:00:00Z", can_remove: false },
+      ] } as never);
+      renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(consent).getByRole("button", { name: "2 versions of Consent Paper" }));
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 1" }));
+      expect(await screen.findByText(/reading upload 11/)).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toHaveTextContent("Consent Paper · version 1");
+
+      const survey = await screen.findByRole("group", { name: "Survey results.pdf" });
+      await userEvent.click(within(survey).getByRole("button", { name: "Open Survey results.pdf" }));
+      expect(await screen.findByText(/reading file 31/)).toBeInTheDocument();
+
+      const notes = screen.getByRole("group", { name: "Interview notes.docx" });
+      expect(within(notes).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
+      expect(within(notes).getByRole("button", { name: "Download Interview notes.docx" })).toBeInTheDocument();
+      vi.mocked(documentsApi.files).mockResolvedValue({ data: [] } as never);
+    });
+
+    it("closes the narrow pane when a document opens, so the reader is seen", async () => {
+      workspaceAt(320);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Open review pane" }));
+      const pane = screen.getByRole("dialog", { name: "Review pane" });
+      const consent = await within(pane).findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Review pane" })).not.toBeInTheDocument());
+      expect(screen.getByText(/reading upload 12/)).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toBeInTheDocument();
     });
   });
 

@@ -21,6 +21,7 @@ import {
   LandingMark, ThreadMarks, useReaderAnnotations, type ReaderLanding, type ReaderMark,
 } from "./threads/readerAnnotations";
 import type { FindHit } from "./findInPaper";
+import type { ReaderDocument } from "./readerDocument";
 import { PaperFind } from "./PaperFind";
 import { ReaderWatermark } from "./ReaderWatermark";
 import {
@@ -244,6 +245,12 @@ export interface PaperPdfReaderProps {
    * to the current paper, so the caller passes neither with a version.
    */
   version?: number | null;
+  /**
+   * A supporting document to read instead of the manuscript (IR-1203). It
+   * carries none of the manuscript's: no place kept, no thread pins, no
+   * Comment; the caller passes no highlights or selection actions with it.
+   */
+  document?: ReaderDocument | null;
   /** The page to scroll to once the document is ready, or `null` for none. */
   scrollToPage: number | null;
   /**
@@ -333,12 +340,14 @@ export interface PaperPdfReaderProps {
  */
 export function PaperPdfReader(props: PaperPdfReaderProps) {
   const epoch = useAuthStore((state) => state.sessionEpoch);
-  return <PaperPdfReaderSource key={`${epoch}:${props.recordId}:${props.version ?? "current"}`} {...props} />;
+  const shows = props.document ? `${props.document.kind}-${props.document.id}` : props.version ?? "current";
+  return <PaperPdfReaderSource key={`${epoch}:${props.recordId}:${shows}`} {...props} />;
 }
 
 function PaperPdfReaderSource({
   recordId,
   version = null,
+  document: shownDocument = null,
   scrollToPage,
   keepPlace = false,
   highlightRegions,
@@ -356,6 +365,7 @@ function PaperPdfReaderSource({
   const { status, pageCount, pages, pageProxy, prioritize, revision } = usePdfDocument({
     recordId,
     version,
+    document: shownDocument,
     attempt,
     firstPage: scrollToPage,
   });
@@ -372,7 +382,9 @@ function PaperPdfReaderSource({
   const [findLanding, setFindLanding] = useState<{ page: number; region: RegionBand } | null>(null);
   // Review's threads (IR-875): drawn only on the Version they quote, and a
   // thread the workspace asks to show is landed on like a find match.
-  const annotations = useReaderAnnotations();
+  // A supporting document is not the manuscript the threads are on (IR-1203).
+  const reviewAnnotations = useReaderAnnotations();
+  const annotations = shownDocument ? null : reviewAnnotations;
   const shownVersion = version ?? annotations?.currentVersion ?? null;
   const marks = useMemo(
     () => (annotations?.marks ?? []).filter((m) => m.version === shownVersion),
@@ -433,7 +445,7 @@ function PaperPdfReaderSource({
   const signedIn = useAuthStore((state) => state.isAuthenticated);
   const resume = useReadingResume({
     recordId,
-    enabled: keepPlace && version === null && signedIn,
+    enabled: keepPlace && version === null && shownDocument === null && signedIn,
     explicitLanding: scrollToPage != null,
     revision,
     ready: status === "ready",
