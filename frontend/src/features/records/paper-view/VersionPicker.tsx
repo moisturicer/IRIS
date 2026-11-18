@@ -8,9 +8,10 @@ import type { RecordVersion } from "@/types/records";
  * The header's version picker (IR-416; ADR-032 §5, spec §4.6/§4.11).
  *
  * Rendered whenever the record has a version, v1 alone included, so every
- * paper's header looks alike (IR-1214). The caller decides that, and passes
- * only what the server sent -- `versions` is null to a viewer who may not
- * read the review (IR-479), so a reader of a published paper never sees this.
+ * paper's header looks alike (IR-1214). `versions` must not be empty: the
+ * caller draws nothing without one, and passes only what the server sent --
+ * `versions` is null to a viewer who may not read the review (IR-479), so a
+ * reader of a published paper never sees this.
  *
  * A native `<select>`: it is a single choice from a short list, and the
  * platform's control is the one every keyboard and screen reader already

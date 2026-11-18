@@ -1226,7 +1226,7 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     await openPaperTab();
 
     expect(screen.getByRole("heading", { level: 1, name: record.title })).toHaveAttribute("title", record.title);
-    // The version menu, even with v1 alone (IR-1214; it was the bare text "v1").
+    // The version menu, even with v1 alone (IR-1214).
     expect(screen.getByRole("combobox", { name: "Version" })).toHaveValue("1");
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
     expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
@@ -3145,9 +3145,8 @@ describe("record versions (IR-416)", () => {
     signInAs(99, "Student");
   });
 
-  // IR-1214 replaces "offers no picker with one version", deliberately: the
-  // menu is there whenever there is a version, so every paper's header looks
-  // alike, and with one version it lists that one alone.
+  // The menu is there whenever there is a version, so every paper's header
+  // looks alike; with one version it lists that one alone (IR-1214).
   it("offers the picker with only v1, current and chosen", async () => {
     shownRecord = { ...record, versions: [version(1, "submission")] };
     const { container } = renderPaperView();
@@ -3160,13 +3159,16 @@ describe("record versions (IR-416)", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("offers no picker when no version is disclosed", async () => {
-    shownRecord = { ...record, versions: null };
-    renderPaperView();
-    await waitForRecord(record.title);
+  it("offers no picker when no version is disclosed, or there is none", async () => {
+    for (const versions of [null, []]) {
+      shownRecord = { ...record, versions };
+      const { unmount } = renderPaperView();
+      await waitForRecord(record.title);
 
-    expect(screen.queryByRole("combobox", PICKER)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^v1\b/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("combobox", PICKER)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^v1\b/)).not.toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("lists every version, the newest marked current and chosen", async () => {
@@ -3224,8 +3226,6 @@ describe("record versions (IR-416)", () => {
       expect(barOf()).not.toContainElement(picker);
     });
 
-    // Was a bare "v1" label here; with IR-1214 a single version is the picker
-    // too, in the same place, so this now checks the picker's place.
     it("keeps a single version's picker in the toolbar too, so a phone still says which it is reading", async () => {
       shownRecord = { ...record, versions: [version(1, "submission")] };
       workspaceAt(360);
