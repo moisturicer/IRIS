@@ -19,12 +19,14 @@ import { MentionPicker, MentionedPeople, changedMentions, peopleIn } from "./Men
 import { SavedReplies } from "./SavedReplies";
 import { timelineEntries, type TimelineEntry, type TimelineKind } from "./timelineEntries";
 
-/** The submission, drawn as the first box of the timeline, as a pull request opens with its description. */
+/**
+ * The submission, drawn as the first box of the timeline: who submitted and
+ * when, and nothing more. The abstract is on the Overview (IR-1212).
+ */
 export interface TimelineSubmission {
   /** Who submitted v1, as the server names them. */
   author: string | null;
   at: string | null;
-  abstract: string;
 }
 
 /** A glyph per kind of entry, beside its words, never instead of them. */
@@ -235,24 +237,22 @@ function Avatar({ name, large = false }: { name: string | null; large?: boolean 
   return <span aria-hidden className={cn("review-avatar", large && "review-avatar-lg")}>{initials(name)}</span>;
 }
 
-/** The submission, as a pull request opens with its description: who, when, and the abstract. */
+/**
+ * The submission's box: "Ana Cruz submitted on Sep 1, 2026", named as the
+ * other entries name their author, or "Submitted on Sep 1, 2026" when the
+ * server names no one. Only that line: the abstract is on the Overview, and
+ * repeating it here pushed the discussion down (IR-1212).
+ */
 function SubmissionBox({ submission }: { submission: TimelineSubmission }) {
   const who = submission.author ?? "The authors";
+  const when = submission.at && <> on <time dateTime={submission.at}>{formatDate(submission.at)}</time></>;
   return (
     <div className="review-tl-cmt">
       <Avatar name={submission.author} large />
       <article className="review-box" aria-label={`Submission by ${who}`}>
         <header className="review-box-head">
-          <p>
-            <b>{who}</b>{" "}
-            submitted v1{submission.at && <> · <time dateTime={submission.at}>{formatDate(submission.at)}</time></>}
-          </p>
+          <p>{submission.author ? <><b>{submission.author}</b> submitted{when}</> : <>Submitted{when}</>}</p>
         </header>
-        {submission.abstract.trim() && (
-          <div className="review-box-body">
-            <p className="review-abstract whitespace-pre-wrap break-words">{submission.abstract}</p>
-          </div>
-        )}
       </article>
     </div>
   );

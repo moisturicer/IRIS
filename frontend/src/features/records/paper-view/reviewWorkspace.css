@@ -76,7 +76,6 @@
 .review-box-head > p { flex: 1 1 auto; min-width: 0; }
 .review-box-head b { font-weight: 600; color: theme('colors.stone.900'); }
 .review-box-body { padding: 12px 14px; }
-.review-abstract { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: theme('colors.stone.700'); }
 .review-label { padding: 0 8px; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.full'); background: white; font-size: 12px; line-height: 18px; font-weight: 600; color: theme('colors.stone.600'); white-space: nowrap; }
 .review-box-replies { margin: 0; padding: 0; list-style: none; }
 .review-box-rep { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; padding: 10px 14px; border-top: 1px solid theme('colors.stone.200'); }

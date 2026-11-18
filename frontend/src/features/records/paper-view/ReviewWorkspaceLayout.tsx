@@ -447,9 +447,9 @@ export function ReviewWorkspaceLayout({
   };
   // What each tab holds. A tab is mounted wherever it is shown -- its place in
   // the pane, or the right column -- so choosing it there moves it (IR-1094).
-  // The first Version opens the timeline as its own box, as a pull request opens with its description.
+  // The first Version opens the timeline as its own box: who submitted and when (IR-1212).
   const first = versions[0];
-  const submission = first ? { author: first.created_by_name, at: first.created_at, abstract: record.abstract ?? "" } : undefined;
+  const submission = first ? { author: first.created_by_name, at: first.created_at } : undefined;
   const body: Record<Tab, ReactNode> = {
     // The author's first tab (IR-1206): where the record stands, then what
     // waits on them. Their documents are the next tab (IR-1203).

@@ -160,6 +160,28 @@ describe("ReviewTimeline", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  // IR-1212: the first entry says who submitted and when, and nothing more.
+  // The abstract is on the Overview; the submission no longer carries it, so
+  // the whole of the box's text is the one line.
+  it("opens with who submitted and when, and nothing else", async () => {
+    respond(payload);
+    const { container } = renderScreen(
+      <ReviewTimeline recordId={7} submission={{ author: "Rhea Owner", at: "2026-09-01T09:00:00Z" }} />,
+    );
+
+    const box = await screen.findByRole("article", { name: "Submission by Rhea Owner" });
+    expect(box).toHaveTextContent(/^Rhea Owner submitted on Sep 1, 2026$/);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("says only when it was submitted when the server names no one", async () => {
+    respond(payload);
+    renderScreen(<ReviewTimeline recordId={7} submission={{ author: null, at: "2026-09-01T09:00:00Z" }} />);
+
+    const box = await screen.findByRole("article", { name: "Submission by The authors" });
+    expect(box).toHaveTextContent(/^Submitted on Sep 1, 2026$/);
+  });
+
   it("says so when nothing has happened yet", async () => {
     respond({ ...payload, routing_history: [], reviews: [] });
     renderScreen(<ReviewTimeline recordId={7} />);
