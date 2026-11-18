@@ -42,7 +42,7 @@ import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerD
 import { CONTROL_SIZE } from "./controls";
 import { DocumentRow } from "./DocumentRow";
 import { useReviewPane } from "./reviewPane";
-import { extensionOf, opensInReader, readerFormat, type ReaderDocument } from "./readerDocument";
+import { extensionOf, opensInReader, readerFormat, slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { SectionHeading } from "./headings";
 
 const PDF_LIMIT = 50 * 1024 * 1024;
@@ -259,11 +259,10 @@ export function DocumentsTab({
   };
   /** A slot version's Open, when there is a reader and the version is a PDF. */
   // A slot's upload is a PDF, served as one, so only a PDF version opens (images are attachments only).
-  const openVersion = (name: string, u: RecordUpload) => onOpen && readerFormat(u.file) === "pdf" && (
-    <RowAction icon="fa-book-open" verb="Open" name={`${name} version ${u.version}`} onClick={(opener) => open({
-      kind: "upload", id: u.id, label: `${name} · version ${u.version}`,
-      fileName: `${name} v${u.version}.${extensionOf(u.file)}`,
-    }, opener)} />
+  // `newest`: the version a reviewer may open a thread on from the reader (IR-1204).
+  const openVersion = (name: string, u: RecordUpload, newest: boolean) => onOpen && readerFormat(u.file) === "pdf" && (
+    <RowAction icon="fa-book-open" verb="Open" name={`${name} version ${u.version}`}
+      onClick={(opener) => open(slotUploadDocument(name, u, extensionOf(u.file), newest), opener)} />
   );
 
   return (
@@ -315,7 +314,7 @@ export function DocumentsTab({
               note={asked && <AskedNote asked={asked} />}
               actions={(latest || canUpload) && (
                 <>
-                  {latest && openVersion(slot.name, latest)}
+                  {latest && openVersion(slot.name, latest, true)}
                   {latest && (
                     <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
                   )}
@@ -330,7 +329,7 @@ export function DocumentsTab({
                     name={slot.name}
                     uploads={slot.uploads}
                     removable={owner && editable}
-                    open={(u) => openVersion(slot.name, u)}
+                    open={(u) => openVersion(slot.name, u, u.id === latest?.id)}
                     onDownload={(u) => downloadVersion(slot.name, u)}
                     onRemove={(u) =>
                       askToRemove(`${slot.name} version ${u.version}`, async () => {

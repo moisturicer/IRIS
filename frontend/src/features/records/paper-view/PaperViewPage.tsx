@@ -27,7 +27,7 @@ import {
   type AnswerReturn,
 } from "@/lib/citedPage";
 import { conversationPath } from "@/lib/askHandoff";
-import type { RecordDetail, IpType } from "@/types/records";
+import type { RecordDetail, IpType, ThreadDocument } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
@@ -75,7 +75,7 @@ import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { DocumentsTab } from "./DocumentsTab";
 import { DocumentInReader, type ShownDocumentState } from "./DocumentInReader";
-import type { ReaderDocument } from "./readerDocument";
+import { slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
@@ -727,6 +727,15 @@ export default function PaperViewPage() {
   const openDocument = (document: ReaderDocument, opener: HTMLElement) =>
     setDocumentShown({ document, at: location.search, opener });
   const showManuscript = () => setDocumentShown(null);
+  // A thread's document (IR-1204), opened from its card: focus goes back there.
+  const showThreadDocument = (thread: ThreadDocument) => {
+    const opener = window.document.activeElement;
+    setDocumentShown({
+      document: slotUploadDocument(thread.slot, { id: thread.upload, version: thread.version }, thread.extension, !thread.earlier),
+      at: location.search,
+      opener: opener instanceof HTMLElement ? opener : null,
+    });
+  };
   const pendingInBar =
     (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && !shown &&
     record.download?.state === "pending";
@@ -1334,6 +1343,7 @@ export default function PaperViewPage() {
                     : reader()
                   : null}
                 onShowManuscript={showManuscript}
+                onShowDocument={recordHasPaper(record) ? showThreadDocument : undefined}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
                 // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).

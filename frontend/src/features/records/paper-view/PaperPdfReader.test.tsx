@@ -464,7 +464,7 @@ describe("landing on a review passage (IR-1195)", () => {
   const landings = () => scrollBy.mock.calls.filter(([arg]) => typeof arg === "object");
 
   const reader = (landing: Landing | null) => (
-    <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: null, landing }}>
+    <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: null, onCommentDocument: null, landing }}>
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
     </ReaderAnnotationsContext.Provider>
   );
@@ -1264,7 +1264,7 @@ describe("find in this paper (IR-353)", () => {
     function openCommentable(onComment: (passage: Passage, version: number) => void) {
       paperText = PAPER;
       render(
-        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, landing: null }}>
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, onCommentDocument: null, landing: null }}>
           <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
         </ReaderAnnotationsContext.Provider>,
       );
@@ -1305,7 +1305,7 @@ describe("find in this paper (IR-353)", () => {
       paperText = PAPER;
       viewUpload.mockResolvedValue({ data: pdfBlob() });
       render(
-        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: vi.fn(), landing: null }}>
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: vi.fn(), onCommentDocument: null, landing: null }}>
           <PaperPdfReader recordId={7} document={{ kind: "upload", id: 12, label: "Consent Paper · version 2", fileName: "c.pdf" }}
             scrollToPage={null} highlightRegions={[]} navKey="a" />
         </ReaderAnnotationsContext.Provider>,
