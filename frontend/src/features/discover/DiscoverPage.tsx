@@ -55,11 +55,14 @@ const COLUMNS_KEY = "iris.discover.columns";
 
 type ColumnCount = 1 | 2 | 3;
 
-/** Both segmented controls share one track and one height (IR-1082): the chosen
- *  segment is white and raised (the Selected role), never maroon. */
+/** The Papers / People switch shares the row's one control height (IR-1082): the
+ *  chosen segment is white and raised (the Selected role), never maroon. On a
+ *  phone each segment is an icon at 44 x 44 px, its name kept for screen readers
+ *  (IR-1190); from `sm` it carries its word. */
 const SEGMENT_TRACK = "inline-flex shrink-0 items-center rounded-control border border-stone-200 bg-stone-100 p-0 sm:h-11 sm:p-0.5";
-const segmentClass = (chosen: boolean, padding: "px-3" | "px-4" = "px-3") =>
-  cn("h-full min-h-11 rounded-control text-small font-semibold sm:min-h-0", padding, COLOUR_TRANSITION, FOCUS_RING,
+const segmentClass = (chosen: boolean) =>
+  cn("inline-flex h-full min-h-11 min-w-11 items-center justify-center gap-2 rounded-control text-small font-semibold sm:min-h-0 sm:min-w-0 sm:px-4",
+    COLOUR_TRANSITION, FOCUS_RING,
     chosen ? SELECTED_SEGMENT : "text-stone-700 hover:bg-stone-200");
 
 function readColumns(): ColumnCount {
@@ -574,14 +577,21 @@ export default function DiscoverPage() {
   /** Ask IRIS is offered for a question once its results are in, not while they load or if they failed. */
   const suggestAsk = !loading && !failed && looksLikeQuestion(activeQuery);
 
-  /* Papers / People sit in the page header, so on a phone the toolbar row below
-     search holds only what narrows the feed (IR-1080, audit RES-01). */
+  /* Papers / People, Sort, Filters, the column toggle and Publish are ONE row
+     under search (IR-1190): it never wraps and never scrolls sideways. On a
+     phone Papers, People, Filters and Publish are icons that keep their names
+     (`sr-only` until `sm`) and a 44 px target, and Sort gives up its visible
+     label, so all of it fits 360 px; the Sort select is the one part that can
+     shrink. Over People, Sort, Filters and the columns do not apply, so only
+     the switch and Publish stay. */
+  const papersView = discoverView === "papers";
   const resultsSwitch = (
     <div role="group" aria-label="Discover results" className={SEGMENT_TRACK}>
-      {([ ["papers", "Papers"], ["people", "People"] ] as const).map(([value, label]) => (
+      {([ ["papers", "Papers", "fa-file-lines"], ["people", "People", "fa-users"] ] as const).map(([value, label, icon]) => (
         <button key={value} type="button" aria-pressed={discoverView === value} onClick={() => setDiscoverView(value)}
-          className={segmentClass(discoverView === value, "px-4")}>
-          {label}
+          className={segmentClass(discoverView === value)}>
+          <i className={cn("fas text-label sm:hidden", icon)} aria-hidden />
+          <span className="sr-only sm:not-sr-only">{label}</span>
         </button>
       ))}
     </div>
@@ -589,53 +599,58 @@ export default function DiscoverPage() {
 
   const research = (
     <>
-      {discoverView === "people" ? <DiscoverPeopleResults query={peopleQuery} /> : (
-      <>
-      <div role="group" aria-label="Discover controls"
-        className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-        <DiscoverOrderSelect value={orderOf(query)} onChange={chooseOrder} />
-        <button type="button" onClick={() => chooseColumns(nextColumns)}
-          aria-label={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
-          title={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
-          className={cn("ml-auto hidden xl:inline-flex h-11 w-11 items-center justify-center rounded-control border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
-          <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" />
-            {columns === 2 && <path d="M8 2.75v10.5" />}
-            {columns === 3 && <path d="M5.92 2.75v10.5M10.08 2.75v10.5" />}
-          </svg>
-        </button>
-        <DiscoverFilterBar
-          className="shrink-0"
-          filters={filters}
-          onChange={setFilters}
-          options={filterOptions}
-          loading={refLoading}
-          resultCount={loading ? null : totalCount}
-          areas={hasAreas ? (closePanel) => (
-            <DiscoverAreas
-              options={interestOptions}
-              selection={interestSelection}
-              onSelectionChange={setInterestSelection}
-              loading={interestLoading}
-              loadFailed={interestLoadFailed}
-              error={interestError}
-              saving={interestSaving}
-              onSave={() => void saveInterests(closePanel)}
-              resetConfirming={resetConfirming}
-              onResetConfirmingChange={setResetConfirming}
-              resetting={resetting}
-              onReset={() => void resetInterests(closePanel)}
+      <div role="group" aria-label="Discover controls" className="mt-4 flex items-center gap-2">
+        {resultsSwitch}
+        {papersView && <DiscoverOrderSelect value={orderOf(query)} onChange={chooseOrder} />}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {papersView && (
+            <button type="button" onClick={() => chooseColumns(nextColumns)}
+              aria-label={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
+              title={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
+              className={cn("hidden xl:inline-flex h-11 w-11 items-center justify-center rounded-control border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+              <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" />
+                {columns === 2 && <path d="M8 2.75v10.5" />}
+                {columns === 3 && <path d="M5.92 2.75v10.5M10.08 2.75v10.5" />}
+              </svg>
+            </button>
+          )}
+          {papersView && (
+            <DiscoverFilterBar
+              filters={filters}
+              onChange={setFilters}
+              options={filterOptions}
+              loading={refLoading}
+              resultCount={loading ? null : totalCount}
+              areas={hasAreas ? (closePanel) => (
+                <DiscoverAreas
+                  options={interestOptions}
+                  selection={interestSelection}
+                  onSelectionChange={setInterestSelection}
+                  loading={interestLoading}
+                  loadFailed={interestLoadFailed}
+                  error={interestError}
+                  saving={interestSaving}
+                  onSave={() => void saveInterests(closePanel)}
+                  resetConfirming={resetConfirming}
+                  onResetConfirmingChange={setResetConfirming}
+                  resetting={resetting}
+                  onReset={() => void resetInterests(closePanel)}
+                />
+              ) : undefined}
             />
-          ) : undefined}
-        />
-        {canPublish && (
-          <button type="button" onClick={openPublish} aria-label="Publish"
-            className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 shrink-0 !px-4 sm:!px-5")}>
-            <i className="fas fa-plus text-label" aria-hidden />
-            <span>Publish</span>
-          </button>
-        )}
+          )}
+          {canPublish && (
+            <button type="button" onClick={openPublish}
+              className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 min-w-11 shrink-0 !px-0 sm:!px-5")}>
+              <i className="fas fa-plus text-label" aria-hidden />
+              <span className="sr-only sm:not-sr-only">Publish</span>
+            </button>
+          )}
+        </div>
       </div>
+      {!papersView ? <DiscoverPeopleResults query={peopleQuery} /> : (
+      <>
       {feedNotice && <p role="status" className="mt-3 text-small text-stone-700">{feedNotice}</p>}
       {feed === "for_you" && feedback && (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-small text-stone-700">
@@ -773,12 +788,9 @@ export default function DiscoverPage() {
       <div className={cn(PAGE_WIDTH.standard, "px-4 sm:px-7 pt-4 sm:pt-7 pb-12 flex-1")}>
         <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
-            <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
-            <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
-          </div>
-          {resultsSwitch}
+        <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
+          <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
+          <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
         </div>
 
         <DiscoverTabs
