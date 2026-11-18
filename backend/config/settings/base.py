@@ -254,6 +254,13 @@ SIMPLE_JWT = {
 # the token lifetimes above (IR-166, apps/accounts/sessions.py). The interface
 # signs itself out on the same figure: frontend/src/lib/activity.ts.
 SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30, cast=int)
+# ADR-072: "Keep me signed in" lasts this many days from sign-in, outside the
+# idle rule. The refresh token travels only in this HttpOnly cookie, scoped to
+# the auth endpoints; Secure everywhere except DEBUG's plain-http localhost.
+REMEMBERED_SESSION_DAYS = config("REMEMBERED_SESSION_DAYS", default=30, cast=int)
+REFRESH_COOKIE_NAME = "iris_refresh"
+REFRESH_COOKIE_PATH = "/api/v1/auth/"
+REFRESH_COOKIE_SECURE = config("REFRESH_COOKIE_SECURE", default=not DEBUG, cast=bool)
 
 # ---- Browser security headers (IR-663, ASVS 14.4.3/4/6/7) ----------------
 #
@@ -304,9 +311,11 @@ CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default=FRONTEND_URL, cast=csv_list
 )
 CORS_ALLOW_CREDENTIALS = True
-# The interface reports the user's idle time on every request (IR-166); a
-# cross-origin deployment's preflight refuses any header not listed here.
-CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds")
+# The interface reports the user's idle time on every request (IR-166), and
+# marks refresh and logout as its own (`X-IRIS-Auth`, ADR-072); a cross-origin
+# deployment's preflight refuses any header not listed here. Origins stay the
+# allowlist above, so a page on any other origin still can't send either.
+CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds", "x-iris-auth")
 
 # ---- Email --------------------------------------------------------------
 

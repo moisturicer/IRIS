@@ -1,5 +1,4 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView
 from apps.accounts import views
 from apps.accounts.recovery import views as recovery
 
@@ -16,7 +15,8 @@ urlpatterns = [
     path("notice/versions/impact/", views.NoticeImpactView.as_view(),   name="notice-impact"),
     path("notice/draft/",           views.NoticeDraftView.as_view(),    name="notice-draft"),
     path("logout/",               views.LogoutView.as_view(),         name="auth-logout"),
-    path("token/refresh/",        TokenRefreshView.as_view(),         name="token-refresh"),
+    # ADR-072: the refresh token comes from its HttpOnly cookie, never the body.
+    path("token/refresh/",        views.RefreshView.as_view(),        name="token-refresh"),
     # Retired by IR-643 (ADR-045 §8): both answer only "invalid link", so a
     # link emailed before single-use verification, or a cached page, verifies
     # no one and points to a new email.

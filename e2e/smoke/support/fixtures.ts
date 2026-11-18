@@ -53,11 +53,12 @@ export function account(role: SmokeRole = "Student") {
 export const student = () => account("Student");
 
 /** Start the page already signed in, the way a reload does: a stored refresh token the app exchanges. */
-export async function signedIn(page: Page, api: MockApi, role: SmokeRole = "Student") {
+export async function signedIn(_page: Page, api: MockApi, role: SmokeRole = "Student") {
   const user = account(role);
-  api.on("POST", "/auth/token/refresh/", { access: token(), refresh: "refresh-2" });
+  // The browser's HttpOnly cookie is what makes this refresh succeed (ADR-072);
+  // page scripts can't set or read it, so the mock answers as if it were sent.
+  api.on("POST", "/auth/token/refresh/", { access: token(), remembered: false });
   api.on("GET", "/users/me/", user);
-  await page.addInitScript(() => sessionStorage.setItem("iris_refresh_token", "refresh-1"));
   return user;
 }
 

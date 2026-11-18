@@ -450,6 +450,11 @@ class UserSession(models.Model):
     last_activity_at = models.DateTimeField()
     ended_at         = models.DateTimeField(null=True, blank=True)
     ended_reason     = models.CharField(max_length=32, choices=SessionEndReason.choices, null=True, blank=True)
+    #: "Keep me signed in" (ADR-072 decision 3): the idle rule does not end it.
+    remembered       = models.BooleanField(default=False)
+    #: A remembered session's fixed end, sign-in + `REMEMBERED_SESSION_DAYS`
+    #: (ADR-072 decision 4). Null for a session the idle rule ends.
+    expires_at       = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.email} session {self.id}"

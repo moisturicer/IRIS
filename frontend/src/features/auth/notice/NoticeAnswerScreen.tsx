@@ -36,7 +36,6 @@ type Phase = "loading" | "failed" | "ready";
 const NEWER_NOTICE = "A newer notice was published while this one was open. Read it, then answer again.";
 
 export function NoticeAnswerScreen() {
-  const refreshToken = useAuthStore((s) => s.refreshToken);
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
   const logout = useAuthStore((s) => s.logout);
@@ -135,7 +134,7 @@ export function NoticeAnswerScreen() {
   };
 
   const signOut = async () => {
-    await authApi.logout(refreshToken ?? "").catch(() => {});
+    await authApi.logout().catch(() => {});
     logout();
   };
 

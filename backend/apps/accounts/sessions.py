@@ -94,13 +94,28 @@ _REFUSALS = {
         "You were signed out because your password was changed.",
     ),
     SessionEndReason.REVOKED: ("session_ended_revoked", "An administrator ended this session."),
+    SessionEndReason.EXPIRED: (
+        "session_expired",
+        "Your sign-in was kept for as long as it can be. Sign in again.",
+    ),
 }
 
 
-def start_session(user) -> RefreshToken:
-    """Open a session and return its refresh token, carrying the session id."""
+def remembered_lifetime() -> timedelta:
+    return timedelta(days=settings.REMEMBERED_SESSION_DAYS)
+
+
+def start_session(user, *, remember: bool = False) -> RefreshToken:
+    """Open a session and return its refresh token, carrying the session id.
+
+    A remembered session ("Keep me signed in", ADR-072) ends at a fixed time,
+    `remembered_lifetime()` after sign-in, and its refresh token expires then.
+    """
     at = now()
-    session = UserSession.objects.create(user=user, created_at=at, last_activity_at=at)
+    session = UserSession.objects.create(
+        user=user, created_at=at, last_activity_at=at,
+        remembered=remember, expires_at=at + remembered_lifetime() if remember else None,
+    )
     refresh = RefreshToken.for_user(user)
     refresh["sid"] = str(session.id)
     # ADR-045 §4: copied into every access token and through every rotation,
@@ -108,8 +123,23 @@ def start_session(user) -> RefreshToken:
     refresh["cv"] = user.credential_version
     # for_user stores the token before we add sid. Keep its stored payload in
     # sync so end_all_sessions can identify the device it must spare.
+    if session.expires_at is not None:
+        expire_with_session(refresh, session)
     OutstandingToken.objects.filter(jti=refresh["jti"]).update(token=str(refresh))
     return refresh
+
+
+def expire_with_session(refresh: RefreshToken, session: UserSession) -> None:
+    """Give a remembered session's refresh token the session's own end.
+
+    Rotation would otherwise give each new token a fresh `REFRESH_TOKEN_LIFETIME`
+    (simplejwt's `set_exp`), so the token outlives or undercuts the session.
+    The stored payload and expiry follow, so the blacklist sees what was issued.
+    """
+    refresh.set_exp(from_time=now(), lifetime=max(session.expires_at - now(), timedelta(0)))
+    OutstandingToken.objects.filter(jti=refresh["jti"]).update(
+        token=str(refresh), expires_at=session.expires_at,
+    )
 
 
 def end_session(sid, reason: SessionEndReason) -> None:
@@ -196,13 +226,21 @@ def touch(sid, request) -> None:
     stored figure current while someone works on a page that sends nothing.
     """
     at = now()
-    session = UserSession.objects.filter(id=sid).only("last_activity_at", "ended_at", "ended_reason").first()
+    session = UserSession.objects.filter(id=sid).only(
+        "last_activity_at", "ended_at", "ended_reason", "remembered", "expires_at",
+    ).first()
     if session is None:
         raise SessionEnded()
     if session.ended_at is not None:
         raise SessionEnded(session.ended_reason)
 
-    if at - session.last_activity_at > idle_timeout():
+    # A remembered session ends at its fixed time and never for idleness
+    # (ADR-072 decisions 3-4).
+    if session.expires_at is not None and at >= session.expires_at:
+        end_session(sid, SessionEndReason.EXPIRED)
+        raise SessionEnded(SessionEndReason.EXPIRED)
+
+    if not session.remembered and at - session.last_activity_at > idle_timeout():
         end_session(sid, SessionEndReason.IDLE)
         raise SessionEnded(SessionEndReason.IDLE)
 

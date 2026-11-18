@@ -34,7 +34,7 @@ const ITEM =
  * of the collapsed rail.
  */
 export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
-  const { user, refreshToken, logout } = useAuth();
+  const { user, logout } = useAuth();
   const { roleName } = useRole();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,7 +61,7 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
 
   const handleSignOut = async () => {
     setOpen(false);
-    await authApi.logout(refreshToken ?? "").catch(() => {});
+    await authApi.logout().catch(() => {});
     logout();
   };
 

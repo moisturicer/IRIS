@@ -18,7 +18,7 @@ from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
 
 from . import notice, sessions
-from .models import User
+from .models import User, UserSession
 
 
 class CredentialsChanged(AuthenticationFailed):
@@ -135,5 +135,13 @@ class IdleAwareTokenRefreshSerializer(TokenRefreshSerializer):
             sessions.refuse_if_ended(sid)
             data = super().validate(attrs)
             sessions.touch(sid, self.context["request"])
+            # Read by the refresh view to set the cookie (ADR-072).
+            self.session = UserSession.objects.get(id=sid)
+            if self.session.expires_at is not None and "refresh" in data:
+                # Rotation gave the new token a fresh REFRESH_TOKEN_LIFETIME; a
+                # remembered session's tokens keep its fixed end (decision 4).
+                rotated = RefreshToken(data["refresh"])
+                sessions.expire_with_session(rotated, self.session)
+                data["refresh"] = str(rotated)
             return data
 
