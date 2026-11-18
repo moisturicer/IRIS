@@ -335,6 +335,50 @@ function waitingOnYou(needsActionMine: number) {
     })) as never);
 }
 
+/** `/dashboard/stats/` says this many reviews wait on the user (IR-1208). */
+function reviewsWaiting(count: number) {
+  vi.mocked(apiClient.get).mockImplementation(((url: string) =>
+    Promise.resolve({
+      data: url === "/dashboard/stats/"
+        ? { needs_action_mine: 0, reviews_waiting_mine: count }
+        : { count: 0, results: [] },
+    })) as never);
+}
+
+describe("the My Reviews count (IR-1208)", () => {
+  it("shows an Adviser how many reviews wait on them, and says so to a screen reader", async () => {
+    reviewsWaiting(1);
+    signIn(ROLES.ADVISER, true);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const link = await within(nav).findByRole("link", { name: "My Reviews, 1 pending" });
+    expect(link).toHaveAttribute("href", "/review");
+  });
+
+  it("caps the number shown at 9+, while the screen reader hears the real count", async () => {
+    reviewsWaiting(12);
+    signIn(ROLES.ADVISER, true);
+    renderAt("/");
+
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const link = await within(nav).findByRole("link", { name: "My Reviews, 12 pending" });
+    expect(within(link).getByText("9+")).toBeInTheDocument();
+  });
+
+  it("shows no count when nothing waits", async () => {
+    reviewsWaiting(0);
+    signIn(ROLES.ADVISER, true);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/stats/"));
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "My Reviews" })).toBeInTheDocument();
+  });
+});
+
 describe("the My Library dot (IR-534, B2)", () => {
   it("appears when a record waits on you, and says so to a screen reader", async () => {
     waitingOnYou(2);
