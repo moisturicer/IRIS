@@ -9,6 +9,7 @@ import {
   type PdfPage,
   type TextLayerHandle,
 } from "@/lib/pdf";
+import { bindTextSelection } from "@/lib/textSelection";
 import type { Region } from "@/types/ai";
 import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
 import { CitationOverlay } from "./CitationOverlay";
@@ -119,13 +120,24 @@ function LivePageLayers({ page, scale, hits, onPaint }: {
     if (!container) return;
     const layer = renderTextLayer(page, container, scaleRef.current);
     layerRef.current = layer;
+    // A drag across the gaps between spans stays on the text the reader is
+    // dragging through (IR-1209): bound once the spans are drawn, and let go
+    // of before the layer is cleared for another page.
+    let unbindSelection: (() => void) | null = null;
+    let current = true;
     layer.promise.then(
-      () => setTextReady(true),
+      () => {
+        if (!current) return;
+        unbindSelection = bindTextSelection(container);
+        setTextReady(true);
+      },
       () => {
         /* cancelled, or a page pdf.js could not read text from -- it stays unselectable */
       },
     );
     return () => {
+      current = false;
+      unbindSelection?.();
       layer.cancel();
       layerRef.current = null;
       container.replaceChildren();
