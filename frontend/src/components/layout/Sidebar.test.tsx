@@ -58,7 +58,7 @@ function renderAt(path: string) {
           { path: "/profile", element: <h1>Profile</h1> },
           { path: "/settings", element: <h1>Settings</h1> },
           { path: "/help", element: <h1>Help</h1> },
-          { path: "/review/analytics", element: <h1>Workflow analytics</h1> },
+          { path: "/rdco/analytics", element: <h1>Workflow analytics</h1> },
           {
             element: <ReviewAccessRoute />,
             children: [
@@ -377,26 +377,41 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
   const myReviewsItem = () => screen.getByRole("link", { name: "My Reviews" }).closest("li")!;
   const linksUnder = () => within(myReviewsItem()).getAllByRole("link").map((l) => l.textContent?.trim());
 
-  it("gives a coordinator the console and analytics under My Reviews, at their existing addresses", async () => {
+  it("gives a coordinator the console under My Reviews, at its existing address, and no analytics", async () => {
     signIn(ROLES.ITSO, true, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(linksUnder()).toEqual(["My Reviews", "Office console", "Workflow analytics"]);
+    expect(linksUnder()).toEqual(["My Reviews", "Office console"]);
     const item = within(myReviewsItem());
     expect(item.getByRole("link", { name: "Office console" })).toHaveAttribute("href", "/review/office");
-    expect(item.getByRole("link", { name: "Workflow analytics" })).toHaveAttribute("href", "/review/analytics");
     // Nested, not a second heading level: one list inside My Reviews' own row.
     expect(item.getByRole("list")).toBeInTheDocument();
+    // Workflow analytics is RDCO's alone since IR-1216.
+    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
   });
 
-  it("gives an office member who is not a coordinator analytics only", async () => {
+  it("gives an office member who is not a coordinator nothing nested, and no analytics (IR-1216)", async () => {
     signIn(ROLES.KTTO, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(linksUnder()).toEqual(["My Reviews", "Workflow analytics"]);
+    expect(linksUnder()).toEqual(["My Reviews"]);
     expect(screen.queryByRole("link", { name: "Office console" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+  });
+
+  it("lists Workflow analytics in RDCO's group, not under My Reviews, and marks it there (IR-1216)", async () => {
+    signIn(ROLES.RDCO, true, true);
+    renderAt("/rdco/analytics");
+
+    await screen.findByRole("heading", { name: "Workflow analytics" });
+    expect(linksUnder()).not.toContain("Workflow analytics");
+    const nav = within(screen.getByRole("navigation", { name: "Main" }));
+    const analytics = nav.getByRole("link", { name: "Workflow analytics" });
+    expect(analytics).toHaveAttribute("href", "/rdco/analytics");
+    expect(analytics).toHaveAttribute("aria-current", "page");
+    expect(nav.getByRole("link", { name: "My Reviews" })).not.toHaveAttribute("aria-current");
   });
 
   it.each([
@@ -423,13 +438,12 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
 
   it("marks the nested page you are on, and not My Reviews", async () => {
     signIn(ROLES.ITSO, true, true);
-    renderAt("/review/analytics");
+    renderAt("/review/office");
 
-    await screen.findByRole("heading", { name: "Workflow analytics" });
+    await screen.findByRole("heading", { name: "Office console" });
     const nav = within(screen.getByRole("navigation", { name: "Main" }));
-    expect(nav.getByRole("link", { name: "Workflow analytics" })).toHaveAttribute("aria-current", "page");
+    expect(nav.getByRole("link", { name: "Office console" })).toHaveAttribute("aria-current", "page");
     expect(nav.getByRole("link", { name: "My Reviews" })).not.toHaveAttribute("aria-current");
-    expect(nav.getByRole("link", { name: "Office console" })).not.toHaveAttribute("aria-current");
   });
 
   it("opens the office console from the sidebar", async () => {
@@ -448,7 +462,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     const { container } = renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    for (const name of ["Office console", "Workflow analytics"]) {
+    for (const name of ["Office console"]) {
       const link = screen.getByRole("link", { name });
       expect(within(link).getByText(name)).toHaveClass("md:sr-only");
     }

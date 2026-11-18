@@ -28,8 +28,9 @@ interface NavItem {
    */
   dot?: string;
   /**
-   * Pages listed under this row (IR-1085, D5): My Reviews' Office console and
-   * Workflow analytics. A list inside the row, so it reads as part of it.
+   * Pages listed under this row (IR-1085, D5): My Reviews' Office console
+   * (Workflow analytics moved to the RDCO group, IR-1216). A list inside the
+   * row, so it reads as part of it.
    */
   children?: NavItem[];
 }
@@ -188,8 +189,8 @@ interface SidebarProps {
  * The app's navigation (IR-413, spec §4.1).
  *
  * Discover and research links, RDCO's coordination group, and the System
- * Admin's Administration group. My Reviews carries the Office console and
- * Workflow analytics under it, for the roles that have them (IR-1085, D5). The
+ * Admin's Administration group. My Reviews carries the Office console under
+ * it for coordinators (IR-1085, D5); Workflow analytics is RDCO's (IR-1216). The
  * bell is at the top (IR-519); Help and the account menu are at the bottom. Below `md` it is a
  * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
  * rail, and the IRIS mark opens the full sidebar over the page (IR-1086). From
