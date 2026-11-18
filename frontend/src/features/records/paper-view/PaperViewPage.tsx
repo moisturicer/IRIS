@@ -64,7 +64,8 @@ import { AskIrisFab, CORNER_CLEARANCE_CLASS, NotesFab } from "./AskIrisFab";
 import { NotesPanel } from "./NotesPanel";
 import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
 import { useReadingNote } from "./useReadingNote";
-import type { SelectionAction } from "./SelectionMenu";
+import { HighlightSwatch, type SelectionAction } from "./SelectionMenu";
+import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { ContactPersonCard } from "./ContactPersonCard";
@@ -685,12 +686,12 @@ export default function PaperViewPage() {
     : latestVersion ? `Version ${latestVersion.number}` : "Current version";
   const selectionActions: SelectionAction[] = [
     {
-      id: "save-highlight", label: "Save highlight", icon: "fa-highlighter",
+      id: "save-highlight", label: "Save highlight", icon: <HighlightSwatch />,
       run: (passage, manuscriptRevision) => void highlights.save(passage, manuscriptRevision),
     },
     // Wherever Ask IRIS is offered (IR-581): fills an editable question; nothing is sent until Send.
     ...(onReviewTab ? [] : [{
-      id: "ask-selection", label: "Ask about selection", icon: "fa-comment-dots",
+      id: "ask-selection", label: "Ask about selection", icon: <AskIrisMark className="size-4 text-brand" />,
       run: (passage, manuscriptRevision) => {
         focusPanel.current = true;
         chat.askAbout({
@@ -1042,12 +1043,13 @@ export default function PaperViewPage() {
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
-              // takes its place: the rail folds away and the page widens into it.
+              // takes its place: the rail folds away, and the page sits centred
+              // in the room the panel leaves rather than against its left edge.
               showRail &&
                 cn(
                   "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   railHidden
-                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-between overview-wide:gap-x-0"
+                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-center overview-wide:gap-x-0"
                     : "overview-wide:grid-cols-[minmax(0,60rem)_clamp(17rem,25cqw,22rem)] overview-wide:justify-between overview-wide:gap-x-8",
                 ),
             )}
@@ -1063,9 +1065,10 @@ export default function PaperViewPage() {
               "min-w-0",
               onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
               // The Overview reads in one column, up to 60rem, flush left with
-              // the rail beside it; spare room falls to the right, so the
-              // page keeps its place whether Ask IRIS is open or not.
+              // the rail beside it. With Ask IRIS open the rail is gone, so the
+              // column is centred in the room that is left.
               showRail && "w-full max-w-[60rem]",
+              railHidden && "mx-auto",
             )}
           >
             {/* Editorial header (IR-356): what it is, who wrote it, then
