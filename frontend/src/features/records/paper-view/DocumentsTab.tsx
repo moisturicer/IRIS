@@ -22,7 +22,7 @@
  * server-computed `can_remove` (IR-476). This component decides nothing by
  * role. The server re-checks every upload and removal.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
@@ -39,7 +39,10 @@ import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { ItemStatusChip, itemStatus } from "@/features/document-requests/itemStatus";
 import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerDocumentRequests";
 
+import { CONTROL_SIZE } from "./controls";
 import { DocumentRow } from "./DocumentRow";
+import { useReviewPane } from "./reviewPane";
+import { extensionOf, opensInReader, type ReaderDocument } from "./readerDocument";
 import { SectionHeading } from "./headings";
 
 const PDF_LIMIT = 50 * 1024 * 1024;
@@ -68,6 +71,12 @@ interface DocumentsTabProps {
   replaceManuscript?: boolean;
   /** Told after anything changes, so the page can re-read what derives from it. */
   onChanged?: () => void;
+  /**
+   * Show a document in the reader instead of the manuscript (IR-1203), named
+   * with the control that opened it, so focus can come back to it. Absent
+   * where there is no reader; only PDFs offer it.
+   */
+  onOpen?: (document: ReaderDocument, opener: HTMLElement) => void;
 }
 
 /** A requested item, with who asked and whether that request is still open. */
@@ -127,7 +136,9 @@ export function DocumentsTab({
   attach,
   replaceManuscript = false,
   onChanged,
+  onOpen,
 }: DocumentsTabProps) {
+  const pane = useReviewPane();
   const [slots, setSlots] = useState<SlotWithUploads[] | null>(null);
   const [files, setFiles] = useState<RecordFile[]>([]);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
@@ -238,6 +249,19 @@ export function DocumentsTab({
   );
   const downloadVersion = (name: string, u: RecordUpload) =>
     download(() => documentsApi.downloadUpload(u.id), `${name} v${u.version}.${extensionOf(u.file)}`);
+  /** A slot version's Open, when there is a reader and the version is a PDF. */
+  /** Shows `document` in the reader, making room for it when the pane covers the paper. */
+  const open = (document: ReaderDocument, opener: HTMLElement) => {
+    onOpen?.(document, opener);
+    pane?.showReader();
+  };
+  /** A slot version's Open, when there is a reader and the version is a PDF. */
+  const openVersion = (name: string, u: RecordUpload) => onOpen && opensInReader(u.file) && (
+    <RowAction icon="fa-book-open" verb="Open" name={`${name} version ${u.version}`} onClick={(opener) => open({
+      kind: "upload", id: u.id, label: `${name} · version ${u.version}`,
+      fileName: `${name} v${u.version}.${extensionOf(u.file)}`,
+    }, opener)} />
+  );
 
   return (
     <div className="space-y-section">
@@ -288,6 +312,7 @@ export function DocumentsTab({
               note={asked && <AskedNote asked={asked} />}
               actions={(latest || canUpload) && (
                 <>
+                  {latest && openVersion(slot.name, latest)}
                   {latest && (
                     <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
                   )}
@@ -302,6 +327,7 @@ export function DocumentsTab({
                     name={slot.name}
                     uploads={slot.uploads}
                     removable={owner && editable}
+                    open={(u) => openVersion(slot.name, u)}
                     onDownload={(u) => downloadVersion(slot.name, u)}
                     onRemove={(u) =>
                       askToRemove(`${slot.name} version ${u.version}`, async () => {
@@ -361,6 +387,11 @@ export function DocumentsTab({
                   latest={[f.uploaded_by_name, formatDate(f.created_at)].filter(Boolean).join(" · ")}
                   actions={
                     <>
+                      {onOpen && opensInReader(f.filename, "") && (
+                        <RowAction icon="fa-book-open" verb="Open" name={f.filename} onClick={(opener) => open({
+                          kind: "file", id: f.id, label: f.filename, fileName: f.filename,
+                        }, opener)} />
+                      )}
                       <DownloadButton name={f.filename} onClick={() => download(() => documentsApi.downloadFile(f.id), f.filename)} />
                       {f.can_remove && (
                         <RemoveButton
@@ -402,17 +433,6 @@ export function DocumentsTab({
   );
 }
 
-/**
- * The stored file's extension, lower-cased, so a version saves as what it is
- * ("png" for a scan, IR-1203). Slots took only PDFs until IR-1220, so a name
- * with none is a PDF.
- */
-function extensionOf(path: string): string {
-  const name = path.split("/").pop() ?? "";
-  const dot = name.lastIndexOf(".");
-  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : "pdf";
-}
-
 /** A version in words, "v2 · Ana Cruz · Nov 3, 2026", leaving out a name the server did not give. */
 function byline(version: number, by: string | null | undefined, at: string): string {
   return [`v${version}`, by, formatDate(at)].filter(Boolean).join(" · ");
@@ -437,6 +457,7 @@ function Versions({
   name,
   uploads,
   removable,
+  open,
   onDownload,
   onRemove,
 }: {
@@ -444,6 +465,8 @@ function Versions({
   name: string;
   uploads: RecordUpload[];
   removable: boolean;
+  /** A version's Open control, where it opens in the reader (IR-1203). */
+  open: (upload: RecordUpload) => ReactNode;
   onDownload: (upload: RecordUpload) => void;
   onRemove: (upload: RecordUpload) => void;
 }) {
@@ -458,6 +481,7 @@ function Versions({
             {[u.uploaded_by_name, formatDate(u.created_at)].filter(Boolean).join(" · ")}
           </span>
           <span className="flex items-center gap-2">
+            {open(u)}
             <DownloadButton name={`${name} version ${u.version}`} onClick={() => onDownload(u)} />
             {removable && !u.delete_refused && (
               <RemoveButton name={`${name} version ${u.version}`} onClick={() => onRemove(u)} />
@@ -477,30 +501,34 @@ function Versions({
   );
 }
 
-function DownloadButton({ name, onClick }: { name: string; onClick: () => void }) {
+/**
+ * One action on a row's document: an icon and a verb, named for the document
+ * it acts on ("Open Consent Paper version 2"). Hands back the button pressed,
+ * so a caller can return focus to it.
+ */
+function RowAction({ icon, verb, name, onClick }: {
+  icon: string;
+  verb: string;
+  name: string;
+  onClick: (button: HTMLButtonElement) => void;
+}) {
   return (
     <button
       type="button"
-      onClick={onClick}
-      aria-label={`Download ${name}`}
-      className={cn(PILL_SECONDARY, FOCUS_RING, "reading-split:min-h-9 px-3")}
+      onClick={(e) => onClick(e.currentTarget)}
+      aria-label={`${verb} ${name}`}
+      className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3")}
     >
-      <i className="fas fa-download text-2xs" aria-hidden />
-      Download
+      <i className={cn("fas text-2xs", icon)} aria-hidden />
+      {verb}
     </button>
   );
 }
 
+function DownloadButton({ name, onClick }: { name: string; onClick: () => void }) {
+  return <RowAction icon="fa-download" verb="Download" name={name} onClick={onClick} />;
+}
+
 function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={`Remove ${name}`}
-      className={cn(PILL_SECONDARY, FOCUS_RING, "reading-split:min-h-9 px-3")}
-    >
-      <i className="fas fa-trash-can text-2xs" aria-hidden />
-      Remove
-    </button>
-  );
+  return <RowAction icon="fa-trash-can" verb="Remove" name={name} onClick={onClick} />;
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { recordsApi } from "@/api/records";
 import { loadPdfDocument, type PdfPage } from "@/lib/pdf";
+import { DOCUMENT_ROUTES, type ReaderDocument } from "./readerDocument";
 
 /** How many pages the background loader asks pdf.js for at once, and per re-render. */
 const PAGE_CHUNK = 8;
@@ -9,6 +10,8 @@ interface PdfDocumentOptions {
   recordId: number;
   /** An earlier version (IR-416), or null for the current paper. */
   version: number | null;
+  /** A supporting document to read instead of the manuscript (IR-1203). */
+  document?: Pick<ReaderDocument, "kind" | "id"> | null;
   /** Bumped by "Try again": loads the same paper afresh. */
   attempt: number;
   /**
@@ -61,7 +64,10 @@ interface Source {
  * between loads: the bytes and the document live only as long as this load,
  * so there is no reuse to bound or to leak across accounts.
  */
-export function usePdfDocument({ recordId, version, attempt, firstPage }: PdfDocumentOptions) {
+export function usePdfDocument({ recordId, version, document: shown = null, attempt, firstPage }: PdfDocumentOptions) {
+  // By value, so a caller's fresh object for the same document is not a new load.
+  const documentKind = shown?.kind ?? null;
+  const documentId = shown?.id ?? null;
   const [status, setStatus] = useState<PdfDocumentState["status"]>("loading");
   const [pages, setPages] = useState<(PdfPage | undefined)[]>([]);
   const [source, setSource] = useState<Source | null>(null);
@@ -83,9 +89,11 @@ export function usePdfDocument({ recordId, version, attempt, firstPage }: PdfDoc
     (async () => {
       try {
         const options = { signal: controller.signal };
-        const { data, headers } = version == null
-          ? await recordsApi.manuscriptBlob(recordId, options)
-          : await recordsApi.versionManuscriptBlob(recordId, version, options);
+        const { data, headers } = documentKind !== null && documentId !== null
+          ? await DOCUMENT_ROUTES[documentKind].view(documentId, options)
+          : version == null
+            ? await recordsApi.manuscriptBlob(recordId, options)
+            : await recordsApi.versionManuscriptBlob(recordId, version, options);
         if (cancelled) return;
         // The identity of these bytes, named by the server (IR-583). Only the
         // current paper's response carries one.
@@ -150,7 +158,7 @@ export function usePdfDocument({ recordId, version, attempt, firstPage }: PdfDoc
       controller.abort();
       dispose?.();
     };
-  }, [recordId, version, attempt]);
+  }, [recordId, version, documentKind, documentId, attempt]);
 
   const pageProxy = useCallback(
     (pageNumber: number) =>
