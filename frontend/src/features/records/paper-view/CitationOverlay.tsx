@@ -29,7 +29,7 @@ export function CitationOverlay({ regions, look = "citation" }: { regions: Regio
         <div
           key={index}
           className={look === "highlight"
-            ? "absolute rounded-[2px] motion-safe:animate-citation-flash"
+            ? "absolute rounded-none motion-safe:animate-citation-flash"
             : "absolute rounded-none ring-2 ring-brand motion-safe:animate-citation-flash"}
           style={{
             left:   `${region.left * 100}%`,

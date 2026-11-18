@@ -111,7 +111,7 @@ export function SelectionMenu({ actions, position, onChoose, onDismiss, onPress,
           placeholder={mode.placeholder ?? mode.label}
           maxLength={4000}
           autoComplete="off"
-          className="block w-full bg-transparent px-2.5 pb-2 pt-1.5 text-body text-stone-900 outline-none placeholder:text-stone-500"
+          className="block w-full bg-transparent px-2.5 pb-2 pt-1.5 text-body text-stone-900 outline-none placeholder:text-stone-600"
         />
         <div className="flex items-center gap-2">
           {actions.length > 1 && (
