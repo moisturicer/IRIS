@@ -38,6 +38,16 @@ vi.mock("@/api/records", () => ({
   },
 }));
 
+// IR-1203: a supporting document is read through its own route.
+const viewUpload = vi.fn();
+const viewFile = vi.fn();
+vi.mock("@/api/documents", () => ({
+  documentsApi: {
+    viewUpload: (...args: unknown[]) => viewUpload(...(args as [])),
+    viewFile: (...args: unknown[]) => viewFile(...(args as [])),
+  },
+}));
+
 // IR-573: where the reader left off, on their account.
 const position = vi.fn();
 const savePosition = vi.fn();
@@ -1283,6 +1293,38 @@ describe("find in this paper (IR-353)", () => {
       screen.getByRole("button", { name: "Comment" }).focus();
       await userEvent.keyboard("{Enter}");
       expect(onComment).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), 2);
+    });
+  });
+
+  /**
+   * A supporting document opened from Review's Documents tab (IR-1203): read
+   * through its own route, with find, and nothing of the manuscript's on it.
+   */
+  describe("a supporting document", () => {
+    it("is fetched through its own route and offers find but no Comment", async () => {
+      paperText = PAPER;
+      viewUpload.mockResolvedValue({ data: pdfBlob() });
+      render(
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: vi.fn(), landing: null }}>
+          <PaperPdfReader recordId={7} document={{ kind: "upload", id: 12, label: "Consent Paper · version 2", fileName: "c.pdf" }}
+            scrollToPage={null} highlightRegions={[]} navKey="a" />
+        </ReaderAnnotationsContext.Provider>,
+      );
+      await screen.findByText("Page 1 / 3");
+
+      expect(viewUpload).toHaveBeenCalledWith(12, { signal: expect.any(AbortSignal) });
+      expect(manuscriptBlob).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Comment" })).not.toBeInTheDocument();
+      await userEvent.type(await openFind(), "robot");
+      await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
+    });
+
+    it("reads an attachment through the files route", async () => {
+      viewFile.mockResolvedValue({ data: pdfBlob() });
+      render(<PaperPdfReader recordId={7} document={{ kind: "file", id: 31, label: "Survey.pdf", fileName: "Survey.pdf" }}
+        scrollToPage={null} highlightRegions={[]} navKey="a" />);
+      await screen.findByText("Page 1 / 3");
+      expect(viewFile).toHaveBeenCalledWith(31, { signal: expect.any(AbortSignal) });
     });
   });
 
