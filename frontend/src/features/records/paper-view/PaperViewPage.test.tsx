@@ -1229,7 +1229,8 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     await openPaperTab();
 
     expect(screen.getByRole("heading", { level: 1, name: record.title })).toHaveAttribute("title", record.title);
-    expect(screen.getByText("v1")).toBeInTheDocument();
+    // The version menu, even with v1 alone (IR-1214).
+    expect(screen.getByRole("combobox", { name: "Version" })).toHaveValue("1");
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
     expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
@@ -3264,8 +3265,22 @@ describe("record versions (IR-416)", () => {
     signInAs(99, "Student");
   });
 
-  it("offers no picker with one version, or with none disclosed", async () => {
-    for (const versions of [[version(1, "submission")], null]) {
+  // The menu is there whenever there is a version, so every paper's header
+  // looks alike; with one version it lists that one alone (IR-1214).
+  it("offers the picker with only v1, current and chosen", async () => {
+    shownRecord = { ...record, versions: [version(1, "submission")] };
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+
+    const picker = screen.getByRole("combobox", PICKER);
+    expect(picker).toHaveValue("1");
+    expect(within(picker).getAllByRole("option").map((o) => o.textContent))
+      .toEqual([expect.stringMatching(/^v1 · Submission · .* \(current\)$/)]);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("offers no picker when no version is disclosed, or there is none", async () => {
+    for (const versions of [null, []]) {
       shownRecord = { ...record, versions };
       const { unmount } = renderPaperView();
       await waitForRecord(record.title);
@@ -3331,14 +3346,16 @@ describe("record versions (IR-416)", () => {
       expect(barOf()).not.toContainElement(picker);
     });
 
-    it("keeps a single version's label in the toolbar too, so a phone still says which it is reading", async () => {
+    it("keeps a single version's picker in the toolbar too, so a phone still says which it is reading", async () => {
       shownRecord = { ...record, versions: [version(1, "submission")] };
       workspaceAt(360);
       renderPaper(`/records/${RECORD_ID}?section=paper`);
       await screen.findByText(/paper reader open/i);
 
-      expect(readerOf()).toContainElement(screen.getByText("v1"));
-      expect(barOf()).not.toContainElement(screen.getByText("v1"));
+      const picker = screen.getByRole("combobox", PICKER);
+      expect(picker).toHaveValue("1");
+      expect(readerOf()).toContainElement(picker);
+      expect(barOf()).not.toContainElement(picker);
     });
 
     it("stays in the bar from 640px", async () => {
