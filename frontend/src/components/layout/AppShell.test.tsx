@@ -13,7 +13,8 @@
  * Every query goes through the accessible tree, by role and accessible name.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
 import { makeUser } from "@/test/authFixtures";
@@ -53,7 +54,7 @@ function renderAt(path: string) {
     ],
     { initialEntries: [path] },
   );
-  return render(<RouterProvider router={router} />);
+  return { router, ...render(<RouterProvider router={router} />) };
 }
 
 beforeEach(() => {
@@ -130,6 +131,50 @@ describe("the app shell", () => {
     expect(screen.getAllByRole("button", { name: /^Notifications/ })).toHaveLength(3);
     expect(notificationsApi.list).toHaveBeenCalledTimes(1);
     expect(notificationsApi.list).toHaveBeenCalledWith(true);
+  });
+
+  describe("skip link (IR-1184, WCAG 2.4.1)", () => {
+    it("is the first tab stop, and Enter moves focus into main", async () => {
+      const user = userEvent.setup();
+      renderAt("/records/mine");
+      await screen.findByRole("heading", { name: "My Library" });
+
+      await user.tab();
+      const skip = screen.getByRole("link", { name: "Skip to content" });
+      expect(skip).toHaveFocus();
+
+      await user.keyboard("{Enter}");
+      expect(screen.getByRole("main")).toHaveFocus();
+    });
+
+    it("comes before the sidebar, so the sidebar's stops are skipped", async () => {
+      const user = userEvent.setup();
+      renderAt("/records/mine");
+      await screen.findByRole("heading", { name: "My Library" });
+
+      await user.tab();
+      await user.keyboard("{Enter}");
+      // The next stop is inside the page, not the sidebar.
+      const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
+      await user.tab();
+      expect(sidebar).not.toContainElement(document.activeElement as HTMLElement);
+    });
+
+    it("still works after a route change", async () => {
+      const user = userEvent.setup();
+      const { router } = renderAt("/records/mine");
+      await screen.findByRole("heading", { name: "My Library" });
+
+      await act(() => router.navigate("/admin/audit"));
+      await screen.findByRole("heading", { name: "Audit Log" });
+      // A new page load, or the back button, leaves focus at the document.
+      (document.activeElement as HTMLElement | null)?.blur();
+
+      await user.tab();
+      expect(screen.getByRole("link", { name: "Skip to content" })).toHaveFocus();
+      await user.keyboard("{Enter}");
+      expect(screen.getByRole("main")).toHaveFocus();
+    });
   });
 
   it("never makes main a scroll container, so sticky chrome keeps working (IR-351, IR-534)", async () => {
