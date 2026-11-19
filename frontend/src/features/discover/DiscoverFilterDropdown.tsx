@@ -113,7 +113,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "inline-flex h-11 items-center gap-1.5 px-3.5 rounded-control border text-small font-medium",
+          "inline-flex min-h-11 items-center gap-1.5 px-3.5 py-2 rounded-control border text-small font-medium",
           COLOUR_TRANSITION,
           FOCUS_RING,
           block ? "w-full justify-between" : "max-w-[18rem]",

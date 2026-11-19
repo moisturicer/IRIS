@@ -226,7 +226,7 @@ export default function DeleteRequestsPage() {
                     </td>
                     <td className="px-4 py-3">
                       {req.reason ? (
-                        <p className="text-justified whitespace-pre-line break-words text-stone-600 text-small">{req.reason}</p>
+                        <p className="whitespace-pre-line break-words text-stone-600 text-small">{req.reason}</p>
                       ) : (
                         <span className="text-stone-500 italic text-small">No reason given</span>
                       )}

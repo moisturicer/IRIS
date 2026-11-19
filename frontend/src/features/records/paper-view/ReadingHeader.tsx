@@ -114,7 +114,7 @@ export function ReadingHeader({
         ) : title === undefined ? null : (
           <h1
             title={title}
-            className="sr-only reading-split:not-sr-only min-w-0 break-words font-display text-xl font-semibold text-stone-900"
+            className="sr-only reading-split:not-sr-only reading-split:truncate min-w-0 font-display text-xl font-semibold text-stone-900"
           >
             {title}
           </h1>

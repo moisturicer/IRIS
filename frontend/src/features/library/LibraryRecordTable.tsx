@@ -218,8 +218,8 @@ export function LibraryRecordTable({
               <div className="min-w-0">
                 <Link
                   to={`/records/${record.id}`}
-                  // Two lines rather than one: recognising the paper is the whole
-                  // point of the row, and a mid-phrase ellipsis defeats it.
+                  // Whole, however long: recognising the paper is the point of
+                  // the row (the Full Text Rule, IR-1219).
                   className="block break-words text-body font-semibold text-stone-900 hover:text-brand leading-snug"
                 >
                   {highlightMatch(record.title, query)}

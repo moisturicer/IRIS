@@ -78,40 +78,57 @@ export function CallDetails({ call: o, titleId, muted = false, clampAbout = true
   );
 }
 
+const ABOUT_BASE = "mt-2 whitespace-pre-line break-words text-small text-stone-600";
 /** Whole, About is justified (IR-1221) and fills its card (the Full Text Rule). */
-const ABOUT = "mt-2 whitespace-pre-line break-words text-justified text-small text-stone-600";
+const ABOUT = cn(ABOUT_BASE, "text-justified");
 
 /**
  * About on the board: two lines, and Show more when it runs past them, which
- * shows it whole on the card (DESIGN.md, "The five allowed cuts"). Nothing else
+ * shows it whole on the card (DESIGN.md, "The six allowed cuts"). Nothing else
  * on the board reaches the rest: View & apply leaves IRIS, and not every call
  * has it. Clamped, it is left-aligned: its last visible line is not the
  * paragraph's last, and justifying would stretch it (IR-1221). Whether it runs
- * past two lines is measured, and measured again when the card's width changes.
+ * past two lines is measured, and measured again when the card's width changes
+ * or the page's fonts finish loading. Show less on a description that now fits
+ * leaves no button, so focus moves to the description rather than the page.
  */
 function ClampedAbout({ text }: { text: string }) {
   const id = useId();
   const ref = useRef<HTMLParagraphElement>(null);
   const [whole, setWhole] = useState(false);
   const [overflows, setOverflows] = useState(false);
+  const collapsing = useRef(false);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || whole) return;
-    const measure = () => setOverflows(el.scrollHeight > el.clientHeight + 1);
+    let live = true;
+    const measure = () => {
+      if (!live) return;
+      const fits = el.scrollHeight <= el.clientHeight + 1;
+      setOverflows(!fits);
+      if (fits && collapsing.current) el.focus();
+      collapsing.current = false;
+    };
     measure();
-    if (typeof ResizeObserver === "undefined") return;
+    void document.fonts?.ready.then(measure);
+    if (typeof ResizeObserver === "undefined") return () => { live = false; };
     const observer = new ResizeObserver(measure);
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => { live = false; observer.disconnect(); };
   }, [text, whole]);
 
+  const toggle = () => {
+    collapsing.current = whole;
+    setWhole((w) => !w);
+  };
+
   return <>
-    <p id={id} ref={ref} className={whole ? ABOUT : "mt-2 line-clamp-2 whitespace-pre-line break-words text-small text-stone-600"}>
+    <p id={id} ref={ref} tabIndex={-1} className={cn(whole ? ABOUT : cn(ABOUT_BASE, "line-clamp-2"), "outline-none")}>
       {text}
     </p>
     {(overflows || whole) && (
-      <button type="button" aria-expanded={whole} aria-controls={id} onClick={() => setWhole(!whole)}
+      <button type="button" aria-expanded={whole} aria-controls={id} onClick={toggle}
         className={cn("mt-1 rounded-control text-small font-semibold text-stone-700 hover:text-brand hover:underline", FOCUS_RING)}>
         {whole ? "Show less" : "Show more"}
       </button>
