@@ -81,6 +81,7 @@ LOCAL_APPS = [
     "apps.ai",
     "apps.opportunities",
     "apps.library",
+    "apps.live",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -501,6 +502,12 @@ LOGGING = {
 # Redis as Celery, on a different database number, so flushing a queue cannot
 # take the query-embedding cache with it.
 REDIS_CACHE_URL = config("REDIS_CACHE_URL", default="redis://localhost:6379/1")
+
+# ADR-073 (IR-1213): live-update hints, published on commit and streamed per tab
+# through one Redis subscription per process. The test harness turns publishing
+# off (CI has no Redis); pages then simply refetch on focus.
+LIVE_ENABLED = config("LIVE_ENABLED", default=True, cast=bool)
+LIVE_REDIS_URL = config("LIVE_REDIS_URL", default=REDIS_URL)
 
 CACHES = {
     "default": {

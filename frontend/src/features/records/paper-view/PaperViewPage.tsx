@@ -94,6 +94,7 @@ import { PaperDownloadControl } from "./PaperDownloadControl";
 import { PaperPdfReader } from "./lazyReader";
 import { PersonChip } from "./PersonLink";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 
 
@@ -589,6 +590,8 @@ export default function PaperViewPage() {
       // Otherwise the control keeps its last state; a reload catches up.
     }
   };
+  // Live updates (ADR-073): this paper changed for someone who may see it.
+  useLiveRefresh(id ? [`record:${id}`] : [], () => { void reloadRecord(); });
 
   /**
    * RDCO withdrew the paper (IR-798): it is deleted, so reading it again would

@@ -5,7 +5,7 @@
 **Accepted**, 2026-11-19, by Lee Jasmin Adolfo ([IR-1213](https://citiris.atlassian.net/browse/IR-1213)). Accepted verbally, and recorded here by Ashlee Sean the same day; there is no written approval on the PR.
 - **Already decided:** Ashlee Sean chose live push over timed polling on 2026-11-17.
 - **Drafted** by an AI agent (Claude Code) at Ashlee's request. AI does not make architecture decisions (CLAUDE.md), so the design below was a proposal until accepted. The three questions the first draft left open were settled by Ashlee on 2026-11-19 (§Questions settled while drafting); Lee Jasmin Adolfo then accepted the design.
-- **Not built yet.** IR-1213 builds it.
+- **Built by IR-1213.** Measured before merge, as settled question 3 asked (§Consequences). Two build notes: an office's pool channel is its role's channel (`live:role:<office>`), since IRIS's offices are roles; and the stream view is a class-based async view, so the route matrix can read its method.
 
 ## Context
 
@@ -113,7 +113,14 @@ All three were left open in the first draft and decided by Ashlee Sean on 2026-1
 ## Consequences
 
 - **Pages refresh themselves** for the events in decision 3 within about a second, and on focus for everything else.
-- **One long-lived HTTP connection per open tab** on the backend. With async views and one Redis subscription per process, the expected cost is tens of KB of memory per tab, with no thread or database connection while idle. Measured before merge (settled question 3).
+- **One long-lived HTTP connection per open tab** on the backend, with no thread or database connection while idle.
+  - **Measured 2026-11-19 on the Docker stack** (uvicorn, 2 workers, the branch's code, a throwaway database):
+    - **Memory:** a warmed-up server went from 222.6 MiB to 234.7 MiB with 100 open streams, about **120 KB per tab**. That is more than the "tens of KB" first estimated, and still about 12 MB per 100 tabs.
+    - **CPU:** 0.5% with all of them idle.
+    - **Opening:** 100 streams opened in 1.0 s.
+    - **Redis:** 2 pattern subscriptions, one per worker, not one per tab.
+    - **Delivery:** a published hint reached 100 of 100 streams, median 32.5 ms and slowest 41.5 ms.
+  - **End to end:** a real `Notification` created in another process reached an open stream with its topics.
 - **Every refetch is an ordinary API call,** so a burst of activity becomes a burst of reads. Decision 8 coalesces them per tab.
 - **Workflow services gain `publish_live(...)` calls** next to their notifications, inside `on_commit`. A future act that forgets to publish still shows up on focus.
 - **Redis becomes part of the browser experience,** though not of correctness (decision 6).

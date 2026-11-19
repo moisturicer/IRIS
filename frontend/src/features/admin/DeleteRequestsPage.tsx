@@ -49,6 +49,7 @@ import { formatDate }  from "@/lib/utils";
 import type { DeleteRequest } from "@/types/records";
 
 import { RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 type Tab = "pending" | "approved" | "declined" | "all";
 const TABS: readonly (readonly [Tab, string])[] = [
@@ -90,6 +91,8 @@ export default function DeleteRequestsPage() {
   );
   const loading = read.status === "loading";
   const requests = read.rows;
+  // Live updates (ADR-073): RDCO's queues, reloaded quietly.
+  useLiveRefresh(["queues"], read.refresh);
 
   // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
   // the server's own reason on a refusal.

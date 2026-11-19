@@ -5,6 +5,8 @@ import { reloadPage } from "@/lib/readFailure";
 import { authApi } from "@/api/auth";
 import { startHeartbeat, startIdleWatch, trackActivity } from "@/lib/activity";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
+import { startLive, stopLive } from "@/lib/live";
+import { refreshSession } from "@/api/client";
 
 /**
  * Restores the session from sessionStorage (refresh token) before the router
@@ -42,6 +44,14 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
     const stopHeartbeat = startHeartbeat(() => { void authApi.me().catch(() => {}); });
     return () => { unwatch(); stopHeartbeat(); };
   }, [isAuthenticated, remembered]);
+
+  // Live updates (ADR-073): one hint stream per tab while signed in, opened
+  // with the current access token and refreshed through the one refresh path.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    startLive({ token: () => useAuthStore.getState().accessToken, refresh: refreshSession });
+    return () => stopLive();
+  }, [isAuthenticated]);
 
   if (!authReady) {
     return (

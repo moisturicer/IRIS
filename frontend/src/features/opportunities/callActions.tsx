@@ -37,7 +37,12 @@ export function useCallList(read: () => Promise<Opportunity[]>) {
 
   useEffect(() => load(), [load]);
 
-  return { items, setItems, loading, failed, load };
+  /** Read again quietly, for a live-update hint (ADR-073): the list stays until it arrives. */
+  const refresh = useCallback(() => {
+    read().then(setItems).catch(() => { /* keep what is shown; focus or the next hint retries */ });
+  }, [read]);
+
+  return { items, setItems, loading, failed, load, refresh };
 }
 
 /**

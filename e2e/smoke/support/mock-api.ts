@@ -28,6 +28,10 @@ export const test = base.extend<{ api: MockApi }>({
       reply: { detail: "Not signed in.", code: "no_session" },
       status: 401,
     });
+    // Every signed-in page opens the live hint stream (ADR-073). There is no
+    // server to hold it open, so it answers 503 and the client backs off
+    // quietly; pages still load and refetch on focus as they would.
+    handlers.set("GET /live/", { reply: { detail: "smoke: no live stream" }, status: 503 });
     const seen: string[] = [];
     const unmocked: string[] = [];
 
