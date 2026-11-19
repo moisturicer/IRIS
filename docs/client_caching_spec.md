@@ -151,16 +151,15 @@ queryClient.invalidateQueries({ queryKey: topicToKey(topic) });
 
 ### 4.5 Discover thumbnails and the reader's PDF
 
-**Thumbnails (G5): a small image from the server**, as IR-1130's acceptance criteria already said:
-- `GET /records/<id>/first-page/` returns a small image, behind `get_object()` / `visible_to` (404 for a reader who cannot see it), by record id, never a path.
-- `Cache-Control: private, max-age=…`, with the served revision in the URL or an `ETag`, so a new version changes the image. The profile photo already opts out of `no-store` this way (`apps/accounts/views.py:573`).
-- **It writes no `DOWNLOAD` event**, or a distinct event kind if the team wants views counted. That is a team decision (§6).
-- Rendered once per revision on the server (Celery) or on first request. This is backend work.
+**Thumbnails (G5): a small image from the server.** Settled for [IR-1241](https://citiris.atlassian.net/browse/IR-1241) on 2026-11-19 (Lee Jasmin Adolfo); the ticket holds the full criteria.
+- `GET /records/<id>/first-page/`, behind `get_object()` / `visible_to` and the same `resolve_served_manuscript` as the manuscript, by record id, never a path. A reader who cannot see the record gets the 404 of a missing one.
+- **It writes no audit event.** Opening the paper in the reader still writes `DOWNLOAD`.
+- **`Cache-Control: no-store`, like the figure images.** IR-821 keeps one rule: page 1 is the title, authors and abstract, and the endpoint also serves non-public records to their owners and staff. Back is made cheap by the frontend's session map instead.
+- **Drawn by a worker, never in the web request.** The first request queues a task on the `extraction` queue and answers 202; the task draws page 1 as a 192 px WebP inside the IR-830 PDF sandbox (`apps/documents/pdf_evidence/sandbox.py`, its existing limits) and stores it in the Redis cache under the SHA-256 of the served file. A new version therefore gets a new image, and readers served the same bytes share one.
+- The frontend fetches it as a blob through `apiClient`, shows it in an `<img>`, keeps it in a session map cleared on session change, and no longer loads pdf.js on Discover.
 
-*Gains:* tens of kilobytes instead of a paper per row; no PDF parsing in the browser; the browser's private cache then makes Back free; no audit noise.
-*Costs:* an endpoint, a render step and its storage; a backend owner.
-
-*Interim, frontend only:* keep each drawn thumbnail as an image in an in-memory map keyed by record id, so a return to Discover does not download again. This halves the repeated cost but leaves the first visit's downloads and audit events, so it does not close G5.
+*Gains:* tens of kilobytes instead of a paper per row; no PDF parsing in the browser or in a web worker; no audit noise.
+*Costs:* an endpoint, a sandboxed task and cache entries; the first person to see a paper gets the drawn outline once; outside Linux the sandbox refuses, so thumbnails show the outline there.
 
 **The reader's PDF:** keep the last 3 papers' bytes in memory, keyed by record id **and** served revision (`served_manuscript_identity`, IR-583), cleared with the rest on session change. Reopening a paper from Discover then skips the download. IR-1128 (In Review) draws the reader's name over the page in the browser, so the bytes are the same for every reader and caching them changes no watermark. If IR-1129's pre-built per-reader copy is ever adopted, the key must include the reader too.
 
@@ -180,8 +179,8 @@ queryClient.invalidateQueries({ queryKey: topicToKey(topic) });
 
 1. **IR-1032: is option B accepted?** Approver Ashlee Sean. Everything in Appendix A except T1 waits on it.
 2. **The `staleTime` numbers in §4.3.** Proposed only.
-3. **Should a thumbnail count as a download in the audit log?** Recommended: no. Today it does, once per row per visit.
-4. **Who builds the first-page endpoint?** It is backend; this spec's author owns frontend.
+3. ~~**Should a thumbnail count as a download in the audit log?**~~ Settled for IR-1241: no event at all.
+4. ~~**Who builds the first-page endpoint?**~~ Settled: Lee Jasmin Adolfo builds both halves in one PR (IR-1241).
 5. ~~**Order against IR-1213.**~~ Settled: IR-1213 merged first (2026-11-19), with the topic names §4.4 uses. T12 replaces each `reload` with an invalidation.
 6. **PDF memory ceiling** on lab PCs: is 3 papers right?
 
@@ -194,7 +193,7 @@ All under the frontend epic [IR-518](https://citiris.atlassian.net/browse/IR-518
 | # | Ticket | Area | Depends on | Size |
 |---|---|---|---|---|
 | T0 | **(exists) [IR-1032](https://citiris.atlassian.net/browse/IR-1032)**: decide the server-state approach; amend ADR-061 with §4.1–4.4 if B is chosen | architecture | — | S |
-| T1 | **(created) [IR-1241](https://citiris.atlassian.net/browse/IR-1241)**: Discover thumbnails download each whole paper and record a download for every row. First-page image endpoint (backend) and `PaperThumbnail` switched to it (frontend); an interim in-memory thumbnail map may ship first | backend + frontend | — | M |
+| T1 | **(created) [IR-1241](https://citiris.atlassian.net/browse/IR-1241)**: Discover thumbnails download each whole paper and record a download for every row. First-page image endpoint drawn in the PDF sandbox (backend) and `PaperThumbnail` switched to it (frontend), one PR, no interim stopgap (§4.5) | backend + frontend | — | M |
 | T2 | **Foundation**: add TanStack Query; IRIS defaults (§4.2); `api/queryKeys.ts` (§4.4); clear on session change; `useApiRead` over `useQuery`; test wrapper; tests for no-retry, cancellation and no cross-account leak | frontend | T0 | M |
 | T3 | **Reference lists read once per session**: classifications, colleges, record types, PSCED, facets, advisers, used by Discover, interests, Edit details and Publish | frontend | T2 | S |
 | T4 | **Discover keeps its results on Back**: list and For you as infinite queries; scroll restore from the cache instead of re-reading N pages; Not interested via `setQueryData`; stale-cursor handling kept; people results too | frontend | T2, T3 | M |
