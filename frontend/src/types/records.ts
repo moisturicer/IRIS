@@ -586,6 +586,12 @@ export interface RecordDetail extends RecordListItem {
    */
   publish_unlisted?:    { blocked: string | null } | null;
   /**
+   * What the Adviser leaves if RDCO replaces them (IR-1226): beside the
+   * `replace_adviser` offer, so the dialog warns with the server's counts.
+   * Null to anyone not offered the act. Optional: a fixture may leave it out.
+   */
+  adviser_leaving?:     RemovalLeaving | null;
+  /**
    * The record's versions, oldest first (ADR-032 §5, IR-416). Review
    * material: null to a viewer who may not read the review (IR-479), and
    * empty before the record is first submitted.
@@ -680,9 +686,28 @@ export interface DecisionFlags {
   embargo?:     RecordEmbargo | null;
 }
 
+/** What someone taken off a paper leaves unresolved (IR-1226), counted by the server. */
+export interface RemovalUnresolved {
+  /** Unsent drafts: discarded with the seat. */
+  drafts:            number;
+  /** Open threads they posted, document and revision requests they made: these stay open. */
+  open_threads:      number;
+  document_requests: number;
+  revision_requests: number;
+}
+
+/** One person a removal would take off a paper, and what they leave (IR-1226). */
+export interface RemovalLeaving {
+  name:       string;
+  unresolved: RemovalUnresolved;
+}
+
 export interface DecisionCloses {
-  /** Each review a decision would end, with whoever is reviewing there now. */
-  assignments:       { party: Party; label: string; holders: string[] }[];
+  /**
+   * Each review a decision would end, with whoever is reviewing there now,
+   * and what each of them leaves (IR-1226; absent from older fixtures).
+   */
+  assignments:       { party: Party; label: string; holders: string[]; leaving?: RemovalLeaving[] }[];
   /** How many open document requests it would withdraw. */
   document_requests: number;
   revision_requests?: { id: number; party: Party; label: string; reason: string }[];

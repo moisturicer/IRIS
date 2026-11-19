@@ -7,9 +7,10 @@ anyone who has ever held a seat, or a member of an office holding the record
 now. Anyone else is told nothing, not even that a discussion exists: the
 refusal is the same 404 as a missing record (IR-153).
 
-**Who writes.** The record's participants (`is_record_participant`, §7): its
-owners and anyone who has ever held a seat. A pool member about to claim may
-read the history but not write in it -- 403, since they may see it.
+**Who writes.** Its owners and anyone holding a seat on it that was not
+withdrawn (`may_act_on_review`, §7; IR-1226). A pool member about to claim, or
+a reviewer taken off the paper, may read the history but not write in it --
+403, since they may see it.
 
 **On which records.** Every submitted one. A draft is not under review, so a
 comment on it is refused.
@@ -54,7 +55,10 @@ from core.enums import (
     PipelineStatus, ReviewCommentKind, ReviewTextState, ThreadAnswer, ThreadPlaceOutcome,
     ThreadSeverity, ThreadState,
 )
-from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
+from core.permissions import (
+    acting_refusal, holds_seat, is_record_owner, is_record_participant, may_act_on_review,
+    may_read_review,
+)
 
 from . import mentions, threads
 from .models import ReviewComment
@@ -196,6 +200,8 @@ class _Viewer:
         self.record = record
         self.owner = is_record_owner(user, record)
         self.participant = is_record_participant(user, record)
+        # Acting needs ownership or a seat that was not withdrawn (IR-1226).
+        self.acts = may_act_on_review(user, record)
         self.in_review = is_in_review(record)
         self._seats: dict[str, bool] = {}
         self._versions: Optional[list] = None
@@ -278,7 +284,7 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "reply_to": comment.reply_to_id,
         "created_at": comment.created_at.isoformat(),
         "edited_at": comment.edited_at.isoformat() if comment.edited_at else None,
-        "can_edit": mine,
+        "can_edit": mine and viewer.acts,
         # The people it mentions (IR-877).
         "mentions": mentions.payload(comment),
         # The thread (ADR-032 §7, IR-874).
@@ -312,15 +318,15 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
              "to": e.new_value or None, "at": e.created_at.isoformat()}
             for e in comment.events.all()
         ] if sent else [],
-        "can_delete": mine and comment.is_draft,
+        "can_delete": mine and comment.is_draft and viewer.acts,
         # Its writer posts a draft on its own, before *Finish review* (IR-1194).
-        "can_post": mine and comment.is_draft and top and viewer.in_review,
+        "can_post": mine and comment.is_draft and top and viewer.in_review and viewer.acts,
         "can_change_severity": live and reviewer_thread and (
             mine if comment.is_draft else viewer.holds(comment.party)
         ),
-        "can_resolve": live and sent and viewer.participant and not (reviewer_thread and viewer.owner),
+        "can_resolve": live and sent and viewer.acts and not (reviewer_thread and viewer.owner),
         "can_reopen": sent and viewer.in_review and comment.state == ThreadState.RESOLVED
-        and viewer.participant,
+        and viewer.acts,
         "can_answer": live and sent and reviewer_thread and viewer.owner,
     }
 
@@ -361,10 +367,8 @@ def readable_comments(record, user) -> list[dict[str, Any]]:
 def _writer(record, user) -> None:
     if not may_read_review(user, record):
         raise CommentNotFound
-    if not is_record_participant(user, record):
-        raise CommentRefused(
-            "Only the record's owners and its reviewers take part in the review discussion."
-        )
+    if not may_act_on_review(user, record):
+        raise CommentRefused(acting_refusal(user, record))
 
 
 def _body(value) -> str:

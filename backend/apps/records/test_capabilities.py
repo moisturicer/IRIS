@@ -373,11 +373,12 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_ADVISER_OPEN, "stranger": None,
         },
-        # ITSO's pool: any ITSO member may file and ask for documents, but
-        # opens, clears and routes only once seated.
+        # ITSO's pool: an unseated ITSO member reads it as any office does.
+        # Filing and asking for documents take a seat since IR-1226, as
+        # opening, clearing and routing already did.
         "itso_pool": {
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_TAKES_PART,
-            "itso": {"cite", "tag_ip", "attach_file", "request_document"},
+            "itso": OFFICE,
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         "itso_open": {

@@ -85,17 +85,18 @@ class DocumentRequestSerializer(serializers.ModelSerializer):
         return request.requested_by.get_full_name() if request.requested_by else None
 
     def get_can_manage(self, request):
-        """The viewer may accept, reject or withdraw: they can staff its party."""
-        return request.party in self.context["staffable_parties"]
+        """The viewer may accept, reject or withdraw: they hold a seat on its party (IR-1226)."""
+        return request.party in self.context["acting_parties"]
 
 
 def request_context(record, user) -> dict:
     """What `DocumentRequestSerializer` needs to know about the viewer."""
-    from apps.reviews.tracker import is_staff_viewer, staffable_parties
+    from apps.reviews.tracker import is_staff_viewer
+    from core.permissions import acting_parties
 
     return {
         "staff_viewer": is_staff_viewer(user),
-        "staffable_parties": staffable_parties(record, user),
+        "acting_parties": acting_parties(user, record),
     }
 
 

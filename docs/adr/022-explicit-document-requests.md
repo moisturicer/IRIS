@@ -13,7 +13,7 @@
 >
 > Uploads answering a request now join the current Version ([ADR-058](058-each-version-keeps-its-text-and-its-files.md) §2).
 
-> **Amended 2026-11-18 ([IR-1226](https://citiris.atlassian.net/browse/IR-1226); proposed, awaiting acceptance and Ashlee Sean's security review).** Creating, deciding and withdrawing a request takes a seat on the requesting party, not membership of it. See *Amendment 7*.
+> **Amended 2026-11-18 ([IR-1226](https://citiris.atlassian.net/browse/IR-1226); accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado).** Creating, deciding and withdrawing a request takes a seat on the requesting party, not membership of it. See *Amendment 7*.
 
 **Accepted** — 2026-09-15 · **amended 2026-09-24, §Amendment (fulfilment, who may read request data, refusals)**. Settled as a business decision by **Lee Jasmin Adolfo** (project lead);
 takes effect when [PR #81](https://github.com/moisturicer/IRIS/pull/81) merges. Tracked on
@@ -343,7 +343,7 @@ The access matrix declares it (`apps/tests/access/table.py`, `READS_DOCUMENTS`),
 
 ## Amendment 7 — 2026-11-18: acting on a request takes a seat
 
-Decided by Hermoine Zozobrado on 2026-11-18 for [IR-1226](https://citiris.atlassian.net/browse/IR-1226); proposed, awaiting acceptance and Ashlee Sean's security review. It is one part of [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §10's *Amendment, 2026-11-18 (IR-1226)*, which holds the reasons: every act on a paper's review needs a seat on it that was not withdrawn.
+Decided by Hermoine Zozobrado on 2026-11-18 for [IR-1226](https://citiris.atlassian.net/browse/IR-1226); accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado. It is one part of [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §10's *Amendment, 2026-11-18 (IR-1226)*, which holds the reasons: every act on a paper's review needs a seat on it that was not withdrawn.
 
 - **Creating a request, accepting or rejecting an upload, and withdrawing a request** need a seat on the requesting party's assignment that is not withdrawn: assigned, in review or done. Until now, anyone who could staff the party could do them (§3, §5), seated or not.
 - **The request still belongs to the party, not the person.** §3's *"permission never depends on who `requested_by` is"* stands: any seat holder of the requesting party may decide or withdraw it. A reviewer taken off the paper leaves their requests open for whoever holds the seat.

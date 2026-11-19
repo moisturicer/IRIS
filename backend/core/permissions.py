@@ -2,7 +2,7 @@ from rest_framework.permissions import BasePermission
 
 from core.enums import (
     DELETE_REVIEW_STATUSES, OPEN_SEAT_STATES, AssignmentState, EmbargoState, Party,
-    PipelineStatus, RoleName, WorkflowState,
+    PipelineStatus, RoleName, SeatState, WorkflowState,
 )
 
 # Role name constants -- match the Role.name values in the DB exactly.
@@ -401,11 +401,17 @@ def holds_seat(user, record, party) -> bool:
 
 def is_record_participant(user, record) -> bool:
     """
-    An owner of `record`, or anyone who has ever held a seat on it (ADR-032 §10).
+    An owner of `record`, or someone who has held a seat on it (ADR-032 §10).
+    It gates reading the review discussion and the timeline; acting on them is
+    `may_act_on_review`.
 
-    "Ever": a reviewer keeps the Review and Files sections once their part is
-    done, so they can revisit what they worked on (IR-411, settled 2026-10-06).
-    It gates the review discussion and the timeline.
+    - **An office seat counts in any state**, withdrawn included: a reviewer
+      keeps the Review section once their part is done, or once they are taken
+      off the paper, read-only (IR-411, settled 2026-10-06; IR-1226).
+    - **An Adviser seat counts only while its holder is the record's Adviser**
+      (IR-1226, ADR-032 §10 as corrected 2026-11-19): a replaced Adviser reads
+      none of the review, published or not, and one RDCO puts back reads again.
+      Documents follow the same `record.adviser` (ADR-022 §Amendment 6).
     """
     from apps.reviews.models import ReviewerSeat
 
@@ -413,7 +419,58 @@ def is_record_participant(user, record) -> bool:
         return False
     if record.owners.filter(user=user).exists():
         return True
-    return ReviewerSeat.objects.filter(assignment__record=record, reviewer=user).exists()
+    held = ReviewerSeat.objects.filter(assignment__record=record, reviewer=user)
+    if record.adviser_id != user.pk:
+        held = held.exclude(assignment__party=Party.ADVISER)
+    return held.exists()
+
+
+def acting_parties(user, record) -> frozenset:
+    """
+    The parties `user` acts on `record`'s review as (IR-1226, ADR-032 §10):
+    each party whose latest seat of theirs on the record was not withdrawn --
+    assigned, in review or done, so a finished reviewer still acts.
+
+    Latest, so a reviewer taken off the paper keeps no act through an earlier
+    finished seat of the same party, and one seated again acts again. An
+    Adviser acts only while they are the record's Adviser. Belonging to the
+    office grants nothing: an unseated colleague or a coordinator is seated
+    first, by claiming or being assigned.
+    """
+    from apps.reviews.models import ReviewerSeat
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return frozenset()
+    latest: dict[str, str] = {}
+    for party, state in (
+        ReviewerSeat.objects.filter(assignment__record=record, reviewer=user)
+        .order_by("assigned_at", "pk").values_list("assignment__party", "state")
+    ):
+        latest[str(party)] = state
+    parties = {party for party, state in latest.items() if state != SeatState.WITHDRAWN}
+    if record.adviser_id != user.pk:
+        parties.discard(str(Party.ADVISER))
+    return frozenset(parties)
+
+
+def may_act_on_review(user, record) -> bool:
+    """
+    May `user` act on `record`'s review -- post, reply, edit their comments,
+    resolve or reopen a thread (IR-1226)? An owner, or someone holding a seat
+    on it that was not withdrawn (`acting_parties`). Party-scoped acts, such
+    as document requests and office files, ask `acting_parties` itself.
+    """
+    return is_record_owner(user, record) or bool(acting_parties(user, record))
+
+
+def acting_refusal(user, record) -> str:
+    """
+    Why `user`, who reads `record`'s review, may not act on it (IR-1226): they
+    were taken off the paper, or they read it from the pool without a seat.
+    """
+    if is_record_participant(user, record):
+        return "You were taken off this paper's review, so you can read it but no longer act on it."
+    return "Only the record's owners and its reviewers take part in the review discussion."
 
 
 def may_read_review(user, record) -> bool:
@@ -560,10 +617,10 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
     if publish_unlisted is not None:
         offered.append("publish_unlisted")
 
-    # `review-comments/`: the record's participants, once it is submitted
-    # (ADR-032 §7, IR-419). A pool member reads the discussion but is not
-    # offered a place in it.
-    if record.pipeline_status != PipelineStatus.DRAFT and is_record_participant(user, record):
+    # `review-comments/`: an owner or a seat holder, once it is submitted
+    # (ADR-032 §7, IR-419; IR-1226). A pool member, or someone taken off the
+    # paper, reads the discussion but is not offered a place in it.
+    if record.pipeline_status != PipelineStatus.DRAFT and may_act_on_review(user, record):
         offered.append("comment_review")
         # A thread on no passage is a reviewer's: an owner's threads are on a
         # passage, so the screen offers *New comment* only here (IR-1194).

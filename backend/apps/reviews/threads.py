@@ -14,7 +14,7 @@ review is `finish_review.py`'s.
   change is recorded (`ReviewThreadEvent`) and audited. A draft's writer
   changes their own draft freely, unrecorded: nobody else has seen it.
 - *Resolve* and *Reopen*: anyone who may write in the discussion
-  (`is_record_participant`), except that **an owner can't resolve a thread a
+  (`may_act_on_review`, IR-1226), except that **an owner can't resolve a thread a
   reviewer opened** (403). They answer it instead.
 - *Answer*: an owner, on a reviewer's thread: **Addressed**, saying where, or
   **Declined**, with a reason. Answering never resolves; the reviewer checks
@@ -53,7 +53,7 @@ from core.enums import (
     ThreadSeverity,
     ThreadState,
 )
-from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
+from core.permissions import acting_refusal, holds_seat, is_record_owner, may_act_on_review, may_read_review
 
 from .models import ReviewComment, ReviewThreadEvent
 
@@ -228,8 +228,8 @@ def may_change_severity(thread, user, record) -> bool:
 
 def resolve_refusal(thread, user, record) -> Optional[str]:
     """Why `user` may not resolve `thread`, said as a 403, or None."""
-    if not is_record_participant(user, record):
-        return "Only the record's owners and its reviewers take part in the review discussion."
+    if not may_act_on_review(user, record):
+        return acting_refusal(user, record)
     if is_reviewer_thread(thread) and is_record_owner(user, record):
         return (
             "An owner can't resolve a reviewer's thread. Mark it Addressed, saying where, "
@@ -321,10 +321,8 @@ def resolve(record, user, thread_id) -> ReviewComment:
 def reopen(record, user, thread_id) -> ReviewComment:
     """`POST .../review-comments/<id>/reopen/`: any participant reopens a resolved thread."""
     thread = _thread(record, user, thread_id)
-    if not is_record_participant(user, record):
-        raise ThreadRefused(
-            "Only the record's owners and its reviewers take part in the review discussion."
-        )
+    if not may_act_on_review(user, record):
+        raise ThreadRefused(acting_refusal(user, record))
     _in_review(record)
     if thread.state != ThreadState.RESOLVED:
         raise ThreadError("Only a resolved thread can be reopened.")

@@ -262,6 +262,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # on an Unlisted paper, and `None` to everyone else. A rendering hint;
     # `publish-unlisted/` re-checks it.
     publish_unlisted     = serializers.SerializerMethodField()
+    # What the Adviser leaves if RDCO replaces them (IR-1226): `{name,
+    # unresolved}` beside the `replace_adviser` offer, so *Replace Adviser*
+    # warns with the server's counts; `None` to anyone not offered the act.
+    adviser_leaving      = serializers.SerializerMethodField()
     # What the viewer may be offered (ADR-032 §10, IR-418): `core.permissions`
     # assembles it from the blocks above. A rendering hint; every action
     # endpoint re-checks its own predicate, so the server stays authoritative.
@@ -410,15 +414,23 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return self._once(obj, "publish_unlisted", lambda: offer_payload(obj, self._viewer()))
 
+    def get_adviser_leaving(self, obj):
+        from apps.reviews.removal import leaving
+
+        if "replace_adviser" not in self.get_capabilities(obj) or obj.adviser is None:
+            return None
+        return leaving(obj, obj.adviser)
+
     def get_capabilities(self, obj):
         from core.permissions import record_capabilities
 
-        return record_capabilities(
+        # Once per record: `adviser_leaving` reads it too (IR-1226).
+        return self._once(obj, "capabilities", lambda: record_capabilities(
             obj, self._viewer(), workflow=self._workflow(obj),
             my_seats=self.get_my_seats(obj), routing=self.get_routing(obj),
             office_review=self.get_office_review(obj), revision=self.get_revision(obj),
             decision=self.get_decision(obj), publish_unlisted=self.get_publish_unlisted(obj),
-        )
+        ))
 
     def get_readiness(self, obj):
         from apps.reviews import readiness, routing
@@ -623,7 +635,8 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "review_claim", "is_participant", "routing",
-            "office_review", "revision", "decision", "publish_unlisted", "capabilities", "readiness", "keywords",
+            "office_review", "revision", "decision", "publish_unlisted", "adviser_leaving", "capabilities",
+            "readiness", "keywords",
             "dpa_accepted", "dpa_accepted_at", "details_revision", "metadata_sources",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

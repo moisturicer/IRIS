@@ -43,7 +43,7 @@ from core.enums import (
     TrackerPartyState,
     WorkflowState,
 )
-from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
+from core.permissions import REVIEWER_ROLES, acting_parties, get_role_name, may_read_review
 
 from .clearance_state import (
     carryover_fields, clearance_payload, is_preserved, record_versions, resubmission_payload,
@@ -368,13 +368,22 @@ def participating_parties(record) -> frozenset:
 
 def requestable_parties(record, user, *, active_assignments: Optional[list] = None) -> list[str]:
     """
-    The parties `user` may ask for documents as (ADR-022 §Security): an active
-    assignment the user can staff.
+    The parties `user` may ask for documents and file office files as
+    (ADR-022 §Security, Amendment 7; IR-474): an active assignment the user
+    can staff **and holds a seat on that was not withdrawn** (IR-1226).
+    Belonging to the office is not enough: an unseated colleague, a
+    coordinator, or someone taken off the paper asks for nothing.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return []
     active = active_assignments if active_assignments is not None else _active_assignments(record)
-    eligible = {a.party for a in active} & staffable_parties(record, user)
+    seated = set(
+        ReviewerSeat.objects.filter(assignment__in=[a.pk for a in active], reviewer=user)
+        .exclude(state=SeatState.WITHDRAWN).values_list("assignment__party", flat=True)
+    )
+    eligible = (
+        {a.party for a in active} & seated & acting_parties(user, record) & staffable_parties(record, user)
+    )
     return [str(p) for p in TRACKER_ORDER if str(p) in eligible]
 
 

@@ -95,7 +95,7 @@ from core.enums import (
 from core.permissions import is_office_member
 from core.text_limits import too_long, too_long_message
 
-from . import revisions, routing, seats, threads
+from . import removal, revisions, routing, seats, threads
 from .models import RecordAssignment, Review, ReviewerSeat
 
 ACCEPT = "accept"
@@ -296,14 +296,17 @@ def closes_payload(record, decider_seat) -> dict:
     """
     assignments = []
     for assignment, open_seats in _closing(record):
+        others = [s for s in open_seats if s.pk != decider_seat.pk]
         holders = [
             (s.reviewer.get_full_name() or s.reviewer.email) if s.reviewer else "Former reviewer"
-            for s in open_seats if s.pk != decider_seat.pk
+            for s in others
         ]
         if assignment.pk == decider_seat.assignment_id and not holders:
             continue  # the decider's own turn, with nobody else on it, simply completes
         assignments.append({
             "party": assignment.party, "label": _label(assignment.party), "holders": holders,
+            # What each of them leaves, for the warning beside their name (IR-1226).
+            "leaving": [removal.leaving(record, s.reviewer) for s in others if s.reviewer],
         })
     return {
         "assignments": assignments,
@@ -541,6 +544,10 @@ def decide(record, actor, *, outcome, comment="", token=None, thread_count=0) ->
             decision=review, withdrawn_seats=[s.pk for s in others],
         )
     ReviewerSeat.objects.filter(pk=seat.pk).update(state=SeatState.DONE, done_at=now)
+    # The other reviewers' unsent drafts go with their seats (IR-1226); the
+    # decider's stay theirs, sent with *Finish review*.
+    for reviewer in cut_off:
+        removal.discard_drafts(record, reviewer)
 
     requests = list(_open_document_requests(record).select_for_update())
     for request in requests:

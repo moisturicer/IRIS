@@ -247,9 +247,11 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # took no part in `record`, so sees it but not its requests.
     "record-document-requests": Entry({
         "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
-        # Asked by an active assignment the caller can staff: ITSO's, here.
+        # Asked by an active assignment the caller can staff and holds a seat
+        # on (IR-1226): ITSO's seated reviewer here; the pool, the coordinator
+        # and RDCO, seated nowhere, are refused.
         "POST": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD,
+            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE), kwargs=RECORD,
             data={"message": "Please attach it.", "items": [{"label": "Endorsement"}]},
         ),
     }),
@@ -506,16 +508,19 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
             kwargs=RECORD_FILE,
         ),
     }),
-    # The office that filed it, while it takes part (IR-476): ITSO's pool.
+    # The office that filed it, while it takes part (IR-476), from a seat on
+    # it (IR-1226): ITSO's seated reviewer, not its unseated pool or coordinator.
     "record-file-delete": Entry({
-        "DELETE": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE), kwargs=RECORD_FILE),
+        "DELETE": _case(row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE), kwargs=RECORD_FILE),
     }),
 
     # -- office acts on documents ----------------------------------------
-    # An office taking part files its own supplementary file (IR-474); RDCO is now active by ADR-047.
+    # An office taking part files its own supplementary file (IR-474), from a
+    # seat on its assignment (IR-1226): RDCO's assignment is active by ADR-047,
+    # but `rdco` is seated nowhere, so it is refused like ITSO's unseated pool.
     "record-file-upload": Entry(
         {"POST": _case(
-            row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY, DENY),
+            row(ANON, DENY, DENY, DENY, OK, DENY, DENY, DENY, DENY, DENY),
             data={"record": Ref("record"), "file": Upload("note.pdf")}, format="multipart",
         )},
         waiver=DOCUMENTS_EXCEPTION,
@@ -528,16 +533,17 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
 
     # -- deciding a document request (ADR-022 Â§Amendment 4) -------------
     # 404 off a visible Record; 403 to a visible reader who is not the
-    # requesting party; the party, not the person: ITSO's whole pool.
+    # requesting party; the party, not the person, but from a seat on it
+    # (IR-1226, ADR-022 Amendment 7): ITSO's seated reviewer, not its pool.
     "document-request-detail": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE),
+            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("document_request")}, data={"action": "withdraw"},
         ),
     }),
     "document-request-item-detail": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE),
+            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("document_request_item")}, data={"action": "accept"},
         ),
     }),

@@ -271,10 +271,14 @@ def may_fulfil(record, user) -> bool:
 
 
 def is_requester(request: DocumentRequest, user) -> bool:
-    """`user` can staff the party that asked. The party counts, not the person."""
-    from apps.reviews.tracker import staffable_parties
+    """
+    `user` holds a seat that was not withdrawn on the party that asked
+    (ADR-022 Amendment 7, IR-1226). The party counts, not the person: any seat
+    holder of it decides or withdraws, and `requested_by` decides nothing.
+    """
+    from core.permissions import acting_parties
 
-    return request.party in staffable_parties(request.record, user)
+    return request.party in acting_parties(user, request.record)
 
 
 def request_on_visible_record(request_id, user) -> Optional[DocumentRequest]:

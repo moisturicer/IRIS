@@ -19,6 +19,7 @@ const assignOptions = vi.fn();
 const assign = vi.fn();
 const reassign = vi.fn();
 const extend = vi.fn();
+const withdraw = vi.fn();
 
 vi.mock("@/api/reviews", () => ({
   reviewsApi: { office: (o: string | null) => office(o) },
@@ -27,6 +28,7 @@ vi.mock("@/api/reviews", () => ({
     assign: (id: number, reviewer: number) => assign(id, reviewer),
     reassign: (id: number, reviewer: number, reason: string) => reassign(id, reviewer, reason),
     extend: (id: number, dueAt: string, reason: string) => extend(id, dueAt, reason),
+    withdraw: (id: number) => withdraw(id),
   },
 }));
 
@@ -100,6 +102,7 @@ beforeEach(() => {
   assign.mockReset().mockResolvedValue({ data: {} });
   reassign.mockReset().mockResolvedValue({ data: {} });
   extend.mockReset().mockResolvedValue({ data: {} });
+  withdraw.mockReset().mockResolvedValue({ data: {} });
 });
 
 describe("OfficeConsolePage", () => {
@@ -263,5 +266,59 @@ describe("OfficeConsolePage", () => {
     expect(await screen.findByText("This console is for coordinators")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to My Reviews" })).toBeInTheDocument();
+  });
+
+  // --- taking a reviewer off (IR-1226) --------------------------------------------------
+
+  /** Maria leaves one draft and one open thread; the counts are the server's. */
+  const LEAVES = { drafts: 1, open_threads: 1, document_requests: 0, revision_requests: 0 };
+
+  async function openMenuItem(name: string) {
+    await userEvent.click(await screen.findByRole("button", { name: "More actions: Smart Campus Energy Monitor" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name }));
+  }
+
+  it("withdraws a reviewer after saying what they leave, then reloads", async () => {
+    office.mockResolvedValue(payload({
+      rows: [row({ actions: ["reassign", "withdraw", "extend"], unresolved: LEAVES, withdraw_completes_office: false })],
+    }));
+    show();
+    await openMenuItem("Withdraw…");
+    const dialog = await screen.findByRole("dialog", { name: "Withdraw a reviewer" });
+
+    const warning = within(dialog).getByRole("region", { name: "What Maria Reyes leaves" });
+    expect(within(warning).getAllByRole("listitem").map((i) => i.textContent)).toEqual([
+      "1 unsent draft will be discarded.",
+      "1 open thread they posted stays open, for the authors and whoever holds the seat.",
+      "They will no longer act on this review. They can still read it.",
+    ]);
+    expect(within(dialog).queryByText(/This finishes/)).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Withdraw" }));
+    expect(withdraw).toHaveBeenCalledWith(1);
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Maria Reyes was withdrawn."));
+    expect(office).toHaveBeenCalledTimes(2);
+  });
+
+  it("says, in the menu and the dialog, when withdrawing finishes the office's review", async () => {
+    office.mockResolvedValue(payload({
+      rows: [row({ actions: ["reassign", "withdraw"], unresolved: LEAVES, withdraw_completes_office: true })],
+    }));
+    show();
+    await openMenuItem("Withdraw… (finishes the review)");
+    const dialog = await screen.findByRole("dialog", { name: "Withdraw a reviewer" });
+    expect(within(dialog).getByText("This finishes ITSO's review, using the reviews already done.")).toBeInTheDocument();
+  });
+
+  it("warns, before reassigning, what the reviewer leaves", async () => {
+    office.mockResolvedValue(payload({
+      rows: [row({ unresolved: { ...LEAVES, document_requests: 2 } })],
+    }));
+    show();
+    await openMenuItem("Reassign…");
+    const dialog = await screen.findByRole("dialog", { name: "Reassign a reviewer" });
+    const warning = within(dialog).getByRole("region", { name: "What Maria Reyes leaves" });
+    expect(warning).toHaveTextContent("2 document requests they made stay open.");
+    await expectNoBlockingA11yViolations(dialog);
   });
 });
