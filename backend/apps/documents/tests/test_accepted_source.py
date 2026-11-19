@@ -230,6 +230,9 @@ def test_all_pdf_routes_share_acceptance_and_refusals_store_nothing(manuscript, 
     slot = UploadSlot.objects.create(name="Supporting paper", record_type=record.record_type)
     body = {"record": record.pk, "slot": slot.pk, "file": file}
     if route == "general":
+        # An office files on a submitted record: a draft is its creator's alone (IR-1227).
+        record.pipeline_status = "in_review"
+        record.save(update_fields=["pipeline_status"])
         office = make_user("office@cit.edu", "RDCO")
         # Filing takes a seat on the assignment, not membership of the office (IR-1226).
         seat_on(RecordAssignment.objects.create(record=record, party="rdco"), office)
@@ -284,6 +287,9 @@ def test_general_attachment_non_pdf_policy_is_word_png_or_jpg(manuscript):
     from apps.reviews.models import RecordAssignment
 
     client, record = manuscript
+    # An office files on a submitted record: a draft is its creator's alone (IR-1227).
+    record.pipeline_status = "in_review"
+    record.save(update_fields=["pipeline_status"])
     office = make_user("office@cit.edu", "RDCO")
     client.force_authenticate(office)
     # Filing takes a seat on the assignment, not membership of the office (IR-1226).

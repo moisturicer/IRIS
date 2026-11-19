@@ -62,7 +62,7 @@ def office(tmp_path, settings):
     settings.MEDIA_ROOT = str(tmp_path)
     owner = make_user("types-owner@cit.edu", "Student")
     record = Record.objects.create(
-        title="A paper under review", added_by=owner,
+        title="A paper under review", added_by=owner, pipeline_status="in_review",
         record_type=RecordType.objects.get_or_create(name="Thesis / Research")[0],
     )
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)

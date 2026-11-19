@@ -46,7 +46,7 @@ def research(api, runtime):
 
 def bare(title, *, status=PipelineStatus.PUBLISHED, owner=None, **fields):
     """A Record with no Manuscript read yet."""
-    record = Record.objects.create(title=title, abstract="", pipeline_status=status, **fields)
+    record = Record.objects.create(added_by=owner, title=title, abstract="", pipeline_status=status, **fields)
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     return record

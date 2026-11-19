@@ -162,6 +162,11 @@ class RecordDocumentAuthorizationTests(APITestCase):
 
     # --- the refusals, which are the point -------------------------------
 
+    #: How a stranger is refused. This fixture's record is a draft, which is its
+    #: creator's alone (IR-1227, ADR-009 decision 6): a 404, as for a missing
+    #: record. A submitted record keeps the 403 (`AdviserReadsDocumentsTests`).
+    REFUSED = status.HTTP_404_NOT_FOUND
+
     def test_stranger_is_refused_by_every_document_endpoint(self):
         """
         The acceptance criterion, as one table. A single assertion per endpoint
@@ -173,7 +178,7 @@ class RecordDocumentAuthorizationTests(APITestCase):
             with self.subTest(endpoint=label):
                 self.assertEqual(
                     call().status_code,
-                    status.HTTP_403_FORBIDDEN,
+                    self.REFUSED,
                     f"{label} served a user with no claim on the record",
                 )
 
@@ -183,14 +188,14 @@ class RecordDocumentAuthorizationTests(APITestCase):
         a query string returned every supplementary file on the record.
         """
         self.client.force_authenticate(self.stranger)
-        self.assertEqual(self._download_all().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._download_all().status_code, self.REFUSED)
 
     def test_stranger_cannot_write_into_someone_elses_record(self):
         """A refused upload must not leave a RecordUpload behind."""
         before = RecordUpload.objects.filter(record=self.record).count()
         self.client.force_authenticate(self.stranger)
-        self.assertEqual(self._submit().status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(self._upload_create().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._submit().status_code, self.REFUSED)
+        self.assertEqual(self._upload_create().status_code, self.REFUSED)
         self.assertEqual(
             RecordUpload.objects.filter(record=self.record).count(), before,
             "a refused request still created an upload",
@@ -221,7 +226,13 @@ class RecordDocumentAuthorizationTests(APITestCase):
                 )
 
     def test_office_staff_still_reaches_every_document_endpoint(self):
-        """RDCO reviews these documents; the gate is owner-or-staff, not owner-only."""
+        """
+        RDCO reviews these documents; the gate is owner-or-staff, not owner-only,
+        once the record is submitted. A draft is its creator's alone (IR-1227),
+        so the office reaches its documents from Submit on.
+        """
+        self.record.pipeline_status = "in_review"
+        self.record.save(update_fields=["pipeline_status"])
         self.client.force_authenticate(self.rdco)
         for label, call in self._all_endpoints().items():
             with self.subTest(endpoint=label):
@@ -229,6 +240,14 @@ class RecordDocumentAuthorizationTests(APITestCase):
                     call().status_code, 400,
                     f"{label} refused office staff",
                 )
+
+    def test_office_staff_reach_no_document_of_a_draft(self):
+        if self.record.pipeline_status != "draft":
+            self.skipTest("this fixture's record is submitted")
+        self.client.force_authenticate(self.rdco)
+        for label, call in self._all_endpoints().items():
+            with self.subTest(endpoint=label):
+                self.assertEqual(call().status_code, status.HTTP_404_NOT_FOUND, label)
 
 
 def seat_on(assignment, reviewer):
@@ -686,14 +705,21 @@ class AdviserReadsDocumentsTests(RecordDocumentAuthorizationTests):
 
     Inherits the IR-153 fixture and its tests, so the owner/staff/stranger
     guarantees are rechecked on a record that now has an Adviser.
+
+    The record is submitted: a draft is its creator's alone (IR-1227), so its
+    Adviser reaches it only once it is in review, and a stranger is refused
+    with the 403 a submitted record answers.
     """
+
+    REFUSED = status.HTTP_403_FORBIDDEN
 
     def setUp(self):
         super().setUp()
         self.adviser = self.make_user("doc-adviser@cit.edu", "Adviser")
         self.other_adviser = self.make_user("doc-other-adviser@cit.edu", "Adviser")
         self.record.adviser = self.adviser
-        self.record.save(update_fields=["adviser"])
+        self.record.pipeline_status = "in_review"
+        self.record.save(update_fields=["adviser", "pipeline_status"])
         self.record_file = RecordFile.objects.get(record=self.record)
 
     def _reads(self):

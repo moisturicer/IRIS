@@ -195,7 +195,8 @@ class ReplaceAdviserTests(RdcoActsTestBase):
 
         response = self.post(replace_url(record), self.rdco, {"adviser": self.other_adviser.pk})
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # RDCO cannot see it: a draft is its creator's alone (IR-1227, ADR-009 decision 6).
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 # --- add an owner ----------------------------------------------------------------------
@@ -296,7 +297,9 @@ class AddOwnerTests(RdcoActsTestBase):
         for record in (draft, published):
             with self.subTest(status=record.pipeline_status):
                 response = self.post(add_owner_url(record), self.rdco, {"email": self.reader.email})
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                # RDCO cannot see a draft (a draft is its creator's alone (IR-1227, ADR-009 decision 6)): a 404.
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND
+                                 if record is draft else status.HTTP_400_BAD_REQUEST)
                 self.assertFalse(RecordOwner.objects.filter(record=record, user=self.reader).exists())
 
 
@@ -393,7 +396,9 @@ class WithdrawTests(RdcoActsTestBase):
         for record in (draft, published):
             with self.subTest(status=record.pipeline_status):
                 response = self.post(withdraw_url(record), self.rdco, {"reason": self.REASON})
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                # RDCO cannot see a draft (a draft is its creator's alone (IR-1227, ADR-009 decision 6)): a 404.
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND
+                                 if record is draft else status.HTTP_400_BAD_REQUEST)
                 record.refresh_from_db()
                 self.assertFalse(record.is_deleted)
 

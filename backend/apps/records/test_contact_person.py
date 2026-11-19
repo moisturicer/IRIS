@@ -66,13 +66,18 @@ def make_paper(owners, *, status=PipelineStatus.DRAFT, type_name=RecordTypeName.
                adviser=None, ai_consent=True):
     """A paper owned by `owners`, the first of them its Contact person."""
     record = Record.objects.create(
-        title="Tilapia feed trials", abstract="An abstract.", is_ip=False,
+        title="Tilapia feed trials", abstract="An abstract.", is_ip=False, added_by=owners[0],
         pipeline_status=status, adviser=adviser, ai_consent=ai_consent,
         record_type=RecordType.objects.get_or_create(name=type_name)[0],
     )
     for index, owner in enumerate(owners):
         RecordOwner.objects.create(record=record, user=owner, is_primary=index == 0)
     return record
+
+
+# A co-owner who is not a draft's creator never sees it (IR-1227), so the tests
+# where they act use a submitted paper.
+SUBMITTED = PipelineStatus.IN_REVIEW
 
 
 # --- AC 1: any owner, every record type, any time until deletion ----------------
@@ -92,7 +97,7 @@ class TestAnyOwnerNamesAnotherOwner:
         assert response.data["owners"][0] == {"id": ben.pk, "name": "Test User", "is_primary": True}
 
     def test_an_owner_who_is_not_the_contact_person_can_change_it_too(self, ana, ben, carla):
-        record = make_paper([ana, ben, carla])
+        record = make_paper([ana, ben, carla], status=SUBMITTED)
 
         response = post(carla, record, {"owner": ben.pk})
 
@@ -100,12 +105,21 @@ class TestAnyOwnerNamesAnotherOwner:
         assert contacts(record) == [ben.pk]
 
     def test_an_owner_can_name_themselves(self, ana, ben):
-        record = make_paper([ana, ben])
+        record = make_paper([ana, ben], status=SUBMITTED)
 
         response = post(ben, record, {"owner": str(ben.pk)})
 
         assert response.status_code == status.HTTP_200_OK, response.data
         assert contacts(record) == [ben.pk]
+
+    def test_a_co_owner_of_a_draft_they_did_not_create_gets_not_found(self, ana, ben):
+        """A draft is its creator's alone (IR-1227, ADR-009 decision 6)."""
+        record = make_paper([ana, ben])
+
+        response = post(ben, record, {"owner": ben.pk})
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert contacts(record) == [ana.pk]
 
     def test_a_deleted_paper_is_not_found(self, ana, ben):
         record = make_paper([ana, ben])
@@ -169,7 +183,7 @@ class TestRefusals:
         assert contacts(record) == [ana.pk]
 
     def test_the_current_contact_person_is_refused_and_nothing_is_written(self, ana, ben):
-        record = make_paper([ana, ben])
+        record = make_paper([ana, ben], status=SUBMITTED)
 
         response = post(ben, record, {"owner": ana.pk})
 
@@ -229,7 +243,7 @@ class TestSetPrimaryOwnerNeverAddsAStranger:
 class TestAlwaysExactlyOne:
     def test_a_paper_with_two_stale_contacts_ends_with_exactly_one(self, ana, ben, carla):
         """Even a paper left with two primary rows by older data is repaired."""
-        record = make_paper([ana, ben, carla])
+        record = make_paper([ana, ben, carla], status=SUBMITTED)
         RecordOwner.objects.filter(record=record, user=ben).update(is_primary=True)
 
         post(carla, record, {"owner": carla.pk})
@@ -261,7 +275,7 @@ class TestAlwaysExactlyOne:
 
 class TestBothToldAndAudited:
     def test_the_old_and_new_contact_person_are_told_in_app(self, ana, ben, carla, django_capture_on_commit_callbacks):
-        record = make_paper([ana, ben, carla])
+        record = make_paper([ana, ben, carla], status=SUBMITTED)
 
         with django_capture_on_commit_callbacks(execute=True):
             post(carla, record, {"owner": ben.pk})
@@ -273,7 +287,7 @@ class TestBothToldAndAudited:
         assert {n.notif_type.name for n in told} == {"Contact Person Changed"}
 
     def test_one_audit_event_names_the_paper_both_people_and_the_actor(self, ana, ben, carla):
-        record = make_paper([ana, ben, carla])
+        record = make_paper([ana, ben, carla], status=SUBMITTED)
 
         post(carla, record, {"owner": ben.pk})
 

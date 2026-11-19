@@ -68,6 +68,7 @@ def permitted():
 
     owner = make_user(f"indexed-{uuid.uuid4().hex[:10]}@cit.edu")
     record = Record.objects.create(
+        added_by=owner,
         title="Pond research",
         abstract="Ponds sampled weekly",
         abstract_file="manuscripts/pond.pdf",
@@ -455,6 +456,8 @@ def test_uncited_research_dependency_is_withheld_on_replay_and_followup(runtime,
     owner, first, first_token = permitted()
     _, second, second_token = permitted()
     RecordOwner.objects.create(record=second, user=owner, is_primary=False)
+    # Both are drafts, which only their creator reads (IR-1227): the reader made both.
+    Record.objects.filter(pk=second.pk).update(added_by=owner)
     for token in (first_token, second_token):
         assert extraction.run(runtime, token) == "extracted"
         assert index(runtime, token, Recording()) == "ready"

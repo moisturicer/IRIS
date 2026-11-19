@@ -509,8 +509,10 @@ class RefusalTests(DecisionTestBase):
         record = self.make_record()
         self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
         response = self.decide(record, self.adviser, "publish", token="x")
+        # A 404 since IR-1227: a draft is its creator's alone (IR-1227, ADR-009 decision 6), so the Adviser it names cannot see it.
         self.assertIn(
-            response.status_code, (status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN),
+            response.status_code,
+            (status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
         )
         record.refresh_from_db()
         self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
