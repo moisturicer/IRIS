@@ -61,6 +61,9 @@ const ICON_BUTTON =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-control text-stone-600 " +
   "hover:bg-stone-200/70 hover:text-stone-900 " + COLOUR_TRANSITION + " " + FOCUS_RING;
 
+/** The header's Sources toggle is the same button as the pane's (IR-1237). */
+export const SOURCES_TOGGLE_CLASS = ICON_BUTTON;
+
 /**
  * The one toggle for the conversations pane (IR-1233): a left-panel icon at the
  * pane's top-left, in the same place open or closed, so a reader never hunts for
