@@ -124,7 +124,7 @@ export function SourcesPanel({ mode, id, citations, sources, active, question, o
       <div className="flex min-h-[56px] shrink-0 items-start gap-2 border-b border-stone-200/80 py-1.5 pl-4 pr-1.5">
         <div className="min-w-0 flex-1 py-2">
           <h2 className="text-heading font-semibold text-stone-900">Sources</h2>
-          <p className="mt-0.5 line-clamp-2 text-2xs text-stone-500">{subtitle}</p>
+          <p className="mt-0.5 text-2xs text-stone-500">{subtitle}</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Close sources"
           className="flex size-11 shrink-0 items-center justify-center rounded-control text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800">
