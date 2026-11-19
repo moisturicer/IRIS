@@ -889,5 +889,12 @@ TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     },
     "opportunities": OPPORTUNITIES,
     "library": LIBRARY,
+    # ADR-073 (IR-1213): the live stream checks its own `Bearer` access token
+    # (a plain async view, not DRF), which `force_authenticate` does not reach,
+    # so every caller here is answered 401 before a stream opens. Who may open
+    # one, with real tokens and sessions, is `apps/live/test_live.py`.
+    "live": {
+        "live-stream": Entry({"GET": _case(row(*([ANON] * 10)))}),
+    },
 }
 DECLARED = TABLE

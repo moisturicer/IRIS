@@ -215,6 +215,27 @@ def idle_seconds(request) -> int:
         return 0
 
 
+def check_open(sid) -> None:
+    """Refuse an ended, run-out or idle session, recording nothing (ADR-073).
+
+    The live stream's check: unlike `touch`, it never counts as activity, so a
+    tab left open still reaches the idle sign-out, and it ends nothing itself;
+    the next real request does that, with its reason.
+    """
+    session = UserSession.objects.filter(id=sid).only(
+        "last_activity_at", "ended_at", "ended_reason", "remembered", "expires_at",
+    ).first()
+    if session is None:
+        raise SessionEnded()
+    if session.ended_at is not None:
+        raise SessionEnded(session.ended_reason)
+    at = now()
+    if session.expires_at is not None and at >= session.expires_at:
+        raise SessionEnded(SessionEndReason.EXPIRED)
+    if not session.remembered and at - session.last_activity_at > idle_timeout():
+        raise SessionEnded(SessionEndReason.IDLE)
+
+
 def touch(sid, request) -> None:
     """Record this request's activity on session ``sid``, or refuse it as idle.
 
