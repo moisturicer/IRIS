@@ -106,7 +106,7 @@ export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: F
         else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: Number(next.slice("folder:".length)) });
         else onViewChange({ kind: "saved" });
       }}
-      className="max-w-[12rem]"
+      className="max-w-full"
     >
       <option value="">All saved papers</option>
       <option value={HISTORY}>History</option>

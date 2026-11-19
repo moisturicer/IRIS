@@ -39,7 +39,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
   return (
     <Modal open={isOpen} onClose={onClose} title="Cite this paper" size="lg">
       <div className="space-y-4">
-        <p className="text-xs text-stone-500 leading-relaxed line-clamp-2">
+        <p className="break-words text-xs text-stone-500 leading-relaxed">
           <span className="font-semibold text-stone-700">{record.title}</span>
         </p>
 

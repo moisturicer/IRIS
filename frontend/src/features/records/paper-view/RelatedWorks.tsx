@@ -131,7 +131,7 @@ export function RelatedWorks({ recordId }: { recordId: number }) {
             <p className="text-2xs font-semibold text-stone-500 mb-2">
               Record #{item.id}
             </p>
-            <p className="font-display text-lg font-semibold text-stone-900 leading-snug line-clamp-3 group-hover:text-brand transition-colors duration-200">
+            <p className="font-display text-lg font-semibold text-stone-900 leading-snug break-words group-hover:text-brand transition-colors duration-200">
               {item.title}
             </p>
             <p className="text-2xs text-stone-500 mt-2">

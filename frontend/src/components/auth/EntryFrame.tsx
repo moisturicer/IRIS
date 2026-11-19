@@ -128,12 +128,12 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
 
       <main className="flex flex-1 flex-col items-center px-4 pb-12 pt-section sm:px-8 sm:pt-10 lg:pt-12">
         {lede && (
-          <h1 className="order-1 max-w-4xl text-balance font-display text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl md:text-center lg:text-6xl">
+          <h1 className="order-1 text-balance font-display text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl md:text-center lg:text-6xl">
             {lede.headline}
           </h1>
         )}
         {lede && (
-          <p className="order-3 mt-section max-w-2xl text-pretty text-body text-stone-700 md:order-2 md:text-center md:mt-4 md:text-lg">
+          <p className="order-3 mt-section text-pretty text-body text-stone-700 md:order-2 md:text-center md:mt-4 md:text-lg">
             {lede.sentence}
           </p>
         )}

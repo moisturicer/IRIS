@@ -103,7 +103,7 @@ export function ResearchCard({
       id={titleId}
       className={cn(
         "font-display font-semibold text-stone-900",
-        grid ? "text-title line-clamp-3" : compact ? "text-title" : "text-title md:text-display",
+        grid ? "text-title break-words" : compact ? "text-title" : "text-title md:text-display",
       )}
     >
       <Link
@@ -119,7 +119,7 @@ export function ResearchCard({
       </Link>
     </Heading>
 
-    {byline && <p className="mt-1 text-small font-medium text-brand truncate">{byline}</p>}
+    {byline && <p className="mt-1 break-words text-small font-medium text-brand">{byline}</p>}
 
     {summary && (
       <p className={cn(thumbnail ? "mt-1" : "mt-2", "text-body text-stone-600", summaryClassName ?? (grid ? "line-clamp-4" : "line-clamp-3"))}>

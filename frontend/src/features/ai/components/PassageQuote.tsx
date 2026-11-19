@@ -69,7 +69,7 @@ export function PassageQuote({ text, className = "" }: { text: string; className
     <blockquote
       title={text}
       className={
-        "text-xs text-stone-600 leading-relaxed line-clamp-3 border-l-2 " +
+        "text-xs text-stone-600 leading-relaxed break-words border-l-2 " +
         "border-[#6B0F12]/25 pl-2 italic " +
         className
       }

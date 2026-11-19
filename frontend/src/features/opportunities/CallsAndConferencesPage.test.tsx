@@ -223,6 +223,45 @@ describe("the board", () => {
   });
 });
 
+// The Full Text Rule (IR-1219; DESIGN.md "The five allowed cuts"): the board
+// clamps a call's About to two lines only with Show more, because nothing else
+// on the board reaches the rest. jsdom lays nothing out, so "runs past two
+// lines" is an element whose content is taller than its box.
+describe("a call's About on the board", () => {
+  const LONG = "Funding for applied research in energy, materials and manufacturing, open to state and private HEIs.";
+
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return (this.textContent ?? "").includes(LONG) ? 80 : 40;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(40);
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("offers Show more when it runs past two lines, and Show less once it is whole", async () => {
+    serve([call({ title: "DOST Research Grant", description: LONG })]);
+    await renderBoard();
+    const row = screen.getByRole("article", { name: "DOST Research Grant" });
+    const more = within(row).getByRole("button", { name: "Show more" });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+
+    await userEvent.click(more);
+    const less = within(row).getByRole("button", { name: "Show less" });
+    expect(less).toHaveAttribute("aria-expanded", "true");
+
+    await userEvent.click(less);
+    expect(within(row).getByRole("button", { name: "Show more" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("offers nothing when it fits", async () => {
+    serve([call({ title: "ICCE 2027", description: "Full papers on computing education." })]);
+    await renderBoard();
+    const row = screen.getByRole("article", { name: "ICCE 2027" });
+    expect(within(row).queryByRole("button", { name: /Show (more|less)/ })).toBeNull();
+  });
+});
+
 describe("order", () => {
   it("never moves a Featured call ahead of one due the same day", async () => {
     serve([
