@@ -8,6 +8,8 @@ import { RuntimeReader } from "@/features/ai/components/RuntimeReader";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { Button } from "@/components/ui";
 import { RecentChats } from "./RecentChats";
+import { DownloadConversation } from "@/features/ai/components/DownloadConversation";
+import type { AskSelection } from "@/features/ai/components/SelectionChip";
 import { CONTROL_BASE } from "./controls";
 
 /** A square icon control in the panel's header: quiet at rest, a grey wash on hover. */
@@ -59,6 +61,8 @@ export function usePaperChat() {
   const [minimized, setMinimized] = useState(false);
   const [draft, setDraft] = useState("");
   const [width, setWidthState] = useState(readWidth);
+  // A passage the reader chose to ask about (IR-581): shown over the composer until sent or removed.
+  const [selection, setSelection] = useState<AskSelection | null>(null);
 
   const setOpen = (next: boolean) => {
     setOpenState(next);
@@ -82,7 +86,14 @@ export function usePaperChat() {
     }
   };
 
-  return { open, setOpen, tool, openNotes, minimized, setMinimized, draft, setDraft, width, setWidth };
+  /** "Ask about selection": opens Ask IRIS with the passage over an editable question. Nothing is sent. */
+  const askAbout = (next: AskSelection) => {
+    setSelection(next);
+    setOpen(true);
+  };
+
+  return { open, setOpen, tool, openNotes, minimized, setMinimized, draft, setDraft, width, setWidth,
+    selection, setSelection, askAbout };
 }
 
 /**
@@ -140,6 +151,9 @@ interface PaperChatPanelProps {
    * same answer a request again.
    */
   returnTo?: AnswerReturn | null;
+  /** A passage to ask about, and the way to drop it once it is sent or removed (IR-581). */
+  selection?: AskSelection | null;
+  onSelectionChange?: (next: AskSelection | null) => void;
   /**
    * Switch this panel's place to the reader's private Notes (IR-580). Absent
    * where Notes is not offered, and the control is not drawn.
@@ -167,6 +181,8 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
   useEffect(() => {
     try { setConversationId(sessionStorage.getItem(storageKey) ?? undefined); } catch { setConversationId(undefined); }
   }, [storageKey]);
+  // A passage is asked about within its paper: choosing one narrows a widened chat back to it.
+  useEffect(() => { if (props.selection) setAllPapers(false); }, [props.selection]);
   // A chat that began across all papers cannot narrow to this one; a chat that began on this paper can widen and narrow freely.
   const [startedAll, setStartedAll] = useState(() => {
     try { return sessionStorage.getItem(`${storageKey}:all`) === "1"; } catch { return false; }
@@ -213,7 +229,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
       <AskIrisMark className="h-5 w-5 shrink-0 text-brand" />
       <span className="min-w-0 flex-1">
         <span className="block font-display text-lg font-semibold leading-tight text-stone-900">Ask IRIS</span>
-        <span className="block truncate text-2xs text-stone-500">Back to the answer</span>
+        <span className="block break-words text-2xs text-stone-500">Back to the answer</span>
       </span>
       <i className="fas fa-chevron-up text-xs text-stone-500" aria-hidden />
     </button>}
@@ -235,6 +251,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
           <i className="fas fa-clock-rotate-left text-xs" aria-hidden />
           {recent.length > 0 && <span aria-hidden className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-3xs font-semibold leading-4 text-white">{recent.length}</span>}
         </button>
+        {conversationId && <DownloadConversation download={() => api.download(conversationId)} className="hover:bg-stone-200" />}
         <button type="button" onClick={newChat} aria-label="New chat" title="New chat" className={ICON_BUTTON}>
           <i className="fas fa-plus text-xs" aria-hidden />
         </button>
@@ -246,7 +263,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
           <i className="fas fa-xmark" aria-hidden />
         </Button>
       </div>
-      <p className="mt-2 truncate text-2xs text-stone-600">{props.record.title}</p>
+      <p className="mt-2 break-words text-2xs text-stone-600">{props.record.title}</p>
       {props.viewingVersion != null && <p className="mt-1 text-2xs text-stone-700">
         Answers are about the current version, not v{props.viewingVersion}.</p>}
       {recentOpen && <RecentChats className="mt-2 max-h-48 overflow-y-auto" chats={recent} activeId={conversationId ?? null}
@@ -257,7 +274,8 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
       <RuntimeReader key={`${conversationId ?? "new"}:${fresh}`} dense conversationId={conversationId}
         recordId={props.record.id}
         scopeToggle={{ allPapers: allPapers || locked, locked, onChange: next => { setRecentOpen(false); setAllPapers(next); } }}
-        initialDraft={props.draft} onDraftChange={props.onDraftChange} onConversation={remember} />
+        initialDraft={props.draft} onDraftChange={props.onDraftChange} onConversation={remember}
+        selection={props.selection} onSelectionChange={props.onSelectionChange} />
     </div>
   </aside>;
 }

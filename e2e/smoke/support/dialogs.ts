@@ -90,7 +90,10 @@ const consoleAction = (id: string, button: string, kind: "pool" | "seat", source
         is_overdue: false, clock_paused: false, can_extend: true,
         authors_line: "Ada Lovelace · v1", clearance_strip: [],
         status: kind === "pool" ? { kind: "unassigned", text: "Unassigned" } : { kind: "due", text: "Due in 2 days" },
-        actions: kind === "pool" ? ["assign", "extend"] : ["reassign", "extend"],
+        actions: kind === "pool" ? ["assign", "extend"] : ["reassign", "withdraw", "extend"],
+        // What the reviewer leaves, so Reassign and Withdraw are scanned with their warning (IR-1226).
+        unresolved: kind === "seat" ? { drafts: 1, open_threads: 1, document_requests: 1, revision_requests: 0 } : null,
+        withdraw_completes_office: kind === "seat" ? true : null,
       }],
       load: [{ reviewer: 5, name: "Ines Tan", open_count: 1, overdue: 0 }, { reviewer: 6, name: "Rey Cruz", open_count: 0, overdue: 0 }],
     });
@@ -112,9 +115,10 @@ const reviewAction = (
   /** The reviewer's sidebar is a "Details" tab when the workspace is narrow, so a control that lives there opens it first. */
   inDetails = false,
 ): DialogCase => ({
-  // The bar and the workspace host every review action's dialog.
+  // The bar hosts every review action's dialog. The workspace no longer
+  // draws one of its own: the documents drawer became a tab (IR-1203).
   id, screen: "paper-view", path: `/records/${PAPER.id}?section=review`,
-  sources: [source, "features/records/paper-view/ReviewActionBar.tsx", "features/records/paper-view/ReviewWorkspace.tsx"],
+  sources: [source, "features/records/paper-view/ReviewActionBar.tsx"],
   viewport: inDetails ? { width: 820, height: 900 } : undefined,
   override: (api) => { reviewing(capability)(api); api.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER); more?.(api); },
   open: async (page) => {
@@ -129,18 +133,6 @@ const reviewAction = (
     await press(label)(page);
   },
   dialog: anyDialog,
-});
-
-/** Discover with one saved feed, opened from the My feeds menu: its rename and delete dialogs. */
-const SAVED_FEED = { id: 5, name: "Flood studies", query: { q: "flood" }, stale: {}, created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" };
-const feedAction = (id: string, verb: string, title: string): DialogCase => ({
-  id, screen: "discover", sources: ["features/discover/MyFeeds.tsx"],
-  override: (api) => api.on("GET", "/library/feeds/", { results: [SAVED_FEED], limit: 10 }),
-  open: async (page) => {
-    await page.getByRole("button", { name: /^My feeds/ }).click();
-    await page.getByRole("button", { name: `${verb} ${SAVED_FEED.name}` }).click();
-  },
-  dialog: (page) => page.getByRole("dialog", { name: title }),
 });
 
 export const DIALOGS: DialogCase[] = [
@@ -177,7 +169,7 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog", { name: "Delete this comment?" }),
   },
   {
-    id: "cite a paper", screen: "paper-view", sources: ["features/discover/PaperCiteModal.tsx", "features/discover/DiscoverPage.tsx", "components/ui/Modal.tsx"],
+    id: "cite a paper", screen: "paper-view", sources: ["features/discover/PaperCiteModal.tsx", "components/ui/Modal.tsx"],
     open: press(/Cite/), dialog: anyDialog,
   },
   {
@@ -189,16 +181,6 @@ export const DIALOGS: DialogCase[] = [
     id: "discover filters", screen: "discover", sources: ["features/discover/DiscoverFilterBar.tsx"],
     open: press(/^Filters/), dialog: (page) => page.getByRole("dialog", { name: "Filters" }),
   },
-  {
-    id: "save a custom feed", screen: "discover", sources: ["features/discover/MyFeeds.tsx"],
-    open: async (page) => {
-      await page.getByRole("button", { name: /^My feeds/ }).click();
-      await page.getByRole("button", { name: /^Save these filters as a feed/ }).click();
-    },
-    dialog: (page) => page.getByRole("dialog", { name: "Save these filters as a feed" }),
-  },
-  feedAction("rename a custom feed", "Rename", "Rename feed"),
-  feedAction("delete a custom feed", "Delete", "Delete this feed?"),
   {
     id: "notifications", screen: "help", sources: ["components/layout/NotificationBell.tsx"],
     open: press(/^Notifications/), dialog: (page) => page.getByRole("dialog", { name: "Notifications" }),
@@ -333,6 +315,13 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog"),
   },
   {
+    // Why the session ended opens by itself on arrival (IR-1197).
+    id: "session ended on arrival at sign-in", screen: "login", path: "/login?reason=session_expired&code=session_idle",
+    sources: ["components/auth/SessionNoticeDialog.tsx"],
+    open: async () => {},
+    dialog: (page) => page.getByRole("dialog", { name: "Session Expired" }),
+  },
+  {
     id: "ask again for a download", screen: "my-library", path: "/records/mine?section=downloads",
     sources: ["components/records/DownloadRequestModal.tsx"],
     override: (api) => api.on("GET", "/records/download-requests/mine/", [{
@@ -421,10 +410,12 @@ export const DIALOGS: DialogCase[] = [
   {
     id: "ask iris chat history on a narrow screen", screen: "ask-iris-conversation", sources: ["features/ai/components/ChatDrawer.tsx", "features/ai/RAGChatPage.tsx"],
     viewport: { width: 640, height: 900 },
-    open: press("Show chat history"), dialog: (page) => page.getByRole("dialog", { name: "Chat history" }),
+    // IR-1233: the one pane toggle, "Show conversations", opens this dialog at 640px and below.
+    open: press("Show conversations"), dialog: (page) => page.getByRole("dialog", { name: "Chat history" }),
   },
   consoleAction("assign a reviewer", "Assign", "pool", "features/review/AssignReviewerDialog.tsx"),
   consoleAction("reassign a reviewer", "Reassign", "seat", "features/review/ReassignDialog.tsx"),
+  consoleAction("withdraw a reviewer", "Withdraw", "seat", "features/review/WithdrawSeatDialog.tsx"),
   consoleAction("extend a due date", "Extend due date", "seat", "features/review/ExtendDueDateDialog.tsx"),
   reviewAction("accept and publish a paper", "accept_publish", "Accept & publish…", "features/records/paper-view/DecisionDialog.tsx"),
   reviewAction("reject a paper", "reject", "Reject…", "features/records/paper-view/DecisionDialog.tsx"),
@@ -474,6 +465,8 @@ export const DIALOGS: DialogCase[] = [
       });
     },
     open: async (page) => {
+      // A reviewer's Review opens on Documents (IR-1203): the comment box is the Conversation tab's.
+      await page.getByRole("tab", { name: "Conversation" }).click();
       await page.getByRole("button", { name: "Saved replies" }).first().click();
       await page.getByRole("button", { name: "Manage saved replies" }).click();
     },
@@ -546,7 +539,7 @@ export const DIALOGS: DialogCase[] = [
   {
     id: "remove an attached file", screen: "paper-view", role: "Student",
     path: `/records/${PAPER.id}?section=review&documents=open`,
-    sources: ["features/records/paper-view/FilesSection.tsx"],
+    sources: ["features/records/paper-view/DocumentsTab.tsx"],
     override: (api) => {
       api.on("GET", `/records/${PAPER.id}/`, {
         ...PAPER_DETAIL, owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],

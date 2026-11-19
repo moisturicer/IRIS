@@ -1,5 +1,5 @@
 import { INSTITUTION } from "@/config/institution";
-import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { failureMessage, readFailureKind } from "@/lib/readFailure";
@@ -27,7 +27,7 @@ import {
   type AnswerReturn,
 } from "@/lib/citedPage";
 import { conversationPath } from "@/lib/askHandoff";
-import type { RecordDetail, IpType } from "@/types/records";
+import type { RecordDetail, IpType, ThreadDocument } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
@@ -64,7 +64,8 @@ import { AskIrisFab, CORNER_CLEARANCE_CLASS, NotesFab } from "./AskIrisFab";
 import { NotesPanel } from "./NotesPanel";
 import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
 import { useReadingNote } from "./useReadingNote";
-import type { SelectionAction } from "./SelectionMenu";
+import { HighlightSwatch, type SelectionAction } from "./SelectionMenu";
+import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { ContactPersonCard } from "./ContactPersonCard";
@@ -73,11 +74,13 @@ import { UnlistedCard } from "./UnlistedCard";
 import { RdcoPaperControls } from "./RdcoPaperControls";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
-import { FilesSection } from "./FilesSection";
+import { DocumentsTab } from "./DocumentsTab";
+import { DocumentInReader, type ShownDocumentState } from "./DocumentInReader";
+import { slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
-import { ReviewWorkspace } from "./ReviewWorkspace";
+import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
@@ -88,16 +91,12 @@ import { useCitationReference, type CitationResolution } from "./useCitationRefe
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PaperDownloadControl } from "./PaperDownloadControl";
+import { PaperPdfReader } from "./lazyReader";
 import { PersonChip } from "./PersonLink";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
-// Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
-// and most visits to this screen never open the Paper tab at all. Splitting
-// it out of the main bundle means only a reader who actually opens the
-// reader pays for it.
-const PaperPdfReader = lazy(() =>
-  import("./PaperPdfReader").then((m) => ({ default: m.PaperPdfReader })),
-);
+
 
 // ---------------------------------------------------------------------------
 // IP classification tagger -- offered under the `tag_ip` capability
@@ -244,6 +243,20 @@ export default function PaperViewPage() {
   // draft, and read only once Notes is first opened.
   const [notesWanted, setNotesWanted] = useState(false);
   const note = useReadingNote(Number(id), notesWanted);
+  // Saved highlights are drawn until a plain click on the paper hides them (IR-581).
+  const [highlightsShown, setHighlightsShown] = useState(true);
+  // Lines a Highlight's note adds to the reader's Notes once their note has loaded (IR-581).
+  const pendingNote = useRef<string[]>([]);
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const appendPendingNote = () => {
+    const current = noteRef.current;
+    if (current.phase !== "ready" || pendingNote.current.length === 0) return;
+    const lines = pendingNote.current;
+    pendingNote.current = [];
+    current.setText([current.text.trimEnd(), ...lines].filter(Boolean).join("\n\n"));
+  };
+  useEffect(appendPendingNote, [note.phase]);
   // Focus follows a swap of Ask IRIS and Notes into the new panel, in every
   // layout: the control that was clicked is gone with the old panel.
   const focusPanel = useRef(false);
@@ -256,6 +269,8 @@ export default function PaperViewPage() {
     focusPanel.current = true;
     chat.setOpen(true);
   };
+  // The supporting document Review's reader shows (IR-1203); see `shownDocument`.
+  const [documentShown, setDocumentShown] = useState<ShownDocumentState | null>(null);
   // The highlight the reader asked to open from Notes (IR-583): where to land,
   // in which version, and the navigation it belongs to, so a later arrival
   // (a citation, Back) is not held to it.
@@ -283,7 +298,6 @@ export default function PaperViewPage() {
   const [trackerVersion, setTrackerVersion] = useState(0);
   // The author's Review tab action bar, stuck over the bottom of the screen
   // below `reading-wide`: the reader lands citations above it (IR-477).
-  const [reviewBarInset, setReviewBarInset] = useState(0);
   // A My Library link names the request it answers as `#fragment` (IR-625).
   useFragmentFocus(location.hash, record != null);
 
@@ -382,8 +396,9 @@ export default function PaperViewPage() {
       ? "review"
       : "overview";
   const section: PaperSection = landing?.section ?? (openAtPage != null ? readerSection : "overview");
-  // Review's Documents drawer (ADR-032 §10, IR-879): `?documents=open`, or an old `?section=files`.
-  const documentsOpen = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
+  // Review's Documents tab (IR-1203; the drawer it replaced was IR-879):
+  // `?documents=open`, or an old `?section=files`, opens it.
+  const documentsWanted = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
   // Still on the record being left while the next one loads.
   const arriving = loading || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
@@ -520,6 +535,13 @@ export default function PaperViewPage() {
     recordsApi
       .detail(Number(id))
       .then(({ data }) => {
+        // A draft is not a paper page (IR-1227, ADR-009 decision 6). Only its
+        // owner loads one, and opening it is opening the Publish form at the
+        // step they left off -- an old `?section=review` link included.
+        if (data.pipeline_status === "draft") {
+          navigate(`/?publish=${data.id}`, { replace: true });
+          return;
+        }
         setRecord(data);
         setLoadFailed(null);
         // access_count is a global counter, so it cannot answer "what have I
@@ -575,6 +597,8 @@ export default function PaperViewPage() {
       // Otherwise the control keeps its last state; a reload catches up.
     }
   };
+  // Live updates (ADR-073): this paper changed for someone who may see it.
+  useLiveRefresh(id ? [`record:${id}`] : [], () => { void reloadRecord(); });
 
   /**
    * RDCO withdrew the paper (IR-798): it is deleted, so reading it again would
@@ -626,7 +650,9 @@ export default function PaperViewPage() {
 
   const can = capabilitiesFor(record);
   const userIsOwner = isOwner(record, viewer);
-  const reviewerWorkspace = onReviewTab && !userIsOwner;
+  // Review is one full-height workspace for everyone (IR-1206): the owners'
+  // editorial header left it, so Back and the title are all above the reader.
+  const reviewWorkspace = onReviewTab;
   const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
 
@@ -678,13 +704,44 @@ export default function PaperViewPage() {
   const drawnHighlights = highlights.items
     .filter((h) => (viewedVersion ? h.state === "stale" && h.open_version === viewedVersion.number : h.state === "current"))
     .map((h) => ({ key: h.id, regions: h.regions }));
+  // The menu is offered on the current paper only (ADR-065 §8), so this names the current version.
+  const currentVersionLabel = record.manuscript_unsubmitted
+    ? "Unsubmitted upload"
+    : latestVersion ? `Version ${latestVersion.number}` : "Current version";
   const selectionActions: SelectionAction[] = [
+    // Wherever Ask IRIS is offered (IR-581). A typed question is sent with the passage at once,
+    // from the composer's own Send; with nothing typed, Paper Chat opens on an editable question.
+    ...(onReviewTab ? [] : [{
+      id: "ask-selection", label: "Ask about selection", short: "Ask IRIS",
+      placeholder: "Ask IRIS about this passage…",
+      icon: <AskIrisMark className="size-4" />,
+      run: (passage, manuscriptRevision, question) => {
+        focusPanel.current = true;
+        chat.askAbout({
+          recordId: record.id, title: record.title, versionLabel: currentVersionLabel, manuscriptRevision,
+          page: passage.page, quote: passage.quote,
+          ...(question ? { question, send: true } : {}),
+        });
+      },
+    } satisfies SelectionAction]),
     {
-      id: "save-highlight", label: "Save highlight", icon: "fa-highlighter",
-      run: (passage, manuscriptRevision) => void highlights.save(passage, manuscriptRevision),
+      id: "save-highlight", label: "Save highlight", short: "Highlight", sendIcon: "fa-check",
+      placeholder: "Add a note to your Notes (optional)…",
+      icon: <HighlightSwatch />,
+      run: (passage, manuscriptRevision, text) => {
+        setHighlightsShown(true);
+        void highlights.save(passage, manuscriptRevision);
+        // The reader's own words go to their Notes, never into the highlight (ADR-065 §1).
+        if (text) {
+          pendingNote.current = [...pendingNote.current, `Page ${passage.page}: ${text}`];
+          setNotesWanted(true);
+          appendPendingNote();
+        }
+      },
     },
   ];
   const openHighlight = (h: ReadableHighlight) => {
+    setHighlightsShown(true);
     const version = h.state === "stale" ? h.open_version : null;
     setOpened((last) => ({
       key: (last?.key ?? 0) + 1, page: h.page, regions: h.regions, version, arrival: arrivalKey.current,
@@ -718,8 +775,26 @@ export default function PaperViewPage() {
   // record bar, not beside zoom (IR-1098, audit CMP-06). Only where the bar
   // shows the paper and has room: on a phone it stays in the reader's toolbar,
   // as the version does. An earlier version offers no download at all.
+  // A supporting document opened from Documents (IR-1203), shown in Review's
+  // reader instead of the manuscript. It holds only for the address it was
+  // opened at: any change of view (a Version, a section, a citation) brings
+  // the manuscript back, and so does a thread or Changes' *Show in paper*.
+  const shown = section === "review" && documentShown?.at === location.search ? documentShown : null;
+  const openDocument = (document: ReaderDocument, opener: HTMLElement) =>
+    setDocumentShown({ document, at: location.search, opener });
+  const showManuscript = () => setDocumentShown(null);
+  // A thread's document (IR-1204), opened from its card: focus goes back there.
+  const showThreadDocument = (thread: ThreadDocument) => {
+    const opener = window.document.activeElement;
+    setDocumentShown({
+      document: slotUploadDocument(thread.slot, { id: thread.upload, version: thread.version }, thread.extension, !thread.earlier),
+      at: location.search,
+      opener: opener instanceof HTMLElement ? opener : null,
+    });
+  };
   const pendingInBar =
-    (onPaperTab || reviewerWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && record.download?.state === "pending";
+    (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && !shown &&
+    record.download?.state === "pending";
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = () => (
@@ -774,17 +849,19 @@ export default function PaperViewPage() {
           // is never put back only to jump to the citation after.
           keepPlace={resolution.status !== "loading"}
           highlightRegions={highlightRegions}
+          landingLook={openedInShown ? "highlight" : "citation"}
           navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
           highlights={drawnHighlights}
           selectionActions={selectionActions}
-          contained={onPaperTab || reviewerWorkspace || tier === "wide"}
-          fill={onPaperTab || reviewerWorkspace}
+          highlightsShown={highlightsShown}
+          onHighlightsShownChange={setHighlightsShown}
+          contained={onPaperTab || reviewWorkspace || tier === "wide"}
+          fill={onPaperTab || reviewWorkspace}
           // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
           clearCorner={onPaperTab}
           // On a phone's one-row bar there is no room for the version, so it
           // sits at the start of the reader's toolbar (IR-1092).
-          toolbarStart={(onPaperTab || reviewerWorkspace) && tier === "single" ? paperVersion : undefined}
-          bottomInset={onReviewTab ? reviewBarInset : 0}
+          toolbarStart={(onPaperTab || reviewWorkspace) && tier === "single" ? paperVersion : undefined}
           downloadControl={
             // An earlier version is not offered as a copy: the download route
             // serves only the current paper, and every copy must be marked.
@@ -793,7 +870,7 @@ export default function PaperViewPage() {
                 recordId={record.id}
                 recordTitle={record.title}
                 download={record.download}
-                fill={onPaperTab || reviewerWorkspace}
+                fill={onPaperTab || reviewWorkspace}
                 onChanged={reloadRecord}
                 pending={pendingInBar ? "elsewhere" : "here"}
               />
@@ -816,17 +893,17 @@ export default function PaperViewPage() {
   const showRail = section === "overview" && !arriving;
   // Ask IRIS open beside the page leaves no room for the rail (IR-569).
   const railHidden = showRail && chat.open && !chatMinimized;
-  const primary = can.has("continue_draft")
-    ? "continue"
-    : can.has("create_version")
-      ? "elsewhere"
-      : can.has("open_review") && section !== "review"
-        ? "open_review"
-        : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
-          ? "elsewhere"
-          : hasPaper
-            ? "view"
-            : "save";
+  // A draft never reaches this page (it opens in Publish, IR-1227), so
+  // `continue_draft` has no action here.
+  const primary = can.has("create_version")
+    ? "elsewhere"
+    : can.has("open_review") && section !== "review"
+      ? "open_review"
+      : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
+        ? "elsewhere"
+        : hasPaper
+          ? "view"
+          : "save";
 
   // *Open review* (ADR-032 §4) records when this reviewer started -- the
   // seat moves to `in_review` and the server stamps `opened_at` -- then moves
@@ -847,20 +924,18 @@ export default function PaperViewPage() {
     setViewParam("section", "review");
   };
 
-  // Paper mode's version: a compact picker where there is a choice, else
-  // the version's number, else nothing to a reader shown none (IR-416).
-  const paperVersion =
-    versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1) ? (
-      <VersionPicker
-        compact
-        unsubmitted={record.manuscript_unsubmitted}
-        versions={versions}
-        viewing={viewedVersion?.number ?? null}
-        onChoose={chooseVersion}
-      />
-    ) : latestVersion ? (
-      <span className="shrink-0 text-small font-semibold text-stone-600">v{latestVersion.number}</span>
-    ) : null;
+  // Paper mode's version: a compact picker whenever there is a version, v1
+  // alone included, so every paper's header looks alike (IR-1214); nothing
+  // to a reader shown none (IR-416, IR-479).
+  const paperVersion = latestVersion ? (
+    <VersionPicker
+      compact
+      unsubmitted={record.manuscript_unsubmitted}
+      versions={versions}
+      viewing={viewedVersion?.number ?? null}
+      onChoose={chooseVersion}
+    />
+  ) : null;
 
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -882,6 +957,36 @@ export default function PaperViewPage() {
       View
     </button>
   );
+
+  // What left the owners' header for their Review's Details tab (IR-1206):
+  // fixing the title or abstract during a revision, and where the paper
+  // came from or went next. Each only where the server offers it.
+  const lineageLinks = (
+    <>
+      {record.lineage?.derived_from && (
+        <Link to={`/records/${record.lineage.derived_from.id}`} className="text-small underline">
+          Developed from Proposal #{record.lineage.derived_from.id} — View proposal
+        </Link>
+      )}
+      {record.lineage?.continued_as && (
+        <Link to={`/records/${record.lineage.continued_as.id}`} className="text-small underline">
+          Continued as {record.lineage.continued_as.record_type_name} #{record.lineage.continued_as.id}
+        </Link>
+      )}
+    </>
+  );
+  const authorDetails = (can.has("edit_details") || can.has("continue_as") || record.lineage?.derived_from || record.lineage?.continued_as) ? (
+    <div className="flex flex-col items-start gap-3">
+      {can.has("edit_details") && (
+        <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
+          <i className="fas fa-pen text-2xs" aria-hidden />
+          Edit details
+        </button>
+      )}
+      {lineageLinks}
+      {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
+    </div>
+  ) : null;
 
   const saveCiteShareActions = (
     <>
@@ -925,12 +1030,12 @@ export default function PaperViewPage() {
       ref={observeWorkspace}
       className={cn(
         "relative [container-type:inline-size] [container-name:reading]",
-        (onPaperTab || reviewerWorkspace) && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
+        (onPaperTab || reviewWorkspace) && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
       )}
     >
       <ReadingHeader
         inert={chatModal}
-        className={cn(!onPaperTab && !reviewerWorkspace && "sticky top-0 z-30")}
+        className={cn(!onPaperTab && !reviewWorkspace && "sticky top-0 z-30")}
         sections={sections}
         section={section}
         onSelect={(s) => setViewParam("section", s)}
@@ -939,9 +1044,11 @@ export default function PaperViewPage() {
         panelId={arriving ? undefined : `${tabsId}-panel`}
         onBack={() => navigate(-1)}
         onBackToAnswer={backToAnswer}
-        title={!onPaperTab && !reviewerWorkspace ? undefined : arriving ? null : record.title}
-        // Not in the bar below 640px, where the reader's toolbar holds it.
-        version={(onPaperTab || reviewerWorkspace) && tier !== "single" ? paperVersion : undefined}
+        title={!onPaperTab && !reviewWorkspace ? undefined : arriving ? null : record.title}
+        // Not in the bar below 640px, where the reader's toolbar holds it. Not
+        // while a supporting document is shown: the bar would describe the
+        // manuscript, and the document's strip names what is shown (IR-1203).
+        version={(onPaperTab || reviewWorkspace) && tier !== "single" && !shown ? paperVersion : undefined}
         actions={pendingInBar ? (
           <PaperDownloadControl
             recordId={record.id}
@@ -954,7 +1061,7 @@ export default function PaperViewPage() {
       />
       <div
         className={cn(
-          onPaperTab || reviewerWorkspace
+          onPaperTab || reviewWorkspace
             ? "flex-1 min-h-0 flex"
             : onReviewTab
               ? "px-4 sm:px-7 pt-6 pb-7"
@@ -965,7 +1072,7 @@ export default function PaperViewPage() {
           {...(chatModal ? { inert: "" } : {})}
           className={cn(
             "min-w-0",
-            (onPaperTab || reviewerWorkspace) && "flex-1 min-h-0 flex flex-col",
+            (onPaperTab || reviewWorkspace) && "flex-1 min-h-0 flex flex-col",
             // Its own container, so the rail and the page read the room the
             // panel leaves them (IR-569), as the reader reads the paper's.
             !onPaperTab && !onReviewTab && "flex-1 [container-type:inline-size] [container-name:overview]",
@@ -974,17 +1081,18 @@ export default function PaperViewPage() {
 
           <div
             className={cn(
-              onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
+              onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
               !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", CORNER_CLEARANCE_CLASS, PAGE_WIDTH[showRail ? "wide-left" : "standard"]),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
-              // takes its place: the rail folds away and the page widens into it.
+              // takes its place: the rail folds away, and the page sits centred
+              // in the room the panel leaves rather than against its left edge.
               showRail &&
                 cn(
                   "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   railHidden
-                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-between overview-wide:gap-x-0"
+                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-center overview-wide:gap-x-0"
                     : "overview-wide:grid-cols-[minmax(0,60rem)_clamp(17rem,25cqw,22rem)] overview-wide:justify-between overview-wide:gap-x-8",
                 ),
             )}
@@ -998,17 +1106,18 @@ export default function PaperViewPage() {
           <div
             className={cn(
               "min-w-0",
-              onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
+              onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
               // The Overview reads in one column, up to 60rem, flush left with
-              // the rail beside it; spare room falls to the right, so the
-              // page keeps its place whether Ask IRIS is open or not.
+              // the rail beside it. With Ask IRIS open the rail is gone, so the
+              // column is centred in the room that is left.
               showRail && "w-full max-w-[60rem]",
+              railHidden && "mx-auto",
             )}
           >
             {/* Editorial header (IR-356): what it is, who wrote it, then
                 what to do with it. Not in Paper mode, where the record bar
                 holds the paper in one line (IR-569). */}
-            {!onPaperTab && !reviewerWorkspace && (
+            {!onPaperTab && !reviewWorkspace && (
             <header className={cn("space-y-5", section === "overview" && "pb-1")}>
               <h1 className="font-display font-semibold text-4xl sm:text-5xl leading-[1.08] tracking-tight text-stone-900 text-balance">
                 {record.title}
@@ -1060,21 +1169,12 @@ export default function PaperViewPage() {
                 </div>
               </div>
 
-              {record.lineage?.derived_from && (
-                <Link to={`/records/${record.lineage.derived_from.id}`} className="text-small underline">
-                  Developed from Proposal #{record.lineage.derived_from.id} — View proposal
-                </Link>
-              )}
-              {record.lineage?.continued_as && (
-                <Link to={`/records/${record.lineage.continued_as.id}`} className="text-small underline">
-                  Continued as {record.lineage.continued_as.record_type_name} #{record.lineage.continued_as.id}
-                </Link>
-              )}
+              {lineageLinks}
               {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
-              {/* The version picker (IR-416)
-                  only with two or more versions to choose between, or one
-                  beside the owner's unsubmitted revision (IR-273). */}
-              {(versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1)) && (
+              {/* The version picker (IR-416) whenever there is a version,
+                  v1 alone included (IR-1214), and beside the owner's
+                  unsubmitted revision (IR-273). */}
+              {latestVersion && (
                 <VersionPicker
                   unsubmitted={record.manuscript_unsubmitted}
                   versions={versions}
@@ -1083,15 +1183,8 @@ export default function PaperViewPage() {
                 />
               )}
 
-              {(section !== "overview" || primary === "continue" || primary === "open_review" || can.has("edit_details")) && (
+              {(section !== "overview" || primary === "open_review" || can.has("edit_details")) && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {primary === "continue" && (
-                    <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
-                      <i className="fas fa-pen-to-square text-xs" aria-hidden />
-                      Continue
-                    </Link>
-                  )}
-
                   {primary === "open_review" && (
                     <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
                       <i className="fas fa-clipboard-check text-xs" aria-hidden />
@@ -1118,7 +1211,7 @@ export default function PaperViewPage() {
               id={`${tabsId}-panel`}
               role="tabpanel"
               aria-labelledby={tabId(section)}
-              className={onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
+              className={onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
             >
             {section === "paper" && reader()}
 
@@ -1154,7 +1247,7 @@ export default function PaperViewPage() {
                             {r.version != null && <span className="font-normal text-stone-600"> · on v{r.version}</span>}
                           </p>
                           {r.reason && (
-                            <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
+                            <p className="text-justified mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
                               {r.reason}
                             </p>
                           )}
@@ -1249,7 +1342,7 @@ export default function PaperViewPage() {
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="text-lg text-stone-700 leading-7">
+                    <p className="text-justified text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (
@@ -1290,21 +1383,29 @@ export default function PaperViewPage() {
             )}
 
             {section === "review" && (
-              <ReviewWorkspace
+              <ReviewWorkspaceLayout
                 record={record}
                 authorView={userIsOwner}
+                authorDetails={userIsOwner ? authorDetails : undefined}
                 onOpenReview={openReview}
-                onBarInset={setReviewBarInset}
                 onShowVersion={chooseVersion}
                 can={can}
-                reader={recordHasPaper(record) ? reader() : null}
+                reader={recordHasPaper(record)
+                  ? shown
+                    ? <DocumentInReader recordId={record.id} shown={shown} onBack={showManuscript}
+                        fill={reviewWorkspace} contained={reviewWorkspace || tier === "wide"} />
+                    : reader()
+                  : null}
+                onShowManuscript={showManuscript}
+                onShowDocument={recordHasPaper(record) ? showThreadDocument : undefined}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
                 // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
-                documentsOpen={documentsOpen}
-                onDocuments={(open) => setViewParams({ documents: open ? "open" : null, section: "review" })}
+                showDocuments={documentsWanted}
+                // Once shown, the request is spent: the tab is the reviewer's to change.
+                onDocumentsShown={() => setViewParams({ documents: null, section: "review" })}
                 documents={
-                  <FilesSection
+                  <DocumentsTab
                     record={record}
                     owner={userIsOwner}
                     editable={can.has("edit_details")}
@@ -1312,6 +1413,7 @@ export default function PaperViewPage() {
                     attach={can.has("attach_file")}
                     replaceManuscript={can.has("replace_manuscript")}
                     onChanged={handleDocumentRequestChanged}
+                    onOpen={recordHasPaper(record) ? openDocument : undefined}
                   />
                 }
               />
@@ -1331,7 +1433,10 @@ export default function PaperViewPage() {
               {...(railHidden ? { inert: "" } : {})}
               className={cn(
                 "grid min-w-0 transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
+                // The track is the scroller's content box, so the aside can
+                // fit what its own scrollbar leaves rather than the full
+                // column (IR-1178).
+                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:grid-cols-[minmax(0,1fr)] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
                 OVERVIEW_ASIDE_TOP,
                 OVERVIEW_ASIDE_MAX_HEIGHT,
                 railHidden ? "grid-rows-[0fr] opacity-0 invisible" : "grid-rows-[1fr] opacity-100",
@@ -1339,7 +1444,10 @@ export default function PaperViewPage() {
             >
               <aside
                 aria-labelledby={`${tabsId}-details`}
-                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible"
+                // The column's width, held while the column folds, but never
+                // wider than the scroller leaves it: its scrollbar takes ~23px
+                // and the scroller clipped every row's right edge (IR-1178).
+                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:min-w-[15rem] overview-wide:max-w-full overview-wide:overflow-visible"
               >
                 <h2 id={`${tabsId}-details`} className="font-display text-section font-semibold text-stone-900">
                   Record details
@@ -1418,6 +1526,8 @@ export default function PaperViewPage() {
           viewingVersion={viewedVersion?.number ?? null}
           returnTo={chatReturn}
           onOpenNotes={onReviewTab ? undefined : openNotes}
+          selection={chat.selection}
+          onSelectionChange={chat.setSelection}
           className={chatPanelClass}
         />
       )}

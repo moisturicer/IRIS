@@ -37,7 +37,7 @@ POND = "sampling procedure for tilapia ponds stocked in brackish water"
 
 
 def paper(title, pages, *, status=PipelineStatus.PUBLISHED, owner=None, revision="1"):
-    record = Record.objects.create(title=title, abstract="", pipeline_status=status)
+    record = Record.objects.create(added_by=owner, title=title, abstract="", pipeline_status=status)
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     write_source(record, pages, revision)
@@ -156,7 +156,7 @@ def test_a_reader_finds_a_paper_and_opens_its_passage_at_the_exact_revision(rese
     turn = client.get(f"/api/v1/ai/conversations/{response.json()['conversation_id']}",
                       headers=as_reader(grant)).json()["turns"][0]
     assert turn["citations"] == [{"record_id": flood.pk, "page": 4, "quote": FLOOD,
-                                  "revision": hit.source.revision, "regions": []}]
+                                  "revision": hit.source.revision, "regions": [], "title": flood.title}]
 
 
 def test_a_trial_chunk_set_is_never_searched_or_read(research):

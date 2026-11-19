@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from core.enums import RequestStatus, RoleName, SessionEndReason
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import (
     IsAccountAdmin,
@@ -29,7 +30,9 @@ from apps.audit.services import create_audit_event
 from apps.audit import retention
 from apps.audit.models import AuditEvent
 from . import people_search, profile, public_profile, sign_in_audit
-from .models import User, College, Department, Course, RoleRequest, SystemSetting
+from .models import User, College, Department, Course, RoleRequest, SystemSetting, UserSession
+from . import refresh_cookie
+from .authentication import IdleAwareTokenRefreshSerializer
 from .serializers import (
     UserSerializer, UserListSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
@@ -188,11 +191,15 @@ class LoginView(APIView):
             if locked.password != user.password:
                 sign_in_audit.refused(email, sign_in_audit.INVALID_CREDENTIALS)
                 return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
-            refresh = start_session(locked)
+            # "Keep me signed in" (ADR-072 decision 3): a JSON true only.
+            remember = request.data.get("remember") is True
+            refresh = start_session(locked, remember=remember)
         create_audit_event("LOGIN", user, metadata={"email": user.email})
-        return Response({
+        session = UserSession.objects.get(id=refresh["sid"])
+        response = Response({
             "access":  str(refresh.access_token),
-            "refresh": str(refresh),
+            # The refresh token is only in the HttpOnly cookie (ADR-072).
+            "remembered": session.remembered,
             # The signed-in user's own payload, `review_access` included, so
             # the landing after sign-in needs no second request (IR-415).
             "user":    MeSerializer(user).data,
@@ -201,6 +208,49 @@ class LoginView(APIView):
             # client shows the notice instead of loading the app.
             "notice_answer_required": requires_answer(user),
         })
+        refresh_cookie.set_cookie(response, refresh, session)
+        return response
+
+
+class RefreshView(APIView):
+    """`POST /auth/token/refresh/`, reading the refresh token from its cookie (ADR-072).
+
+    Answers a new access token and `remembered` in the body and the rotated
+    refresh token in the cookie. With no cookie, `401 no_session`: the browser
+    was never signed in, which is not a session that ended. Any refusal clears
+    the cookie, so a browser stops presenting a token the server has refused.
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get_authenticate_header(self, request):
+        # With no authentication classes DRF answers a refused session 403;
+        # this keeps it 401, as simplejwt's own refresh view did.
+        return 'Bearer realm="api"'
+
+    def post(self, request):
+        refresh_cookie.require_first_party(request)
+        token = refresh_cookie.read(request)
+        if token is None:
+            return Response(
+                {"detail": "Not signed in.", "code": "no_session"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        serializer = IdleAwareTokenRefreshSerializer(data={"refresh": token}, context={"request": request})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0]) from exc
+        data = serializer.validated_data
+        response = Response({"access": data["access"], "remembered": serializer.session.remembered})
+        refresh_cookie.set_cookie(response, data.get("refresh", token), serializer.session)
+        return response
+
+    def handle_exception(self, exc):
+        response = super().handle_exception(exc)
+        if response.status_code == status.HTTP_401_UNAUTHORIZED:
+            refresh_cookie.clear_cookie(response)
+        return response
 
 
 class CurrentNoticeView(APIView):
@@ -359,18 +409,22 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        refresh_cookie.require_first_party(request)
         # Ended through the access token in hand, which is the one this request
-        # was authenticated with; the refresh token in the body may be stale.
+        # was authenticated with; the refresh token in the cookie may be stale.
         sid = request.auth.get("sid") if request.auth else None
         if sid:
             end_session(sid, SessionEndReason.LOGOUT)
         try:
-            token = RefreshToken(request.data["refresh"])
+            # From the cookie only, never the body (ADR-072 decision 1).
+            token = RefreshToken(refresh_cookie.read(request))
             token.blacklist()
             create_audit_event("LOGOUT", request.user, metadata={"email": request.user.email})
         except Exception:
             pass
-        return Response({"detail": "Logged out."})
+        response = Response({"detail": "Logged out."})
+        refresh_cookie.clear_cookie(response)
+        return response
 
 
 class ActivateView(APIView):
@@ -483,6 +537,12 @@ class MePhotoView(APIView):
     def put(self, request):
         serializer = PhotoUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Scanned like every upload, though it is re-encoded (ADR-074).
+        from apps.documents.scanning import upload_problem
+
+        problem = upload_problem(serializer.validated_data["photo"], user=request.user, where="profile_photo")
+        if problem:
+            return Response({"photo": [problem], "detail": problem}, status=status.HTTP_400_BAD_REQUEST)
         profile.set_photo(request.user, serializer.validated_data["photo"], serializer.crop)
         return Response({"photo_url": profile.photo_url(request.user)})
 

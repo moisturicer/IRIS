@@ -54,7 +54,7 @@ def reader(db):
 
 
 def make_record(title, owner, texts, *, status=PipelineStatus.PUBLISHED):
-    record = Record.objects.create(title=title, pipeline_status=status)
+    record = Record.objects.create(added_by=owner, title=title, pipeline_status=status)
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     chunk_set = ChunkSet.objects.create(
         record=record, extraction_hash="h", strategy_id="s",

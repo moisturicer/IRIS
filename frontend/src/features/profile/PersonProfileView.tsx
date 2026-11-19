@@ -84,7 +84,7 @@ export function PersonProfileView({ profile, lists, self = false }: PersonProfil
           <div className="min-w-0 divide-y divide-stone-200">
             {profile.bio && (
               <Section title="About">
-                <p className="max-w-prose whitespace-pre-line text-body text-stone-700">{profile.bio}</p>
+                <p className="whitespace-pre-line break-words text-body text-stone-700">{profile.bio}</p>
               </Section>
             )}
 
@@ -254,7 +254,7 @@ function CollaboratorRail({ list, onMore }: { list: ListState<Collaborator>; onM
                 <Link
                   to={personPath(person.id)}
                   className={cn(
-                    "block truncate rounded-control text-body font-semibold text-stone-900 hover:text-brand",
+                    "block break-words rounded-control text-body font-semibold text-stone-900 hover:text-brand",
                     COLOUR_TRANSITION,
                     FOCUS_RING,
                     "after:absolute after:inset-0 after:content-['']",

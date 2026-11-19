@@ -14,7 +14,7 @@ MODEL = "fake-model"
 
 
 def paper(title, *, status=PipelineStatus.PUBLISHED, owner=None, version=None):
-    record = Record.objects.create(title=title, abstract=f"About {title}.", pipeline_status=status)
+    record = Record.objects.create(added_by=owner, title=title, abstract=f"About {title}.", pipeline_status=status)
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     ChunkSet.objects.create(

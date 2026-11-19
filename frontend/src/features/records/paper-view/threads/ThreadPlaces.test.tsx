@@ -150,7 +150,7 @@ describe("suggested wording", () => {
     const form = screen.getByRole("form", { name: "New comment" });
     await userEvent.type(within(form).getByRole("textbox", { name: "Comment" }), "Count again.");
     await userEvent.type(within(form).getByRole("textbox", { name: "Suggested wording (optional)" }), "forty-two respondents");
-    await userEvent.click(within(form).getByRole("button", { name: "Add to review" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Save as draft" }));
 
     expect(api.postReviewComment).toHaveBeenCalledWith(9, expect.objectContaining({ suggestion: "forty-two respondents" }));
   });
@@ -183,6 +183,17 @@ describe("the response to reviewers in Threads", () => {
     // Before the threads.
     expect(panel.compareDocumentPosition(card()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("labels an answer to a document thread with its document (IR-1204)", () => {
+    const withDocument = { ...letter, entries: [{
+      thread: 3, party: "ierc", party_label: "IERC", severity: "must_fix" as const, comment: "The consent form isn't signed.",
+      version: 1, page: null, quote: "", document: "Consent form, v1", answer: "addressed" as const, note: "Signed copy uploaded.",
+    }] };
+    setup([comment({ anchor: ANCHOR })], { letter: withDocument });
+
+    const [item] = within(screen.getByRole("region", { name: "Response to reviewers, v2" })).getAllByRole("listitem");
+    expect(item).toHaveTextContent("IERC · Must fix · Consent form, v1");
   });
 
   it("isn't shown when no Version carries one", () => {

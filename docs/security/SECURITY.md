@@ -28,9 +28,11 @@ JWT through SimpleJWT, with rotation and blacklist after rotation.
 | Control | How it works today |
 |---|---|
 | Access token | 30 minutes by default |
-| Refresh token | 7 days by default, the absolute limit on a session. Used once, then blacklisted. Only the refresh token is stored in the browser, in `sessionStorage` (`frontend/src/lib/authStorage.ts`) |
+| Refresh token | 7 days by default, counted from the last refresh: rotation gives each new token a fresh 7 days (simplejwt `set_exp`), so this is not an absolute limit on a session; the 30-minute inactivity rule ends sessions long before it (ADR-072 §Context). Used once, then blacklisted. Kept only in the `iris_refresh` cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, path `/api/v1/auth/`, never in a response body or the browser's own storage; the access token lives in memory only ([ADR-072](../adr/072-stay-signed-in-with-a-secure-cookie.md), [IR-1222](https://citiris.atlassian.net/browse/IR-1222)) |
 | Refresh in the client | `refreshOnce` shares one refresh between concurrent 401s, and the new pair goes through `setTokens` (`frontend/src/api/client.ts`) |
-| Inactivity | A session idle for 30 minutes is ended on the server for good, and polling doesn't count as activity ([IR-166](https://citiris.atlassian.net/browse/IR-166), `apps/accounts/sessions.py`) |
+| Inactivity | A session idle for 30 minutes is ended on the server for good, and polling doesn't count as activity ([IR-166](https://citiris.atlassian.net/browse/IR-166), `apps/accounts/sessions.py`). A "Keep me signed in" session is exempt (below) |
+| Keep me signed in | Off by default on the sign-in form. Ticked, the cookie survives a browser restart and the session lasts 30 days from sign-in (`REMEMBERED_SESSION_DAYS`), outside the inactivity rule, then ends with `session_expired` ([ADR-072](../adr/072-stay-signed-in-with-a-secure-cookie.md)) |
+| Refresh and logout | Read the token from its cookie only, and refuse a request without `X-IRIS-Auth: 1` or from an `Origin` outside `CORS_ALLOWED_ORIGINS` (ADR-072 decision 5). Tabs refresh one at a time under a Web Lock, so rotation never signs one out (decision 6) |
 | Failed sign-ins | **Switched off by default for now** ([IR-865](https://citiris.atlassian.net/browse/IR-865)); `AXES_ENABLED=True` turns it on. When on, `django-axes` locks a username and client address pair after 3 failures for 10 minutes by default, answering 429 with `unlock_at`. The address comes from `TRUSTED_PROXY_COUNT`, so it is the real client behind nginx ([IR-656](https://citiris.atlassian.net/browse/IR-656)) |
 | Manual lock | `User.is_locked`, set by an administrator. It never lifts on its own and ends the person's sessions at once ([IR-644](https://citiris.atlassian.net/browse/IR-644)) |
 | Password change or reset | Ends every session and revokes unused reset links. API passwords meet `AUTH_PASSWORD_VALIDATORS` ([IR-644](https://citiris.atlassian.net/browse/IR-644)) |
@@ -76,7 +78,7 @@ Files are served only through Django views that authorize the reader and write a
 
 If download throughput ever matters, the answer is `X-Accel-Redirect`, where nginx serves the bytes and Django still authorizes. It is never a public alias.
 
-- **Uploads:** a file is accepted only if it opens as a PDF with at least one page ([IR-665](https://citiris.atlassian.net/browse/IR-665)). **Uploads aren't scanned for malware. Open:** [IR-666](https://citiris.atlassian.net/browse/IR-666).
+- **Uploads:** a file is accepted only if it opens as a PDF with at least one page ([IR-665](https://citiris.atlassian.net/browse/IR-665)). Every upload is scanned for known malware by ClamAV before it is stored, and refused if flagged or if the scanner is down ([ADR-074](../adr/074-uploads-scanned-for-malware.md), [IR-666](https://citiris.atlassian.net/browse/IR-666)). ClamAV finds known malware only.
 - **Manuscript downloads:** an approved request becomes a time-limited grant, 30 days by default, used while signed in. No link is emailed ([IR-675](https://citiris.atlassian.net/browse/IR-675)).
 - **Downloaded copies:** each carries a footer naming the downloader, a diagonal "CIT-U" background and matching PDF metadata ([IR-676](https://citiris.atlassian.net/browse/IR-676)).
 
@@ -190,7 +192,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | # | Risk | Severity | Why | Closed by |
 |---|---|---|---|---|
 | 1 | Django's admin has no MFA. Since IR-782 it is served only at `/django-admin/`, and nginx's network allowlist is the one control in front of `is_staff` | **High** | One stolen staff password, from an allowlisted network, opens a separate path to the database | MFA, once CIT-U IT provides an identity provider ([IR-652](https://citiris.atlassian.net/browse/IR-652)); the allowlist is [IR-668](https://citiris.atlassian.net/browse/IR-668) |
-| 2 | Uploads aren't scanned for malware | **High** | A hostile file reaches the parser and the people who download it | [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)) |
+| 2 | Uploads are scanned for known malware only (ADR-074); a new, targeted exploit can pass ClamAV | **Medium** | A hostile file no signature knows reaches the parser and the people who download it | Scanning: [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)); the sandboxed PDF checks ([IR-830](https://citiris.atlassian.net/browse/IR-830)) remain the defence against parser exploits |
 | 3 | No backups and no rehearsed restore | **High** | A lost disk loses records that can't be recreated | [IR-167](https://citiris.atlassian.net/browse/IR-167) (parent [IR-151](https://citiris.atlassian.net/browse/IR-151)) |
 | 5 | Security-relevant sign-in events leave no audit row | **Medium** | Password guessing leaves nothing to investigate | [IR-659](https://citiris.atlassian.net/browse/IR-659) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 6 | Registration accepts any email domain | **Medium** | Anyone can get a signed-in account | [IR-660](https://citiris.atlassian.net/browse/IR-660) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |

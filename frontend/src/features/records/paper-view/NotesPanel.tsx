@@ -5,8 +5,11 @@ import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { cn } from "@/lib/utils";
 import type { RecordDetail } from "@/types/records";
 
-import { CONTROL_BASE, CONTROL_FILLED, CONTROL_OUTLINE } from "./controls";
+import { FOCUS_RING } from "@/components/ui/interaction";
+
+import { CONTROL_BASE, CONTROL_FILLED, CONTROL_OUTLINE, CONTROL_SHAPE, CONTROL_SQUARE } from "./controls";
 import { ICON_BUTTON, ResizeEdge } from "./PaperChatDock";
+import { HighlightSwatch } from "./SelectionMenu";
 import type { ReadableHighlight, ReadingHighlightsState } from "./useReadingHighlights";
 import { MAX_NOTE_LENGTH, type ReadingNoteState } from "./useReadingNote";
 
@@ -71,7 +74,7 @@ export function NotesPanel({ record, note, highlights, onOpenHighlight, canOpenV
             <i className="fas fa-xmark" aria-hidden />
           </Button>
         </div>
-        <p className="mt-2 truncate text-2xs text-stone-600">{record.title}</p>
+        <p className="mt-2 break-words text-2xs text-stone-600">{record.title}</p>
         <p id={hintId} className="mt-1 text-2xs text-stone-600">
           <i className="fas fa-lock mr-1" aria-hidden />
           Private: only you can read your notes. Not staff, the paper’s authors or Ask IRIS.
@@ -141,7 +144,7 @@ function HighlightsSection({ highlights, onOpen, canOpenVersion }: {
         </p>
       )}
 
-      <ul className="mt-2 space-y-2">
+      <ul className="-mx-2 mt-1.5 divide-y divide-stone-200/70">
         {highlights.items.map((h) => (
           <HighlightItem key={h.id} highlight={h} onOpen={onOpen} canOpenVersion={canOpenVersion}
             removeFailed={highlights.removeFailed === h.id} onRemove={() => void highlights.remove(h.id)} />
@@ -151,6 +154,11 @@ function HighlightsSection({ highlights, onOpen, canOpenVersion }: {
   );
 }
 
+/**
+ * One saved passage, drawn like a cited passage in Ask IRIS's sources: the
+ * highlight's own colour as its marker, the quote in the reading face, and
+ * the page it opens at. The whole row opens it; Remove sits beside it.
+ */
 function HighlightItem({ highlight: h, onOpen, canOpenVersion, removeFailed, onRemove }: {
   highlight: ReadableHighlight;
   onOpen: (highlight: ReadableHighlight) => void;
@@ -164,31 +172,48 @@ function HighlightItem({ highlight: h, onOpen, canOpenVersion, removeFailed, onR
   // A current highlight opens on the paper shown; a stale one only on its own version.
   const openable = !stale || (version !== null && canOpenVersion(version) === true);
   const where = `page ${h.page}${stale && version !== null ? ` in v${version}` : ""}`;
-  return (
-    <li className="rounded-control border border-stone-300 bg-white p-2">
-      <p className="text-3xs font-semibold text-stone-600">
-        Page {h.page}
-        {stale && <span className="ml-2 normal-case tracking-normal text-brand">· From an earlier version of this paper</span>}
-      </p>
-      <blockquote id={quoteId} className="mt-1 max-h-24 overflow-y-auto border-l-2 border-stone-300 pl-2 text-2xs text-stone-900">
-        {h.quote}
-      </blockquote>
-      {stale && !openable && (
-        <p className="mt-1 text-2xs text-stone-600">That version is no longer shown, so this passage can’t be opened here.</p>
-      )}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {openable && (
-          <button type="button" aria-describedby={quoteId} onClick={() => onOpen(h)}
-            className={cn("px-3", CONTROL_BASE, CONTROL_OUTLINE)}>
-            Open {where}
-          </button>
+  const body = (
+    <>
+      <HighlightSwatch className={cn("mt-1.5", stale && "opacity-50")} />
+      <span className="min-w-0">
+        {stale && <span className="block text-label font-medium text-brand">From an earlier version of this paper</span>}
+        <span id={quoteId} className="block break-words font-display text-body italic leading-snug text-stone-700">
+          “{h.quote}”
+        </span>
+        {stale && !openable && (
+          <span className="mt-1 block text-label text-stone-600">
+            That version is no longer shown, so this passage can’t be opened here.
+          </span>
         )}
-        <button type="button" aria-describedby={quoteId} onClick={onRemove}
-          className={cn("px-3", CONTROL_BASE, CONTROL_OUTLINE)}>
-          Remove highlight on page {h.page}
+      </span>
+      <span className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-label font-medium tabular-nums text-stone-500">
+        <span>Page {h.page}</span>
+        {openable && (
+          <i aria-hidden className="fas fa-arrow-right text-label opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-visible/row:opacity-100 motion-reduce:transition-none" />
+        )}
+      </span>
+    </>
+  );
+  const row = "grid grid-cols-[0.875rem_minmax(0,1fr)_auto] items-start gap-x-2.5 px-2 py-2 text-left";
+  return (
+    <li className="group/item py-1 first:pt-0 last:pb-0">
+      <div className="flex items-start gap-1">
+        {openable ? (
+          <button type="button" aria-label={`Open ${where}`} aria-describedby={quoteId} onClick={() => onOpen(h)}
+            className={cn("group/row min-w-0 flex-1 rounded-control transition-colors duration-150 hover:bg-stone-100 motion-reduce:transition-none", row, FOCUS_RING)}>
+            {body}
+          </button>
+        ) : (
+          <div className={cn("min-w-0 flex-1", row)}>{body}</div>
+        )}
+        <button type="button" aria-label={`Remove highlight on page ${h.page}`} aria-describedby={quoteId}
+          title="Remove highlight" onClick={onRemove}
+          className={cn("grid shrink-0 place-items-center text-stone-500 transition-colors duration-150 hover:bg-stone-100 hover:text-brand motion-reduce:transition-none",
+            CONTROL_SQUARE, CONTROL_SHAPE, FOCUS_RING)}>
+          <i aria-hidden className="far fa-trash-can text-small" />
         </button>
-        {removeFailed && <span role="alert" className="text-2xs font-semibold text-brand">Could not remove it. Try again.</span>}
       </div>
+      {removeFailed && <p role="alert" className="px-2 pb-1 text-2xs font-semibold text-brand">Could not remove it. Try again.</p>}
     </li>
   );
 }

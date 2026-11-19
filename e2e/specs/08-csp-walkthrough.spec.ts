@@ -131,7 +131,7 @@ test("an Adviser's screens, with a paper in review, report no CSP violation", as
 
 test("RDCO's screens report no CSP violation", async ({ page }) => {
   await walk(page, EMAIL.rdco, [
-    "/review", "/review/office", "/review/analytics", `/records/${inReviewId}`, "/records/import", "/rdco/users",
+    "/review", "/review/office", "/rdco/analytics", `/records/${inReviewId}`, "/records/import", "/rdco/users",
     "/rdco/role-requests", "/rdco/download-requests", "/rdco/delete-requests", "/notices",
   ]);
 });
@@ -143,7 +143,8 @@ for (const office of ["itso", "ierc", "ktto"] as const) {
 }
 
 test("an office coordinator's screens report no CSP violation", async ({ page }) => {
-  await walk(page, EMAIL.itsoCoordinator, ["/review", "/review/office", "/review/analytics"]);
+  // No analytics: RDCO's alone since IR-1216.
+  await walk(page, EMAIL.itsoCoordinator, ["/review", "/review/office"]);
 });
 
 test("the System Admin's screens report no CSP violation", async ({ page }) => {

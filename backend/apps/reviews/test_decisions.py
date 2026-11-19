@@ -509,8 +509,10 @@ class RefusalTests(DecisionTestBase):
         record = self.make_record()
         self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
         response = self.decide(record, self.adviser, "publish", token="x")
+        # A 404 since IR-1227: a draft is its creator's alone (IR-1227, ADR-009 decision 6), so the Adviser it names cannot see it.
         self.assertIn(
-            response.status_code, (status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN),
+            response.status_code,
+            (status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
         )
         record.refresh_from_db()
         self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
@@ -612,6 +614,11 @@ class DetailFlagTests(DecisionTestBase):
             [{
                 "party": Party.RDCO, "label": seats._label(Party.RDCO),
                 "holders": [self.rdco2.get_full_name()],
+                # IR-1226 adds what each of them leaves, for the dialog's warning.
+                "leaving": [{
+                    "name": self.rdco2.get_full_name(),
+                    "unresolved": {"drafts": 0, "open_threads": 0, "document_requests": 0, "revision_requests": 0},
+                }],
             }],
         )
 

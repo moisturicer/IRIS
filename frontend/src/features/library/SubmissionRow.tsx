@@ -101,7 +101,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
                 {item.title}
               </Link>
             </h3>
-            {people && <p className="mt-0.5 truncate text-small text-stone-600">{people}</p>}
+            {people && <p className="mt-0.5 break-words text-small text-stone-600">{people}</p>}
             <p className="mt-1 text-small text-stone-800">{waitingOn(item)}</p>
           </div>
 

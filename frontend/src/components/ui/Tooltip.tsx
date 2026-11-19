@@ -80,7 +80,7 @@ export function Tooltip({ label, disabled = false, className, children }: Toolti
         >
           <span
             role="tooltip"
-            className="block whitespace-nowrap rounded-control bg-stone-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-card-md animate-fade-in motion-reduce:animate-none"
+            className="block w-max max-w-[min(18rem,calc(100vw-5rem))] break-words rounded-control bg-stone-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-card-md animate-fade-in motion-reduce:animate-none"
           >
             {label}
           </span>

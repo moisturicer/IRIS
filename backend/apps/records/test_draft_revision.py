@@ -136,6 +136,8 @@ class MetadataSourcesTests(APITestCase):
 
     def test_only_owners_see_the_decisions_or_the_revision(self):
         self.client.patch(self.url, {"metadata_sources": {"title": {"state": "authored"}}}, format="json")
+        # Submitted, so the Adviser sees it: a draft is its creator's alone (IR-1227, ADR-009 decision 6).
+        Record.objects.filter(pk=self.record.pk).update(pipeline_status=PipelineStatus.IN_REVIEW)
         self.client.force_authenticate(self.adviser)
 
         response = self.client.get(self.url)

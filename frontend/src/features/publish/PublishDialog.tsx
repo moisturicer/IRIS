@@ -25,7 +25,7 @@
  * office (the hints are hints; see `metadataPayload`), and the confirmation
  * names whoever the server says holds the record now.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
@@ -160,6 +160,32 @@ function PublishUnavailable({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** The question closing the form asks (IR-1227). */
+type Closing = "upload" | "leave" | "delete" | "discard";
+
+/**
+ * One question about closing, inline above the form while it waits: an
+ * `alertdialog` named by its title and described by its body.
+ */
+function CloseQuestion({ title, body, error, children }: {
+  title: string; body: string; error?: string | null; children: ReactNode;
+}) {
+  const id = useId();
+  return (
+    <div
+      role="alertdialog"
+      aria-labelledby={`${id}-title`}
+      aria-describedby={`${id}-body`}
+      className="mb-section rounded-card border border-stone-300 bg-stone-50 p-card-compact"
+    >
+      <p id={`${id}-title`} className="text-body font-medium text-stone-900">{title}</p>
+      <p id={`${id}-body`} className="mt-1 text-small text-stone-600">{body}</p>
+      {error && <p role="alert" className="mt-2 text-small text-brand">{error}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
 type Phase =
   | { kind: "loading" }
   | { kind: "loadError"; message: string }
@@ -271,12 +297,15 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [likelyMatches, setLikelyMatches] = useState<ManuscriptMatch[]>([]);
   const [matchesAcknowledged, setMatchesAcknowledged] = useState(false);
   const [matchFailure, setMatchFailure] = useState("");
-  const [confirmingClose, setConfirmingClose] = useState(false);
-  // Escape or Close put the question on screen; focus goes with it, once.
-  const keepUploadingRef = useRef<HTMLButtonElement>(null);
+  // The question closing asks, if any (IR-1227, ADR-009 decision 6).
+  const [closing, setClosing] = useState<Closing | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Escape or Close put a question on screen; focus goes to its default, once.
+  const closeDefaultRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (confirmingClose) keepUploadingRef.current?.focus();
-  }, [confirmingClose]);
+    if (closing) closeDefaultRef.current?.focus();
+  }, [closing]);
   const [announcement, setAnnouncement] = useState("");
 
   /* ── Load the lists, then the draft if one was named ─────────────────── */
@@ -705,14 +734,43 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   }
 
   /* ── Closing ─────────────────────────────────────────────────────────── */
+  /**
+   * Closing asks what to do with the work: stop an upload in flight; leave a
+   * saved draft, keep it or delete it; or discard a type chosen before any
+   * manuscript, when nothing is saved yet. With nothing entered it just closes.
+   */
   function requestClose() {
-    if (upload.status === "uploading") setConfirmingClose(true);
+    if (closing) return;
+    if (phase.kind !== "form") onClose();
+    else if (upload.status === "uploading") setClosing("upload");
+    else if (draftIdRef.current != null) setClosing("leave");
+    else if (typeId != null) setClosing("discard");
     else onClose();
   }
 
   function stopAndClose() {
     abortRef.current?.abort();
     onClose();
+  }
+
+  function askToDelete() {
+    setDeleteError(null);
+    setClosing("delete");
+  }
+
+  /** Delete the draft as My submissions does (`DELETE /records/<id>/`, IR-508). */
+  async function deleteDraft() {
+    const id = draftIdRef.current;
+    if (id == null) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await recordsApi.delete(id);
+      onClose();
+    } catch (err) {
+      setDeleteError(describeFailure(err, "Could not delete this draft. Try again.").message);
+      setDeleting(false);
+    }
   }
 
   /* ── What the steps show ─────────────────────────────────────────────── */
@@ -766,7 +824,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   };
 
   let footer: ReactNode = null;
-  if (phase.kind === "form" && !confirmingClose) {
+  if (phase.kind === "form" && !closing) {
     footer = (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-small text-stone-600">
@@ -825,26 +883,64 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         {announcement}
       </span>
 
-      {confirmingClose && (
-        <div
-          role="alertdialog"
-          aria-labelledby="publish-close-title"
-          aria-describedby="publish-close-body"
-          className="mb-section rounded-card border border-stone-300 bg-stone-50 p-card-compact"
+      {closing === "upload" && (
+        <CloseQuestion
+          title="Stop the upload and close?"
+          body="Your draft is kept, but the file has not finished uploading. You can add it when you come back."
         >
-          <p id="publish-close-title" className="text-body font-medium text-stone-900">Stop the upload and close?</p>
-          <p id="publish-close-body" className="mt-1 text-small text-stone-600">
-            Your draft is kept, but the file has not finished uploading. You can add it when you come back.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" size="page" ref={keepUploadingRef} onClick={() => setConfirmingClose(false)}>
-              Keep uploading
-            </Button>
-            <Button type="button" variant="outline" size="page" onClick={stopAndClose}>
-              Stop and close
-            </Button>
-          </div>
-        </div>
+          <Button type="button" size="page" ref={closeDefaultRef} onClick={() => setClosing(null)}>
+            Keep uploading
+          </Button>
+          <Button type="button" variant="outline" size="page" onClick={stopAndClose}>
+            Stop and close
+          </Button>
+        </CloseQuestion>
+      )}
+
+      {closing === "leave" && (
+        <CloseQuestion
+          title="Leave this submission?"
+          body="Your answers are saved as a draft. You can finish it later from My submissions."
+        >
+          <Button type="button" size="page" ref={closeDefaultRef} onClick={onClose}>
+            Keep as draft
+          </Button>
+          <Button type="button" variant="outline" size="page" onClick={askToDelete}>
+            Delete draft
+          </Button>
+          <Button type="button" variant="ghost" size="page" onClick={() => setClosing(null)}>
+            Keep editing
+          </Button>
+        </CloseQuestion>
+      )}
+
+      {closing === "delete" && (
+        <CloseQuestion title="Delete this draft?" body="This can't be undone." error={deleteError}>
+          <Button type="button" variant="danger" size="page" loading={deleting} onClick={() => void deleteDraft()}>
+            Delete draft
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="page"
+            ref={closeDefaultRef}
+            disabled={deleting}
+            onClick={() => setClosing("leave")}
+          >
+            Keep draft
+          </Button>
+        </CloseQuestion>
+      )}
+
+      {closing === "discard" && (
+        <CloseQuestion title="Discard what you've entered?" body="Nothing is saved until your manuscript is uploaded.">
+          <Button type="button" size="page" ref={closeDefaultRef} onClick={() => setClosing(null)}>
+            Keep editing
+          </Button>
+          <Button type="button" variant="outline" size="page" onClick={onClose}>
+            Discard
+          </Button>
+        </CloseQuestion>
       )}
 
       {phase.kind === "loading" && (

@@ -33,6 +33,7 @@ import { queueCountsChanged } from "@/lib/queueCounts";
 import type { DownloadRequest } from "@/types/records";
 
 import { NO_NOTE, RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 type Filter = "" | "pending" | "approved" | "declined" | "revoked";
 const FILTERS: readonly Filter[] = ["pending", "approved", "declined", "revoked", ""];
@@ -88,6 +89,8 @@ export default function DownloadRequestsPage() {
   );
   const requests = read.rows;
   const loading = read.status === "loading";
+  // Live updates (ADR-073): RDCO's queues, reloaded quietly.
+  useLiveRefresh(["queues"], read.refresh);
 
   // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
   // the server's own reason on a refusal.
@@ -112,7 +115,7 @@ export default function DownloadRequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Download Requests"
+        title="Download requests"
         description="Requests for a PDF copy of a paper. Reading in IRIS needs no approval."
       />
 
@@ -191,7 +194,7 @@ export default function DownloadRequestsPage() {
                       <td className="px-4 py-3">
                         <Link
                           to={`/records/${req.record}`}
-                          className="text-brand font-medium hover:underline line-clamp-1"
+                          className="break-words text-brand font-medium hover:underline"
                         >
                           {req.record_title}
                         </Link>
@@ -200,9 +203,9 @@ export default function DownloadRequestsPage() {
                         <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
                         <p className="text-label text-stone-500">{req.requested_by_email}</p>
                       </td>
-                      <td className="px-4 py-3 max-w-xs">
+                      <td className="px-4 py-3">
                         {req.note
-                          ? <p className="text-stone-700 whitespace-pre-line break-words">{req.note}</p>
+                          ? <p className="text-justified text-stone-700 whitespace-pre-line break-words">{req.note}</p>
                           : <p className="text-stone-500 italic">{NO_NOTE}</p>}
                       </td>
                       <td className="px-4 py-3 text-stone-500 whitespace-nowrap">
@@ -213,7 +216,7 @@ export default function DownloadRequestsPage() {
                           state={req.status}
                           expired={!req.grant_live && !!req.grant_expires_at}
                         />
-                        {grant && <p className="mt-1 text-label text-stone-600 whitespace-nowrap">{grant}</p>}
+                        {grant && <p className="mt-1 text-label text-stone-600">{grant}</p>}
                         {endedByRdco && <RdcoNoteLine note={req.rdco_note} />}
                       </td>
                       <td className="px-4 py-3 text-right">

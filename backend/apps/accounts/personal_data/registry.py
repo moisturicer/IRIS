@@ -83,6 +83,7 @@ INCLUDED: dict[str, str] = {
     "documents.UploadReview": "workflow_acts",
     "documents.DocumentRequest": "workflow_acts",
     "documents.DocumentRequestItem": "workflow_acts",
+    "documents.DocumentRejection": "workflow_acts",
 }
 
 # -- excluded: model -> why --------------------------------------------------

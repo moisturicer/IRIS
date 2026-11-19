@@ -55,6 +55,7 @@ def pytest_configure(config):
     _use_fast_password_hashing()
     _use_in_process_celery_broker()
     _use_local_memory_cache()
+    _no_live_publishing()
     _connect_the_notice_default()
 
     try:
@@ -205,6 +206,18 @@ def _assert_celery_runs_in_process(celery_app) -> None:
             f"built backend={type(backend).__name__}, transport={transport!r}); "
             "every .delay() would block on an unreachable broker. See IR-251."
         )
+
+
+def _no_live_publishing() -> None:
+    """No live-update hints in tests (ADR-073): CI has no Redis to publish to.
+
+    A test about hints swaps in a recorder with `apps.live.publish.use_publisher`.
+    """
+    try:
+        from django.conf import settings
+    except ImportError:
+        return
+    settings.LIVE_ENABLED = False
 
 
 def _use_local_memory_cache() -> None:
@@ -411,3 +424,18 @@ def _connect_the_notice_default() -> None:
     pre_save.connect(
         _new_users_answer_the_notice, dispatch_uid="iris-test-users-answer-the-notice", weak=False,
     )
+
+
+@pytest.fixture(autouse=True)
+def _every_upload_is_scanned_by_the_test_scanner():
+    """Scan every upload with the test scanner, which flags EICAR (IR-666, ADR-074).
+
+    Tests run with DEBUG on, where development may switch scanning off; this
+    keeps every upload path going through the scan, so a path that stops
+    asking is caught by the EICAR tests rather than by nothing. A test about
+    the scanner itself installs its own.
+    """
+    from apps.documents.scanning import FakeScanner, use_scanner
+
+    with use_scanner(FakeScanner()):
+        yield

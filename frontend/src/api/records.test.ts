@@ -229,6 +229,7 @@ describe("recordsApi: calls with a shape of their own", () => {
   describe("the manuscript's bytes", () => {
     it.each<[string, () => Promise<unknown>, string]>([
       ["manuscriptBlob", () => recordsApi.manuscriptBlob(9), "/records/9/manuscript/"],
+      ["firstPage", () => recordsApi.firstPage(9), "/records/9/first-page/"],
       ["versionManuscriptBlob", () => recordsApi.versionManuscriptBlob(9, 2), "/records/9/versions/2/manuscript/"],
       ["downloadCopy", () => recordsApi.downloadCopy(9), "/records/9/download/"],
     ])("%s is read as a blob through the authenticated client", async (_name, call, url) => {

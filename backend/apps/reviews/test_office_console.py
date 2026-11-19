@@ -185,7 +185,8 @@ class OfficeConsoleTests(APITestCase):
         self.assertEqual(rows["Late thesis"]["authors_line"], "Ada Lovelace, Alan Turing")
         self.assertEqual(rows["Late thesis"]["status"]["kind"], "overdue")
         self.assertRegex(rows["Late thesis"]["status"]["text"], r"^Overdue by [2-4] days$")
-        self.assertEqual(rows["Late thesis"]["actions"], ["reassign", "extend"])
+        # An open seat may also be withdrawn from the console (IR-1226).
+        self.assertEqual(rows["Late thesis"]["actions"], ["reassign", "withdraw", "extend"])
         self.assertEqual(rows["Pool thesis"]["status"], {"kind": "unassigned", "text": "Unassigned"})
         self.assertEqual(rows["Pool thesis"]["actions"], ["assign", "extend"])
         self.assertEqual(rows["Soon thesis"]["status"]["kind"], "due")

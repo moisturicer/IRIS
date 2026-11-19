@@ -38,6 +38,16 @@ vi.mock("@/api/records", () => ({
   },
 }));
 
+// IR-1203: a supporting document is read through its own route.
+const viewUpload = vi.fn();
+const viewFile = vi.fn();
+vi.mock("@/api/documents", () => ({
+  documentsApi: {
+    viewUpload: (...args: unknown[]) => viewUpload(...(args as [])),
+    viewFile: (...args: unknown[]) => viewFile(...(args as [])),
+  },
+}));
+
 // IR-573: where the reader left off, on their account.
 const position = vi.fn();
 const savePosition = vi.fn();
@@ -428,6 +438,103 @@ describe("landing on a cited passage (IR-354)", () => {
       // (which moves both) does not change it.
       expect(paneScrollBy).toHaveBeenCalledWith({ top: 2326 - 444 - 48, behavior: "auto" });
     });
+  });
+});
+
+/**
+ * Show in paper from Review (IR-1195): a change's or a thread's passage is
+ * outlined on the Version it belongs to, centred in the reading band, and
+ * takes keyboard focus under a name that says where the reader landed.
+ */
+describe("landing on a review passage (IR-1195)", () => {
+  // A passage that starts in the left column and carries on at the top of the right one.
+  const REGIONS = [
+    { page: 2, left: 0.05, top: 0.4, right: 0.48, bottom: 0.45 },
+    { page: 2, left: 0.52, top: 0.1, right: 0.95, bottom: 0.15 },
+  ];
+  const LANDING = { version: 2, page: 2, regions: REGIONS, label: "Added in v2, page 2, Method", tag: "Added", key: 1 };
+  type Landing = typeof LANDING;
+
+  let scrollBy: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    vi.stubGlobal("innerHeight", 768);
+  });
+  const landings = () => scrollBy.mock.calls.filter(([arg]) => typeof arg === "object");
+
+  const reader = (landing: Landing | null) => (
+    <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: null, onCommentDocument: null, landing }}>
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
+    </ReaderAnnotationsContext.Provider>
+  );
+
+  async function openThenLand(landing: Landing) {
+    const view = render(reader(null));
+    await screen.findByText("Page 1 / 3");
+    placePages([
+      { top: 484, height: 1000 },
+      { top: 1500, height: 1000 },
+      { top: 2516, height: 1000 },
+    ]);
+    vi.spyOn(screen.getByRole("toolbar", { name: "Paper tools" }), "getBoundingClientRect").mockReturnValue(box(400, 44));
+    view.rerender(reader(landing));
+    return view;
+  }
+
+  it("outlines every region of the passage, says what it is in words, and takes focus", async () => {
+    await openThenLand(LANDING);
+    const page2 = screen.getByRole("group", { name: "Page 2" });
+    const passage = await within(page2).findByRole("group", { name: "Added in v2, page 2, Method" });
+    await waitFor(() => expect(passage).toHaveFocus());
+    expect(within(page2).getByText("Added")).toBeInTheDocument();
+    // The outlines are decorative (the group above names the passage), so,
+    // as with citation highlights below, this reaches past the accessible
+    // tree, scoped to the page found through it.
+    expect(page2.querySelectorAll("[data-landing-region]")).toHaveLength(2);
+    expect(screen.getByRole("group", { name: "Page 1" }).querySelector("[data-landing-region]")).toBeNull();
+  });
+
+  it("brings the passage's middle to the middle of the reading band", async () => {
+    await openThenLand(LANDING);
+    // The passage spans 1500 + 100 = 1600 to 1500 + 450 = 1950: its middle is 1775.
+    // The band runs from under the stuck toolbar to the window's bottom.
+    const middle = (READER_TOOLBAR_TOP_PX + 44 + 768) / 2;
+    await waitFor(() => expect(scrollBy).toHaveBeenCalledWith({ top: 1775 - middle, behavior: "smooth" }));
+  });
+
+  it("lands instantly with reduced motion", async () => {
+    mediaQueryAt(true);
+    await openThenLand(LANDING);
+    await waitFor(() => expect(landings()).toHaveLength(1));
+    expect(landings()[0][0]).toMatchObject({ behavior: "auto" });
+  });
+
+  it("lands and takes focus again when shown a second time", async () => {
+    const view = await openThenLand(LANDING);
+    const passage = await screen.findByRole("group", { name: "Added in v2, page 2, Method" });
+    await waitFor(() => expect(passage).toHaveFocus());
+    screen.getByRole("toolbar", { name: "Paper tools" }).querySelector("button")?.focus();
+
+    view.rerender(reader({ ...LANDING, key: 2 }));
+
+    await waitFor(() => expect(landings()).toHaveLength(2));
+    await waitFor(() =>
+      expect(screen.getByRole("group", { name: "Added in v2, page 2, Method" })).toHaveFocus());
+  });
+
+  it("draws nothing and does not move for a passage of a Version not shown", async () => {
+    // The reader shows v2, the current Version; the passage is v1's.
+    await openThenLand({ ...LANDING, version: 1, label: "Removed in v1, page 2, Method", tag: "Removed" });
+    await screen.findByRole("group", { name: "Page 2" });
+    expect(screen.queryByRole("group", { name: "Removed in v1, page 2, Method" })).toBeNull();
+    expect(landings()).toHaveLength(0);
+  });
+
+  it("has no serious or critical violations with a passage outlined", async () => {
+    const { container } = await openThenLand(LANDING);
+    await screen.findByRole("group", { name: "Added in v2, page 2, Method" });
+    await expectNoBlockingA11yViolations(container);
   });
 });
 
@@ -1157,7 +1264,7 @@ describe("find in this paper (IR-353)", () => {
     function openCommentable(onComment: (passage: Passage, version: number) => void) {
       paperText = PAPER;
       render(
-        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, landing: null }}>
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, onCommentDocument: null, landing: null }}>
           <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
         </ReaderAnnotationsContext.Provider>,
       );
@@ -1186,6 +1293,38 @@ describe("find in this paper (IR-353)", () => {
       screen.getByRole("button", { name: "Comment" }).focus();
       await userEvent.keyboard("{Enter}");
       expect(onComment).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), 2);
+    });
+  });
+
+  /**
+   * A supporting document opened from Review's Documents tab (IR-1203): read
+   * through its own route, with find, and nothing of the manuscript's on it.
+   */
+  describe("a supporting document", () => {
+    it("is fetched through its own route and offers find but no Comment", async () => {
+      paperText = PAPER;
+      viewUpload.mockResolvedValue({ data: pdfBlob() });
+      render(
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: vi.fn(), onCommentDocument: null, landing: null }}>
+          <PaperPdfReader recordId={7} document={{ kind: "upload", id: 12, label: "Consent Paper · version 2", fileName: "c.pdf" }}
+            scrollToPage={null} highlightRegions={[]} navKey="a" />
+        </ReaderAnnotationsContext.Provider>,
+      );
+      await screen.findByText("Page 1 / 3");
+
+      expect(viewUpload).toHaveBeenCalledWith(12, { signal: expect.any(AbortSignal) });
+      expect(manuscriptBlob).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Comment" })).not.toBeInTheDocument();
+      await userEvent.type(await openFind(), "robot");
+      await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
+    });
+
+    it("reads an attachment through the files route", async () => {
+      viewFile.mockResolvedValue({ data: pdfBlob() });
+      render(<PaperPdfReader recordId={7} document={{ kind: "file", id: 31, label: "Survey.pdf", fileName: "Survey.pdf" }}
+        scrollToPage={null} highlightRegions={[]} navKey="a" />);
+      await screen.findByText("Page 1 / 3");
+      expect(viewFile).toHaveBeenCalledWith(31, { signal: expect.any(AbortSignal) });
     });
   });
 
@@ -1246,7 +1385,61 @@ describe("selected text actions (IR-583)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Save highlight" }));
 
     expect(run).toHaveBeenCalledTimes(1);
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), "rev-1");
+    // Nothing typed: the action gets the passage, the revision and an empty line (IR-581).
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), "rev-1", "");
+  });
+
+  it("hands what the reader typed in the composer to the chosen mode (IR-581)", async () => {
+    const ask = vi.fn();
+    const save = vi.fn();
+    await openWith({ selectionActions: [
+      { id: "ask-selection", label: "Ask about selection", short: "Ask IRIS", placeholder: "Ask IRIS about this passage…", icon: "fa-comment", run: ask },
+      { id: "save-highlight", label: "Save highlight", short: "Highlight", placeholder: "Add a note", icon: "fa-highlighter", run: save },
+    ] });
+    await selectByFind();
+
+    const group = await screen.findByRole("group", { name: "Selected text actions" });
+    expect(within(group).getByRole("radio", { name: "Ask IRIS" })).toHaveAttribute("aria-checked", "true");
+    await userEvent.type(within(group).getByRole("textbox", { name: "Ask IRIS about this passage…" }), "  Why a robot arm?  ");
+    await userEvent.click(within(group).getByRole("button", { name: "Ask about selection" }));
+
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ quote: "robot arm" }), null, "Why a robot arm?");
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("opens the composer only once the mouse button is released (IR-581)", async () => {
+    await openWith({ selectionActions: [{ id: "save-highlight", label: "Save highlight", icon: "fa-highlighter", run: vi.fn() }] });
+    await userEvent.click(screen.getByRole("button", { name: "Find in this paper" }));
+    const input = await screen.findByRole("searchbox", { name: "Find in this paper" });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.pointerDown(document.body, { button: 0 });
+    // Typed without clicking the field first, which would release the button.
+    await userEvent.type(input, "robot arm", { skipClick: true });
+    expect(menu()).not.toBeInTheDocument();
+
+    fireEvent.pointerUp(document.body, { button: 0 });
+    expect(await screen.findByRole("group", { name: "Selected text actions" })).toBeInTheDocument();
+  });
+
+  it("hides the saved highlights on a plain click on the paper, and the toolbar shows them again (IR-581)", async () => {
+    const shown = vi.fn();
+    const highlights = [{ key: 1, regions: [{ page: 1, left: 0.1, top: 0.1, right: 0.3, bottom: 0.12 }] }];
+    await openWith({ highlights, highlightsShown: true, onHighlightsShownChange: shown });
+
+    const paper = screen.getByRole("region", { name: /^Paper, 3 pages/ });
+    fireEvent.pointerDown(paper, { clientX: 40, clientY: 40 });
+    fireEvent.pointerUp(paper, { clientX: 41, clientY: 41 });
+    expect(shown).toHaveBeenLastCalledWith(false);
+
+    // A drag is a selection, not a click: it hides nothing.
+    shown.mockClear();
+    fireEvent.pointerDown(paper, { clientX: 40, clientY: 40 });
+    fireEvent.pointerUp(paper, { clientX: 140, clientY: 44 });
+    expect(shown).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Hide your highlights" }));
+    expect(shown).toHaveBeenLastCalledWith(false);
   });
 
   it("hands over no revision when the server named none", async () => {
@@ -1256,7 +1449,7 @@ describe("selected text actions (IR-583)", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Save highlight" }));
 
-    expect(run).toHaveBeenCalledWith(expect.anything(), null);
+    expect(run).toHaveBeenCalledWith(expect.anything(), null, "");
   });
 
   it("offers nothing on an earlier version: its bytes are not the paper a highlight belongs to", async () => {

@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from core.permissions import ADMIN_ROLES, IsCommentModerator, get_role_name
+from core.permissions import ADMIN_ROLES, REVIEWER_ROLES, IsCommentModerator, get_role_name
 from .models import DeleteRequest, DownloadRequest, Record
 from apps.reviews.models import ResubmissionRequest
 from core.enums import (
@@ -46,6 +46,14 @@ def needs_action_count(user) -> int:
     )
 
 
+def reviews_waiting(user) -> int:
+    """My Reviews' To review count, or 0 for a role that reviews nothing."""
+    if get_role_name(user) not in REVIEWER_ROLES:
+        return 0
+    from apps.reviews.my_reviews import waiting_count
+    return waiting_count(user)
+
+
 class DashboardStatsView(APIView):
     """
     GET /dashboard/stats/
@@ -55,7 +63,7 @@ class DashboardStatsView(APIView):
 
     def get(self, request):
         user = request.user
-        my_ids = Record.objects.filter(owners__user=user).values_list("pk", flat=True)
+        my_ids = Record.objects.owned_by(user).values_list("pk", flat=True)
         return Response({
             "total_mine":       my_ids.count(),
             "pending_mine":     Record.objects.filter(pk__in=my_ids, pipeline_status__in=IN_REVIEW_STATUSES).count(),
@@ -73,6 +81,9 @@ class DashboardStatsView(APIView):
             # What is waiting on the owner (B2): the sidebar's My Library dot.
             # Unlike `pending_mine`, which is "in review", this is actionable.
             "needs_action_mine": needs_action_count(user),
+            # Reviews waiting on the user: the sidebar's My Reviews badge
+            # (IR-1208), the same number as My Reviews' To review tab.
+            "reviews_waiting_mine": reviews_waiting(user),
             # Staff-only totals -- return 0 for students
             "total_published":  Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).count() if request.user.role else 0,
         })

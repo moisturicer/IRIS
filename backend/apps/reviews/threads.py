@@ -14,7 +14,7 @@ review is `finish_review.py`'s.
   change is recorded (`ReviewThreadEvent`) and audited. A draft's writer
   changes their own draft freely, unrecorded: nobody else has seen it.
 - *Resolve* and *Reopen*: anyone who may write in the discussion
-  (`is_record_participant`), except that **an owner can't resolve a thread a
+  (`may_act_on_review`, IR-1226), except that **an owner can't resolve a thread a
   reviewer opened** (403). They answer it instead.
 - *Answer*: an owner, on a reviewer's thread: **Addressed**, saying where, or
   **Declined**, with a reason. Answering never resolves; the reviewer checks
@@ -47,12 +47,13 @@ from django.utils import timezone
 
 from apps.audit import workflow as audit
 from core.enums import (
+    ReviewCommentKind,
     ThreadAnswer,
     ThreadEventKind,
     ThreadSeverity,
     ThreadState,
 )
-from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
+from core.permissions import acting_refusal, holds_seat, is_record_owner, may_act_on_review, may_read_review
 
 from .models import ReviewComment, ReviewThreadEvent
 
@@ -78,6 +79,11 @@ class ThreadError(Exception):
     """400: this cannot be done now, or the request is malformed."""
 
 
+#: How a reply by one of the record's owners names its writer: a person, not
+#: the authors as a party (IR-1192). A thread of theirs reads `party_label`.
+AUTHOR_LABEL = "Author"
+
+
 def party_label(party: str) -> str:
     from .seats import _label
 
@@ -86,9 +92,21 @@ def party_label(party: str) -> str:
 
 # --- which threads ----------------------------------------------------------------
 
+def document_label(upload) -> str:
+    """A document thread's upload as people name it: "Consent form, v1" (IR-1204)."""
+    return f"{upload.slot.name}, v{upload.version}"
+
+
+def all_threads(record):
+    """Every thread on `record`, drafts included: no replies, no discussion (IR-1194)."""
+    return ReviewComment.objects.filter(
+        record=record, reply_to__isnull=True, kind=ReviewCommentKind.THREAD,
+    )
+
+
 def published(record):
-    """Every thread on `record` that has been sent: no drafts, no replies."""
-    return ReviewComment.objects.filter(record=record, reply_to__isnull=True, is_draft=False)
+    """Every thread on `record` that has been sent: no drafts, no replies, no discussion."""
+    return all_threads(record).filter(is_draft=False)
 
 
 def open_threads(record):
@@ -106,9 +124,7 @@ def closing_threads(record, user):
     every sent one plus their own drafts, which *Finish review* sends just
     before deciding. The decision token covers exactly these.
     """
-    rows = ReviewComment.objects.filter(
-        record=record, reply_to__isnull=True, state=ThreadState.OPEN,
-    )
+    rows = all_threads(record).filter(state=ThreadState.OPEN)
     viewer = getattr(user, "pk", None)
     return rows.filter(Q(is_draft=False) | Q(author_id=viewer)).order_by("created_at", "pk")
 
@@ -119,14 +135,18 @@ def _count(n: int, one: str, many: str) -> str:
     return f"{n} {one if n == 1 else many}"
 
 
-def approval_blocked_reason(record, party) -> Optional[str]:
-    """Why `party`'s Seat holders can't approve yet, or None."""
+def approval_blocked_reason(record, party, *, act="approving") -> Optional[str]:
+    """
+    Why `party`'s Seat holders can't approve yet, or None. A finding waits the
+    same way (`act="recording a finding"`; IR-1226, 2026-11-19), so nobody
+    finishes their part with their own Must fix still open.
+    """
     n = open_must_fix(record, [str(party)]).count()
     if not n:
         return None
     return (
         f"{party_label(str(party))} has {_count(n, 'open Must fix thread', 'open Must fix threads')}. "
-        f"Resolve each one, or change it to Suggestion, before approving."
+        f"Resolve each one, or change it to Suggestion, before {act}."
     )
 
 
@@ -164,11 +184,16 @@ def token_facts(record, user) -> list:
 
 
 def closing_payload(record, user) -> list[dict]:
-    """The threads a Decision would close, for its dialog (`decision.closes.threads`)."""
+    """
+    The threads a Decision would close, for its dialog (`decision.closes.threads`):
+    each named by its passage (`anchored`) or its document (IR-1204), else the record.
+    """
     return [
         {"id": t.pk, "party": t.party or None, "label": party_label(t.party), "severity": t.severity,
-         "anchored": t.anchor_version_id is not None}
-        for t in closing_threads(record, user)
+         "anchored": t.anchor_version_id is not None,
+         "document": document_label(t.anchor_upload) if t.anchor_upload_id else None}
+        # Joined here, not in `closing_threads`: a Decision locks those rows.
+        for t in closing_threads(record, user).select_related("anchor_upload__slot")
     ]
 
 
@@ -207,8 +232,8 @@ def may_change_severity(thread, user, record) -> bool:
 
 def resolve_refusal(thread, user, record) -> Optional[str]:
     """Why `user` may not resolve `thread`, said as a 403, or None."""
-    if not is_record_participant(user, record):
-        return "Only the record's owners and its reviewers take part in the review discussion."
+    if not may_act_on_review(user, record):
+        return acting_refusal(user, record)
     if is_reviewer_thread(thread) and is_record_owner(user, record):
         return (
             "An owner can't resolve a reviewer's thread. Mark it Addressed, saying where, "
@@ -230,10 +255,7 @@ def _thread(record, user, thread_id) -> ReviewComment:
     """A thread `user` may see on `record`, locked, or `ThreadNotFound`."""
     if not may_read_review(user, record):
         raise ThreadNotFound
-    thread = (
-        ReviewComment.objects.select_for_update()
-        .filter(record=record, pk=thread_id, reply_to__isnull=True).first()
-    )
+    thread = all_threads(record).select_for_update().filter(pk=thread_id).first()
     if thread is None or (thread.is_draft and thread.author_id != getattr(user, "pk", None)):
         raise ThreadNotFound
     return thread
@@ -303,10 +325,8 @@ def resolve(record, user, thread_id) -> ReviewComment:
 def reopen(record, user, thread_id) -> ReviewComment:
     """`POST .../review-comments/<id>/reopen/`: any participant reopens a resolved thread."""
     thread = _thread(record, user, thread_id)
-    if not is_record_participant(user, record):
-        raise ThreadRefused(
-            "Only the record's owners and its reviewers take part in the review discussion."
-        )
+    if not may_act_on_review(user, record):
+        raise ThreadRefused(acting_refusal(user, record))
     _in_review(record)
     if thread.state != ThreadState.RESOLVED:
         raise ThreadError("Only a resolved thread can be reopened.")

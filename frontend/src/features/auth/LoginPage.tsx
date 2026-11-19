@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useNoticeStore } from "@/store/notice.store";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,6 +8,7 @@ import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import { AccountLockedModal } from "@/components/auth/AccountLockedModal";
+import { SessionNoticeDialog } from "@/components/auth/SessionNoticeDialog";
 import { LoginForm, type LoginFormValues } from "@/components/auth/LoginForm";
 import {
   clearLockout,
@@ -20,8 +21,11 @@ import {
   sessionEndMessage,
   setLockoutUntil,
 } from "@/lib/authSession";
+import { canOpenPath } from "@/lib/access";
+import type { User } from "@/types/auth";
 import { landingPathFor } from "@/lib/landing";
 import { safeRedirectPath } from "@/lib/redirectTarget";
+import { sessionAccount } from "@/lib/authSession";
 import { classifyLoginFailure, type AccountLock, type LoginFailure } from "./loginFailure";
 
 /**
@@ -34,6 +38,17 @@ const CLIENT_LOCKOUT_MS = 15 * 60 * 1000;
 /** Every failure but a lock, which opens its own dialog instead. */
 type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
 
+/**
+ * May this account be sent back to the page saved before sign-in (IR-1207)?
+ * Often the saved page belongs to the account that signed out before them.
+ * Django staff with no IRIS role pass every route guard (`ProtectedRoute`), so
+ * they may return anywhere; everyone else only where their role may go.
+ */
+function mayReturnTo(user: User, path: string): boolean {
+  if ((user.is_staff || user.is_superuser) && !user.role_name) return true;
+  return canOpenPath(user.role_name, path);
+}
+
 export default function LoginPage() {
   // The submitting button may lose focus when the form disables it, before the
   // lock reply arrives. Keep its actual element as the dialog's return target.
@@ -41,7 +56,12 @@ export default function LoginPage() {
   const navigate       = useNavigate();
   const location       = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { login }      = useAuth();
+  const { login, user: signedInUser, isAuthenticated } = useAuth();
+  /**
+   * Set while this screen's own sign-in is completing, so the signed-in
+   * redirect below does not race `handleLogin`'s own navigation (IR-1215).
+   */
+  const signingIn = useRef(false);
   const [loginAlert, setLoginAlert]     = useState<LoginAlert | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutOpen, setLockoutOpen]   = useState(false);
@@ -53,9 +73,9 @@ export default function LoginPage() {
    * use the normal landing page (IR-236, IR-534).
    *
    * **Captured once, on mount, on purpose.** The guard passes it in router
-   * state, and `dismissSessionAlert` below navigates to clear that state — so
+   * state, and `dismissSignedOutNotice` below navigates to clear that state — so
    * reading it at submit time would mean a visitor who dismisses the
-   * "session expired" banner before signing in silently loses their
+   * "session expired" dialog before signing in silently loses their
    * destination. It is also validated once here rather than at the point of
    * navigation, so there is no path from an unchecked string to `navigate`.
    *
@@ -67,9 +87,31 @@ export default function LoginPage() {
     const fromState = (location.state as { from?: unknown } | null)?.from;
     return safeRedirectPath(fromState) ?? safeRedirectPath(searchParams.get("next"));
   });
+  /**
+   * The account whose session this tab last held, read once on mount for the
+   * same reason as `redirectTo`: signing in records the new one (IR-1242).
+   */
+  const [previousAccount] = useState<number | null>(() => sessionAccount());
+  /**
+   * Where a signed-in person goes from here: the saved page when it was their
+   * own session that ended on it and their role may open it, else their
+   * landing page (IR-1207, IR-1242).
+   *
+   * A saved page on a shared device is often the last account's, and that is
+   * not this person's to land on even when their role may open it. With no
+   * account on record (a fresh tab, a link opened while signed out) the page is
+   * the one this visitor asked for, and is followed. A page typed while signed
+   * in still meets the guard's "not for you" screen; only this return trip
+   * skips it.
+   */
+  const isPreviousAccount = (user: User) => previousAccount === null || previousAccount === user.id;
+  const destinationFor = (user: User) =>
+    redirectTo && isPreviousAccount(user) && mayReturnTo(user, redirectTo)
+      ? redirectTo
+      : landingPathFor(user);
   // IR-642: Settings sends a person here after changing their password,
   // which ends every session. Read once, like `redirectTo`.
-  const [passwordChanged] = useState(
+  const [passwordChanged, setPasswordChanged] = useState(
     () => (location.state as { reason?: string } | null)?.reason === "password_changed",
   );
   const sessionExpiredFromState =
@@ -104,19 +146,34 @@ export default function LoginPage() {
     setFailedAttempts(getLoginAttempts(identifier));
   }, [identifier]);
 
-  const dismissSessionAlert = () => {
+  // Why they were signed out, as a dialog in front of the page (IR-1197).
+  const signedOutNotice = passwordChanged
+    ? {
+        title: "Password Changed",
+        text: "You were signed out on every device. Sign in again with your new password.",
+      }
+    : sessionAlert
+      ? sessionEnd
+      : null;
+
+  const dismissSignedOutNotice = () => {
+    setPasswordChanged(false);
     setSessionAlert(false);
     if (searchParams.get("reason") || searchParams.get("code")) {
       searchParams.delete("reason");
       searchParams.delete("code");
       setSearchParams(searchParams, { replace: true });
     }
-    if ((location.state as { reason?: string } | null)?.reason === "session_expired") {
+    const reason = (location.state as { reason?: string } | null)?.reason;
+    if (reason === "session_expired" || reason === "password_changed") {
       // Clearing the state wholesale is safe: `redirectTo` was captured on
       // mount, so the destination does not live here any more. Writing it back
-      // would only look like it mattered.
+      // would only look like it mattered. Cleared, a reload shows no notice.
       navigate("/login", { replace: true, state: null });
     }
+    // Nothing opened the dialog, so its focus has nowhere to return: start
+    // them on the form they came to fill in.
+    globalThis.setTimeout(() => document.getElementById("login-identifier")?.focus());
   };
 
   const openLockout = (forIdentifier: string, next: AccountLock) => {
@@ -153,17 +210,18 @@ export default function LoginPage() {
     }
 
     try {
-      const res = await authApi.login({ email: loginId, password: data.password });
+      const res = await authApi.login({ email: loginId, password: data.password, remember: data.remember });
       resetLoginAttempts(loginId);
       clearLockout(loginId);
-      login(res.data.user, res.data.access, res.data.refresh);
+      signingIn.current = true;
+      login(res.data.user, res.data.access, res.data.remembered === true);
       // Every other request is refused until they answer, so the guard shows
       // the notice before the page loads (IR-790).
       if (res.data.notice_answer_required) useNoticeStore.getState().require();
       // Back to the page they asked for, or -- when they simply came to sign
-      // in, or asked for somewhere `safeRedirectPath` refused -- My Reviews
-      // when they have review work, otherwise Discover (IR-534).
-      navigate(redirectTo ?? landingPathFor(res.data.user), { replace: true });
+      // in, or asked for somewhere `safeRedirectPath` or their role refused --
+      // My Reviews when they have review work, otherwise Discover (IR-534).
+      navigate(destinationFor(res.data.user), { replace: true });
     } catch (err: unknown) {
       const failure = classifyLoginFailure(err);
 
@@ -200,6 +258,13 @@ export default function LoginPage() {
   const showFieldError = loginAlert?.kind === "credentials" && !lockoutOpen;
   const attemptsLeft = LOGIN_FAILURE_LIMIT - failedAttempts;
 
+  // Someone whose session is still valid has nothing to do here (IR-1215).
+  // `AuthBootstrap` renders no page until the session is restored, so this
+  // reads the settled answer, never the moment before a refresh completes.
+  if (isAuthenticated && signedInUser && !signingIn.current) {
+    return <Navigate to={destinationFor(signedInUser)} replace />;
+  }
+
   return (
     <EntryFrame
       help
@@ -210,30 +275,17 @@ export default function LoginPage() {
       }}
       tabs={<EntryTab>Sign in</EntryTab>}
       before={
-        <AccountLockedModal
-          open={lockoutOpen}
-          onClose={closeLockout}
-          lock={lock}
-          returnTo={signInRef.current}
-        />
+        <>
+          <SessionNoticeDialog notice={signedOutNotice} onClose={dismissSignedOutNotice} />
+          <AccountLockedModal
+            open={lockoutOpen}
+            onClose={closeLockout}
+            lock={lock}
+            returnTo={signInRef.current}
+          />
+        </>
       }
     >
-
-      {passwordChanged && (
-        <AuthAlert variant="warning" title="Password changed">
-          You were signed out on every device. Sign in again with your new password.
-        </AuthAlert>
-      )}
-
-      {sessionAlert && (
-        <AuthAlert
-          variant="session"
-          title={sessionEnd.title}
-          onDismiss={dismissSessionAlert}
-        >
-          {sessionEnd.text}
-        </AuthAlert>
-      )}
 
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">Welcome back</h2>
       <p className="mt-2 mb-section text-body text-stone-600">

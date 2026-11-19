@@ -315,6 +315,9 @@ class RecordViewSet(viewsets.ModelViewSet):
                 return
 
             in_review = instance.pipeline_status == PipelineStatus.IN_REVIEW
+            # A draft's co-owners never saw it (IR-1227), so its deletion is
+            # news to nobody; a rejected record's owners are told.
+            draft = instance.pipeline_status == PipelineStatus.DRAFT
             # Read before the withdrawal closes it: whose work is ending.
             work = open_review_work(instance) if in_review else None
             soft_delete_record(instance, deleted_by=actor)
@@ -323,7 +326,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                     instance, withdrawn_by=actor,
                     seats=work.seats, requesting_parties=work.requesting_parties,
                 ))
-            else:
+            elif not draft:
                 transaction.on_commit(lambda: notify_record_deleted(instance, deleted_by=actor))
 
     # get_permissions() below is a full override with no super() fallback, so a
@@ -595,6 +598,45 @@ class RecordViewSet(viewsets.ModelViewSet):
         if revision is not None:
             response["X-Manuscript-Revision"] = str(revision)
         return response
+
+    @action(detail=True, methods=["get"], url_path="first-page", url_name="first-page")
+    def first_page(self, request, pk=None):
+        """
+        GET /records/<id>/first-page/ -- the small image beside a Discover
+        row (IR-1241, `first_page.py`).
+
+        Read as the paper is: `get_object()` resolves through
+        `visible_to(user)`, so a reader without access gets the 404 of a
+        missing record, and the image is of the file this reader is served.
+        It never parses the PDF here and writes no audit event: a thumbnail
+        is not a download.
+
+        200 the WebP; 202 `first_page_pending` while a worker draws it;
+        404 `no_manuscript`, or `first_page_unavailable` when it can't be drawn.
+        """
+        from . import first_page
+
+        found = first_page.lookup(self.get_object(), request.user)
+        if found.state == first_page.READY:
+            response = HttpResponse(found.image, content_type="image/webp")
+            response["Content-Disposition"] = "inline"
+            response["Cache-Control"] = "private, no-store"
+            response["X-Content-Type-Options"] = "nosniff"
+            return response
+        if found.state == first_page.PENDING:
+            return Response(
+                {"code": "first_page_pending", "detail": "The first page is being drawn."},
+                status=status.HTTP_202_ACCEPTED,
+            )
+        if found.state == first_page.NO_MANUSCRIPT:
+            return Response(
+                {"code": "no_manuscript", "detail": "No paper has been uploaded for this record."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            {"code": "first_page_unavailable", "detail": "The first page can't be shown."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     @action(detail=True, methods=["get"], url_path=r"figures/(?P<figure_id>[0-9]+)", url_name="figure")
     def figure(self, request, pk=None, figure_id=None):
@@ -1023,8 +1065,9 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         GET  /records/<id>/review-comments/ -- the review discussion, oldest first.
         POST /records/<id>/review-comments/
-        `{"body": str, "reply_to"?: id, "severity"?: str, "anchor"?: {...}, "suggestion"?: str,
-          "mentions"?: [user id]}`
+        `{"body": str, "kind"?: "discussion" | "thread", "post_now"?: bool, "reply_to"?: id,
+          "severity"?: str, "anchor"?: {...}, "suggestion"?: str, "mentions"?: [user id],
+          "document"?: upload id}` -- `document` names a supporting document's upload (IR-1204).
 
         Read under `may_read_review`; written by the record's participants, on
         a submitted record (`apps.reviews.comments`). A new comment answers 201.
@@ -1036,8 +1079,10 @@ class RecordViewSet(viewsets.ModelViewSet):
             lambda c: c.comment_payload(c.post_comment(
                 record, request.user,
                 body=request.data.get("body"), reply_to=request.data.get("reply_to"),
+                kind=request.data.get("kind"), post_now=request.data.get("post_now"),
                 severity=request.data.get("severity"), anchor=request.data.get("anchor"),
                 suggestion=request.data.get("suggestion"), mentioned=request.data.get("mentions"),
+                document=request.data.get("document"),
             ), request.user),
             success=status.HTTP_201_CREATED,
         )
@@ -1081,7 +1126,7 @@ class RecordViewSet(viewsets.ModelViewSet):
 
     @action(
         detail=True, methods=["post"],
-        url_path=r"review-comments/(?P<comment_id>[0-9]+)/(?P<act>severity|resolve|reopen|answer)",
+        url_path=r"review-comments/(?P<comment_id>[0-9]+)/(?P<act>severity|resolve|reopen|answer|post)",
         url_name="review-thread-act",
     )
     def review_thread_act(self, request, pk=None, comment_id=None, act=None):
@@ -1090,6 +1135,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         POST /records/<id>/review-comments/<comment_id>/resolve/
         POST /records/<id>/review-comments/<comment_id>/reopen/
         POST /records/<id>/review-comments/<comment_id>/answer/ `{"answer": "addressed" | "declined", "note": str}`
+        POST /records/<id>/review-comments/<comment_id>/post/ -- its writer sends a draft on its own
 
         A review thread's acts (ADR-032 §7, IR-874; `apps.reviews.threads`).
         Answers with the thread. 404 for a record, review or thread the caller
@@ -1100,6 +1146,10 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         record = self.get_object()
         user, thread_id = request.user, int(comment_id)
+        if act == "post":
+            # A draft is the comments service's, with its refusals (IR-1194).
+            return self._comment_response(
+                lambda c: c.comment_payload(c.post_draft(record, user, thread_id), user))
         acts = {
             "severity": lambda: threads.change_severity(
                 record, user, thread_id, request.data.get("severity")),
@@ -1733,7 +1783,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         from django.db.models import Exists, OuterRef
 
         qs = (
-            Record.objects.filter(owners__user=request.user).distinct()
+            Record.objects.owned_by(request.user)
             .annotate(has_continuation=Exists(
                 Record.objects.with_deleted().filter(derived_from_id=OuterRef("pk"))
             ))
@@ -1810,7 +1860,7 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         for row in rows:
             values, problems = check_import_row(row, choices)
-            pdf, pdf_problems = check_import_pdf(row, pdfs, taken)
+            pdf, pdf_problems = check_import_pdf(row, pdfs, taken, user=request.user)
             problems = problems + pdf_problems
             if check:
                 checked.append({
@@ -1875,8 +1925,16 @@ class RecordViewSet(viewsets.ModelViewSet):
     def download_template(self, request):
         """
         GET /records/download_template/
-        Returns a pre-formatted .xlsx import template with a sample data row
-        and an END OF RECORDS sentinel so users know where to stop.
+        Returns the .xlsx import template (IR-639). Uploaded unchanged, it
+        imports nothing: the import publishes with no review.
+
+        - "Records", the first sheet and the only one the importer reads,
+          holds the header row alone. Staff type one paper per row under it.
+        - "How to fill this in" holds the same headers over an example row,
+          what each column takes, and the names each named column accepts.
+          The names, and those in the example, are read here from
+          `ImportChoices`, the importer's own lookup, so they cannot go stale
+          or be misspelled, and a copied example imports.
         """
         try:
             import openpyxl
@@ -1918,25 +1976,47 @@ class RecordViewSet(viewsets.ModelViewSet):
             right=Side(style="thin",  color="CCCCCC"),
         )
 
-        for col_idx, (header, width) in enumerate(zip(HEADERS, WIDTHS), start=1):
-            cell = ws.cell(row=1, column=col_idx, value=header)
-            cell.font      = header_font
-            cell.fill      = header_fill
-            cell.alignment = header_align
-            cell.border    = thin_border
-            ws.column_dimensions[cell.column_letter].width = width
+        def write_headers(sheet):
+            for col_idx, (header, width) in enumerate(zip(HEADERS, WIDTHS), start=1):
+                cell = sheet.cell(row=1, column=col_idx, value=header)
+                cell.font      = header_font
+                cell.fill      = header_fill
+                cell.alignment = header_align
+                cell.border    = thin_border
+                sheet.column_dimensions[cell.column_letter].width = width
+            sheet.row_dimensions[1].height = 30
+            sheet.freeze_panes = "A2"
 
-        ws.row_dimensions[1].height = 30
+        write_headers(ws)
+
+        # ---- How to fill this in: the same columns, never imported ----------
+        guide = wb.create_sheet("How to fill this in")
+        write_headers(guide)
+
+        # What each named column accepts, as the importer looks it up.
+        choices  = ImportChoices()
+        accepted = {
+            "Record Type":          choices.record_types,
+            "Classification":       choices.classifications,
+            "PSCED Classification": choices.psced,
+        }
+        accepted = {header: sorted((c.name for c in names.values()), key=str.lower) for header, names in accepted.items()}
+        accepted["Origin"] = list(Record.Origin.values)
+
+        def example(header, preferred=None):
+            """`preferred` when this database has it, else its first name, else blank."""
+            names = accepted[header]
+            return preferred if preferred in names else (names[0] if names else None)
 
         # ---- Example data row ----------------------------------------------
-        ws.append([
+        guide.append([
             "Blockchain-Based Verification of Academic Credentials",
             "This study proposes a tamper-proof academic credential system using distributed ledger technology.",
             2024,
             2024,
-            RecordTypeName.THESIS_RESEARCH,
-            "Applied Sciences",
-            "Information and Communication Technologies",
+            example("Record Type", RecordTypeName.THESIS_RESEARCH),
+            example("Classification"),
+            example("PSCED Classification"),
             "FALSE",
             "FALSE",
             "FALSE",
@@ -1954,35 +2034,34 @@ class RecordViewSet(viewsets.ModelViewSet):
             "Optional",
             "e.g. 2024",
             "e.g. 2024",
-            "Project, Proposal or Thesis / Research",
-            "Exact name from the system",
-            "Exact name from the system",
+            "One of the names below; blank is Project",
+            "Blank, or one of the names below",
+            "Blank, or one of the names below",
             "TRUE or FALSE",
             "TRUE or FALSE",
             "TRUE or FALSE",
-            "Comma-separated names",
-            "unknown / institutional / imported_reference / synthetic",
+            "Separated by semicolons or commas",
+            "Blank (unknown), or one of the values below",
             "Optional; separate from completion year",
             "Optional; the PDF's name, uploaded with the sheet",
         ]
-        ws.append(note_row)
-        note_row_idx = ws.max_row
+        guide.append(note_row)
+        note_row_idx = guide.max_row
         for col_idx in range(1, len(HEADERS) + 1):
-            cell = ws.cell(row=note_row_idx, column=col_idx)
+            cell = guide.cell(row=note_row_idx, column=col_idx)
             cell.fill = notes_fill
             cell.font = notes_font
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-        # ---- Sentinel row --------------------------------------------------
-        ws.append(["END OF RECORDS"])
-        sentinel_font = Font(bold=True, color="FFFFFF")
-        sentinel_fill = PatternFill(start_color="333333", end_color="333333", fill_type="solid")
-        sentinel_cell = ws.cell(row=ws.max_row, column=1)
-        sentinel_cell.font = sentinel_font
-        sentinel_cell.fill = sentinel_fill
-
-        # ---- Freeze header row ---------------------------------------------
-        ws.freeze_panes = "A2"
+        # ---- What each named column accepts, one per row under it ----------
+        guide.append([])
+        guide.append(["Accepted values: each column below lists every name the import accepts."])
+        guide.cell(row=guide.max_row, column=1).font = Font(bold=True)
+        first = guide.max_row + 1
+        for header, names in accepted.items():
+            col_idx = HEADERS.index(header) + 1
+            for offset, name in enumerate(names):
+                guide.cell(row=first + offset, column=col_idx, value=name)
 
         # ---- Serialize and return ------------------------------------------
         buffer = BytesIO()
@@ -2005,7 +2084,7 @@ class MyRecordsViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
     serializer_class = RecordDetailSerializer
 
     def get_queryset(self):
-        return Record.objects.filter(owners__user=self.request.user).distinct()
+        return Record.objects.owned_by(self.request.user)
 
 
 class DownloadRequestViewSet(viewsets.ModelViewSet):

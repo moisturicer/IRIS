@@ -114,7 +114,7 @@ export function ReadingHeader({
         ) : title === undefined ? null : (
           <h1
             title={title}
-            className="sr-only reading-split:not-sr-only min-w-0 truncate font-display text-xl font-semibold text-stone-900"
+            className="sr-only reading-split:not-sr-only reading-split:truncate min-w-0 font-display text-xl font-semibold text-stone-900"
           >
             {title}
           </h1>
@@ -157,7 +157,7 @@ export function ReadingHeader({
             tabIndex={section === s ? 0 : -1}
             onClick={() => onSelect(s)}
             className={cn(
-              "relative z-10 min-w-0 truncate px-1.5 reading-split:px-5 rounded-control",
+              "relative z-10 min-w-0 break-words px-1.5 reading-split:px-5 rounded-control",
               CONTROL_SIZE,
               CONTROL_TEXT,
               "transition-colors duration-300",

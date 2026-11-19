@@ -4,7 +4,7 @@ import type {
   IpReleaseResult,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment, MentionedPerson,
-  ThreadSeverity, ThreadAnchor, FinishReviewRequest,
+  ThreadSeverity, ThreadAnchor, FinishReviewRequest, ReviewCommentKind,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
   DiscoverInterests, ForYouPage, MetadataSuggestions, VersionComparisonPayload, ResponseLetter,
@@ -101,6 +101,12 @@ export const recordsApi = {
       body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor; suggestion?: string;
       /** Account ids of the people it mentions (IR-877). */
       mentions?: number[];
+      /** Conversation's `discussion`, or a `thread` (the server's default). A reply takes its parent's. */
+      kind?: ReviewCommentKind;
+      /** A seated reviewer's thread is sent now rather than saved as a draft (IR-1194). */
+      post_now?: boolean;
+      /** A reviewer's thread on a supporting document's upload, as a whole (IR-1204). */
+      document?: number;
     },
   ) => apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
   /**
@@ -128,6 +134,9 @@ export const recordsApi = {
     apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/resolve/`, {}),
   reopenThread: (id: number, threadId: number) =>
     apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/reopen/`, {}),
+  /** Its writer sends one draft thread on its own, outside any review round (IR-1194). */
+  postThread: (id: number, threadId: number) =>
+    apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/post/`, {}),
   /** An owner answers a reviewer's thread: Addressed, saying where, or Declined, with a reason. */
   answerThread: (id: number, threadId: number, body: { answer: "addressed" | "declined"; note: string }) =>
     apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/answer/`, body),
@@ -278,6 +287,16 @@ export const recordsApi = {
    */
   manuscriptBlob: (id: number, options: { signal?: AbortSignal } = {}) =>
     apiClient.get<Blob>(`/records/${id}/manuscript/`, { responseType: "blob", signal: options.signal }),
+  /**
+   * The small first-page image beside a Discover row (IR-1241), instead of
+   * the whole manuscript. A blob through `apiClient` for the same reason as
+   * `manuscriptBlob`: the bearer token is in memory, so a bare `<img src>`
+   * could not authenticate. 200 is the WebP; 202 means a worker is still
+   * drawing it; 404 (`no_manuscript`, `first_page_unavailable`) means there
+   * is none. Writes no audit event, unlike `manuscriptBlob`.
+   */
+  firstPage: (id: number, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<Blob>(`/records/${id}/first-page/`, { responseType: "blob", signal: options.signal }),
   /**
    * An earlier version's manuscript (IR-416), fetched the same way and for
    * the same reason. Participants only: anyone else gets a 404.

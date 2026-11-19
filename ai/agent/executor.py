@@ -34,14 +34,17 @@ from ai.agent.protocol import (
     AgentRequest, ModelTurn, NotFinal, Pin, StopReason, Text, ToolGroup, ToolResult, User, final_answer,
 )
 from ai.agent.prompts import (  # noqa: F401 -- re-exported: callers and pinned tests name them here
-    CHAT_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION, COHERENT_INSTRUCTIONS, COHERENT_PROMPT_VERSION,
-    COHERENT_TOOL_VERSION, COMPACT_REQUEST, EVIDENCE_INSTRUCTIONS,
+    CHAT_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION, CITED_INSTRUCTIONS, CITED_NOTE, CITED_PROMPT_VERSION,
+    CITED_TOOL_VERSION, COHERENT_INSTRUCTIONS, DELIMITED_INSTRUCTIONS, DELIMITED_PROMPT_VERSION,
+    DELIMITED_TOOL_VERSION, COHERENT_PROMPT_VERSION,
+    COHERENT_TOOL_VERSION, COMPACT_REQUEST, EARLIER_TURN, EVIDENCE_INSTRUCTIONS,
     EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION, FINAL_NOTE, HYBRID_INSTRUCTIONS, HYBRID_PROMPT_VERSION,
     HYBRID_TOOL_VERSION, INSTRUCTIONS, LISTING_INSTRUCTIONS, LISTING_PROMPT_VERSION, LISTING_TOOL_VERSION,
     MANUSCRIPT_INSTRUCTIONS, MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION, METADATA_INSTRUCTIONS,
     METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION, PAPER_CHAT_PREFIX, PROMPT_VERSION, PROMPTS,
     RECOVERY_INSTRUCTIONS, RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION, RESEARCH_INSTRUCTIONS,
-    RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, TOOL_VERSION,
+    RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, SELECTION_INSTRUCTIONS, SELECTION_PREFIX,
+    SELECTION_PROMPT_VERSION, SELECTION_TOOL_VERSION, SELECTION_WITHDRAWN, TOOL_VERSION, quoted, unquoted,
 )
 from ai.agent.tools import (
     ASK_CLARIFICATION, ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded,
@@ -60,9 +63,17 @@ NOTHING_TO_COMPACT = "nothing_to_compact"
 
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
                           RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
-                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION)
-#: Pins that offer research-7's tools and never mention an unseen draft in a repair (IR-1004, IR-1166).
-EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION)
+                          CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION,
+                          DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+#: Pins that offer research-7's tools and never mention an unseen draft in a repair (IR-1004, IR-1166, IR-1168).
+EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION,
+                          DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+#: Versions that number earlier Turns and list what they cited (IR-1168).
+CITED_TOOL_VERSIONS = (CITED_TOOL_VERSION, DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+#: Versions that quote paper text wherever it reaches the model (IR-1196).
+DELIMITED_TOOL_VERSIONS = (DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+#: Versions that may be sent a passage the reader selected (IR-581).
+SELECTION_TOOL_VERSIONS = (SELECTION_TOOL_VERSION,)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -335,8 +346,16 @@ class _Run:
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
         self.chat = tool_set == CHAT_TOOL_VERSION
         self.repairs = 2
-        #: research-8 and research-9 repairs never mention the unseen draft (IR-1004, IR-1166).
+        #: research-8 and later repairs never mention the unseen draft (IR-1004, IR-1166).
         self.fresh_repairs = version in EVIDENCE_TOOL_VERSIONS
+        #: research-10 numbers earlier Turns and lists what they cited (IR-1168).
+        self.cites = version in CITED_TOOL_VERSIONS
+        #: research-11 and later quote paper text wherever it reaches the model (IR-1196).
+        self.delimit = self.investigation.delimit = version in DELIMITED_TOOL_VERSIONS
+        #: research-12 is told about a selected passage; no earlier pin ever is (IR-581).
+        self.selects = version in SELECTION_TOOL_VERSIONS
+        #: Each earlier answer sent with its citation list -> the same answer without it.
+        self.unlisted: dict = {}
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         #: Sources the history carried when the answer was written (IR-994).
@@ -346,7 +365,10 @@ class _Run:
         self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0),
                             attempts=spent.get("attempts", 0))
         self.task = checkpoint.task_key(question, context.prior, context.state or {},
-                                        handoff=(context.handoff or {}).get("revision"))
+                                        handoff=(context.handoff or {}).get("revision"),
+                                        selection=(context.selection.to_json() if context.selection
+                                                   else {"withdrawn": True} if context.selection_withdrawn
+                                                   else None))
         # The compact handoff the history now opens with, and the original Turns still carried whole (IR-734).
         self.handoff = (context.handoff or {}).get("body")
         self.handoff_revision = (context.handoff or {}).get("revision")
@@ -449,30 +471,113 @@ class _Run:
         # One read gives the handoff's papers the same handles the state message uses.
         also = [*handoff["shown"], *handoff["selected"], *handoff["excluded"]] if handoff else ()
         scope = getattr(self.tools, "scope", None) if self.chat else None
-        shown = await self.investigation.recall(state, also=[*also, *([scope] if scope is not None else [])])
+        asked = [*also, *([scope] if scope is not None else [])]
+        if self.selects and self.context.selection is not None:
+            # A handle for the selected paper, which need not be a Paper Chat's own (IR-581).
+            asked.append(self.context.selection.selection.record_id)
+        # The same read gives every paper an earlier Turn cited a fresh handle, if still readable (IR-1168).
+        cited = [rid for turn in self.prior for rid, _ in turn.cited] if self.cites else []
+        shown = await self.investigation.recall(state, also=[*asked, *cited])
+        if cited and not asked and not any(state.get(k) for k in ("shown", "selected", "excluded")):
+            # Citations alone open no state message.
+            shown = {}
         if scope is not None and not any(shown.get(k) for k in ("shown", "selected", "excluded")):
             # The scope read alone opens no state message.
             shown = {}
         if handoff:
             # Earlier Turns arrive compacted (IR-734).
-            summary = compacting.render(handoff, self.investigation.papers, passages=False)
+            summary = compacting.render(handoff, self.investigation.papers, passages=False, delimit=self.delimit)
             history.append(summary)
+        plain, earlier = self._earlier(listed=False), self._earlier(listed=True)
+        self.unlisted = {e: p for e, p in zip(earlier, plain) if e != p}
+        closing = self._closing(shown, scope)
+        if self.unlisted and self._overflows([*history, *earlier, *closing]):
+            # A history that would not fit loses the citation lists before any Turn (IR-1168).
+            earlier, self.unlisted = plain, {}
+        return [*history, *earlier, *closing]
+
+    def _without_lists(self, history: list) -> list:
+        return [self.unlisted.get(e, e) if isinstance(e, ModelTurn) else e for e in history]
+
+    def _earlier(self, *, listed: bool) -> list:
+        """The carried Turns; under research-10 numbered, and with what they cited when `listed` (IR-1168)."""
+        history: list = []
         for turn in self.prior:
             answer, sources = DELIVERED_MARKER.sub("", turn.answer), frozenset(turn.sources)
-            history += [User(compacting.reader(turn.question)),
-                        ModelTurn(items=(Text(answer),), stop=StopReason.END, dependencies=sources)]
+            question = compacting.reader(turn.question)
+            if self.cites and turn.ordinal is not None:
+                question = EARLIER_TURN.format(n=turn.ordinal) + question
+                note, papers = self._cited(turn) if listed else ("", frozenset())
+                answer += note
+                sources |= frozenset(s for s in self.investigation.recalled_sources if s.record_id in papers)
+            history += [User(question), ModelTurn(items=(Text(answer),), stop=StopReason.END, dependencies=sources)]
+        return history
+
+    def _cited(self, turn) -> tuple[str, frozenset]:
+        """The papers `turn` cited that the reader can still read, with their pages, and their Record ids."""
+        pages: dict[int, set] = {}
+        for rid, page in turn.cited:
+            if rid in self.investigation.papers:
+                pages.setdefault(rid, set()).update({page} if page else ())
+        parts = []
+        for rid, numbers in pages.items():
+            handle, title = self.investigation.papers[rid]
+            ordered = sorted(numbers)
+            where = (f", page {ordered[0]}" if len(ordered) == 1
+                     else f", pages {', '.join(map(str, ordered))}" if ordered else "")
+            parts.append(f"«{title}» (paper {handle}){where}")
+        return (CITED_NOTE + "; ".join(parts) + "." if parts else ""), frozenset(pages)
+
+    def _unmarked(self, text: str) -> str:
+        return unquoted(text) if self.delimit else text
+
+    def _title(self, title: str) -> str:
+        return quoted(title) if self.delimit else title
+
+    def _overflows(self, history) -> bool:
+        """Whether `history` would fill the window or start a compaction (IR-1168)."""
+        try:
+            _, status = self.agent.estimate(self.request(history))
+        except Unavailable as full:
+            return full.code in WINDOW_FULL
+        rule = self.agent.compaction
+        return (rule is not None and self.context.commit_handoff is not None
+                and self.compactions < rule.max_attempts and status.occupancy_tokens >= rule.threshold_tokens)
+
+    def _closing(self, shown: dict, scope) -> list:
+        """The state message, the Paper Chat note and the reader's question, in that order."""
+        history: list = []
         if shown:
+            if self.delimit:
+                shown = {**shown, "shown": [{**p, "title": self._title(p["title"])} for p in shown.get("shown", ())]}
             history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False),
                                 self.investigation.recalled_sources))
         if scope is not None and scope in self.investigation.papers:
             handle, title = self.investigation.papers[scope]
-            note = User(PAPER_CHAT_PREFIX + json.dumps({"paper": handle, "title": title}, ensure_ascii=False),
+            note = User(PAPER_CHAT_PREFIX + json.dumps({"paper": handle, "title": self._title(title)},
+                                                       ensure_ascii=False),
                         self.investigation.recalled_sources)
             history.append(note)
+        history += self._selection(scope)
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history
 
+
+    def _selection(self, scope) -> list:
+        """The passage the reader asked about, rechecked at this claim; or that it is gone (IR-581)."""
+        assessed = self.context.selection
+        if not self.selects:
+            return []
+        if assessed is None:
+            return [User(SELECTION_WITHDRAWN)] if self.context.selection_withdrawn else []
+        chosen = assessed.selection
+        body = {"page": chosen.page, "quote": quoted(chosen.quote) if self.delimit else chosen.quote,
+                "found_on_page": assessed.found_on_page, "version": assessed.version}
+        if chosen.record_id in self.investigation.papers:
+            handle, title = self.investigation.papers[chosen.record_id]
+            body = {"paper": handle, **({} if chosen.record_id == scope else {"title": self._title(title)}), **body}
+        return [User(SELECTION_PREFIX + json.dumps(body, ensure_ascii=False), self.investigation.recalled_sources)]
 
     async def _resume(self) -> Optional[tuple[list, int]]:
         """The Conversation an earlier fence completed, verified now; None to start afresh (IR-724).
@@ -550,6 +655,12 @@ class _Run:
             return await self._compaction_failed(history, "capacity_unknown") if forced else history
         if not forced and occupancy < rule.threshold_tokens:
             return history
+        if not forced and self.unlisted:
+            # The citation lists go before any Turn is compacted (IR-1168).
+            history, self.unlisted = self._without_lists(history), {}
+            occupancy = self.agent.occupancy(self.request(history))
+            if occupancy is not None and occupancy < rule.threshold_tokens:
+                return history
         cut = compacting.split(history, rule.keep_exchanges)
         if cut is None:
             self.outcome = NOTHING_TO_COMPACT
@@ -595,7 +706,8 @@ class _Run:
         self.outcome, self.revision, self.condensed = "compacted", revision, len(cut.gone_turns)
         await self._journal("compaction", {"outcome": "compacted", "revision": revision,
                                            "turns": len(cut.gone_turns), "exchanges": len(cut.gone_exchanges)})
-        rebuilt = cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True))
+        rebuilt = cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True,
+                                                  delimit=self.delimit))
         # What the compacted exchanges showed is no longer in front of the model (IR-736).
         self.investigation.reshown(e.content for e in rebuilt if isinstance(e, ToolResult))
         return rebuilt
@@ -686,7 +798,7 @@ class _Run:
 
     async def _deliver(self, turn: ModelTurn, history: list) -> Result:
         self.carried_sources = _carried(history)
-        text = _final(turn)
+        text = self._unmarked(_final(turn))
         found = self._findings(text)
         if not found:
             return await self._commit(text)
@@ -705,6 +817,7 @@ class _Run:
             if repaired is None:
                 break
             text_now, history = repaired
+            text_now = self._unmarked(text_now)
             drafts.insert(0, text_now)
             found = self._findings(text_now)
             if not found:

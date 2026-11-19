@@ -17,8 +17,9 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("en-US", {
  * Workflow analytics (IR-626, ADR-043).
  *
  * Every figure is the server's, computed from the workflow audit log
- * (`backend/apps/reviews/analytics.py`); this page only lays it out. An
- * office sees its own figures and RDCO every party's. Three things are said
+ * (`backend/apps/reviews/analytics.py`); this page only lays it out. It is
+ * RDCO's alone, in its own sidebar section, with every party's figures
+ * (IR-1216; offices saw their own before). Three things are said
  * on the page rather than left to be assumed: when the log starts (always
  * visible) and, in the "How these numbers are counted" disclosure (IR-1091),
  * that time in stage is elapsed time rather than effort and how many records a
@@ -80,7 +81,7 @@ function MethodDisclosure({ children }: { children: ReactNode }) {
       </button>
       {open && (
         <div id={bodyId} role="region" aria-label="How these numbers are counted"
-             className="mt-2 max-w-3xl space-y-3 rounded-control bg-stone-50 p-4 text-sm text-stone-700">
+             className="mt-2 space-y-3 rounded-control bg-stone-50 p-4 text-sm text-stone-700">
           {children}
         </div>
       )}
@@ -168,7 +169,7 @@ export default function ReviewAnalyticsPage() {
   return (
     <div>
       <PageHeader
-        title="Workflow Analytics"
+        title="Workflow analytics"
         description="How long each office holds a record, what is open and overdue now, and how many new versions kept a clearance."
       />
 
@@ -200,7 +201,7 @@ export default function ReviewAnalyticsPage() {
       ) : data && (
         <div aria-busy={loading}>
           {loading && <p role="status" className="mb-3 text-sm text-stone-600">Updating…</p>}
-          <p className="mb-6 max-w-3xl rounded-control bg-stone-50 p-3 text-sm text-stone-700">
+          <p className="mb-6 rounded-control bg-stone-50 p-3 text-sm text-stone-700">
             {data.data_since
               ? <>Figures start on {formatDate(data.data_since)}, the first workflow event recorded for {data.parties.length > 1 ? "these offices" : "this office"}. Work before then was never logged, so it is absent from these figures, not counted as zero.</>
               : <>No workflow events have been recorded yet, so there is nothing to measure.</>}

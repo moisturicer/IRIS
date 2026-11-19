@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type DependencyList } from "react";
+import { useCallback, useEffect, useRef, useState, type DependencyList } from "react";
 
 import { isRequestTimeout } from "@/api/requestPolicy";
 
@@ -17,9 +17,14 @@ export interface ApiRead<T> {
   error: unknown;
   /** Read again. The only way a read is ever repeated (see `api/requestPolicy.ts`). */
   retry: () => void;
+  /**
+   * Read again quietly, for a live-update hint (ADR-073): what is shown stays
+   * until the new answer arrives, and a failed refresh leaves it in place.
+   */
+  refresh: () => void;
 }
 
-type Settled<T> = Omit<ApiRead<T>, "retry">;
+type Settled<T> = Omit<ApiRead<T>, "retry" | "refresh">;
 
 const LOADING = { status: "loading", data: undefined, error: undefined } as const;
 
@@ -44,10 +49,13 @@ export function useApiRead<T>(
 ): ApiRead<T> {
   const [state, setState] = useState<Settled<T>>(LOADING);
   const [attempt, setAttempt] = useState(0);
+  const quiet = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    setState(LOADING);
+    const isQuiet = quiet.current;
+    quiet.current = false;
+    if (!isQuiet) setState(LOADING);
 
     // Wrapped so a read that throws before it returns a promise fails like any other.
     new Promise<T>((resolve) => resolve(read(controller.signal))).then(
@@ -57,7 +65,8 @@ export function useApiRead<T>(
       },
       (error: unknown) => {
         // A read this hook cancelled is not a failure; its screen has moved on.
-        if (controller.signal.aborted) return;
+        // A quiet refresh that fails keeps what is already shown.
+        if (controller.signal.aborted || isQuiet) return;
         setState({
           status: isRequestTimeout(error) ? "interrupted" : "failed",
           data: undefined,
@@ -72,6 +81,10 @@ export function useApiRead<T>(
   }, [...deps, attempt]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const refresh = useCallback(() => {
+    quiet.current = true;
+    setAttempt((n) => n + 1);
+  }, []);
 
-  return { ...state, retry };
+  return { ...state, retry, refresh };
 }

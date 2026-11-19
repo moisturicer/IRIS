@@ -1,4 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -59,6 +61,9 @@ interface DiscoverFilterBarProps {
   loading:   boolean;
   /** How many results the current filters return, for the sheet's button. */
   resultCount: number | null;
+  /** The reader's Areas, drawn below the filters (IR-1188). Given the panel's
+   *  close, for a save or reset that finishes there. Omitted, no section. */
+  areas?: (close: () => void) => ReactNode;
 }
 
 /** Both ends set, and the From after the To. "Any year" never conflicts. */
@@ -93,8 +98,11 @@ export function activeFilterCount(filters: DiscoverFilters): number {
 
 /**
  * One Filters control keeps the feed toolbar compact at every width. Its panel
- * holds every catalogue filter, each with a visible label. Sort is not here: it
- * sits in the results header beside the count (IR-1082).
+ * holds every catalogue filter, each with a visible label, and below them the
+ * reader's Areas (IR-1188). Sort is not here: it sits beside it (IR-1187).
+ *
+ * The panel is modal while open: Tab stays inside, Escape closes it, and focus
+ * goes back to the Filters control (`useDialogFocus`, shared with `Modal`).
  */
 export function DiscoverFilterBar({
   className,
@@ -103,31 +111,27 @@ export function DiscoverFilterBar({
   options,
   loading,
   resultCount,
+  areas,
 }: DiscoverFilterBarProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const filtersHeadingId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const count = activeFilterCount(filters);
+  const close = useCallback(() => setOpen(false), []);
+
+  // Focus moves to the panel's first control (Close) and back to the trigger.
+  useDialogFocus(open, panelRef, close, triggerRef.current);
 
   useEffect(() => {
     if (!open) return;
-    closeRef.current?.focus();
     const onPointerDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      triggerRef.current?.focus();
-    };
     document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onEscape);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onEscape);
-    };
+    return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open]);
 
   const set = <K extends keyof DiscoverFilters>(key: K, value: DiscoverFilters[K]) =>
@@ -202,14 +206,15 @@ export function DiscoverFilterBar({
           aria-controls={open ? panelId : undefined}
           aria-label={count ? `Filters, ${count} active` : "Filters"}
           className={cn(
-            "relative inline-flex h-11 px-3 items-center justify-center gap-2 rounded-control border text-small font-medium",
+            "relative inline-flex h-11 min-w-11 px-3 items-center justify-center gap-2 rounded-control border text-small font-medium",
             COLOUR_TRANSITION,
             FOCUS_RING,
             count > 0 ? SELECTED : "bg-white border-stone-300 text-stone-700",
           )}
         >
           <i className="fas fa-sliders text-label" aria-hidden />
-          <span>Filters</span>
+          {/* Icon and count alone on a phone, where one row has no room for the word (IR-1190). */}
+          <span className="sr-only sm:not-sr-only">Filters</span>
           {/* A real space: the button is a flex row, which draws none, but the
               visible text a checker compares with the name reads "Filters1"
               without it (IR-934, WCAG 2.5.3). */}
@@ -222,17 +227,21 @@ export function DiscoverFilterBar({
           )}
         </button>
 
-      {open && <div id={panelId} role="dialog" aria-label="Filters"
-        className="fixed inset-x-4 bottom-4 z-50 flex max-h-[min(80dvh,34rem)] flex-col rounded-card border border-stone-200 bg-white shadow-card-md sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem]">
+      {open && <div id={panelId} ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Filters"
+        className="fixed inset-x-4 bottom-4 z-50 flex max-h-[min(80dvh,40rem)] flex-col overflow-x-hidden rounded-card border border-stone-200 bg-white shadow-card-md focus:outline-none sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[24rem]">
         <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
           <h2 className="text-small font-semibold text-stone-900">Filters</h2>
-          <button type="button" ref={closeRef} onClick={() => { setOpen(false); triggerRef.current?.focus(); }} aria-label="Close filters"
+          <button type="button" onClick={close} aria-label="Close filters"
             className={cn("flex h-9 w-9 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
             <i className="fas fa-xmark text-small" aria-hidden />
           </button>
         </div>
-        <div className="flex flex-col gap-3 overflow-y-auto px-4 py-4">
-          {controls()}
+        <div className="flex min-w-0 flex-col gap-5 overflow-y-auto px-4 py-4">
+          <section aria-labelledby={filtersHeadingId} className="flex min-w-0 flex-col gap-3">
+            <h3 id={filtersHeadingId} className="text-small font-semibold text-stone-900">Filter the list</h3>
+            {controls()}
+          </section>
+          {areas && <div className="border-t border-stone-100 pt-4">{areas(close)}</div>}
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3">
             <button
@@ -241,9 +250,9 @@ export function DiscoverFilterBar({
               disabled={count === 0}
               className={cn(PILL_SECONDARY, "disabled:opacity-50 disabled:pointer-events-none")}
             >
-              Clear all
+              Clear filters
             </button>
-            <button type="button" onClick={() => { setOpen(false); triggerRef.current?.focus(); }} className={PILL_PRIMARY}>
+            <button type="button" onClick={close} className={PILL_PRIMARY}>
               {resultCount === null ? "Show results" : `Show ${resultCount} result${resultCount === 1 ? "" : "s"}`}
             </button>
         </div>

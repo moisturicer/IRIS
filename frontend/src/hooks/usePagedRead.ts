@@ -51,6 +51,8 @@ export interface PagedRead<T> {
   loadMore: () => void;
   /** Reads again from the first page. */
   retry: () => void;
+  /** Read the first page again quietly (ADR-073); see `useApiRead`. */
+  refresh: () => void;
 }
 
 const MORE_FAILED = "Could not load more. Please try again.";
@@ -138,5 +140,6 @@ export function usePagedRead<T>(
     moreError,
     loadMore,
     retry,
+    refresh: read.refresh,
   };
 }

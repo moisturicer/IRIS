@@ -23,6 +23,7 @@ import { isRequestTimeout } from "@/api/requestPolicy";
 import { SavedCallsSection } from "@/features/opportunities/SavedCallsSection";
 import { SavedView } from "./SavedView";
 import { useLibrary, useReadingHistory } from "./useLibrary";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 type Tab = "overview" | "research" | "saved" | "calls" | "downloads";
 type SavedViewKind = Exclude<LibraryView, { kind: "research" }>;
@@ -113,6 +114,8 @@ export default function MyLibraryPage() {
   useEffect(() => {
     if (mayAuthor) void loadResearch();
   }, [mayAuthor, loadResearch]);
+  // Live updates (ADR-073): the author's own papers, reloaded quietly.
+  useLiveRefresh(["library"], () => { void loadResearch(); }, mayAuthor);
 
   const selectTab = (next: Tab) => {
     const params = new URLSearchParams(searchParams);

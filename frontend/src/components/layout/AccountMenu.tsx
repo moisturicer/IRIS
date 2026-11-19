@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { pathFor } from "@/lib/access";
@@ -34,7 +33,7 @@ const ITEM =
  * of the collapsed rail.
  */
 export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
-  const { user, refreshToken, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const { roleName } = useRole();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,8 +60,7 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
 
   const handleSignOut = async () => {
     setOpen(false);
-    await authApi.logout(refreshToken ?? "").catch(() => {});
-    logout();
+    await signOut();
   };
 
   return (
@@ -109,11 +107,11 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
           {initials}
         </span>
         <span className={cn("min-w-0 flex-1", collapsed && "md:sr-only")}>
-          <span className="block truncate text-xs font-semibold text-stone-900">{fullName}</span>
+          <span className="block break-words text-xs font-semibold text-stone-900">{fullName}</span>
           {subtitle && (
             <>
               <span className="sr-only">,</span>{" "}
-              <span className="block truncate text-2xs text-stone-500">{subtitle}</span>
+              <span className="block break-words text-2xs text-stone-500">{subtitle}</span>
             </>
           )}
         </span>
@@ -140,8 +138,8 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
           )}
         >
           <div className="border-b border-stone-100 px-3 pb-2 pt-1.5">
-            <p className="truncate text-xs font-semibold text-stone-900">{fullName}</p>
-            {user?.email && <p className="truncate text-2xs text-stone-500">{user.email}</p>}
+            <p className="break-words text-xs font-semibold text-stone-900">{fullName}</p>
+            {user?.email && <p className="break-words text-2xs text-stone-500">{user.email}</p>}
           </div>
           <ul role="list" className="pt-1.5">
             <li>

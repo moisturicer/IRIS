@@ -17,6 +17,8 @@ import type { OfficeConsole, OfficeConsoleAction, OfficeConsoleRow, OfficeConsol
 import { AssignReviewerDialog } from "./AssignReviewerDialog";
 import { ExtendDueDateDialog } from "./ExtendDueDateDialog";
 import { ReassignDialog } from "./ReassignDialog";
+import { WithdrawSeatDialog } from "./WithdrawSeatDialog";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 type Load = "loading" | "ready" | "interrupted" | "failed" | "refused";
 
@@ -66,6 +68,8 @@ export default function OfficeConsolePage() {
   useEffect(() => {
     void load();
   }, [load]);
+  // Live updates (ADR-073): the office's pool and seats, reloaded quietly.
+  useLiveRefresh(["reviews"], () => { void load(); });
 
   const retry = () => {
     setState("loading");
@@ -189,8 +193,23 @@ export default function OfficeConsolePage() {
           assignmentId={acting.row.assignment}
           recordTitle={acting.row.title}
           holderName={acting.row.reviewer_name}
+          leaving={acting.row.unresolved
+            ? { name: acting.row.reviewer_name ?? "This reviewer", unresolved: acting.row.unresolved }
+            : null}
           onClose={() => setActing(null)}
           onReassigned={(name) => done(`Reassigned to ${name}.`)}
+        />
+      )}
+      {acting?.act === "withdraw" && acting.row.seat != null && (
+        <WithdrawSeatDialog
+          seatId={acting.row.seat}
+          recordTitle={acting.row.title}
+          officeLabel={label ?? "your office"}
+          holderName={acting.row.reviewer_name}
+          unresolved={acting.row.unresolved}
+          completesOffice={acting.row.withdraw_completes_office === true}
+          onClose={() => setActing(null)}
+          onWithdrawn={() => done(`${acting.row.reviewer_name ?? "The reviewer"} was withdrawn.`)}
         />
       )}
       {acting?.act === "extend" && acting.row.due_at && (
@@ -226,6 +245,14 @@ function ConsoleRow({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: Office
   // Assign is the row's own button; the rest sit in its "More actions" menu.
   const items: RowMenuItem[] = [
     ...(may("reassign") ? [{ key: "reassign", label: "Reassign…", onSelect: () => onAct("reassign") }] : []),
+    // IR-1226: take the reviewer off without naming anyone; it says when that finishes the office.
+    ...(may("withdraw")
+      ? [{
+          key: "withdraw",
+          label: "Withdraw…",
+          onSelect: () => onAct("withdraw"),
+        }]
+      : []),
     ...(may("extend") ? [{ key: "extend", label: "Extend due date…", onSelect: () => onAct("extend") }] : []),
   ];
 

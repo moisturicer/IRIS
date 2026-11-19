@@ -3,9 +3,9 @@ Supplementary attachments: who files one, and who may remove it (IR-474, IR-476)
 
 ADR-032 §10, as amended 2026-10-06, grants `attach_file`: an office files a
 supplementary file **of its own** on a record it takes part in, and may remove
-one. Taking part is an active assignment the user can staff
-(`tracker.requestable_parties`), the same test that offers the action in Paper
-View.
+one. Taking part is an active assignment the user can staff and holds a seat
+on that was not withdrawn (`tracker.requestable_parties`; IR-1226), the same
+test that offers the action in Paper View.
 
 A file belongs to an office, not a person (§10's IR-476 amendment, the same
 "party, not person" rule as a document request). So the removal rule is: the
@@ -43,15 +43,16 @@ def removable_parties(record, user) -> frozenset:
     """
     The parties whose files `user` may remove on `record`.
 
-    Empty unless the user's office holds an active assignment on the record;
-    otherwise every party they can staff. Compute it once per record and test
-    each file with `may_remove`.
+    Empty unless the user is seated on an active assignment of the record;
+    otherwise every party they hold a seat on that was not withdrawn (IR-1226).
+    Compute it once per record and test each file with `may_remove`.
     """
-    from apps.reviews.tracker import requestable_parties, staffable_parties
+    from apps.reviews.tracker import requestable_parties
+    from core.permissions import acting_parties
 
     if not requestable_parties(record, user):
         return frozenset()
-    return staffable_parties(record, user)
+    return acting_parties(user, record)
 
 
 def may_remove(record_file, user, *, removable: Optional[frozenset] = None) -> bool:

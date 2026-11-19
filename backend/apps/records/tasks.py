@@ -10,6 +10,15 @@ def send_embargo_reminders():
 
 
 @shared_task
+def draw_first_page(record_id, user_id, sha256):
+    """IR-1241: draw one manuscript's first page for Discover, in the IR-830
+    sandbox. On `extraction`, with the other PDF work, never in a web request."""
+    from .first_page import draw
+
+    return draw(record_id, user_id, sha256)
+
+
+@shared_task
 def read_review_text(text_id):
     """ADR-058 §1 as amended (IR-871): read one Version's review text, on
     campus, in the IR-830 sandbox. On `default`: it calls nothing outside."""

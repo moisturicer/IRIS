@@ -276,14 +276,15 @@ def test_direct_restricted_role_reads_follow_the_revocation_for_every_kind_of_re
         assert all(rows_ for found in reads(conn, readers).values() for rows_ in found.values())
 
         unpublish(source)
-        # A draft: its owner, its adviser and the office still read it; a stranger reads nothing,
-        # in any table, so no dependent text or vector can be reached around the Record.
+        # A draft is its creator's alone (IR-1227): its owner, who created it, still reads it;
+        # its adviser, the office and a stranger read nothing, in any table, so no dependent
+        # text or vector can be reached around the Record.
         for order in (list(readers), list(reversed(readers))):
             # One connection serves every reader in turn, in either order: nothing carries over.
             found = reads(conn, order)
-            for name in ("owner", "adviser", "office"):
-                assert all(found[name].values()), name
-            assert not any(found["stranger"].values())
+            assert all(found["owner"].values()), "owner"
+            for name in ("adviser", "office", "stranger"):
+                assert not any(found[name].values()), name
             for name, user in readers.items():
                 assert bool(found[name][tables[0]]) == Record.objects.visible_to(user).filter(pk=source.pk).exists()
 

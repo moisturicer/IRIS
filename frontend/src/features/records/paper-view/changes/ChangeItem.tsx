@@ -10,6 +10,10 @@ export interface ShowPlace {
   version: number;
   page:    number;
   regions: PageRegion[];
+  /** The change's kind in words, drawn on the outline. */
+  tag:     string;
+  /** What the reader calls the passage once landed: "Added in v2, page 18, Methodology". */
+  label:   string;
 }
 
 interface Props {
@@ -72,8 +76,11 @@ export function ChangeItem({ change, from, to, view, sectionName, onShow }: Prop
   const where = (side: "from" | "to", part: ChangeSide | null) => {
     if (!part) return null;
     const version = side === "from" ? from : to;
+    const section = sectionName(side, part.section);
+    const label = [`${KIND_LABEL[change.kind]} in v${version}`, `page ${part.page}`, section].filter(Boolean).join(", ");
     return (
-      <button type="button" onClick={() => onShow({ version, page: part.page, regions: part.regions })}
+      <button type="button"
+        onClick={() => onShow({ version, page: part.page, regions: part.regions, tag: KIND_LABEL[change.kind], label })}
         className={cn("review-control text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
         Show in v{version}, p. {part.page}
       </button>

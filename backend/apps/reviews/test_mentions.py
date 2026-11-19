@@ -53,7 +53,7 @@ class WhoMayBeMentionedTests(MentionTestBase):
     def test_an_owner_mentions_the_adviser_who_is_told_once(self):
         record = self.at_adviser_open()
 
-        made = self.commented(record, self.owner, "Is the consent form right?",
+        made = self.discussed(record, self.owner, "Is the consent form right?",
                               mentions=[self.adviser.pk])
 
         self.assertEqual(made["mentions"], [{"id": self.adviser.pk, "name": self.adviser.get_full_name()}])
@@ -63,7 +63,7 @@ class WhoMayBeMentionedTests(MentionTestBase):
     def test_a_pool_member_of_the_office_holding_the_record_may_be_mentioned(self):
         record = self.itso_with_pool()
 
-        self.commented(record, self.owner, "Who handles the patent search?", mentions=[self.itso2.pk])
+        self.discussed(record, self.owner, "Who handles the patent search?", mentions=[self.itso2.pk])
 
         self.assertEqual(len(self.told(self.itso2, record)), 1)
 
@@ -74,7 +74,7 @@ class WhoMayBeMentionedTests(MentionTestBase):
             with self.subTest(outsider=outsider.email):
                 before = record.review_comments.count()
 
-                response = self.comment(record, self.owner, "Look at this.",
+                response = self.discuss(record, self.owner, "Look at this.",
                                         mentions=[self.adviser.pk, outsider.pk])
 
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -85,8 +85,8 @@ class WhoMayBeMentionedTests(MentionTestBase):
     def test_the_refusal_does_not_say_whether_the_person_exists(self):
         record = self.at_adviser_open()
 
-        stranger = self.comment(record, self.owner, "Hi.", mentions=[self.stranger.pk])
-        nobody = self.comment(record, self.owner, "Hi.", mentions=[10_000_000])
+        stranger = self.discuss(record, self.owner, "Hi.", mentions=[self.stranger.pk])
+        nobody = self.discuss(record, self.owner, "Hi.", mentions=[10_000_000])
 
         self.assertEqual(stranger.data, nobody.data)
 
@@ -95,14 +95,14 @@ class WhoMayBeMentionedTests(MentionTestBase):
         for bad in ("everyone", {"id": self.adviser.pk}, [str(self.adviser.pk)], [True], [None]):
             with self.subTest(bad=bad):
                 self.assertEqual(
-                    self.comment(record, self.owner, "Hi.", mentions=bad).status_code,
+                    self.discuss(record, self.owner, "Hi.", mentions=bad).status_code,
                     status.HTTP_400_BAD_REQUEST,
                 )
 
     def test_too_many_names_says_how_many_a_comment_may_mention(self):
         record = self.at_adviser_open()
 
-        response = self.comment(record, self.owner, "Hi.", mentions=list(range(1, 300)))
+        response = self.discuss(record, self.owner, "Hi.", mentions=list(range(1, 300)))
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("at most 20", response.data["detail"])
@@ -110,21 +110,21 @@ class WhoMayBeMentionedTests(MentionTestBase):
     def test_mentioning_yourself_tells_nobody(self):
         record = self.at_adviser_open()
 
-        self.commented(record, self.owner, "Note to self.", mentions=[self.owner.pk])
+        self.discussed(record, self.owner, "Note to self.", mentions=[self.owner.pk])
 
         self.assertEqual(self.told(self.owner), [])
 
     def test_naming_someone_twice_is_one_mention(self):
         record = self.at_adviser_open()
 
-        made = self.commented(record, self.owner, "Hi.", mentions=[self.adviser.pk, self.adviser.pk])
+        made = self.discussed(record, self.owner, "Hi.", mentions=[self.adviser.pk, self.adviser.pk])
 
         self.assertEqual([m["id"] for m in made["mentions"]], [self.adviser.pk])
         self.assertEqual(len(self.told(self.adviser)), 1)
 
     def test_a_reply_mention_is_told_at_once(self):
         record = self.at_adviser_open()
-        thread = self.commented(record, self.owner, "Is the consent form attached?")
+        thread = self.discussed(record, self.owner, "Is the consent form attached?")
 
         self.commented(record, self.adviser, "Yes, page 4.", reply_to=thread["id"],
                        mentions=[self.owner.pk])
@@ -191,7 +191,7 @@ class EditedMentionTests(MentionTestBase):
 
     def test_someone_added_in_an_edit_is_told_once(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Is the consent form right?")
+        made = self.discussed(record, self.owner, "Is the consent form right?")
 
         edited = self.patch(record, self.owner, made["id"],
                             {"body": "Is the consent form right?", "mentions": [self.adviser.pk]})
@@ -204,7 +204,7 @@ class EditedMentionTests(MentionTestBase):
 
     def test_removing_a_name_unsends_nothing_and_adding_it_back_tells_nobody_twice(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Hi.", mentions=[self.adviser.pk])
+        made = self.discussed(record, self.owner, "Hi.", mentions=[self.adviser.pk])
 
         removed = self.patch(record, self.owner, made["id"], {"body": "Hi.", "mentions": []})
         self.patch(record, self.owner, made["id"], {"body": "Hi.", "mentions": [self.adviser.pk]})
@@ -214,7 +214,7 @@ class EditedMentionTests(MentionTestBase):
 
     def test_an_edit_that_leaves_mentions_out_keeps_them(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Hi.", mentions=[self.adviser.pk])
+        made = self.discussed(record, self.owner, "Hi.", mentions=[self.adviser.pk])
 
         edited = self.patch(record, self.owner, made["id"], {"body": "Hello."})
 
@@ -222,7 +222,7 @@ class EditedMentionTests(MentionTestBase):
 
     def test_mentions_alone_do_not_mark_the_comment_edited(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Hi.")
+        made = self.discussed(record, self.owner, "Hi.")
 
         edited = self.patch(record, self.owner, made["id"], {"body": "Hi.", "mentions": [self.adviser.pk]})
 
@@ -230,7 +230,7 @@ class EditedMentionTests(MentionTestBase):
 
     def test_someone_who_has_since_lost_access_does_not_stop_the_author_editing(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Hi.", mentions=[self.adviser.pk])
+        made = self.discussed(record, self.owner, "Hi.", mentions=[self.adviser.pk])
         self.adviser.is_active = False
         self.adviser.save(update_fields=["is_active"])
 
@@ -241,7 +241,7 @@ class EditedMentionTests(MentionTestBase):
 
     def test_an_edit_naming_an_outsider_is_refused_and_changes_nothing(self):
         record = self.at_adviser_open()
-        made = self.commented(record, self.owner, "Hi.")
+        made = self.discussed(record, self.owner, "Hi.")
 
         response = self.patch(record, self.owner, made["id"],
                               {"body": "Hi.", "mentions": [self.adviser.pk, self.stranger.pk]})
@@ -275,7 +275,7 @@ class MentionableTests(MentionTestBase):
         record = self.itso_with_pool()
         offered = [p["id"] for p in self.get(record, self.owner).data["results"]]
 
-        self.commented(record, self.owner, "Everyone.", mentions=offered)
+        self.discussed(record, self.owner, "Everyone.", mentions=offered)
 
     def test_someone_who_may_not_read_the_review_gets_a_404(self):
         record = self.at_adviser_open()

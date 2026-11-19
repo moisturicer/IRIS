@@ -338,7 +338,12 @@ export type Capability =
   | "set_visibility"
   | "tag_ip"
   | "attach_file"
+  /** Write in Conversation and reply in a thread: an open or a finished seat (IR-1226). */
   | "comment_review"
+  /** Start a thread on a passage: an owner, or an open seat (IR-1226). */
+  | "start_thread"
+  /** A thread on no passage, from *New comment*: a reviewer's; an owner's threads are on a passage (IR-1194). */
+  | "open_general_thread"
   | "finish_review"
   | "comment_public"
   | "cite";
@@ -584,6 +589,12 @@ export interface RecordDetail extends RecordListItem {
    */
   publish_unlisted?:    { blocked: string | null } | null;
   /**
+   * What the Adviser leaves if RDCO replaces them (IR-1226): beside the
+   * `replace_adviser` offer, so the dialog warns with the server's counts.
+   * Null to anyone not offered the act. Optional: a fixture may leave it out.
+   */
+  adviser_leaving?:     RemovalLeaving | null;
+  /**
    * The record's versions, oldest first (ADR-032 §5, IR-416). Review
    * material: null to a viewer who may not read the review (IR-479), and
    * empty before the record is first submitted.
@@ -612,7 +623,7 @@ export interface RecordVersion {
   documents?:               VersionDocument[];
   /** Uploads made while it was the latest version: "added during vN". */
   documents_added?:         VersionDocument[];
-  /** True when `documents` is a best guess, for versions older than IR-872. */
+  /** True when `documents` was reconstructed, for versions older than IR-872. Not shown since IR-1202. */
   documents_reconstructed?: boolean;
   /** Its review text's state (ADR-058 §1 as amended, IR-871). Null with no manuscript. */
   review_text?:             VersionReviewText | null;
@@ -635,6 +646,19 @@ export interface VersionDocument {
   version:      number;
   uploaded_at:  string;
   download_url: string;
+  /**
+   * Each time this upload was rejected, oldest first (IR-1201). Null to a
+   * viewer who may not read document requests (ADR-022 §Amendment 5).
+   */
+  rejections?:  VersionDocumentRejection[] | null;
+}
+
+/** A requesting party's rejection of one upload, with its reason (IR-1201). */
+export interface VersionDocumentRejection {
+  party:            string;
+  reason:           string;
+  rejected_by_name: string | null;
+  rejected_at:      string;
 }
 
 /**
@@ -665,15 +689,38 @@ export interface DecisionFlags {
   embargo?:     RecordEmbargo | null;
 }
 
+/** What someone taken off a paper leaves unresolved (IR-1226), counted by the server. */
+export interface RemovalUnresolved {
+  /** Unsent drafts: discarded with the seat. */
+  drafts:            number;
+  /** Open threads they posted, document and revision requests they made: these stay open. */
+  open_threads:      number;
+  document_requests: number;
+  revision_requests: number;
+}
+
+/** One person a removal would take off a paper, and what they leave (IR-1226). */
+export interface RemovalLeaving {
+  name:       string;
+  unresolved: RemovalUnresolved;
+}
+
 export interface DecisionCloses {
-  /** Each review a decision would end, with whoever is reviewing there now. */
-  assignments:       { party: Party; label: string; holders: string[] }[];
+  /**
+   * Each review a decision would end, with whoever is reviewing there now,
+   * and what each of them leaves (IR-1226; absent from older fixtures).
+   */
+  assignments:       { party: Party; label: string; holders: string[]; leaving?: RemovalLeaving[] }[];
   /** How many open document requests it would withdraw. */
   document_requests: number;
   revision_requests?: { id: number; party: Party; label: string; reason: string }[];
   findings?: { party: Party; label: string; comment: string }[];
   /** The open threads deciding closes, the decider's own drafts included (IR-874). */
-  threads?: { id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean }[];
+  threads?: {
+    id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean;
+    /** The supporting document a thread is on, "Consent form, v1" (IR-1204). */
+    document?: string | null;
+  }[];
 }
 
 export interface OfficeReviewFlags {
@@ -682,8 +729,10 @@ export interface OfficeReviewFlags {
   label:      string | null;
   /** Why the act cannot be taken yet (an unopened seat, an open document request). */
   blocked:    string | null;
-  /** Why *Clear* alone is held: the office's own open Must fix threads (IR-874). */
+  /** Why *Clear* is held: the office's own open Must fix threads (IR-874). */
   clear_blocked?: string | null;
+  /** Why *Record a finding* is held, for the same reason (IR-1226). */
+  finding_blocked?: string | null;
   assignment: number | null;
 }
 
@@ -730,6 +779,8 @@ export interface ResponseLetterEntry {
   version:     number | null;
   page:        number | null;
   quote:       string;
+  /** A document thread's upload, "Consent form, v1" (IR-1204); absent from older letters. */
+  document?:   string | null;
   /** Null: no answer given. */
   answer:      ThreadAnswerPayload["kind"] | null;
   note:        string;
@@ -935,6 +986,12 @@ export interface MentionedPerson {
  */
 export interface ReviewComment {
   id:          number;
+  /**
+   * Conversation's discussion or a review thread (ADR-032 §7 as amended
+   * 2026-11-16, IR-1194). A reply takes its parent's kind. Missing on an
+   * older payload, which reads as a thread.
+   */
+  kind?:       ReviewCommentKind;
   author:      number | null;
   author_name: string | null;
   /** Plain text, verbatim. Never render as markup. */
@@ -957,7 +1014,11 @@ export interface ReviewComment {
    */
   /** The party it belongs to; null for the authors' own threads. */
   party?:                ThreadParty | null;
-  /** Server-worded party: "The authors", "Adviser", "ITSO"... */
+  /**
+   * Server-worded party: "The authors", "Adviser", "ITSO"... On a reply, who
+   * its writer is in this review ("Author", "IERC"...), or null where the
+   * server can't say (IR-1192).
+   */
   party_label?:          string | null;
   /** A reviewer's thread only; null on an owner's thread and on a reply. */
   severity?:             ThreadSeverity | null;
@@ -967,6 +1028,8 @@ export interface ReviewComment {
   round?:                number | null;
   /** The passage it is about; null for a general thread. */
   anchor?:               ThreadAnchor | null;
+  /** The supporting document it is about instead, as a whole (IR-1204); null otherwise. */
+  document?:             ThreadDocument | null;
   state?:                ThreadState | null;
   resolved_by?:          string | null;
   resolved_at?:          string | null;
@@ -999,11 +1062,16 @@ export interface ReviewComment {
    * flag is true; the screen compares no role (ADR-032 §10).
    */
   can_delete?:           boolean;
+  /** Its writer may post this draft on its own, before *Finish review* (IR-1194). */
+  can_post?:             boolean;
   can_change_severity?:  boolean;
   can_resolve?:          boolean;
   can_reopen?:           boolean;
   can_answer?:           boolean;
 }
+
+/** Where a review comment lives: Conversation, or Threads (IR-1194). */
+export type ReviewCommentKind = "discussion" | "thread";
 
 /** A thread's party: an office, the Adviser, or (null) the authors. */
 export type ThreadParty = Party;
@@ -1111,6 +1179,22 @@ export interface VersionComparisonPayload {
   threads?:  PlacedThread[];
 }
 
+/**
+ * A supporting document a reviewer's thread is about, as a whole (ADR-032 §7,
+ * Amendment 2026-11-18; IR-1204): one upload of one of the record's slots.
+ */
+export interface ThreadDocument {
+  upload:    number;
+  slot:      string;
+  version:   number;
+  /** "Consent form, v1". */
+  label:     string;
+  /** A newer upload of the document has replaced this one: "From an earlier upload". */
+  earlier:   boolean;
+  /** The stored file's extension, lower-cased: whether the reader can show it. */
+  extension: string;
+}
+
 /** A passage of one Version: where an anchored thread points. */
 export interface ThreadAnchor {
   version:  number;
@@ -1170,6 +1254,8 @@ export interface ReviewRound {
   review:     number | null;
   /** How many threads it sent. */
   threads:    number;
+  /** How many of them were Must fix (IR-1194). Missing on an older payload. */
+  must_fix?:  number;
   created_at: string;
 }
 

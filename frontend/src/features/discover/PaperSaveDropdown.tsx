@@ -155,7 +155,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
               >
                 <span className="flex items-center gap-2 min-w-0">
                   <i className={cn(checked ? "fas text-brand" : "far text-stone-300", option.icon, "text-2xs shrink-0")} aria-hidden />
-                  <span className="truncate">{option.label}</span>
+                  <span className="min-w-0 break-words">{option.label}</span>
                 </span>
                 {checked && <i className="fas fa-check text-brand text-xs shrink-0" aria-hidden />}
               </button>
@@ -199,7 +199,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
                   >
                     <span className="flex items-center gap-2 min-w-0">
                       <i className={cn("fa-folder text-2xs shrink-0", checked ? "fas text-brand" : "far text-stone-300")} aria-hidden />
-                      <span className="truncate">{folder.name}</span>
+                      <span className="min-w-0 break-words">{folder.name}</span>
                     </span>
                     {checked && <i className="fas fa-check text-brand text-xs shrink-0" aria-hidden />}
                   </button>

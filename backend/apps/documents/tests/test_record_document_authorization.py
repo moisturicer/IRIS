@@ -42,6 +42,10 @@ from apps.documents.models import RecordFile, RecordUpload, UploadSlot
 from apps.documents.testing import real_pdf_bytes
 from apps.records.models import Record, RecordOwner, RecordType
 
+# An office memo as an image. It was a .txt file until IR-1220, which refuses any
+# type but PDF, Word, PNG or JPG; these tests are about who may attach, not the type.
+MEMO_PNG = b"\x89PNG\r\n\x1a\n" + b"office memo"
+
 
 class RecordDocumentAuthorizationTests(APITestCase):
     """Owner and office staff may reach a record's documents. Nobody else may."""
@@ -158,6 +162,11 @@ class RecordDocumentAuthorizationTests(APITestCase):
 
     # --- the refusals, which are the point -------------------------------
 
+    #: How a stranger is refused. This fixture's record is a draft, which is its
+    #: creator's alone (IR-1227, ADR-009 decision 6): a 404, as for a missing
+    #: record. A submitted record keeps the 403 (`AdviserReadsDocumentsTests`).
+    REFUSED = status.HTTP_404_NOT_FOUND
+
     def test_stranger_is_refused_by_every_document_endpoint(self):
         """
         The acceptance criterion, as one table. A single assertion per endpoint
@@ -169,7 +178,7 @@ class RecordDocumentAuthorizationTests(APITestCase):
             with self.subTest(endpoint=label):
                 self.assertEqual(
                     call().status_code,
-                    status.HTTP_403_FORBIDDEN,
+                    self.REFUSED,
                     f"{label} served a user with no claim on the record",
                 )
 
@@ -179,14 +188,14 @@ class RecordDocumentAuthorizationTests(APITestCase):
         a query string returned every supplementary file on the record.
         """
         self.client.force_authenticate(self.stranger)
-        self.assertEqual(self._download_all().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._download_all().status_code, self.REFUSED)
 
     def test_stranger_cannot_write_into_someone_elses_record(self):
         """A refused upload must not leave a RecordUpload behind."""
         before = RecordUpload.objects.filter(record=self.record).count()
         self.client.force_authenticate(self.stranger)
-        self.assertEqual(self._submit().status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(self._upload_create().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._submit().status_code, self.REFUSED)
+        self.assertEqual(self._upload_create().status_code, self.REFUSED)
         self.assertEqual(
             RecordUpload.objects.filter(record=self.record).count(), before,
             "a refused request still created an upload",
@@ -217,7 +226,13 @@ class RecordDocumentAuthorizationTests(APITestCase):
                 )
 
     def test_office_staff_still_reaches_every_document_endpoint(self):
-        """RDCO reviews these documents; the gate is owner-or-staff, not owner-only."""
+        """
+        RDCO reviews these documents; the gate is owner-or-staff, not owner-only,
+        once the record is submitted. A draft is its creator's alone (IR-1227),
+        so the office reaches its documents from Submit on.
+        """
+        self.record.pipeline_status = "in_review"
+        self.record.save(update_fields=["pipeline_status"])
         self.client.force_authenticate(self.rdco)
         for label, call in self._all_endpoints().items():
             with self.subTest(endpoint=label):
@@ -225,6 +240,21 @@ class RecordDocumentAuthorizationTests(APITestCase):
                     call().status_code, 400,
                     f"{label} refused office staff",
                 )
+
+    def test_office_staff_reach_no_document_of_a_draft(self):
+        if self.record.pipeline_status != "draft":
+            self.skipTest("this fixture's record is submitted")
+        self.client.force_authenticate(self.rdco)
+        for label, call in self._all_endpoints().items():
+            with self.subTest(endpoint=label):
+                self.assertEqual(call().status_code, status.HTTP_404_NOT_FOUND, label)
+
+
+def seat_on(assignment, reviewer):
+    """Seat `reviewer` on `assignment`: acting on a review takes a seat (IR-1226)."""
+    from apps.reviews.models import ReviewerSeat
+
+    return ReviewerSeat.objects.create(assignment=assignment, reviewer=reviewer)
 
 
 class RecordFileUploadAuthorizationTests(APITestCase):
@@ -237,7 +267,8 @@ class RecordFileUploadAuthorizationTests(APITestCase):
     that: `owns_or_staffs_record` admits every office, so any KTTO, RDCO, ITSO or
     IERC account would still pass. ADR-032 grants `attach_file` on a record the
     office *takes part in*, so the gate is participation -- an active assignment
-    the user can staff, the same test that offers the action in Paper View.
+    the user can staff and, since IR-1226, holds a seat on, the same test that
+    offers the action in Paper View.
 
     The refusals follow ADR-022 §Amendment 4. Office staff can see every
     record, so an office that does not take part is refused with a **403**, not
@@ -281,15 +312,16 @@ class RecordFileUploadAuthorizationTests(APITestCase):
             pipeline_status="in_review",
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
-        # ITSO holds the record; KTTO has no part in it.
-        RecordAssignment.objects.create(record=self.record, party=Party.ITSO)
+        # ITSO holds the record; KTTO has no part in it. Filing takes a seat
+        # on the assignment, not membership of the office (IR-1226).
+        seat_on(RecordAssignment.objects.create(record=self.record, party=Party.ITSO), self.itso)
 
     def _attach(self, record_id=None):
         return self.client.post(
             "/api/v1/documents/files/upload/",
             {
                 "record": self.record.pk if record_id is None else record_id,
-                "file": SimpleUploadedFile("memo.txt", b"office memo"),
+                "file": SimpleUploadedFile("memo.png", MEMO_PNG),
             },
             format="multipart",
         )
@@ -391,9 +423,10 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
         self.record_type = RecordType.objects.first()
         self.assertIsNotNone(self.record_type, "no seeded RecordType -- migrations incomplete")
         self.record = self._record("in_review")
-        # ITSO and IERC both hold the record; KTTO has no part in it.
-        RecordAssignment.objects.create(record=self.record, party=Party.ITSO)
-        RecordAssignment.objects.create(record=self.record, party=Party.IERC)
+        # ITSO and IERC both hold the record; KTTO has no part in it. Each
+        # files and removes from a seat on its assignment (IR-1226).
+        seat_on(RecordAssignment.objects.create(record=self.record, party=Party.ITSO), self.itso)
+        seat_on(RecordAssignment.objects.create(record=self.record, party=Party.IERC), self.ierc)
 
         self.itso_file = self._file(self.record, "itso", self.itso)
         self.ierc_file = self._file(self.record, "ierc", self.ierc)
@@ -481,7 +514,7 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
         from core.enums import Party
 
         record = self._record("in_review")
-        RecordAssignment.objects.create(record=record, party=Party.RDCO)
+        seat_on(RecordAssignment.objects.create(record=record, party=Party.RDCO), self.rdco)  # IR-1226
         record_file = self._file(record, "rdco", self.rdco)
         self.client.force_authenticate(self.rdco)
         self.assertRemoved(record_file, self._remove(record_file))
@@ -508,7 +541,7 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
     def _attach(self, record):
         return self.client.post(
             "/api/v1/documents/files/upload/",
-            {"record": record.pk, "file": SimpleUploadedFile("memo.txt", b"office memo")},
+            {"record": record.pk, "file": SimpleUploadedFile("memo.png", MEMO_PNG)},
             format="multipart",
         )
 
@@ -529,7 +562,7 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
         from core.enums import Party
 
         record = self._record("in_review")
-        RecordAssignment.objects.create(record=record, party=Party.RDCO)
+        seat_on(RecordAssignment.objects.create(record=record, party=Party.RDCO), self.rdco)  # IR-1226
         self.client.force_authenticate(self.rdco)
         response = self._attach(record)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
@@ -662,3 +695,85 @@ class RecordFileAdminTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertTrue(RecordFile.objects.filter(pk=self.record_file.pk).exists())
         self.assertTrue(default_storage.exists(self.record_file.file.name))
+
+
+class AdviserReadsDocumentsTests(RecordDocumentAuthorizationTests):
+    """
+    IR-1200 (ADR-022 §Amendment 6): the record's Adviser reads and downloads
+    its documents, and writes none of them. Access follows `record.adviser`,
+    so it ends when RDCO replaces them and outlasts the review otherwise.
+
+    Inherits the IR-153 fixture and its tests, so the owner/staff/stranger
+    guarantees are rechecked on a record that now has an Adviser.
+
+    The record is submitted: a draft is its creator's alone (IR-1227), so its
+    Adviser reaches it only once it is in review, and a stranger is refused
+    with the 403 a submitted record answers.
+    """
+
+    REFUSED = status.HTTP_403_FORBIDDEN
+
+    def setUp(self):
+        super().setUp()
+        self.adviser = self.make_user("doc-adviser@cit.edu", "Adviser")
+        self.other_adviser = self.make_user("doc-other-adviser@cit.edu", "Adviser")
+        self.record.adviser = self.adviser
+        self.record.pipeline_status = "in_review"
+        self.record.save(update_fields=["adviser", "pipeline_status"])
+        self.record_file = RecordFile.objects.get(record=self.record)
+
+    def _reads(self):
+        return {
+            "GET  /documents/records/<id>/slots/":   self._slots,
+            "GET  /documents/uploads/?record=":      self._uploads,
+            "GET  /documents/files/?record=":        self._files,
+            "GET  /documents/files/download-all/":   self._download_all,
+            "GET  /documents/uploads/<id>/download/": lambda: self.client.get(
+                f"/api/v1/documents/uploads/{self.upload.pk}/download/"),
+            "GET  /documents/files/<id>/download/":  lambda: self.client.get(
+                f"/api/v1/documents/files/{self.record_file.pk}/download/"),
+        }
+
+    def test_the_adviser_reads_and_downloads_every_document(self):
+        self.client.force_authenticate(self.adviser)
+        for label, call in self._reads().items():
+            with self.subTest(endpoint=label):
+                self.assertEqual(call().status_code, status.HTTP_200_OK, f"{label} refused the Adviser")
+
+    def test_the_adviser_uploads_nothing_and_deletes_nothing(self):
+        self.client.force_authenticate(self.adviser)
+        before = RecordUpload.objects.filter(record=self.record).count()
+        self.assertEqual(self._submit().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._upload_create().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            self.client.delete(f"/api/v1/documents/uploads/{self.upload.pk}/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/v1/documents/files/{self.record_file.pk}/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(RecordUpload.objects.filter(record=self.record).count(), before)
+        self.assertTrue(RecordFile.objects.filter(pk=self.record_file.pk).exists())
+
+    def test_a_replaced_adviser_is_refused(self):
+        self.record.adviser = self.other_adviser
+        self.record.save(update_fields=["adviser"])
+        self.client.force_authenticate(self.adviser)
+        for label, call in self._reads().items():
+            with self.subTest(endpoint=label):
+                self.assertGreaterEqual(call().status_code, 400, f"{label} served a replaced Adviser")
+
+    def test_an_adviser_of_other_papers_is_refused(self):
+        self.client.force_authenticate(self.other_adviser)
+        for label, call in self._reads().items():
+            with self.subTest(endpoint=label):
+                self.assertGreaterEqual(call().status_code, 400, f"{label} served an unrelated Adviser")
+
+    def test_the_adviser_keeps_access_after_the_review_ends(self):
+        self.record.pipeline_status = "published"
+        self.record.save(update_fields=["pipeline_status"])
+        self.client.force_authenticate(self.adviser)
+        for label, call in self._reads().items():
+            with self.subTest(endpoint=label):
+                self.assertEqual(call().status_code, status.HTTP_200_OK, f"{label} refused the Adviser")

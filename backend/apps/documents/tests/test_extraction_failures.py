@@ -213,8 +213,9 @@ def owned(extraction):
     record = extraction.record
     owner = make_user("failure-owner@cit.edu", "Student")
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+    record.added_by = owner  # its creator, as Publish makes it (IR-1227)
     record.manuscript_revision = uuid.uuid4()
-    record.save(update_fields=["manuscript_revision"])
+    record.save(update_fields=["manuscript_revision", "added_by"])
     extraction.source_revision = record.manuscript_revision
     extraction.source_file = record.abstract_file.name
     extraction.save(update_fields=["source_revision", "source_file"])

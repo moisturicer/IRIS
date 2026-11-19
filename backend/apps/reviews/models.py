@@ -10,6 +10,7 @@ from core.enums import (
     Office,
     Party,
     ResubmissionRequestState,
+    ReviewCommentKind,
     ReviewDecision,
     ReviewStage,
     ReviewVerdict,
@@ -474,13 +475,23 @@ class ReviewComment(models.Model):
     #: Stamped by an edit that changed the body; null until then.
     edited_at  = models.DateTimeField(null=True, blank=True)
 
+    #: A Conversation *discussion* or a review *thread* (ADR-032 §7, 2026-11-16
+    #: amendment; IR-1194). A discussion leaves every thread field below at its
+    #: default; a reply takes its parent's kind.
+    kind       = models.CharField(
+        max_length=12, choices=ReviewCommentKind.choices, default=ReviewCommentKind.THREAD,
+    )
+
     # --- a top-level comment is a thread (ADR-032 §7, 2026-11-04; IR-874) ---------
     # Every field below describes the thread, so a reply leaves them at their
-    # defaults: it is never a draft, has no severity, and is never resolved.
+    # defaults: it is never a draft, has no severity, and is never resolved --
+    # except `party`, which a reply keeps for its label (IR-1192).
 
     #: The party the thread belongs to, not the person: the writer's party when
     #: they wrote it. Blank for an owner's thread. A withdrawn writer's thread
-    #: stays the party's, and its current Seat holders own it.
+    #: stays the party's, and its current Seat holders own it. A reply stores
+    #: its writer's party the same way, but only to say who wrote it: no rule
+    #: reads a reply's party, and every thread query excludes replies.
     party      = models.CharField(max_length=20, choices=PARTY_CHOICES, blank=True, default="")
     #: A reviewer's thread only. Existing rows were backfilled as *Suggestion*.
     severity   = models.CharField(
@@ -506,6 +517,15 @@ class ReviewComment(models.Model):
     anchor_prefix  = models.TextField(blank=True, default="")
     anchor_suffix  = models.TextField(blank=True, default="")
     anchor_regions = models.JSONField(default=list, blank=True)
+    #: A thread on a supporting document instead (ADR-032 §7, Amendment
+    #: 2026-11-18; IR-1204): one upload of one of the record's slot documents,
+    #: as a whole, never a passage. `RESTRICT`, so no thread loses the document
+    #: it names (`records.versions.deletion_refused_reason`); deleting the whole
+    #: Record still removes both.
+    anchor_upload  = models.ForeignKey(
+        "documents.RecordUpload", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="review_threads",
+    )
 
     state       = models.CharField(
         max_length=20, choices=ThreadState.choices, default=ThreadState.OPEN,
@@ -543,6 +563,13 @@ class ReviewComment(models.Model):
         indexes  = [
             models.Index(fields=["record", "created_at"]),
             models.Index(fields=["record", "state", "severity"]),
+        ]
+        constraints = [
+            # A thread names a manuscript passage, a document upload or neither (IR-1204).
+            models.CheckConstraint(
+                condition=models.Q(anchor_version__isnull=True) | models.Q(anchor_upload__isnull=True),
+                name="review_thread_names_one_place",
+            ),
         ]
 
     def __str__(self):

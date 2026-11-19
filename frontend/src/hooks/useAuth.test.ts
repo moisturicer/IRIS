@@ -14,43 +14,40 @@ import { makeUser } from "@/test/authFixtures";
 beforeEach(() => {
   sessionStorage.clear();
   useAuthStore.setState({
-    user: null, accessToken: null, refreshToken: null, isAuthenticated: false,
+    user: null, accessToken: null, isAuthenticated: false, remembered: false,
   });
 });
 
 describe("useAuth", () => {
-  it("is signed out with no user and no refresh token to begin with", () => {
+  it("is signed out with no user to begin with", () => {
     const { result } = renderHook(() => useAuth());
 
     expect(result.current.user).toBeNull();
     expect(result.current.isAuthenticated).toBe(false);
-    expect(result.current.refreshToken).toBeNull();
   });
 
   it("reflects a sign-in made through the hook's own login", () => {
     const { result } = renderHook(() => useAuth());
     const user = makeUser();
 
-    act(() => result.current.login(user, "access-1", "refresh-1"));
+    act(() => result.current.login(user, "access-1"));
 
     expect(result.current.user).toEqual(user);
     expect(result.current.isAuthenticated).toBe(true);
-    expect(result.current.refreshToken).toBe("refresh-1");
   });
 
   it("reflects a sign-out", () => {
-    useAuthStore.getState().login(makeUser(), "access-1", "refresh-1");
+    useAuthStore.getState().login(makeUser(), "access-1");
     const { result } = renderHook(() => useAuth());
 
     act(() => result.current.logout());
 
     expect(result.current.user).toBeNull();
     expect(result.current.isAuthenticated).toBe(false);
-    expect(result.current.refreshToken).toBeNull();
   });
 
   it("re-renders when the session ends somewhere else, such as the 401 handler", () => {
-    useAuthStore.getState().login(makeUser(), "access-1", "refresh-1");
+    useAuthStore.getState().login(makeUser(), "access-1");
     const { result } = renderHook(() => useAuth());
     expect(result.current.isAuthenticated).toBe(true);
 
@@ -59,23 +56,19 @@ describe("useAuth", () => {
     expect(result.current.isAuthenticated).toBe(false);
   });
 
-  it("picks up a rotated refresh token", () => {
-    useAuthStore.getState().login(makeUser(), "access-1", "refresh-1");
+  it("exposes no refresh token: it is only in the server's HttpOnly cookie (ADR-072)", () => {
     const { result } = renderHook(() => useAuth());
 
-    act(() => useAuthStore.getState().setTokens("access-2", "refresh-2"));
-
-    expect(result.current.refreshToken).toBe("refresh-2");
+    expect(result.current).not.toHaveProperty("refreshToken");
   });
 
   it("updateUser replaces the user without touching the session", () => {
-    useAuthStore.getState().login(makeUser(), "access-1", "refresh-1");
+    useAuthStore.getState().login(makeUser(), "access-1");
     const { result } = renderHook(() => useAuth());
 
     act(() => result.current.updateUser(makeUser({ first_name: "Renamed" })));
 
     expect(result.current.user?.first_name).toBe("Renamed");
     expect(result.current.isAuthenticated).toBe(true);
-    expect(result.current.refreshToken).toBe("refresh-1");
   });
 });

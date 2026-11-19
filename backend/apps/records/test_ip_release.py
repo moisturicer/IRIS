@@ -24,7 +24,6 @@ from apps.ai.policy.records import decision_for_record
 from apps.audit.models import AuditEvent
 from core.enums import PipelineStatus, RecordTypeName, RoleName
 
-from . import ip_release
 from .models import Record, RecordOwner, RecordType
 from .tests import make_user
 
@@ -167,8 +166,8 @@ class WhatCanBeReleasedTests(ReleaseBase):
 
         response = self._release(record, self.ktto)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"], ip_release.DRAFT_HAS_NOTHING_TO_RELEASE)
+        # KTTO cannot see it: a draft is its creator's alone (IR-1227, ADR-009 decision 6), so it is a missing record.
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         record.refresh_from_db()
         self.assertFalse(record.ip_released)
 
@@ -343,8 +342,8 @@ class OfferedTests(IpReleaseFixtures, APITestCase):
                 self.assertFalse(self._offers_release(record, user))
 
     def test_it_is_not_offered_with_nothing_to_release(self):
-        for record in (self._paper(is_ip=False), self._paper(ip_released=True),
-                       self._paper(PipelineStatus.DRAFT)):
+        # A draft is not offered either: KTTO cannot open it (a draft is its creator's alone (IR-1227, ADR-009 decision 6)).
+        for record in (self._paper(is_ip=False), self._paper(ip_released=True)):
             with self.subTest(record=record.pk):
                 self.assertFalse(self._offers_release(record, self.ktto))
 

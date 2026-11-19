@@ -1,17 +1,19 @@
 """
 IR-676: every copy saved through the download route is marked, or not served.
 
-The footer names the downloader on every page, a faint "CIT-U" is drawn over the
-content (IR-1127), and the PDF's metadata says the same (ADR-048, decisions 10
+The footer names the downloader on every page, a faint "PROPERTY OF / CIT-U / DO
+NOT DISTRIBUTE" is drawn over the content (IR-1127, IR-1198), and the PDF's metadata says the same (ADR-048, decisions 10
 and 11).
 
 **Seam: the API.** Pages are read back out of the response with pypdf.
 """
 
+import math
 from io import BytesIO
 from unittest import mock
 
 from django.core.files.base import ContentFile
+from django.test import SimpleTestCase
 from django.utils import timezone
 from pypdf import PdfReader, PdfWriter
 from reportlab.lib.utils import ImageReader
@@ -19,6 +21,7 @@ from reportlab.pdfgen import canvas
 from rest_framework import status
 
 from apps.audit.models import AuditEvent
+from apps.records import watermark
 from apps.records.test_download_grant import Fixtures, _user
 from core.enums import RequestStatus
 
@@ -158,8 +161,11 @@ class MarkedCopyTests(WatermarkFixtures):
         self.request_by()
 
         for page in self.copy().pages:
+            text = page.extract_text()
             # Once, in the footer's "via CIT-U IRIS"; the mark itself is drawn as shapes.
-            self.assertEqual(page.extract_text().count("CIT-U"), 1)
+            self.assertEqual(text.count("CIT-U"), 1)
+            self.assertNotIn("PROPERTY", text)
+            self.assertNotIn("DISTRIBUTE", text)
 
     def test_an_exempt_copy_says_why_in_place_of_a_request(self):
         self.use_manuscript(_text_pdf(pages=1))
@@ -351,3 +357,64 @@ class NoStoredCopyTests(WatermarkFixtures):
 
         with mock.patch("django.core.files.storage.base.Storage.save", side_effect=AssertionError("stored a copy")):
             self.copy()
+
+
+class MarkWordingTests(SimpleTestCase):
+    """IR-1198: the mark reads PROPERTY OF / CIT-U / DO NOT DISTRIBUTE, centred."""
+
+    def test_the_mark_has_three_lines_and_a_shape_for_every_letter(self):
+        self.assertEqual(watermark.MARK_LINES, ("PROPERTY OF", "CIT-U", "DO NOT DISTRIBUTE"))
+        for line in watermark.MARK_LINES:
+            for char in line.replace(" ", ""):
+                self.assertIn(char, watermark.MARK_GLYPHS)
+
+    def test_line_widths_match_the_readers_mark(self):
+        # ReaderWatermark.test.ts pins the same numbers, so the two marks stay one shape.
+        widths = [round(watermark._line_width(line), 6) for line in watermark.MARK_LINES]
+        self.assertEqual(widths, [11.6, 4.5, 16.6])
+
+    def test_every_line_is_cut_to_one_height(self):
+        # ReaderWatermark.test.ts pins the same bands. Each is a letter and a stroke tall.
+        bands = [(round(y, 6), round(height, 6)) for _x, y, _width, height in watermark._line_bands()]
+        self.assertEqual(bands, [(1.08, 1.24), (-0.62, 1.24), (-2.32, 1.24)])
+
+    def test_the_tilted_mark_is_centred_on_the_page(self):
+        # The last line is the longest, so the block's own centre would put the mark low and
+        # to the right. ReaderWatermark.test.ts pins the same offset.
+        dx, dy = watermark._tilted_centre()
+        self.assertEqual((round(dx, 6), round(dy, 6)), (0.883883, -0.883883))
+
+    def test_every_letter_fills_its_line_from_bottom_to_top(self):
+        # A flat-ended upright stops where its centre line does, half a stroke short of a
+        # crossbar's or a curve's outer edge, so it has to run past the edge to be cut there.
+        half = watermark.MARK_STROKE / 2
+        for char, (_width, strokes) in watermark.MARK_GLYPHS.items():
+            if char == "-":
+                continue
+            lowest, highest = _ink_extent(strokes, half)
+            with self.subTest(letter=char):
+                self.assertLessEqual(lowest, -half + 1e-3)  # A curve is measured along short chords
+                self.assertGreaterEqual(highest, 1 + half - 1e-3)
+
+
+def _ink_extent(strokes, half):
+    """The lowest and highest y a glyph's strokes ink, flat ends, joins left out."""
+    ys = []
+    for stroke in strokes:
+        points = []
+        for command, *args in stroke:
+            if command in ("M", "L"):
+                points.append((args[0], args[1]))
+            elif command == "A":
+                cx, cy, rx, ry, start, extent = args
+                for step in range(91):
+                    angle = math.radians(start + extent * step / 90)
+                    points.append((cx + rx * math.cos(angle), cy + ry * math.sin(angle)))
+            else:
+                points.append(points[0])
+        for (x0, y0), (x1, y1) in zip(points, points[1:]):
+            length = math.hypot(x1 - x0, y1 - y0)
+            if length:
+                reach = half * abs(x1 - x0) / length  # How far the stroke's edge is above its centre line
+                ys += [y0 - reach, y0 + reach, y1 - reach, y1 + reach]
+    return min(ys), max(ys)

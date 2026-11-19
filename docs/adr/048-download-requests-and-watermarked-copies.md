@@ -30,7 +30,7 @@ Observed on `main`, 2026-10-30:
 9. **Every download is audited** as `DOWNLOAD`, with its source (`grant` or `exempt`) and the request. Every cancel and revoke is audited too.
 10. **Every downloaded copy is watermarked, once IR-676 lands.** Until then, the download route serves the manuscript unmarked: still stricter than today, when the reader's own button saves an unmarked copy for anyone. The watermark is built per download and never stored:
     - a footer on every page: "Downloaded by <name> (<email>) on <date> via CIT-U IRIS · request #N", or the exemption reason in place of the request;
-    - a large grey diagonal **"CIT-U"** drawn in each page's background, beneath the content; *(amended 2026-11-15, IR-1127: drawn over the content, translucent, as shapes; see the Amendment below)*
+    - a large grey diagonal **"CIT-U"** drawn in each page's background, beneath the content; *(amended 2026-11-15, IR-1127: drawn over the content, translucent, as shapes; amended 2026-11-17, IR-1198: reads "PROPERTY OF / CIT-U / DO NOT DISTRIBUTE"; see the Amendments below)*
     - the same identity, date and request in the PDF's metadata.
 11. **Fail closed, from IR-676 on.** A copy that cannot be watermarked is not served. The failure is audited and the reader is told to contact RDCO.
 12. **Libraries for the watermark:** pypdf merges the pages and reportlab draws the overlay. Both are BSD-licensed.
@@ -58,6 +58,18 @@ Decided by Ashlee Sean, 2026-11-15; awaiting the project lead's acceptance on th
 **The gap, decided rather than overlooked.** The PDF the browser holds is still unmarked, so a reader who saves it with browser tools gets a copy without the mark or their name (Consequences, first point). This amendment does not close it. Closing it means building a copy that names the reader on the server on every view, measured 2026-11-15 at 1.2 s and 625 KB → 2.1 MB for a 27-page paper with no caching possible, or sending page images instead of a PDF, which costs more and loses selection, find and highlights. Either is a later decision for a person to make. A pre-built "CIT-U" copy per version without a name is IR-1129, waiting on a team decision.
 
 **Alternatives.** *Mark the PDF on the server for each view* closes the gap but costs the server on every paper opened, with nothing shareable between readers to cache. *Leave the reader unmarked* costs nothing, but screenshots and prints stay anonymous.
+
+## Amendment — 2026-11-17 (IR-1198): the mark reads "PROPERTY OF / CIT-U / DO NOT DISTRIBUTE"
+
+Decided by Ashlee Sean, 2026-11-17; awaiting the project lead's acceptance on the PR.
+
+**Decision.** The diagonal mark on a downloaded copy (decision 10, as amended for IR-1127) and over the reader's pages (decision 1, as amended for IR-1128) reads **PROPERTY OF / CIT-U / DO NOT DISTRIBUTE**, on three centred lines, in place of "CIT-U" alone. Its look is unchanged: the same stroked letters with flat ends, grey 0.45 at opacity 0.18, at 45°, drawn over the content and as shapes, so the copy's text gains nothing. The longest line, not the word, is now as wide as the page's short side, so letters are about a quarter of their old height (about 37 pt on a Letter page, from about 136 pt). Footers are unchanged.
+
+*Corrected the same day (IR-1205):* every letter is drawn to one height. An upright with a flat end stops where its centre line does, half a stroke short of the outer edge of a crossbar or a curve, so I, N, T, Y, U, P, R and F first came out shorter than O, C, S, D, E and B. Strokes that end open at the top or bottom of a letter now run past it, and each line is clipped to its ink, which cuts them level. The tilted mark is also centred on the page: the last line is the longest, so centring the block of lines had left the mark low and to the right, and it is now placed by the middle of the box around the tilted lines. Nothing else about the look changes.
+
+**Why.** "CIT-U" says where a copy came from but not that it may not be passed on. The longer wording says both on every page and in every screenshot.
+
+**Alternatives.** *One line* keeps the mark a single stripe but makes its letters about 17 pt, too small to read as a stamp. *Two lines* ("PROPERTY OF CIT-U / DO NOT DISTRIBUTE") is close to three in size but separates the owner less clearly. *Keep "CIT-U"* is the largest and lightest mark but says nothing about distribution.
 
 ## Alternatives Considered
 
