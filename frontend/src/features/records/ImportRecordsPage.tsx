@@ -1,13 +1,14 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { recordsApi, type ImportAnswer } from "@/api/records";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { downloadBlob } from "@/lib/utils";
 
 function StepCard({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  const headingId = useId();
   return (
-    <div className="rounded-card border border-stone-200 bg-white p-5">
-      <h2 className="flex items-center gap-2 text-body font-semibold text-stone-800">
+    <section aria-labelledby={headingId} className="rounded-card border border-stone-200 bg-white p-5">
+      <h2 id={headingId} className="flex items-center gap-2 text-body font-semibold text-stone-800">
         <span
           aria-hidden
           className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand text-label font-semibold text-white"
@@ -17,7 +18,7 @@ function StepCard({ n, title, children }: { n: number; title: string; children: 
         {title}
       </h2>
       <div className="mt-2 text-small text-stone-600">{children}</div>
-    </div>
+    </section>
   );
 }
 
@@ -146,8 +147,10 @@ export default function ImportRecordsPage() {
         </StepCard>
         <StepCard n={2} title="Fill it in">
           <p>
-            Keep the column names. Authors are separated by semicolons or commas. Put each PDF&apos;s name in{" "}
-            <strong>File Name</strong>. The import stops at a merged cell containing <strong>END OF RECORDS</strong>.
+            Type one paper per row under the headers on the Records sheet, and keep the column names. The{" "}
+            <strong>How to fill this in</strong> sheet has an example row, what each column takes and the names IRIS
+            accepts; it is never imported. Authors are separated by semicolons or commas. Put each PDF&apos;s name in{" "}
+            <strong>File Name</strong>.
           </p>
         </StepCard>
         <StepCard n={3} title="Upload">

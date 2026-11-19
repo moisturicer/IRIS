@@ -177,6 +177,14 @@ RECORDS: dict[str, Entry | Shadowed] = {
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
     "record-manuscript": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
+    # Discover's first-page image is read as the paper is (IR-1241): anyone
+    # signed in for a published paper, readers of the record for one in review.
+    "record-first-page": Entry({
+        "GET": [
+            Case(Call(kwargs={"pk": Ref("published")}), SIGNED_IN, label="a published record"),
+            Case(Call(kwargs=RECORD), READS_RECORD, label="a record in review"),
+        ],
+    }),
     # A Figure is read as the paper is (IR-845).
     "record-figure": Entry({
         "GET": _case(READS_RECORD, kwargs={"pk": Ref("record"), "figure_id": Ref("figure")}),

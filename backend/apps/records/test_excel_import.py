@@ -338,23 +338,105 @@ class ImportRefusesValuesItCannotAcceptTests(ImportTestCase):
             self.assertIn(problem, line)
         self.assertEqual(self.imported(), {"Still Imported"})
 
-    def test_the_template_imports_its_own_sample_row_and_not_its_notes_row(self):
+    def test_the_template_uploaded_unchanged_imports_nothing(self):
         """
-        The downloaded template's sample used a Record Type name the system
-        does not have, and its notes row imported as a record titled
-        "Required" (both seen in IR-315). The notes row's "e.g. 2024" is not a
-        year, so it is now skipped with its reasons.
+        The template's example row used to import as a published paper, and
+        its notes row as one titled "Required" (IR-315). The import publishes
+        with no review, so an unedited template must add nothing (IR-639).
         """
         template = self.client.get(reverse("record-download-template"))
         self.assertEqual(template.status_code, status.HTTP_200_OK)
 
-        response = self.post(template.content, name="template.xlsx")
+        response = self.post(template.content, name="iris_import_template.xlsx")
 
-        sample = Record.objects.get(title="Blockchain-Based Verification of Academic Credentials")
-        self.assertEqual(sample.record_type.name, RecordTypeName.THESIS_RESEARCH, response.data["log"])
-        self.assertFalse(Record.objects.filter(title="Required").exists())
-        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])
-        self.assertIn('Row 3: skipped — Year Accomplished "e.g. 2024"', response.data["log"])
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual((response.data["created"], response.data["skipped"]), (0, 0), response.data["log"])
+        self.assertFalse(Record.objects.exists())
+
+    def test_the_example_row_copied_onto_the_records_sheet_imports(self):
+        """
+        The example names only what this database has, so copying it is a
+        working start rather than a skipped row (IR-639). It hard-coded
+        "Applied Sciences", which `seed_demo` never creates.
+        """
+        Classification.objects.all().delete()
+        PSCEDClassification.objects.all().delete()
+        Classification.objects.create(name="Maritime Studies")
+        PSCEDClassification.objects.create(name="Fisheries Science")
+        response = self.client.get(reverse("record-download-template"))
+        book = openpyxl.load_workbook(BytesIO(response.content))
+        example = [c.value for c in book["How to fill this in"][2]]
+        book["Records"].append(example)
+        buffer = BytesIO()
+        book.save(buffer)
+
+        response = self.post(buffer.getvalue(), name="iris_import_template.xlsx")
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 0), response.data["log"])
+        record = Record.objects.get()
+        self.assertEqual(
+            (record.record_type.name, record.classification.name, record.psced.name),
+            (RecordTypeName.THESIS_RESEARCH, "Maritime Studies", "Fisheries Science"),
+        )
+
+    def test_only_the_first_sheet_is_imported(self):
+        """Rows on any later sheet, as the template's example is, are never read (IR-639)."""
+        wb = openpyxl.Workbook()
+        wb.active.append(HEADERS)
+        notes = wb.create_sheet("Notes")
+        notes.append(HEADERS)
+        notes.append(row("A Paper On The Second Sheet"))
+        buffer = BytesIO()
+        wb.save(buffer)
+
+        response = self.post(buffer.getvalue())
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (0, 0), response.data["log"])
+        self.assertFalse(Record.objects.exists())
+
+    def test_rows_after_an_end_of_records_row_staff_add_are_not_imported(self):
+        response = self.post_rows(row("Before The End"), row("END OF RECORDS"), row("After The End"))
+
+        self.assertEqual(response.data["created"], 1, response.data["log"])
+        self.assertEqual(self.imported(), {"Before The End"})
+
+    def template(self):
+        """The downloaded template, opened: {sheet title: its rows of values}."""
+        response = self.client.get(reverse("record-download-template"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        book = openpyxl.load_workbook(BytesIO(response.content))
+        return {sheet.title: [list(r) for r in sheet.iter_rows(values_only=True)] for sheet in book.worksheets}
+
+    def test_the_records_sheet_comes_first_and_holds_only_the_headers(self):
+        sheets = self.template()
+
+        self.assertEqual(list(sheets), ["Records", "How to fill this in"])
+        self.assertEqual(len(sheets["Records"]), 1)
+        self.assertEqual(sheets["Records"][0][: len(HEADERS)], HEADERS)
+
+    def test_the_instructions_sheet_has_the_example_and_every_name_the_import_accepts(self):
+        """
+        The accepted names are read when the template is downloaded, so a
+        name RDCO adds appears, and none can be misspelled (IR-639).
+        """
+        RecordType.objects.create(name="Capstone Showcase")
+        Classification.objects.create(name="Maritime Studies")
+        PSCEDClassification.objects.create(name="Fisheries Science")
+
+        guide = self.template()["How to fill this in"]
+        column = {name: [r[i] for r in guide[1:] if r[i] is not None] for i, name in enumerate(guide[0])}
+
+        self.assertEqual(guide[0][: len(HEADERS)], HEADERS)
+        self.assertIn("Blockchain-Based Verification of Academic Credentials", column["Title"])
+        for header, name in (
+            ("Record Type", "Capstone Showcase"),
+            ("Record Type", RecordTypeName.THESIS_RESEARCH),
+            ("Classification", "Maritime Studies"),
+            ("PSCED Classification", "Fisheries Science"),
+            ("Origin", Record.Origin.IMPORTED_REFERENCE),
+        ):
+            with self.subTest(header=header, name=name):
+                self.assertIn(name, column[header])
 
     def test_origin_and_publication_year_are_reported_with_the_rest_of_the_row(self):
         wb = openpyxl.Workbook()

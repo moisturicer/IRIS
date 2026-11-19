@@ -121,6 +121,11 @@ interface Props {
   /** The answer whose sources a page's panel shows, and how to pick one. */
   selectedId?: string | null;
   onSelectSources?: (message: ChatMessage) => void;
+  /**
+   * A Sources panel beside the chat (IR-1237): the answer it shows, the passage it
+   * highlights, and how a chip or the count opens it. Absent in Paper Chat.
+   */
+  sourcePanel?: { selectedId: string | null; marker: number | null; onOpen: (message: ChatMessage, marker: number | null) => void };
   /** The newest answer, each time one lands: a page shows its sources. */
   onAnswered?: (message: ChatMessage) => void;
   /** The Conversation's title as the server holds it, each time it is reopened (IR-1160). */
@@ -137,7 +142,7 @@ interface Props {
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
-  selectedId = null, onSelectSources, onAnswered, onTitle, scopeToggle, selection = null, onSelectionChange, focusRequest = 0 }: Props) {
+  selectedId = null, onSelectSources, sourcePanel, onAnswered, onTitle, scopeToggle, selection = null, onSelectionChange, focusRequest = 0 }: Props) {
   // The research scope: this paper, or every paper once the reader widens. Read on each request, so
   // widening continues the same conversation instead of starting another.
   const scope = scopeToggle?.allPapers ? undefined : recordId;
@@ -448,9 +453,10 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
             {current.selection && <AskedPassage selection={current.selection} />}
             {messages.filter(m => m.id === `q:${item.id}` || (m.id === `a:${item.id}` && !(writing && item.id === run?.id))).map(m => <div key={m.id}>
               <ChatMessageBubble message={m} compact={dense} inlineSources
-                sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources}
+                sourcesSelected={m.id === (sourcePanel ? sourcePanel.selectedId : selectedId)} onSelectSources={onSelectSources}
+                onOpenSources={sourcePanel?.onOpen} openMarker={sourcePanel?.marker}
                 controlsDisabled={blocked}
-                onAskAgain={m.role === "user" ? question => void send(question) : undefined}
+                onAskAgain={m.role === "user" || sourcePanel ? question => void send(question) : undefined}
                 onEdit={m.role === "user" ? editQuestion : undefined} />
             </div>)}
             {(() => {

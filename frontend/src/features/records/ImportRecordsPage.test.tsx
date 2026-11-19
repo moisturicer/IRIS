@@ -43,6 +43,16 @@ describe("Import Records", () => {
     expect(save).toHaveBeenCalledWith(blob, "iris_import_template.xlsx");
   });
 
+  it("says where to type and that the instructions sheet is never imported", () => {
+    renderScreen(<ImportRecordsPage />);
+
+    const step = within(screen.getByRole("region", { name: "Fill it in" }));
+    expect(step.getByText(/one paper per row under the headers on the Records sheet/)).toBeInTheDocument();
+    expect(step.getByText(/How to fill this in/)).toBeInTheDocument();
+    expect(step.getByText(/is never imported/)).toBeInTheDocument();
+    expect(step.queryByText(/merged cell/)).not.toBeInTheDocument();
+  });
+
   const CHECK = {
     check: true as const,
     ok: 1,

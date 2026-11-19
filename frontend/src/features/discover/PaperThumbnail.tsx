@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import { recordsApi } from "@/api/records";
-import type { LoadedPdf } from "@/lib/pdf";
-
-const RENDER_SCALE = 0.6;
+import {
+  firstPageSession,
+  knownFirstPage,
+  rememberFirstPage,
+  rememberNoFirstPage,
+} from "@/lib/firstPages";
 
 interface PaperThumbnailProps {
   recordId: number;
@@ -13,17 +16,20 @@ interface PaperThumbnailProps {
 
 /**
  * The 96 px page beside a one-column result (IR-1082, D4; spec §4.6), showing the
- * paper's real first page (IR-1141). Until that is drawn, and wherever it can't
- * be (no manuscript, a failed read), the drawn page outline stands in, so a row
- * is the same size either way. The page is fetched only once the row nears the
- * viewport. Decoration only, so a screen reader skips it. Phones drop it, as the
- * prototype does, to give the title the width.
+ * paper's real first page (IR-1141). Until that arrives, and wherever there is
+ * none, the drawn page outline stands in, so a row is the same size either way.
+ *
+ * The page is a small image the server draws (IR-1241), never the whole
+ * manuscript, and it writes no audit event. It is asked for only once the row
+ * nears the viewport, and kept for the session (`lib/firstPages`), so going
+ * back to Discover asks again only for pages still being drawn. Decoration
+ * only, so a screen reader skips it. Phones drop it, as the prototype does, to
+ * give the title the width.
  */
 export function PaperThumbnail({ recordId, available }: PaperThumbnailProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(false);
-  const [drawn, setDrawn] = useState(false);
+  const [src, setSrc] = useState<string | null>(() => (available ? knownFirstPage(recordId) ?? null : null));
 
   useEffect(() => {
     if (!available || !hostRef.current) return;
@@ -42,37 +48,33 @@ export function PaperThumbnail({ recordId, available }: PaperThumbnailProps) {
   }, [available]);
 
   useEffect(() => {
-    if (!visible || !available) return;
-    let cancelled = false;
-    let loaded: LoadedPdf | null = null;
-    let cancelRender: (() => void) | null = null;
+    if (!available) {
+      setSrc(null);
+      return;
+    }
+    const known = knownFirstPage(recordId);
+    setSrc(known ?? null);
+    if (!visible || known !== undefined) return;
 
-    void (async () => {
-      try {
-        const { data } = await recordsApi.manuscriptBlob(recordId);
-        if (cancelled) return;
-        const { loadPdfDocument, renderPageToCanvas } = await import("@/lib/pdf");
-        if (cancelled) return;
-        loaded = await loadPdfDocument(await data.arrayBuffer());
-        if (cancelled) return;
-        const page = await loaded.document.getPage(1);
-        const canvas = canvasRef.current;
-        if (!canvas || cancelled) return;
-        const rendered = renderPageToCanvas(page, canvas, RENDER_SCALE);
-        cancelRender = rendered.cancel;
-        await rendered.promise;
-        if (!cancelled) setDrawn(true);
-      } catch {
-        // The outline stays.
-      } finally {
-        if (loaded) void loaded.destroy();
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      cancelRender?.();
-    };
+    const controller = new AbortController();
+    const session = firstPageSession();
+    recordsApi.firstPage(recordId, { signal: controller.signal }).then(
+      ({ status, data }) => {
+        // 202: a worker is still drawing it. The outline stays, and the next
+        // time this row appears it asks again.
+        if (controller.signal.aborted || status !== 200 || !data.type.startsWith("image/")) return;
+        setSrc(rememberFirstPage(recordId, data, session) ?? null);
+      },
+      (error: unknown) => {
+        if (controller.signal.aborted) return;
+        // 404: no manuscript, or one that can't be drawn. Not asked again this
+        // session. Anything else (offline, a timeout) is not remembered.
+        if ((error as { response?: { status?: number } })?.response?.status === 404) {
+          rememberNoFirstPage(recordId, session);
+        }
+      },
+    );
+    return () => controller.abort();
   }, [available, recordId, visible]);
 
   return (
@@ -88,10 +90,11 @@ export function PaperThumbnail({ recordId, available }: PaperThumbnailProps) {
           <i key={index} className={`block h-[3px] rounded-full bg-stone-200 ${width}`} />
         ))}
       </div>
-      {available && (
-        <canvas
-          ref={canvasRef}
-          className={`absolute inset-0 h-full w-full bg-white object-cover object-top ${drawn ? "block" : "hidden"}`}
+      {src && (
+        <img
+          src={src}
+          alt=""
+          className="absolute inset-0 h-full w-full bg-white object-cover object-top"
         />
       )}
     </div>

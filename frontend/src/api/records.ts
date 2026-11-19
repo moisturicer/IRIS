@@ -288,6 +288,16 @@ export const recordsApi = {
   manuscriptBlob: (id: number, options: { signal?: AbortSignal } = {}) =>
     apiClient.get<Blob>(`/records/${id}/manuscript/`, { responseType: "blob", signal: options.signal }),
   /**
+   * The small first-page image beside a Discover row (IR-1241), instead of
+   * the whole manuscript. A blob through `apiClient` for the same reason as
+   * `manuscriptBlob`: the bearer token is in memory, so a bare `<img src>`
+   * could not authenticate. 200 is the WebP; 202 means a worker is still
+   * drawing it; 404 (`no_manuscript`, `first_page_unavailable`) means there
+   * is none. Writes no audit event, unlike `manuscriptBlob`.
+   */
+  firstPage: (id: number, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<Blob>(`/records/${id}/first-page/`, { responseType: "blob", signal: options.signal }),
+  /**
    * An earlier version's manuscript (IR-416), fetched the same way and for
    * the same reason. Participants only: anyone else gets a 404.
    */

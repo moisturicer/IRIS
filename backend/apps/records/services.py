@@ -84,9 +84,12 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
       Is IP, For Commercialization, Community Extension, Authors
 
     Rules:
+    - Only the first sheet is read. The template's second sheet, "How to fill
+      this in", holds an example row that must never import (IR-639).
     - Processing stops when the first cell of a row equals "END OF RECORDS".
+      The template no longer ships one; staff may add it.
     - Completely blank rows are silently skipped.
-    - Authors should be comma-separated (e.g. "Juan Dela Cruz, Maria Santos").
+    - Authors are separated by commas or semicolons (e.g. "Juan Dela Cruz; Maria Santos").
     - Boolean columns accept: TRUE / FALSE / YES / NO / 1 / 0 (case-insensitive).
 
     This only reads the sheet. Whether a row's values can be accepted --
@@ -116,7 +119,8 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
             text = text.decode("utf-8-sig") if isinstance(text, bytes) else text
             all_rows = [tuple(r) for r in csv.reader(io.StringIO(text))]
         else:
-            all_rows = pyexcel.get_array(file_stream=file, file_type=file_type)
+            book = pyexcel.get_book(file_stream=file, file_type=file_type)
+            all_rows = book.sheet_by_index(0).to_array()
     except Exception as exc:
         return [], [f"Could not open file: {exc}. Make sure it is a valid .xls, .xlsx or UTF-8 .csv file."]
 

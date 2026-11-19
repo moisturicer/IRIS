@@ -25,6 +25,7 @@ import { canOpenPath } from "@/lib/access";
 import type { User } from "@/types/auth";
 import { landingPathFor } from "@/lib/landing";
 import { safeRedirectPath } from "@/lib/redirectTarget";
+import { sessionAccount } from "@/lib/authSession";
 import { classifyLoginFailure, type AccountLock, type LoginFailure } from "./loginFailure";
 
 /**
@@ -87,14 +88,27 @@ export default function LoginPage() {
     return safeRedirectPath(fromState) ?? safeRedirectPath(searchParams.get("next"));
   });
   /**
-   * Where a signed-in person goes from here: the saved page when their role may
-   * open it, else their landing page (IR-1207). A saved page is often one of
-   * the account that signed out before them, which this account may not open.
-   * A page typed while signed in still meets the guard's "not for you" screen;
-   * only this return trip skips it.
+   * The account whose session this tab last held, read once on mount for the
+   * same reason as `redirectTo`: signing in records the new one (IR-1242).
    */
+  const [previousAccount] = useState<number | null>(() => sessionAccount());
+  /**
+   * Where a signed-in person goes from here: the saved page when it was their
+   * own session that ended on it and their role may open it, else their
+   * landing page (IR-1207, IR-1242).
+   *
+   * A saved page on a shared device is often the last account's, and that is
+   * not this person's to land on even when their role may open it. With no
+   * account on record (a fresh tab, a link opened while signed out) the page is
+   * the one this visitor asked for, and is followed. A page typed while signed
+   * in still meets the guard's "not for you" screen; only this return trip
+   * skips it.
+   */
+  const isPreviousAccount = (user: User) => previousAccount === null || previousAccount === user.id;
   const destinationFor = (user: User) =>
-    redirectTo && mayReturnTo(user, redirectTo) ? redirectTo : landingPathFor(user);
+    redirectTo && isPreviousAccount(user) && mayReturnTo(user, redirectTo)
+      ? redirectTo
+      : landingPathFor(user);
   // IR-642: Settings sends a person here after changing their password,
   // which ends every session. Read once, like `redirectTo`.
   const [passwordChanged, setPasswordChanged] = useState(
