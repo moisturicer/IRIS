@@ -98,24 +98,20 @@ function RuntimeAskPage() {
 
   useEffect(() => { setDialogOpen(false); }, [conversationId, phone]);
 
-  const setPane = (open: boolean) => { setPaneOpen(open); savePaneOpen(open); };
-  const openDialog = () => {
+  const setPane = useCallback((open: boolean) => { setPaneOpen(open); savePaneOpen(open); }, []);
+  const openDialog = useCallback(() => {
     dialogOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setDialogOpen(true);
-  };
+  }, []);
 
   // Search from a closed pane (the strip's Search, or Ctrl+K) opens it first.
   const openSearch = useCallback(() => {
-    if (phone) {
-      dialogOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setDialogOpen(true);
-    } else if (!paneOpen) {
-      setPaneOpen(true);
-      savePaneOpen(true);
-    }
+    if (phone) openDialog(); else setPane(true);
     setSearchAsked(n => n + 1);
-  }, [phone, paneOpen]);
-  useEffect(() => { if (searchAsked > 0) searchRef.current?.focus(); }, [searchAsked]);
+  }, [phone, openDialog, setPane]);
+  // `preventScroll`: the pane is still narrowing or widening, and a focus that
+  // scrolled its clipped box sideways would leave the list shifted.
+  useEffect(() => { if (searchAsked > 0) searchRef.current?.focus({ preventScroll: true }); }, [searchAsked]);
   // While the pane is shown the list takes Ctrl+K itself; here it is closed.
   useEffect(() => {
     if (paneShown) return;

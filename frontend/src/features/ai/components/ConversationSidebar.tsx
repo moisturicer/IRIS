@@ -126,8 +126,7 @@ export function ConversationSidebar({
 
           {/* Hidden, not unmounted, so a search and the scroll position survive a close. */}
           <div aria-hidden={!open} {...(open ? {} : { inert: "" })}
-            className={cn("flex min-h-0 flex-1 flex-col transition-[opacity,visibility] duration-200 motion-reduce:transition-none",
-              !open && "invisible opacity-0")}>
+            className={cn("flex min-h-0 flex-1 flex-col", !open && "invisible")}>
             <ConversationHistoryList conversations={conversations} activeId={activeId} search={search}
               searchRef={searchRef} onDelete={onDelete} onRename={onRename} />
           </div>
