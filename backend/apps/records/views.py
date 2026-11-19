@@ -599,6 +599,45 @@ class RecordViewSet(viewsets.ModelViewSet):
             response["X-Manuscript-Revision"] = str(revision)
         return response
 
+    @action(detail=True, methods=["get"], url_path="first-page", url_name="first-page")
+    def first_page(self, request, pk=None):
+        """
+        GET /records/<id>/first-page/ -- the small image beside a Discover
+        row (IR-1241, `first_page.py`).
+
+        Read as the paper is: `get_object()` resolves through
+        `visible_to(user)`, so a reader without access gets the 404 of a
+        missing record, and the image is of the file this reader is served.
+        It never parses the PDF here and writes no audit event: a thumbnail
+        is not a download.
+
+        200 the WebP; 202 `first_page_pending` while a worker draws it;
+        404 `no_manuscript`, or `first_page_unavailable` when it can't be drawn.
+        """
+        from . import first_page
+
+        found = first_page.lookup(self.get_object(), request.user)
+        if found.state == first_page.READY:
+            response = HttpResponse(found.image, content_type="image/webp")
+            response["Content-Disposition"] = "inline"
+            response["Cache-Control"] = "private, no-store"
+            response["X-Content-Type-Options"] = "nosniff"
+            return response
+        if found.state == first_page.PENDING:
+            return Response(
+                {"code": "first_page_pending", "detail": "The first page is being drawn."},
+                status=status.HTTP_202_ACCEPTED,
+            )
+        if found.state == first_page.NO_MANUSCRIPT:
+            return Response(
+                {"code": "no_manuscript", "detail": "No paper has been uploaded for this record."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            {"code": "first_page_unavailable", "detail": "The first page can't be shown."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
     @action(detail=True, methods=["get"], url_path=r"figures/(?P<figure_id>[0-9]+)", url_name="figure")
     def figure(self, request, pk=None, figure_id=None):
         """
