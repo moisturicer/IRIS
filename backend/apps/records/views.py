@@ -1886,8 +1886,15 @@ class RecordViewSet(viewsets.ModelViewSet):
     def download_template(self, request):
         """
         GET /records/download_template/
-        Returns a pre-formatted .xlsx import template with a sample data row
-        and an END OF RECORDS sentinel so users know where to stop.
+        Returns the .xlsx import template (IR-639). Uploaded unchanged, it
+        imports nothing: the import publishes with no review.
+
+        - "Records", the first sheet and the only one the importer reads,
+          holds the header row alone. Staff type one paper per row under it.
+        - "How to fill this in" holds the same headers over an example row,
+          what each column takes, and the names each named column accepts.
+          Those are read here, at download, so they match what the import
+          will accept (`ImportChoices`) and cannot go stale or be misspelled.
         """
         try:
             import openpyxl
@@ -1938,9 +1945,21 @@ class RecordViewSet(viewsets.ModelViewSet):
             ws.column_dimensions[cell.column_letter].width = width
 
         ws.row_dimensions[1].height = 30
+        ws.freeze_panes = "A2"
+
+        # ---- How to fill this in: the same columns, never imported ----------
+        guide = wb.create_sheet("How to fill this in")
+        for col_idx, (header, width) in enumerate(zip(HEADERS, WIDTHS), start=1):
+            cell = guide.cell(row=1, column=col_idx, value=header)
+            cell.font      = header_font
+            cell.fill      = header_fill
+            cell.alignment = header_align
+            cell.border    = thin_border
+            guide.column_dimensions[cell.column_letter].width = width
+        guide.row_dimensions[1].height = 30
 
         # ---- Example data row ----------------------------------------------
-        ws.append([
+        guide.append([
             "Blockchain-Based Verification of Academic Credentials",
             "This study proposes a tamper-proof academic credential system using distributed ledger technology.",
             2024,
@@ -1965,35 +1984,43 @@ class RecordViewSet(viewsets.ModelViewSet):
             "Optional",
             "e.g. 2024",
             "e.g. 2024",
-            "Project, Proposal or Thesis / Research",
-            "Exact name from the system",
-            "Exact name from the system",
+            "One of the names below; blank is Project",
+            "Blank, or one of the names below",
+            "Blank, or one of the names below",
             "TRUE or FALSE",
             "TRUE or FALSE",
             "TRUE or FALSE",
-            "Comma-separated names",
-            "unknown / institutional / imported_reference / synthetic",
+            "Separated by semicolons or commas",
+            "Blank (unknown), or one of the values below",
             "Optional; separate from completion year",
             "Optional; the PDF's name, uploaded with the sheet",
         ]
-        ws.append(note_row)
-        note_row_idx = ws.max_row
+        guide.append(note_row)
+        note_row_idx = guide.max_row
         for col_idx in range(1, len(HEADERS) + 1):
-            cell = ws.cell(row=note_row_idx, column=col_idx)
+            cell = guide.cell(row=note_row_idx, column=col_idx)
             cell.fill = notes_fill
             cell.font = notes_font
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-        # ---- Sentinel row --------------------------------------------------
-        ws.append(["END OF RECORDS"])
-        sentinel_font = Font(bold=True, color="FFFFFF")
-        sentinel_fill = PatternFill(start_color="333333", end_color="333333", fill_type="solid")
-        sentinel_cell = ws.cell(row=ws.max_row, column=1)
-        sentinel_cell.font = sentinel_font
-        sentinel_cell.fill = sentinel_fill
+        # ---- What each named column accepts, one per row under it ----------
+        from .models import Classification, PSCEDClassification, RecordType
 
-        # ---- Freeze header row ---------------------------------------------
-        ws.freeze_panes = "A2"
+        accepted = {
+            "Record Type":          RecordType.objects.order_by("name").values_list("name", flat=True),
+            "Classification":       Classification.objects.order_by("name").values_list("name", flat=True),
+            "PSCED Classification": PSCEDClassification.objects.order_by("name").values_list("name", flat=True),
+            "Origin":               Record.Origin.values,
+        }
+        guide.append([])
+        guide.append(["Accepted values: each column below lists every name the import accepts."])
+        guide.cell(row=guide.max_row, column=1).font = Font(bold=True)
+        first = guide.max_row + 1
+        for header, names in accepted.items():
+            col_idx = HEADERS.index(header) + 1
+            for offset, name in enumerate(names):
+                guide.cell(row=first + offset, column=col_idx, value=name)
+        guide.freeze_panes = "A2"
 
         # ---- Serialize and return ------------------------------------------
         buffer = BytesIO()
