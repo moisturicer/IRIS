@@ -10,7 +10,7 @@ import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { NotificationBell } from "./NotificationBell";
 import { AccountMenu } from "./AccountMenu";
-import { ASK_IRIS_ICON, navFor, canAccess, pathFor, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
+import { ASK_IRIS_ICON, navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
 import { AskIrisGlyph, IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { isRail, useSidebarMode } from "@/lib/layout";
@@ -35,8 +35,6 @@ interface NavItem {
   children?: NavItem[];
 }
 
-/** Help's own link in the sidebar's footer, outside the nav list (IR-1085). */
-const HELP_ITEM: NavItem = { to: pathFor("help"), label: "Help", icon: "fa-circle-question" };
 
 // There is no `comingSoon` flag. Nav items are derived from `lib/access.ts`,
 // which maps a role to screens that exist and are routed -- so a dead-end entry
@@ -191,7 +189,8 @@ interface SidebarProps {
  * Discover and research links, RDCO's coordination group, and the System
  * Admin's Administration group. My Reviews carries the Office console under
  * it for coordinators (IR-1085, D5); Workflow analytics is RDCO's (IR-1216). The
- * bell is at the top (IR-519); Help and the account menu are at the bottom. Below `md` it is a
+ * bell is at the top (IR-519); the account menu is at the bottom, and Help is
+ * in Settings (IR-1217). Below `md` it is a
  * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
  * rail, and the IRIS mark opens the full sidebar over the page (IR-1086). From
  * 1024 px it is at full width, or as the rail if the user chooses (stored per
@@ -402,11 +401,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
         ))}
       </nav>
 
-      {/* ── Footer: Help, then the account menu ───────────────────────── */}
+      {/* ── Footer: the account menu. Help is in Settings (IR-1217). ─── */}
       <div className={cn("border-t border-stone-200 p-3", collapsed && "md:px-2")}>
-        <ul role="list" className="mb-2">
-          <NavItemLink item={HELP_ITEM} collapsed={collapsed} onNavigate={closeSidebar} />
-        </ul>
         <AccountMenu collapsed={collapsed} onNavigate={closeSidebar} />
       </div>
     </aside>

@@ -5,8 +5,10 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, downloadBlob } from "@/lib/utils";
 import { CONTROL_SIZE } from "./controls";
+import { ImageReader } from "./ImageReader";
 import { PaperPdfReader } from "./lazyReader";
-import { DOCUMENT_ROUTES, readerDocumentKey, type ReaderDocument } from "./readerDocument";
+import { DOCUMENT_ROUTES, readerDocumentKey, readerFormat, type ReaderDocument } from "./readerDocument";
+import { useReaderAnnotations } from "./threads/readerAnnotations";
 
 /**
  * The document shown, the address it was opened at (a change of view brings
@@ -29,7 +31,8 @@ const reachable = (el: HTMLElement | null): el is HTMLElement =>
  * A supporting document in Review's reader (IR-1203): named above the reader,
  * with the way back to the manuscript. The reader keeps find, zoom and pages,
  * and its download saves this document. Nothing is offered on a selection:
- * highlights, Ask IRIS and review threads belong to the manuscript.
+ * highlights and Ask IRIS belong to the manuscript. A reviewer comments on the
+ * whole document instead, its newest upload only (IR-1204).
  *
  * Opening moves focus to the strip, so a keyboard or screen-reader user is
  * told what the reader now shows. Back puts it on the control that opened
@@ -54,6 +57,9 @@ export function DocumentInReader({
   const strip = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Where the workspace lets this viewer open a thread on it (IR-1204).
+  const commentOnDocument = useReaderAnnotations()?.onCommentDocument;
+  const commentLabel = doc.kind === "upload" ? doc.commentLabel : undefined;
 
   useEffect(() => {
     strip.current?.focus();
@@ -75,6 +81,20 @@ export function DocumentInReader({
       .catch(() => setFailed(true))
       .finally(() => setSaving(false));
   };
+  // The manuscript's control, as the reader's toolbar draws it (PaperDownloadControl).
+  const downloadControl = (
+    <Button
+      variant="ghost"
+      size={fill ? "sm" : "icon"}
+      onClick={save}
+      loading={saving}
+      aria-label={`Download ${doc.label}`}
+      className={cn(fill && "text-stone-600", fill && CONTROL_SIZE)}
+    >
+      <i className="fas fa-download" aria-hidden />
+      {fill && <span aria-hidden className="hidden reading-split:inline">Download</span>}
+    </Button>
+  );
 
   return (
     <>
@@ -94,39 +114,39 @@ export function DocumentInReader({
           <span className="font-semibold text-stone-900">{doc.label}</span>
           {" · a supporting document, not the manuscript"}
         </p>
-        <button type="button" onClick={back} className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3")}>
-          <i className="fas fa-arrow-left text-2xs" aria-hidden />
-          Back to the manuscript
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {commentOnDocument && commentLabel && (
+            <button type="button" onClick={() => commentOnDocument(doc.id, commentLabel)}
+              className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3")}>
+              <i className="fas fa-comment text-2xs" aria-hidden />
+              Comment on this document
+            </button>
+          )}
+          <button type="button" onClick={back} className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3")}>
+            <i className="fas fa-arrow-left text-2xs" aria-hidden />
+            Back to the manuscript
+          </button>
+        </div>
       </div>
       <p role="status" className="text-small font-semibold text-brand empty:hidden">
         {failed ? `Could not download ${doc.fileName}. Please try again.` : ""}
       </p>
-      <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
-        <PaperPdfReader
-          recordId={recordId}
-          document={doc}
-          scrollToPage={null}
-          highlightRegions={NO_REGIONS}
-          navKey={`document-${readerDocumentKey(doc)}`}
-          contained={contained}
-          fill={fill}
-          downloadControl={
-            // The manuscript's control, as the reader's toolbar draws it (PaperDownloadControl).
-            <Button
-              variant="ghost"
-              size={fill ? "sm" : "icon"}
-              onClick={save}
-              loading={saving}
-              aria-label={`Download ${doc.label}`}
-              className={cn(fill && "text-stone-600", fill && CONTROL_SIZE)}
-            >
-              <i className="fas fa-download" aria-hidden />
-              {fill && <span aria-hidden className="hidden reading-split:inline">Download</span>}
-            </Button>
-          }
-        />
-      </Suspense>
+      {readerFormat(doc.fileName) === "image" ? (
+        <ImageReader document={doc} downloadControl={downloadControl} />
+      ) : (
+        <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
+          <PaperPdfReader
+            recordId={recordId}
+            document={doc}
+            scrollToPage={null}
+            highlightRegions={NO_REGIONS}
+            navKey={`document-${readerDocumentKey(doc)}`}
+            contained={contained}
+            fill={fill}
+            downloadControl={downloadControl}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

@@ -42,10 +42,12 @@ import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerD
 import { CONTROL_SIZE } from "./controls";
 import { DocumentRow } from "./DocumentRow";
 import { useReviewPane } from "./reviewPane";
-import { extensionOf, opensInReader, type ReaderDocument } from "./readerDocument";
+import { extensionOf, opensInReader, readerFormat, slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { SectionHeading } from "./headings";
 
 const PDF_LIMIT = 50 * 1024 * 1024;
+/** What an office may attach (IR-1220, ADR-032 §10 as amended 2026-11-18). */
+const SUPPLEMENTARY_TYPES = ".pdf,.docx,.png,.jpg,.jpeg";
 
 interface DocumentsTabProps {
   record:    Pick<
@@ -256,11 +258,11 @@ export function DocumentsTab({
     pane?.showReader();
   };
   /** A slot version's Open, when there is a reader and the version is a PDF. */
-  const openVersion = (name: string, u: RecordUpload) => onOpen && opensInReader(u.file) && (
-    <RowAction icon="fa-book-open" verb="Open" name={`${name} version ${u.version}`} onClick={(opener) => open({
-      kind: "upload", id: u.id, label: `${name} · version ${u.version}`,
-      fileName: `${name} v${u.version}.${extensionOf(u.file)}`,
-    }, opener)} />
+  // A slot's upload is a PDF, served as one, so only a PDF version opens (images are attachments only).
+  // `newest`: the version a reviewer may open a thread on from the reader (IR-1204).
+  const openVersion = (name: string, u: RecordUpload, newest: boolean) => onOpen && readerFormat(u.file) === "pdf" && (
+    <RowAction icon="fa-book-open" verb="Open" name={`${name} version ${u.version}`}
+      onClick={(opener) => open(slotUploadDocument(name, u, extensionOf(u.file), newest), opener)} />
   );
 
   return (
@@ -312,7 +314,7 @@ export function DocumentsTab({
               note={asked && <AskedNote asked={asked} />}
               actions={(latest || canUpload) && (
                 <>
-                  {latest && openVersion(slot.name, latest)}
+                  {latest && openVersion(slot.name, latest, true)}
                   {latest && (
                     <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
                   )}
@@ -327,7 +329,7 @@ export function DocumentsTab({
                     name={slot.name}
                     uploads={slot.uploads}
                     removable={owner && editable}
-                    open={(u) => openVersion(slot.name, u)}
+                    open={(u) => openVersion(slot.name, u, u.id === latest?.id)}
                     onDownload={(u) => downloadVersion(slot.name, u)}
                     onRemove={(u) =>
                       askToRemove(`${slot.name} version ${u.version}`, async () => {
@@ -369,7 +371,10 @@ export function DocumentsTab({
           {attach && (
             <UploadDropzone
               label="Attach a supplementary file"
-              hint="Any file type. Filed by your office, alongside the author's documents."
+              // The server checks the name and the first bytes too (IR-1220); this only spares a wasted upload.
+              accept={SUPPLEMENTARY_TYPES}
+              validate
+              hint="PDF, Word (.docx), PNG or JPG. Filed by your office, alongside the author's documents."
               upload={uploads.attachment}
               onFiles={([file]) =>
                 void send("attachment", file, (onProgress) =>

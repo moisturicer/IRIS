@@ -5,7 +5,7 @@ import { recordsApi } from "@/api/records";
 import type { Capability } from "@/features/records/capabilities";
 import { joinLabels } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import type { PageRegion, Party, RecordDetail, ReviewVerdict } from "@/types/records";
+import type { PageRegion, Party, RecordDetail, ReviewVerdict, ThreadDocument } from "@/types/records";
 
 import { RouteDialog } from "../RouteDialog";
 import { FinishReviewDialog } from "./FinishReviewDialog";
@@ -25,6 +25,8 @@ interface Options {
   showThreads: () => void;
   /** Show the paper (in a drawer, close the pane). */
   showPaper?: () => void;
+  /** Show the document a thread is about in the reader (IR-1204). */
+  showDocument?: (document: ThreadDocument) => void;
   /** Announce an outcome. */
   announce?: (text: string) => void;
 }
@@ -35,7 +37,7 @@ interface Options {
  * pin or Readiness points at, where the reader lands, and the Finish and
  * routing dialogs. Both review workspaces hold one.
  */
-export function useThreadsWorkspace({ record, can, onChanged, showThreads, showPaper, announce }: Options) {
+export function useThreadsWorkspace({ record, can, onChanged, showThreads, showPaper, showDocument, announce }: Options) {
   const threads = useReviewThreads(record.id, record.readiness !== null);
   const letter = useNewestResponseLetter(record.id, record.readiness !== null);
   const userId = useAuthStore((s) => s.user?.id ?? null);
@@ -79,6 +81,13 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
           showThreads();
         }
         : null,
+      // A thread on the whole document shown, opened where a general one is (IR-1204).
+      onCommentDocument: can.has("open_general_thread")
+        ? (upload, label) => {
+          setComposing({ kind: "document", upload, label });
+          showThreads();
+        }
+        : null,
       landing,
     };
     // `openThread` and `showThreads` only set state.
@@ -88,7 +97,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
   const panel: ReviewThreadsProps = {
     recordId: record.id, can, threads,
     viewer: { userId, party: record.revision?.party ?? null },
-    composing, onCompose: setComposing, onChanged, onShowInPaper: showInPaper,
+    composing, onCompose: setComposing, onChanged, onShowInPaper: showInPaper, onShowDocument: showDocument,
     party, onClearParty: () => setParty(null), focus, letter,
   };
 

@@ -185,6 +185,17 @@ describe("the response to reviewers in Threads", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("labels an answer to a document thread with its document (IR-1204)", () => {
+    const withDocument = { ...letter, entries: [{
+      thread: 3, party: "ierc", party_label: "IERC", severity: "must_fix" as const, comment: "The consent form isn't signed.",
+      version: 1, page: null, quote: "", document: "Consent form, v1", answer: "addressed" as const, note: "Signed copy uploaded.",
+    }] };
+    setup([comment({ anchor: ANCHOR })], { letter: withDocument });
+
+    const [item] = within(screen.getByRole("region", { name: "Response to reviewers, v2" })).getAllByRole("listitem");
+    expect(item).toHaveTextContent("IERC · Must fix · Consent form, v1");
+  });
+
   it("isn't shown when no Version carries one", () => {
     setup([comment({ anchor: ANCHOR })], { letter: null });
     expect(screen.queryByRole("region", { name: /Response to reviewers/ })).not.toBeInTheDocument();

@@ -94,7 +94,7 @@ A compact per-party strip extracted from `ReviewRoutingTracker` ("Cleared on v1 
 - **The whole card opens the paper,** using a stretched link on the title. Other controls on the card stay clickable above it, and keyboard focus outlines the whole card.
 - **No permanent Ask IRIS hint.** When a search looks like a question (it ends in "?" or starts with a question word), one line suggests Ask IRIS and carries the question over.
 - **Search matches every word.** Words are matched separately, stopwords are dropped, and each match is highlighted (§4.9).
-- **Phone:** search first, then one horizontally scrolling row (feed, Filters (n), My feeds). *IR-1189 later removed My feeds from Discover.*
+- **One row, every width (IR-1190):** search first, then one row that neither wraps nor scrolls: Papers / People, Sort, Filters (n), the column toggle (from `xl`) and Publish. On a phone Papers, People, Filters and Publish are 44 px icons that keep their names. *IR-1189 removed My feeds; IR-1187 and IR-1188 replaced the feed tabs and Areas.*
 - **Neutral copy:** Discover, sign-in and sign-up do not say "CIT-U" (IRIS is not only for CIT-U; live IR-768 already did this for part of it).
 
 ### 4.7 Navigation and layout

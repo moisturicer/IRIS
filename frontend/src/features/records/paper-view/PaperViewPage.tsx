@@ -27,7 +27,7 @@ import {
   type AnswerReturn,
 } from "@/lib/citedPage";
 import { conversationPath } from "@/lib/askHandoff";
-import type { RecordDetail, IpType } from "@/types/records";
+import type { RecordDetail, IpType, ThreadDocument } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
@@ -64,7 +64,8 @@ import { AskIrisFab, CORNER_CLEARANCE_CLASS, NotesFab } from "./AskIrisFab";
 import { NotesPanel } from "./NotesPanel";
 import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
 import { useReadingNote } from "./useReadingNote";
-import type { SelectionAction } from "./SelectionMenu";
+import { HighlightSwatch, type SelectionAction } from "./SelectionMenu";
+import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { ContactPersonCard } from "./ContactPersonCard";
@@ -75,7 +76,7 @@ import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { DocumentsTab } from "./DocumentsTab";
 import { DocumentInReader, type ShownDocumentState } from "./DocumentInReader";
-import type { ReaderDocument } from "./readerDocument";
+import { slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
@@ -241,6 +242,20 @@ export default function PaperViewPage() {
   // draft, and read only once Notes is first opened.
   const [notesWanted, setNotesWanted] = useState(false);
   const note = useReadingNote(Number(id), notesWanted);
+  // Saved highlights are drawn until a plain click on the paper hides them (IR-581).
+  const [highlightsShown, setHighlightsShown] = useState(true);
+  // Lines a Highlight's note adds to the reader's Notes once their note has loaded (IR-581).
+  const pendingNote = useRef<string[]>([]);
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const appendPendingNote = () => {
+    const current = noteRef.current;
+    if (current.phase !== "ready" || pendingNote.current.length === 0) return;
+    const lines = pendingNote.current;
+    pendingNote.current = [];
+    current.setText([current.text.trimEnd(), ...lines].filter(Boolean).join("\n\n"));
+  };
+  useEffect(appendPendingNote, [note.phase]);
   // Focus follows a swap of Ask IRIS and Notes into the new panel, in every
   // layout: the control that was clicked is gone with the old panel.
   const focusPanel = useRef(false);
@@ -679,13 +694,44 @@ export default function PaperViewPage() {
   const drawnHighlights = highlights.items
     .filter((h) => (viewedVersion ? h.state === "stale" && h.open_version === viewedVersion.number : h.state === "current"))
     .map((h) => ({ key: h.id, regions: h.regions }));
+  // The menu is offered on the current paper only (ADR-065 §8), so this names the current version.
+  const currentVersionLabel = record.manuscript_unsubmitted
+    ? "Unsubmitted upload"
+    : latestVersion ? `Version ${latestVersion.number}` : "Current version";
   const selectionActions: SelectionAction[] = [
+    // Wherever Ask IRIS is offered (IR-581). A typed question is sent with the passage at once,
+    // from the composer's own Send; with nothing typed, Paper Chat opens on an editable question.
+    ...(onReviewTab ? [] : [{
+      id: "ask-selection", label: "Ask about selection", short: "Ask IRIS",
+      placeholder: "Ask IRIS about this passage…",
+      icon: <AskIrisMark className="size-4" />,
+      run: (passage, manuscriptRevision, question) => {
+        focusPanel.current = true;
+        chat.askAbout({
+          recordId: record.id, title: record.title, versionLabel: currentVersionLabel, manuscriptRevision,
+          page: passage.page, quote: passage.quote,
+          ...(question ? { question, send: true } : {}),
+        });
+      },
+    } satisfies SelectionAction]),
     {
-      id: "save-highlight", label: "Save highlight", icon: "fa-highlighter",
-      run: (passage, manuscriptRevision) => void highlights.save(passage, manuscriptRevision),
+      id: "save-highlight", label: "Save highlight", short: "Highlight", sendIcon: "fa-check",
+      placeholder: "Add a note to your Notes (optional)…",
+      icon: <HighlightSwatch />,
+      run: (passage, manuscriptRevision, text) => {
+        setHighlightsShown(true);
+        void highlights.save(passage, manuscriptRevision);
+        // The reader's own words go to their Notes, never into the highlight (ADR-065 §1).
+        if (text) {
+          pendingNote.current = [...pendingNote.current, `Page ${passage.page}: ${text}`];
+          setNotesWanted(true);
+          appendPendingNote();
+        }
+      },
     },
   ];
   const openHighlight = (h: ReadableHighlight) => {
+    setHighlightsShown(true);
     const version = h.state === "stale" ? h.open_version : null;
     setOpened((last) => ({
       key: (last?.key ?? 0) + 1, page: h.page, regions: h.regions, version, arrival: arrivalKey.current,
@@ -727,6 +773,15 @@ export default function PaperViewPage() {
   const openDocument = (document: ReaderDocument, opener: HTMLElement) =>
     setDocumentShown({ document, at: location.search, opener });
   const showManuscript = () => setDocumentShown(null);
+  // A thread's document (IR-1204), opened from its card: focus goes back there.
+  const showThreadDocument = (thread: ThreadDocument) => {
+    const opener = window.document.activeElement;
+    setDocumentShown({
+      document: slotUploadDocument(thread.slot, { id: thread.upload, version: thread.version }, thread.extension, !thread.earlier),
+      at: location.search,
+      opener: opener instanceof HTMLElement ? opener : null,
+    });
+  };
   const pendingInBar =
     (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && !shown &&
     record.download?.state === "pending";
@@ -784,9 +839,12 @@ export default function PaperViewPage() {
           // is never put back only to jump to the citation after.
           keepPlace={resolution.status !== "loading"}
           highlightRegions={highlightRegions}
+          landingLook={openedInShown ? "highlight" : "citation"}
           navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
           highlights={drawnHighlights}
           selectionActions={selectionActions}
+          highlightsShown={highlightsShown}
+          onHighlightsShownChange={setHighlightsShown}
           contained={onPaperTab || reviewWorkspace || tier === "wide"}
           fill={onPaperTab || reviewWorkspace}
           // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
@@ -856,20 +914,18 @@ export default function PaperViewPage() {
     setViewParam("section", "review");
   };
 
-  // Paper mode's version: a compact picker where there is a choice, else
-  // the version's number, else nothing to a reader shown none (IR-416).
-  const paperVersion =
-    versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1) ? (
-      <VersionPicker
-        compact
-        unsubmitted={record.manuscript_unsubmitted}
-        versions={versions}
-        viewing={viewedVersion?.number ?? null}
-        onChoose={chooseVersion}
-      />
-    ) : latestVersion ? (
-      <span className="shrink-0 text-small font-semibold text-stone-600">v{latestVersion.number}</span>
-    ) : null;
+  // Paper mode's version: a compact picker whenever there is a version, v1
+  // alone included, so every paper's header looks alike (IR-1214); nothing
+  // to a reader shown none (IR-416, IR-479).
+  const paperVersion = latestVersion ? (
+    <VersionPicker
+      compact
+      unsubmitted={record.manuscript_unsubmitted}
+      versions={versions}
+      viewing={viewedVersion?.number ?? null}
+      onChoose={chooseVersion}
+    />
+  ) : null;
 
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -1020,12 +1076,13 @@ export default function PaperViewPage() {
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
-              // takes its place: the rail folds away and the page widens into it.
+              // takes its place: the rail folds away, and the page sits centred
+              // in the room the panel leaves rather than against its left edge.
               showRail &&
                 cn(
                   "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   railHidden
-                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-between overview-wide:gap-x-0"
+                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-center overview-wide:gap-x-0"
                     : "overview-wide:grid-cols-[minmax(0,60rem)_clamp(17rem,25cqw,22rem)] overview-wide:justify-between overview-wide:gap-x-8",
                 ),
             )}
@@ -1041,9 +1098,10 @@ export default function PaperViewPage() {
               "min-w-0",
               onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
               // The Overview reads in one column, up to 60rem, flush left with
-              // the rail beside it; spare room falls to the right, so the
-              // page keeps its place whether Ask IRIS is open or not.
+              // the rail beside it. With Ask IRIS open the rail is gone, so the
+              // column is centred in the room that is left.
               showRail && "w-full max-w-[60rem]",
+              railHidden && "mx-auto",
             )}
           >
             {/* Editorial header (IR-356): what it is, who wrote it, then
@@ -1103,10 +1161,10 @@ export default function PaperViewPage() {
 
               {lineageLinks}
               {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
-              {/* The version picker (IR-416)
-                  only with two or more versions to choose between, or one
-                  beside the owner's unsubmitted revision (IR-273). */}
-              {(versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1)) && (
+              {/* The version picker (IR-416) whenever there is a version,
+                  v1 alone included (IR-1214), and beside the owner's
+                  unsubmitted revision (IR-273). */}
+              {latestVersion && (
                 <VersionPicker
                   unsubmitted={record.manuscript_unsubmitted}
                   versions={versions}
@@ -1186,7 +1244,7 @@ export default function PaperViewPage() {
                             {r.version != null && <span className="font-normal text-stone-600"> · on v{r.version}</span>}
                           </p>
                           {r.reason && (
-                            <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
+                            <p className="text-justified mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
                               {r.reason}
                             </p>
                           )}
@@ -1281,7 +1339,7 @@ export default function PaperViewPage() {
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="text-lg text-stone-700 leading-7">
+                    <p className="text-justified text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (
@@ -1336,6 +1394,7 @@ export default function PaperViewPage() {
                     : reader()
                   : null}
                 onShowManuscript={showManuscript}
+                onShowDocument={recordHasPaper(record) ? showThreadDocument : undefined}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
                 // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
@@ -1371,7 +1430,10 @@ export default function PaperViewPage() {
               {...(railHidden ? { inert: "" } : {})}
               className={cn(
                 "grid min-w-0 transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
+                // The track is the scroller's content box, so the aside can
+                // fit what its own scrollbar leaves rather than the full
+                // column (IR-1178).
+                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:grid-cols-[minmax(0,1fr)] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
                 OVERVIEW_ASIDE_TOP,
                 OVERVIEW_ASIDE_MAX_HEIGHT,
                 railHidden ? "grid-rows-[0fr] opacity-0 invisible" : "grid-rows-[1fr] opacity-100",
@@ -1379,7 +1441,10 @@ export default function PaperViewPage() {
             >
               <aside
                 aria-labelledby={`${tabsId}-details`}
-                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible"
+                // The column's width, held while the column folds, but never
+                // wider than the scroller leaves it: its scrollbar takes ~23px
+                // and the scroller clipped every row's right edge (IR-1178).
+                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:min-w-[15rem] overview-wide:max-w-full overview-wide:overflow-visible"
               >
                 <h2 id={`${tabsId}-details`} className="font-display text-section font-semibold text-stone-900">
                   Record details
@@ -1458,6 +1523,8 @@ export default function PaperViewPage() {
           viewingVersion={viewedVersion?.number ?? null}
           returnTo={chatReturn}
           onOpenNotes={onReviewTab ? undefined : openNotes}
+          selection={chat.selection}
+          onSelectionChange={chat.setSelection}
           className={chatPanelClass}
         />
       )}

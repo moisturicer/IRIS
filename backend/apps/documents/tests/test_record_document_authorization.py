@@ -42,6 +42,10 @@ from apps.documents.models import RecordFile, RecordUpload, UploadSlot
 from apps.documents.testing import real_pdf_bytes
 from apps.records.models import Record, RecordOwner, RecordType
 
+# An office memo as an image. It was a .txt file until IR-1220, which refuses any
+# type but PDF, Word, PNG or JPG; these tests are about who may attach, not the type.
+MEMO_PNG = b"\x89PNG\r\n\x1a\n" + b"office memo"
+
 
 class RecordDocumentAuthorizationTests(APITestCase):
     """Owner and office staff may reach a record's documents. Nobody else may."""
@@ -289,7 +293,7 @@ class RecordFileUploadAuthorizationTests(APITestCase):
             "/api/v1/documents/files/upload/",
             {
                 "record": self.record.pk if record_id is None else record_id,
-                "file": SimpleUploadedFile("memo.txt", b"office memo"),
+                "file": SimpleUploadedFile("memo.png", MEMO_PNG),
             },
             format="multipart",
         )
@@ -508,7 +512,7 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
     def _attach(self, record):
         return self.client.post(
             "/api/v1/documents/files/upload/",
-            {"record": record.pk, "file": SimpleUploadedFile("memo.txt", b"office memo")},
+            {"record": record.pk, "file": SimpleUploadedFile("memo.png", MEMO_PNG)},
             format="multipart",
         )
 

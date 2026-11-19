@@ -105,6 +105,8 @@ export const recordsApi = {
       kind?: ReviewCommentKind;
       /** A seated reviewer's thread is sent now rather than saved as a draft (IR-1194). */
       post_now?: boolean;
+      /** A reviewer's thread on a supporting document's upload, as a whole (IR-1204). */
+      document?: number;
     },
   ) => apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
   /**

@@ -195,12 +195,12 @@ function TrackerBody({ data }: { data: RecordTracker }) {
                 <span className="font-semibold">{r.state_label}</span>
                 <span className="text-stone-500"> · {formatDate(r.created_at, "MMM d")}</span>
                 {r.message && (
-                  <p className="text-stone-600 mt-0.5 leading-relaxed break-words">“{r.message}”</p>
+                  <p className="text-justified text-stone-600 mt-0.5 leading-relaxed break-words">“{r.message}”</p>
                 )}
                 {r.items
                   .filter((i) => i.rejection_reason)
                   .map((i) => (
-                    <p key={i.id} className="text-stone-600 mt-0.5 leading-relaxed break-words">
+                    <p key={i.id} className="text-justified text-stone-600 mt-0.5 leading-relaxed break-words">
                       {r.label} rejected an upload of {i.label}: “{i.rejection_reason}”
                     </p>
                   ))}
@@ -227,7 +227,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
                 {r.withdrawn_by_decision && <p className="text-stone-700">{r.withdrawn_by_decision}; this request was superseded by the Decision.</p>}
                 <span className="text-stone-500"> · {formatDate(r.created_at, "MMM d")}</span>
                 {r.reason && (
-                  <p className="text-stone-600 mt-0.5 leading-relaxed">“{r.reason}”</p>
+                  <p className="text-justified text-stone-600 mt-0.5 leading-relaxed">“{r.reason}”</p>
                 )}
               </li>
             ))}
@@ -382,7 +382,7 @@ function RoutingHistory({
                 {g.actor && ` · ${g.actor}`}
               </span>
               {g.reason && (
-                <p className="text-stone-600 mt-0.5 leading-relaxed">“{g.reason}”</p>
+                <p className="text-justified text-stone-600 mt-0.5 leading-relaxed">“{g.reason}”</p>
               )}
             </li>
           ))}

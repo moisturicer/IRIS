@@ -464,7 +464,7 @@ describe("landing on a review passage (IR-1195)", () => {
   const landings = () => scrollBy.mock.calls.filter(([arg]) => typeof arg === "object");
 
   const reader = (landing: Landing | null) => (
-    <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: null, landing }}>
+    <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: null, onCommentDocument: null, landing }}>
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
     </ReaderAnnotationsContext.Provider>
   );
@@ -1264,7 +1264,7 @@ describe("find in this paper (IR-353)", () => {
     function openCommentable(onComment: (passage: Passage, version: number) => void) {
       paperText = PAPER;
       render(
-        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, landing: null }}>
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, onCommentDocument: null, landing: null }}>
           <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
         </ReaderAnnotationsContext.Provider>,
       );
@@ -1305,7 +1305,7 @@ describe("find in this paper (IR-353)", () => {
       paperText = PAPER;
       viewUpload.mockResolvedValue({ data: pdfBlob() });
       render(
-        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: vi.fn(), landing: null }}>
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment: vi.fn(), onCommentDocument: null, landing: null }}>
           <PaperPdfReader recordId={7} document={{ kind: "upload", id: 12, label: "Consent Paper · version 2", fileName: "c.pdf" }}
             scrollToPage={null} highlightRegions={[]} navKey="a" />
         </ReaderAnnotationsContext.Provider>,
@@ -1385,7 +1385,61 @@ describe("selected text actions (IR-583)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Save highlight" }));
 
     expect(run).toHaveBeenCalledTimes(1);
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), "rev-1");
+    // Nothing typed: the action gets the passage, the revision and an empty line (IR-581).
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), "rev-1", "");
+  });
+
+  it("hands what the reader typed in the composer to the chosen mode (IR-581)", async () => {
+    const ask = vi.fn();
+    const save = vi.fn();
+    await openWith({ selectionActions: [
+      { id: "ask-selection", label: "Ask about selection", short: "Ask IRIS", placeholder: "Ask IRIS about this passage…", icon: "fa-comment", run: ask },
+      { id: "save-highlight", label: "Save highlight", short: "Highlight", placeholder: "Add a note", icon: "fa-highlighter", run: save },
+    ] });
+    await selectByFind();
+
+    const group = await screen.findByRole("group", { name: "Selected text actions" });
+    expect(within(group).getByRole("radio", { name: "Ask IRIS" })).toHaveAttribute("aria-checked", "true");
+    await userEvent.type(within(group).getByRole("textbox", { name: "Ask IRIS about this passage…" }), "  Why a robot arm?  ");
+    await userEvent.click(within(group).getByRole("button", { name: "Ask about selection" }));
+
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ quote: "robot arm" }), null, "Why a robot arm?");
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("opens the composer only once the mouse button is released (IR-581)", async () => {
+    await openWith({ selectionActions: [{ id: "save-highlight", label: "Save highlight", icon: "fa-highlighter", run: vi.fn() }] });
+    await userEvent.click(screen.getByRole("button", { name: "Find in this paper" }));
+    const input = await screen.findByRole("searchbox", { name: "Find in this paper" });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.pointerDown(document.body, { button: 0 });
+    // Typed without clicking the field first, which would release the button.
+    await userEvent.type(input, "robot arm", { skipClick: true });
+    expect(menu()).not.toBeInTheDocument();
+
+    fireEvent.pointerUp(document.body, { button: 0 });
+    expect(await screen.findByRole("group", { name: "Selected text actions" })).toBeInTheDocument();
+  });
+
+  it("hides the saved highlights on a plain click on the paper, and the toolbar shows them again (IR-581)", async () => {
+    const shown = vi.fn();
+    const highlights = [{ key: 1, regions: [{ page: 1, left: 0.1, top: 0.1, right: 0.3, bottom: 0.12 }] }];
+    await openWith({ highlights, highlightsShown: true, onHighlightsShownChange: shown });
+
+    const paper = screen.getByRole("region", { name: /^Paper, 3 pages/ });
+    fireEvent.pointerDown(paper, { clientX: 40, clientY: 40 });
+    fireEvent.pointerUp(paper, { clientX: 41, clientY: 41 });
+    expect(shown).toHaveBeenLastCalledWith(false);
+
+    // A drag is a selection, not a click: it hides nothing.
+    shown.mockClear();
+    fireEvent.pointerDown(paper, { clientX: 40, clientY: 40 });
+    fireEvent.pointerUp(paper, { clientX: 140, clientY: 44 });
+    expect(shown).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Hide your highlights" }));
+    expect(shown).toHaveBeenLastCalledWith(false);
   });
 
   it("hands over no revision when the server named none", async () => {
@@ -1395,7 +1449,7 @@ describe("selected text actions (IR-583)", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Save highlight" }));
 
-    expect(run).toHaveBeenCalledWith(expect.anything(), null);
+    expect(run).toHaveBeenCalledWith(expect.anything(), null, "");
   });
 
   it("offers nothing on an earlier version: its bytes are not the paper a highlight belongs to", async () => {

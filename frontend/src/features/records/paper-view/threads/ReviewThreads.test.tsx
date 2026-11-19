@@ -41,6 +41,7 @@ function setup(comments: ReviewComment[], over: Partial<ReviewThreadsProps> & { 
   const onChanged = vi.fn();
   const onCompose = vi.fn();
   const onShowInPaper = vi.fn();
+  const onShowDocument = vi.fn();
   const props: ReviewThreadsProps = {
     recordId: 9,
     can: new Set<Capability>(over.caps ?? ["comment_review"]),
@@ -50,13 +51,14 @@ function setup(comments: ReviewComment[], over: Partial<ReviewThreadsProps> & { 
     onCompose,
     onChanged,
     onShowInPaper,
+    onShowDocument,
     party: null,
     onClearParty: vi.fn(),
     focus: null,
     ...over,
   };
   const view = renderScreen(<ReviewThreads {...props} />);
-  return { ...view, reload, onChanged, onCompose, onShowInPaper, props };
+  return { ...view, reload, onChanged, onCompose, onShowInPaper, onShowDocument, props };
 }
 
 const thread = (name: RegExp | string) => screen.getByRole("article", { name });
@@ -411,6 +413,49 @@ it("shows a passage in the paper from its quote", async () => {
   const { onShowInPaper } = setup([comment({ id: 1, anchor: { version: 1, page: 2, quote: "low-cost sensors" } })]);
   await user.click(screen.getByRole("button", { name: "Show in paper: “low-cost sensors”" }));
   expect(onShowInPaper).toHaveBeenCalledWith(expect.objectContaining({ pin: "1" }));
+});
+
+// ADR-032 §7, Amendment 2026-11-18 (IR-1204): a reviewer's thread on a supporting document, as a whole.
+describe("a thread on a document", () => {
+  const consent = { upload: 41, slot: "Consent form", version: 1, label: "Consent form, v1", earlier: false, extension: "pdf" };
+
+  it("is written about the whole document: severity and Post, no passage and no suggested wording", async () => {
+    const user = userEvent.setup();
+    setup([], {
+      composing: { kind: "document", upload: 41, label: "Consent form, v1" },
+      caps: ["comment_review", "finish_review", "open_general_thread"],
+    });
+    expect(screen.getByRole("form", { name: "New comment" })).toHaveTextContent("Comment on Consent form, v1");
+    expect(screen.queryByRole("textbox", { name: "Suggested wording (optional)" })).toBeNull();
+    await user.keyboard("The consent form isn't signed.");
+    await user.click(screen.getByRole("radio", { name: "Must fix" }));
+    await user.click(screen.getByRole("button", { name: "Post" }));
+    expect(api.postReviewComment).toHaveBeenCalledWith(9, {
+      body: "The consent form isn't signed.", kind: "thread", severity: "must_fix", post_now: true, document: 41,
+    });
+  });
+
+  it("names its document, and opening that shows it in the reader", async () => {
+    const user = userEvent.setup();
+    const { onShowDocument, container } = setup([comment({ id: 1, severity: "must_fix", document: consent })]);
+    const card = within(thread("Thread 1, Adviser"));
+    expect(card.queryByText("From an earlier upload")).toBeNull();
+    await user.click(card.getByRole("button", { name: "Open Consent form, v1" }));
+    expect(onShowDocument).toHaveBeenCalledWith(consent);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("says when a newer upload of the document has replaced the one it is about", () => {
+    setup([comment({ id: 1, document: { ...consent, earlier: true } })]);
+    expect(within(thread("Thread 1, Adviser")).getByText("From an earlier upload")).toBeInTheDocument();
+  });
+
+  it("names a document the reader can't show without offering to open it", () => {
+    setup([comment({ id: 1, document: { ...consent, extension: "docx" } })]);
+    const card = within(thread("Thread 1, Adviser"));
+    expect(card.getByText("Consent form, v1")).toBeInTheDocument();
+    expect(card.queryByRole("button", { name: "Open Consent form, v1" })).toBeNull();
+  });
 });
 
 it("has no serious or critical accessibility violations", async () => {

@@ -10,7 +10,7 @@ import { useElementWidth } from "@/hooks/useElementWidth";
 import { seatToOpen } from "@/features/records/capabilities";
 import type { Capability } from "@/features/records/capabilities";
 import { cn, formatDate } from "@/lib/utils";
-import type { RecordDetail, RecordTracker, RecordVersion } from "@/types/records";
+import type { RecordDetail, RecordTracker, RecordVersion, ThreadDocument } from "@/types/records";
 
 import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
@@ -133,6 +133,8 @@ export interface ReviewWorkspaceProps {
   onShowVersion?: (n: number | null) => void;
   /** Put the manuscript back in the reader: a thread or a change is shown there (IR-1203). */
   onShowManuscript?: () => void;
+  /** Show the document a thread is about in the reader (IR-1204). */
+  onShowDocument?: (document: ThreadDocument) => void;
 }
 
 /** True from the first render `shown` is true, and from then on. */
@@ -162,7 +164,7 @@ function SentBy({ version }: { version: RecordVersion }) {
 
 export function ReviewWorkspaceLayout({
   record, can, reader, timelineVersion, onChanged, documents, showDocuments = false, onDocumentsShown, onOpenReview,
-  onShowVersion, authorView = false, authorDetails, onShowManuscript,
+  onShowVersion, authorView = false, authorDetails, onShowManuscript, onShowDocument,
 }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
@@ -232,6 +234,7 @@ export function ReviewWorkspaceLayout({
     showThreads: () => { reveal("threads"); if (drawer) setOpen(true); },
     // Threads and Changes point into the manuscript, so a document steps aside for it (IR-1203).
     showPaper: () => { onShowManuscript?.(); if (drawer && open) closeDrawer(); },
+    showDocument: onShowDocument && ((document) => { onShowDocument(document); if (drawer && open) closeDrawer(); }),
     announce: setRouted,
   });
   const finishing = can.has("finish_review");

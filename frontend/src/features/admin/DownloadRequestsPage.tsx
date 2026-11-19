@@ -202,7 +202,7 @@ export default function DownloadRequestsPage() {
                       </td>
                       <td className="px-4 py-3 max-w-xs">
                         {req.note
-                          ? <p className="text-stone-700 whitespace-pre-line break-words">{req.note}</p>
+                          ? <p className="text-justified text-stone-700 whitespace-pre-line break-words">{req.note}</p>
                           : <p className="text-stone-500 italic">{NO_NOTE}</p>}
                       </td>
                       <td className="px-4 py-3 text-stone-500 whitespace-nowrap">

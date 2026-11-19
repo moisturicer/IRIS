@@ -688,7 +688,11 @@ export interface DecisionCloses {
   revision_requests?: { id: number; party: Party; label: string; reason: string }[];
   findings?: { party: Party; label: string; comment: string }[];
   /** The open threads deciding closes, the decider's own drafts included (IR-874). */
-  threads?: { id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean }[];
+  threads?: {
+    id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean;
+    /** The supporting document a thread is on, "Consent form, v1" (IR-1204). */
+    document?: string | null;
+  }[];
 }
 
 export interface OfficeReviewFlags {
@@ -745,6 +749,8 @@ export interface ResponseLetterEntry {
   version:     number | null;
   page:        number | null;
   quote:       string;
+  /** A document thread's upload, "Consent form, v1" (IR-1204); absent from older letters. */
+  document?:   string | null;
   /** Null: no answer given. */
   answer:      ThreadAnswerPayload["kind"] | null;
   note:        string;
@@ -992,6 +998,8 @@ export interface ReviewComment {
   round?:                number | null;
   /** The passage it is about; null for a general thread. */
   anchor?:               ThreadAnchor | null;
+  /** The supporting document it is about instead, as a whole (IR-1204); null otherwise. */
+  document?:             ThreadDocument | null;
   state?:                ThreadState | null;
   resolved_by?:          string | null;
   resolved_at?:          string | null;
@@ -1139,6 +1147,22 @@ export interface VersionComparisonPayload {
   notices?:  ComparisonNotice[];
   counts?:   ChangeCounts & { sections_renamed: number; sections_moved: number };
   threads?:  PlacedThread[];
+}
+
+/**
+ * A supporting document a reviewer's thread is about, as a whole (ADR-032 §7,
+ * Amendment 2026-11-18; IR-1204): one upload of one of the record's slots.
+ */
+export interface ThreadDocument {
+  upload:    number;
+  slot:      string;
+  version:   number;
+  /** "Consent form, v1". */
+  label:     string;
+  /** A newer upload of the document has replaced this one: "From an earlier upload". */
+  earlier:   boolean;
+  /** The stored file's extension, lower-cased: whether the reader can show it. */
+  extension: string;
 }
 
 /** A passage of one Version: where an anchored thread points. */

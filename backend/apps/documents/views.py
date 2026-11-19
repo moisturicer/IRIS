@@ -10,7 +10,17 @@ from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, Record
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
-from .validators import is_pdf_upload, pdf_upload_problem
+from .validators import pdf_upload_problem, supplementary_file_problem
+
+#: The type an office file is served as, by extension, for the types Review's
+#: reader shows (IR-1203); the frontend's ``readerFormat`` lists the same ones.
+#: Any other file is served as ``application/octet-stream``, and never inline.
+READER_CONTENT_TYPES = {
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+}
 
 
 def authorize_record_documents(request, record_id, *, reading=False):
@@ -471,10 +481,11 @@ class RecordFileUploadView(APIView):
                 {"detail": "Only an office taking part in this record's review may attach a file."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if is_pdf_upload(file):
-            problem = pdf_upload_problem(file)
-            if problem:
-                return Response({"file": [problem], "detail": problem}, status=400)
+        # PDF, Word, PNG or JPG, by name and by bytes, and a PDF's safety check
+        # (IR-1220, ADR-032 §10 as amended 2026-11-18).
+        problem = supplementary_file_problem(file)
+        if problem:
+            return Response({"file": [problem], "detail": problem}, status=400)
         record_file = RecordFile.objects.create(
             record=record,
             file=file,
@@ -546,24 +557,27 @@ class RecordFileDownloadView(APIView):
         if not may_read_record_documents(request.user, record_file.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
-        inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
         filename = record_file.filename or record_file.file.name.split("/")[-1]
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-        content_type = "application/pdf" if ext == "pdf" else "application/octet-stream"
+        # Only these are ever shown in the browser (IR-1203): Review's reader
+        # draws a PDF or an image. Anything else, an SVG stored before IR-1220
+        # included, is an attachment of no renderable type, and nosniff
+        # (SECURE_CONTENT_TYPE_NOSNIFF) keeps the browser from guessing one.
+        shown_as = READER_CONTENT_TYPES.get(ext)
+        inline = shown_as is not None and (
+            request.query_params.get("inline", "").lower() in ("1", "true", "yes")
+        )
 
         create_audit_event(
             "DOWNLOAD", request.user, record=record_file.record,
             metadata={"file_id": pk, "filename": filename},
         )
-        response = FileResponse(
+        return FileResponse(
             record_file.file.open(),
-            content_type=content_type,
+            content_type=shown_as or "application/octet-stream",
             as_attachment=not inline,
             filename=filename,
         )
-        if inline and ext == "pdf":
-            response["Content-Disposition"] = f'inline; filename="{filename}"'
-        return response
 
 
 class RecordFileDeleteView(APIView):

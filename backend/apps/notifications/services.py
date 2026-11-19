@@ -541,7 +541,7 @@ def notify_review_finished(record, *, actor, party_label: str, version, threads:
         _log_failure("notify_review_finished", record=record)
 
 
-def notify_thread_posted(record, *, actor, party_label: str, severity, page):
+def notify_thread_posted(record, *, actor, party_label: str, severity, page, document=None):
     """
     A reviewer posted a thread outside a review round (ADR-032 §7 as amended
     2026-11-16, IR-1194): one notice to each owner, since the thread is theirs
@@ -549,7 +549,14 @@ def notify_thread_posted(record, *, actor, party_label: str, severity, page):
     """
     try:
         what = "Must fix" if severity == "must_fix" else "Suggestion"
-        where = f" on p. {page} of" if page else " on"
+        # A passage names its page; a document thread its document (IR-1204):
+        # "on p. 4 of", "on Consent form, v1 of", else "on" the record.
+        if page:
+            where = f" on p. {page} of"
+        elif document:
+            where = f" on {document} of"
+        else:
+            where = " on"
         message = f'{party_label} posted a {what}{where} "{record.title}".'
         notif_type = NotificationType.objects.get_or_create(name="Review Thread Posted")[0]
         for owner in record.owners.select_related("user"):

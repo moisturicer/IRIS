@@ -92,6 +92,11 @@ def party_label(party: str) -> str:
 
 # --- which threads ----------------------------------------------------------------
 
+def document_label(upload) -> str:
+    """A document thread's upload as people name it: "Consent form, v1" (IR-1204)."""
+    return f"{upload.slot.name}, v{upload.version}"
+
+
 def all_threads(record):
     """Every thread on `record`, drafts included: no replies, no discussion (IR-1194)."""
     return ReviewComment.objects.filter(
@@ -175,11 +180,16 @@ def token_facts(record, user) -> list:
 
 
 def closing_payload(record, user) -> list[dict]:
-    """The threads a Decision would close, for its dialog (`decision.closes.threads`)."""
+    """
+    The threads a Decision would close, for its dialog (`decision.closes.threads`):
+    each named by its passage (`anchored`) or its document (IR-1204), else the record.
+    """
     return [
         {"id": t.pk, "party": t.party or None, "label": party_label(t.party), "severity": t.severity,
-         "anchored": t.anchor_version_id is not None}
-        for t in closing_threads(record, user)
+         "anchored": t.anchor_version_id is not None,
+         "document": document_label(t.anchor_upload) if t.anchor_upload_id else None}
+        # Joined here, not in `closing_threads`: a Decision locks those rows.
+        for t in closing_threads(record, user).select_related("anchor_upload__slot")
     ]
 
 

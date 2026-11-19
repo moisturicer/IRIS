@@ -24,7 +24,7 @@ export function NoticeText({
             : `Version ${notice.version} · not published yet`}
         </p>
       </div>
-      <p className="whitespace-pre-wrap break-words leading-relaxed">{notice.text}</p>
+      <p className="text-justified whitespace-pre-wrap break-words leading-relaxed">{notice.text}</p>
     </div>
   );
 }

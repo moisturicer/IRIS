@@ -42,6 +42,7 @@
     "retry_of": null,
     "retried_by": null,
     "sources_available": true,
+    "selection": null,
     "capabilities": {
       "manual_compaction": false
     }
@@ -95,6 +96,7 @@
         "retry_of": null,
         "retried_by": null,
         "sources_available": true,
+        "selection": null,
         "capabilities": {
           "manual_compaction": false
         }
@@ -134,7 +136,8 @@
             "exhaustive": false
           }
         ],
-        "papers": []
+        "papers": [],
+        "selection": null
       }
     ]
   }
