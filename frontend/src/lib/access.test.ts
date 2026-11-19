@@ -190,10 +190,10 @@ describe("the pages nested under My Reviews (IR-1085, D5)", () => {
   });
 });
 
-test("the System Admin's nav is Discover, Guidelines, Users, Audit Log, Account Deletions, Reported comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972, IR-974)", () => {
-  // Guidelines is every signed-in person's sidebar link (ADR-063 decision 7).
+test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Reported comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972)", () => {
+  // No Guidelines link (IR-974, ADR-063 amendment 2026-11-19).
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
-    "Main: Discover", "Main: Guidelines",
+    "Main: Discover",
     "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
     "Administration: Reported comments", "Administration: Retention",
   ]);
@@ -228,12 +228,15 @@ test("My Templates is the Adviser's alone", () => {
   }
 });
 
-// IR-974 (ADR-063 decision 7): Guidelines is everyone's, last in the main list.
-test("every role opens Guidelines from the end of the main list", () => {
+// IR-974 (ADR-063 decision 7, amended 2026-11-19): every role but the System
+// Admin has Guidelines last in its main list. Anyone signed in may open it.
+test("every role but the System Admin opens Guidelines from the end of the main list", () => {
   only("guidelines", EVERY_ROLE);
   for (const role of EVERY_ROLE) {
     const main = navFor(role, REVIEW_WORK).filter((item) => item.section === "Main");
-    assertEqual(main[main.length - 1]?.to, "/guidelines", `${role}'s last main link`);
+    const last = main[main.length - 1]?.to;
+    if (role === ROLES.SYSTEM_ADMIN) assertEqual(last === "/guidelines", false, "the System Admin has no Guidelines link");
+    else assertEqual(last, "/guidelines", `${role}'s last main link`);
   }
 });
 

@@ -22,6 +22,7 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { PlainTextWithLinks } from "@/components/shared/PlainTextWithLinks";
 import { RequirementLabel } from "./RequirementLabel";
 import { Button } from "@/components/ui/Button";
@@ -29,6 +30,7 @@ import { fieldClasses, LABEL, WARNING_NOTICE } from "@/components/ui/fieldClasse
 import { Spinner } from "@/components/ui/Spinner";
 import { useApiRead } from "@/hooks/useApiRead";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { downloadBlob } from "@/lib/utils";
 import NoticeSection from "./NoticeSection";
 
@@ -154,6 +156,8 @@ function RequirementsSection() {
     <div className="space-y-4">
       {read.status === "interrupted" && !types ? (
         <InterruptedState what="setup" onRetry={read.retry} framed />
+      ) : read.status === "failed" && !types ? (
+        <LoadFailedAlert message={failureMessage(read.error, { lead: "Setup didn't load." })} onRetry={read.retry} />
       ) : !types ? (
         read.status === "ready" ? (
           <div className="space-y-3 rounded-card border border-stone-200 bg-white p-5">

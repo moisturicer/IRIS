@@ -285,6 +285,20 @@ describe("a failed read", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Setup didn't load");
   });
+
+  it("says so when the server answers with an error, instead of loading for ever (IR-974)", async () => {
+    const read = vi.spyOn(setupApi, "recordTypes")
+      .mockRejectedValueOnce({ isAxiosError: true, response: { status: 500, data: {} } })
+      .mockResolvedValue({ data: [thesis(), PROPOSAL] } as never);
+    const user = userEvent.setup();
+    renderScreen(<SetupPage />, { route: "/rdco/setup" });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Setup didn't load.");
+    await user.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "Requirements & Templates" })).toBeInTheDocument();
+    expect(read).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("linkParts", () => {

@@ -256,9 +256,9 @@ describe("the sidebar's list", () => {
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
     // IR-693 adds Reported comments, after Account Deletions; IR-972 moves the Notice onto RDCO's Setup.
-    // IR-974: Guidelines is everyone's main link (ADR-063 decision 7).
+    // IR-974: no Guidelines link for the System Admin (ADR-063 amendment 2026-11-19).
     expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
-      .toEqual(["Discover", "Guidelines", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention"]);
+      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");

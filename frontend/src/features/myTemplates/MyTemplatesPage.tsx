@@ -14,12 +14,14 @@ import { TEMPLATE_ACCEPT } from "@/api/setup";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { PlainTextWithLinks } from "@/components/shared/PlainTextWithLinks";
 import { Button } from "@/components/ui/Button";
 import { fieldClasses, LABEL, WARNING_NOTICE } from "@/components/ui/fieldClasses";
 import { Spinner } from "@/components/ui/Spinner";
 import { useApiRead } from "@/hooks/useApiRead";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { downloadBlob } from "@/lib/utils";
 
 const MAX_TEMPLATE_BYTES = 50 * 1024 * 1024;
@@ -91,6 +93,8 @@ export default function MyTemplatesPage() {
       </div>
       {read.status === "interrupted" && !templates ? (
         <InterruptedState what="your Templates" onRetry={read.retry} framed />
+      ) : read.status === "failed" && !templates ? (
+        <LoadFailedAlert message={failureMessage(read.error, { lead: "Your Templates didn't load." })} onRetry={read.retry} />
       ) : !templates ? (
         read.status === "ready" ? (
           <div className="space-y-3 rounded-card border border-stone-200 bg-white p-5">
