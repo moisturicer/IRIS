@@ -1,14 +1,14 @@
 """
 No uploaded file is stored until it has passed a malware scan (IR-666, ADR-074).
 
-Every intake path is driven through the API with the EICAR test file, as the
-test scanner (conftest.py) flags it: the upload is refused, nothing is
+Every intake path is driven through the API with a file the test scanner
+(conftest.py) flags: the upload is refused, nothing is
 stored, and the refusal is audited with the file's digest and the signature,
 never its bytes. A scanner that is down refuses the upload (fail closed).
 
-The office attachment takes any type, so it is sent the EICAR file itself.
 ClamAV flags EICAR only at the start of a file, so a valid PDF or image can't
-carry it; those paths send one carrying `MARKER`, which the test scanner is
+carry it; every path, the office attachment included since IR-1220 limited it
+to PDF, Word, PNG and JPG, sends one carrying `MARKER`, which the test scanner is
 told to flag, to prove each asks the scan and refuses. Real ClamAV with
 EICAR is CI's `malware-scan` job.
 """
@@ -24,7 +24,7 @@ from rest_framework.test import APITestCase
 
 from apps.audit.models import AuditEvent
 from apps.documents.models import RecordFile, RecordUpload, UploadSlot
-from apps.documents.scanning import EICAR, UNAVAILABLE, UNSAFE, FakeScanner, use_scanner
+from apps.documents.scanning import UNAVAILABLE, UNSAFE, FakeScanner, use_scanner
 
 #: What the test scanner is told to flag inside a valid PDF or image.
 MARKER = b"%IRIS-TEST-MALWARE"
@@ -60,7 +60,13 @@ class _Media(APITestCase):
 
 
 class OfficeAttachmentScanTests(_Media):
-    """`POST /documents/files/upload/` takes any type, so every type is scanned."""
+    """
+    `POST /documents/files/upload/`: every type an office may attach is scanned.
+
+    Changed on purpose when IR-1220 merged: the endpoint now accepts only PDF,
+    Word, PNG and JPG, checked by their bytes before the scan, so these tests
+    attach a real PNG (carrying `MARKER` to be flagged) rather than a text file.
+    """
 
     make_user = make_user
 
@@ -76,17 +82,30 @@ class OfficeAttachmentScanTests(_Media):
             added_by=self.owner, pipeline_status="in_review",
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
-        RecordAssignment.objects.create(record=self.record, party=Party.ITSO)
+        # Filing takes an open seat on the assignment, not office membership (IR-1226).
+        from apps.documents.tests.test_record_document_authorization import seat_on
+        seat_on(RecordAssignment.objects.create(record=self.record, party=Party.ITSO), self.itso)
         self.client.force_authenticate(self.itso)
 
-    def attach(self, content, name="memo.txt"):
+    @staticmethod
+    def png(trailer=b""):
+        from io import BytesIO
+
+        from PIL import Image
+
+        buffer = BytesIO()
+        Image.new("RGB", (40, 40), "white").save(buffer, "PNG")
+        return buffer.getvalue() + trailer
+
+    def attach(self, content, name="scan.png"):
         return self.client.post("/api/v1/documents/files/upload/", {
-            "record": self.record.pk, "file": SimpleUploadedFile(name, content),
+            "record": self.record.pk, "file": SimpleUploadedFile(name, content, content_type="image/png"),
         }, format="multipart")
 
-    def test_the_eicar_file_is_refused_stored_nowhere_and_audited(self):
+    def test_a_flagged_file_is_refused_stored_nowhere_and_audited(self):
         stored_before = set(Path(self._media_root).rglob("*"))
-        response = self.attach(EICAR, "eicar.com")
+        flagged = self.png(MARKER)
+        response = self.attach(flagged)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["detail"], UNSAFE)
         self.assertFalse(RecordFile.objects.exists())
@@ -96,19 +115,19 @@ class OfficeAttachmentScanTests(_Media):
         self.assertEqual(event.user_id, self.itso.pk)
         self.assertEqual(event.record_id, self.record.pk)
         self.assertEqual(event.metadata["where"], "office_attachment")
-        self.assertEqual(event.metadata["signature"], "Eicar-Test-Signature")
-        self.assertEqual(event.metadata["size"], len(EICAR))
+        self.assertEqual(event.metadata["signature"], "Iris-Test-Marker")
+        self.assertEqual(event.metadata["size"], len(flagged))
         self.assertEqual(len(event.metadata["sha256"]), 64)
-        self.assertNotIn(EICAR.decode(), str(event.metadata), "the audit kept the file's bytes")
+        self.assertNotIn(MARKER.decode(), str(event.metadata), "the audit kept the file's bytes")
 
     def test_a_clean_file_is_stored(self):
-        self.assertEqual(self.attach(b"office memo").status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.attach(self.png()).status_code, status.HTTP_201_CREATED)
         self.assertEqual(RecordFile.objects.count(), 1)
         self.assertEqual(self.refused_events(), [])
 
     def test_a_scanner_that_is_down_refuses_and_stores_nothing(self):
         with use_scanner(FakeScanner(down=True)):
-            response = self.attach(b"office memo")
+            response = self.attach(self.png())
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["detail"], UNAVAILABLE)
         self.assertFalse(RecordFile.objects.exists())
