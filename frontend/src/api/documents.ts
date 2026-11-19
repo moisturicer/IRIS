@@ -23,8 +23,8 @@ export const documentsApi = {
     }),
 
   // Fetch slots with their upload history for a specific record (Paper View's Files section)
-  slotsForRecord: (recordId: number) =>
-    apiClient.get<SlotWithUploads[]>(`/documents/records/${recordId}/slots/`),
+  slotsForRecord: (recordId: number, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<SlotWithUploads[]>(`/documents/records/${recordId}/slots/`, options),
 
   uploads:        (recordId: number) =>
     apiClient.get<RecordUpload[]>("/documents/uploads/", { params: { record: recordId } }),

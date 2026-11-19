@@ -83,6 +83,29 @@ vi.mock("@/api/documents", () => ({
   },
 }));
 
+// What RDCO asks a Thesis / Research for (IR-973 reads labels and Templates from Guidelines' list).
+const guidelinesList = vi.fn();
+const downloadManuscriptTemplate = vi.fn();
+const downloadRequirementTemplate = vi.fn();
+vi.mock("@/api/guidelines", () => ({
+  guidelinesApi: {
+    list: () => guidelinesList(),
+    downloadManuscriptTemplate: (id: number) => downloadManuscriptTemplate(id),
+    downloadRequirementTemplate: (id: number) => downloadRequirementTemplate(id),
+  },
+}));
+const GUIDE = [
+  { id: 1, name: "Proposal", description: "", manuscript: { description: "", template_name: "proposal-format.docx" }, requirements: [] },
+  {
+    id: 2, name: "Thesis / Research", description: "",
+    manuscript: { description: "", template_name: "thesis-format.docx" },
+    requirements: [
+      { id: ETHICS, name: "Ethics Clearance", is_required: true, description: "", template_name: "ethics-form.docx" },
+      { id: PATENT, name: "Patent Draft", is_required: false, description: "", template_name: "" },
+    ],
+  },
+];
+
 function item(overrides: Partial<DocumentRequestItem> = {}): DocumentRequestItem {
   return {
     id: 11, slot: ETHICS, label: "Ethics Clearance", state: "missing", state_label: "Missing",
@@ -102,6 +125,7 @@ function openRequest(items: DocumentRequestItem[]): DocumentRequest {
 
 const record = {
   id: RECORD_ID,
+  record_type_name: "Thesis / Research",
   abstract_file: "/api/v1/records/9/manuscript/",
   can_request_document: [],
   current_holders: [],
@@ -127,6 +151,10 @@ function slot(id: number, name: string): SlotWithUploads {
 }
 
 beforeEach(() => {
+  guidelinesList.mockReset().mockResolvedValue({ data: GUIDE });
+  downloadManuscriptTemplate.mockReset().mockResolvedValue({ data: new Blob(["docx"]) });
+  downloadRequirementTemplate.mockReset().mockResolvedValue({ data: new Blob(["docx"]) });
+  downloadBlob.mockReset();
   attachments = [];
   uploadRecordFile.mockReset().mockImplementation((_record: number, file: File) => {
     // The server says the office that just filed it may remove it.
@@ -261,6 +289,68 @@ describe("the Documents tab, for the owner of an editable record", () => {
 
     expect(await screen.findByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Upload Patent Draft/ })).toBeInTheDocument();
+  });
+});
+
+// IR-973 (ADR-063 decision 6): each of RDCO's requirements reads its label and
+// offers its Template, from the same row Publish uses.
+describe("requirement labels and Templates", () => {
+  const row = async (name: string) => screen.findByRole("group", { name });
+
+  it("labels each requirement Required or Optional and offers its Template, and the Manuscript its type's", async () => {
+    requests = [];
+    renderFiles({ editable: true });
+
+    const ethics = await row("Ethics Clearance");
+    expect(await within(ethics).findByText("Required")).toBeInTheDocument();
+    expect(within(ethics).getByRole("button", { name: "Download the Ethics Clearance Template, ethics-form.docx" })).toBeInTheDocument();
+
+    const patent = await row("Patent Draft");
+    expect(within(patent).getByText("Optional")).toBeInTheDocument();
+    expect(within(patent).queryByRole("button", { name: /Template/ })).not.toBeInTheDocument();
+
+    const manuscript = await row("Manuscript");
+    expect(within(manuscript).getByText("Required")).toBeInTheDocument();
+    expect(within(manuscript).getByRole("button", { name: "Download the Manuscript Template, thesis-format.docx" })).toBeInTheDocument();
+  });
+
+  it("downloads a Template under its own file name", async () => {
+    requests = [];
+    renderFiles({ editable: true });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Download the Ethics Clearance Template, ethics-form.docx" }));
+
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "ethics-form.docx"));
+    expect(downloadRequirementTemplate).toHaveBeenCalledWith(ETHICS);
+  });
+
+  it("gives a slot that is no longer one of RDCO's requirements no label and no Template", async () => {
+    requests = [];
+    slots = [...slots, { ...slot(99, "Old Endorsement"), hidden: true, is_required: true, template_name: "old.docx" }];
+    renderFiles({ editable: true });
+
+    const old = await row("Old Endorsement");
+    await within(await row("Ethics Clearance")).findByText("Required");
+    expect(within(old).queryByText(/^(Required|Optional)$/)).not.toBeInTheDocument();
+    expect(within(old).queryByRole("button", { name: /Template/ })).not.toBeInTheDocument();
+  });
+
+  it("says when the labels and Templates didn't load, and still offers every upload", async () => {
+    requests = [];
+    guidelinesList.mockRejectedValueOnce({ isAxiosError: true, response: { status: 500, data: {} } });
+    renderFiles({ editable: true });
+
+    expect(await screen.findByText(/labels and the Templates didn't load/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
+    expect(within(await row("Ethics Clearance")).queryByText("Required")).not.toBeInTheDocument();
+  });
+
+  it("passes axe with labels and Templates shown", async () => {
+    requests = [];
+    const { container } = renderFiles({ editable: true });
+    await within(await row("Ethics Clearance")).findByText("Required");
+
+    await expectNoBlockingA11yViolations(container);
   });
 });
 

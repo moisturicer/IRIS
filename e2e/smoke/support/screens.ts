@@ -76,7 +76,7 @@ const MY_TEMPLATES = [
 ];
 
 /** Guidelines (IR-974): long names, long file names and descriptions holding links, at every width. */
-const GUIDELINES = [
+export const GUIDELINES = [
   {
     id: 1, name: "Proposal", description: "Comes before a Thesis / Research. See https://cit.edu/research/proposal-guidelines-2026-revised.",
     manuscript: { description: "The proposal itself, chapters 1 to 3.", template_name: "cit-u-research-proposal-manuscript-format-2026-revised-edition.docx" },
@@ -96,7 +96,7 @@ const GUIDELINES = [
   { id: 3, name: "Project", description: "", manuscript: { description: "", template_name: "" }, requirements: [] },
 ];
 
-const ADVISERS_TEMPLATES = MY_TEMPLATES.map((t) => ({
+export const ADVISERS_TEMPLATES = MY_TEMPLATES.map((t) => ({
   ...t, shared_by: { id: 40, name: "Maria Concepcion Villanueva-Dela Cruz Santiago" },
 }));
 
@@ -143,6 +143,7 @@ const reviewDocumentsMocks = (api: MockApi) => {
         id: 31, record: PAPER.id, file: "x.pdf", filename: "Final_Thesis_Manuscript_Revised_Signed_Adviser_Copy_v3.pdf",
         uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
       }]);
+      api.on("GET", "/documents/guidelines/", GUIDELINES);
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
       api.on("GET", "/library/saves/", { results: [] });
       api.on("GET", "/library/folders/", { results: [], limit: 10 });
@@ -350,6 +351,8 @@ export const SCREENS: Screen[] = [
       api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
       // A participant's Review opens on its Documents tab (IR-1203), which reads these.
       api.on("GET", `/documents/records/${PAPER.id}/slots/`, []);
+      // Its rows read their labels and Templates from Guidelines (IR-973).
+      api.on("GET", "/documents/guidelines/", GUIDELINES);
       api.on("GET", "/documents/files/", []);
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
     }),

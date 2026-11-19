@@ -8,6 +8,10 @@ import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatDate } from "@/lib/utils";
 import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip } from "./itemStatus";
+import type { GuidelineRequirement } from "@/api/guidelines";
+import {
+  GuideUnavailable, RequirementTemplate, useRequirementGuide,
+} from "@/features/guidelines/requirementGuide";
 import type { DocumentRequest, DocumentRequestItem } from "@/types/records";
 
 interface ActionRequiredPanelProps {
@@ -38,6 +42,10 @@ interface ActionRequiredPanelProps {
  * 2026-10-06), not an `UploadDropzone`, yet behaves like one (IR-471): a
  * progress bar while it runs, Retry with the same file after a failure, and
  * a live region per row that announces each start and finish.
+ *
+ * An item for one of RDCO's requirements offers that requirement's Template
+ * (ADR-063 decision 6, IR-973), read from Guidelines' list only while a
+ * request is shown. An "Other" item has no slot, so it has none.
  *
  * Each item reads in spec §4.10's one vocabulary (`itemStatus`): Requested,
  * Uploaded · awaiting review, Accepted, Replacement needed.
@@ -124,10 +132,26 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
           {refreshFailed}
         </p>
       )}
-      {shown.map((r) => (
-        <RequestEntry key={r.id} recordId={recordId} request={r} onUploaded={uploaded} />
-      ))}
+      <RequestEntries recordId={recordId} requests={shown} onUploaded={uploaded} />
     </section>
+  );
+}
+
+/** The shown requests, with each requested slot's Template. */
+function RequestEntries({ recordId, requests, onUploaded }: {
+  recordId: number;
+  requests: DocumentRequest[];
+  onUploaded: () => Promise<void>;
+}) {
+  const guideRead = useRequirementGuide();
+  return (
+    <>
+      <GuideUnavailable read={guideRead} what="The requested documents' Templates" />
+      {requests.map((r) => (
+        <RequestEntry key={r.id} recordId={recordId} request={r} onUploaded={onUploaded}
+          requirement={(slot) => guideRead.guide?.requirement(slot) ?? null} />
+      ))}
+    </>
   );
 }
 
@@ -135,10 +159,12 @@ function RequestEntry({
   recordId,
   request,
   onUploaded,
+  requirement,
 }: {
   recordId: number;
   request: DocumentRequest;
   onUploaded: () => Promise<void>;
+  requirement: (slot: number | null) => GuidelineRequirement | null;
 }) {
   const listId = useId();
   return (
@@ -171,6 +197,7 @@ function RequestEntry({
             item={item}
             asker={request.label}
             onUploaded={onUploaded}
+            requirement={requirement(item.slot)}
           />
         ))}
       </ul>
@@ -188,12 +215,15 @@ function ItemRow({
   item,
   asker,
   onUploaded,
+  requirement,
 }: {
   recordId: number;
   item: DocumentRequestItem;
   /** Who asked, as the server words it. */
   asker: string;
   onUploaded: () => Promise<void>;
+  /** The RDCO requirement this item asks for, if it is one; it carries the Template. */
+  requirement: GuidelineRequirement | null;
 }) {
   const inputId = useId();
   const [upload, setUpload] = useState<RowUpload | null>(null);
@@ -305,6 +335,7 @@ function ItemRow({
           )}
         </span>
       </div>
+      {requirement?.template_name && <div className="mt-1"><RequirementTemplate requirement={requirement} /></div>}
       {item.state === "missing" && item.rejection_reason && (
         <p className="text-xs text-brand mt-1 break-words">
           {asker} did not accept your last upload: “{item.rejection_reason}”
