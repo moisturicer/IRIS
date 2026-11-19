@@ -139,19 +139,15 @@ class MyTemplateDownloadView(APIView):
 
 
 class ShownAdviserTemplateListView(APIView):
-    """GET /documents/adviser-templates/[?shared_by=<user id>] -- every shown Template, by Adviser."""
+    """
+    GET /documents/adviser-templates/ -- every shown Template, by Adviser.
+    Narrowing it to one Adviser is Guidelines' (IR-974), which has no screen yet.
+    """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        shown = templates.shown_templates()
-        shared_by = request.query_params.get("shared_by")
-        if shared_by is not None:
-            try:
-                shown = shown.filter(owner_id=int(shared_by))
-            except (TypeError, ValueError):
-                return Response({"detail": "shared_by must be a user id."}, status=status.HTTP_400_BAD_REQUEST)
-        return Response([shown_payload(t) for t in shown])
+        return Response([shown_payload(t) for t in templates.shown_templates()])
 
 
 class AdviserTemplateDownloadView(APIView):

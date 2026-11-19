@@ -279,7 +279,7 @@ class WhoseTemplatesShowTests(AdviserTemplateBase):
         return self.client.get(f"{SHOWN}/{self.template['id']}/file/").status_code == status.HTTP_200_OK
 
     def test_anyone_signed_in_sees_and_downloads_an_active_advisers_template(self):
-        response = self.client.get(f"{SHOWN}/", {"shared_by": self.adviser.pk})
+        response = self.client.get(f"{SHOWN}/")
 
         (shown,) = response.data
         self.assertEqual((shown["title"], shown["shared_by"]["id"]), ("Ada's format", self.adviser.pk))

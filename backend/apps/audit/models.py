@@ -138,9 +138,9 @@ class AuditEvent(models.Model):
     # file's `sha256`, `size` and `filename`, and the scanner's `signature`.
     # Never the bytes: nothing flagged is stored.
     UPLOAD_REFUSED_UNSAFE = "UPLOAD_REFUSED_UNSAFE"
-    # `scan_stored_uploads` moved a stored file that failed out of use. No
-    # `user`; the record it belongs to; metadata `model`, `pk`, `field`,
-    # `sha256`, `size` and `signature`.
+    # A stored file that failed a re-scan was taken out of use. No longer
+    # written: the command that wrote it was removed (ADR-074 amendment
+    # 2026-11-19, IR-975). Kept so any earlier row still reads by its name.
     FILE_QUARANTINED      = "FILE_QUARANTINED"
     # Comment moderation (ADR-032 §7, amendment 2026-10-31; IR-691). `user` is
     # RDCO or the System Admin; the record is the comment's paper. Metadata:

@@ -372,6 +372,35 @@ class ConfirmTests(DeletionBase):
         self.assertFalse(LibraryPreferences.objects.filter(owner=self.person).exists())
         self.assertFalse(ReadingPosition.objects.filter(owner=self.person).exists())
 
+    def test_their_shared_templates_and_files_go_with_them(self):
+        """IR-975 (ADR-063 decision 8): a deleted Adviser's Templates can never show again, so they go."""
+        import shutil
+        import tempfile
+
+        from django.core.files.base import ContentFile
+        from django.test import override_settings
+
+        from apps.documents.models import AdviserTemplate
+
+        media = tempfile.mkdtemp(prefix="iris-test-media-")
+        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+        with override_settings(MEDIA_ROOT=media):
+            mine = AdviserTemplate(owner=self.person, title="Proposal format", file_name="format.pdf", position=1)
+            mine.file.save("format.pdf", ContentFile(b"%PDF-1.4\n"), save=False)
+            mine.save()
+            theirs = AdviserTemplate(owner=self.adviser, title="Someone else's", file_name="other.pdf", position=1)
+            theirs.file.save("other.pdf", ContentFile(b"%PDF-1.4\n"), save=False)
+            theirs.save()
+            stored = mine.file.name
+
+            response, _send = self.confirm(self.sysadmin, self.made.pk)
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+            self.assertFalse(AdviserTemplate.objects.filter(owner=self.person).exists())
+            self.assertFalse(mine.file.storage.exists(stored))
+            self.assertTrue(AdviserTemplate.objects.filter(pk=theirs.pk).exists())
+            self.assertTrue(theirs.file.storage.exists(theirs.file.name))
+
     def test_the_row_and_the_history_that_points_at_it_survive(self):
         self.confirm(self.sysadmin, self.made.pk)
         self.assertTrue(User.objects.filter(pk=self.person.pk).exists())

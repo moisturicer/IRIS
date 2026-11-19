@@ -8,9 +8,10 @@ My Templates: the proposal Templates an Adviser shares (ADR-063 decision 8, IR-9
   changes or removes one: every change looks the Template up among the
   caller's own, so RDCO, or another Adviser, finds nothing (a 404).
 - **Shown** to everyone signed in only while the owner is an Adviser whose
-  profile is open (`shown_templates`): a suspended, locked or deleted account,
-  or one that no longer holds the Adviser role, shows none, everywhere. The
-  rows are kept, so a lifted suspension shows them again.
+  profile is open (`shown_templates`): a suspended or locked account, or one
+  that no longer holds the Adviser role, shows none, everywhere, and its rows
+  are kept, so lifting the suspension shows them again. A **deleted** account's
+  Templates and files are removed with it (`remove_all_of_deleted_account`).
 - **Every change is audited** (decision 11); descriptions as character
   counts, never their text. Downloads are not.
 
@@ -28,12 +29,9 @@ from apps.audit.models import AuditEvent
 from apps.audit.services import create_audit_event
 from core.enums import RoleName
 
+from . import template_rules as rules
 from .models import AdviserTemplate
-from .scanning import upload_problem
-from .template_files import display_name, drop_file_after_commit, template_problem
-
-MAX_TITLE_CHARS = 200
-MAX_DESCRIPTION_CHARS = 2000
+from .template_files import display_name, drop_file_after_commit
 
 
 class TemplateError(Exception):
@@ -79,34 +77,15 @@ def shown_templates() -> QuerySet:
 
 
 def _title(value) -> str:
-    title = value.strip() if isinstance(value, str) else ""
-    if not title:
-        raise TemplateError("Give the Template a title.")
-    if len(title) > MAX_TITLE_CHARS:
-        raise TemplateError(f"Keep the title to {MAX_TITLE_CHARS} characters.")
-    return title
+    return rules.name(value, what="title", missing="Give the Template a title.", error=TemplateError)
 
 
 def _description(value) -> str:
-    if value is None:
-        return ""
-    if not isinstance(value, str):
-        raise TemplateError("A description is plain text.")
-    text = value.strip()
-    if len(text) > MAX_DESCRIPTION_CHARS:
-        raise TemplateError(f"Keep the description to {MAX_DESCRIPTION_CHARS} characters.")
-    return text
+    return rules.description(value, error=TemplateError)
 
 
 def _check_file(file, user) -> None:
-    """
-    Setup's file rules, then the malware scan (ADR-074). Called before the
-    change's transaction opens, so the audit of a file refused as unsafe is
-    never rolled back with it.
-    """
-    problem = template_problem(file) or upload_problem(file, user=user, where="my_template")
-    if problem:
-        raise TemplateError(problem)
+    rules.check_file(file, user, where="my_template", error=TemplateError)
 
 
 def _meta(template) -> dict:
@@ -152,9 +131,7 @@ def add_template(user, *, title, description="", file=None) -> AdviserTemplate:
 
 def edit_template(template, user, changes: dict, file=None) -> AdviserTemplate:
     """Change a Template's title or description, and/or replace its file."""
-    unknown = set(changes) - {"title", "description"}
-    if unknown:
-        raise TemplateError(f"These can't be changed here: {', '.join(sorted(unknown))}.")
+    rules.only_fields(changes, {"title", "description"}, error=TemplateError)
     title = _title(changes["title"]) if "title" in changes else None
     description = _description(changes["description"]) if "description" in changes else None
     if file is not None:
@@ -185,22 +162,30 @@ def edit_template(template, user, changes: dict, file=None) -> AdviserTemplate:
 
 def reorder_templates(user, order: Iterable) -> list[int]:
     """Put the Adviser's Templates in `order`, which must name each of theirs exactly once."""
-    if not isinstance(order, (list, tuple)):
-        raise TemplateError("Give your Templates' ids in their new order.")
-    try:
-        ids = [int(pk) for pk in order]
-    except (TypeError, ValueError):
-        raise TemplateError("Give your Templates' ids in their new order.")
+    ids = rules.order_ids(order, error=TemplateError, ask="Give your Templates' ids in their new order.")
     with transaction.atomic():
         _lock_owner_row(user)
         current = list(my_templates(user).values_list("pk", flat=True))
-        if len(ids) != len(set(ids)) or set(ids) != set(current):
-            raise TemplateError("The order must list each of your Templates once.")
+        rules.check_complete_order(ids, current, error=TemplateError,
+                                   mismatch="The order must list each of your Templates once.")
         for position, pk in enumerate(ids, start=1):
             AdviserTemplate.objects.filter(pk=pk).update(position=position)
         if ids != current:
             create_audit_event(AuditEvent.ADVISER_TEMPLATES_REORDERED, user, metadata={"order": ids})
     return ids
+
+
+def remove_all_of_deleted_account(person) -> int:
+    """
+    A deleted account's Templates, and their files once the deletion commits
+    (IR-975): a deleted Adviser can never show again, so nothing is kept.
+    Account deletion's own audit event records the act. Returns how many went.
+    """
+    gone = list(AdviserTemplate.objects.filter(owner=person))
+    for template in gone:
+        drop_file_after_commit(template.file)
+    AdviserTemplate.objects.filter(pk__in=[t.pk for t in gone]).delete()
+    return len(gone)
 
 
 def remove_template(template, user) -> None:
