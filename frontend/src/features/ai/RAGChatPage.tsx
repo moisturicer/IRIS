@@ -19,11 +19,13 @@ import { RuntimeReader } from "./components/RuntimeReader";
 import { EarlierConversation } from "./components/EarlierConversations";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
+import { SourcesPanel, type SourcesMode } from "./components/SourcesPanel";
+import type { ChatMessage } from "@/types/chat";
 import {
   ConversationHistoryList, ConversationSidebar, NewChatButton, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
   type RenameConversation,
 } from "./components/ConversationSidebar";
-import { ASK_PHONE_MAX_PX } from "./components/answerLayout";
+import { ASK_PHONE_MAX_PX, ASK_SOURCES_BESIDE_MIN_PX } from "./components/answerLayout";
 import { useConversationHistory } from "./hooks/useConversationHistory";
 
 const RUNTIME_ID = /^[0-9a-f-]{36}$/i;
@@ -98,6 +100,34 @@ function RuntimeAskPage() {
 
   useEffect(() => { setDialogOpen(false); }, [conversationId, phone]);
 
+  // The Sources panel (IR-1237): closed until a chip, the count or the header toggle
+  // opens it. It describes the answer a reader picked, else the newest one; `marker`
+  // is the passage it highlights, none when it was opened from the count or the toggle.
+  const sourcesId = useId();
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [latest, setLatest] = useState<ChatMessage | null>(null);
+  const [picked, setPicked] = useState<{ message: ChatMessage; marker: number | null } | null>(null);
+  const sourcesOpener = useRef<HTMLElement | null>(null);
+  const sourcesMode: SourcesMode = phone ? "sheet" : pageWidth > 0 && pageWidth < ASK_SOURCES_BESIDE_MIN_PX ? "over" : "beside";
+  const shown = picked?.message ?? latest;
+  // Another conversation has other answers: nothing carries over.
+  useEffect(() => { setPicked(null); setLatest(null); }, [conversationId]);
+  const rememberOpener = () => {
+    sourcesOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  };
+  const openSources = useCallback((message: ChatMessage, marker: number | null) => {
+    rememberOpener();
+    setPicked({ message, marker });
+    setSourcesOpen(true);
+  }, []);
+  const toggleSources = () => {
+    if (sourcesOpen) { setSourcesOpen(false); return; }
+    rememberOpener();
+    setPicked(p => p && { ...p, marker: null });
+    setSourcesOpen(true);
+  };
+  const sourcesDialog = sourcesOpen && sourcesMode !== "beside";
+
   const setPane = useCallback((open: boolean) => { setPaneOpen(open); savePaneOpen(open); }, []);
   const openDialog = useCallback(() => {
     dialogOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -158,7 +188,7 @@ function RuntimeAskPage() {
 
 
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
-    <div className="relative flex min-h-0 min-w-0 flex-1" {...(dialogOpen ? { inert: "" } : {})}>
+    <div className="relative flex min-h-0 min-w-0 flex-1" {...(dialogOpen || sourcesDialog ? { inert: "" } : {})}>
       {!phone && <ConversationSidebar id={paneId} conversations={conversations} activeId={conversationId ?? null}
         open={paneOpen} search={search} searchRef={searchRef} onNewChat={newChat} onSearch={openSearch}
         onToggle={() => setPane(!paneOpen)}
@@ -167,11 +197,13 @@ function RuntimeAskPage() {
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
         <ChatToolbar sessionTitle={title}
           phoneHistory={phone ? { open: dialogOpen, onOpen: openDialog } : undefined}
+          sources={{ open: sourcesOpen, onToggle: toggleSources, controls: sourcesId, asDialog: sourcesMode !== "beside" }}
           onDownload={conversationId ? () => api.download(conversationId) : undefined} />
         <div className="flex min-h-0 flex-1 flex-col">
           <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
             initialDraft={conversationId ? undefined : draft ?? undefined}
-            onAnswered={() => void refreshList()}
+            sourcePanel={{ selectedId: sourcesOpen ? shown?.id ?? null : null, marker: picked?.marker ?? null, onOpen: openSources }}
+            onAnswered={message => { setLatest(message); void refreshList(); }}
             onTitle={retitle}
             onConversation={id => {
               void refreshList();
@@ -179,7 +211,14 @@ function RuntimeAskPage() {
             }} />
         </div>
       </div>
+      {sourcesOpen && sourcesMode === "beside" && <SourcesPanel mode="beside" id={sourcesId} citations={shown?.citations ?? []}
+        sources={shown?.sources ?? []} active={picked?.marker ?? null} question={shown?.question ?? null}
+        onClose={() => setSourcesOpen(false)} returnTo={null} />}
     </div>
+
+    {sourcesDialog && <SourcesPanel mode={sourcesMode} id={sourcesId} citations={shown?.citations ?? []}
+      sources={shown?.sources ?? []} active={picked?.marker ?? null} question={shown?.question ?? null}
+      onClose={() => setSourcesOpen(false)} returnTo={sourcesOpener.current} />}
 
     {phone && dialogOpen && <ChatDrawer title="Chat history" side="start" closeLabel="Close chat history"
       onClose={() => setDialogOpen(false)} returnTo={dialogOpener.current}>
