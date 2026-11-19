@@ -370,9 +370,11 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                    "add_reviewer", "route", "request_revision",
                    "keep_unlisted", "reject", "accept_publish"} | OPENS_THREADS | EMBARGO_ACTS | SEATED | RDCO_ACTS
     EXPECTED = {
+        # A draft is its owner's alone (IR-1227, ADR-009 decision 6): its
+        # Adviser and every office get the 404 a missing record gets.
         "draft": {
-            "owner": {"cite", "continue_draft", "edit_details", "delete_record"} | NAMES_CONTACT, "adviser": {"cite"},
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "owner": {"cite", "continue_draft", "edit_details", "delete_record"} | NAMES_CONTACT, "adviser": None,
+            "itso": None, "ierc": None, "rdco": None, "stranger": None,
         },
         "with_adviser_unopened": {
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,

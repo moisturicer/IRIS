@@ -133,13 +133,16 @@ class RecordManager(models.Manager):
         retrieval must filter through it too, so a generated citation can never
         point at a record the reader cannot open.
 
-        Four disjoint grounds, in the order they matter:
+        Four grounds, in the order they matter:
 
-        * **Office staff** (KTTO/RDCO/ITSO/IERC) see everything. They run the
-          clearance pipeline; RDCO cannot perform intake review on a record it
-          cannot open.
-        * **Owners** see their own records at any pipeline status, which is what
-          makes a draft readable to the person writing it.
+        * **A draft is its creator's alone** (IR-1227, ADR-009 decision 6): the
+          account that started it in Publish (`added_by`) reads it, and nobody
+          else does -- not a co-owner it names, nor any ground below. Every
+          ground below holds only for a submitted record.
+        * **Owners** see their own submitted records at any status.
+        * **Office staff** (KTTO/RDCO/ITSO/IERC) see every submitted record. They
+          run the clearance pipeline; RDCO cannot perform intake review on a
+          record it cannot open.
         * **The assigned adviser** sees the record they advise. `Adviser` is in
           `REVIEWER_ROLES` but deliberately not in `STAFF_ROLES`, so the role
           alone grants nothing -- the grant is the `adviser` FK pointing at this
@@ -160,12 +163,27 @@ class RecordManager(models.Manager):
         qs = self.get_queryset()
         if not user or not user.is_authenticated:
             return qs.none()
+        drafted = models.Q(pipeline_status=PipelineStatus.DRAFT, added_by=user)
+        submitted = ~models.Q(pipeline_status=PipelineStatus.DRAFT)
         if get_role_name(user) in STAFF_ROLES:
-            return qs
+            return qs.filter(drafted | submitted).distinct()
         return qs.filter(
-            models.Q(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
-            | models.Q(owners__user=user)
-            | models.Q(adviser=user)
+            drafted
+            | (submitted & (
+                models.Q(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
+                | models.Q(owners__user=user)
+                | models.Q(adviser=user)
+            ))
+        ).distinct()
+
+    def owned_by(self, user):
+        """
+        The records `user` owns, as their own lists show them: every submitted
+        one, and the drafts they created. A draft that names them as a
+        co-owner is its creator's alone until it is submitted (IR-1227).
+        """
+        return self.get_queryset().filter(owners__user=user).exclude(
+            models.Q(pipeline_status=PipelineStatus.DRAFT) & ~models.Q(added_by=user)
         ).distinct()
 
 

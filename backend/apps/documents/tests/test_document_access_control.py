@@ -288,12 +288,22 @@ class ObjectIdRouteExistenceOracleTests(_TempMediaAPITestCase):
                 self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_the_adviser_downloads_but_does_not_delete(self):
-        """IR-1200: the Adviser reads the record's documents and removes none."""
+        """IR-1200: the Adviser reads the record's documents and removes none,
+        once it is submitted: a draft is its creator's alone (IR-1227)."""
+        self.record.pipeline_status = PipelineStatus.IN_REVIEW
+        self.record.save(update_fields=["pipeline_status"])
         expected = {"upload-download": 200, "file-download": 200, "upload-delete": 403}
         for name, (method, url, _) in self.routes.items():
             with self.subTest(route=name):
                 self.assertEqual(self._call(self.adviser, method, url).status_code, expected[name])
         self.assertTrue(RecordUpload.objects.filter(pk=self.upload.pk).exists())
+
+    def test_the_adviser_reaches_no_document_of_a_draft(self):
+        """IR-1227: before it is submitted, the Adviser it names is refused as
+        a stranger is, with the 404 a missing id answers."""
+        for name, (method, url, _) in self.routes.items():
+            with self.subTest(route=name):
+                self.assertEqual(self._call(self.adviser, method, url).status_code, 404)
 
     def test_hidden_upload_is_not_deleted(self):
         method, url, _ = self.routes["upload-delete"]

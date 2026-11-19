@@ -28,12 +28,14 @@ def people():
     office = make_user("reads-office@cit.edu", ROLE_RDCO)
     stranger = make_user("reads-stranger@cit.edu", ROLE_STUDENT)
     Record.objects.create(title="Published", abstract="a", pipeline_status=PipelineStatus.PUBLISHED)
+    co_owner = make_user("reads-co-owner@cit.edu", ROLE_STUDENT)
     draft = Record.objects.create(title="Draft", abstract="a", pipeline_status=PipelineStatus.DRAFT,
-                                  adviser=adviser)
+                                  adviser=adviser, added_by=owner)
     RecordOwner.objects.create(record=draft, user=owner, is_primary=True)
+    RecordOwner.objects.create(record=draft, user=co_owner, is_primary=False)
     Record.objects.create(title="Other draft", abstract="a", pipeline_status=PipelineStatus.DRAFT)
-    return {"owner": owner, "adviser": adviser, "office": office, "stranger": stranger,
-            "draft": draft}
+    return {"owner": owner, "co_owner": co_owner, "adviser": adviser, "office": office,
+            "stranger": stranger, "draft": draft}
 
 
 def ids(qs):
@@ -49,7 +51,7 @@ def use_database(settings, name, password):
 
 def test_application_mode_is_visible_to(settings, people):
     settings.AI_RESEARCH_READ_POLICY = "application"
-    for key in ("owner", "adviser", "office", "stranger"):
+    for key in ("owner", "co_owner", "adviser", "office", "stranger"):
         user = people[key]
         assert ids(reads.research_records(user)) == ids(Record.objects.visible_to(user)), key
 
@@ -58,13 +60,17 @@ def test_database_mode_reads_the_same_population_under_the_restricted_role(setti
     with probe_credentials("iris_django_runtime") as (name, password):
         use_database(settings, name, password)
         reads.verify_research_read_configuration()
-        for key in ("owner", "adviser", "office", "stranger"):
+        for key in ("owner", "co_owner", "adviser", "office", "stranger"):
             user = people[key]
             want = ids(Record.objects.visible_to(user))
             assert ids(reads.research_records(user)) == want, key
         draft = people["draft"]
         assert ids(reads.research_records(people["owner"], scope_record_id=draft.pk)) == {draft.pk}
         assert ids(reads.research_records(people["stranger"], scope_record_id=draft.pk)) == set()
+        # An unsubmitted draft is its creator's alone (IR-1227, ADR-009 decision 6):
+        # neither a co-owner, the Adviser it names nor an office reads it, here or in Django.
+        for key in ("co_owner", "adviser", "office"):
+            assert draft.pk not in ids(reads.research_records(people[key])), key
 
 
 def test_database_mode_reads_nothing_for_an_unauthenticated_or_disabled_reader(settings, grant_db, people):

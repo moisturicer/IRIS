@@ -315,6 +315,9 @@ class RecordViewSet(viewsets.ModelViewSet):
                 return
 
             in_review = instance.pipeline_status == PipelineStatus.IN_REVIEW
+            # A draft's co-owners never saw it (IR-1227), so its deletion is
+            # news to nobody; a rejected record's owners are told.
+            draft = instance.pipeline_status == PipelineStatus.DRAFT
             # Read before the withdrawal closes it: whose work is ending.
             work = open_review_work(instance) if in_review else None
             soft_delete_record(instance, deleted_by=actor)
@@ -323,7 +326,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                     instance, withdrawn_by=actor,
                     seats=work.seats, requesting_parties=work.requesting_parties,
                 ))
-            else:
+            elif not draft:
                 transaction.on_commit(lambda: notify_record_deleted(instance, deleted_by=actor))
 
     # get_permissions() below is a full override with no super() fallback, so a
@@ -1741,7 +1744,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         from django.db.models import Exists, OuterRef
 
         qs = (
-            Record.objects.filter(owners__user=request.user).distinct()
+            Record.objects.owned_by(request.user)
             .annotate(has_continuation=Exists(
                 Record.objects.with_deleted().filter(derived_from_id=OuterRef("pk"))
             ))
@@ -2013,7 +2016,7 @@ class MyRecordsViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
     serializer_class = RecordDetailSerializer
 
     def get_queryset(self):
-        return Record.objects.filter(owners__user=self.request.user).distinct()
+        return Record.objects.owned_by(self.request.user)
 
 
 class DownloadRequestViewSet(viewsets.ModelViewSet):

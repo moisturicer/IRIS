@@ -6,6 +6,8 @@ Accepted — 2026-09-01
 
 [ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01 and built for this part by IR-781 (corrected 2026-11-07, IR-968), adds a seventh role, the System Admin, and moves the Audit Log and system settings to it. It keeps decision 2: Django's `is_staff` and `is_superuser` grant nothing in this API.
 
+*Amended 2026-11-19 (IR-1227): an unsubmitted draft is its creator's alone* (decision 6). Proposed with IR-1227's PR, decided by Hermoine Zozobrado. It is accepted when that PR merges, and it needs Ashlee Sean's security review.
+
 ## Context
 
 IRIS enforces role-based access across six roles (Student, Adviser, RDCO, KTTO, ITSO, IERC) and object-level ownership on records, documents and files. `core/permissions.py` declares eleven permission classes, of which five are referenced nowhere.
@@ -34,6 +36,36 @@ This directly violates **NFR-S4**: *"no authenticated user can view, modify, app
 
 **5 · Client-side role checks are UX only.** `ProtectedRoute`'s own docstring is already correct on this point. No frontend change mitigates any server-side gap.
 
+**6 · An unsubmitted draft is its creator's alone** (*Amendment, 2026-11-19, IR-1227*). A record whose `pipeline_status` is `draft` is one its submitter started in the Publish form and has not submitted. Only the account that created it reads it (`Record.added_by`, set when Publish creates the draft and when someone continues a Proposal). Everyone else gets the answer a missing record gets, a 404 that confirms nothing (IR-153):
+    - the co-owners it names: anyone added under the Publish form's owner emails (`owner_emails`, changeable only on a draft), and, on a continuation, the Proposal's owners, whom it copies;
+    - office staff (KTTO, RDCO, ITSO, IERC);
+    - the Adviser the draft names;
+    - the System Admin and every other user.
+
+  Only a submitted record reaches its co-owners, the Adviser, RDCO or an office pool. *Decided by Hermoine Zozobrado on 2026-11-19*: the card's own wording, "a draft has exactly one owner", was wrong (co-owners are named before submission), and the rule is the creator, not every owner. The creator is not always the primary owner, the Contact person, since a continuation copies the Proposal's.
+- **What it corrects.** Until now `visible_to` gave office staff every record and the named Adviser their record, drafts included. Lists already left drafts out (Discover, the review queues, the office consoles), so only a direct open by link or id reached one. The documents rules (`owns_or_staffs_record`, `may_read_record_documents`, `may_read_embargo`) had the same office and Adviser grounds, as did the AI runtime's copy of the rule in PostgreSQL, `iris_authz.research_record_ids()` (`ai/0035`).
+- **The rule is one predicate in three places, and they move together.** `Record.objects.visible_to` gives a draft to its creator alone and puts every other ground, ownership included, behind "not a draft". `core.permissions.hides_draft(user, record)` says the same for the documents rules, and the document routes answer a hidden draft with the same 404 as a missing record, not their usual 403. The AI runtime's function is replaced by a migration with the same condition, so a citation can never point at a draft for anyone but its creator. That function now reads `records_record.added_by_id`, which `provision_research_roles` grants its verifier, so the command must be run again after `migrate`, as deployment already does. Until it is, research reads fail closed with a permission error.
+- **The owner's own lists follow it.** `Record.objects.owned_by(user)` is a person's records minus the drafts someone else created. My submissions (`records/mine/`) and the dashboard's counts read it, so a co-owner neither sees nor counts a draft they cannot open. The office-only route that queues one record for indexing (`POST /ai/embed/<id>/`) now answers a record its caller cannot read as a missing one; it used to queue a draft and fail on a missing id, which told the two apart.
+- **Unchanged.**
+    - After Submit, the record reads exactly as before: its Adviser at once, then the offices it is routed to and RDCO.
+    - A record sent back for revision is in review, not a draft, so nobody loses it.
+    - Django's own admin site (`/admin/`, superusers only by decision 2) reads the database directly and still shows every row. It is not part of the app's authorization, and this decision leaves it as it is.
+    - Deleting a draft stays its creator's (IR-508), since nobody else reaches it.
+    - The System Admin's Audit Log still lists a draft's events, such as its creator's upload, with the record's id and title. It records what was done and opens nothing. *Decided by Hermoine Zozobrado, 2026-11-19: leave it.*
+- **Consequences.**
+    - Deleting a draft tells nobody. IR-517 told its other owners, but a co-owner never saw the draft, and the message would name it. A rejected record's owners are still told.
+    - Deleting an account deletes the drafts it created, even ones that name co-owners, who could never open them. A draft someone else created stays theirs. ADR-051's account deletion deleted a draft only when it had no other owner.
+    - The duplicate check offers *resume your draft* to the draft's creator alone.
+    - The manuscript duplicate check (`records.duplicates`) reads through `visible_to`, so it no longer reports someone else's draft of the same file to an Adviser or an office account. It never could to a student.
+    - Nothing in the app relied on reading another person's draft. Every list already filters drafts out. Notifications reach the Adviser and the offices only at Submit or later, and comments and mentions already refuse a draft. `seed_demo`'s draft is opened only by its creator.
+- **Presentation** (part of the same decision). A draft is not shown as a paper page. Its creator opening `/records/<id>`, including an old link to `?section=review`, lands in the Publish form at the step they left off (`/?publish=<id>`). Closing the Publish form asks what to do with the work:
+    - with a draft saved (*Leave this submission?*): **Keep as draft** (the default), **Delete draft**, confirmed once (*Delete this draft? This can't be undone.*), and **Keep editing**;
+    - with entries but no manuscript yet, so nothing saved (*Discard what you've entered?*): **Discard** and **Keep editing**;
+    - while a file uploads, the existing *Stop the upload and close?*;
+    - with nothing entered, it simply closes.
+- *Rejected: an escape hatch for the System Admin or a superuser.* Nobody but its creator has a reason to read a paper they have not submitted, and support can ask the author.
+- *Rejected: creating the draft on the first answer*, so that closing has one case. It would leave empty drafts in My submissions, and creating the draft at upload is what titles it from the file and runs the duplicate search.
+
 ## Alternatives Considered
 
 **Fix the twelve endpoints individually, leave the pattern.** Rejected. The thirteenth endpoint would ship unchecked — the same way these twelve did. The duplication *is* the defect.
@@ -59,6 +91,8 @@ The `is_staff` decision resolves a genuine conflation. Migration 0005's rational
 **Negative.** ITSO and IERC accounts lose capabilities they may currently rely on. **This requires team and stakeholder communication before it lands, not after.**
 
 **Risk.** Over-restriction breaking legitimate reviewer access. Mitigated by `T-02`'s role × endpoint × ownership matrix test, written alongside the fixes rather than after.
+
+**Decision 6 (2026-11-19).** It narrows reading for co-owners, office staff and Advisers, and only on records nobody has submitted yet. The capability table's `draft` row and the HTTP tests in `apps/records/test_draft_visibility.py` pin who still reads.
 
 ## MVP Impact
 

@@ -126,7 +126,7 @@ def make_user(email, role_name=ROLE_STUDENT):
 
 def make_record(*, title, text, embedder, space, status=PipelineStatus.PUBLISHED,
                 owner=None, adviser=None):
-    record = Record.objects.create(title=title, pipeline_status=status, adviser=adviser)
+    record = Record.objects.create(added_by=owner, title=title, pipeline_status=status, adviser=adviser)
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     seed_record_vector(
@@ -293,13 +293,14 @@ class KeywordPathVisibilityTests:
         much as one returning more."""
         author = make_user("author@cit.edu")
         adviser = make_user("adviser@cit.edu", ROLE_ADVISER)
-        make_record(title="Advised Draft", text=self.TEXT, status=PipelineStatus.DRAFT,
+        # Submitted: a draft is its creator's alone (IR-1227), not the Adviser's or an office's.
+        make_record(title="Advised Paper", text=self.TEXT, status=PipelineStatus.IN_REVIEW,
                     owner=author, adviser=adviser, embedder=embedder, space=space)
         ktto = make_user("ktto@cit.edu", ROLE_KTTO)
 
         for user in (author, adviser, ktto):
             titles = [p.record_title for p in fused.retrieve("pond sampling", user).passages]
-            assert titles == ["Advised Draft"], f"{user.email} lost a record they may read"
+            assert titles == ["Advised Paper"], f"{user.email} lost a record they may read"
 
 
 # ---------------------------------------------------------------------------

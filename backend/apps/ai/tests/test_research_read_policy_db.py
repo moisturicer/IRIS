@@ -134,6 +134,9 @@ def test_disabled_accounts_and_revoked_grounds_read_nothing_next_time(world):
         owner_grant = issue.record_read_grant(owner).token
         adviser_grant = issue.record_read_grant(adviser).token
         assert records["draft"].pk in read_as(conn, owner_grant, "record_read")
+        # A draft is its owner's alone (IR-1227); its Adviser reads it once submitted.
+        assert records["draft"].pk not in read_as(conn, adviser_grant, "record_read")
+        Record.objects.filter(pk=records["draft"].pk).update(pipeline_status=PipelineStatus.IN_REVIEW)
         assert records["draft"].pk in read_as(conn, adviser_grant, "record_read")
 
         RecordOwner.objects.filter(record=records["draft"], user=owner).delete()

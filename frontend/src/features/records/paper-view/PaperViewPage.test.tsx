@@ -1664,14 +1664,28 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
     capabilities: ["cite", "continue_draft", "edit_details"],
   };
 
-  it("offers the owner of a draft Continue, into Publish, as the one primary action", async () => {
+  // A draft is not a paper page (IR-1227, ADR-009 decision 6): only its owner
+  // can load one, and opening it is opening the Publish form where they left off.
+  it.each([
+    ["its address", `/records/${RECORD_ID}`],
+    ["an old link to its Review", `/records/${RECORD_ID}?section=review`],
+  ])("sends the owner opening a draft by %s to the Publish form", async (_label, route) => {
     shownRecord = draft;
     signInAs(OWNER_ID, "Student");
-    renderPaperView();
+    renderWithProbe(route);
 
-    const resume = await screen.findByRole("link", { name: "Continue" });
-    expect(resume).toHaveAttribute("href", `/?publish=${RECORD_ID}`);
-    expect(screen.getByRole("button", { name: "Edit details" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(`/?publish=${RECORD_ID}`));
+    expect(screen.queryByRole("heading", { name: draft.title })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+  });
+
+  it("opens a submitted record's paper page as before", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderWithProbe(`/records/${RECORD_ID}`);
+
+    await waitForRecord(inReview.title);
+    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(`/records/${RECORD_ID}`);
   });
 
   it("offers no author action on a rejected record (invariant 5)", async () => {
@@ -1701,19 +1715,23 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
     expect(screen.queryByRole("dialog", { name: "Edit details" })).not.toBeInTheDocument();
   });
 
+  // A draft never shows its paper page (IR-1227), so Edit details there is
+  // tried on the one other state that offers it, a revision requested.
+  const revising: RecordDetail = {
+    ...inReview, workflow_state: "awaiting_resubmission", workflow_state_label: "Revision requested",
+    capabilities: ["cite", "edit_details"],
+  };
+
   it("offers Edit details to the owner while a revision is requested", async () => {
-    shownRecord = {
-      ...inReview, workflow_state: "awaiting_resubmission", workflow_state_label: "Revision requested",
-      capabilities: ["cite", "edit_details"],
-    };
+    shownRecord = revising;
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
     expect(await screen.findByRole("button", { name: "Edit details" })).toBeInTheDocument();
   });
 
-  it("offers nobody but the owner Edit details on a draft", async () => {
-    shownRecord = { ...draft, capabilities: ["cite"] };
+  it("offers nobody but the owner Edit details while a revision is requested", async () => {
+    shownRecord = { ...revising, capabilities: ["cite"] };
     signInAs(99, "Student");
     renderPaperView();
 
@@ -1722,7 +1740,7 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   });
 
   it("edits the details in a dialog, and the page shows the change at once", async () => {
-    shownRecord = draft;
+    shownRecord = revising;
     signInAs(OWNER_ID, "Student");
     renderWithProbe(`/records/${RECORD_ID}`);
 
@@ -1731,7 +1749,7 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
     const title = await within(dialog).findByRole("textbox", { name: /Title/ });
     await userEvent.clear(title);
     await userEvent.type(title, "Groundwater Recharge Mapping, Revised");
-    shownRecord = { ...draft, title: "Groundwater Recharge Mapping, Revised" };
+    shownRecord = { ...revising, title: "Groundwater Recharge Mapping, Revised" };
     await userEvent.click(within(dialog).getByRole("button", { name: "Save details" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "Groundwater Recharge Mapping, Revised" })).toBeInTheDocument();
@@ -1745,7 +1763,7 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   });
 
   it("opens Edit details from the old edit page's address", async () => {
-    shownRecord = draft;
+    shownRecord = revising;
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?edit=details`);
 

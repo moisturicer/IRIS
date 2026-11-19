@@ -159,6 +159,8 @@ def test_the_submit_endpoint_marks_what_it_writes(record, upload, tmp_path, sett
     # Owner, not a stranger -- the documents endpoints are ownership-gated
     # (IR-153/IR-120), and this test is about `kind`, not authorization.
     RecordOwner.objects.create(record=record, user=user, is_primary=True)
+    record.added_by = user  # its creator, as Publish makes it (IR-1227)
+    record.save(update_fields=["added_by"])
     client = APIClient()
     client.force_authenticate(user)
 

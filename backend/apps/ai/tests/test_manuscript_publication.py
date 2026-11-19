@@ -29,7 +29,7 @@ def test_save_rollback_and_duplicate_preserve_one_work_identity():
 def test_owner_status_reports_pending_without_extraction_claims():
     owner = make_user("publication-owner@cit.edu")
     other = make_user("publication-other@cit.edu")
-    record = Record.objects.create(title="Pending", abstract_file="manuscripts/pending.pdf")
+    record = Record.objects.create(added_by=owner, title="Pending", abstract_file="manuscripts/pending.pdf")
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     client = APIClient()
     client.force_authenticate(owner)
@@ -144,6 +144,9 @@ def test_reconcile_lost_publication_and_race_independent_workers(grant_db):
             assert sorted(out.strip() for out, _ in outputs) == ["0", "1"]
         owner = make_user("recovered-owner@cit.edu")
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+        # Its creator, as Publish makes it: a draft is its creator's alone (IR-1227).
+        Record.objects.filter(pk=record.pk).update(added_by=owner)
+        record.added_by = owner
         client = APIClient()
         client.force_authenticate(owner)
         url = f"/api/v1/records/{record.pk}/metadata-suggestions/"
@@ -171,7 +174,7 @@ def test_access_change_denies_bound_grant_before_cleanup(grant_db):
     from .grant_support import probe_login
 
     owner = make_user("revoked-publication-owner@cit.edu")
-    record = Record.objects.create(title="Access", abstract_file="manuscripts/access.pdf")
+    record = Record.objects.create(added_by=owner, title="Access", abstract_file="manuscripts/access.pdf")
     ownership = RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     work = ManuscriptWork.objects.get(record=record, revoked_at=None)
     grant = authority.issue_grant(work.pk)
@@ -305,7 +308,7 @@ def test_canonical_embargo_change_invalidates_old_processing_grant(grant_db):
     from apps.records.embargo import set_embargo
 
     owner = make_user("publication-embargo@cit.edu")
-    record = Record.objects.create(title="Embargo", abstract_file="manuscripts/embargo.pdf")
+    record = Record.objects.create(added_by=owner, title="Embargo", abstract_file="manuscripts/embargo.pdf")
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     old = ManuscriptWork.objects.get(record=record, revoked_at=None)
     assert verify(old.grant_token, "ingestion") is not None

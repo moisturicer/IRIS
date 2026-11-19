@@ -60,15 +60,19 @@ class EditPolicyTestBase(DecisionTestBase):
 class OnlyAnOwnerEditsTests(EditPolicyTestBase):
 
     def test_no_office_edits_a_record_that_is_not_theirs(self):
-        """A draft, a record in review, a published one: every office sees all three."""
+        """A draft, a record in review, a published one. An office sees the last
+        two and is refused (403); a draft is its creator's alone (IR-1227), so
+        to an office it is a missing record (404)."""
         for state in ("make_record", "at_adviser", "published"):
             record = getattr(self, state)()
             title = record.title
+            refused = (status.HTTP_404_NOT_FOUND if state == "make_record"
+                       else status.HTTP_403_FORBIDDEN)
             for office in (self.itso, self.ierc, self.rdco):
                 with self.subTest(state=state, office=office.email):
                     response = self.edit(record, office, {"title": "An office's own title"})
 
-                    self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+                    self.assertEqual(response.status_code, refused, response.data)
                     record.refresh_from_db()
                     self.assertEqual(record.title, title)
 
@@ -82,6 +86,9 @@ class OnlyAnOwnerEditsTests(EditPolicyTestBase):
     def test_any_owner_edits_not_only_the_primary_one(self):
         record = self.make_record()
         RecordOwner.objects.create(record=record, user=self.reader, is_primary=False)
+        # The co-owner created it, as a continuation does, while the primary
+        # owner stays primary: a draft is its creator's alone (IR-1227).
+        Record.objects.filter(pk=record.pk).update(added_by=self.reader)
 
         response = self.edit(record, self.reader, {"title": "A co-author's better title"})
 
@@ -91,12 +98,13 @@ class OnlyAnOwnerEditsTests(EditPolicyTestBase):
 class OnlyAnOwnerSubmitsTests(EditPolicyTestBase):
 
     def test_neither_an_office_nor_the_adviser_submits_a_draft(self):
+        # They cannot see it: a draft is its creator's alone (IR-1227), a 404.
         record = self.make_record()
         for user in (self.itso, self.rdco, self.adviser):
             with self.subTest(user=user.email):
                 response = self.submit(record, user)
 
-                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+                self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND, response.data)
         record.refresh_from_db()
         self.assertEqual(record.pipeline_status, PipelineStatus.DRAFT)
         self.assertIsNone(record.dpa_accepted_by)
@@ -107,6 +115,9 @@ class OnlyAnOwnerSubmitsTests(EditPolicyTestBase):
         record = self.make_record()
         stored = record.ai_consent
         RecordOwner.objects.create(record=record, user=self.reader, is_primary=False)
+        # The co-owner created it, as a continuation does, while the primary
+        # owner stays primary: a draft is its creator's alone (IR-1227).
+        Record.objects.filter(pk=record.pk).update(added_by=self.reader)
 
         response = self.submit(record, self.reader)
 

@@ -294,7 +294,8 @@ class ReleasingAnEmbargoTests(ActsBase):
 
         response = self._release(record, self.adviser)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # The Adviser cannot see it: a draft is its creator's alone (IR-1227, ADR-009 decision 6).
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(self._state(record), EmbargoState.ACTIVE)
 
 
@@ -510,6 +511,10 @@ class RecordDetailOffersTheActsTests(ActsBase):
     def test_a_draft_offers_neither(self):
         record = self._paper(PipelineStatus.DRAFT, until=_in_days(60))
 
-        for user in (self.owner, self.adviser):
-            with self.subTest(user=user.email):
-                self.assertEqual(self._offered(record, user), set())
+        self.assertEqual(self._offered(record, self.owner), set())
+        # The Adviser cannot open it at all: a draft is its creator's alone (IR-1227, ADR-009 decision 6).
+        self.client.force_authenticate(self.adviser)
+        self.assertEqual(
+            self.client.get(reverse("record-detail", args=[record.pk])).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )

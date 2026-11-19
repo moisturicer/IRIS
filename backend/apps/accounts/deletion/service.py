@@ -160,6 +160,11 @@ def _settle_papers(person) -> None:
     ):
         record = ownership.record
         others = RecordOwner.objects.filter(record=record).exclude(user=person).order_by("pk")
+        # A draft is its creator's alone (IR-1227), so the drafts they created
+        # go with them: a co-owner it names could never open it.
+        if record.pipeline_status == PipelineStatus.DRAFT and record.added_by_id == person.pk:
+            soft_delete_record(record, deleted_by=person)
+            continue
         if not others.exists():
             if record.pipeline_status == PipelineStatus.DRAFT:
                 soft_delete_record(record, deleted_by=person)

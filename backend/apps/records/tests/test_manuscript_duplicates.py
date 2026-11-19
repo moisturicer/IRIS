@@ -77,6 +77,10 @@ def test_hidden_file_never_changes_an_unrelated_authors_upload_outcome(author):
     assert upload(other_client, hidden).status_code == 200
     assert client.get(matches_url).json() == before
     RecordOwner.objects.create(record=hidden, user=user)
+    # Named its co-owner, they still cannot see a draft someone else created
+    # (IR-1227, ADR-009 decision 6), so it blocks nothing until it is submitted.
+    assert upload(client, mine, "same-bytes-co-owned-draft.pdf").status_code == 200
+    Record.objects.filter(pk=hidden.pk).update(pipeline_status="in_review")
     retry = upload(client, mine, "same-bytes-new-name.pdf")
     assert retry.status_code == 409
     assert retry.json()["matches"][0]["id"] == hidden.pk

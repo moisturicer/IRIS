@@ -37,7 +37,7 @@ POND = "sampling procedure for tilapia ponds stocked in brackish water"
 
 
 def paper(title, pages, *, status=PipelineStatus.PUBLISHED, owner=None, revision="1"):
-    record = Record.objects.create(title=title, abstract="", pipeline_status=status)
+    record = Record.objects.create(added_by=owner, title=title, abstract="", pipeline_status=status)
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     write_source(record, pages, revision)
