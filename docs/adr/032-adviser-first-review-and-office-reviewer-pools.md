@@ -834,6 +834,7 @@ readiness: null | {
 
 - **No office pool is told.** Nobody there had started, so no work ends. The Decision does the same.
 - **The owner who acted is not told.** The other owners are, by email too, because one owner's delete removes the record for every co-author and nothing undoes it.
+  - *Amended by [ADR-009](009-authorization-model.md) decision 6, 2026-11-19 (IR-1227):* deleting a **draft** tells nobody. A draft is its creator's alone, so a co-owner it names never saw it, and the notice would name it. `delete_record` on a rejected record still tells the other owners.
 - **A deleted record is a 404 for everyone**, so withdrawal and delete notices carry no record link. A delete request leaves the record readable while RDCO decides, so its notices link it.
 - **A withdrawal also withdraws the record's open document requests**, with `closed_at` and no `closed_by_decision`, since there is no Decision to name (`reviews.withdrawal`). They used to be left open.
 - Notices go after commit and never raise into the request, as every notice does.
