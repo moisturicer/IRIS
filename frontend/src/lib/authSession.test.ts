@@ -12,13 +12,16 @@ import {
   LOGIN_FAILURE_LIMIT,
   SESSION_END_MESSAGES,
   clearLockout,
+  forgetSessionAccount,
   getLockoutUntil,
   getLoginAttempts,
   incrementLoginAttempts,
   isAccountLocked,
   isSessionEndCode,
   redirectToLoginSessionExpired,
+  rememberSessionAccount,
   resetLoginAttempts,
+  sessionAccount,
   sessionEndMessage,
   setLockoutUntil,
 } from "./authSession";
@@ -68,6 +71,28 @@ describe("login attempts", () => {
 
     expect(getLoginAttempts("a@cit.edu")).toBe(0);
     expect(incrementLoginAttempts("a@cit.edu")).toBe(1);
+  });
+});
+
+describe("whose session this tab last held (IR-1242)", () => {
+  it("knows of none in a fresh tab", () => {
+    expect(sessionAccount()).toBeNull();
+  });
+
+  it("remembers the account that signed in", () => {
+    rememberSessionAccount(21);
+    expect(sessionAccount()).toBe(21);
+  });
+
+  it("forgets it on a deliberate sign-out", () => {
+    rememberSessionAccount(21);
+    forgetSessionAccount();
+    expect(sessionAccount()).toBeNull();
+  });
+
+  it("reads a corrupted value as no account", () => {
+    sessionStorage.setItem("iris_session_account", "not-a-number");
+    expect(sessionAccount()).toBeNull();
   });
 });
 

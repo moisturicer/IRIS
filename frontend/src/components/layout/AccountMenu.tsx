@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { pathFor } from "@/lib/access";
@@ -34,7 +33,7 @@ const ITEM =
  * of the collapsed rail.
  */
 export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const { roleName } = useRole();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,8 +60,7 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
 
   const handleSignOut = async () => {
     setOpen(false);
-    await authApi.logout().catch(() => {});
-    logout();
+    await signOut();
   };
 
   return (
