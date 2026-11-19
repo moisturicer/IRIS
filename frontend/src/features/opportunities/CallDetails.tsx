@@ -1,3 +1,6 @@
+import { useId, useLayoutEffect, useRef, useState } from "react";
+
+import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import type { Opportunity } from "@/types/opportunities";
 
@@ -10,8 +13,8 @@ interface CallDetailsProps {
   /** Grey the title, for a Call whose submissions have closed. */
   muted?:  boolean;
   /**
-   * Two lines of About, as the board shows it. RDCO reviewing a request reads
-   * it whole (IR-765).
+   * Two lines of About, as the board shows it, with Show more when it runs
+   * past them (IR-1219). RDCO reviewing a request reads it whole (IR-765).
    */
   clampAbout?: boolean;
 }
@@ -70,13 +73,48 @@ export function CallDetails({ call: o, titleId, muted = false, clampAbout = true
         </p>
       )}
 
-      {/* Justified only when whole: clamped, its last visible line is not the
-          paragraph's last, and justifying would stretch it (IR-1221). */}
-      {o.description && (
-        <p className={cn("text-small text-stone-600 mt-2 max-w-prose whitespace-pre-line", clampAbout ? "line-clamp-2" : "text-justified")}>
-          {o.description}
-        </p>
-      )}
+      {o.description && (clampAbout ? <ClampedAbout text={o.description} /> : <p className={ABOUT}>{o.description}</p>)}
     </>
   );
+}
+
+/** Whole, About is justified (IR-1221) and fills its card (the Full Text Rule). */
+const ABOUT = "mt-2 whitespace-pre-line break-words text-justified text-small text-stone-600";
+
+/**
+ * About on the board: two lines, and Show more when it runs past them, which
+ * shows it whole on the card (DESIGN.md, "The five allowed cuts"). Nothing else
+ * on the board reaches the rest: View & apply leaves IRIS, and not every call
+ * has it. Clamped, it is left-aligned: its last visible line is not the
+ * paragraph's last, and justifying would stretch it (IR-1221). Whether it runs
+ * past two lines is measured, and measured again when the card's width changes.
+ */
+function ClampedAbout({ text }: { text: string }) {
+  const id = useId();
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [whole, setWhole] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || whole) return;
+    const measure = () => setOverflows(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text, whole]);
+
+  return <>
+    <p id={id} ref={ref} className={whole ? ABOUT : "mt-2 line-clamp-2 whitespace-pre-line break-words text-small text-stone-600"}>
+      {text}
+    </p>
+    {(overflows || whole) && (
+      <button type="button" aria-expanded={whole} aria-controls={id} onClick={() => setWhole(!whole)}
+        className={cn("mt-1 rounded-control text-small font-semibold text-stone-700 hover:text-brand hover:underline", FOCUS_RING)}>
+        {whole ? "Show less" : "Show more"}
+      </button>
+    )}
+  </>;
 }

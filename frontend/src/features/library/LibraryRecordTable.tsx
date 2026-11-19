@@ -136,7 +136,7 @@ export function LibraryRecordTable({
                   aria-label={`Select ${record.title}`}
                   className="relative z-10 h-4 w-4 accent-brand"
                 />
-                <p className="min-w-0 flex-1 truncate text-label text-stone-600">
+                <p className="min-w-0 flex-1 break-words text-label text-stone-600">
                   {[record.record_type_name, recordYearLabel(record)].filter((part) => part && part !== "—").join(" · ")}
                 </p>
                 <div className="relative z-10 -mr-1.5">{actions(record)}</div>
@@ -144,12 +144,12 @@ export function LibraryRecordTable({
               <h3 className="mt-2 font-display text-title font-semibold leading-snug text-stone-900">
                 <Link
                   to={`/records/${record.id}`}
-                  className="line-clamp-3 rounded-control transition-colors group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 after:absolute after:inset-0 after:rounded-card after:content-['']"
+                  className="break-words rounded-control transition-colors group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 after:absolute after:inset-0 after:rounded-card after:content-['']"
                 >
                   {highlightMatch(record.title, query)}
                 </Link>
               </h3>
-              <p className="mt-1 truncate text-small text-stone-600">
+              <p className="mt-1 break-words text-small text-stone-600">
                 <span className={formatAuthorList(record.authors, 2) === "Authors not recorded" ? "italic" : undefined}>{formatAuthorList(record.authors, 2)}</span>
               </p>
               {viewed && <p className="mt-0.5 text-label text-stone-500">{viewed}</p>}
@@ -220,7 +220,7 @@ export function LibraryRecordTable({
                   to={`/records/${record.id}`}
                   // Two lines rather than one: recognising the paper is the whole
                   // point of the row, and a mid-phrase ellipsis defeats it.
-                  className="block text-body font-semibold text-stone-900 hover:text-brand leading-snug line-clamp-2"
+                  className="block break-words text-body font-semibold text-stone-900 hover:text-brand leading-snug"
                 >
                   {highlightMatch(record.title, query)}
                 </Link>
@@ -232,7 +232,7 @@ export function LibraryRecordTable({
               </div>
             </div>
 
-            <p className="text-small text-stone-500 truncate">
+            <p className="break-words text-small text-stone-500">
               <span className="md:hidden text-stone-400">By </span>
               <span className={formatAuthorList(record.authors, 2) === "Authors not recorded" ? "italic text-stone-500" : undefined}>{formatAuthorList(record.authors, 2)}</span>
             </p>

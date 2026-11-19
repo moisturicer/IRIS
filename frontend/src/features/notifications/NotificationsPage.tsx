@@ -221,7 +221,7 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
       <div className="flex-1 min-w-0 max-sm:basis-[calc(100%-1.25rem)]">
         <span
           className={cn(
-            "block text-body max-w-[75ch]",
+            "block break-words text-body",
             unread ? "text-stone-900 font-medium" : "text-stone-600",
           )}
         >

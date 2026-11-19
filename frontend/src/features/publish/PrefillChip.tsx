@@ -65,7 +65,7 @@ function Provenance({ field, entry }: { field: string; entry: SuggestionEntry<un
         </p>
       )}
       {quote && (
-        <blockquote className="mt-1 line-clamp-2 border-l-2 border-stone-300 pl-2 text-small italic text-stone-600">
+        <blockquote className="mt-1 break-words border-l-2 border-stone-300 pl-2 text-small italic text-stone-600">
           {quote}
         </blockquote>
       )}
@@ -90,7 +90,7 @@ export function PrefillChip({ field, suggestion, replaces, page, tooLong = false
         <i className="fas fa-file-lines" aria-hidden />
         {foundIn(page)}
       </p>
-      <p className="mt-1 line-clamp-3 whitespace-pre-line text-small text-stone-800">{suggestion}</p>
+      <p className="mt-1 break-words whitespace-pre-line text-small text-stone-800">{suggestion}</p>
       <Provenance field={field} entry={entry} />
       {tooLong && (
         <p className="mt-1 text-small text-stone-600">This is longer than the field allows. Shorten it after using it.</p>

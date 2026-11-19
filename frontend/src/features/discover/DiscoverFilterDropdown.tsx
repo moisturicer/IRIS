@@ -122,7 +122,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
             : "bg-white text-stone-700 border-field hover:border-stone-500",
         )}
       >
-        <span id={valueId} className="truncate">{valueText}</span>
+        <span id={valueId} className="min-w-0 break-words text-left">{valueText}</span>
         <i
           className={cn(
             "fas fa-chevron-down text-label text-stone-500 shrink-0 transition-transform motion-reduce:transition-none",
@@ -179,7 +179,7 @@ export function DiscoverFilterDropdown(props: DiscoverFilterDropdownProps) {
                     FOCUS_RING,
                   )}
                 >
-                  <span className="truncate">{option.label}</span>
+                  <span className="min-w-0 break-words">{option.label}</span>
                   {selected && <i className="fas fa-check text-brand text-label shrink-0" aria-hidden />}
                 </button>
               );

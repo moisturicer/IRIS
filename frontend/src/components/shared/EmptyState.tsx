@@ -53,7 +53,7 @@ export function EmptyState({
         <i className={cn("fas", icon)} aria-hidden="true" />
       </div>
       <h2 className="text-heading font-semibold text-stone-900">{title}</h2>
-      {message && <p className="text-small text-stone-600 mt-1 max-w-sm">{message}</p>}
+      {message && <p className="text-small text-stone-600 mt-1">{message}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

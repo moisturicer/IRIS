@@ -39,7 +39,7 @@ export function PaperDocuments({ files, manageHref }: PaperDocumentsProps) {
                   <i className="fas fa-file-lines text-xs" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-semibold text-stone-800 truncate">
+                  <span className="block break-words text-xs font-semibold text-stone-800">
                     {file.filename}
                   </span>
                   <span className="block text-2xs text-stone-500">

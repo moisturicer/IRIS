@@ -71,7 +71,7 @@ export function PublishSuccess({ recordId, holders, adviserName, isProposal, onP
         <i className="fas fa-check text-lg" aria-hidden />
       </span>
       <h3 className="mt-4 font-display text-title text-stone-900">{headline}</h3>
-      <div className="mt-2 max-w-md text-body text-stone-700">
+      <div className="mt-2 text-body text-stone-700">
         {next && <p>{next}</p>}
         <p className={next ? "mt-1" : undefined}>
           You'll get a notification when someone acts on it, or if anything more is needed from you.

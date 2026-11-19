@@ -303,8 +303,8 @@ const ProgressPanel = forwardRef<HTMLDivElement, ProgressPanelProps>(function Pr
       className={cn("rounded-card border border-stone-200 bg-surface px-5 py-4", FOCUS_RING)}
     >
       <div className="flex items-center justify-between gap-3 text-small" aria-hidden="true">
-        <span className="font-medium text-stone-800 truncate">{name}</span>
-        <span className="text-stone-600 tabular-nums">{percent}%</span>
+        <span className="min-w-0 break-words font-medium text-stone-800">{name}</span>
+        <span className="shrink-0 text-stone-600 tabular-nums">{percent}%</span>
       </div>
       <ProgressBar label={name} progress={progress} className="mt-2 h-1.5 bg-stone-100" />
     </div>
