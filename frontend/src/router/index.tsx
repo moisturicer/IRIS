@@ -53,7 +53,6 @@ const ReportedCommentsPage = lazy(() => import("@/features/admin/ReportedComment
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
 const AccountDeletionRequestsPage = lazy(() => import("@/features/admin/AccountDeletionRequestsPage"));
 const RetentionPage = lazy(() => import("@/features/admin/RetentionPage"));
-const NoticesPage = lazy(() => import("@/features/admin/NoticesPage"));
 
 export const routes: RouteObject[] = [{
   // The last resort (IR-745): a crash outside the shell's own boundary below,
@@ -265,15 +264,6 @@ export const routes: RouteObject[] = [{
               path: pathFor("reportedComments"),
               element: <DeferredPage message="Loading reported comments"><ReportedCommentsPage /></DeferredPage>,
               handle: { crumb: "Reported comments" },
-            }],
-          },
-          {
-            // RDCO publishes, the System Admin reads (ADR-063 decision 9, IR-800).
-            element: <ProtectedRoute allowedRoles={[...rolesFor("notices"), ...rolesFor("adminNotices")]} />,
-            children: [{
-              path: pathFor("notices"),
-              element: <DeferredPage message="Loading notices"><NoticesPage /></DeferredPage>,
-              handle: { crumb: "Notices" },
             }],
           },
 
