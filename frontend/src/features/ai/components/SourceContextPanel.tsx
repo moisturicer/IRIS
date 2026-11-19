@@ -1,6 +1,7 @@
 import type { ChatCitation, SemanticSearchResult } from "@/types/ai";
 import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
 import { plainSnippet } from "@/lib/plainSnippet";
+import { excerpt } from "@/lib/excerpt";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { withMathRendered } from "./PassageQuote";
@@ -94,6 +95,8 @@ function sectionOf(citation: ChatCitation, title: string): string {
 function PassageRow({ citation, title }: { citation: ChatCitation; title: string }) {
   const { to, state } = useCitationLink(citation);
   const snippet = hasCitationQuote(citation) ? plainSnippet(citation.text) : "";
+  // The opening sentence or two, not the whole chunk; the full passage is on hover.
+  const opening = snippet ? excerpt(snippet) : "";
   const section = sectionOf(citation, title);
   return (
     <Link to={to} state={state} title={snippet || undefined}
@@ -104,8 +107,8 @@ function PassageRow({ citation, title }: { citation: ChatCitation; title: string
       </span>
       <span className="min-w-0">
         {section && <span className="block truncate text-label font-medium text-stone-600">{section}</span>}
-        <span className="line-clamp-2 block text-small text-stone-700">
-          {snippet ? withMathRendered(snippet) : <span className="italic text-stone-500">Open the passage</span>}
+        <span className="line-clamp-2 block font-display text-body italic leading-snug text-stone-700">
+          {opening ? <>“{withMathRendered(opening)}”</> : <span className="font-sans not-italic text-stone-500">Open the passage</span>}
         </span>
       </span>
       <span className="mt-0.5 flex items-center gap-1.5 text-label font-medium tabular-nums text-stone-500">

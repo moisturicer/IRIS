@@ -20,6 +20,7 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
   const authReady       = useAuthStore((s) => s.authReady);
   const hydrateAuth     = useAuthStore((s) => s.hydrateAuth);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const remembered      = useAuthStore((s) => s.remembered);
 
   useEffect(() => {
     void hydrateAuth();
@@ -29,7 +30,9 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const unwatch = startIdleWatch(() => {
+    // "Keep me signed in" (ADR-072): the server doesn't end a remembered
+    // session for idleness, so neither does the browser.
+    const unwatch = remembered ? () => {} : startIdleWatch(() => {
       useAuthStore.getState().logout();
       redirectToLoginSessionExpired();
     });
@@ -38,7 +41,7 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
     // handled by the client's interceptor like any other.
     const stopHeartbeat = startHeartbeat(() => { void authApi.me().catch(() => {}); });
     return () => { unwatch(); stopHeartbeat(); };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, remembered]);
 
   if (!authReady) {
     return (

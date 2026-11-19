@@ -1,4 +1,4 @@
-import type { ClearanceStripEntry } from "./records";
+import type { ClearanceStripEntry, RemovalUnresolved } from "./records";
 
 /** The three tabs of My Reviews (ADR-032 §9). */
 export type MyReviewsTab = "to_review" | "in_review" | "done";
@@ -137,10 +137,14 @@ export interface OfficeConsoleRow {
   status:           { kind: OfficeConsoleStatusKind; text: string };
   /** What the viewer may do to this row, in menu order. */
   actions:          OfficeConsoleAction[];
+  /** What the seat holder leaves if reassigned or withdrawn (IR-1226); null on a pool row. */
+  unresolved?:      RemovalUnresolved | null;
+  /** Withdrawing this seat finishes the office's review, on the reviews already done (IR-1226). */
+  withdraw_completes_office?: boolean | null;
 }
 
 export type OfficeConsoleStatusKind = "kept" | "overdue" | "unassigned" | "due" | "paused" | "no_date";
-export type OfficeConsoleAction = "assign" | "reassign" | "extend";
+export type OfficeConsoleAction = "assign" | "reassign" | "withdraw" | "extend";
 
 /** One member's load in the console: every member, idle ones too. */
 export interface OfficeLoad {

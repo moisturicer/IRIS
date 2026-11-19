@@ -14,10 +14,12 @@ import {
   MIN_SCALE,
   PAGE_LANDING_GAP,
   anchorDelta,
+  centredLandingDelta,
   citationLandingDelta,
   firstRegionOn,
   fitScale,
   liveWindow,
+  passageBand,
   readingAnchor,
   regionInView,
   windowReadingBand,
@@ -134,6 +136,44 @@ describe("citationLandingDelta (IR-354)", () => {
     const delta = citationLandingDelta(page, null, view);
 
     expect(2000 - delta).toBe(view.top + PAGE_LANDING_GAP);
+  });
+});
+
+describe("centredLandingDelta (IR-1195)", () => {
+  // The same page and view: readable from y = 180 to y = 780, so its middle is 480.
+  const page = { top: 2000, height: 1000 };
+  const view = { top: 180, bottom: 780 };
+
+  it("brings a passage's middle to the middle of the view", () => {
+    // 2850 to 2900: its middle is 2875.
+    const delta = centredLandingDelta(page, { top: 0.85, bottom: 0.9 }, view);
+    expect(2875 - delta).toBe(480);
+  });
+
+  it("lands a passage taller than the view at its start, clear of the view's top", () => {
+    const delta = centredLandingDelta(page, { top: 0.1, bottom: 0.9 }, view);
+    expect(2100 - delta).toBe(view.top + PAGE_LANDING_GAP);
+  });
+
+  it("lands a tall passage at where it starts in reading order, not at its highest line", () => {
+    // Two columns: it starts at 0.7 in the left one and carries on from 0.05 in the right.
+    const delta = centredLandingDelta(page, { top: 0.05, bottom: 0.9 }, view, 0.7);
+    expect(2700 - delta).toBe(view.top + PAGE_LANDING_GAP);
+  });
+});
+
+describe("passageBand (IR-1195)", () => {
+  it("spans every region of the passage on the page, and starts where the first one does", () => {
+    const regions = [
+      { page: 4, left: 0.1, top: 0.1, right: 0.9, bottom: 0.2 },
+      { page: 5, left: 0.05, top: 0.8, right: 0.48, bottom: 0.9 },
+      { page: 5, left: 0.52, top: 0.1, right: 0.95, bottom: 0.2 },
+    ];
+    expect(passageBand(regions, 5)).toEqual({ top: 0.1, bottom: 0.9, start: 0.8 });
+  });
+
+  it("is nothing when the page has no region", () => {
+    expect(passageBand([{ page: 4, left: 0, top: 0, right: 1, bottom: 1 }], 5)).toBeNull();
   });
 });
 

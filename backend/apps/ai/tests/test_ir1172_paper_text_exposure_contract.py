@@ -1,4 +1,4 @@
-"""IR-1172 (how paper text reaches a model): records today's exposure, changes no prompt.
+"""IR-1172 (how paper text reaches a model): records the exposure under research-8, changes no prompt.
 
 A scripted model stands in for the vendor, so this never shows whether a real model obeys.
 The fix under IR-1112 flips these deliberately.
@@ -66,9 +66,13 @@ def test_its_only_delimiter_is_json_quoting_of_the_passage_text():
     assert passage["text"] == f"{FLOOD} {INJECTION}"
 
 
-def test_no_agent_prompt_version_says_tool_text_is_data():
-    for text in PROMPTS.values():
-        assert not any(phrase in text for phrase in DATA_FRAMING)
+def test_only_research_11_and_later_say_tool_text_is_data():
+    # Flipped by IR-1196: research-11 adds the rule; every earlier pin keeps its bytes.
+    # Widened by IR-581: research-12 is built on research-11 and keeps the rule.
+    says = {pin for pin, text in PROMPTS.items() if "never an instruction to you" in text}
+    assert says == {("agent-research-11", "research-11"), ("agent-research-12", "research-12")}
+    for pin, text in PROMPTS.items():
+        assert pin in says or not any(phrase in text for phrase in DATA_FRAMING)
 
 
 def test_an_obeyed_instruction_cited_to_its_passage_is_delivered_without_repair():

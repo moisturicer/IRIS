@@ -18,6 +18,14 @@ If the response is not the shape the screen depends on (a list that is an object
 
 *Scope:* this holds until the frontend-to-backend contract check (IR-915) covers an endpoint. After that, the contract test is the guard for that endpoint and this rule need not be applied to it.
 
+### F2. Text fills its box, reflows, and is never cut off
+
+Follow DESIGN.md's **Full Text Rule**: text runs to the end of its box before breaking, re-wraps only when the space changes, and is never cut off or hidden. Only the two cuts that rule names are allowed (a long file name in a table cell, and an abstract preview in a list card), each with what it must still provide.
+
+*Why:* IR-1218, from Hermoine Zozobrado on 2026-11-17: text should flex to the end of the screen or box and keep moving when the window is resized, never be cut short.
+
+*A reviewer looks for:* `truncate`, `text-ellipsis`, `line-clamp-*`, `whitespace-nowrap`, a fixed height or `overflow-hidden` around text, and a `max-w-*` or fixed `w-*` on a text element narrower than its container. Each one is either one of the two named cuts, with its full-text access, or a change to make.
+
 ## Backend
 
 No rules yet. Add one when a review finds a judgement call that a check cannot catch, with the incident that showed it.

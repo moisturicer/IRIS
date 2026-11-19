@@ -5,11 +5,13 @@ import { recordsApi } from "@/api/records";
 import type { Capability } from "@/features/records/capabilities";
 import { joinLabels } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import type { PageRegion, Party, RecordDetail, ReviewVerdict } from "@/types/records";
+import type { PageRegion, Party, RecordDetail, ReviewVerdict, ThreadDocument } from "@/types/records";
 
 import { RouteDialog } from "../RouteDialog";
 import { FinishReviewDialog } from "./FinishReviewDialog";
-import { ReaderAnnotationsContext, type ReaderAnnotations, type ReaderMark } from "./readerAnnotations";
+import {
+  ReaderAnnotationsContext, type ReaderAnnotations, type ReaderLanding, type ReaderMark,
+} from "./readerAnnotations";
 import { useNewestResponseLetter } from "./ResponseLetter";
 import type { CommentTarget, ReviewThreadsProps } from "./ReviewThreads";
 import { SEVERITY_WORDS, countLabel, type Thread } from "./threadModel";
@@ -23,6 +25,8 @@ interface Options {
   showThreads: () => void;
   /** Show the paper (in a drawer, close the pane). */
   showPaper?: () => void;
+  /** Show the document a thread is about in the reader (IR-1204). */
+  showDocument?: (document: ThreadDocument) => void;
   /** Announce an outcome. */
   announce?: (text: string) => void;
 }
@@ -33,7 +37,7 @@ interface Options {
  * pin or Readiness points at, where the reader lands, and the Finish and
  * routing dialogs. Both review workspaces hold one.
  */
-export function useThreadsWorkspace({ record, can, onChanged, showThreads, showPaper, announce }: Options) {
+export function useThreadsWorkspace({ record, can, onChanged, showThreads, showPaper, showDocument, announce }: Options) {
   const threads = useReviewThreads(record.id, record.readiness !== null);
   const letter = useNewestResponseLetter(record.id, record.readiness !== null);
   const userId = useAuthStore((s) => s.user?.id ?? null);
@@ -54,19 +58,15 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
   const showInPaper = (t: Thread) => {
     const at = whereShown(t, currentVersion);
     if (!at) return;
-    const first = at.regions.find((r) => r.page === at.page);
     showPaper?.();
-    setLanding({ page: at.page, top: first?.top ?? 0, bottom: first?.bottom ?? 0, key: Date.now() });
+    setLanding({ ...at, label: `${threadLabel(t, false)}, page ${at.page}`, key: Date.now() });
   };
 
   const annotations = useMemo<ReaderAnnotations>(() => {
     const mark = (t: Thread, pending: boolean): ReaderMark | null => {
       const a = whereShown(t, currentVersion);
       if (!a || !a.regions.length) return null;
-      const label = [pending ? `Draft ${t.pin}` : `Thread ${t.pin}`, t.root.party_label,
-        t.root.severity ? SEVERITY_WORDS[t.root.severity] : null]
-        .filter(Boolean).join(", ");
-      return { key: `t${t.root.id}`, pin: t.pin, version: a.version, regions: a.regions, label, pending,
+      return { key: `t${t.root.id}`, pin: t.pin, version: a.version, regions: a.regions, label: threadLabel(t, pending), pending,
         open: focus?.id === t.root.id, onActivate: () => openThread(t) };
     };
     return {
@@ -75,9 +75,17 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
         ...threads.sent.filter((t) => t.root.state === "open").map((t) => mark(t, false)),
         ...threads.drafts.map((t) => mark(t, true)),
       ].filter((m): m is ReaderMark => m !== null),
-      onComment: can.has("comment_review")
+      // Starting a thread takes an open seat; a finished reviewer only replies (IR-1226).
+      onComment: can.has("start_thread")
         ? (passage, version) => {
           setComposing({ kind: "passage", version, passage });
+          showThreads();
+        }
+        : null,
+      // A thread on the whole document shown, opened where a general one is (IR-1204).
+      onCommentDocument: can.has("open_general_thread")
+        ? (upload, label) => {
+          setComposing({ kind: "document", upload, label });
           showThreads();
         }
         : null,
@@ -90,7 +98,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
   const panel: ReviewThreadsProps = {
     recordId: record.id, can, threads,
     viewer: { userId, party: record.revision?.party ?? null },
-    composing, onCompose: setComposing, onChanged, onShowInPaper: showInPaper,
+    composing, onCompose: setComposing, onChanged, onShowInPaper: showInPaper, onShowDocument: showDocument,
     party, onClearParty: () => setParty(null), focus, letter,
   };
 
@@ -141,11 +149,17 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     finish: (verdict?: ReviewVerdict) => setFinishing(verdict ?? true),
     /** Open one thread in the Threads tab (the Changes tab's thread links). */
     openThread,
+    /** Conversation's *View in Threads* (IR-1194): one thread by id, else the tab. */
+    openThreads: (id?: number) => {
+      const thread = id === undefined ? undefined : threads.sent.find((t) => t.root.id === id);
+      if (thread) openThread(thread);
+      else showThreads();
+    },
     /** Show the paper and land on this page's band (the Changes tab's *Show in paper*). */
-    showPlace: (page: number, regions: readonly PageRegion[]) => {
-      const first = regions.find((r) => r.page === page);
+    /** Show a passage of `version` (IR-1195): outlined, centred and focused, named `label`. */
+    showPlace: (place: Omit<ReaderLanding, "key">) => {
       showPaper?.();
-      setLanding({ page, top: first?.top ?? 0, bottom: first?.bottom ?? 0, key: Date.now() });
+      setLanding({ ...place, regions: [...place.regions], key: Date.now() });
     },
     /** Wrap the reader so it draws the pins and offers Comment. */
     wrapReader: (reader: ReactNode) => (
@@ -153,6 +167,13 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     ),
     dialogs,
   };
+}
+
+/** A thread as the reader names it: "Thread 3, ITSO, Must fix", or "Draft D1, …". */
+function threadLabel(t: Thread, pending: boolean): string {
+  return [pending ? `Draft ${t.pin}` : `Thread ${t.pin}`, t.root.party_label,
+    t.root.severity ? SEVERITY_WORDS[t.root.severity] : null]
+    .filter(Boolean).join(", ");
 }
 
 /**

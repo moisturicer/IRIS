@@ -41,7 +41,7 @@ function isRow(row: unknown): row is ReportedComment {
     && typeof r.report_count === "number";
 }
 
-const QUOTE = "whitespace-pre-wrap break-words rounded-control border-l-2 border-stone-300 bg-stone-50 px-3 py-2 text-body text-stone-800";
+const QUOTE = "text-justified whitespace-pre-wrap break-words rounded-control border-l-2 border-stone-300 bg-stone-50 px-3 py-2 text-body text-stone-800";
 
 export default function ReportedCommentsPage() {
   const addToast = useUIStore((s) => s.addToast);

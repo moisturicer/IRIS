@@ -4,7 +4,7 @@ import type {
   IpReleaseResult,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment, MentionedPerson,
-  ThreadSeverity, ThreadAnchor, FinishReviewRequest,
+  ThreadSeverity, ThreadAnchor, FinishReviewRequest, ReviewCommentKind,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
   DiscoverInterests, ForYouPage, MetadataSuggestions, VersionComparisonPayload, ResponseLetter,
@@ -101,6 +101,12 @@ export const recordsApi = {
       body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor; suggestion?: string;
       /** Account ids of the people it mentions (IR-877). */
       mentions?: number[];
+      /** Conversation's `discussion`, or a `thread` (the server's default). A reply takes its parent's. */
+      kind?: ReviewCommentKind;
+      /** A seated reviewer's thread is sent now rather than saved as a draft (IR-1194). */
+      post_now?: boolean;
+      /** A reviewer's thread on a supporting document's upload, as a whole (IR-1204). */
+      document?: number;
     },
   ) => apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
   /**
@@ -128,6 +134,9 @@ export const recordsApi = {
     apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/resolve/`, {}),
   reopenThread: (id: number, threadId: number) =>
     apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/reopen/`, {}),
+  /** Its writer sends one draft thread on its own, outside any review round (IR-1194). */
+  postThread: (id: number, threadId: number) =>
+    apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/post/`, {}),
   /** An owner answers a reviewer's thread: Addressed, saying where, or Declined, with a reason. */
   answerThread: (id: number, threadId: number, body: { answer: "addressed" | "declined"; note: string }) =>
     apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/answer/`, body),

@@ -369,6 +369,18 @@ class ThreadSeverity(models.TextChoices):
     SUGGESTION = "suggestion", "Suggestion"
 
 
+class ReviewCommentKind(models.TextChoices):
+    """
+    What a review comment is (ADR-032 §7, 2026-11-16 amendment; IR-1194). A
+    *discussion* is a Conversation comment: it posts at once and carries none
+    of a thread's fields. A *thread* is a review item. A reply takes its
+    parent's kind.
+    """
+
+    DISCUSSION = "discussion", "Discussion"
+    THREAD = "thread", "Thread"
+
+
 class ThreadState(models.TextChoices):
     """
     Where a review thread stands (ADR-032 §7). `CLOSED` is a Decision ending
@@ -553,6 +565,8 @@ class SessionEndReason(models.TextChoices):
     LOCKED = "locked", "Account locked"
     PASSWORD_CHANGED = "password_changed", "Password changed"
     REVOKED = "revoked", "Revoked by an administrator"
+    #: A remembered sign-in reached its fixed end, 30 days after sign-in (ADR-072 decision 4).
+    EXPIRED = "remembered_expired", "Remembered sign-in ran out"
     #: The account was deleted (ADR-051 §11, IR-785).
     DELETED = "deleted", "Account deleted"
 

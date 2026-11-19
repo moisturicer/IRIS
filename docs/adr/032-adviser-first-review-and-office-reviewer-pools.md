@@ -61,7 +61,13 @@ See the *Amendment* notes under §4 and §10.
 
 **Corrected 2026-11-06 (Hermoine Zozobrado, IR-874): §7's review threads.** Only the parties that asked hold a Version with their open *Must fix* threads, every Decision closes open threads with its comment as the reason, and the Adviser's *Accept* of a Proposal is blocked like *Accept & send to RDCO*. See the *Correction, 2026-11-06* note under §7.
 
+**Amended 2026-11-18 (Hermoine Zozobrado, IR-1204 design session): §7's review threads.** A reviewer may open a thread on a supporting document, one uploaded version in one of the record's slots, as a whole and never a passage. It is a thread in every other respect, read by whoever reads the review. Its answers block the next Version and go in the response to reviewers, and its *Must fix* blocks its own party's approval. A newer upload labels it "from an earlier upload", and an upload with a thread is kept. See the *Amendment, 2026-11-18* note under §7.
+
 **Clarified 2026-11-14 (project lead, IR-1072; Accepted): §9's word "Accepted".** It names an act, not only a record state. A record is *Accepted* only when it is a Proposal; an Adviser's or RDCO's *accept* of a Thesis/Research or Project reads "Accepted" on that reviewer's own Done row, and the record itself reads by where it rests. No behaviour changes. See the *Clarification, 2026-11-14* note under §9.
+
+**Amended 2026-11-18 (Hermoine Zozobrado, IR-1220; security review by Ashlee Sean): §10 and Security Impact.** An office's supplementary file (`attach_file`) is PDF, Word (`.docx`), PNG or JPG, by its name and its first bytes, where it was any type. See the *Amendment, 2026-11-18* note under §10.
+
+**Amended 2026-11-18 (Hermoine Zozobrado, IR-1226; accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado): §7, §10, Security Impact, and ADR-022.** Acting on a paper's review takes a seat on it that was not withdrawn: posting, editing, resolving, and asking for or deciding documents. Belonging to the office is no longer enough. A reviewer taken off a paper keeps no act. A removed Adviser also stops reading the review, even once the paper is published, while removed office staff keep reading it. Their unsent drafts are discarded, their requests stay open, and each removal first warns what the person leaves unresolved. See the *Amendment, 2026-11-18 (IR-1226)* note under §10.
 
 **Corrected 2026-11-04: the IR-767 paragraph below.** Its last sentence, "Proposals and the Adviser's direct publication path remain", is wrong about the second half. The Adviser has no publication path. `OUTCOMES_FOR` gives the Adviser `REJECT` only on a Thesis/Research or Project (`apps/reviews/decisions.py:115-118`), as ADR-047's amendment decided. Proposals remain.
 
@@ -449,6 +455,7 @@ Found in code review the same day and settled by the agent within the amendment'
 
 - **The owner's next Version.** *Submit vN* is refused until every open *Must fix* thread from the Revision requests it answers has an *Addressed* or *Declined* answer.
 - **Its own party's approval.** While its party has an open *Must fix* thread, a Seat holder can't take *Accept & send to RDCO* (Adviser) or *Clear* (an office). They must resolve each one, or change it to *Suggestion*, which is recorded. *Request revision*, *Record a finding* and *Reject* aren't blocked, because none of them approves.
+    - *Amended 2026-11-19 (IR-1226):* *Record a finding* is held like *Clear*, by the office's own open *Must fix* threads and by a *Must fix* draft sent with it. A finding ends the seat as *Clear* does (§10 Amendment 2026-11-19), so no reviewer finishes their part with a *Must fix* of their own left open. While the seat is open they can still resolve the thread, change it to *Suggestion*, or edit it. *Request revision* and *Reject* stay unblocked.
 - **RDCO's Decision is not blocked, and it answers for open threads** (ADR-047 §5). When *Must fix* threads are open, the Decision dialog lists them and requires one reason. Deciding closes them as *"Closed by RDCO's Decision"*, with the reason, linked to the Decision the same way `closed_by_decision` links Seats and requests.
 - **A *Suggestion* never blocks anything.**
 - **The open threads are listed in three places:** the Threads tab's count (*"2 must fix · 5 suggestions"*), the Readiness panel (a new `open_thread` item, `blocker` exactly where one of the blocks above applies, `info` otherwise), and the Finish and Decision dialogs.
@@ -514,6 +521,54 @@ Moving an anchor never resolves a thread, and a removed passage still needs reso
 - *Saved replies.* A title of at most 60 characters, unique to its owner ignoring case, so the menu never shows two the same; at most 50 per person, a ceiling because each is stored and listed in full. Offered where a comment or reply is written or edited, not in an *Addressed* or *Declined* note, which is an answer.
 - *Viewed marks.* A section with no text of its own (a chapter heading before its first subsection) has the hash of nothing, which every such section shares, so it is matched by its `key` as well; otherwise ticking one would tick them all. A section is marked on its later Version's side, or on the earlier side when the later Version removed it, and the server refuses any other side. Unticking removes every mark of that text on the paper, since any of them would keep it ticked. Ticking folds the section's changes away and adds *Viewed* to its row in *Changed sections*; it decides nothing else.
 - *@mentions.* The picker offers the record's owners, anyone who ever held a seat, and the members of each party holding it now, each one `may_read_review` admits and with an active account, but never the writer. It is offered only to a writer; a pool member who reads the review but may not write in it is refused (403). A comment mentions at most 20 people. A refused name refuses the whole comment, in the same words whether or not that person exists. Mentioning yourself tells nobody. A draft's mentions are checked again at *Finish review*, and someone who has lost access by then is not told. An edit checks only the names it adds, so someone the comment already mentions who has since lost access never stops its author editing it. Changing only whom a comment mentions does not mark it edited. A mention counts as told when its notice is queued; a notice that fails to send is logged, not retried, as with every review notice. The person mentioned may export where they were mentioned (the paper and when they were told), never a draft's mention, and the mention is deleted with their account.
+
+**Amendment, 2026-11-16 (IR-1194; Accepted by Lee Jasmin Adolfo, project lead, on behalf of the team): Conversation comments are discussion, and a reviewer posts a thread now or saves it as a draft.** Decided in a design session with an agent and transcribed by it. Where this amendment and the 2026-11-04 amendment above differ, this one wins; the earlier text is kept.
+
+*Why.* Every top-level comment had become a thread, wherever it was typed. A reviewer holding an open Seat who commented in Conversation got an unsent draft, seen only by them and only in Threads, until a *Finish review* that RDCO could reach only through a decision button. Comments were lost that way, and a reviewer could not make a review item public without deciding.
+
+1. **Two kinds of review comment** (`ReviewComment.kind`). A **discussion** is a Conversation comment: it posts at once, is never a draft, carries no severity, passage or suggested wording, is never resolved or answered, and never blocks or counts toward anything in this section. A **thread** is a review item and keeps everything the 2026-11-04 amendment gives it. A reply takes its parent's kind. Both stay review content under `may_read_review`, with the same writers. *Rejected: one kind, explained better.* The surprise was built into the model; a notice would not remove it.
+2. **Existing rows.** A top-level comment becomes discussion when it has no passage, is not *Must fix*, was sent by no review round, has no answer and no recorded event, and is not a draft. Everything else stays a thread. This returns the pre-IR-874 comments that "become general threads" above, and the owners' plain comments, to Conversation, and leaves whatever someone acted on as a review item where it is.
+3. **Who opens a thread.** A reviewer, on a passage or for the whole record (*New comment* in Threads; a *Must fix* need not have a passage). An owner, on a passage only; their general remarks are discussion. The server refuses an owner's general thread and a discussion with thread fields.
+4. **A seated reviewer chooses, per thread: Post or Save as draft.** This replaces "A reviewer's threads start as drafts" above. *Post* sends the thread at once: it belongs to no review round, *Finish review* never sends it again, and the authors are told in-app ("RDCO posted a Must fix on p. 1"), which is the one exception to "one notification per finished review". *Save as draft* holds it for the next *Finish review*, as before. A writer may post one of their drafts on its own, with the same effect. *Rejected: no drafts at all.* It would lose the review round that *Comment only*, the response to reviewers and the thesis's resubmission model are built on.
+5. **Sending the drafts is in reach.** While a reviewer has drafts, the footer offers **Send N comments**, which opens *Finish review* on *Comment only*, so sending them never requires choosing a verdict first.
+6. **Conversation and Threads are two places, not two views.** Conversation shows discussion in full, with its replies; one line per finished review that sent threads ("Rita Cruz reviewed v2: 2 threads, 1 Must fix"); and one line per thread sent outside a review ("Sam Student commented on p. 18"), each linking to Threads. Thread bodies and their replies live only in Threads. *Rejected: showing each thread in both.* The same review said twice, in two shapes.
+7. **The same controls in both.** A ⋯ menu with *Edit* on one's own comments and replies, mentions, saved replies and one level of replies, in Conversation and Threads alike.
+
+**Amendment, 2026-11-18 (Hermoine Zozobrado, IR-1204 design session): a review thread on a supporting document.** Decided by Hermoine Zozobrado on 2026-11-17 and 2026-11-18, and transcribed by an agent. Where it differs from IR-1204's description, this amendment wins, and the ticket is updated to match.
+
+*Why.* A reviewer reading the Documents tab (IR-1203) could say what is wrong with a document only in Conversation or in a manuscript thread, for example "the consent form isn't signed". It was neither a review item nor tied to the document, so it blocked nothing and was easy to miss.
+
+*The rule:* a supporting document is reviewed the way the manuscript is. Its threads are threads in every respect except the two that need a passage of text.
+
+1. **A thread may name a document upload.** That is one uploaded version of a document in one of the record's slots (`RecordUpload`, ADR-022), for example *Consent form, v1*.
+    - It names the **whole document**, never a passage, so it works on a scan that has no text.
+    - A thread names a manuscript passage, a document upload or neither, never two of them.
+    - *Rejected: an office's own attachment* (`attach_file`, §10). The author cannot replace it, so a *Must fix* on it could never be fixed. An office raises it in Conversation.
+2. **Everything else is a thread's.**
+    - It has its severity, *Must fix* or *Suggestion*.
+    - It is posted at once or saved as a draft for *Finish review* (IR-1194).
+    - It belongs to its writer's party.
+    - It has replies, mentions, saved replies and edits.
+    - It is resolved and reopened.
+    - The owner answers it with *Addressed*, saying how, or *Declined*, with a required reason. A reviewer checks the answer and resolves it.
+3. **A reviewer opens it, and the author answers it.** Who may open one is the same as for a general thread (IR-1194 point 3). An owner does not open a document thread. An owner's question about a document is discussion, in Conversation.
+4. **Who reads it is who reads the review** (`may_read_review`, IR-479), as for every thread.
+    - Someone who reads the review but may not open the document still reads the thread. An example is an earlier Adviser, since documents are read by the current Adviser only (ADR-022 §Amendment 6).
+    - *Corrected 2026-11-18 (IR-1226, under §10):* an earlier Adviser read the review only once the paper was published, since `visible_to` refuses them the record in review, and under IR-1226 they do not read it at all. The reader who may not open a document is now someone who reads the review as office staff, for example a removed office reviewer.
+    - *Rejected: also requiring the document rule* (`may_read_record_documents`), as IR-1204's description first asked. Review content would then have two reading rules to keep in step, and a thread would vanish from a reviewer who lost document access mid-review.
+5. **A newer upload does not move the thread.** When the author uploads a new version of that document, earlier threads stay on the upload they name and read **"from an earlier upload"**. Nothing is carried over to the new upload. There is no Outdated search (2026-11-04), because a document has no passage to look for.
+6. **It blocks what a manuscript thread blocks** (§7's 2026-11-04 amendment as corrected on 2026-11-06).
+    - **The owner's next Version.** *Submit vN* is refused until every open *Must fix* document thread owned by a party with an open Revision request has an *Addressed* or *Declined* answer, as manuscript threads are. A document is fixed by uploading a new version, but the answer is still what the reviewer reads with the Version.
+    - **Its own party's approval.** *Accept & send to RDCO* or *Clear* is refused while the party has an open *Must fix* document thread.
+    - **Counts.** It is counted wherever open threads are counted: the Threads tab, the Readiness panel's `open_thread` item, and the *Finish review* and Decision dialogs.
+    - **A *Suggestion* blocks nothing.**
+7. **The response to reviewers includes it.**
+    - The answers to document threads go in the letter attached to the Version (2026-11-09 build note 7), each labelled with its document and upload, for example *"Consent form, v1"*.
+    - This reverses IR-1204's description, which left document threads out of the letter.
+    - *Rejected: answers shown only on the thread.* The author gives them to submit the Version, so a letter without them would not be the whole response.
+8. **A Decision closes it**, as it closes every open thread, with the Decision's comment as its reason (2026-11-06).
+9. **Opening it shows its document** in the review reader (IR-1203). The reader shows PDFs; PNG and JPG wait on IR-1203's image half.
+10. **An upload with a thread is kept.** Nobody may delete it, staff included, so no thread loses the document it names. This joins the review history that already keeps an upload (`records.versions.deletion_refused_reason`: one a Version was submitted with, or one that answered a document request; ADR-058 §2, IR-872, IR-1201). Only a superuser in Django admin can remove it, as with those. *A default chosen in transcription, not discussed in the session:* the alternative, deleting the threads with the upload, would erase review content. This point can be overturned without reopening the rest.
 
 ### 8. Discover: research, and Discoverable Proposals
 
@@ -686,6 +741,18 @@ readiness: null | {
 - **Refusals follow ADR-022 §Amendment 4:** 404 for a file that does not exist or is on a record the caller cannot see, 403 for one they can see but may not remove.
 - **Out of scope:** KTTO filing on a published record (for example a patent receipt). If needed, it becomes its own capability.
 
+**Amendment, 2026-11-18 (Hermoine Zozobrado, IR-1220; security review by Ashlee Sean): an office's file is PDF, Word (.docx), PNG or JPG.** Decided by Hermoine Zozobrado on 2026-11-17, while planning IR-1203's reader. `attach_file` took a file of any type, the one upload in IRIS that did. Only a PDF had the PDF safety check, so an SVG, which can carry script, or an executable was stored as uploaded. Every other upload already keeps to a type: the manuscript and slot documents are PDF, and a profile photo is an image.
+
+- **The types are PDF, Word (`.docx`), PNG and JPG (`.jpg`, `.jpeg`), for every file IRIS stores.** Anything else is refused with a 400, *"Only PDF, Word, PNG or JPG files are accepted."*, and nothing is stored. The one other type IRIS takes is RDCO's import spreadsheet (`.xls`, `.xlsx`), which is read and never stored.
+- **Word is `.docx` only** (Hermoine Zozobrado, 2026-11-18, after the code review). A Word 97-2003 `.doc` begins with the same OLE2 header as an Excel `.xls`, a PowerPoint `.ppt` and a Windows installer (`.msi`), so its first bytes cannot show it is a document, and it can carry macros. An office re-saves a `.doc` as `.docx`, which Word has saved by default since 2007.
+    - *Rejected:* reading a `.doc`'s OLE2 directory for its `WordDocument` stream. It needs a new dependency or a hand-written parser, for a format offices rarely produce now.
+- **The name and the first bytes must agree** (`documents.validators.supplementary_file_problem`). A PDF's header must be in its first kilobyte; PNG and JPG must open with their signatures. A `.docx` must be a zip that holds `word/document.xml` and no `word/vbaProject.bin`, so a plain ZIP or a document carrying macros under a `.docx` name is refused. Only the zip's directory is read; nothing is decompressed. A renamed file, such as a PNG called `.pdf` or an SVG called `.png`, is refused.
+- **A PDF then has the PDF safety check** every PDF upload has (`pdf_upload_problem`). A type check is not a malware scan: scanning every upload is IR-666's, separate from this.
+- **ZIP is not an upload type.** The *Download all* ZIP is built by IRIS from stored files and is unaffected.
+- **Stored files are not touched.** The rule applies when a file is uploaded. The dev database held only PDFs when this was decided.
+- **The attach control offers only these types**, and refuses another before sending it. The server's check is the one that counts.
+- **Why these four:** they are what an office files, such as a memo, a signed form or a scan, and PNG and JPG are what IR-1203's reader can show. A type an office needs that is not here is a further amendment, not an exception.
+
 **The party status strip** follows ADR-021 §14, with two changes. The Intake row is gone. The RDCO row reads **"Not required"** on a record no office was routed to, instead of "awaiting".
 
 **Amendment, 2026-10-08 (project lead, IR-269): the strip, settled in a design grilling.**
@@ -778,6 +845,69 @@ readiness: null | {
 - **Access follows current business.** A pool member who read the discussion but never claimed stops reading it once their office's assignment is no longer active: the endpoint refuses with a 404 and the tracker sends `null`. This is intended. As IR-479 put it, a candid comment is not the business of every colleague who later joins. A coordinator who wants them to keep reading seats them.
 - **What §12's "404 on the review timeline" means.** The timeline is drawn from the tracker, which answers every reader of the record with 200 and gives `review_comments: null`, like its other review fields, to anyone `may_read_review` refuses. The 404 is the discussion endpoint's (`GET /records/<id>/review-comments/`). That 404 is word for word a missing record's, so a caller who sees the record learns nothing of its discussion (IR-153).
 - **Not settled here:** a hint explaining to a reader who may not write why there is no composer. It would need its own server-side reason, because the frontend never compares roles (§10).
+
+**Amendment, 2026-11-18 (Hermoine Zozobrado, IR-1226; accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado): acting on a review takes a seat, and a removed Adviser stops reading it.** Decided by Hermoine Zozobrado on 2026-11-18, after IR-1204's code review, and transcribed by an agent. It narrows IR-411's look-back, the IR-479, IR-419, IR-474 and IR-476 amendments above, and ADR-022 §3 and §5 (its Amendment 7). Where they differ, this one wins, and their text is kept.
+
+*Why.* A seat ends `withdrawn` when its holder is taken off the paper, which happens in four ways:
+- RDCO replaces the Adviser (`rdco_acts.replace_adviser`);
+- a coordinator reassigns the seat to another member (`seats.reassign`, IR-623);
+- a coordinator withdraws the seat and gives it to nobody (`seats.withdraw`);
+- a Decision closes the seat while it is still open (IR-270).
+
+`is_record_participant` counts anyone who has *ever* held a seat, a withdrawn one included, so until now someone taken off a paper kept almost everything:
+- **They read the whole review.** A replaced Adviser is refused the record in review (`visible_to`). Once it is published every signed-in user reads it, and the replaced Adviser then reads its review too: Conversation, the threads, the response to reviewers and the timeline. They cannot open its documents (ADR-022 §Amendment 6 follows the current Adviser), so a document thread (IR-1204) shows them a link that fails.
+- **They acted.** They posted in Conversation, edited their own comments, and resolved and reopened threads. As members of an office whose review is running, office staff also asked the author for documents, accepted or rejected uploads, withdrew requests and attached the office's files. Any member of that office may do those, seated or not.
+
+1. **Acting on a review takes a seat.** Every act on a paper's review needs the actor to own the record, or to hold a seat on it that is not withdrawn: assigned, in review or done. That covers:
+    - posting a thread, a reply or a Conversation comment, and editing one's own comment;
+    - resolving or reopening a thread, and changing its severity;
+    - asking for a revision, which already needed an open seat;
+    - creating a document request, accepting or rejecting an upload against it, and withdrawing it (ADR-022 §3 and §5), from a seat on the requesting party;
+    - attaching or removing an office file (IR-474, IR-476), from a seat on the file's party.
+
+    - *Corrected 2026-11-19 (IR-1226, as built):* the seat that counts is the person's **latest on each party**, so an earlier `done` seat grants nothing once a later one on that party was withdrawn. An Adviser seat counts only while its holder is the record's current Adviser (point 2). Creating a request or attaching an office file also needs the seat on that party's *active* assignment (`tracker.requestable_parties`). `core.permissions.acting_parties` and `may_act_on_review` hold the rule.
+
+    Belonging to the office no longer grants these acts. An unseated colleague, or a coordinator, who wants to act on the paper is seated first, by claiming it or being assigned. What the party made still belongs to the party (point 6): whoever holds its seat acts on it, and `requested_by` still decides nothing.
+    - **Unchanged, because they manage the review rather than take part in it:** claiming from the pool, a coordinator's assign, reassign and withdraw, RDCO's replacing the Adviser, adding an owner and routing, a Decision (already taken from the decider's seat), and the owner's answers and uploads.
+2. **Reading.**
+    - **A removed Adviser reads nothing of the review**, during review or after publication. An Adviser seat that ended withdrawn makes its holder no participant, even if they finished an earlier Adviser seat on the record. They read a published paper like any signed-in user.
+        - *Corrected 2026-11-19 (IR-1226, as built):* the test is whether they are the record's current Adviser (`record.adviser`), not which state their seats ended in. An Adviser seat, in any state, makes its holder a participant only while they are `record.adviser`. One rule covers a replaced Adviser and one with an earlier finished Adviser seat, and an Adviser RDCO puts back reads again. A Decision never withdraws an Adviser seat other than the decider's own, so only *Replace Adviser* removes one. Office seats still count in any state.
+    - **Removed office staff keep reading, read-only.** IR-411's look-back stays for them: they are office staff, and reading is not acting. The same holds for the intake seats that migration `reviews/0014` withdrew when the intake party was retired.
+    - **The pool rule is unchanged.** A member of an office whose assignment is active reads its review (IR-479's third ground), and a pool member still claims from it.
+    - **Nothing they sent is removed or hidden.** Their comments, threads, replies, review rounds, requests, seat and audit events stay on the paper, under their name, for everyone who reads the review. Their open threads are resolved by whoever holds a seat, or answered by the author.
+3. **Writing in Conversation** (IR-419) moves from `is_record_participant` to point 1's seat. Reading it stays `may_read_review`.
+4. **A warning before every removal.** Each of the four removals first shows what the person leaves unresolved, and goes ahead once confirmed. It warns and never blocks. It lists:
+    - their unsent draft threads, which will be discarded (point 5);
+    - the open threads they posted, which stay open for the author and whoever holds the seat;
+    - the open document requests and the revision request they made, which stay open (point 6);
+    - for an Adviser, that they will no longer read this review; for office staff, that they will no longer act on it.
+
+    The server states these counts with each act's offer, per person, as it states what a Decision closes (`decision.closes`), so the screen does not count. The warning appears in RDCO's *Replace Adviser*, in a coordinator's *Reassign* and *Withdraw*, and in the Decision dialog beside each review in progress it closes.
+5. **Their unsent drafts are discarded**, in the same transaction as the removal. A draft is visible only to its writer (2026-11-04), and without a seat they could never send it. A draft document thread goes with it, and its upload stays.
+    - A Decision's decider sends their own drafts with *Finish review* (IR-874). Only the other reviewers' drafts are discarded.
+6. **Their requests stay open**, both document requests and revision requests. Requests belong to the party, not the person (ADR-022 §3, ADR-021 §11), so whoever holds the party's seat carries them on, and may withdraw a document request they do not need. This holds for an Adviser too, though the Adviser party is one person.
+    - *Rejected: withdrawing their unfulfilled document requests.* The next reviewer usually needs the same document. An open request also pauses the party's clock (`sync_document_pause`), so withdrawing it would restart the new reviewer's clock with the author's missing file gone from the list.
+    - *Rejected: withdrawing their revision request.* It would cancel the party's verdict that the paper needs changes, and withdrawing the last open one restores the submitted manuscript over a revision the author has already uploaded (IR-1047).
+7. **The frontend needs no rule of its own.** It reads `is_participant`, the per-comment `can_*` answers, `can_request_document`, `can_manage` and the `attach_file` capability from the server, so a removed reviewer is offered nothing to do, and a removed Adviser no Review section.
+
+This corrects §7's 2026-11-18 amendment, point 4, which named an earlier Adviser as a reader of the review.
+
+#### Amendment, 2026-11-19 (IR-1226): a finished seat discusses, and acts on nothing
+
+Decided by Hermoine Zozobrado while building IR-1226, and awaiting review on its PR. It reverses point 1's "assigned, in review or done": **a `done` seat no longer acts.** *Finish review* ends a reviewer's part, so ending it should mean what it says. Otherwise a reviewer could clear a paper and still add a *Must fix*, which blocks nothing, because their approval is already given and no revision request is open.
+
+1. **Three levels of taking part**, each the latest seat per party (point 1 as corrected):
+    - **Act** (an owner, or an **open** seat: assigned or in review; `acting_parties`, `may_act_on_review`). An actor starts a thread on a passage, on no passage, or on a document. They edit, resolve or reopen a thread, change its severity, post or drop a draft, ask for a revision or for documents, decide or withdraw a document request, and attach or remove an office file.
+    - **Discuss** (an owner, or an open **or done** seat; `discussing_parties`, `may_discuss_review`). Someone who discusses writes in Conversation, replies in a thread, and edits those comments. A finished reviewer can still answer the author's questions, and their reply posts at once, never as a draft.
+    - **Read** (`is_record_participant`, point 2, unchanged). A withdrawn office seat reads only.
+2. **Severity follows the seat.** A thread's severity changes only while the person's seat is open: an author changes their own draft's, and a seat holder a sent thread's (§7). A `done` seat changes neither.
+3. **Capabilities.** `comment_review` now means *discuss*. A new `start_thread` means *start a thread on a passage* (owners and open seats). `open_general_thread` (no passage, or a document) stays a reviewer's and now also needs an open seat. The reader offers *select a passage and press C* only with `start_thread`, so a finished reviewer is offered *Reply* and Conversation, and nothing that starts a thread.
+4. **A finding waits on its own Must fix** (§7 as amended 2026-11-19), the same as *Clear*. `office_review.finding_blocked` states why.
+5. **Corrections to points 4 and 5, as built:**
+    - Every count and every discard is **for the party the person is taken off**. A draft, a thread and a request belong to the party they were written as. So the warning's "will be discarded" count is exactly what is removed, even for someone who also reviews the paper for another party, whose drafts there stay.
+    - *Replace Adviser* discards the previous Adviser's Adviser drafts whatever state their seat ended in, because they no longer read the review (point 2).
+    - The Decision dialog's line beside each review it closes names the drafts that will be discarded. It leaves out that reviewer's open threads and requests, which the dialog already lists for the whole paper.
+6. **Not here:** an unsubmitted draft record is visible to its owners only. That is IR-1228, with its own amendment.
 
 ### 11. Lifecycle
 
@@ -937,6 +1067,10 @@ Each authority is a named predicate in `core.permissions`, checked at the endpoi
 - **Public comments.** Stored text, rendered escaped, and hideable.
 
 **Review discussion** is record data gated by `is_record_participant`. It refuses with a 404, per IR-153. *Amended 2026-10-30 (IR-419, under §10): read under `may_read_review`, written under `is_record_participant`. The refusal is the same 404 as a missing record.*
+
+**Acting on a review takes a seat that was not withdrawn**, and a removed Adviser reads none of the review, published or not. *Amended 2026-11-18 (IR-1226, under §10): until then a withdrawn seat still counted toward `is_record_participant`, so someone taken off a paper kept acting on it, and a replaced Adviser read the whole review once the paper was published. Document requests and office files were open to any member of an office whose review was running.*
+
+**Office attachments** are PDF, Word (`.docx`), PNG or JPG, checked by name and by their first bytes. *Amended 2026-11-18 (IR-1220, under §10): they took any type until then, so an SVG or an executable could be stored.*
 
 **No change** to `visible_to()` or to Ask IRIS retrieval.
 

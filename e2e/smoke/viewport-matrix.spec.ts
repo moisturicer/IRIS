@@ -35,6 +35,11 @@ SCREENS.forEach((screen, order) => {
       await page.goto(screen.path);
       await expect(page.getByRole("heading", { name: screen.heading }).first()).toBeVisible();
       await page.waitForLoadState("networkidle");
+      // A view the address does not open on, such as a document in the reader (IR-1203).
+      if (screen.open) {
+        await screen.open(page);
+        await page.waitForLoadState("networkidle");
+      }
 
       // A screen that crashed into the error screen has no overflow to find and
       // no action to reach; the heading above would not catch every one.

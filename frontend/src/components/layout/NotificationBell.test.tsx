@@ -83,7 +83,7 @@ const nodeProcess = (
 ).process;
 
 function signIn(id: number) {
-  act(() => useAuthStore.getState().login(makeUser({ id }), validToken({ user_id: id }), "refresh"));
+  act(() => useAuthStore.getState().login(makeUser({ id }), validToken({ user_id: id })));
 }
 
 /**

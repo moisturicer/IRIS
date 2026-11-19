@@ -233,7 +233,7 @@ describe("where the login screen sends you", () => {
 
   function acceptAnyPassword() {
     return vi.spyOn(authApi, "login").mockResolvedValue({
-      data: { access: "access-token", refresh: "refresh-token", user: KTTO_USER },
+      data: { access: "access-token", remembered: false, user: KTTO_USER },
     } as Awaited<ReturnType<typeof authApi.login>>);
   }
 
@@ -253,6 +253,11 @@ describe("where the login screen sends you", () => {
     );
   }
 
+  /** Close the signed-out dialog the way a person does, with its own button (IR-1197). */
+  async function closeSignedOutDialog() {
+    await userEvent.setup().click(screen.getByRole("button", { name: "Sign in again" }));
+  }
+
   async function signIn() {
     const user = userEvent.setup();
     await user.type(screen.getByRole("textbox", { name: "Email address" }), "ktto@cit.edu");
@@ -264,7 +269,6 @@ describe("where the login screen sends you", () => {
     useAuthStore.setState({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
     });
   });
@@ -282,6 +286,118 @@ describe("where the login screen sends you", () => {
     });
   });
 
+  it("skips a saved page this account's role may not open, and lands on its own home page (IR-1207)", async () => {
+    // The page an RDCO account was on when it signed out. A KTTO account
+    // signing in next must not be sent to "this page is not for you".
+    acceptAnyPassword();
+    renderLoginAt("/login", { from: "/rdco/users" });
+
+    await signIn();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: /rdco/ })).not.toBeInTheDocument();
+  });
+
+  it("still follows a saved page the role may open, after a real sign-in (IR-1207)", async () => {
+    acceptAnyPassword();
+    renderLoginAt("/login", { from: "/review?status=pending" });
+
+    await signIn();
+
+    expect(await screen.findByRole("heading", { name: "landed on /review?status=pending" })).toBeInTheDocument();
+  });
+
+  it("lets Django staff with no IRIS role return anywhere, as the route guard does (IR-1207)", async () => {
+    const staff = makeUser({ role: null, role_name: null, is_staff: true });
+    vi.spyOn(authApi, "login").mockResolvedValue({
+      data: { access: "access-token", remembered: false, user: staff },
+    } as Awaited<ReturnType<typeof authApi.login>>);
+    renderLoginAt("/login", { from: "/rdco/users" });
+
+    await signIn();
+
+    expect(await screen.findByRole("heading", { name: "landed on /rdco/users" })).toBeInTheDocument();
+  });
+
+  it("skips a page the role may not open in the query string as well (IR-1207)", async () => {
+    acceptAnyPassword();
+    renderLoginAt("/login?next=%2Fadmin%2Faudit");
+
+    await signIn();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+    });
+  });
+
+  it("sends someone already signed in straight to their home page, without the form (IR-1215)", async () => {
+    useAuthStore.setState({ user: KTTO_USER, accessToken: "access-token", isAuthenticated: true });
+    renderLoginAt("/login");
+
+    expect(await screen.findByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
+  });
+
+  it("sends someone already signed in to the page they asked for, when their role may open it (IR-1215)", async () => {
+    useAuthStore.setState({ user: KTTO_USER, accessToken: "access-token", isAuthenticated: true });
+    renderLoginAt("/login?next=%2Frecords%2F42");
+
+    expect(await screen.findByRole("heading", { name: "landed on /records/42" })).toBeInTheDocument();
+  });
+
+  it("still shows the form to someone whose session has ended (IR-1215)", () => {
+    useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false });
+    renderLoginAt("/login");
+
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("shows the form when the silent refresh on load fails, and does not redirect (IR-1215)", async () => {
+    // The real restore path: the browser's cookie, which the server now refuses.
+    vi.spyOn(authApi, "refreshToken").mockRejectedValue({ response: { status: 401, data: {} } });
+    await useAuthStore.getState().hydrateAuth();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+
+    renderLoginAt("/login");
+
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /landed on/ })).not.toBeInTheDocument();
+  });
+
+  it("still shows why a password change signed someone out, with the redirect in place (IR-1215)", () => {
+    // Settings signs the person out before it sends them here, so the store is
+    // signed out and the dialog, not the redirect, is what they see.
+    renderLoginAt("/login", { reason: "password_changed" });
+
+    expect(screen.getByRole("dialog", { name: "Password Changed" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /landed on/ })).not.toBeInTheDocument();
+  });
+
+  it("sends Keep me signed in only when it is ticked, and remembers the answer (ADR-072)", async () => {
+    const login = acceptAnyPassword();
+    renderLoginAt("/login");
+
+    const box = screen.getByRole("checkbox", { name: "Keep me signed in for 30 days" });
+    expect(box).not.toBeChecked();
+    await userEvent.setup().click(box);
+    await signIn();
+
+    await waitFor(() => expect(login).toHaveBeenCalled());
+    expect(login.mock.calls[0][0]).toMatchObject({ remember: true });
+  });
+
+  it("leaves Keep me signed in off unless someone ticks it (ADR-072)", async () => {
+    const login = acceptAnyPassword();
+    renderLoginAt("/login");
+
+    await signIn();
+
+    await waitFor(() => expect(login).toHaveBeenCalled());
+    expect(login.mock.calls[0][0]).toMatchObject({ remember: false });
+  });
+
   it("honours a destination that survived a full page load in the query string", async () => {
     // The idle-timeout path is a `window.location` assignment, so router state
     // is gone by the time the login screen mounts. `?next=` is how the
@@ -289,6 +405,7 @@ describe("where the login screen sends you", () => {
     acceptAnyPassword();
     renderLoginAt("/login?reason=session_expired&next=%2Frecords%2F42");
 
+    await closeSignedOutDialog();
     await signIn();
 
     await waitFor(() => {
@@ -364,10 +481,11 @@ describe("where the login screen sends you", () => {
       from: "/review/12/evaluate?status=pending",
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    expect(screen.getByRole("dialog", { name: "Session Ended" })).toHaveTextContent(
       "Your session ended. Sign in to continue where you were.",
     );
 
+    await closeSignedOutDialog();
     await signIn();
 
     await waitFor(() => {
@@ -377,15 +495,14 @@ describe("where the login screen sends you", () => {
     });
   });
 
-  it("keeps the destination when the session-expired banner is dismissed first", async () => {
-    // `dismissSessionAlert` navigates to clear the banner's reason out of
+  it("keeps the destination when the session-ended dialog is closed first", async () => {
+    // `dismissSignedOutNotice` navigates to clear the dialog's reason out of
     // router state. Reading the destination at submit time instead of on mount
-    // would mean dismissing the banner quietly threw the destination away.
+    // would mean closing the dialog quietly threw the destination away.
     acceptAnyPassword();
     renderLoginAt("/login", { reason: "session_expired", from: "/review/12/evaluate" });
 
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /dismiss/i }));
+    await closeSignedOutDialog();
     await signIn();
 
     await waitFor(() => {
@@ -767,14 +884,20 @@ describe("why the session ended", () => {
     { code: "session_ended_revoked", title: "Session Ended", text: /An administrator ended this session/ },
   ];
 
-  it.each(cases)("says why for $code", async ({ code, title, text }) => {
+  it.each(cases)("says why for $code, in a dialog in front of the page (IR-1197)", async ({ code, title, text }) => {
     const { container } = renderScreen(<LoginPage />, {
       route: `/login?reason=session_expired&code=${code}`,
     });
 
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent(title);
-    expect(alert).toHaveTextContent(text);
+    // Named by its title and described by its text, as a screen reader announces it.
+    const dialog = screen.getByRole("dialog", { name: title });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAccessibleDescription(text);
+    // In front of the page, not a box inside the sign-in card.
+    expect(screen.getByRole("heading", { name: "Welcome back" }).closest("[role=dialog]")).toBeNull();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // Focus starts inside it.
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
     await expectNoBlockingA11yViolations(container);
   });
 
@@ -783,7 +906,7 @@ describe("why the session ended", () => {
       const { unmount } = renderScreen(<LoginPage />, {
         route: `/login?reason=session_expired&code=${code}`,
       });
-      const text = screen.getByRole("alert").textContent;
+      const text = screen.getByRole("dialog").textContent;
       unmount();
       return text;
     });
@@ -796,7 +919,7 @@ describe("why the session ended", () => {
   ])("keeps the inactivity message for $label", ({ route }) => {
     renderScreen(<LoginPage />, { route });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/30 minutes of inactivity/);
+    expect(screen.getByRole("dialog", { name: "Session Expired" })).toHaveTextContent(/30 minutes of inactivity/);
   });
 
   it("says the session ended, and that sign-in returns to the page, for a session lost on load (IR-1081)", () => {
@@ -805,9 +928,9 @@ describe("why the session ended", () => {
       state: { reason: "session_expired", code: "session_lost", from: "/review/12/evaluate" },
     });
 
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent("Your session ended. Sign in to continue where you were.");
-    expect(alert).not.toHaveTextContent(/30 minutes/);
+    const dialog = screen.getByRole("dialog", { name: "Session Ended" });
+    expect(dialog).toHaveTextContent("Your session ended. Sign in to continue where you were.");
+    expect(dialog).not.toHaveTextContent(/30 minutes/);
   });
 
   it("reads the reason from router state as well as the address (IR-1081)", () => {
@@ -816,15 +939,54 @@ describe("why the session ended", () => {
       state: { reason: "session_expired", code: "session_ended_revoked" },
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/An administrator ended this session/);
+    expect(screen.getByRole("dialog")).toHaveTextContent(/An administrator ended this session/);
   });
 
-  it("clears the reason from the address when dismissed", async () => {
+  it("closes with its button, clears the reason from the address and starts them on the email field", async () => {
     const user = userEvent.setup();
-    renderScreen(<LoginPage />, { route: "/login?reason=session_expired&code=session_ended" });
+    renderScreen(
+      <Routes>
+        <Route path="/login" element={<><LoginPage /><AddressProbe /></>} />
+      </Routes>,
+      { route: "/login?reason=session_expired&code=session_ended" },
+    );
 
-    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    await user.click(screen.getByRole("button", { name: "Sign in again" }));
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // Cleared, a reload shows no notice.
+    expect(screen.getByRole("heading", { name: "address /login" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Email address" })).toHaveFocus());
+  });
+
+  it("closes on Escape", async () => {
+    const user = userEvent.setup();
+    renderScreen(<LoginPage />, { route: "/login?reason=session_expired&code=session_idle" });
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
+
+/** After changing a password in Settings, every session ends (IR-642); why is a dialog too (IR-1197). */
+describe("after a password change", () => {
+  it("says so in a dialog, which closes", async () => {
+    const user = userEvent.setup();
+    const { container } = renderScreen(<LoginPage />, { route: "/login", state: { reason: "password_changed" } });
+
+    const dialog = screen.getByRole("dialog", { name: "Password Changed" });
+    expect(dialog).toHaveAccessibleDescription(/signed out on every device/);
+    await expectNoBlockingA11yViolations(container);
+
+    await user.click(within(dialog).getByRole("button", { name: "Sign in again" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+/** The address the router holds, so a test can see a query cleared. */
+function AddressProbe() {
+  const location = useLocation();
+  return <h2>{`address ${location.pathname}${location.search}`}</h2>;
+}

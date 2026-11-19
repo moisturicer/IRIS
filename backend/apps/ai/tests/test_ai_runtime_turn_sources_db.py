@@ -70,3 +70,25 @@ def test_an_older_turn_is_labelled_by_its_citations_and_the_sources_its_run_read
     _, later = follow_up(runtime, grant, "sources-legacy-next", uuid.UUID(done["conversation_id"]), 1)
     (prior,) = later.prior
     assert prior.sources == {flood, pond}
+
+
+def test_a_turns_cited_papers_and_pages_are_reloaded_in_citation_order(runtime):
+    # IR-1168: research-10 lists them under the earlier answer.
+    grant = session(make_user("sources-cited@cit.edu"))
+    flood = source_of(paper("Flood forecasting", {4: [("Methods", FLOOD)]}))
+    pond = source_of(paper("Pond sampling", {2: [("Methods", POND)]}))
+    citations = (Citation(pond.record_id, POND, 2, pond.revision),
+                 Citation(flood.record_id, FLOOD, 4, flood.revision))
+    done = answered(runtime, grant, "sources-cited", Result(answer="Both [1] [2].", citations=citations))
+
+    _, later = follow_up(runtime, grant, "sources-cited-next", uuid.UUID(done["conversation_id"]), 1)
+    (prior,) = later.prior
+    assert prior.cited == ((pond.record_id, 2), (flood.record_id, 4))
+
+
+def test_a_turn_with_no_citations_reloads_none(runtime):
+    grant = session(make_user("sources-uncited@cit.edu"))
+    done = answered(runtime, grant, "sources-uncited", Result(answer="General background."))
+    _, later = follow_up(runtime, grant, "sources-uncited-next", uuid.UUID(done["conversation_id"]), 1)
+    (prior,) = later.prior
+    assert prior.cited == ()

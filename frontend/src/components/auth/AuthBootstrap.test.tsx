@@ -16,7 +16,6 @@ function signedIn() {
     authReady: true,
     isAuthenticated: true,
     accessToken: "access",
-    refreshToken: "refresh",
     hydrateAuth: async () => {},
   });
 }

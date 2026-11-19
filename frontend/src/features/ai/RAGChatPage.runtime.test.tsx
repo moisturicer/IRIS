@@ -98,7 +98,7 @@ afterEach(() => {
 it("delivers a question through the runtime and reopens the same answer after a reload", async () => {
   const user = userEvent.setup();
   const first = renderAsk("/ai");
-  const box = await screen.findByRole("textbox", { name: "Ask about the research corpus" });
+  const box = await screen.findByRole("textbox", { name: "Ask about the research in IRIS" });
   await user.type(box, live.question);
   await user.click(screen.getByRole("button", { name: "Send message" }));
 
@@ -138,7 +138,7 @@ it.each([
   route = (config) => (config.url === "/ai/runtime/runs" ? reply : runtime(config));
   const user = userEvent.setup();
   const { container } = renderAsk("/ai");
-  await user.type(await screen.findByRole("textbox", { name: "Ask about the research corpus" }), "Compare");
+  await user.type(await screen.findByRole("textbox", { name: "Ask about the research in IRIS" }), "Compare");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(message);
   expect(screen.queryByRole("button", { name: "Reconnect" }) !== null).toBe(canReconnect);
@@ -217,3 +217,37 @@ describe("conversations Django answered before the switch (IR-957)", () => {
     expect(screen.getByRole("link", { name: "Gauges" })).toHaveAttribute("href", "/ai/conversations/12");
   });
 });
+
+describe("the open conversation's toolbar (IR-1167)", () => {
+  it("downloads the conversation as Markdown through the runtime, by keyboard", async () => {
+    route = (config) => (config.url === `${CONVERSATION}/export`
+      ? { data: new Blob(["# Title"]) } : runtime(config));
+    Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderAsk(`/ai/conversations/${conversation.id}`);
+    await answerText();
+    screen.getByRole("button", { name: "Download conversation as Markdown" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(click).toHaveBeenCalled());
+    const request = sent.find(config => config.url === `${CONVERSATION}/export`);
+    expect(request?.responseType).toBe("blob");
+    expect(request?.headers["X-IRIS-Reader-Grant"]).toBeUndefined();
+  });
+
+  it("offers no download before a conversation exists", async () => {
+    renderAsk("/ai");
+    await screen.findByRole("textbox", { name: "Ask about the research in IRIS" });
+    expect(screen.queryByRole("button", { name: "Download conversation as Markdown" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the open conversation's title (IR-1160)", () => {
+  it("is the one the server holds, even when the history list has not loaded it", async () => {
+    route = (config) => (config.url === CONVERSATION
+      ? { data: { ...conversation, title: "Estuary notes" } } : runtime(config));
+    renderAsk(`/ai/conversations/${conversation.id}`);
+    expect(await screen.findByRole("heading", { level: 1, name: "Estuary notes" })).toBeInTheDocument();
+  });
+});
+

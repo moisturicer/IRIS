@@ -86,11 +86,15 @@ export interface ReviewAccess {
 export interface LoginPayload {
   email:    string;
   password: string;
+  /** "Keep me signed in" (ADR-072): 30 days from sign-in, outside the idle rule. */
+  remember?: boolean;
 }
 
+/** The refresh token is not in the body: the server sets it in an HttpOnly cookie (ADR-072). */
 export interface LoginResponse {
   access:  string;
-  refresh: string;
+  /** Whether this sign-in was kept ("Keep me signed in"), so the idle watch stays off. */
+  remembered: boolean;
   user:    User;
   /** True until the person answers the current data notice (ADR-054, IR-789). */
   notice_answer_required?: boolean;

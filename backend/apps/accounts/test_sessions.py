@@ -26,6 +26,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from apps.accounts.models import User, UserSession
+from apps.accounts.testing_auth import post_logout, post_refresh, refresh_from
 
 LOGIN = "/api/v1/auth/login/"
 LOGOUT = "/api/v1/auth/logout/"
@@ -59,7 +60,7 @@ class SessionTestBase(APITestCase):
     def sign_in(self):
         response = self.client.post(LOGIN, {"email": self.user.email, "password": PASSWORD}, format="json")
         self.assertEqual(response.status_code, 200, response.content)
-        self.access, self.refresh = response.data["access"], response.data["refresh"]
+        self.access, self.refresh = response.data["access"], refresh_from(response)
 
     def get_me(self, idle_seconds=None, access=None):
         headers = {"HTTP_AUTHORIZATION": f"Bearer {access or self.access}"}
@@ -71,7 +72,7 @@ class SessionTestBase(APITestCase):
         headers = {}
         if idle_seconds is not None:
             headers["HTTP_X_IRIS_IDLE_SECONDS"] = str(idle_seconds)
-        return self.client.post(REFRESH, {"refresh": self.refresh}, format="json", **headers)
+        return post_refresh(self.refresh, **headers)
 
 
 class SignInOpensASessionTests(SessionTestBase):
@@ -91,7 +92,7 @@ class SignInOpensASessionTests(SessionTestBase):
         sid = RefreshToken(self.refresh)["sid"]
         response = self.refresh_tokens()
         self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(RefreshToken(response.data["refresh"])["sid"], sid)
+        self.assertEqual(RefreshToken(refresh_from(response))["sid"], sid)
         self.assertEqual(AccessToken(response.data["access"])["sid"], sid)
 
 
@@ -141,7 +142,7 @@ class InactivityExpiryTests(SessionTestBase):
         self.clock.advance(minutes=25)
         response = self.refresh_tokens(idle_seconds=0)
         self.assertEqual(response.status_code, 200)
-        self.access, self.refresh = response.data["access"], response.data["refresh"]
+        self.access, self.refresh = response.data["access"], refresh_from(response)
         self.clock.advance(minutes=25)
         self.assertEqual(self.get_me().status_code, 200)
 
@@ -188,9 +189,7 @@ class BackgroundRequestsDoNotCountTests(SessionTestBase):
 class SessionLifecycleTests(SessionTestBase):
     def test_logout_ends_the_session(self):
         self.sign_in()
-        response = self.client.post(
-            LOGOUT, {"refresh": self.refresh}, format="json", HTTP_AUTHORIZATION=f"Bearer {self.access}",
-        )
+        response = post_logout(self.refresh, self.access)
         self.assertEqual(response.status_code, 200)
         self.assertIsNotNone(UserSession.objects.get(user=self.user).ended_at)
         self.assertEqual(self.get_me().status_code, 401)
@@ -218,9 +217,7 @@ class RefusalSaysWhyTheSessionEndedTests(SessionTestBase):
     """
 
     def log_out(self):
-        response = self.client.post(
-            LOGOUT, {"refresh": self.refresh}, format="json", HTTP_AUTHORIZATION=f"Bearer {self.access}",
-        )
+        response = post_logout(self.refresh, self.access)
         self.assertEqual(response.status_code, 200)
 
     def end_as(self, reason):

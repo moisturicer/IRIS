@@ -5,6 +5,7 @@ The copy is built per download, in memory, and never stored. Anything that goes
 wrong raises `WatermarkFailed`, and the caller serves nothing.
 """
 import logging
+import math
 from dataclasses import dataclass
 from io import BytesIO
 
@@ -71,72 +72,185 @@ def _single_page(draw, width: float, height: float):
     return PdfReader(buffer).pages[0]
 
 
-def _cit_u(pdf) -> float:
-    """
-    "CIT-U" as stroked lines and arcs, one unit tall, from the origin rightwards.
-    The C and U curve; every stroke ends flat, with no rounded tips.
+#: The mark's words, one line each, centred on one another (IR-1198).
+MARK_LINES = ("PROPERTY OF", "CIT-U", "DO NOT DISTRIBUTE")
+MARK_WORD_GAP = 0.6  # A space between words, of a letter's height
+MARK_LINE_GAP = 0.7  # Clear space between lines, of a letter's height
 
-    Shapes rather than a font, so the mark adds no "CIT-U" to the copy's text:
-    copying or searching the copy finds only the paper and its footer. Letters
-    are spaced by their stroke as well as MARK_GAP, so a thicker stroke widens
-    the word instead of closing it up. Returns the width between the outer
-    edges of the first and last strokes.
+MARK_OVERSHOOT = 0.2  # How far an open stroke runs past its line's edge, to be cut flat there
+
+#: Each letter as strokes, one unit tall, y up, from x = 0: (width, strokes).
+#: The unit is between the centres of a letter's top and bottom strokes, so its
+#: ink is one unit and a stroke tall. A stroke that ends open at the top or the
+#: bottom runs MARK_OVERSHOOT past it (y = 1.2 or -0.2) and `_line_bands` cuts
+#: it flat at the ink's edge, which makes every letter the same height.
+#: A stroke is ("M", x, y) then ("L", x, y) lines and ("A", cx, cy, rx, ry,
+#: start, extent) elliptical arcs in degrees, counterclockwise when positive,
+#: each beginning where the one before it ended; ("Z",) closes it. Mirrored in
+#: `ReaderWatermark.tsx`, so the reader's mark matches a downloaded copy's.
+MARK_GLYPHS: dict[str, tuple[float, tuple[tuple, ...]]] = {
+    "B": (0.7, (
+        (("M", 0.38, 0.5), ("L", 0, 0.5), ("L", 0, 1), ("L", 0.38, 1), ("A", 0.38, 0.75, 0.28, 0.25, 90, -180)),
+        (("M", 0, 0.5), ("L", 0.4, 0.5), ("A", 0.4, 0.25, 0.3, 0.25, 90, -180), ("L", 0, 0), ("L", 0, 0.5)),
+    )),
+    "C": (0.7, ((("M", 0.35 + 0.35 * 0.6427876, 0.5 + 0.5 * 0.7660444), ("A", 0.35, 0.5, 0.35, 0.5, 50, 260)),)),
+    "D": (0.7, ((("M", 0, 0), ("L", 0, 1), ("L", 0.25, 1), ("A", 0.25, 0.5, 0.45, 0.5, 90, -180), ("Z",)),)),
+    "E": (0.6, (
+        (("M", 0.6, 1), ("L", 0, 1), ("L", 0, 0), ("L", 0.6, 0)),
+        (("M", 0, 0.5), ("L", 0.5, 0.5)),
+    )),
+    "F": (0.6, (
+        (("M", 0.6, 1), ("L", 0, 1), ("L", 0, -0.2)),
+        (("M", 0, 0.5), ("L", 0.5, 0.5)),
+    )),
+    "I": (0.0, ((("M", 0, -0.2), ("L", 0, 1.2)),)),
+    "N": (0.7, (
+        (("M", 0, -0.2), ("L", 0, 1.2)),
+        (("M", 0, 1), ("L", 0.7, 0)),
+        (("M", 0.7, -0.2), ("L", 0.7, 1.2)),
+    )),
+    "O": (0.7, ((("M", 0.7, 0.5), ("A", 0.35, 0.5, 0.35, 0.5, 0, 360), ("Z",)),)),
+    "P": (0.7, ((("M", 0, -0.2), ("L", 0, 1), ("L", 0.4, 1), ("A", 0.4, 0.725, 0.3, 0.275, 90, -180), ("L", 0, 0.45)),)),
+    "R": (0.7, (
+        (("M", 0, -0.2), ("L", 0, 1), ("L", 0.4, 1), ("A", 0.4, 0.725, 0.3, 0.275, 90, -180), ("L", 0, 0.45)),
+        (("M", 0.36, 0.45), ("L", 0.724, -0.2)),
+    )),
+    "S": (0.7, ((
+        ("M", 0.35 + 0.35 * 0.8660254, 0.75 + 0.25 * 0.5),
+        ("A", 0.35, 0.75, 0.35, 0.25, 30, 240),
+        ("A", 0.35, 0.25, 0.35, 0.25, 90, -240),
+    ),)),
+    "T": (0.7, (
+        (("M", 0, 1), ("L", 0.7, 1)),
+        (("M", 0.35, 1), ("L", 0.35, -0.2)),
+    )),
+    "U": (0.7, ((("M", 0, 1.2), ("L", 0, 0.35), ("A", 0.35, 0.35, 0.35, 0.35, 180, 180), ("L", 0.7, 1.2)),)),
+    "Y": (0.7, (
+        (("M", -0.025, 1.2), ("L", 0.35, 0.45), ("L", 0.725, 1.2)),
+        (("M", 0.35, 0.45), ("L", 0.35, -0.2)),
+    )),
+    "-": (0.4, ((("M", 0, 0.45), ("L", 0.4, 0.45)),)),
+}
+
+
+def _line_width(text: str) -> float:
     """
-    advance = MARK_STROKE + MARK_GAP  # Added to each letter's own width
-    path = pdf.beginPath()
+    A line's width between the outer edges of its first and last strokes.
+    Letters are spaced by their stroke as well as MARK_GAP, so a thicker stroke
+    widens the line instead of closing it up.
+    """
+    advance = MARK_STROKE + MARK_GAP
     x = 0.0
-    # C: an open ellipse
-    path.arc(x, 0, x + 0.7, 1, startAng=50, extent=260)
-    x += 0.7 + advance
-    # I
-    path.moveTo(x, 0)
-    path.lineTo(x, 1)
-    x += advance
-    # T
-    path.moveTo(x, 1)
-    path.lineTo(x + 0.7, 1)
-    path.moveTo(x + 0.35, 1)
-    path.lineTo(x + 0.35, 0)
-    x += 0.7 + advance
-    # -
-    path.moveTo(x, 0.45)
-    path.lineTo(x + 0.4, 0.45)
-    x += 0.4 + advance
-    # U: two sides joined by a half ellipse
-    path.moveTo(x, 1)
-    path.lineTo(x, 0.35)
-    path.arcTo(x, 0, x + 0.7, 0.7, startAng=180, extent=180)
-    path.lineTo(x + 0.7, 1)
+    for char in text:
+        x += MARK_WORD_GAP if char == " " else MARK_GLYPHS[char][0] + advance
+    return x - advance + MARK_STROKE
+
+
+def _block_height() -> float:
+    """The mark's lines, one unit tall each, and the space between them."""
+    return len(MARK_LINES) + (len(MARK_LINES) - 1) * MARK_LINE_GAP
+
+
+def _mark_width() -> float:
+    return max(_line_width(line) for line in MARK_LINES)
+
+
+def _draw_glyph(path, strokes, dx: float, dy: float) -> None:
+    for stroke in strokes:
+        for command, *args in stroke:
+            if command == "M":
+                path.moveTo(args[0] + dx, args[1] + dy)
+            elif command == "L":
+                path.lineTo(args[0] + dx, args[1] + dy)
+            elif command == "A":
+                cx, cy, rx, ry, start, extent = args
+                path.arcTo(cx - rx + dx, cy - ry + dy, cx + rx + dx, cy + ry + dy, startAng=start, extent=extent)
+            else:
+                path.close()
+
+
+def _row_bottom(row: int) -> float:
+    """Where a line's bottom strokes are centred, with the block centred on y = 0."""
+    return _block_height() / 2 - 1 - row * (1 + MARK_LINE_GAP)
+
+
+def _line_bands() -> list[tuple[float, float, float, float]]:
+    """
+    Each line's ink as (x, y, width, height): from the outer edge of its bottom
+    strokes to the outer edge of its top ones, wide enough for any line.
+    """
+    half = _mark_width() / 2 + 1
+    return [(-half, _row_bottom(row) - MARK_STROKE / 2, 2 * half, 1 + MARK_STROKE) for row in range(len(MARK_LINES))]
+
+
+def _tilted_centre() -> tuple[float, float]:
+    """
+    The middle of the box around the tilted mark, from the block's own centre, in
+    letters. The lines differ in length, so the tilted block reaches further to
+    one side, and centring the block itself would leave the mark off-centre.
+    """
+    angle = math.radians(MARK_ANGLE_DEGREES)
+    xs, ys = [], []
+    for text, (_x, y, _width, height) in zip(MARK_LINES, _line_bands()):
+        half = _line_width(text) / 2
+        for cx in (-half, half):
+            for cy in (y, y + height):
+                xs.append(cx * math.cos(angle) - cy * math.sin(angle))
+                ys.append(cx * math.sin(angle) + cy * math.cos(angle))
+    return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+
+
+def _mark_lines(pdf) -> None:
+    """
+    MARK_LINES as stroked lines and arcs, one unit per letter, each line centred
+    on the origin and the block centred on it vertically. Every stroke ends flat,
+    and nothing is drawn outside `_line_bands`, so every letter is one height.
+
+    Shapes rather than a font, so the mark adds no text to the copy: copying or
+    searching it finds only the paper and its footer. One path, stroked once, so
+    where strokes cross the translucent grey is not laid down twice.
+    """
+    bands = pdf.beginPath()
+    for band in _line_bands():
+        bands.rect(*band)
+    pdf.clipPath(bands, stroke=0, fill=0)
+
+    advance = MARK_STROKE + MARK_GAP
+    path = pdf.beginPath()
+    for row, text in enumerate(MARK_LINES):
+        y = _row_bottom(row)
+        x = -_line_width(text) / 2 + MARK_STROKE / 2
+        for char in text:
+            if char == " ":
+                x += MARK_WORD_GAP
+                continue
+            width, strokes = MARK_GLYPHS[char]
+            _draw_glyph(path, strokes, x, y)
+            x += width + advance
     pdf.drawPath(path, stroke=1, fill=0)
-    return x + 0.7 + MARK_STROKE
-
-
-def _cit_u_width() -> float:
-    """What `_cit_u` returns, without drawing: four letters' widths and gaps."""
-    return 0.7 + 0.7 + 0.4 + 0.7 + 4 * (MARK_STROKE + MARK_GAP) + MARK_STROKE
 
 
 def _mark_overlay(width: float, height: float):
     """
-    A faint diagonal "CIT-U" across the page, drawn over the content.
+    A faint diagonal "PROPERTY OF / CIT-U / DO NOT DISTRIBUTE" across the middle of
+    the page, drawn over the content, its longest line as wide as the page's short side.
 
     Over, not beneath (ADR-048 decision 10, amended for IR-1127): many exported
     papers paint each page white edge to edge, and scanned pages are one opaque
     image, and either hides a mark beneath. Translucent, so the text stays readable.
     """
     def draw(pdf):
-        word = _cit_u_width()
-        letter = MARK_WIDTH_OF_SHORT_SIDE * min(width, height) / word
+        letter = MARK_WIDTH_OF_SHORT_SIDE * min(width, height) / _mark_width()
         pdf.setStrokeGray(MARK_GREY)
         pdf.setStrokeAlpha(MARK_OPACITY)
         pdf.setLineWidth(MARK_STROKE)
         pdf.setLineCap(0)  # Flat ends: strokes stop square where they end
         pdf.setLineJoin(0)
-        pdf.translate(width / 2, height / 2)
+        dx, dy = _tilted_centre()
+        pdf.translate(width / 2 - dx * letter, height / 2 - dy * letter)  # The tilted mark's middle on the page's
         pdf.rotate(MARK_ANGLE_DEGREES)
         pdf.scale(letter, letter)
-        pdf.translate(-word / 2 + MARK_STROKE / 2, -0.5)
-        _cit_u(pdf)
+        _mark_lines(pdf)
 
     return _single_page(draw, width, height)
 

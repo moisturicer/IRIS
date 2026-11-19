@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Optional, Protocol
 
 if TYPE_CHECKING:
     from ai.agent.budget import Bounds
+    from ai.runs.anchor import Assessed
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,8 @@ class PriorTurn:
     ordinal: int | None = None
     #: The sources its answer could draw on, rechecked before it is sent again (IR-994).
     sources: frozenset = frozenset()
+    #: (record id, page) per citation of its answer, in citation order (IR-1168).
+    cited: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,10 @@ class RunContext:
     committed: frozenset = frozenset()
     #: `await commit_handoff(handoff)` returns ("committed", revision), ("stale", None) or ("fenced", None).
     commit_handoff: Optional[Callable[..., Awaitable[tuple]]] = None
+    #: The passage the reader asked about and what this claim found about it (IR-581).
+    selection: Optional["Assessed"] = None
+    #: The reader asked about a passage whose paper this reader may not read now, or that has no indexed text.
+    selection_withdrawn: bool = False
 
 
 class Unavailable(Exception):

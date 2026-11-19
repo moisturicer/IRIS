@@ -29,6 +29,7 @@ from apps.records import lifecycle
 from apps.records.versions import versions_payload
 from core.enums import (
     ASSIGNABLE_PARTIES,
+    OPEN_SEAT_STATES,
     AssignmentState,
     ClearanceStatus,
     DocumentRequestState,
@@ -43,7 +44,7 @@ from core.enums import (
     TrackerPartyState,
     WorkflowState,
 )
-from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
+from core.permissions import REVIEWER_ROLES, acting_parties, get_role_name, may_read_review
 
 from .clearance_state import (
     carryover_fields, clearance_payload, is_preserved, record_versions, resubmission_payload,
@@ -368,13 +369,23 @@ def participating_parties(record) -> frozenset:
 
 def requestable_parties(record, user, *, active_assignments: Optional[list] = None) -> list[str]:
     """
-    The parties `user` may ask for documents as (ADR-022 §Security): an active
-    assignment the user can staff.
+    The parties `user` may ask for documents and file office files as
+    (ADR-022 §Security, Amendment 7; IR-474): an active assignment the user
+    can staff **and holds an open seat on** (IR-1226). Belonging to the
+    office is not enough: an unseated colleague, a coordinator, a reviewer
+    whose part is done, or someone taken off the paper asks for nothing.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return []
     active = active_assignments if active_assignments is not None else _active_assignments(record)
-    eligible = {a.party for a in active} & staffable_parties(record, user)
+    seated = set(
+        ReviewerSeat.objects.filter(
+            assignment__in=[a.pk for a in active], reviewer=user, state__in=OPEN_SEAT_STATES,
+        ).values_list("assignment__party", flat=True)
+    )
+    eligible = (
+        {a.party for a in active} & seated & acting_parties(user, record) & staffable_parties(record, user)
+    )
     return [str(p) for p in TRACKER_ORDER if str(p) in eligible]
 
 
@@ -821,7 +832,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
         ],
         # Each version is a timeline entry of its own (ADR-032 §5, IR-416).
         # Review material, so `None` to a viewer who may not read the review.
-        "versions": versions_payload(record) if readable else None,
+        "versions": versions_payload(record, disclose_requests=disclose_requests) if readable else None,
         # The review discussion (ADR-032 §7, IR-419), oldest first. `None`,
         # as `reviews` is, to a viewer who may not read the review.
         "review_comments": comments_payload(record, user) if readable else None,

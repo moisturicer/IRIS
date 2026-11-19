@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from core.permissions import IsReviewer, IsStaff
+from core.permissions import IsRDCO, IsReviewer
 from .models import Review
 
 
@@ -28,14 +28,15 @@ class ReviewViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return Review.objects.filter(reviewed_by=self.request.user).select_related("record")
 
-    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsStaff])
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsRDCO])
     def analytics(self, request):
         """
         GET /reviews/analytics/?office=&from=&to=  -- workflow analytics (IR-626)
 
-        Computed from the workflow audit log (`apps/reviews/analytics.py`). An
-        office reads its own figures and RDCO every party's; naming another
-        office is refused with 403.
+        Computed from the workflow audit log (`apps/reviews/analytics.py`).
+        RDCO alone since IR-1216 (ADR-043 amendment 2026-11-18): it reads every
+        party's figures and may narrow to one office. The computation still
+        keeps any other caller to its own office, as a second layer.
         """
         from . import analytics
 

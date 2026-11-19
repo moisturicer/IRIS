@@ -58,7 +58,7 @@ function renderAt(path: string) {
           { path: "/profile", element: <h1>Profile</h1> },
           { path: "/settings", element: <h1>Settings</h1> },
           { path: "/help", element: <h1>Help</h1> },
-          { path: "/review/analytics", element: <h1>Workflow analytics</h1> },
+          { path: "/rdco/analytics", element: <h1>Workflow analytics</h1> },
           {
             element: <ReviewAccessRoute />,
             children: [
@@ -177,11 +177,11 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     const admin = screen.getByRole("list", { name: "RDCO" });
-    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import Records");
-    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
+    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import records");
+    expect(await within(admin).findByRole("link", { name: "Role requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/rdco/users");
-    expect(within(admin).getByRole("link", { name: "Download Requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
-    expect(within(admin).getByRole("link", { name: "Delete Requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
+    expect(within(admin).getByRole("link", { name: "Download requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
+    expect(within(admin).getByRole("link", { name: "Delete requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
     expect(screen.queryByRole("link", { name: "Audit Log" })).not.toBeInTheDocument();
   });
 
@@ -192,7 +192,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
-    expect(await within(admin).findByRole("link", { name: "Reported Comments, 4 pending" }))
+    expect(await within(admin).findByRole("link", { name: "Reported comments, 4 pending" }))
       .toHaveAttribute("href", "/moderation/comments");
   });
 
@@ -202,7 +202,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     const admin = await screen.findByRole("list", { name: "Administration" });
-    expect(await within(admin).findByRole("link", { name: "Reported Comments, 2 pending" }))
+    expect(await within(admin).findByRole("link", { name: "Reported comments, 2 pending" }))
       .toHaveAttribute("href", "/moderation/comments");
   });
 
@@ -213,8 +213,8 @@ describe("the sidebar's list", () => {
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
-    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
-    expect(within(admin).getByRole("link", { name: "Delete Requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Download requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Delete requests" })).toBeInTheDocument();
   });
 
   it("shows no count, not a stale one, when the read fails", async () => {
@@ -224,7 +224,7 @@ describe("the sidebar's list", () => {
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
-    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Download requests" })).toBeInTheDocument();
   });
 
   it("reads the counts again when a decision is made, without a reload", async () => {
@@ -232,11 +232,11 @@ describe("the sidebar's list", () => {
     signIn(ROLES.RDCO, true);
     renderAt("/records/mine");
     const admin = await screen.findByRole("list", { name: "RDCO" });
-    expect(await within(admin).findByRole("link", { name: "Download Requests, 2 pending" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Download requests, 2 pending" })).toBeInTheDocument();
 
     queues({ role_change_requests: 0, download_requests: 1, delete_requests: 1 });
     act(() => { queueCountsChanged(); });
-    expect(await within(admin).findByRole("link", { name: "Download Requests, 1 pending" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Download requests, 1 pending" })).toBeInTheDocument();
   });
 
   // The System Admin asks since IR-693: it shares the Reported comments queue.
@@ -255,9 +255,9 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    // IR-693 adds Reported Comments, after Account Deletions.
+    // IR-693 adds Reported comments, after Account Deletions.
     expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
-      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported Comments", "Retention", "Notices"]);
+      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention", "Notices"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
@@ -335,6 +335,50 @@ function waitingOnYou(needsActionMine: number) {
     })) as never);
 }
 
+/** `/dashboard/stats/` says this many reviews wait on the user (IR-1208). */
+function reviewsWaiting(count: number) {
+  vi.mocked(apiClient.get).mockImplementation(((url: string) =>
+    Promise.resolve({
+      data: url === "/dashboard/stats/"
+        ? { needs_action_mine: 0, reviews_waiting_mine: count }
+        : { count: 0, results: [] },
+    })) as never);
+}
+
+describe("the My Reviews count (IR-1208)", () => {
+  it("shows an Adviser how many reviews wait on them, and says so to a screen reader", async () => {
+    reviewsWaiting(1);
+    signIn(ROLES.ADVISER, true);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const link = await within(nav).findByRole("link", { name: "My Reviews, 1 pending" });
+    expect(link).toHaveAttribute("href", "/review");
+  });
+
+  it("caps the number shown at 9+, while the screen reader hears the real count", async () => {
+    reviewsWaiting(12);
+    signIn(ROLES.ADVISER, true);
+    renderAt("/");
+
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const link = await within(nav).findByRole("link", { name: "My Reviews, 12 pending" });
+    expect(within(link).getByText("9+")).toBeInTheDocument();
+  });
+
+  it("shows no count when nothing waits", async () => {
+    reviewsWaiting(0);
+    signIn(ROLES.ADVISER, true);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/stats/"));
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "My Reviews" })).toBeInTheDocument();
+  });
+});
+
 describe("the My Library dot (IR-534, B2)", () => {
   it("appears when a record waits on you, and says so to a screen reader", async () => {
     waitingOnYou(2);
@@ -377,26 +421,41 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
   const myReviewsItem = () => screen.getByRole("link", { name: "My Reviews" }).closest("li")!;
   const linksUnder = () => within(myReviewsItem()).getAllByRole("link").map((l) => l.textContent?.trim());
 
-  it("gives a coordinator the console and analytics under My Reviews, at their existing addresses", async () => {
+  it("gives a coordinator the console under My Reviews, at its existing address, and no analytics", async () => {
     signIn(ROLES.ITSO, true, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(linksUnder()).toEqual(["My Reviews", "Office console", "Workflow analytics"]);
+    expect(linksUnder()).toEqual(["My Reviews", "Office console"]);
     const item = within(myReviewsItem());
     expect(item.getByRole("link", { name: "Office console" })).toHaveAttribute("href", "/review/office");
-    expect(item.getByRole("link", { name: "Workflow analytics" })).toHaveAttribute("href", "/review/analytics");
     // Nested, not a second heading level: one list inside My Reviews' own row.
     expect(item.getByRole("list")).toBeInTheDocument();
+    // Workflow analytics is RDCO's alone since IR-1216.
+    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
   });
 
-  it("gives an office member who is not a coordinator analytics only", async () => {
+  it("gives an office member who is not a coordinator nothing nested, and no analytics (IR-1216)", async () => {
     signIn(ROLES.KTTO, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(linksUnder()).toEqual(["My Reviews", "Workflow analytics"]);
+    expect(linksUnder()).toEqual(["My Reviews"]);
     expect(screen.queryByRole("link", { name: "Office console" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+  });
+
+  it("lists Workflow analytics in RDCO's group, not under My Reviews, and marks it there (IR-1216)", async () => {
+    signIn(ROLES.RDCO, true, true);
+    renderAt("/rdco/analytics");
+
+    await screen.findByRole("heading", { name: "Workflow analytics" });
+    expect(linksUnder()).not.toContain("Workflow analytics");
+    const nav = within(screen.getByRole("navigation", { name: "Main" }));
+    const analytics = nav.getByRole("link", { name: "Workflow analytics" });
+    expect(analytics).toHaveAttribute("href", "/rdco/analytics");
+    expect(analytics).toHaveAttribute("aria-current", "page");
+    expect(nav.getByRole("link", { name: "My Reviews" })).not.toHaveAttribute("aria-current");
   });
 
   it.each([
@@ -423,13 +482,12 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
 
   it("marks the nested page you are on, and not My Reviews", async () => {
     signIn(ROLES.ITSO, true, true);
-    renderAt("/review/analytics");
+    renderAt("/review/office");
 
-    await screen.findByRole("heading", { name: "Workflow analytics" });
+    await screen.findByRole("heading", { name: "Office console" });
     const nav = within(screen.getByRole("navigation", { name: "Main" }));
-    expect(nav.getByRole("link", { name: "Workflow analytics" })).toHaveAttribute("aria-current", "page");
+    expect(nav.getByRole("link", { name: "Office console" })).toHaveAttribute("aria-current", "page");
     expect(nav.getByRole("link", { name: "My Reviews" })).not.toHaveAttribute("aria-current");
-    expect(nav.getByRole("link", { name: "Office console" })).not.toHaveAttribute("aria-current");
   });
 
   it("opens the office console from the sidebar", async () => {
@@ -448,7 +506,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     const { container } = renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    for (const name of ["Office console", "Workflow analytics"]) {
+    for (const name of ["Office console"]) {
       const link = screen.getByRole("link", { name });
       expect(within(link).getByText(name)).toHaveClass("md:sr-only");
     }
@@ -456,56 +514,26 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
   });
 });
 
-describe("Help in the sidebar footer (IR-1085, NAV-04)", () => {
-  const footerHelp = () =>
-    within(screen.getByRole("complementary", { name: "Sidebar" })).getByRole("link", { name: "Help" });
-
-  it.each(Object.values(ROLES))("is there for %s, outside the main list", async (role) => {
+// IR-1217: Help left the sidebar for Settings, which every role can open. The
+// sign-in pages keep their own Help link, since a signed-out person has no Settings.
+describe("Help is not in the sidebar (IR-1217)", () => {
+  it.each(Object.values(ROLES))("is not there for %s, expanded or collapsed", async (role) => {
     signIn(role as RoleName, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(footerHelp()).toHaveAttribute("href", "/help");
-    expect(within(screen.getByRole("navigation", { name: "Main" })).queryByRole("link", { name: "Help" }))
-      .not.toBeInTheDocument();
+    const sidebar = within(screen.getByRole("complementary", { name: "Sidebar" }));
+    expect(sidebar.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
   });
 
-  it("opens the Help page and marks it as the current page", async () => {
-    const user = userEvent.setup();
-    signIn(ROLES.STUDENT);
-    renderAt("/records/mine");
-
-    await screen.findByRole("heading", { name: "My Library" });
-    expect(footerHelp()).not.toHaveAttribute("aria-current");
-    await user.click(footerHelp());
-
-    expect(await screen.findByRole("heading", { name: "Help" })).toBeInTheDocument();
-    expect(footerHelp()).toHaveAttribute("aria-current", "page");
-  });
-
-  it("keeps its name, with a tooltip, on the collapsed rail", async () => {
-    const user = userEvent.setup();
+  it("is not on the collapsed rail either", async () => {
     useUIStore.setState({ sidebarCollapsed: true });
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(within(footerHelp()).getByText("Help")).toHaveClass("md:sr-only");
-    await user.hover(footerHelp());
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Help");
-  });
-
-  it("closes the phone drawer when chosen", async () => {
-    const user = userEvent.setup();
-    atPhoneWidth();
-    signIn(ROLES.STUDENT);
-    renderAt("/records/mine");
-
-    await user.click(await screen.findByRole("button", { name: "Open menu" }));
-    await user.click(footerHelp());
-
-    expect(await screen.findByRole("heading", { name: "Help" })).toBeInTheDocument();
-    expect(useUIStore.getState().sidebarOpen).toBe(false);
+    expect(within(screen.getByRole("complementary", { name: "Sidebar" })).queryByRole("link", { name: "Help" }))
+      .not.toBeInTheDocument();
   });
 });
 
@@ -525,13 +553,13 @@ describe("the account menu", () => {
     expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     expect(screen.queryByRole("link", { name: "Settings & Profile" })).not.toBeInTheDocument();
-    // The one Help link is the footer's, outside the menu the trigger controls.
+    // Help is in Settings since IR-1217: not in this menu, nor anywhere in the sidebar.
     const menu = document.getElementById(trigger.getAttribute("aria-controls")!)!;
     // IR-1137: Notifications is reachable from the account menu too.
     expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings", "Notifications"]);
     expect(within(menu).getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
     expect(within(menu).queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Help" })).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
 
@@ -647,13 +675,11 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
     expect(screen.getByRole("button", { name: "Open menu", hidden: true })).toHaveClass("w-11", "h-11");
   });
 
-  it("makes every navigation link and Help at least 44px tall, and compact again from md", async () => {
+  it("makes every navigation link at least 44px tall, and compact again from md", async () => {
     const { sidebar } = await openDrawer();
 
-    const links = [
-      ...within(within(sidebar).getByRole("navigation", { name: "Main" })).getAllByRole("link"),
-      within(sidebar).getByRole("link", { name: "Help" }),
-    ];
+    // Help left the sidebar for Settings (IR-1217); the nav links remain.
+    const links = within(within(sidebar).getByRole("navigation", { name: "Main" })).getAllByRole("link");
     expect(links.length).toBeGreaterThan(2);
     for (const link of links) expect(link).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
   });

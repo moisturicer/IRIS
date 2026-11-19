@@ -60,6 +60,11 @@ export function useConversationHistory(api: ReturnType<typeof runtimeReader>, ac
     conversations, setConversations, refresh, loadMore,
     /** A title seen on any page, so the open Conversation keeps its name while a search hides it. */
     titleOf: (id?: string) => (id ? titles.current.get(id) : undefined),
+    /** Shows a title the reader just chose (IR-1160) wherever the Conversation is listed. */
+    retitle: useCallback((id: string, title: string) => {
+      titles.current.set(id, title);
+      setConversations(all => all.map(c => (c.id === id ? { ...c, title } : c)));
+    }, []),
     search: { text, onText: setText, query, state, hasMore: next !== null, loadingMore, onMore: () => void loadMore() },
   };
 }

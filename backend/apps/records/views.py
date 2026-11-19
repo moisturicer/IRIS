@@ -1023,8 +1023,9 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         GET  /records/<id>/review-comments/ -- the review discussion, oldest first.
         POST /records/<id>/review-comments/
-        `{"body": str, "reply_to"?: id, "severity"?: str, "anchor"?: {...}, "suggestion"?: str,
-          "mentions"?: [user id]}`
+        `{"body": str, "kind"?: "discussion" | "thread", "post_now"?: bool, "reply_to"?: id,
+          "severity"?: str, "anchor"?: {...}, "suggestion"?: str, "mentions"?: [user id],
+          "document"?: upload id}` -- `document` names a supporting document's upload (IR-1204).
 
         Read under `may_read_review`; written by the record's participants, on
         a submitted record (`apps.reviews.comments`). A new comment answers 201.
@@ -1036,8 +1037,10 @@ class RecordViewSet(viewsets.ModelViewSet):
             lambda c: c.comment_payload(c.post_comment(
                 record, request.user,
                 body=request.data.get("body"), reply_to=request.data.get("reply_to"),
+                kind=request.data.get("kind"), post_now=request.data.get("post_now"),
                 severity=request.data.get("severity"), anchor=request.data.get("anchor"),
                 suggestion=request.data.get("suggestion"), mentioned=request.data.get("mentions"),
+                document=request.data.get("document"),
             ), request.user),
             success=status.HTTP_201_CREATED,
         )
@@ -1081,7 +1084,7 @@ class RecordViewSet(viewsets.ModelViewSet):
 
     @action(
         detail=True, methods=["post"],
-        url_path=r"review-comments/(?P<comment_id>[0-9]+)/(?P<act>severity|resolve|reopen|answer)",
+        url_path=r"review-comments/(?P<comment_id>[0-9]+)/(?P<act>severity|resolve|reopen|answer|post)",
         url_name="review-thread-act",
     )
     def review_thread_act(self, request, pk=None, comment_id=None, act=None):
@@ -1090,6 +1093,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         POST /records/<id>/review-comments/<comment_id>/resolve/
         POST /records/<id>/review-comments/<comment_id>/reopen/
         POST /records/<id>/review-comments/<comment_id>/answer/ `{"answer": "addressed" | "declined", "note": str}`
+        POST /records/<id>/review-comments/<comment_id>/post/ -- its writer sends a draft on its own
 
         A review thread's acts (ADR-032 §7, IR-874; `apps.reviews.threads`).
         Answers with the thread. 404 for a record, review or thread the caller
@@ -1100,6 +1104,10 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         record = self.get_object()
         user, thread_id = request.user, int(comment_id)
+        if act == "post":
+            # A draft is the comments service's, with its refusals (IR-1194).
+            return self._comment_response(
+                lambda c: c.comment_payload(c.post_draft(record, user, thread_id), user))
         acts = {
             "severity": lambda: threads.change_severity(
                 record, user, thread_id, request.data.get("severity")),

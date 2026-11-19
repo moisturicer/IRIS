@@ -67,16 +67,26 @@
 .review-tl-cmt, .review-composer { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; align-items: start; }
 .review-tl-ev { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; margin-left: 38px; font-size: 13px; line-height: 20px; }
 .review-badge { position: relative; width: 28px; height: 28px; margin: -2px; border-radius: 9999px; display: grid; place-items: center; box-sizing: content-box; border: 2px solid white; background: theme('colors.stone.100'); color: theme('colors.stone.600'); font-size: 12px; }
+/* Details tab (IR-1193): people in brand maroon, an office without a person in a quiet outline. */
+.review-avatar-brand { background: theme('colors.brand.DEFAULT'); flex-shrink: 0; }
+.review-avatar-office { flex-shrink: 0; color: theme('colors.stone.600'); background: white; border: 1px solid theme('colors.stone.300'); }
 .review-avatar-lg { width: 36px; height: 36px; font-size: 13px; }
 .review-box { min-width: 0; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.control'); background: white; font-size: 14px; line-height: 22px; overflow: hidden; }
 .review-box-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 14px; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); font-size: 13px; line-height: 20px; color: theme('colors.stone.600'); }
 .review-box-head > p { flex: 1 1 auto; min-width: 0; }
 .review-box-head b { font-weight: 600; color: theme('colors.stone.900'); }
 .review-box-body { padding: 12px 14px; }
-.review-abstract { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: theme('colors.stone.700'); }
 .review-label { padding: 0 8px; border: 1px solid theme('colors.stone.300'); border-radius: theme('borderRadius.full'); background: white; font-size: 12px; line-height: 18px; font-weight: 600; color: theme('colors.stone.600'); white-space: nowrap; }
 .review-box-replies { margin: 0; padding: 0; list-style: none; }
 .review-box-rep { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; padding: 10px 14px; border-top: 1px solid theme('colors.stone.200'); }
+/* A thread's history (IR-1191, IR-1192): replies by a person in the brand
+ * colour; the authors' answer and other events marked by an outlined icon in
+ * the avatar's place, the answer on a tinted row so it reads as an act. */
+.review-avatar-brand { background: theme('colors.brand.DEFAULT'); }
+.review-event-ic { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid theme('colors.stone.700'); border-radius: theme('borderRadius.full'); background: white; color: theme('colors.stone.800'); font-size: 11px; }
+.review-box-event { align-items: center; padding-top: 6px; padding-bottom: 6px; }
+.review-box-event .review-event-ic { width: 20px; height: 20px; margin: 0 2px; border-color: theme('colors.stone.300'); color: theme('colors.stone.500'); font-size: 10px; }
+.review-box-answer { background: theme('colors.stone.50'); }
 .review-box-foot { padding: 8px 14px; border-top: 1px solid theme('colors.stone.200'); background: theme('colors.stone.50'); }
 .review-box-foot > form { margin-top: 0; }
 .review-reply-field { display: block; width: 100%; min-height: 36px; padding: 0 12px; border: 1px solid theme('colors.stone.300'); border-radius: 8px; background: white; color: theme('colors.stone.600'); font-size: 14px; text-align: left; cursor: text; }

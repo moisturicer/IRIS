@@ -1,4 +1,6 @@
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { DownloadConversation } from "./DownloadConversation";
+import type { ConversationFile } from "@/api/runtimeReader";
 
 interface ChatToolbarProps {
   sessionTitle:     string;
@@ -10,6 +12,8 @@ interface ChatToolbarProps {
    * target.
    */
   asDrawers?:       boolean;
+  /** The open Conversation as Markdown (IR-1167); absent for a new chat. */
+  onDownload?:      () => Promise<ConversationFile>;
 }
 
 export function ChatToolbar({
@@ -17,6 +21,7 @@ export function ChatToolbar({
   historyOpen,
   onToggleHistory,
   asDrawers = false,
+  onDownload,
 }: ChatToolbarProps) {
   const touch = asDrawers ? "min-w-11 min-h-11 justify-center" : "";
 
@@ -50,6 +55,8 @@ export function ChatToolbar({
         </p>
         <h1 className="text-body font-semibold text-stone-900 truncate">{sessionTitle}</h1>
       </div>
+
+      {onDownload && <DownloadConversation download={onDownload} />}
 
 
       {/* Phones only: Ask IRIS fills the window, so AppShell draws no phone bar

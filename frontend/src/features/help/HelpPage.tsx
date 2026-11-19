@@ -56,7 +56,7 @@ export default function HelpPage() {
               <h2 id={`${s.id}-title`} className="mb-3 font-display text-section font-semibold text-stone-900">
                 {s.title}
               </h2>
-              <div className="text-body leading-[1.75] text-stone-700 [&_li]:mt-1 [&_li]:marker:text-brand [&_p+p]:mt-4 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5">
+              <div className="text-body leading-[1.75] text-stone-700 [&_p]:text-justified [&_li]:mt-1 [&_li]:marker:text-brand [&_p+p]:mt-4 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5">
                 {s.body}
               </div>
             </section>

@@ -34,10 +34,12 @@ export const OVERVIEW_MARKDOWN = [
   "prose-h3:mt-[1.5em] prose-h3:mb-[0.3em]",
   "prose-p:leading-[1.8] prose-li:leading-[1.75] prose-li:my-[0.35em] prose-li:marker:text-brand",
   "[&>p:first-child]:text-lg [&>p:first-child]:leading-[1.7] [&>p:first-child]:text-stone-800",
+  // Its paragraphs are reading text, justified like the abstract (IR-1221).
+  "[&_p]:text-justified",
 ].join(" ");
 
 // The thread's width: one literal, so Tailwind sees the whole class.
-const CHAT_MEASURE = "max-w-[min(92vw,68ch)]";
+const CHAT_MEASURE = "max-w-[min(92vw,136ch)]";
 
 /**
  * The chat column, shared by the transcript and the composer below it so the
@@ -45,8 +47,7 @@ const CHAT_MEASURE = "max-w-[min(92vw,68ch)]";
  *
  * Viewport-relative with a cap, never a fixed pixel width: `92vw` keeps a
  * narrow screen usable without a horizontal scrollbar, and the cap is a
- * reading measure of 68 characters (IR-1090; it was 60rem, about 110 characters
- * a line at the answer's 16px, which the audit found too long to read).
+ * measure of 136 characters: twice IR-1090's 68, at the owner's request.
  */
 export const CHAT_COLUMN = `w-full ${CHAT_MEASURE} mx-auto`;
 
@@ -63,7 +64,7 @@ export const ASK_PANELS_INLINE_PX = 900;
 export const CHAT_OPENING = "overflow-y-auto before:my-auto before:content-[''] after:my-auto after:content-['']";
 
 export const CHAT_COMPOSER_SURFACE =
-  "rounded-card border border-field bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 motion-reduce:transition-none";
+  "rounded-card border border-field bg-surface transition-[border-color,box-shadow] duration-150 hover:border-brand/50 hover:ring-4 hover:ring-brand/15 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 motion-reduce:transition-none";
 
 // Grows with the question up to a cap; browsers without field-sizing keep `rows`.
 export const CHAT_COMPOSER_FIELD =
@@ -71,7 +72,8 @@ export const CHAT_COMPOSER_FIELD =
 
 // The opening's text, starter questions and composer share this width, which is
 // the thread's own (IR-1090), so the page does not widen when the first answer lands.
-export const CHAT_OPENING_COLUMN = `mx-auto w-full ${CHAT_MEASURE}`;
+// A new chat's prompt and its opening sit at IR-1090's narrower measure.
+export const CHAT_OPENING_COLUMN = "mx-auto w-full max-w-[min(92vw,68ch)]";
 
 // A round composer control: 44 px on touch, 36 px beside a pointer.
 export const CHAT_COMPOSER_ICON =
