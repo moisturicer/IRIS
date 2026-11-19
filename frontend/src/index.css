@@ -102,6 +102,18 @@
 }
 
 @layer utilities {
+  /* Long reading text: both edges straight, like a printed paper, at every
+     width (IR-1221; DESIGN.md's Full Text Rule, point 4). Hyphenation keeps
+     the word gaps small, and needs the page's `lang="en"`. A paragraph's last
+     line stays left, so a one-line comment reads as before. Never on titles,
+     labels, buttons, table cells, form fields, or text clamped to a few lines,
+     whose last visible line would be stretched. */
+  .text-justified {
+    text-align: justify;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+  }
+
   /* No scrollbar at all, for a row that scrolls sideways on a phone and is
      cued by the chip cut off at its edge instead (IR-530). `scrollbar-thin`
      is not enough there: with `scrollbar-width` set, Chromium ignores the
