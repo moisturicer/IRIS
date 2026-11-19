@@ -58,7 +58,7 @@ function only(key: ScreenKey, allowed: RoleName[]) {
 
 test("the corpus and the shared tools are open to every role", () => {
   for (const key of ["discover", "paper", "library", "opportunities", "ai",
-                     "notifications", "settings", "help"] as ScreenKey[]) {
+                     "notifications", "settings"] as ScreenKey[]) {
     only(key, EVERY_ROLE);
   }
 });

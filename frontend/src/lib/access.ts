@@ -133,15 +133,14 @@ export const SCREEN_ACCESS = {
   notifications: { path: "/notifications", roles: EVERYONE },
   // Profile and Settings live in the account menu in the sidebar's user block
   // (IR-413, spec §4.2), not in the nav list. Profile (who you are) and
-  // Settings (your account) are separate pages since IR-933. Help is a link of
-  // its own in the sidebar's footer (IR-1085), also outside the nav list.
+  // Settings (your account) are separate pages since IR-933. Help is a section
+  // of Settings (IR-1245); `/help` is a redirect (`router/redirects.tsx`).
   profile:       { path: "/profile",       roles: EVERYONE },
   profileEdit:   { path: "/profile/edit",  roles: EVERYONE },
   // Another person's Profile (IR-700), opened by clicking their name. Who may be
   // opened is the server's decision: a hidden account answers 404.
   person:        { path: "/people/:id",    roles: EVERYONE },
   settings:      { path: "/settings",      roles: EVERYONE },
-  help:          { path: "/help",          roles: EVERYONE },
   // Reached from Discover and the queues, never from the nav. Which *records*
   // are visible is the server's decision (IR-153), not this map's, and what a
   // viewer may do there is the capabilities adapter's (IR-411). The documents

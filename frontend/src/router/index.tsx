@@ -31,7 +31,6 @@ import SettingsPage         from "@/features/settings/SettingsPage";
 import ProfilePage          from "@/features/profile/ProfilePage";
 import EditProfilePage      from "@/features/profile/EditProfilePage";
 import PersonProfilePage    from "@/features/profile/PersonProfilePage";
-import HelpPage             from "@/features/help/HelpPage";
 
 // Error screens (IR-745)
 import { NotFoundScreen }   from "@/features/errors/NotFoundScreen";
@@ -126,7 +125,6 @@ export const routes: RouteObject[] = [{
               },
             ],
           },
-          { path: "help",                  element: <HelpPage />,        handle: { crumb: "Help" } },
           {
             // Edit profile sits under Profile, so its breadcrumb reads Profile > Edit profile.
             path: "profile", handle: { crumb: "Profile" },

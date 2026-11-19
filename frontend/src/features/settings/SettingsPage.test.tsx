@@ -194,32 +194,55 @@ describe("settings and profile are separate", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
     const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    // Changed deliberately by IR-1245: Help is a fourth section, not a link out.
     expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Account & security", "Data privacy & consent", "Role & access",
+      "Account & security", "Data privacy & consent", "Role & access", "Help",
     ]);
     expect(within(nav).getByRole("button", { name: "Account & security" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByLabelText("Current password")).toBeVisible();
   });
 
-  it("offers Help in its section list, as a link to the Help page (IR-1217)", async () => {
+  // IR-1245 replaces IR-1217's link: Help opened from Settings stays in Settings.
+  it("opens Help as one of its sections, without leaving Settings (IR-1245)", async () => {
+    function Where() {
+      const { pathname, search } = useLocation();
+      return <input readOnly aria-label="Location" value={pathname + search} />;
+    }
     const user = userEvent.setup();
     renderScreen(
       <Routes>
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/help" element={<h1>Help</h1>} />
+        <Route path="/settings" element={<><SettingsPage /><Where /></>} />
+        <Route path="*" element={<h1>Somewhere else</h1>} />
       </Routes>,
-      { route: "/settings" },
+      { route: "/settings?tab=privacy" },
     );
 
     const nav = screen.getByRole("navigation", { name: "Settings sections" });
-    const help = within(nav).getByRole("link", { name: "Help" });
-    expect(help).toHaveAttribute("href", "/help");
-    // A link, not a fourth tab: it leaves Settings for the Help page.
-    expect(within(nav).getAllByRole("button")).toHaveLength(3);
+    expect(within(nav).queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
+    await user.click(within(nav).getByRole("button", { name: "Help" }));
 
-    help.focus();
-    await user.keyboard("{Enter}");
-    expect(await screen.findByRole("heading", { level: 1, name: "Help" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Location")).toHaveValue("/settings?tab=help");
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+    expect(within(nav).getByRole("button", { name: "Help" })).toHaveAttribute("aria-current", "page");
+    const contents = screen.getByRole("navigation", { name: "Help contents" });
+    // Each contents entry jumps within this page, keeping Settings' address.
+    expect(within(contents).getByRole("link", { name: "Finding research" })).toHaveAttribute("href", "#discover");
+    expect(screen.getByRole("region", { name: "Finding research" })).toBeInTheDocument();
+  });
+
+  it("opens straight on Help from its address, and on the section it names", () => {
+    const original = Element.prototype.scrollIntoView;
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    try {
+      renderScreen(<SettingsPage />, { route: "/settings?tab=help#discover" });
+
+      expect(screen.getByRole("button", { name: "Help" })).toHaveAttribute("aria-current", "page");
+      expect(scrolled).toHaveBeenCalled();
+      expect(scrolled.mock.contexts[0]).toBe(screen.getByRole("region", { name: "Finding research" }));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
   });
 
   it("points to the Profile instead of holding it", () => {

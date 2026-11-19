@@ -10,7 +10,7 @@
  * to a record's documents lands on that record. `byRole` sends a role whose
  * old page went somewhere else to its own destination instead of `to`.
  */
-import { Navigate, useParams, type RouteObject } from "react-router-dom";
+import { Navigate, useLocation, useParams, type RouteObject } from "react-router-dom";
 import { ROLES, type RoleName } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -50,13 +50,20 @@ export const REDIRECTS: ReadonlyArray<{
     to: "/rdco/analytics",
     why: "Workflow analytics left My Reviews for RDCO's own section, RDCO alone (IR-1216)",
   },
+  {
+    path: "help",
+    to: "/settings?tab=help",
+    why: "Help became a Settings section, so opening it never leaves Settings (IR-1245)",
+  },
 ];
 
 function RetiredUrl({ to, byRole }: { to: string; byRole?: Partial<Record<RoleName, string>> }) {
   const params = useParams();
+  // The fragment carries over, so an old link to a section lands on it (IR-1245).
+  const { hash } = useLocation();
   const role = useAuthStore((state) => state.user?.role_name) as RoleName | undefined;
   const target = ((role && byRole?.[role]) || to).replace(/:(\w+)/g, (_, name: string) => encodeURIComponent(params[name] ?? ""));
-  return <Navigate to={target} replace />;
+  return <Navigate to={`${target}${hash}`} replace />;
 }
 
 export const redirectRoutes: RouteObject[] = REDIRECTS.map(({ path, to, byRole }) => ({

@@ -13,7 +13,7 @@ export interface HelpReader {
 }
 
 export interface HelpSection {
-  /** The anchor: `/help#<id>`. Stable, because other screens link to it. */
+  /** The anchor: `/settings?tab=help#<id>` (`/help#<id>` redirects there). Stable, because other screens link to it. */
   id:    string;
   title: string;
   /**

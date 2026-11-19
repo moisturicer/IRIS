@@ -34,6 +34,24 @@ describe("retired URLs", () => {
   });
 });
 
+// IR-1245: Help became a Settings section. An old link to one of its sections
+// keeps the section, so it still lands on what it pointed at.
+describe("an old link into Help", () => {
+  function LandingWithHash() {
+    const { pathname, search, hash } = useLocation();
+    return <p>Landed on {`${pathname}${search}${hash}`}</p>;
+  }
+  function AppWithHash() {
+    return useRoutes([...redirectRoutes, { path: "*", element: <LandingWithHash /> }]);
+  }
+
+  it("keeps the section it named", async () => {
+    renderScreen(<AppWithHash />, { route: "/help#ask-iris" });
+
+    expect(await screen.findByText("Landed on /settings?tab=help#ask-iris")).toBeInTheDocument();
+  });
+});
+
 // ADR-063 decision 9 (IR-972): the Notices page became Setup's Notice section,
 // which is RDCO's. The System Admin, who reads publications in the Audit Log,
 // lands there instead, filtered to them.

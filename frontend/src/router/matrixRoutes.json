@@ -9,7 +9,6 @@
   "/admin/users",
   "/ai",
   "/ai/conversations/:conversationId",
-  "/help",
   "/login",
   "/moderation/comments",
   "/notifications",
