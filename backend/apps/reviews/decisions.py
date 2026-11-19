@@ -306,7 +306,7 @@ def closes_payload(record, decider_seat) -> dict:
         assignments.append({
             "party": assignment.party, "label": _label(assignment.party), "holders": holders,
             # What each of them leaves, for the warning beside their name (IR-1226).
-            "leaving": [removal.leaving(record, s.reviewer) for s in others if s.reviewer],
+            "leaving": [removal.leaving(record, s.reviewer, assignment.party) for s in others if s.reviewer],
         })
     return {
         "assignments": assignments,
@@ -528,6 +528,7 @@ def decide(record, actor, *, outcome, comment="", token=None, thread_count=0) ->
     # `withdraw()` is a coordinator's act with a coordinator's checks.
     now = timezone.now()
     cut_off = []  # reviewers whose open seat the decision withdrew
+    dropped = []  # (reviewer, party) whose unsent drafts go with that seat (IR-1226)
     for assignment, open_seats in _closing(record):
         own = assignment.pk == seat.assignment_id
         others = [s for s in open_seats if s.pk != seat.pk]
@@ -535,6 +536,7 @@ def decide(record, actor, *, outcome, comment="", token=None, thread_count=0) ->
             state=SeatState.WITHDRAWN, closed_by_decision=review,
         )
         cut_off.extend(s.reviewer for s in others if s.reviewer is not None)
+        dropped.extend((s.reviewer, assignment.party) for s in others if s.reviewer is not None)
         _close_assignment(
             assignment, actor, now, review,
             AssignmentState.COMPLETED if own else AssignmentState.WITHDRAWN,
@@ -546,8 +548,8 @@ def decide(record, actor, *, outcome, comment="", token=None, thread_count=0) ->
     ReviewerSeat.objects.filter(pk=seat.pk).update(state=SeatState.DONE, done_at=now)
     # The other reviewers' unsent drafts go with their seats (IR-1226); the
     # decider's stay theirs, sent with *Finish review*.
-    for reviewer in cut_off:
-        removal.discard_drafts(record, reviewer)
+    for reviewer, cut_party in dropped:
+        removal.discard_drafts(record, reviewer, cut_party)
 
     requests = list(_open_document_requests(record).select_for_update())
     for request in requests:

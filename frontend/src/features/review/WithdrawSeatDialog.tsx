@@ -58,7 +58,7 @@ export function WithdrawSeatDialog({
           <Button type="button" variant="secondary" onClick={onClose} disabled={sending}>
             Cancel
           </Button>
-          <Button type="button" onClick={submit} loading={sending}>
+          <Button type="button" variant="danger" onClick={submit} loading={sending}>
             Withdraw
           </Button>
         </div>

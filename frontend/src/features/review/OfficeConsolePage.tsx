@@ -246,7 +246,7 @@ function ConsoleRow({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: Office
     ...(may("withdraw")
       ? [{
           key: "withdraw",
-          label: row.withdraw_completes_office ? "Withdraw… (finishes the review)" : "Withdraw…",
+          label: "Withdraw…",
           onSelect: () => onAct("withdraw"),
         }]
       : []),

@@ -89,7 +89,21 @@ describe("Finish review", () => {
   it("won't approve while sending the reviewer's own Must fix draft", () => {
     open(["office_review"], [comment({ is_draft: true, severity: "must_fix" })]);
     expect(screen.getByRole("radio", { name: /Clear for ITSO/ })).toHaveAccessibleDescription(/Change it to Suggestion/);
-    expect(screen.getByRole("radio", { name: /Record a finding/ })).toBeEnabled();
+    // Changed deliberately by IR-1226 (2026-11-19): a finding ends the seat as
+    // Clear does, so it waits on the reviewer's own Must fix too.
+    const finding = screen.getByRole("radio", { name: /Record a finding/ });
+    expect(finding).toBeDisabled();
+    expect(finding).toHaveAccessibleDescription(/can't record a finding while sending a Must fix/);
+  });
+
+  it("holds Record a finding while the office has an open Must fix (IR-1226)", () => {
+    const why = "ITSO has 1 open Must fix thread. Resolve each one, or change it to Suggestion, before recording a finding.";
+    open(["office_review"], [], record({
+      office_review: { party: "itso", label: "ITSO", blocked: null, clear_blocked: why, finding_blocked: why, assignment: 3 },
+    } as Partial<RecordDetail>));
+    const finding = screen.getByRole("radio", { name: /Record a finding/ });
+    expect(finding).toBeDisabled();
+    expect(finding).toHaveAccessibleDescription(`Unavailable: ${why}`);
   });
 
   it("asks for a summary or a comment before Comment only", async () => {

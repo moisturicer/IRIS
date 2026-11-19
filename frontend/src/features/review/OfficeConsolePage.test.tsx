@@ -300,12 +300,12 @@ describe("OfficeConsolePage", () => {
     expect(office).toHaveBeenCalledTimes(2);
   });
 
-  it("says, in the menu and the dialog, when withdrawing finishes the office's review", async () => {
+  it("says, in the dialog, when withdrawing finishes the office's review", async () => {
     office.mockResolvedValue(payload({
       rows: [row({ actions: ["reassign", "withdraw"], unresolved: LEAVES, withdraw_completes_office: true })],
     }));
     show();
-    await openMenuItem("Withdraw… (finishes the review)");
+    await openMenuItem("Withdraw…");
     const dialog = await screen.findByRole("dialog", { name: "Withdraw a reviewer" });
     expect(within(dialog).getByText("This finishes ITSO's review, using the reviews already done.")).toBeInTheDocument();
   });

@@ -96,7 +96,9 @@ function StandInReader() {
   );
 }
 
-function openWorkspace(caps: Capability[] = ["comment_review", "finish_review", "office_review", "request_revision"]) {
+function openWorkspace(
+  caps: Capability[] = ["comment_review", "start_thread", "finish_review", "office_review", "request_revision"],
+) {
   return renderScreen(
     <ReviewWorkspaceLayout record={record} can={new Set(caps)} reader={<StandInReader />} timelineVersion={0}
       onChanged={() => {}} documents={null} />,
@@ -119,8 +121,9 @@ describe("threads in the review workspace", () => {
     expect(form.getByRole("radio", { name: "Suggestion" })).toBeChecked();
   });
 
-  it("offers no Comment without comment_review", async () => {
-    openWorkspace(["finish_review"]);
+  // A finished reviewer still replies (`comment_review`) but starts no thread (IR-1226).
+  it("offers no Comment without start_thread", async () => {
+    openWorkspace(["comment_review", "finish_review"]);
     await screen.findByRole("tab", { name: /Threads/ });
     expect(screen.queryByRole("button", { name: "Comment" })).toBeNull();
   });

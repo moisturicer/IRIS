@@ -402,9 +402,16 @@ describe("the composer", () => {
   });
 
   it("offers no New comment where the server allows only threads on a passage (IR-1194)", () => {
-    setup([]);
+    setup([], { caps: ["comment_review", "start_thread"] });
     expect(screen.queryByRole("button", { name: "New comment" })).toBeNull();
     expect(screen.getByText(/A remark on the whole paper goes in Conversation\./)).toBeInTheDocument();
+  });
+
+  it("lets a finished reviewer reply but start no thread (IR-1226)", () => {
+    setup([comment({ id: 1 })], { caps: ["comment_review"] });
+    expect(within(thread(/Thread 1/)).getByRole("button", { name: "Reply" })).toBeInTheDocument();
+    expect(screen.queryByText(/Select a passage in the paper/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "New comment" })).toBeNull();
   });
 });
 

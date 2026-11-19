@@ -15,87 +15,101 @@ A seat ends withdrawn in four ways: RDCO replaces the Adviser
   seat they could never send it. A draft document thread goes with it; its
   upload stays.
 
+Everything is counted **for the party the person is taken off**: a draft, a
+thread and a request each belong to the party they were written as, so the
+warning's draft count is exactly what `discard_drafts` removes, even for
+someone who also reviews the paper for another party.
+
 Their requests stay open for whoever holds the party's seat, and nothing they
 sent is removed or hidden.
 """
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
+
 from django.db.models import Count, Q
 
 from core.enums import DocumentRequestState, ResubmissionRequestState, ReviewCommentKind, ThreadState
-from core.permissions import may_act_on_review
 
 from .models import ResubmissionRequest, ReviewComment
 
 
-def unresolved(record, user) -> dict:
-    """
-    What `user` leaves unresolved on `record` if taken off it: their unsent
-    drafts (discarded), and the open threads and open requests they made
-    (which stay open).
-    """
-    return unresolved_many([(record.pk, user.pk)])[(record.pk, user.pk)]
+@dataclass
+class Unresolved:
+    """What one person leaves as one party: drafts go, the rest stays open."""
+
+    drafts: int = 0
+    open_threads: int = 0
+    document_requests: int = 0
+    revision_requests: int = 0
 
 
-def unresolved_many(pairs) -> dict:
+def unresolved(record, user, party) -> dict:
+    """What `user` leaves unresolved on `record` if taken off `party`."""
+    key = (record.pk, user.pk, str(party))
+    return unresolved_many([key])[key]
+
+
+def unresolved_many(keys) -> dict:
     """
-    `unresolved` for many `(record_id, user_id)` pairs, in three queries
+    `unresolved` for many `(record_id, user_id, party)` keys, in three queries
     whatever their number, so a list of seats (the office console) costs the
     same for ten rows as for one.
     """
     from apps.documents.models import DocumentRequest
 
-    pairs = set(pairs)
-    counts = {pair: dict(drafts=0, open_threads=0, document_requests=0, revision_requests=0) for pair in pairs}
-    if not pairs:
-        return counts
-    records = {r for r, _ in pairs}
-    users = {u for _, u in pairs}
+    keys = {(r, u, str(p)) for r, u, p in keys}
+    counts = {key: Unresolved() for key in keys}
+    if keys:
+        records = {r for r, _, _ in keys}
+        users = {u for _, u, _ in keys}
 
-    def add(rows, key, *fields):
-        for row in rows:
-            pair = (row[key[0]], row[key[1]])
-            if pair in counts:
-                for field in fields:
-                    counts[pair][field] += row[field]
+        def add(rows, user_field, *fields):
+            for row in rows:
+                key = (row["record_id"], row[user_field], str(row["party"]))
+                if key in counts:
+                    for field in fields:
+                        setattr(counts[key], field, getattr(counts[key], field) + row[field])
 
-    open_thread = Q(
-        is_draft=False, reply_to__isnull=True, kind=ReviewCommentKind.THREAD, state=ThreadState.OPEN,
-    )
-    add(
-        ReviewComment.objects.filter(record_id__in=records, author_id__in=users)
-        .values("record_id", "author_id")
-        .annotate(drafts=Count("pk", filter=Q(is_draft=True)), open_threads=Count("pk", filter=open_thread)),
-        ("record_id", "author_id"), "drafts", "open_threads",
-    )
-    add(
-        DocumentRequest.objects.filter(
-            record_id__in=records, requested_by_id__in=users, state=DocumentRequestState.OPEN,
-        ).values("record_id", "requested_by_id").annotate(document_requests=Count("pk")),
-        ("record_id", "requested_by_id"), "document_requests",
-    )
-    add(
-        ResubmissionRequest.objects.filter(
-            record_id__in=records, requested_by_id__in=users, state=ResubmissionRequestState.OPEN,
-        ).values("record_id", "requested_by_id").annotate(revision_requests=Count("pk")),
-        ("record_id", "requested_by_id"), "revision_requests",
-    )
-    return counts
-
-
-def leaving(record, user) -> dict:
-    """`{name, unresolved}`: one person a removal would take off `record`."""
-    return {"name": user.get_full_name() or user.email, "unresolved": unresolved(record, user)}
+        open_thread = Q(
+            is_draft=False, reply_to__isnull=True, kind=ReviewCommentKind.THREAD, state=ThreadState.OPEN,
+        )
+        add(
+            ReviewComment.objects.filter(record_id__in=records, author_id__in=users)
+            .values("record_id", "author_id", "party")
+            .annotate(drafts=Count("pk", filter=Q(is_draft=True)), open_threads=Count("pk", filter=open_thread)),
+            "author_id", "drafts", "open_threads",
+        )
+        add(
+            DocumentRequest.objects.filter(
+                record_id__in=records, requested_by_id__in=users, state=DocumentRequestState.OPEN,
+            ).values("record_id", "requested_by_id", "party").annotate(document_requests=Count("pk")),
+            "requested_by_id", "document_requests",
+        )
+        add(
+            ResubmissionRequest.objects.filter(
+                record_id__in=records, requested_by_id__in=users, state=ResubmissionRequestState.OPEN,
+            ).values("record_id", "requested_by_id", "party").annotate(revision_requests=Count("pk")),
+            "requested_by_id", "revision_requests",
+        )
+    return {key: asdict(value) for key, value in counts.items()}
 
 
-def discard_drafts(record, user) -> int:
+def leaving(record, user, party) -> dict:
+    """`{name, unresolved}`: one person a removal would take off `record`'s `party`."""
+    return {"name": user.get_full_name() or user.email, "unresolved": unresolved(record, user, party)}
+
+
+def discard_drafts(record, user, party) -> int:
     """
-    Delete `user`'s unsent drafts on `record`, unless they still act on its
-    review through another seat or as an owner. Called inside each removal's
-    transaction, after the seat is withdrawn. Returns how many went.
+    Delete `user`'s unsent drafts written as `party` on `record`. Called
+    inside each removal's transaction, after the seat is withdrawn. Returns
+    how many went.
     """
-    if user is None or may_act_on_review(user, record):
+    if user is None:
         return 0
-    deleted, _ = ReviewComment.objects.filter(record=record, author=user, is_draft=True).delete()
+    deleted, _ = ReviewComment.objects.filter(
+        record=record, author=user, party=str(party), is_draft=True,
+    ).delete()
     return deleted

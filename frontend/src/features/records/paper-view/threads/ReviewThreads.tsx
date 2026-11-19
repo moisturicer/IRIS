@@ -90,7 +90,9 @@ export function ReviewThreads(props: ReviewThreadsProps) {
     (Object.keys(FILTER_NAMES) as ThreadFilter[]).map((f) => [f, ofParty(filterThreads(threads.sent, f, viewer))]),
   ) as Record<ThreadFilter, Thread[]>;
   const shown = groups[filter];
-  const canComment = props.can.has("comment_review");
+  // Replying (`comment_review`) outlasts a reviewer's seat; starting a thread
+  // on a passage (`start_thread`) does not (IR-1226).
+  const canStart = props.can.has("start_thread");
   // A thread on no passage is a reviewer's (IR-1194); the authors comment on a passage.
   const canGeneral = props.can.has("open_general_thread");
 
@@ -128,7 +130,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
       </div>
       {props.composing
         ? <Composer {...props} target={props.composing} />
-        : canComment && (
+        : canStart && (
           <p className="text-small text-stone-600">
             Select a passage in the paper and press{" "}
             <kbd className="rounded-control border border-stone-300 bg-surface px-1.5 font-mono text-2xs text-stone-700">C</kbd>

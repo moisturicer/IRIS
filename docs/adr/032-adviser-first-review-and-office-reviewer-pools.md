@@ -455,6 +455,7 @@ Found in code review the same day and settled by the agent within the amendment'
 
 - **The owner's next Version.** *Submit vN* is refused until every open *Must fix* thread from the Revision requests it answers has an *Addressed* or *Declined* answer.
 - **Its own party's approval.** While its party has an open *Must fix* thread, a Seat holder can't take *Accept & send to RDCO* (Adviser) or *Clear* (an office). They must resolve each one, or change it to *Suggestion*, which is recorded. *Request revision*, *Record a finding* and *Reject* aren't blocked, because none of them approves.
+    - *Amended 2026-11-19 (IR-1226):* *Record a finding* is held like *Clear*, by the office's own open *Must fix* threads and by a *Must fix* draft sent with it. A finding ends the seat as *Clear* does (§10 Amendment 2026-11-19), so no reviewer finishes their part with a *Must fix* of their own left open. While the seat is open they can still resolve the thread, change it to *Suggestion*, or edit it. *Request revision* and *Reject* stay unblocked.
 - **RDCO's Decision is not blocked, and it answers for open threads** (ADR-047 §5). When *Must fix* threads are open, the Decision dialog lists them and requires one reason. Deciding closes them as *"Closed by RDCO's Decision"*, with the reason, linked to the Decision the same way `closed_by_decision` links Seats and requests.
 - **A *Suggestion* never blocks anything.**
 - **The open threads are listed in three places:** the Threads tab's count (*"2 must fix · 5 suggestions"*), the Readiness panel (a new `open_thread` item, `blocker` exactly where one of the blocks above applies, `info` otherwise), and the Finish and Decision dialogs.
@@ -890,6 +891,23 @@ readiness: null | {
 7. **The frontend needs no rule of its own.** It reads `is_participant`, the per-comment `can_*` answers, `can_request_document`, `can_manage` and the `attach_file` capability from the server, so a removed reviewer is offered nothing to do, and a removed Adviser no Review section.
 
 This corrects §7's 2026-11-18 amendment, point 4, which named an earlier Adviser as a reader of the review.
+
+#### Amendment, 2026-11-19 (IR-1226): a finished seat discusses, and acts on nothing
+
+Decided by Hermoine Zozobrado while building IR-1226, and awaiting review on its PR. It reverses point 1's "assigned, in review or done": **a `done` seat no longer acts.** *Finish review* ends a reviewer's part, so ending it should mean what it says. Otherwise a reviewer could clear a paper and still add a *Must fix*, which blocks nothing, because their approval is already given and no revision request is open.
+
+1. **Three levels of taking part**, each the latest seat per party (point 1 as corrected):
+    - **Act** (an owner, or an **open** seat: assigned or in review; `acting_parties`, `may_act_on_review`). An actor starts a thread on a passage, on no passage, or on a document. They edit, resolve or reopen a thread, change its severity, post or drop a draft, ask for a revision or for documents, decide or withdraw a document request, and attach or remove an office file.
+    - **Discuss** (an owner, or an open **or done** seat; `discussing_parties`, `may_discuss_review`). Someone who discusses writes in Conversation, replies in a thread, and edits those comments. A finished reviewer can still answer the author's questions, and their reply posts at once, never as a draft.
+    - **Read** (`is_record_participant`, point 2, unchanged). A withdrawn office seat reads only.
+2. **Severity follows the seat.** A thread's severity changes only while the person's seat is open: an author changes their own draft's, and a seat holder a sent thread's (§7). A `done` seat changes neither.
+3. **Capabilities.** `comment_review` now means *discuss*. A new `start_thread` means *start a thread on a passage* (owners and open seats). `open_general_thread` (no passage, or a document) stays a reviewer's and now also needs an open seat. The reader offers *select a passage and press C* only with `start_thread`, so a finished reviewer is offered *Reply* and Conversation, and nothing that starts a thread.
+4. **A finding waits on its own Must fix** (§7 as amended 2026-11-19), the same as *Clear*. `office_review.finding_blocked` states why.
+5. **Corrections to points 4 and 5, as built:**
+    - Every count and every discard is **for the party the person is taken off**. A draft, a thread and a request belong to the party they were written as. So the warning's "will be discarded" count is exactly what is removed, even for someone who also reviews the paper for another party, whose drafts there stay.
+    - *Replace Adviser* discards the previous Adviser's Adviser drafts whatever state their seat ended in, because they no longer read the review (point 2).
+    - The Decision dialog's line beside each review it closes names the drafts that will be discarded. It leaves out that reviewer's open threads and requests, which the dialog already lists for the whole paper.
+6. **Not here:** an unsubmitted draft record is visible to its owners only. That is IR-1228, with its own amendment.
 
 ### 11. Lifecycle
 

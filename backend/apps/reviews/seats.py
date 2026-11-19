@@ -145,20 +145,20 @@ def office_complete(assignment) -> bool:
     """
     return completes(
         list(_live_seats(assignment).values_list("state", flat=True)),
-        open_resubmission=lambda: _open_resubmission(assignment),
+        has_open_resubmission=lambda: _open_resubmission(assignment),
     )
 
 
-def completes(live_states, *, open_resubmission) -> bool:
+def completes(live_states, *, has_open_resubmission) -> bool:
     """
     `office_complete`'s rule over seat states already in hand: at least one,
-    all `done`, and no open resubmission (`open_resubmission`, asked only if
+    all `done`, and no open resubmission (`has_open_resubmission`, asked only if
     the seats allow it). The console asks it without the seat a coordinator
     may withdraw, to say whether withdrawing finishes the office (IR-1226).
     """
     if not live_states or any(state != SeatState.DONE for state in live_states):
         return False
-    return not open_resubmission()
+    return not has_open_resubmission()
 
 
 def _open_resubmission(assignment) -> bool:
@@ -370,10 +370,9 @@ def withdraw(seat, coordinator) -> ReviewerSeat:
     seat.state = SeatState.WITHDRAWN
     seat.save(update_fields=["state"])
     audit.seat_moved(AuditEvent.SEAT_WITHDRAWN, seat, coordinator)
-    discard_drafts(assignment.record, seat.reviewer)  # IR-1226
+    discard_drafts(assignment.record, seat.reviewer, assignment.party)  # IR-1226
     _close_if_complete(assignment, coordinator)
     return seat
-
 
 
 @transaction.atomic
@@ -400,7 +399,7 @@ def reassign(seat, coordinator, reviewer, *, reason) -> ReviewerSeat:
         assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator,
         reassigned_from=seat, reason=reason.strip(),
     )
-    discard_drafts(assignment.record, seat.reviewer)  # IR-1226
+    discard_drafts(assignment.record, seat.reviewer, assignment.party)  # IR-1226
     audit.seat_moved(AuditEvent.SEAT_REASSIGNED, new_seat, coordinator, previous=seat)
     return new_seat
 

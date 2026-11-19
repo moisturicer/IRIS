@@ -16,6 +16,7 @@ from core.enums import AssignmentState, Party, RoleName, SeatState
 
 from . import seats
 from .models import RecordAssignment, ReviewComment, ReviewerSeat
+from .test_review_comments import comment_url
 from .test_review_threads import ThreadTestBase, comments_url
 from apps.accounts.tests import make_user
 
@@ -175,16 +176,75 @@ class WhoStillActsTests(SeatTestBase):
         self.assertEqual(self.discuss(record, self.owner).status_code, status.HTTP_201_CREATED)
         self.assertIn("comment_review", self.detail(record, self.itso)["capabilities"])
 
-    def test_a_reviewer_whose_part_is_done_still_acts(self):
+
+
+class AFinishedReviewerOnlyDiscussesTests(SeatTestBase):
+    """
+    IR-1226, decided 2026-11-19: once a seat is done its holder reads, writes
+    in Conversation and replies in a thread, and edits those. They start,
+    edit, resolve, reopen and re-rate no thread, and act on no document.
+    """
+
+    def done_itso(self):
         record = self.itso_open()
-        made = self.thread(record, self.itso, "Note the licence.")
+        self.made = self.thread(record, self.itso, "Note the licence.")
+        self.question = self.owner_thread(record, "Which licence?")
         self.sent(record, self.itso)
         self.cleared(record, self.itso)
         seat = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.itso)
         self.assertEqual(seat.state, SeatState.DONE)
+        return record
 
+    def test_they_still_write_in_conversation_and_reply(self):
+        record = self.done_itso()
         self.assertEqual(self.discuss(record, self.itso).status_code, status.HTTP_201_CREATED)
-        self.assertEqual(self.act(record, self.itso, made["id"], "resolve").status_code, status.HTTP_200_OK)
+        reply = self.comment(record, self.itso, "MIT.", reply_to=self.question["id"])
+        self.assertEqual(reply.status_code, status.HTTP_201_CREATED, reply.data)
+        edited = self.client.patch(
+            comment_url(record, reply.data["id"]), {"body": "MIT, see p. 2."}, format="json",
+        )
+        self.assertEqual(edited.status_code, status.HTTP_200_OK, edited.data)
+        self.assertIn("comment_review", self.detail(record, self.itso)["capabilities"])
+
+    def test_they_start_edit_resolve_reopen_and_re_rate_no_thread(self):
+        record = self.done_itso()
+        new = self.comment(record, self.itso, "One more note.")
+        self.assertEqual(new.status_code, status.HTTP_403_FORBIDDEN, new.data)
+        self.assertIn("Your part of this review is finished", new.data["detail"])
+        self.client.force_authenticate(self.itso)
+        edit = self.client.patch(comment_url(record, self.made["id"]), {"body": "Changed."}, format="json")
+        self.assertEqual(edit.status_code, status.HTTP_403_FORBIDDEN, edit.data)
+        for act, body in (("resolve", None), ("severity", {"severity": "must_fix"})):
+            with self.subTest(act):
+                self.assertIn(
+                    self.act(record, self.itso, self.made["id"], act, body).status_code,
+                    (status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN),
+                )
+        self.assertEqual(ReviewComment.objects.get(pk=self.made["id"]).state, "open")
+
+        offered = set(self.detail(record, self.itso)["capabilities"])
+        self.assertFalse({"start_thread", "open_general_thread"} & offered)
+        [listed] = [c for c in self.listed(record, self.itso).data if c["id"] == self.made["id"]]
+        self.assertEqual(
+            {k: listed[k] for k in ("can_edit", "can_resolve", "can_reopen", "can_change_severity")},
+            {"can_edit": False, "can_resolve": False, "can_reopen": False, "can_change_severity": False},
+        )
+
+    def test_they_act_on_no_document_request(self):
+        record = self.itso_open()
+        # A colleague keeps ITSO's review running, and asks for a document
+        # after this reviewer has cleared: the party's request, not theirs.
+        ReviewerSeat.objects.create(
+            assignment=self.assignment(record, Party.ITSO), reviewer=self.itso2, state=SeatState.IN_REVIEW,
+        )
+        self.cleared(record, self.itso)
+        asked = self.ask_for_documents(record, self.itso2)
+        self.assertEqual(asked.status_code, status.HTTP_201_CREATED, asked.data)
+
+        self.assertEqual(self.withdraw_request(asked.data["id"], self.itso).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.ask_for_documents(record, self.itso).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.attach(record, self.itso).status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.withdraw_request(asked.data["id"], self.itso2).status_code, status.HTTP_200_OK)
 
 
 class DocumentRequestsTakeASeatTests(SeatTestBase):

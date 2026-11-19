@@ -338,7 +338,10 @@ export type Capability =
   | "set_visibility"
   | "tag_ip"
   | "attach_file"
+  /** Write in Conversation and reply in a thread: an open or a finished seat (IR-1226). */
   | "comment_review"
+  /** Start a thread on a passage: an owner, or an open seat (IR-1226). */
+  | "start_thread"
   /** A thread on no passage, from *New comment*: a reviewer's; an owner's threads are on a passage (IR-1194). */
   | "open_general_thread"
   | "finish_review"
@@ -726,8 +729,10 @@ export interface OfficeReviewFlags {
   label:      string | null;
   /** Why the act cannot be taken yet (an unopened seat, an open document request). */
   blocked:    string | null;
-  /** Why *Clear* alone is held: the office's own open Must fix threads (IR-874). */
+  /** Why *Clear* is held: the office's own open Must fix threads (IR-874). */
   clear_blocked?: string | null;
+  /** Why *Record a finding* is held, for the same reason (IR-1226). */
+  finding_blocked?: string | null;
   assignment: number | null;
 }
 

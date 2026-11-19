@@ -134,7 +134,7 @@ def _attach_removal(rows, assignments, office) -> None:
     decides it again under its lock.
     """
     seat_rows = [r for r in rows if r["kind"] == "seat"]
-    counts = unresolved_many((r["record"], r["reviewer"]) for r in seat_rows if r["reviewer"])
+    counts = unresolved_many((r["record"], r["reviewer"], office) for r in seat_rows if r["reviewer"])
     asked = {(a.record_id, a.party) for a in assignments}
     open_resubmission = set(
         ResubmissionRequest.objects.filter(
@@ -145,10 +145,10 @@ def _attach_removal(rows, assignments, office) -> None:
     by_pk = {a.pk: a for a in assignments}
     for row in seat_rows:
         assignment = by_pk[row["assignment"]]
-        row["unresolved"] = counts.get((row["record"], row["reviewer"]))
+        row["unresolved"] = counts.get((row["record"], row["reviewer"], str(office)))
         row["withdraw_completes_office"] = completes(
             [s.state for s in assignment.console_seats if s.pk != row["seat"]],
-            open_resubmission=lambda a=assignment: (a.record_id, a.party) in open_resubmission,
+            has_open_resubmission=lambda a=assignment: (a.record_id, a.party) in open_resubmission,
         )
 
 

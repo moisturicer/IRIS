@@ -301,12 +301,20 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # (participants, and the pool of a party holding the record now), written by
     # participants alone, so ITSO's unseated pool reads and is refused. RDCO
     # holds an assignment from the Adviser’s send (ADR-047), but this account has no Seat. An edit is its author’s.
+    # The Adviser's seat on `record` is done, so since IR-1226 (2026-11-19) they
+    # still write in Conversation but start, resolve and reopen no thread.
     "record-review-comments": Entry({
         "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
-        "POST": _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
-            kwargs=RECORD, data={"body": "Which version is this?"},
-        ),
+        "POST": [
+            _case(
+                row(ANON, HIDE, OK, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
+                kwargs=RECORD, data={"body": "Which version is this?"},
+            ),
+            _case(
+                row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+                kwargs=RECORD, data={"body": "Which version is this?", "kind": "discussion"},
+            ),
+        ],
     }),
     # Whom a writer may mention (IR-877): the writers of the discussion only,
     # so a pool member who reads it is refused, as POST above refuses them.
@@ -331,15 +339,15 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # participant resolves it. On the owner's own thread any participant resolves.
     "record-review-thread-act": Entry({"POST": [
         _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, OK, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment"), "act": "resolve"},
         ),
         _case(
-            row(ANON, HIDE, DENY, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "resolve"},
         ),
         _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, OK, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "reopen"},
         ),
         _case(

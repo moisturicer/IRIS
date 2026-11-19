@@ -29,6 +29,7 @@ from apps.records import lifecycle
 from apps.records.versions import versions_payload
 from core.enums import (
     ASSIGNABLE_PARTIES,
+    OPEN_SEAT_STATES,
     AssignmentState,
     ClearanceStatus,
     DocumentRequestState,
@@ -370,16 +371,17 @@ def requestable_parties(record, user, *, active_assignments: Optional[list] = No
     """
     The parties `user` may ask for documents and file office files as
     (ADR-022 §Security, Amendment 7; IR-474): an active assignment the user
-    can staff **and holds a seat on that was not withdrawn** (IR-1226).
-    Belonging to the office is not enough: an unseated colleague, a
-    coordinator, or someone taken off the paper asks for nothing.
+    can staff **and holds an open seat on** (IR-1226). Belonging to the
+    office is not enough: an unseated colleague, a coordinator, a reviewer
+    whose part is done, or someone taken off the paper asks for nothing.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return []
     active = active_assignments if active_assignments is not None else _active_assignments(record)
     seated = set(
-        ReviewerSeat.objects.filter(assignment__in=[a.pk for a in active], reviewer=user)
-        .exclude(state=SeatState.WITHDRAWN).values_list("assignment__party", flat=True)
+        ReviewerSeat.objects.filter(
+            assignment__in=[a.pk for a in active], reviewer=user, state__in=OPEN_SEAT_STATES,
+        ).values_list("assignment__party", flat=True)
     )
     eligible = (
         {a.party for a in active} & seated & acting_parties(user, record) & staffable_parties(record, user)

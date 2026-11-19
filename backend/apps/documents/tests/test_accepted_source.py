@@ -210,7 +210,8 @@ def test_all_pdf_routes_share_acceptance_and_refusals_store_nothing(manuscript, 
     from django.core.files.uploadedfile import SimpleUploadedFile
     from pypdf import PdfWriter
     from apps.documents.models import RecordFile, RecordUpload, UploadSlot
-    from apps.reviews.models import RecordAssignment, ReviewerSeat
+    from apps.documents.tests.test_record_document_authorization import seat_on
+    from apps.reviews.models import RecordAssignment
 
     client, record = manuscript
     writer = PdfWriter()
@@ -231,7 +232,7 @@ def test_all_pdf_routes_share_acceptance_and_refusals_store_nothing(manuscript, 
     if route == "general":
         office = make_user("office@cit.edu", "RDCO")
         # Filing takes a seat on the assignment, not membership of the office (IR-1226).
-        ReviewerSeat.objects.create(assignment=RecordAssignment.objects.create(record=record, party="rdco"), reviewer=office)
+        seat_on(RecordAssignment.objects.create(record=record, party="rdco"), office)
         client.force_authenticate(office)
     if route == "manuscript":
         response = client.patch(reverse("record-detail", args=[record.pk]), {"abstract_file": file}, format="multipart")
@@ -279,13 +280,14 @@ def test_general_attachment_non_pdf_policy_is_word_png_or_jpg(manuscript):
     amendment. test_supplementary_file_types.py covers the types in full.
     """
     from django.core.files.uploadedfile import SimpleUploadedFile
-    from apps.reviews.models import RecordAssignment, ReviewerSeat
+    from apps.documents.tests.test_record_document_authorization import seat_on
+    from apps.reviews.models import RecordAssignment
 
     client, record = manuscript
     office = make_user("office@cit.edu", "RDCO")
     client.force_authenticate(office)
     # Filing takes a seat on the assignment, not membership of the office (IR-1226).
-    ReviewerSeat.objects.create(assignment=RecordAssignment.objects.create(record=record, party="rdco"), reviewer=office)
+    seat_on(RecordAssignment.objects.create(record=record, party="rdco"), office)
     response = client.post(reverse("record-file-upload"), {
         "record": record.pk,
         "file": SimpleUploadedFile("notes.png", b"\x89PNG\r\n\x1a\nOffice notes", content_type="image/png"),

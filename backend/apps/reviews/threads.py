@@ -135,14 +135,18 @@ def _count(n: int, one: str, many: str) -> str:
     return f"{n} {one if n == 1 else many}"
 
 
-def approval_blocked_reason(record, party) -> Optional[str]:
-    """Why `party`'s Seat holders can't approve yet, or None."""
+def approval_blocked_reason(record, party, *, act="approving") -> Optional[str]:
+    """
+    Why `party`'s Seat holders can't approve yet, or None. A finding waits the
+    same way (`act="recording a finding"`; IR-1226, 2026-11-19), so nobody
+    finishes their part with their own Must fix still open.
+    """
     n = open_must_fix(record, [str(party)]).count()
     if not n:
         return None
     return (
         f"{party_label(str(party))} has {_count(n, 'open Must fix thread', 'open Must fix threads')}. "
-        f"Resolve each one, or change it to Suggestion, before approving."
+        f"Resolve each one, or change it to Suggestion, before {act}."
     )
 
 

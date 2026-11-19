@@ -416,10 +416,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
     def get_adviser_leaving(self, obj):
         from apps.reviews.removal import leaving
+        from core.enums import Party
 
         if "replace_adviser" not in self.get_capabilities(obj) or obj.adviser is None:
             return None
-        return leaving(obj, obj.adviser)
+        return leaving(obj, obj.adviser, Party.ADVISER)
 
     def get_capabilities(self, obj):
         from core.permissions import record_capabilities

@@ -75,7 +75,8 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
         ...threads.sent.filter((t) => t.root.state === "open").map((t) => mark(t, false)),
         ...threads.drafts.map((t) => mark(t, true)),
       ].filter((m): m is ReaderMark => m !== null),
-      onComment: can.has("comment_review")
+      // Starting a thread takes an open seat; a finished reviewer only replies (IR-1226).
+      onComment: can.has("start_thread")
         ? (passage, version) => {
           setComposing({ kind: "passage", version, passage });
           showThreads();
