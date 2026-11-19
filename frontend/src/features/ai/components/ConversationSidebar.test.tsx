@@ -15,7 +15,7 @@ afterEach(() => vi.restoreAllMocks());
 vi.mock("./EarlierConversations", () => ({ EarlierConversationList: () => null }));
 
 const search: HistorySearch = {
-  text: "", onText: () => undefined, query: "", state: "ready", hasMore: false, loadingMore: false, onMore: () => undefined,
+  text: "", onText: () => undefined, query: "", state: "ready", onRetry: () => undefined, hasMore: false, loadingMore: false, onMore: () => undefined,
 };
 
 const entries = (...titles: string[]): ReaderConversationSummary[] =>
