@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask IRIS · IRIS</title>
+<meta name="description" content="Ask IRIS redesign prototype: a static, clickable proposal with invented sample data. Not connected to the live system.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Ask IRIS prototype. Tokens are DESIGN.md's, the same as styles.css beside this file.
+   Type roles only (DESIGN.md): display 32 serif, title 20 serif, reading 16/1.75,
+   body 15/24, control 14/20, label 13/20. Nothing smaller than 13 px.
+   One icon set: stroked, 1.75 px, 20 px in controls and 16 px inline. */
+:root {
+  --maroon: #6b0f12; --maroon-light: #8b1316; --maroon-press: #5a0c0f; --maroon-thread: #f9b8b9;
+  --hl: #f7e08f;
+  --endpaper: #fafaf9; --page: #ffffff; --bar: #f5f5f4; --desk: #e7e5e4; --rule: #d6d3d1; --field: #8f8884;
+  --ink: #1c1917; --body: #44403c; --quiet: #57534e; --faint: #78716c;
+  --serif: "EB Garamond", Georgia, Cambria, serif;
+  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r-thumb: 6px; --r-control: 12px; --r-sheet: 16px; --r-pill: 999px;
+  --float: 0 12px 32px rgb(41 37 36 / .16), 0 2px 6px rgb(41 37 36 / .06);
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --proto: 52px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: #d6d3d1; color: var(--body); font: 400 15px/24px var(--sans); -webkit-font-smoothing: antialiased; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p { margin: 0; }
+a { color: var(--maroon); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--maroon); outline-offset: 2px; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+svg.i { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.s16 { width: 16px; height: 16px; }
+
+/* ---------- Prototype bar (not part of the design) ---------- */
+.proto { position: sticky; top: 0; z-index: 50; height: var(--proto); display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: #1c1917; color: #e7e5e4; font-size: 13px; overflow-x: auto; }
+.proto b { color: #fff; font-weight: 600; white-space: nowrap; }
+.proto .grp { display: flex; gap: 4px; padding: 3px; background: #292524; border-radius: 10px; }
+.proto button { border: 0; background: transparent; color: #d6d3d1; padding: 5px 10px; border-radius: 7px; white-space: nowrap; font-size: 13px; }
+.proto button[aria-pressed="true"] { background: #fafaf9; color: #1c1917; font-weight: 600; }
+.proto .note { margin-left: auto; color: #a8a29e; white-space: nowrap; }
+
+/* ---------- Stage: the device frame. Layout keys off its width, not the window's. ---------- */
+.stage-wrap { display: flex; justify-content: center; padding: 0; height: calc(100% - var(--proto)); }
+.stage { container-type: inline-size; width: 100%; height: 100%; background: var(--page); overflow: hidden; position: relative; }
+.stage-wrap.tablet { padding: 20px; } .stage-wrap.tablet .stage { width: 900px; border-radius: 14px; box-shadow: var(--float); }
+.stage-wrap.phone { padding: 20px; } .stage-wrap.phone .stage { width: 375px; max-height: 812px; border-radius: 28px; box-shadow: var(--float); }
+
+.app { --pane: 272px; display: grid; grid-template-columns: 232px var(--pane) minmax(0, 1fr) auto; height: 100%; transition: grid-template-columns .22s var(--ease); }
+.app.pane-closed { --pane: 60px; }
+@media (prefers-reduced-motion: reduce) { .app { transition: none; } }
+
+/* App sidebar (as in IRIS today, shown for context) */
+.nav { display: flex; flex-direction: column; border-right: 1px solid var(--desk); background: var(--page); padding: 14px 12px; gap: 2px; }
+.nav .brand { display: flex; align-items: center; gap: 8px; padding: 2px 8px 14px; }
+.nav .brand .glyph { width: 26px; height: 26px; }
+.nav .brand span { font: 600 20px/1 var(--serif); letter-spacing: .14em; color: var(--maroon); }
+.nav a { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 10px; border-radius: var(--r-control); color: var(--body); text-decoration: none; font-size: 14px; }
+.nav a:hover { background: var(--bar); }
+.nav a[aria-current="page"] { background: var(--desk); color: var(--ink); font-weight: 600; }
+.nav a[aria-current="page"] svg { color: var(--maroon); }
+.nav .who { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px 8px 2px; border-top: 1px solid var(--desk); font-size: 14px; color: var(--ink); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--maroon); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 600; flex: none; }
+.who small { display: block; font-size: 13px; color: var(--quiet); line-height: 18px; }
+
+/* History pane */
+.history { position: relative; min-height: 0; overflow: hidden; background: var(--endpaper); border-right: 1px solid var(--desk); }
+/* Fixed inner width, so the list doesn't reflow while the column animates. */
+.history .full { width: 272px; height: 100%; display: flex; flex-direction: column; }
+.history .rail { display: none; width: 60px; height: 100%; flex-direction: column; align-items: center; }
+.app.pane-closed .history .full { display: none; }
+.app.pane-closed .history .rail { display: flex; }
+.app.pane-closed .history { overflow: visible; z-index: 5; } /* lets the rail's tooltips show beside it */
+/* The toggle never moves: top-left of the pane, open or closed, on the thread header's line. */
+.pane-bar { display: flex; align-items: center; gap: 4px; height: 60px; flex: none; padding: 0 12px; border-bottom: 1px solid var(--desk); }
+.pane-bar p { flex: 1; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--ink); }
+.rail .pane-bar { width: 100%; justify-content: center; padding: 0; }
+.rail-tools { display: grid; gap: 4px; padding-top: 12px; }
+.pane-toggle[aria-expanded="true"] { color: var(--ink); }
+.tip { position: relative; }
+.tip:hover::after, .tip:focus-visible::after { content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); z-index: 30; padding: 4px 10px; border-radius: 8px; background: var(--ink); color: #fff; font-size: 13px; line-height: 20px; font-weight: 500; white-space: nowrap; pointer-events: none; }
+.history-head { display: grid; gap: 10px; padding: 12px 12px 10px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: var(--r-pill); border: 1px solid transparent; font-size: 14px; font-weight: 600; white-space: nowrap; text-decoration: none; }
+.btn-primary { background: var(--maroon); color: #fff; }
+.btn-primary:hover { background: var(--maroon-light); }
+.btn-primary:active { background: var(--maroon-press); }
+.btn-secondary { background: var(--page); color: var(--body); border-color: var(--field); }
+.btn-secondary:hover { background: var(--bar); }
+.btn-ghost { background: transparent; color: var(--body); padding: 0 12px; }
+.btn-ghost:hover { background: var(--bar); }
+.btn[disabled] { background: var(--desk); color: var(--quiet); border-color: transparent; cursor: not-allowed; }
+.history .btn-primary { width: 100%; }
+.search { position: relative; }
+.search svg { position: absolute; left: 12px; top: 10px; color: var(--quiet); }
+.search input { width: 100%; height: 40px; padding: 0 56px 0 38px; border: 1px solid var(--field); border-radius: var(--r-control); background: var(--page); font-size: 14px; }
+.search input::placeholder { color: var(--faint); }
+.search kbd { position: absolute; right: 8px; top: 9px; padding: 0 6px; border: 1px solid var(--rule); border-radius: 6px; font: 500 13px/20px var(--sans); color: var(--quiet); background: var(--bar); }
+.history-list { flex: 1; overflow-y: auto; padding: 4px 8px 12px; }
+.group { padding: 14px 10px 4px; font-size: 13px; line-height: 20px; font-weight: 600; color: var(--quiet); }
+.row { position: relative; display: flex; align-items: center; border-radius: var(--r-control); }
+.row:hover, .row:focus-within { background: var(--bar); }
+.row[aria-current="true"] { background: var(--desk); }
+.row a { flex: 1; min-width: 0; display: block; padding: 8px 10px; color: var(--ink); text-decoration: none; font-size: 14px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .pin { color: var(--quiet); margin-left: 10px; }
+.row .more { opacity: 0; }
+.row:hover .more, .row:focus-within .more, .row[aria-current="true"] .more { opacity: 1; }
+@media (hover: none) { .row .more { opacity: 1; } }
+.icon-btn { display: inline-grid; place-items: center; width: 36px; height: 36px; flex: none; border: 0; border-radius: 10px; background: transparent; color: var(--quiet); }
+.icon-btn:hover { background: var(--desk); color: var(--ink); }
+.history-note { margin: 8px 10px; font-size: 14px; line-height: 20px; color: var(--quiet); }
+.inline-error { margin: 10px 6px; padding: 12px; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--page); display: grid; gap: 10px; }
+.inline-error p { display: flex; gap: 10px; font-size: 14px; line-height: 20px; color: var(--ink); }
+.inline-error p svg { color: var(--maroon); margin-top: 0; }
+.inline-error .btn { justify-self: start; height: 36px; }
+
+/* Thread */
+.thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--page); }
+.thread-head { display: flex; align-items: center; gap: 8px; height: 60px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--desk); }
+.thread-head h1 { flex: 1; min-width: 0; font: 600 20px/28px var(--serif); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-head .show-history, .thread-head .show-nav, .thread-head .phone-new { display: none; }
+.thread-body { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+.col { width: 100%; max-width: 720px; margin: 0 auto; padding: 28px 24px 24px; }
+
+.empty { display: grid; justify-items: center; text-align: center; gap: 14px; padding-top: 10vh; }
+.empty .glyph { width: 48px; height: 48px; }
+.empty h2 { font: 600 32px/38px var(--serif); color: var(--ink); text-wrap: balance; }
+.empty p { max-width: 50ch; color: var(--quiet); }
+.starters { width: 100%; margin-top: 18px; display: grid; gap: 8px; text-align: left; }
+.starter { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--page); color: var(--ink); font-size: 15px; line-height: 22px; text-align: left; }
+.starter:hover { border-color: var(--field); background: var(--endpaper); }
+.starter svg { color: var(--maroon); }
+.starter span { flex: 1; }
+
+.turn { display: grid; gap: 14px; margin-bottom: 36px; }
+.q { justify-self: end; max-width: 85%; padding: 10px 16px; border-radius: 18px 18px 6px 18px; background: var(--bar); color: var(--ink); font-size: 15px; line-height: 24px; }
+.q-actions { justify-self: end; display: flex; gap: 2px; margin-top: -8px; }
+.a { font-size: 16px; line-height: 1.75; color: var(--body); }
+.a p + p, .a p + ul, .a ul + p { margin-top: .75em; }
+.a ul { margin: .5em 0 0; padding-left: 1.2em; }
+.a li + li { margin-top: .35em; }
+.a li::marker { color: var(--maroon); }
+.a b { color: var(--ink); font-weight: 600; }
+.cite { display: inline-flex; align-items: center; height: 22px; margin: 0 1px; padding: 0 7px; border: 0; border-radius: var(--r-thumb); background: var(--page); box-shadow: inset 0 0 0 1px var(--rule); color: var(--maroon); font-size: 13px; font-weight: 600; line-height: 22px; vertical-align: 1px; }
+.nw { white-space: nowrap; }
+.cite:hover, .cite[aria-pressed="true"] { background: var(--maroon); color: #fff; box-shadow: none; }
+.a-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: -2px; }
+.a-meta .count { margin-right: auto; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 10px; border: 1px solid var(--rule); border-radius: var(--r-pill); background: var(--page); color: var(--body); font-size: 14px; font-weight: 500; }
+.a-meta .count:hover { background: var(--bar); }
+.a-meta .count svg { color: var(--maroon); }
+.notice { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--r-control); background: var(--bar); color: var(--body); font-size: 14px; line-height: 20px; }
+.notice svg { color: var(--quiet); }
+
+/* Research progress: one quiet block, no card. */
+.progress { display: grid; gap: 10px; padding: 2px 0 2px 16px; border-left: 2px solid var(--maroon-thread); }
+.progress-head { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; font-size: 15px; }
+.spinner { width: 16px; height: 16px; border: 2px solid var(--desk); border-top-color: var(--maroon); border-radius: 50%; animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: var(--maroon); } * { scroll-behavior: auto !important; } }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; line-height: 20px; color: var(--quiet); }
+.steps li { display: flex; gap: 10px; align-items: center; }
+.steps li.done svg { color: var(--maroon); }
+.steps li.now { color: var(--ink); }
+.steps li.next { color: var(--faint); }
+.steps .dot { width: 16px; height: 16px; display: grid; place-items: center; }
+.steps .dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--rule); }
+
+/* Composer */
+.composer { padding: 8px 24px 16px; }
+.composer-in { max-width: 720px; margin: 0 auto; }
+.box { border: 1px solid var(--field); border-radius: var(--r-sheet); background: var(--page); padding: 10px 10px 8px 16px; transition: border-color .15s, box-shadow .15s; }
+.box:focus-within { border-color: var(--maroon); box-shadow: inset 0 0 0 1px var(--maroon); }
+.box textarea { display: block; width: 100%; min-height: 28px; max-height: 180px; border: 0; outline: 0; resize: none; background: transparent; font-size: 16px; line-height: 26px; color: var(--ink); }
+.box textarea::placeholder { color: var(--faint); }
+.box-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.depth { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px 0 8px; border: 0; border-radius: var(--r-pill); background: var(--bar); color: var(--body); font-size: 14px; font-weight: 500; }
+.depth:hover { background: var(--desk); }
+.send { margin-left: auto; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--maroon); color: #fff; }
+.send:hover { background: var(--maroon-light); }
+.send[disabled] { background: var(--desk); color: var(--faint); cursor: not-allowed; }
+.send.stop { background: var(--ink); }
+.disclaimer { margin-top: 8px; text-align: center; font-size: 13px; line-height: 20px; color: var(--quiet); }
+.box.off { background: var(--bar); border-color: var(--rule); }
+
+/* Menus */
+.menu { position: absolute; z-index: 30; min-width: 240px; padding: 6px; border: 1px solid var(--desk); border-radius: var(--r-control); background: var(--page); box-shadow: var(--float); }
+.menu button { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; font-size: 14px; line-height: 20px; color: var(--ink); }
+.menu button:hover, .menu button:focus-visible { background: var(--bar); outline: 0; }
+.menu button small { display: block; font-size: 13px; color: var(--quiet); }
+.menu button svg { margin-top: 0; color: var(--quiet); }
+.menu button[aria-checked="true"] svg.tick { color: var(--maroon); }
+.menu .danger { color: var(--maroon); }
+.menu .danger svg { color: var(--maroon); }
+.menu hr { border: 0; border-top: 1px solid var(--desk); margin: 6px 4px; }
+
+/* Sources panel */
+.sources { width: 380px; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--desk); background: var(--endpaper); }
+.sources[hidden] { display: none; }
+.sources-head { display: flex; align-items: center; gap: 8px; height: 60px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--desk); }
+.sources-head h2 { flex: 1; font-size: 15px; line-height: 24px; font-weight: 600; color: var(--ink); }
+.sources-head h2 span { font-weight: 400; color: var(--quiet); }
+.sources-list { flex: 1; overflow-y: auto; padding: 12px; display: grid; gap: 10px; align-content: start; }
+.src { padding: 14px; border: 1px solid var(--desk); border-radius: var(--r-control); background: var(--page); display: grid; gap: 8px; scroll-margin: 12px; }
+.src.on { border-color: var(--maroon); box-shadow: inset 0 0 0 1px var(--maroon); }
+.src-top { display: flex; gap: 10px; align-items: baseline; }
+.src-n { flex: none; display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--r-thumb); background: var(--maroon); color: #fff; font-size: 13px; font-weight: 600; }
+.src h3 { font: 600 17px/22px var(--serif); color: var(--ink); }
+.src-meta { font-size: 13px; line-height: 20px; color: var(--quiet); }
+.src blockquote { margin: 0; padding-left: 12px; border-left: 2px solid var(--rule); font-size: 14px; line-height: 22px; color: var(--body); }
+.src mark { background: var(--hl); color: var(--ink); padding: 0 1px; }
+.src a { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+.src a:hover { text-decoration: underline; }
+
+/* Full-state notices (unavailable, earlier conversation) */
+.state-card { display: grid; justify-items: center; text-align: center; gap: 12px; max-width: 520px; margin: 12vh auto 0; }
+.state-card .ico { width: 48px; height: 48px; border-radius: 50%; background: var(--bar); display: grid; place-items: center; color: var(--maroon); }
+.state-card h2 { font: 600 28px/34px var(--serif); color: var(--ink); text-wrap: balance; }
+.state-card p { color: var(--quiet); }
+.admin-note { width: 100%; margin-top: 8px; text-align: left; border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--page); }
+.admin-note summary { padding: 10px 14px; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.admin-note div { padding: 0 14px 12px; font-size: 14px; line-height: 22px; color: var(--body); }
+.admin-note code { font: 500 13px/20px ui-monospace, Consolas, monospace; background: var(--bar); padding: 1px 5px; border-radius: 4px; }
+.banner { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 24px; border-radius: var(--r-control); background: var(--bar); font-size: 14px; line-height: 20px; color: var(--body); }
+.banner svg { color: var(--quiet); }
+.banner span { flex: 1; }
+.banner .btn { height: 36px; }
+
+.scrim { display: none; }
+.toast { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 40; padding: 10px 16px; border-radius: var(--r-pill); background: var(--ink); color: #fff; font-size: 14px; box-shadow: var(--float); }
+
+/* ---------- Tablet: app sidebar shrinks to icons; conversations still push the chat; sources overlay ---------- */
+@container (max-width: 1180px) {
+  .app { grid-template-columns: 72px var(--pane) minmax(0, 1fr) auto; }
+  .nav { padding: 14px 8px; align-items: center; }
+  .nav .brand span, .nav a span, .nav .who > div { display: none; }
+  .nav a { width: 48px; justify-content: center; padding: 0; }
+  .sources { position: absolute; z-index: 20; top: 0; right: 0; bottom: 0; width: min(380px, 90%); box-shadow: var(--float); }
+  .app.sources-open .scrim { display: block; position: absolute; inset: 0; z-index: 15; background: rgb(28 25 23 / .28); }
+}
+/* ---------- Phone: no app sidebar; a top bar; sources as a bottom sheet ---------- */
+@container (max-width: 640px) {
+  /* No room to push a column on a phone, so here, and only here, the pane slides over the chat. */
+  .app, .app.pane-closed { grid-template-columns: minmax(0, 1fr); }
+  .nav { display: none; }
+  .history { position: absolute; z-index: 20; top: 0; bottom: 0; left: 0; width: min(320px, 88%); box-shadow: var(--float); transform: translateX(-105%); transition: transform .25s var(--ease); border-right: 0; }
+  .history .full, .app.pane-closed .history .full { display: flex; width: 100%; }
+  .history .rail, .app.pane-closed .history .rail { display: none; }
+  .app.history-open .history { transform: none; }
+  .app.history-open .scrim { display: block; position: absolute; inset: 0; z-index: 15; background: rgb(28 25 23 / .28); }
+  .thread-head .show-history, .thread-head .phone-new { display: inline-grid; }
+  .pane-bar { height: 56px; }
+  .search kbd { display: none; }
+  .search input { padding-right: 12px; }
+  .thread-head { height: 56px; padding: 0 8px; gap: 4px; }
+  .thread-head h1 { font-size: 18px; }
+  .thread-head .show-nav { display: inline-grid; }
+  .thread-head .hide-phone { display: none; }
+  .col { padding: 20px 16px 16px; }
+  .empty { padding-top: 4vh; }
+  .empty h2 { font-size: 28px; line-height: 34px; }
+  .starter { padding: 12px; }
+  .composer { padding: 6px 12px 12px; }
+  .icon-btn { width: 44px; height: 44px; }
+  .q { max-width: 92%; }
+  .sources { top: auto; left: 0; width: 100%; height: 72%; border-left: 0; border-radius: 20px 20px 0 0; }
+  .sources-head { height: 56px; }
+  .state-card { margin-top: 6vh; padding: 0 4px; }
+  .state-card h2 { font-size: 24px; line-height: 30px; }
+  .banner { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="g-mark" viewBox="6.87 -0.93 212.93 212.93"><g fill="#6B0F12" fill-rule="evenodd"><path d="M21.84 132.44 C21.72 132.26 21.65 108.01 21.69 76.81 C21.75 23.29 21.77 21.50 22.21 21.50 C22.47 21.50 22.89 21.74 23.15 22.03 C23.41 22.33 24.02 22.83 24.50 23.16 C24.98 23.48 26.16 24.32 27.12 25.02 C29.93 27.06 34.60 30.09 37.25 31.60 C38.14 32.10 39.04 32.62 39.25 32.75 C42.94 35.00 49.74 38.56 63.75 45.60 C72.91 50.20 75.61 51.61 80.38 54.26 C82.82 55.62 88.22 59.19 90.43 60.91 C92.79 62.75 93.70 63.96 94.46 66.24 C94.98 67.80 95.00 68.23 95.00 79.90 L95.00 91.96 L93.94 94.04 C93.06 95.76 92.38 96.63 90.00 99.01 C87.14 101.89 85.85 102.85 81.03 105.73 C77.60 107.78 76.62 108.26 68.99 111.61 C65.35 113.21 61.64 114.85 60.75 115.24 C59.86 115.64 57.85 116.49 56.30 117.12 C54.74 117.76 51.98 118.95 50.17 119.78 C48.36 120.61 44.40 122.39 41.38 123.74 C38.35 125.09 34.75 126.72 33.38 127.37 C30.45 128.74 28.80 129.51 26.81 130.39 C24.50 131.42 23.66 131.85 23.03 132.31 C22.32 132.83 22.13 132.85 21.84 132.44 Z"/><path d="M206.72 191.94 C192.61 180.13 177.79 171.33 161.38 165.00 C157.61 163.55 157.11 163.37 155.25 162.80 C149.36 160.98 146.86 160.22 144.88 159.64 C143.64 159.28 141.89 158.76 141.00 158.49 C140.11 158.22 139.24 157.99 139.07 158.00 C138.70 158.00 135.25 157.01 133.09 156.28 C130.13 155.28 128.03 153.76 127.05 151.91 L126.38 150.62 L126.32 130.38 L126.26 110.14 L127.08 108.26 C128.66 104.62 131.62 101.29 136.87 97.28 C140.34 94.63 141.36 93.97 146.93 90.80 C148.69 89.80 150.29 88.88 150.50 88.75 C151.05 88.40 157.96 85.00 158.11 85.00 C158.18 85.00 159.34 84.48 160.68 83.85 C162.03 83.22 163.52 82.53 164.00 82.32 C166.31 81.30 166.97 81.01 168.25 80.50 C169.01 80.19 169.96 79.80 170.38 79.63 C171.76 79.06 182.09 74.99 184.69 74.00 C189.07 72.33 192.25 71.12 195.50 69.88 C197.22 69.23 198.84 68.59 199.09 68.45 C199.35 68.32 200.03 68.06 200.59 67.87 C201.16 67.69 202.41 67.24 203.38 66.88 C204.34 66.52 205.52 66.10 206.00 65.96 C206.48 65.82 207.17 65.52 207.53 65.31 C207.90 65.10 208.38 64.99 208.60 65.08 C208.97 65.22 209.00 70.54 208.94 129.16 C208.89 176.69 208.80 193.11 208.59 193.18 C208.43 193.23 207.59 192.67 206.72 191.94 Z"/><path d="M126.44 104.11 C126.36 104.02 126.33 95.51 126.39 85.18 C126.49 66.78 126.51 66.40 127.02 65.34 C127.86 63.59 129.56 62.53 135.88 59.76 C137.53 59.04 139.01 58.27 139.18 58.06 C139.38 57.81 139.49 56.83 139.48 55.36 C139.46 52.60 139.26 52.30 137.38 52.29 C135.74 52.27 127.88 51.73 118.88 51.00 C109.27 50.22 92.14 47.63 83.88 45.70 C82.09 45.29 79.97 44.83 79.17 44.68 C77.72 44.43 77.18 43.97 77.69 43.46 C77.83 43.32 78.83 42.89 79.91 42.51 C80.99 42.14 83.56 41.18 85.62 40.40 C87.69 39.61 89.99 38.76 90.75 38.50 C91.51 38.24 93.08 37.67 94.25 37.24 C95.42 36.81 96.83 36.31 97.38 36.12 C97.92 35.94 99.72 35.27 101.38 34.63 C103.03 33.99 104.83 33.32 105.38 33.14 C105.92 32.95 108.51 32.05 111.12 31.13 C113.74 30.21 116.38 29.31 117.00 29.12 C117.62 28.94 119.76 28.23 121.75 27.55 C126.47 25.95 131.58 24.40 134.62 23.65 C138.56 22.67 147.06 20.85 151.75 19.99 C163.34 17.85 177.37 17.85 187.00 19.97 C197.25 22.24 203.49 25.20 208.40 30.11 C211.14 32.86 212.47 35.11 213.26 38.30 C213.80 40.49 213.80 40.54 213.37 42.70 C212.42 47.38 210.77 50.43 206.53 55.34 C204.53 57.66 200.93 60.85 198.12 62.79 C195.18 64.82 188.14 68.53 183.75 70.36 C182.86 70.74 181.79 71.19 181.38 71.38 C180.96 71.56 179.28 72.29 177.62 73.00 C175.97 73.70 174.40 74.38 174.12 74.50 C173.85 74.62 172.89 75.01 172.00 75.38 C171.11 75.74 169.89 76.26 169.31 76.52 C168.72 76.78 168.11 77.00 167.96 77.00 C167.81 77.00 166.66 77.44 165.40 77.98 C164.15 78.52 162.00 79.43 160.62 80.00 C150.04 84.44 144.22 87.60 137.88 92.39 C133.94 95.36 129.84 99.70 128.18 102.66 C127.42 104.01 126.83 104.50 126.44 104.11 Z"/><path d="M51.50 191.10 C42.31 190.05 36.45 188.47 30.38 185.44 C23.55 182.02 18.17 177.04 15.59 171.75 C14.45 169.42 14.25 168.90 13.60 166.54 C13.02 164.46 12.92 163.62 12.90 160.50 C12.87 156.66 12.97 156.17 14.43 152.62 C16.63 147.31 21.16 141.83 27.49 136.81 C33.54 132.02 36.14 130.40 44.25 126.35 C48.35 124.31 56.06 120.75 56.38 120.75 C56.61 120.75 71.89 113.93 73.78 112.98 C76.63 111.56 80.28 109.41 83.41 107.33 C86.75 105.11 91.53 100.88 92.51 99.28 C93.49 97.66 94.51 96.48 94.77 96.64 C94.91 96.72 95.00 108.03 95.00 123.87 C95.00 149.93 94.98 151.00 94.52 152.07 C93.75 153.87 92.02 155.00 85.25 158.07 C82.60 159.27 82.51 159.39 82.55 161.70 C82.59 164.37 82.73 164.50 85.60 164.50 C93.99 164.49 124.14 166.02 127.25 166.62 C127.59 166.68 129.28 166.86 131.00 167.00 C132.72 167.15 135.03 167.43 136.12 167.63 C137.22 167.83 139.41 168.17 140.98 168.39 C143.81 168.78 144.75 169.05 144.75 169.49 C144.75 169.92 144.25 170.03 141.07 170.25 C135.16 170.66 123.45 173.48 114.62 176.63 C112.84 177.26 110.92 177.94 110.38 178.12 C109.83 178.31 108.59 178.76 107.62 179.12 C103.65 180.63 92.79 184.42 87.50 186.16 C81.74 188.05 74.10 189.88 69.38 190.51 C66.40 190.91 63.71 191.06 58.88 191.12 C55.30 191.17 51.98 191.16 51.50 191.10 Z"/></g></symbol>
+<symbol id="g-ask" viewBox="1.60 1.70 20.80 20.80"><path fill="#6B0F12" fill-rule="evenodd" d="M7.5 2.5H16.5A5.5 5.5 0 0 1 22 8V12A5.5 5.5 0 0 1 16.5 17.5H11.5L7.2 21.4C6.6 21.9 5.6 21.5 5.6 20.7V17.2A5.5 5.5 0 0 1 2 12V8A5.5 5.5 0 0 1 7.5 2.5Z M8.3 5.3H15.7V7H13V13H15.7V14.7H8.3V13H11V7H8.3Z"/></symbol>
+<symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="i-msg-plus" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v6M9 10h6"/></symbol>
+<symbol id="i-library" viewBox="0 0 24 24"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></symbol>
+<symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+<symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+<symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+<symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8M16 13H8M16 17H8"/></symbol>
+<symbol id="i-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></symbol>
+<symbol id="i-panel" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></symbol>
+<symbol id="i-square" viewBox="0 0 24 24"><rect width="12" height="12" x="6" y="6" rx="2"/></symbol>
+</defs></svg>
+
+<div class="proto" role="region" aria-label="Prototype controls (not part of the design)">
+  <b>Ask IRIS prototype</b>
+  <div class="grp" role="group" aria-label="State">
+    <button type="button" data-state="new">New conversation</button>
+    <button type="button" data-state="answering">Answering</button>
+    <button type="button" data-state="answer">Answer + sources</button>
+    <button type="button" data-state="listfail">List failed</button>
+    <button type="button" data-state="unavailable">Ask IRIS not set up</button>
+    <button type="button" data-state="earlier">Earlier conversation</button>
+  </div>
+  <div class="grp" role="group" aria-label="Width">
+    <button type="button" data-vp="desktop">Desktop</button>
+    <button type="button" data-vp="tablet">Tablet</button>
+    <button type="button" data-vp="phone">Phone</button>
+  </div>
+  <span class="note">Invented sample data · nothing is sent</span>
+</div>
+
+<div class="stage-wrap" id="wrap"><div class="stage" id="stage"></div></div>
+
+<script>
+/* ------------------------------------------------------------------ data (invented) */
+const PAPERS = {
+  101: { title: "Predicting Student Absenteeism", by: "Zozobrado & Abac · 2026" },
+  109: { title: "Perceived Usability of the CIT-U Learning Management System Among First-Year Students", by: "Santos · 2026" },
+  107: { title: "Forecasting Dengue Incidence in Cebu City from Weather and Mobility Data", by: "Ybañez & Lim · 2025" },
+};
+const SOURCES = [
+  { n: 1, paper: 101, page: 27, quote: "Of the four models compared, <mark>gradient boosting achieved the highest F1 score (0.81)</mark> on the held-out 2025 cohort, ahead of random forest (0.77) and logistic regression (0.71)." },
+  { n: 2, paper: 101, page: 24, quote: "<mark>Previous-term absences were the strongest single predictor</mark>, accounting for 38% of the model's total feature importance." },
+  { n: 3, paper: 101, page: 25, quote: "First-quarter grades and <mark>commuting distance above 8 km</mark> each added measurable predictive value once prior absences were controlled for." },
+  { n: 4, paper: 109, page: 41, quote: "Students who logged in to the learning system fewer than twice a week <mark>missed 1.6 more class days per month</mark> on average than weekly users." },
+];
+let CONVOS = [
+  { id: 1, g: "Pinned", title: "What predicts chronic absenteeism?", pinned: true },
+  { id: 2, g: "Today", title: "Dengue forecasting methods used at CIT-U" },
+  { id: 3, g: "Previous 7 days", title: "Papers that used the System Usability Scale" },
+  { id: 4, g: "Previous 7 days", title: "IoT projects in aquaculture" },
+  { id: 5, g: "Older", title: "Compare land-suitability forecasting methods" },
+];
+const QUESTION = "What predicts chronic absenteeism among senior high school students?";
+const STARTERS = [
+  "What predicts chronic absenteeism among senior high school students?",
+  "Which theses used IoT sensors, and what did they measure?",
+  "Compare the methods of the dengue forecasting papers",
+];
+const DEPTHS = [
+  { v: "Standard", icon: "search", d: "A shorter search for a quicker answer" },
+  { v: "Thorough", icon: "book", d: "Searches and reads more before answering" },
+];
+
+/* ------------------------------------------------------------------ state */
+const S = { state: "new", vp: "desktop", sources: false, active: null, history: false, pane: readPane(), depth: "Standard", q: "", menu: null, draft: "" };
+const $ = (s, el = document) => el.querySelector(s);
+const ic = (n, cls = "") => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let timers = [];
+/* The open/closed choice is remembered per browser; if storage is blocked the pane just starts open. */
+function readPane() { try { return localStorage.getItem("askIris.pane") !== "closed"; } catch { return true; } }
+function savePane() { try { localStorage.setItem("askIris.pane", S.pane ? "open" : "closed"); } catch { /* fine */ } }
+function isPhone() { const st = document.getElementById("stage"); return !!st && st.clientWidth <= 640; }
+
+/* ------------------------------------------------------------------ views */
+function nav() {
+  return `<nav class="nav" aria-label="Main">
+    <div class="brand"><svg class="glyph" aria-hidden="true"><use href="#g-mark"/></svg><span>IRIS</span></div>
+    <a href="#">${ic("compass")}<span>Discover</span></a>
+    <a href="#" aria-current="page"><svg class="glyph" width="20" height="20" aria-hidden="true"><use href="#g-ask"/></svg><span>Ask IRIS</span></a>
+    <a href="#">${ic("library")}<span>My Library</span></a>
+    <a href="#">${ic("megaphone")}<span>Calls &amp; Conferences</span></a>
+    <div class="who"><span class="avatar">SS</span><div>Sam Student<small>Student</small></div></div>
+  </nav>`;
+}
+
+function history() {
+  const unavailable = S.state === "unavailable";
+  const current = S.state === "answer" || S.state === "answering" ? 1 : S.state === "earlier" ? 99 : null;
+  let body;
+  if (S.state === "listfail") {
+    body = `<div class="inline-error" role="alert"><p>${ic("alert", "s16")}<span>IRIS couldn’t load your conversations. Your new questions still work.</span></p>
+      <button class="btn btn-secondary" type="button" data-act="retry-list">${ic("rotate", "s16")}Try again</button></div>`;
+  } else if (unavailable) {
+    body = `<p class="history-note">Your conversations will show here once Ask IRIS is available.</p>`;
+  } else {
+    const shown = CONVOS.filter((c) => !S.q || c.title.toLowerCase().includes(S.q.toLowerCase()));
+    let last = "";
+    body = shown.length ? shown.map((c) => {
+      const g = c.g !== last ? `<p class="group">${c.g}</p>` : ""; last = c.g;
+      return `${g}<div class="row" ${c.id === current ? 'aria-current="true"' : ""}>
+        <a href="#" data-act="open" data-id="${c.id}" ${c.id === current ? 'aria-current="page"' : ""}>${esc(c.title)}</a>
+        <button class="icon-btn more" type="button" data-act="row-menu" data-id="${c.id}" aria-haspopup="menu" aria-label="More for ${esc(c.title)}">${ic("more")}</button></div>`;
+    }).join("") : `<p class="history-note">No conversations match “${esc(S.q)}”.</p>`;
+    if (S.state === "earlier" && !S.q) body += `<p class="group">Earlier conversations</p><div class="row" aria-current="true"><a href="#" aria-current="page">Usability papers in the College of Computer Studies</a></div>`;
+  }
+  const phone = isPhone();
+  const open = phone ? S.history : S.pane;
+  const toggle = (where) => `<button class="icon-btn pane-toggle tip" type="button" data-act="pane" aria-expanded="${open}" aria-controls="conv-pane"
+      aria-label="${where === "rail" ? "Show conversations" : phone ? "Close conversations" : "Hide conversations"}" data-tip="${where === "rail" ? "Show conversations" : "Hide conversations"}">${ic(phone && where !== "rail" ? "x" : "panel-left")}</button>`;
+  return `<aside class="history" id="conv-pane" aria-label="Conversations">
+    <div class="rail">
+      <div class="pane-bar">${toggle("rail")}</div>
+      <div class="rail-tools">
+        <button class="icon-btn tip" type="button" data-act="new" data-tip="New conversation" aria-label="New conversation" ${unavailable ? "disabled" : ""}>${ic("msg-plus")}</button>
+        ${unavailable ? "" : `<button class="icon-btn tip" type="button" data-act="rail-search" data-tip="Search conversations (Ctrl K)" aria-label="Search conversations">${ic("search")}</button>`}
+      </div>
+    </div>
+    <div class="full">
+    <div class="pane-bar">${phone ? "" : toggle("full")}<p>Conversations</p>${phone ? toggle("full") : ""}</div>
+    <div class="history-head">
+      <button class="btn btn-primary" type="button" data-act="new" ${unavailable ? "disabled" : ""}>${ic("msg-plus")}New conversation</button>
+      ${unavailable ? "" : `<div class="search">${ic("search", "s16")}<label class="sr-only" for="conv-q">Search your conversations</label><input id="conv-q" type="search" placeholder="Search conversations" value="${esc(S.q)}" ${S.state === "listfail" ? "disabled" : ""}><kbd aria-hidden="true">Ctrl K</kbd></div>`}
+    </div>
+    <div class="history-list">${body}</div>
+    </div>
+  </aside>`;
+}
+
+function head() {
+  const title = { new: "Ask IRIS", listfail: "Ask IRIS", unavailable: "Ask IRIS", answering: QUESTION, answer: "What predicts chronic absenteeism?", earlier: "Usability papers in the College of Computer Studies" }[S.state];
+  const own = S.state === "answer";
+  return `<header class="thread-head">
+    <button class="icon-btn show-nav" type="button" aria-label="Open menu" data-act="toast" data-msg="Opens the IRIS menu">${ic("menu")}</button>
+    <button class="icon-btn show-history" type="button" data-act="pane" aria-expanded="${S.history}" aria-controls="conv-pane" aria-label="Show conversations">${ic("panel-left")}</button>
+    <h1 id="thread-h">${esc(title)}</h1>
+    ${own ? `<button class="icon-btn" type="button" data-act="sources" aria-expanded="${S.sources}" aria-controls="sources" aria-label="${S.sources ? "Hide" : "Show"} sources" title="Sources">${ic("panel")}</button>
+      <button class="icon-btn" type="button" data-act="row-menu" data-id="1" aria-haspopup="menu" aria-label="More for this conversation">${ic("more")}</button>` : ""}
+    ${/* Phone only, where the pane is hidden: one New conversation on screen at a time, and none while you're already in one. */
+      ["answer", "answering", "earlier"].includes(S.state) ? `<button class="icon-btn phone-new" type="button" data-act="new" aria-label="New conversation" title="New conversation">${ic("msg-plus")}</button>` : ""}
+  </header>`;
+}
+
+function answerHtml() {
+  const c = (n) => `<button class="cite" type="button" data-act="cite" data-n="${n}" aria-pressed="${S.active === n}" aria-label="Source ${n}: ${esc(PAPERS[SOURCES[n - 1].paper].title)}, page ${SOURCES[n - 1].page}">${n}</button>`;
+  return `<div class="a">
+    <p>Gradient boosting predicted chronic absenteeism best, with an F1 score of 0.81 on the held-out <span class="nw">cohort ${c(1)}.</span></p>
+    <ul>
+      <li><b>Previous-term absences</b> were the strongest single <span class="nw">predictor ${c(2)}.</span></li>
+      <li><b>First-quarter grades</b> and <b>a commute over 8 km</b> added to it once prior absences were <span class="nw">counted ${c(3)}.</span></li>
+    </ul>
+    <p>One other paper points the same way from a different angle: first-year students who rarely used the learning system missed more class <span class="nw">days ${c(4)}.</span></p>
+  </div>
+  <div class="a-meta">
+    <button class="count" type="button" data-act="sources" aria-expanded="${S.sources}" aria-controls="sources">${ic("file", "s16")}4 passages from 2 papers</button>
+    <button class="icon-btn" type="button" data-act="toast" data-msg="Answer copied" aria-label="Copy answer" title="Copy answer">${ic("copy", "s16")}</button>
+    <button class="icon-btn" type="button" data-act="ask" aria-label="Ask again" title="Ask again">${ic("rotate", "s16")}</button>
+  </div>`;
+}
+
+function thread() {
+  let body = "";
+  if (S.state === "new" || S.state === "listfail") {
+    body = `<div class="empty">
+      <svg class="glyph" aria-hidden="true"><use href="#g-ask"/></svg>
+      <h2>Ask about research in IRIS</h2>
+      <p>Answers come only from papers you can read, and each claim names the page it comes from.</p>
+      <div class="starters" role="list" aria-label="Suggested questions">${STARTERS.map((s) => `<button class="starter" type="button" role="listitem" data-act="starter" data-v="${esc(s)}">${ic("arrow-right", "s16")}<span>${esc(s)}</span></button>`).join("")}</div>
+    </div>`;
+  } else if (S.state === "unavailable") {
+    body = `<div class="state-card" role="status">
+      <span class="ico">${ic("plug")}</span>
+      <h2>Ask IRIS isn’t available on this server</h2>
+      <p>IRIS can’t give Ask IRIS permission to read papers for you, so no question can be asked here yet. This is a setup problem, not something you did.</p>
+      <a class="btn btn-secondary" href="#">${ic("compass", "s16")}Search papers in Discover</a>
+      <details class="admin-note"><summary>For the team running IRIS</summary><div>Django refuses the reader grant because research grants are not configured: set <code>AI_RESEARCH_GRANTS</code> and the <code>AI_RESEARCH_GRANT_*</code> keys in <code>backend/.env</code>, then restart the backend. <br><span style="color:var(--quiet)">Prototype note: only a System Admin sees this box.</span></div></details>
+    </div>`;
+  } else if (S.state === "earlier") {
+    body = `<div class="banner">${ic("lock", "s16")}<span>An earlier conversation, kept to read. To keep going, start a new conversation.</span></div>
+      <div class="turn"><div class="q">Which usability papers came out of the College of Computer Studies?</div>
+      <div class="a"><p>Two papers in the catalogue tested usability in the College of Computer Studies. The learning-system study scored it 61.4 on the System Usability Scale, below the benchmark of 68.</p></div></div>`;
+  } else {
+    const answering = S.state === "answering";
+    body = `<div class="turn">
+      <div class="q">${esc(QUESTION)}</div>
+      ${answering ? "" : `<div class="q-actions"><button class="icon-btn" type="button" data-act="edit" aria-label="Edit this question" title="Edit">${ic("pencil", "s16")}</button><button class="icon-btn" type="button" data-act="toast" data-msg="Question copied" aria-label="Copy question" title="Copy question">${ic("copy", "s16")}</button></div>`}
+      ${answering ? progress() : answerHtml()}
+    </div>`;
+  }
+  return `<section class="thread" aria-labelledby="thread-h">
+    ${head()}
+    <div class="thread-body" id="tb"><div class="col" aria-live="polite">${body}</div></div>
+    ${composer()}
+  </section>`;
+}
+
+function progress() {
+  const step = S.step || 0;
+  const steps = ["Searching papers you can read", "Reading 4 passages from 2 papers", "Checking every citation against its page"];
+  return `<section class="progress" aria-label="Research progress">
+    <p class="progress-head"><span class="spinner" aria-hidden="true"></span>${S.depth === "Thorough" ? "Thorough research" : "Researching"}…</p>
+    <ol class="steps">${steps.map((t, i) => `<li class="${i < step ? "done" : i === step ? "now" : "next"}">${i < step ? ic("check", "s16") : `<span class="dot"></span>`}${t}</li>`).join("")}</ol>
+  </section>`;
+}
+
+function composer() {
+  const off = S.state === "unavailable" || S.state === "earlier";
+  const busy = S.state === "answering";
+  const d = DEPTHS.find((x) => x.v === S.depth);
+  const ph = S.state === "earlier" ? "This conversation is kept to read" : off ? "Ask IRIS isn’t available on this server" : "Ask a question about research in IRIS";
+  return `<form class="composer" data-form="ask"><div class="composer-in">
+    <div class="box ${off ? "off" : ""}"><label class="sr-only" for="ask-in">Ask IRIS a question</label>
+      <textarea id="ask-in" rows="1" placeholder="${ph}" ${off ? "disabled" : ""}>${esc(S.draft)}</textarea>
+      <div class="box-row">
+        <button class="depth" type="button" data-act="depth" aria-haspopup="menu" aria-label="Research depth: ${d.v}" ${off ? "disabled" : ""}>${ic(d.icon, "s16")}${d.v}${ic("chev-down", "s16")}</button>
+        ${busy ? `<button class="send stop" type="button" data-act="stop" aria-label="Stop research" title="Stop">${ic("square", "s16")}</button>`
+               : `<button class="send" type="submit" aria-label="Send" ${off || !S.draft.trim() ? "disabled" : ""}>${ic("arrow-up")}</button>`}
+      </div></div>
+    ${off ? "" : `<p class="disclaimer">Ask IRIS can be wrong. Check the cited page.</p>`}
+  </div></form>`;
+}
+
+function sources() {
+  const on = S.state === "answer" && S.sources;
+  return `<aside class="sources" id="sources" aria-label="Sources" ${on ? "" : "hidden"}>
+    <div class="sources-head"><h2>Sources <span>· 4 passages from 2 papers</span></h2>
+      <button class="icon-btn" type="button" data-act="sources" aria-label="Hide sources">${ic("x")}</button></div>
+    <div class="sources-list">${SOURCES.map((s) => `<article class="src ${S.active === s.n ? "on" : ""}" id="src-${s.n}" aria-labelledby="src-h-${s.n}">
+      <div class="src-top"><span class="src-n" aria-hidden="true">${s.n}</span><div><h3 id="src-h-${s.n}">${esc(PAPERS[s.paper].title)}</h3><p class="src-meta">${PAPERS[s.paper].by} · page ${s.page}</p></div></div>
+      <blockquote>${s.quote}</blockquote>
+      <a href="#" data-act="toast" data-msg="Opens the paper at page ${s.page}">Open at page ${s.page}${ic("arrow-right", "s16")}</a>
+    </article>`).join("")}</div>
+  </aside>`;
+}
+
+function render(focus) {
+  const app = `<div class="app ${S.pane ? "" : "pane-closed"} ${S.history ? "history-open" : ""} ${S.state === "answer" && S.sources ? "sources-open" : ""}">
+    ${nav()}${history()}${thread()}${sources()}<div class="scrim" data-act="scrim"></div></div>`;
+  $("#stage").innerHTML = app;
+  document.querySelectorAll("[data-state]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.state === S.state));
+  document.querySelectorAll("[data-vp]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.vp === S.vp));
+  $("#wrap").className = "stage-wrap " + S.vp;
+  document.title = (S.state === "answer" ? "What predicts chronic absenteeism? · " : "") + "Ask IRIS · IRIS";
+  const ta = $("#ask-in"); if (ta) autosize(ta);
+  if (focus) { const el = $(focus); if (el) el.focus(); }
+  if (S.active) { const el = $("#src-" + S.active); if (el) el.scrollIntoView({ block: "nearest" }); }
+}
+
+/* ------------------------------------------------------------------ behaviour */
+function setState(st) { timers.forEach(clearTimeout); timers = []; S.state = st; S.menu = null; S.history = false; if (st !== "answer") { S.sources = false; S.active = null; } if (st === "answering") run(); }
+function run() {
+  S.step = 0;
+  [900, 1900, 2900].forEach((t, i) => timers.push(setTimeout(() => { if (S.state !== "answering") return; if (i < 2) { S.step = i + 1; render(); } else { S.state = "answer"; render("#tb"); } }, t)));
+}
+function autosize(ta) { if (!ta.value) { ta.style.height = ""; return; } ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 180) + "px"; }
+function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.role = "status"; t.textContent = msg; $("#stage").append(t); setTimeout(() => t.remove(), 1800); }
+function closeMenu() { const m = $(".menu"); if (m) m.remove(); if (S.menuFrom) { S.menuFrom.focus(); S.menuFrom = null; } }
+function openMenu(from, html) {
+  closeMenu();
+  const m = document.createElement("div"); m.className = "menu"; m.setAttribute("role", "menu"); m.innerHTML = html;
+  const stage = $("#stage").getBoundingClientRect(); const r = from.getBoundingClientRect();
+  $("#stage").append(m);
+  const mw = m.offsetWidth, mh = m.offsetHeight;
+  let left = Math.min(r.left - stage.left, stage.width - mw - 8); left = Math.max(8, left);
+  let top = r.bottom - stage.top + 4; if (top + mh > stage.height - 8) top = r.top - stage.top - mh - 4;
+  m.style.left = left + "px"; m.style.top = top + "px";
+  S.menuFrom = from; m.querySelector("button").focus();
+}
+
+document.addEventListener("click", (e) => {
+  const st = e.target.closest("[data-state]"); if (st) { setState(st.dataset.state); render(); return; }
+  const vp = e.target.closest("[data-vp]"); if (vp) { S.vp = vp.dataset.vp; S.history = false; render(); return; }
+  if (!e.target.closest(".menu") && !e.target.closest("[aria-haspopup]")) closeMenu();
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  const act = a.dataset.act;
+  if (a.tagName === "A") e.preventDefault();
+  switch (act) {
+    case "new": setState("new"); S.draft = ""; render("#ask-in"); break;
+    case "starter": S.draft = ""; setState("answering"); render(); break;
+    case "open": setState(a.dataset.id === "1" ? "answer" : "answer"); render("#thread-h"); break;
+    case "retry-list": setState("new"); render("#conv-q"); toast("Conversations loaded"); break;
+    case "pane":
+      if (isPhone()) { S.history = !S.history; render(S.history ? ".full .pane-toggle" : ".show-history"); }
+      else { S.pane = !S.pane; savePane(); render(S.pane ? ".full .pane-toggle" : ".rail .pane-toggle"); }
+      break;
+    case "rail-search": S.pane = true; savePane(); render("#conv-q"); break;
+    case "scrim": S.history = false; S.sources = false; S.active = null; render(); break;
+    case "sources": S.sources = !S.sources; if (!S.sources) S.active = null; render(S.sources ? ".sources .icon-btn" : null); break;
+    case "cite": { const n = Number(a.dataset.n); S.sources = true; S.active = S.active === n && S.sources ? null : n; render(); break; }
+    case "ask": setState("answering"); render(); break;
+    case "edit": S.draft = QUESTION; render("#ask-in"); break;
+    case "stop": setState("new"); S.draft = QUESTION; render("#ask-in"); toast("Stopped. Your question is back in the box."); break;
+    case "toast": toast(a.dataset.msg); break;
+    case "depth": openMenu(a, DEPTHS.map((d) => `<button type="button" role="menuitemradio" aria-checked="${d.v === S.depth}" data-act="pick-depth" data-v="${d.v}">${ic(d.icon)}<span>${d.v}<small>${d.d}</small></span>${d.v === S.depth ? ic("check", "s16 tick") : ""}</button>`).join("")); break;
+    case "pick-depth": S.depth = a.dataset.v; S.menuFrom = null; closeMenu(); render(".depth"); break;
+    case "row-menu": { const c = CONVOS.find((x) => x.id === Number(a.dataset.id)); openMenu(a, `<button type="button" role="menuitem" data-act="m-rename" data-id="${c.id}">${ic("pencil", "s16")}Rename</button>
+        <button type="button" role="menuitem" data-act="m-pin" data-id="${c.id}">${ic("pin", "s16")}${c.pinned ? "Unpin" : "Pin"}</button><hr>
+        <button type="button" role="menuitem" class="danger" data-act="m-delete" data-id="${c.id}">${ic("trash", "s16")}Delete…</button>`); break; }
+    case "m-rename": { const c = CONVOS.find((x) => x.id === Number(a.dataset.id)); const t = prompt("Rename conversation", c.title); S.menuFrom = null; closeMenu(); if (t && t.trim()) { c.title = t.trim(); render(); } break; }
+    case "m-pin": { const c = CONVOS.find((x) => x.id === Number(a.dataset.id)); c.pinned = !c.pinned; c.g = c.pinned ? "Pinned" : "Today"; CONVOS.sort((x, y) => (y.pinned ? 1 : 0) - (x.pinned ? 1 : 0)); S.menuFrom = null; closeMenu(); render(); toast(c.pinned ? "Pinned" : "Unpinned"); break; }
+    case "m-delete": { const c = CONVOS.find((x) => x.id === Number(a.dataset.id)); S.menuFrom = null; closeMenu(); if (confirm(`Delete “${c.title}”? This can’t be undone.`)) { CONVOS = CONVOS.filter((x) => x !== c); if (c.id === 1 && S.state === "answer") setState("new"); render(); toast("Conversation deleted"); } break; }
+  }
+});
+document.addEventListener("submit", (e) => { e.preventDefault(); if (!S.draft.trim()) return; S.draft = ""; setState("answering"); render(); });
+document.addEventListener("input", (e) => {
+  if (e.target.id === "ask-in") { S.draft = e.target.value; autosize(e.target); const s = $(".send:not(.stop)"); if (s) s.disabled = !S.draft.trim(); }
+  if (e.target.id === "conv-q") { S.q = e.target.value; const pos = e.target.selectionStart; render("#conv-q"); const i = $("#conv-q"); i.setSelectionRange(pos, pos); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { if ($(".menu")) { closeMenu(); return; } if (S.sources || S.history) { S.sources = false; S.history = false; S.active = null; render(); } }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); if (isPhone()) { S.history = true; render(); } else if (!S.pane) { S.pane = true; savePane(); render(); } const q = $("#conv-q"); if (q) q.focus(); }
+  if (e.target.id === "ask-in" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.target.form.requestSubmit(); }
+  const m = $(".menu"); if (m && (e.key === "ArrowDown" || e.key === "ArrowUp")) { e.preventDefault(); const items = [...m.querySelectorAll("button")]; const i = items.indexOf(document.activeElement); items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus(); }
+});
+
+const init = new URLSearchParams(location.search);
+if (init.get("state")) S.state = init.get("state");
+if (init.get("vp")) S.vp = init.get("vp");
+if (S.state === "answering") run();
+render();
+</script>
+</body>
+</html>

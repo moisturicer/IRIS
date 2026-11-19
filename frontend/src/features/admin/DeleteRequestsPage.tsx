@@ -121,7 +121,7 @@ export default function DeleteRequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Delete Requests"
+        title="Delete requests"
         description="Authors asking RDCO to remove a published record. Approving removes it from Discover and Ask IRIS; the audit log keeps the decision."
       />
 

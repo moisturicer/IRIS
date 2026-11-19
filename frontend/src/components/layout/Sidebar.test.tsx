@@ -177,11 +177,11 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     const admin = screen.getByRole("list", { name: "RDCO" });
-    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import Records");
-    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
+    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import records");
+    expect(await within(admin).findByRole("link", { name: "Role requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/rdco/users");
-    expect(within(admin).getByRole("link", { name: "Download Requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
-    expect(within(admin).getByRole("link", { name: "Delete Requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
+    expect(within(admin).getByRole("link", { name: "Download requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
+    expect(within(admin).getByRole("link", { name: "Delete requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
     expect(screen.queryByRole("link", { name: "Audit Log" })).not.toBeInTheDocument();
   });
 
@@ -192,7 +192,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
-    expect(await within(admin).findByRole("link", { name: "Reported Comments, 4 pending" }))
+    expect(await within(admin).findByRole("link", { name: "Reported comments, 4 pending" }))
       .toHaveAttribute("href", "/moderation/comments");
   });
 
@@ -202,7 +202,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     const admin = await screen.findByRole("list", { name: "Administration" });
-    expect(await within(admin).findByRole("link", { name: "Reported Comments, 2 pending" }))
+    expect(await within(admin).findByRole("link", { name: "Reported comments, 2 pending" }))
       .toHaveAttribute("href", "/moderation/comments");
   });
 
@@ -213,8 +213,8 @@ describe("the sidebar's list", () => {
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
-    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
-    expect(within(admin).getByRole("link", { name: "Delete Requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Download requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Delete requests" })).toBeInTheDocument();
   });
 
   it("shows no count, not a stale one, when the read fails", async () => {
@@ -224,7 +224,7 @@ describe("the sidebar's list", () => {
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
-    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Download requests" })).toBeInTheDocument();
   });
 
   it("reads the counts again when a decision is made, without a reload", async () => {
@@ -232,11 +232,11 @@ describe("the sidebar's list", () => {
     signIn(ROLES.RDCO, true);
     renderAt("/records/mine");
     const admin = await screen.findByRole("list", { name: "RDCO" });
-    expect(await within(admin).findByRole("link", { name: "Download Requests, 2 pending" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Download requests, 2 pending" })).toBeInTheDocument();
 
     queues({ role_change_requests: 0, download_requests: 1, delete_requests: 1 });
     act(() => { queueCountsChanged(); });
-    expect(await within(admin).findByRole("link", { name: "Download Requests, 1 pending" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Download requests, 1 pending" })).toBeInTheDocument();
   });
 
   // The System Admin asks since IR-693: it shares the Reported comments queue.
@@ -255,9 +255,9 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    // IR-693 adds Reported Comments, after Account Deletions.
+    // IR-693 adds Reported comments, after Account Deletions.
     expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
-      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported Comments", "Retention", "Notices"]);
+      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention", "Notices"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");

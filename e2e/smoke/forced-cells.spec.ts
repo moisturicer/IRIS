@@ -11,7 +11,7 @@ import { PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUN
 import { EMPTY_REVIEWS, TRACKER } from "./support/states";
 
 const screen = (id: string) => SCREENS.find((s) => s.id === id)!;
-const COMPOSER = "Ask about the research corpus";
+const COMPOSER = "Ask about the research in IRIS";
 const SECOND = { ...PAPER, id: 102, title: "Rainwater harvesting for terraced farms" };
 const searchOf = (request: Request) => new URL(request.url()).searchParams;
 const retryControl = (page: Page) => page.getByRole("button", { name: /^(Try again|Retry)$/ });

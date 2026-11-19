@@ -42,7 +42,7 @@ interface NavItem {
 // is not something you have to remember not to add. IR-160: "a dead end is
 // worse than an absence."
 
-function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed: boolean; onNavigate?: () => void }) {
+function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; collapsed: boolean; onNavigate?: () => void; nested?: boolean }) {
   const badge = item.badge != null && item.badge > 0 ? item.badge : null;
   const dot = badge == null ? item.dot : undefined;
   return (
@@ -58,7 +58,10 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
         className={({ isActive }) =>
           cn(
             // 44px on the phone drawer; compact from md, where a pointer is (IR-1092).
-            "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center gap-3 rounded-control px-3 py-2 text-sm",
+            // A nested row gives up some padding and gap so a name like "Workflow
+            // analytics" fits at 240px without being cut short (IR-1180).
+            "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center rounded-control py-2 text-sm",
+            nested ? "gap-2 px-2" : "gap-3 px-3",
             collapsed && "md:h-10 md:justify-center md:px-0",
             // Active is "here" (a Desk Stone fill); hover is the lighter Bar Stone, so a
             // hovered row can never be mistaken for the page you are on (IR-1097).
@@ -121,12 +124,12 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
         <ul
           role="list"
           className={cn(
-            "ml-5 mt-0.5 space-y-0.5 border-l border-stone-200 pl-2",
+            "ml-3 mt-0.5 space-y-0.5 border-l border-stone-200 pl-1.5",
             collapsed && "md:ml-0 md:border-l-0 md:pl-0",
           )}
         >
           {item.children.map((child) => (
-            <NavItemLink key={child.to} item={child} collapsed={collapsed} onNavigate={onNavigate} />
+            <NavItemLink key={child.to} item={child} collapsed={collapsed} onNavigate={onNavigate} nested />
           ))}
         </ul>
       )}

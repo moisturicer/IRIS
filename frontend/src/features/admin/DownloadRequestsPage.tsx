@@ -115,7 +115,7 @@ export default function DownloadRequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Download Requests"
+        title="Download requests"
         description="Requests for a PDF copy of a paper. Reading in IRIS needs no approval."
       />
 

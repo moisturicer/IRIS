@@ -132,7 +132,7 @@ export default function ImportRecordsPage() {
   return (
     <div>
       <PageHeader
-        title="Import Records"
+        title="Import records"
         description="Add papers that were finished before IRIS, in one batch. IRIS checks every row before anything is added."
       />
 

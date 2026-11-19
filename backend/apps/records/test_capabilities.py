@@ -272,6 +272,12 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 u, "post", url("record-review-comments", r),
                 {"body": "A question on section 3.", "kind": "discussion"},
             ),
+            # A thread on a passage: an owner's, or an open seat's (IR-1226). A
+            # 400 for a passage this test paper lacks is still an offer kept.
+            "start_thread": lambda r, u, d: self._call(
+                u, "post", url("record-review-comments", r),
+                {"body": "Is this the response rate?", "anchor": {"version": 1, "page": 1, "quote": "respondents"}},
+            ),
             # A thread on no passage: a reviewer's alone (ADR-032 §7, IR-1194).
             "open_general_thread": lambda r, u, d: self._call(
                 u, "post", url("record-review-comments", r), {"body": "Section 3 needs a source."},
@@ -320,12 +326,14 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # Office staff are offered `tag_ip` on every record they can see (decided
     # 2026-10-11: the offer follows `tags/`, not published records alone).
     OFFICE = {"cite", "tag_ip"}
-    # The review discussion is its participants': the owners and anyone who
-    # has ever held a seat, on a submitted record (ADR-032 §7, IR-419). A
-    # reviewer whose part is done keeps it, so the Adviser keeps it after
-    # routing and ITSO after clearing. A reviewer may also open a thread on no
-    # passage; an owner's threads are on a passage only (IR-1194).
-    TAKES_PART = {"cite", "comment_review", "open_general_thread"}
+    # The review discussion is its participants', on a submitted record
+    # (ADR-032 §7, IR-419). A reviewer whose part is done still writes in
+    # Conversation and replies, so the Adviser keeps that after routing, ITSO
+    # after clearing and RDCO after deciding; starting a thread takes an open
+    # seat (IR-1226, 2026-11-19). An owner starts threads on a passage only;
+    # an open seat on no passage too (IR-1194).
+    TAKES_PART = {"cite", "comment_review"}
+    OPENS_THREADS = {"comment_review", "start_thread", "open_general_thread"}
     # Every paper starts embargoed (ADR-052, IR-882). Once it is submitted, the
     # Adviser and RDCO may date it, and release it while it is held (§5-6 as
     # amended). Owners and the other offices never do either.
@@ -336,18 +344,19 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     SEATED = {"finish_review"}
     ADVISER_AT_ENTRY = {
         "cite", "open_review", "send_to_rdco", "reject",
-        "request_document", "request_revision", "comment_review", "open_general_thread",
-    } | EMBARGO_ACTS | SEATED
+        "request_document", "request_revision",
+    } | OPENS_THREADS | EMBARGO_ACTS | SEATED
     ITSO_SEATED = {
         "cite", "tag_ip", "attach_file", "request_document", "open_review",
-        "office_review", "add_reviewer", "route", "comment_review", "open_general_thread",
-    } | SEATED
+        "office_review", "add_reviewer", "route",
+    } | OPENS_THREADS | SEATED
     # Any owner names the Contact person, on every paper in every state, and
     # nobody else does (ADR-051 decision 27, IR-801; offered since IR-803).
     NAMES_CONTACT = {"change_contact_person"}
     # An owner is offered the one delete its record's status names (IR-508).
-    OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"} | NAMES_CONTACT
-    OWNER_AFTER_REVIEW = {"cite", "request_deletion", "comment_review"} | NAMES_CONTACT
+    OWNER_TALK = {"comment_review", "start_thread"}
+    OWNER_IN_REVIEW = {"cite", "withdraw_submission"} | OWNER_TALK | NAMES_CONTACT
+    OWNER_AFTER_REVIEW = {"cite", "request_deletion"} | OWNER_TALK | NAMES_CONTACT
     # RDCO publishes only a released paper (ADR-052 §14 as amended), so while
     # these are held it keeps them unlisted or rejects them. Record detail still
     # offers *publish* to the seated RDCO, held with the embargo's reason, so the
@@ -358,8 +367,8 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     RDCO_ACTS = {"add_owner", "withdraw_paper"}
     RDCO_ADVISER_OPEN = RDCO_UNSEATED | RDCO_ACTS | {"replace_adviser"}
     RDCO_SEATED = {"cite", "tag_ip", "attach_file", "request_document", "open_review",
-                   "add_reviewer", "route", "comment_review", "open_general_thread", "request_revision",
-                   "keep_unlisted", "reject", "accept_publish"} | EMBARGO_ACTS | SEATED | RDCO_ACTS
+                   "add_reviewer", "route", "request_revision",
+                   "keep_unlisted", "reject", "accept_publish"} | OPENS_THREADS | EMBARGO_ACTS | SEATED | RDCO_ACTS
     EXPECTED = {
         "draft": {
             "owner": {"cite", "continue_draft", "edit_details", "delete_record"} | NAMES_CONTACT, "adviser": {"cite"},
@@ -373,11 +382,12 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_ADVISER_OPEN, "stranger": None,
         },
-        # ITSO's pool: any ITSO member may file and ask for documents, but
-        # opens, clears and routes only once seated.
+        # ITSO's pool: an unseated ITSO member reads it as any office does.
+        # Filing and asking for documents take a seat since IR-1226, as
+        # opening, clearing and routing already did.
         "itso_pool": {
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_TAKES_PART,
-            "itso": {"cite", "tag_ip", "attach_file", "request_document"},
+            "itso": OFFICE,
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         "itso_open": {
@@ -407,7 +417,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         "published": {
             "owner": OWNER_AFTER_REVIEW,
             "adviser": TAKES_PART | {"set_embargo"},
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review", "open_general_thread", "set_embargo"},
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review", "set_embargo"},
             "stranger": {"cite"},
         },
         # A stranger reading the paper learns nothing of its embargo.
@@ -415,7 +425,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "owner": OWNER_AFTER_REVIEW,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
-            "rdco": OFFICE | {"comment_review", "open_general_thread"} | EMBARGO_ACTS, "stranger": {"cite"},
+            "rdco": OFFICE | {"comment_review"} | EMBARGO_ACTS, "stranger": {"cite"},
         },
         # Unlisted (IR-878): any RDCO member is offered the later publish, held
         # back while the embargo is Active so its reason can be shown.
@@ -423,21 +433,21 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "owner": OWNER_AFTER_REVIEW,
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
-            "rdco": OFFICE | {"comment_review", "open_general_thread", "publish_unlisted"} | EMBARGO_ACTS, "stranger": None,
+            "rdco": OFFICE | {"comment_review", "publish_unlisted"} | EMBARGO_ACTS, "stranger": None,
         },
         "unlisted_released": {
             "owner": OWNER_AFTER_REVIEW,
             "adviser": TAKES_PART | {"set_embargo"},
             "itso": OFFICE, "ierc": OFFICE,
-            "rdco": OFFICE | {"comment_review", "open_general_thread", "set_embargo", "publish_unlisted"}, "stranger": None,
+            "rdco": OFFICE | {"comment_review", "set_embargo", "publish_unlisted"}, "stranger": None,
         },
         # A Proposal's Adviser accepts it or rejects it; it is never routed.
         "proposal_with_adviser": {
             "owner": OWNER_IN_REVIEW,
             "adviser": {
                 "cite", "open_review", "accept_proposal", "reject",
-                "request_document", "request_revision", "comment_review", "open_general_thread",
-            } | EMBARGO_ACTS | SEATED,
+                "request_document", "request_revision",
+            } | OPENS_THREADS | EMBARGO_ACTS | SEATED,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_ADVISER_OPEN, "stranger": None,
         },
         # An accepted Proposal's owner may continue it once (ADR-032 §6, IR-417).

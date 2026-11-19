@@ -98,7 +98,7 @@ afterEach(() => {
 it("delivers a question through the runtime and reopens the same answer after a reload", async () => {
   const user = userEvent.setup();
   const first = renderAsk("/ai");
-  const box = await screen.findByRole("textbox", { name: "Ask about the research corpus" });
+  const box = await screen.findByRole("textbox", { name: "Ask about the research in IRIS" });
   await user.type(box, live.question);
   await user.click(screen.getByRole("button", { name: "Send message" }));
 
@@ -138,7 +138,7 @@ it.each([
   route = (config) => (config.url === "/ai/runtime/runs" ? reply : runtime(config));
   const user = userEvent.setup();
   const { container } = renderAsk("/ai");
-  await user.type(await screen.findByRole("textbox", { name: "Ask about the research corpus" }), "Compare");
+  await user.type(await screen.findByRole("textbox", { name: "Ask about the research in IRIS" }), "Compare");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(message);
   expect(screen.queryByRole("button", { name: "Reconnect" }) !== null).toBe(canReconnect);
@@ -237,7 +237,7 @@ describe("the open conversation's toolbar (IR-1167)", () => {
 
   it("offers no download before a conversation exists", async () => {
     renderAsk("/ai");
-    await screen.findByRole("textbox", { name: "Ask about the research corpus" });
+    await screen.findByRole("textbox", { name: "Ask about the research in IRIS" });
     expect(screen.queryByRole("button", { name: "Download conversation as Markdown" })).not.toBeInTheDocument();
   });
 });

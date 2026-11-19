@@ -35,10 +35,10 @@ function visit(path: string, role: RoleName, staff = false, review_access?: Revi
 describe("role-owned addresses (IR-783)", () => {
   it.each([
     ["/rdco/users", "Users"],
-    ["/rdco/role-requests", "Role Requests"],
-    ["/rdco/download-requests", "Download Requests"],
-    ["/rdco/call-requests", "Call Requests"],
-    ["/rdco/delete-requests", "Delete Requests"],
+    ["/rdco/role-requests", "Role requests"],
+    ["/rdco/download-requests", "Download requests"],
+    ["/rdco/call-requests", "Call requests"],
+    ["/rdco/delete-requests", "Delete requests"],
   ])("opens %s for RDCO", async (path, title) => {
     visit(path, ROLES.RDCO);
     expect(await screen.findByRole("heading", { level: 1, name: title })).toBeInTheDocument();

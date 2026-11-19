@@ -69,7 +69,7 @@ export default function CallRequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Call Requests"
+        title="Call requests"
         description="Advisers' calls for papers waiting for RDCO, oldest first. A request leaves this list when its paper deadline passes."
       />
 

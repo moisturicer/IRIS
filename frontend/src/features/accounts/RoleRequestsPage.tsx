@@ -60,7 +60,7 @@ export default function RoleRequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Role Requests"
+        title="Role requests"
         description="People asking for a different role, such as office reviewer."
       />
 

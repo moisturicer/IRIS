@@ -487,8 +487,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       beside={usage.latest && <TokenUsageMeter usage={usage.latest} />}
       onStop={run && activeRun(run) && !compactionRun(run) && !busy ? () => void stop() : undefined}
       maxLength={4000}
-      placeholder={scope ? "Ask about this paper…" : "Ask about the research corpus…"}
-      disabled={busy || !!error || !!opening || !!(run && activeRun(run))} label={scope ? "Ask about this paper" : "Ask about the research corpus"}>
+      placeholder={scope ? "Ask about this paper…" : "Ask about the research in IRIS…"}
+      disabled={busy || !!error || !!opening || !!(run && activeRun(run))} label={scope ? "Ask about this paper" : "Ask about the research in IRIS"}>
       <ModelPill name="Research depth" value={depth} options={DEPTHS} onChange={setDepth}
         note="IRIS chooses the model for each answer." />
       {scopeToggle && <button type="button" onClick={() => scopeToggle.onChange(!scopeToggle.allPapers)}
