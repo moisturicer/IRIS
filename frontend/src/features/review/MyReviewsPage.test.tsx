@@ -495,6 +495,26 @@ describe("MyReviewsPage due dates (IR-622)", () => {
     expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("labels the sort and sets Overdue only apart as a filter, not a third sort (IR-1243)", async () => {
+    show();
+    const sort = await screen.findByRole("group", { name: "Sort" });
+    const filter = screen.getByRole("group", { name: "Filter" });
+
+    // Both names are on screen, not only read aloud.
+    expect(within(sort).getByText("Sort")).toBeVisible();
+    expect(within(filter).getByText("Filter")).toBeVisible();
+    expect(within(sort).queryByRole("button", { name: "Overdue only" })).not.toBeInTheDocument();
+    expect(within(filter).getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "false");
+
+    // A sort does not clear the filter: they combine.
+    await userEvent.click(within(filter).getByRole("button", { name: "Overdue only" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Sort" })).getByRole("button", { name: "Longest waiting" }));
+    await waitFor(() =>
+      expect(mine).toHaveBeenLastCalledWith({ tab: "to_review", outcome: null, office: null, cursor: null, sort: "waiting", overdue: true }),
+    );
+    expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("clears Overdue only when the tab changes, as leaving Done clears its outcome (IR-1210)", async () => {
     show();
     const overdueOnly = await screen.findByRole("button", { name: "Overdue only" });
