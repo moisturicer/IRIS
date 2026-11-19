@@ -406,7 +406,7 @@ export const DIALOGS: DialogCase[] = [
     id: "ask iris chat history on a narrow screen", screen: "ask-iris-conversation", sources: ["features/ai/components/ChatDrawer.tsx", "features/ai/RAGChatPage.tsx"],
     viewport: { width: 640, height: 900 },
     // IR-1233: the one pane toggle, "Show conversations", opens this dialog at 640px and below.
-    open: press("Show conversations"), dialog: (page) => page.getByRole("dialog", { name: "Chat history" }),
+    open: press("Show conversations"), dialog: (page) => page.getByRole("dialog", { name: "Conversations" }),
   },
   consoleAction("assign a reviewer", "Assign", "pool", "features/review/AssignReviewerDialog.tsx"),
   consoleAction("reassign a reviewer", "Reassign", "seat", "features/review/ReassignDialog.tsx"),

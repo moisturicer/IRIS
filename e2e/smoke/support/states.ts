@@ -203,7 +203,7 @@ export const STATES: UiState[] = [
   }, {
     loading: announced("Loading this conversation"),
     ok: RUNTIME_CONVERSATION, recovered: text("What would you like to investigate?"),
-    revokedNext: (page) => page.getByRole("link", { name: "Start a new chat" }),
+    revokedNext: (page) => page.getByRole("link", { name: "Start a new conversation" }),
   }),
 
   // Review.
