@@ -186,22 +186,22 @@ export const SCREEN_ACCESS = {
 
   // --- RDCO coordination (ADR-051, IR-783) ----------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
-                 nav: { label: "Import Records", icon: "fa-file-import", section: "RDCO" } },
+                 nav: { label: "Import records", icon: "fa-file-import", section: "RDCO" } },
   users:         { path: "/rdco/users", roles: COORDINATOR,
                  nav: { label: "Users", icon: "fa-users", section: "RDCO" } },
   roleRequests:  { path: "/rdco/role-requests", roles: COORDINATOR,
-                 nav: { label: "Role Requests", icon: "fa-user-check", section: "RDCO" } },
+                 nav: { label: "Role requests", icon: "fa-user-check", section: "RDCO" } },
   downloadRequests: { path: "/rdco/download-requests", roles: COORDINATOR,
-                 nav: { label: "Download Requests", icon: "fa-download", section: "RDCO" } },
+                 nav: { label: "Download requests", icon: "fa-download", section: "RDCO" } },
   // ADR-050 decision 8 and ADR-051: Advisers' Calls waiting for RDCO (IR-765).
   callRequests:  { path: "/rdco/call-requests", roles: COORDINATOR,
-                 nav: { label: "Call Requests", icon: "fa-bullhorn", section: "RDCO" } },
+                 nav: { label: "Call requests", icon: "fa-bullhorn", section: "RDCO" } },
   deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
-                 nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "RDCO" } },
+                 nav: { label: "Delete requests", icon: "fa-trash-alt", section: "RDCO" } },
   // One page for RDCO and the System Admin (IR-693, decision 2026-11-15), each
   // reaching it from their own section, as with Notices below.
   reportedComments: { path: "/moderation/comments", roles: COORDINATOR,
-                 nav: { label: "Reported Comments", icon: "fa-flag", section: "RDCO" } },
+                 nav: { label: "Reported comments", icon: "fa-flag", section: "RDCO" } },
   // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): one
   // Notices page at one address. RDCO publishes there; the System Admin reads
   // it from `adminNotices`, the same page, in its own sidebar section.
@@ -223,7 +223,7 @@ export const SCREEN_ACCESS = {
                  nav: { label: "Account Deletions", icon: "fa-user-slash", section: "Administration" } },
   // The Reported comments page above, shared (IR-693).
   adminReportedComments: { path: "/moderation/comments", roles: SYSTEM_ADMIN,
-                 nav: { label: "Reported Comments", icon: "fa-flag", section: "Administration" } },
+                 nav: { label: "Reported comments", icon: "fa-flag", section: "Administration" } },
   // ADR-051 §3 and §19: the System Admin sets retention periods (IR-795).
   retention:     { path: "/admin/retention", roles: SYSTEM_ADMIN,
                  nav: { label: "Retention", icon: "fa-clock-rotate-left", section: "Administration" } },
