@@ -1,9 +1,11 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { cn, formatDate } from "@/lib/utils";
 import { TITLE_MAX, TITLE_TOO_LONG, type ReaderConversationSummary } from "@/api/runtimeReader";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { HERE } from "@/components/ui/highlightRoles";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { PanelLeftIcon } from "./AskIrisIcons";
 import { EarlierConversationList } from "./EarlierConversations";
 import { usePinnedConversations, type Pin } from "../hooks/usePinnedConversations";
 
@@ -25,15 +27,27 @@ export const SIDEBAR_MIN = 220;
 export const SIDEBAR_MAX = 480;
 export const SIDEBAR_DEFAULT = 280;
 
+/** The width of the strip the pane shrinks to while it is closed (IR-1233). */
+export const STRIP_WIDTH = 60;
+/** How long the open/close width animation is given before resizing follows the pointer again. */
+const SETTLE_MS = 240;
+
 interface ConversationSidebarProps {
   conversations:    ReaderConversationSummary[];
   activeId:         string | null;
   open:             boolean;
   search:           HistorySearch;
+  /** The pane's id, which the toggle's `aria-controls` names. */
+  id:               string;
+  /** The search box, so the page can put focus in it when it opens the pane to search. */
+  searchRef?:       RefObject<HTMLInputElement>;
   onDelete:         (id: string) => void;
   onRename:         RenameConversation;
   onNewChat:        () => void;
-  onCollapse:       () => void;
+  /** The strip's Search: the page opens the pane and focuses the search box. */
+  onSearch:         () => void;
+  /** Opens a closed pane and closes an open one. */
+  onToggle:         () => void;
   /** The column's width, which the reader drags or arrows (`SIDEBAR_MIN`–`SIDEBAR_MAX`). */
   width:            number;
   onResize:         (width: number) => void;
@@ -43,23 +57,94 @@ const NAV_ITEM =
   "flex min-h-10 w-full min-w-0 items-center gap-3 rounded-control px-3 text-body text-stone-700 " +
   "hover:bg-stone-200/70 hover:text-stone-900 " + COLOUR_TRANSITION + " " + FOCUS_RING;
 
+const ICON_BUTTON =
+  "inline-flex size-10 shrink-0 items-center justify-center rounded-control text-stone-600 " +
+  "hover:bg-stone-200/70 hover:text-stone-900 " + COLOUR_TRANSITION + " " + FOCUS_RING;
+
+/**
+ * The one toggle for the conversations pane (IR-1233): a left-panel icon at the
+ * pane's top-left, in the same place open or closed, so a reader never hunts for
+ * it and focus stays on it through the change. On a phone the same button sits in
+ * the chat header and opens the pane as a dialog (`asDialog`).
+ */
+export function ConversationsToggle({ open, onClick, controls, asDialog = false }: {
+  open: boolean;
+  onClick: () => void;
+  controls?: string;
+  asDialog?: boolean;
+}) {
+  const label = open ? "Hide conversations" : "Show conversations";
+  return <Tooltip label={label} className="shrink-0">
+    <button type="button" onClick={onClick} aria-label={label} aria-expanded={open}
+      aria-controls={controls} aria-haspopup={asDialog ? "dialog" : undefined}
+      className={cn(ICON_BUTTON, asDialog && "size-11")}>
+      <PanelLeftIcon />
+    </button>
+  </Tooltip>;
+}
+
+/**
+ * The pane pushes the chat over, never covers it. Open it is the toggle and
+ * New chat over Search, Pinned and Recents; closed it narrows to a strip of the
+ * toggle, a New chat icon and a Search icon. The list keeps its own width while
+ * the column animates, so it slides rather than reflows.
+ */
 export function ConversationSidebar({
-  conversations, activeId, open, search, onDelete, onRename, onNewChat, onCollapse, width, onResize,
+  conversations, activeId, open, search, id, searchRef, onDelete, onRename, onNewChat, onSearch, onToggle, width, onResize,
 }: ConversationSidebarProps) {
+  // A drag must follow the pointer, so the width eases only while the pane opens or closes.
+  // Decided while rendering, so the render that changes the width already carries the transition.
+  const [easing, setEasing] = useState(false);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) { setWasOpen(open); setEasing(true); }
+  useEffect(() => {
+    if (!easing) return;
+    const timer = window.setTimeout(() => setEasing(false), SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [easing]);
+
   return (
     <aside
-      style={{ width: open ? width : 0 }}
+      id={id}
+      style={{ width: open ? width : STRIP_WIDTH }}
       className={cn(
-        "relative shrink-0 flex flex-col bg-stone-50",
-        // `invisible` also drops the collapsed panel out of the tab order.
-        open ? "border-r border-stone-200" : "border-r-0 invisible overflow-hidden",
+        "relative shrink-0 flex flex-col bg-stone-50 border-r border-stone-200",
+        easing && "transition-[width] duration-200 ease-out motion-reduce:transition-none",
       )}
       aria-label="Chat history"
-      aria-hidden={!open}
     >
-      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
-        <ConversationHistoryList conversations={conversations} activeId={activeId} search={search}
-          onDelete={onDelete} onRename={onRename} onNewChat={onNewChat} onCollapse={onCollapse} />
+      <div className="h-full min-h-0 w-full overflow-hidden">
+        {/* Fixed width, so the list does not reflow while the column animates. */}
+        <div className="relative flex h-full min-h-0 flex-col" style={{ width: Math.max(width, STRIP_WIDTH) }}>
+          <div className="flex h-14 shrink-0 items-center gap-1 border-b border-stone-200/80 px-2.5">
+            <ConversationsToggle open={open} onClick={onToggle} controls={id} />
+            {open && <button type="button" onClick={onNewChat} className={cn(NAV_ITEM, "flex-1")}>
+              <i className="fas fa-plus w-4 text-center text-label" aria-hidden />
+              <span className="font-medium">New chat</span>
+            </button>}
+          </div>
+
+          {/* Hidden, not unmounted, so a search and the scroll position survive a close. */}
+          <div aria-hidden={!open} {...(open ? {} : { inert: "" })}
+            className={cn("flex min-h-0 flex-1 flex-col transition-[opacity,visibility] duration-200 motion-reduce:transition-none",
+              !open && "invisible opacity-0")}>
+            <ConversationHistoryList conversations={conversations} activeId={activeId} search={search}
+              searchRef={searchRef} onDelete={onDelete} onRename={onRename} />
+          </div>
+
+          {!open && <div className="absolute left-0 top-14 flex flex-col items-center gap-1 pt-3" style={{ width: STRIP_WIDTH }}>
+            <Tooltip label="New chat">
+              <button type="button" onClick={onNewChat} aria-label="New chat" className={ICON_BUTTON}>
+                <i className="fas fa-plus text-label" aria-hidden />
+              </button>
+            </Tooltip>
+            <Tooltip label="Search conversations (Ctrl+K)">
+              <button type="button" onClick={onSearch} aria-label="Search conversations" className={ICON_BUTTON}>
+                <i className="fas fa-magnifying-glass text-label" aria-hidden />
+              </button>
+            </Tooltip>
+          </div>}
+        </div>
       </div>
       {open && <SidebarResizer width={width} onChange={onResize} />}
     </aside>
@@ -95,12 +180,12 @@ function SidebarResizer({ width, onChange }: { width: number; onChange: (width: 
 }
 
 /**
- * New chat, Search (IR-1161), Pinned and Recents, each Conversation a link to
- * its own address with Pin, Rename (IR-1160) and Delete. Beside the answer on
- * a wide page, and in the history drawer on a phone (IR-570).
+ * Search (IR-1161), Pinned and Recents, each Conversation a link to its own
+ * address with Pin, Rename (IR-1160) and Delete. Beside the answer on a wide
+ * page, and in the history drawer on a phone (IR-570).
  */
 export function ConversationHistoryList({
-  conversations, activeId, search, onDelete, onRename, onNewChat, onCollapse,
+  conversations, activeId, search, onDelete, onRename, searchRef: givenRef,
 }: {
   conversations: ReaderConversationSummary[];
   activeId:      string | null;
@@ -108,11 +193,12 @@ export function ConversationHistoryList({
   onDelete:      (id: string) => void;
   /** Absent, a row offers no Rename. */
   onRename?:     RenameConversation;
-  onNewChat?:    () => void;
-  onCollapse?:   () => void;
+  /** Lets the page focus the search box; the list keeps its own when none is given. */
+  searchRef?:    RefObject<HTMLInputElement>;
 }) {
   const searchId = useId();
-  const searchRef = useRef<HTMLInputElement>(null);
+  const ownRef = useRef<HTMLInputElement>(null);
+  const searchRef = givenRef ?? ownRef;
   const [pinnedOpen, setPinnedOpen] = useState(true);
   const { pins, toggle, retitle, unpin } = usePinnedConversations();
 
@@ -141,16 +227,6 @@ export function ConversationHistoryList({
 
   return (<>
     <div className="shrink-0 space-y-0.5 px-2 pt-2">
-      {onNewChat && <div className="flex items-center gap-1">
-        <button type="button" onClick={onNewChat} className={NAV_ITEM}>
-          <i className="fas fa-plus w-4 text-center text-label" aria-hidden />
-          <span className="font-medium">New chat</span>
-        </button>
-        {onCollapse && <button type="button" onClick={onCollapse} aria-label="Hide chat history" title="Hide history"
-          className={cn("inline-flex size-10 shrink-0 items-center justify-center rounded-control text-stone-500 transition-colors hover:bg-stone-200/70 hover:text-stone-800", FOCUS_RING)}>
-          <i className="fas fa-angles-left text-small" aria-hidden />
-        </button>}
-      </div>}
       <label htmlFor={searchId} className={cn(NAV_ITEM, "cursor-text focus-within:bg-stone-200/70")}>
         <i className="fas fa-magnifying-glass w-4 text-center text-label" aria-hidden />
         <span className="sr-only">Search your past conversations</span>

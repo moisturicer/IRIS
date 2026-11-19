@@ -32,9 +32,9 @@ function Sidebar({ titles = ["Flood methods", "Pond sampling"], onRename, onNewC
     return problem;
   };
   return <MemoryRouter>
-    <ConversationSidebar conversations={conversations} activeId={null} open search={search}
-      onDelete={() => undefined} onRename={rename} onNewChat={onNewChat} onCollapse={() => undefined}
-      width={width} onResize={setWidth} />
+    <ConversationSidebar id="pane" conversations={conversations} activeId={null} open search={search}
+      onDelete={() => undefined} onRename={rename} onNewChat={onNewChat} onSearch={() => undefined}
+      onToggle={() => undefined} width={width} onResize={setWidth} />
   </MemoryRouter>;
 }
 

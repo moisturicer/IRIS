@@ -52,13 +52,13 @@ const CHAT_MEASURE = "max-w-[min(92vw,136ch)]";
 export const CHAT_COLUMN = `w-full ${CHAT_MEASURE} mx-auto`;
 
 /**
- * Ask IRIS's history and sources sit beside the answer from this page width,
- * and open as drawers over it below (IR-570). It is the width at which the
- * answer column keeps 640px -- the reading minimum IR-569 holds the paper to
- * -- with the 260px history beside it. Read off the page's own measured width,
- * not the window's, so the app sidebar's state counts.
+ * Up to this page width, and only here, Ask IRIS's conversations open as a
+ * dialog over the chat (IR-1233, replacing IR-570's 900px rule for history).
+ * A phone has no room to push the chat over; a tablet does. Read off the
+ * page's own measured width, not the window's, so the app sidebar's state
+ * counts.
  */
-export const ASK_PANELS_INLINE_PX = 900;
+export const ASK_PHONE_MAX_PX = 640;
 
 // Auto margins center the opening content and collapse when it needs to scroll.
 export const CHAT_OPENING = "overflow-y-auto before:my-auto before:content-[''] after:my-auto after:content-['']";

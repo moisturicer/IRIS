@@ -6,7 +6,7 @@
  * opens read-only (`EarlierConversation`), so nothing a reader asked is lost,
  * and continuing it means asking again here.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useConsumeHandoff } from "@/lib/askHandoff";
 import { isAxiosError } from "axios";
@@ -23,11 +23,24 @@ import {
   ConversationHistoryList, ConversationSidebar, NewChatButton, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
   type RenameConversation,
 } from "./components/ConversationSidebar";
-import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
+import { ASK_PHONE_MAX_PX } from "./components/answerLayout";
 import { useConversationHistory } from "./hooks/useConversationHistory";
 
 const RUNTIME_ID = /^[0-9a-f-]{36}$/i;
 const SIDEBAR_KEY = "iris-ask-sidebar-width";
+const PANE_KEY = "iris-ask-pane";
+
+/** The reader's last choice for the conversations pane; blocked storage means open. */
+function readPaneOpen() {
+  try {
+    return localStorage.getItem(PANE_KEY) !== "closed";
+  } catch {
+    return true;
+  }
+}
+function savePaneOpen(open: boolean) {
+  try { localStorage.setItem(PANE_KEY, open ? "open" : "closed"); } catch { /* per-browser convenience */ }
+}
 
 function readSidebarWidth() {
   try {
@@ -38,8 +51,6 @@ function readSidebarWidth() {
   }
 }
 const EARLIER_ID = /^[1-9]\d*$/;
-
-type AskPanel = "history";
 
 export default function RAGChatPage() {
   const rawId = useParams().conversationId;
@@ -68,24 +79,52 @@ function RuntimeAskPage() {
     setSidebarWidth(width);
     try { localStorage.setItem(SIDEBAR_KEY, String(width)); } catch { /* per-browser convenience */ }
   };
-  const [historyOpen, setHistoryOpen] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ReaderConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [observePage, pageWidth] = useElementWidth<HTMLDivElement>();
-  const asDrawers = pageWidth > 0 && pageWidth < ASK_PANELS_INLINE_PX;
-  const [drawer, setDrawer] = useState<AskPanel | null>(null);
-  const drawerOpener = useRef<HTMLElement | null>(null);
 
-  useEffect(() => { setDrawer(null); }, [conversationId]);
-  useEffect(() => { setDrawer(null); }, [asDrawers]);
+  // The conversations pane (IR-1233). Beside the chat it pushes it over, open or
+  // closed to a strip, and the choice is kept per browser. On a phone it is a
+  // dialog over the chat instead, closed whenever the page is.
+  const phone = pageWidth > 0 && pageWidth <= ASK_PHONE_MAX_PX;
+  const paneId = useId();
+  const [paneOpen, setPaneOpen] = useState(readPaneOpen);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const dialogOpener = useRef<HTMLElement | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [searchAsked, setSearchAsked] = useState(0);
+  const paneShown = phone ? dialogOpen : paneOpen;
 
-  const shown = (panel: AskPanel) => asDrawers ? drawer === panel : historyOpen;
-  const toggle = (panel: AskPanel) => {
-    if (!asDrawers) { setHistoryOpen(v => !v); return; }
-    drawerOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setDrawer(panel);
+  useEffect(() => { setDialogOpen(false); }, [conversationId, phone]);
+
+  const setPane = (open: boolean) => { setPaneOpen(open); savePaneOpen(open); };
+  const openDialog = () => {
+    dialogOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setDialogOpen(true);
   };
+
+  // Search from a closed pane (the strip's Search, or Ctrl+K) opens it first.
+  const openSearch = useCallback(() => {
+    if (phone) {
+      dialogOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setDialogOpen(true);
+    } else if (!paneOpen) {
+      setPaneOpen(true);
+      savePaneOpen(true);
+    }
+    setSearchAsked(n => n + 1);
+  }, [phone, paneOpen]);
+  useEffect(() => { if (searchAsked > 0) searchRef.current?.focus(); }, [searchAsked]);
+  // While the pane is shown the list takes Ctrl+K itself; here it is closed.
+  useEffect(() => {
+    if (paneShown) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openSearch(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [paneShown, openSearch]);
 
   // A conversation names the tab with its own title (IR-1073); a new chat keeps "Ask IRIS".
   usePageTitle(titleOf(conversationId));
@@ -123,14 +162,15 @@ function RuntimeAskPage() {
 
 
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
-    <div className="relative flex min-h-0 min-w-0 flex-1" {...(drawer ? { inert: "" } : {})}>
-      {!asDrawers && <ConversationSidebar conversations={conversations} activeId={conversationId ?? null}
-        open={historyOpen} search={search} onNewChat={newChat} onCollapse={() => toggle("history")}
+    <div className="relative flex min-h-0 min-w-0 flex-1" {...(dialogOpen ? { inert: "" } : {})}>
+      {!phone && <ConversationSidebar id={paneId} conversations={conversations} activeId={conversationId ?? null}
+        open={paneOpen} search={search} searchRef={searchRef} onNewChat={newChat} onSearch={openSearch}
+        onToggle={() => setPane(!paneOpen)}
         onRename={rename} width={sidebarWidth} onResize={resizeSidebar}
         onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
-        <ChatToolbar sessionTitle={title} historyOpen={shown("history")}
-          onToggleHistory={() => toggle("history")} asDrawers={asDrawers}
+        <ChatToolbar sessionTitle={title}
+          phoneHistory={phone ? { open: dialogOpen, onOpen: openDialog } : undefined}
           onDownload={conversationId ? () => api.download(conversationId) : undefined} />
         <div className="flex min-h-0 flex-1 flex-col">
           <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
@@ -145,13 +185,14 @@ function RuntimeAskPage() {
       </div>
     </div>
 
-    {drawer === "history" && <ChatDrawer title="Chat history" side="start" closeLabel="Close chat history"
-      onClose={() => setDrawer(null)} returnTo={drawerOpener.current}>
+    {phone && dialogOpen && <ChatDrawer title="Chat history" side="start" closeLabel="Close chat history"
+      onClose={() => setDialogOpen(false)} returnTo={dialogOpener.current}>
       <div className="flex shrink-0 px-3 pt-3">
-        <NewChatButton onClick={() => { setDrawer(null); newChat(); }} />
+        <NewChatButton onClick={() => { setDialogOpen(false); newChat(); }} />
       </div>
       <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={search}
-        onRename={rename} onDelete={id => { setDrawer(null); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
+        searchRef={searchRef}
+        onRename={rename} onDelete={id => { setDialogOpen(false); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
     </ChatDrawer>}
     <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"
       message={`Delete “${deleteTarget?.title || "New conversation"}” and its messages? This cannot be undone.`}
