@@ -508,9 +508,10 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: "Send message" }), primaryLabel: "Send message",
   },
   {
-    id: "help", path: "/help", route: "/help", role: "Student",
+    // Help is a Settings section since IR-1245; `/help` redirects here.
+    id: "help", path: "/settings?tab=help", route: "/settings", role: "Student",
     mocks: wrap("Student"),
-    heading: "Help",
+    heading: "Settings",
     primary: (p) => p.getByRole("link", { name: "Finding research" }).first(), primaryLabel: "Finding research (contents)",
   },
   {

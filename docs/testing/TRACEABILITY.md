@@ -394,6 +394,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1241** | A Discover row's thumbnail is a small first-page image the server draws in the PDF sandbox (`GET /records/<id>/first-page/`, `visible_to`, `no-store`), never the whole manuscript, and writes no audit event; the browser keeps it for the session — no FR- id (NFR-S4) | [details](traceability/IR-1241.md) | **PARTIAL** |
 | **IR-1243** | My Reviews' "Overdue only" is labelled and drawn as a filter, apart from the "Sort" chips it combines with — no FR- id | [details](traceability/IR-1243.md) | **PARTIAL** |
 | **IR-1244** | Overview's Record details lists no documents, and a record's attachments are sent only to those who may download them — no FR- id | [details](traceability/IR-1244.md) | **PARTIAL** |
+| **IR-1245** | Help is a Settings section: opening it never leaves Settings, and `/help` redirects there keeping its section — no FR- id | [details](traceability/IR-1245.md) | **PARTIAL** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
