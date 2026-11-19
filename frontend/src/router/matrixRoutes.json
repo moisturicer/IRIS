@@ -9,6 +9,7 @@
   "/admin/users",
   "/ai",
   "/ai/conversations/:conversationId",
+  "/guidelines",
   "/login",
   "/moderation/comments",
   "/my-templates",

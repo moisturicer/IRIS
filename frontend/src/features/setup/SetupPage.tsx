@@ -22,13 +22,15 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
+import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { PlainTextWithLinks } from "@/components/shared/PlainTextWithLinks";
-import { Badge } from "@/components/ui/Badge";
+import { RequirementLabel } from "./RequirementLabel";
 import { Button } from "@/components/ui/Button";
 import { fieldClasses, LABEL, WARNING_NOTICE } from "@/components/ui/fieldClasses";
 import { Spinner } from "@/components/ui/Spinner";
 import { useApiRead } from "@/hooks/useApiRead";
 import { errorDetail } from "@/lib/errorDetail";
+import { failureMessage } from "@/lib/readFailure";
 import { downloadBlob } from "@/lib/utils";
 import NoticeSection from "./NoticeSection";
 
@@ -154,6 +156,8 @@ function RequirementsSection() {
     <div className="space-y-4">
       {read.status === "interrupted" && !types ? (
         <InterruptedState what="setup" onRetry={read.retry} framed />
+      ) : read.status === "failed" && !types ? (
+        <LoadFailedAlert message={failureMessage(read.error, { lead: "Setup didn't load." })} onRetry={read.retry} />
       ) : !types ? (
         read.status === "ready" ? (
           <div className="space-y-3 rounded-card border border-stone-200 bg-white p-5">
@@ -343,10 +347,6 @@ function Requirements({ recordType, act }: { recordType: SetupRecordType; act: A
   );
 }
 
-function Label({ required }: { required: boolean }) {
-  return <Badge variant={required ? "warning" : "neutral"}>{required ? "Required" : "Optional"}</Badge>;
-}
-
 function ManuscriptRow({ recordType, act }: { recordType: SetupRecordType; act: Act }) {
   const [editing, setEditing] = useState(false);
   const { description, template_name } = recordType.manuscript;
@@ -355,7 +355,7 @@ function ManuscriptRow({ recordType, act }: { recordType: SetupRecordType; act: 
     <div role="group" aria-label="Manuscript" className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-small font-semibold text-stone-900">Manuscript</h3>
-        <Label required />
+        <RequirementLabel required />
       </div>
       <p className="text-label text-stone-600">Always first. It can&apos;t be removed or made Optional.</p>
       {editing ? (
@@ -431,7 +431,7 @@ function RequirementRow({
     <div role="group" aria-label={requirement.name} className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-small font-semibold text-stone-900">{requirement.name}</h3>
-        <Label required={requirement.is_required} />
+        <RequirementLabel required={requirement.is_required} />
       </div>
       {requirement.description && (
         <PlainTextWithLinks text={requirement.description} className="text-small text-stone-700" />

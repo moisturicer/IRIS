@@ -75,6 +75,31 @@ const MY_TEMPLATES = [
   { id: 8, title: "Budget sheet", description: "", file_name: "budget.xlsx", position: 2, updated_at: when("11-19") },
 ];
 
+/** Guidelines (IR-974): long names, long file names and descriptions holding links, at every width. */
+const GUIDELINES = [
+  {
+    id: 1, name: "Proposal", description: "Comes before a Thesis / Research. See https://cit.edu/research/proposal-guidelines-2026-revised.",
+    manuscript: { description: "The proposal itself, chapters 1 to 3.", template_name: "cit-u-research-proposal-manuscript-format-2026-revised-edition.docx" },
+    requirements: [
+      { id: 11, name: "Thesis Revision Form", is_required: true, description: "", template_name: "thesis-revision-form.pdf" },
+      { id: 12, name: "Patent Search Report", is_required: false, description: "Only when the work may be patentable.", template_name: "" },
+    ],
+  },
+  {
+    id: 2, name: "Thesis / Research", description: "Needs an approved Proposal first.",
+    manuscript: { description: "", template_name: "" },
+    requirements: [
+      { id: 21, name: "Publication / Conference Presentation / Both", is_required: true,
+        description: "Proof of acceptance. See https://cit.edu/research/forms.", template_name: "publication-proof-of-acceptance-form.pdf" },
+    ],
+  },
+  { id: 3, name: "Project", description: "", manuscript: { description: "", template_name: "" }, requirements: [] },
+];
+
+const ADVISERS_TEMPLATES = MY_TEMPLATES.map((t) => ({
+  ...t, shared_by: { id: 40, name: "Maria Concepcion Villanueva-Dela Cruz Santiago" },
+}));
+
 /** Setup's record types (IR-971): one requirement with a long name, a Template and a description holding a link. */
 const SETUP_RECORD_TYPES = [
   {
@@ -504,6 +529,16 @@ export const SCREENS: Screen[] = [
     mocks: wrap("Adviser", (api) => api.on("GET", "/documents/my-templates/", MY_TEMPLATES)),
     heading: "My Templates",
     primary: (p) => p.getByRole("button", { name: "Add a Template" }), primaryLabel: "Add a Template",
+  },
+  {
+    id: "guidelines", path: "/guidelines", route: "/guidelines", role: "Student",
+    mocks: wrap("Student", (api) => {
+      api.on("GET", "/documents/guidelines/", GUIDELINES);
+      api.on("GET", "/documents/adviser-templates/", ADVISERS_TEMPLATES);
+    }),
+    heading: "Guidelines",
+    primary: (p) => p.getByRole("button", { name: /^Download the Manuscript Template, cit-u-research-proposal/ }),
+    primaryLabel: "Download the Proposal's Manuscript Template",
   },
   {
     id: "notifications", path: "/notifications", route: "/notifications", role: "Student",

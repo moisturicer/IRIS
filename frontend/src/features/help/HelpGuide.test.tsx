@@ -62,6 +62,8 @@ describe("Help", () => {
     expect(within(publishing).getByText(/outside AI companies/)).toBeInTheDocument();
     expect(within(publishing).getByText(/doesn.t end the embargo/)).toBeInTheDocument();
     expect(within(publishing).getByText(/Only your Adviser or RDCO can release it/)).toBeInTheDocument();
+    // IR-974: what each record type needs, and its Templates.
+    expect(within(publishing).getByRole("link", { name: "Guidelines" })).toHaveAttribute("href", "/guidelines");
   });
 
   it("always explains the review workflow and who to contact", () => {

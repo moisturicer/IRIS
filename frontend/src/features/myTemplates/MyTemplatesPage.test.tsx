@@ -196,3 +196,19 @@ describe("changing a Template", () => {
     await waitFor(() => expect(remove).toHaveBeenCalledWith(8));
   });
 });
+
+describe("a failed read", () => {
+  it("says so when the server answers with an error, instead of loading for ever (IR-974)", async () => {
+    const read = vi.spyOn(myTemplatesApi, "list")
+      .mockRejectedValueOnce({ isAxiosError: true, response: { status: 500, data: {} } })
+      .mockResolvedValue({ data: [CHAPTER_1] } as never);
+    const user = userEvent.setup();
+    renderScreen(<MyTemplatesPage />, { route: "/my-templates" });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Your Templates didn't load.");
+    await user.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("list", { name: "Your Templates" })).toBeInTheDocument();
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+});

@@ -134,3 +134,11 @@ A switch at the top of the page chooses the section, and the address keeps it (`
 **What this adds.** Decision 9 said the System Admin no longer publishes, and sees every publication in the Audit Log. It did not say whether the System Admin still reads past versions. **It does not.** Only RDCO reads the Notice's history, on Setup. The Audit Log records who published, when, and which version, but not the text. The current version stays readable by everyone. The System Admin's view of ADR-051's shared `/notices` page is removed. An old `/notices` link takes RDCO to Setup's Notice section and the System Admin to the Audit Log, filtered to Notice publications.
 
 **What stands.** Everything else in decision 9 is unchanged: only RDCO publishes, every publication is audited, and a published version never changes (ADR-051 decision 17).
+
+## Amendment — 2026-11-19 (IR-974): the System Admin has no Guidelines link
+
+The decision is Hermoine Zozobrado's, made on 2026-11-19 while building IR-974.
+
+**What this changes.** Decision 7 said Guidelines is a page every signed-in person reaches from the main sidebar. **The System Admin's sidebar has no Guidelines link.** Its sidebar is its administration (Users, Audit Log, Account Deletions, Reported comments, Retention), and it neither publishes nor reviews. Every other role has Guidelines as its last Main link, after Calls & Conferences.
+
+**What stands.** Guidelines stays open to anyone signed in, the System Admin included, by link or address: only the sidebar link is left out, as it already is for Ask IRIS and Calls & Conferences. Help and Publish link to it as decision 7 says.

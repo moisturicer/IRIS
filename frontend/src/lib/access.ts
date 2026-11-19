@@ -185,6 +185,12 @@ export const SCREEN_ACCESS = {
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,
                    nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Main", onlyFor: RESEARCH_ROLES } },
+  // What each record type needs and its Templates (ADR-063 decision 7, IR-974).
+  // Anyone signed in may open it; the sidebar lists it last in Main for every
+  // role but the System Admin, whose sidebar is its administration (ADR-063
+  // amendment 2026-11-19).
+  guidelines:    { path: "/guidelines", roles: EVERYONE,
+                   nav: { label: "Guidelines", icon: "fa-book", section: "Main", onlyFor: RESEARCH_ROLES } },
   // A poster's own Calls in every status (IR-765), reached from the board.
   myCalls:       { path: "/opportunities/mine", roles: CALL_POSTERS },
 

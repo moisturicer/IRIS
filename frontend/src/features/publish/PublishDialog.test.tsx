@@ -310,6 +310,22 @@ describe("record types (invariant 7)", () => {
   });
 });
 
+describe("Guidelines (IR-974)", () => {
+  it("links to what each type needs in a new tab, so the dialog stays, and to the chosen type's section", async () => {
+    const user = userEvent.setup();
+    await openNew();
+
+    const link = screen.getByRole("link", { name: /What each record type needs.*opens in a new tab/ });
+    expect(link).toHaveAttribute("href", "/guidelines");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+
+    await chooseType(user, /Thesis \/ Research/);
+    expect(screen.getByRole("link", { name: /What a Thesis \/ Research needs.*opens in a new tab/ }))
+      .toHaveAttribute("href", "/guidelines#thesis-research");
+  });
+});
+
 describe("a file drop", () => {
   it("creates exactly one draft, titled from the file name and typed", async () => {
     const user = userEvent.setup();

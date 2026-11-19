@@ -141,7 +141,7 @@ class MyTemplateDownloadView(APIView):
 class ShownAdviserTemplateListView(APIView):
     """
     GET /documents/adviser-templates/ -- every shown Template, by Adviser.
-    Narrowing it to one Adviser is Guidelines' (IR-974), which has no screen yet.
+    Guidelines (IR-974) searches it by Adviser in the browser, so there is no filter here.
     """
 
     permission_classes = [IsAuthenticated]
