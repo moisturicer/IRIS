@@ -145,6 +145,12 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
             "You can't approve while sending a Must fix comment. Change it to Suggestion, "
             "or request a revision."
         )
+    # A finding ends the seat too, so it can't leave a Must fix of its own open (IR-1226).
+    if verdict == ReviewVerdict.FINDING and must_fix:
+        raise FinishError(
+            "You can't record a finding while sending a Must fix comment. Change it to "
+            "Suggestion, or request a revision."
+        )
 
     party = str(seat.assignment.party)
     version = latest_version(record)

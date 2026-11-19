@@ -201,6 +201,27 @@ describe("settings and profile are separate", () => {
     expect(screen.getByLabelText("Current password")).toBeVisible();
   });
 
+  it("offers Help in its section list, as a link to the Help page (IR-1217)", async () => {
+    const user = userEvent.setup();
+    renderScreen(
+      <Routes>
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/help" element={<h1>Help</h1>} />
+      </Routes>,
+      { route: "/settings" },
+    );
+
+    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    const help = within(nav).getByRole("link", { name: "Help" });
+    expect(help).toHaveAttribute("href", "/help");
+    // A link, not a fourth tab: it leaves Settings for the Help page.
+    expect(within(nav).getAllByRole("button")).toHaveLength(3);
+
+    help.focus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { level: 1, name: "Help" })).toBeInTheDocument();
+  });
+
   it("points to the Profile instead of holding it", () => {
     renderScreen(<SettingsPage />, { route: "/settings" });
 

@@ -43,7 +43,8 @@ from ai.agent.prompts import (  # noqa: F401 -- re-exported: callers and pinned 
     MANUSCRIPT_INSTRUCTIONS, MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION, METADATA_INSTRUCTIONS,
     METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION, PAPER_CHAT_PREFIX, PROMPT_VERSION, PROMPTS,
     RECOVERY_INSTRUCTIONS, RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION, RESEARCH_INSTRUCTIONS,
-    RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, TOOL_VERSION, quoted, unquoted,
+    RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, SELECTION_INSTRUCTIONS, SELECTION_PREFIX,
+    SELECTION_PROMPT_VERSION, SELECTION_TOOL_VERSION, SELECTION_WITHDRAWN, TOOL_VERSION, quoted, unquoted,
 )
 from ai.agent.tools import (
     ASK_CLARIFICATION, ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded,
@@ -63,12 +64,16 @@ NOTHING_TO_COMPACT = "nothing_to_compact"
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
                           RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
                           CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION,
-                          DELIMITED_TOOL_VERSION)
+                          DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
 #: Pins that offer research-7's tools and never mention an unseen draft in a repair (IR-1004, IR-1166, IR-1168).
 EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION,
-                          DELIMITED_TOOL_VERSION)
+                          DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
 #: Versions that number earlier Turns and list what they cited (IR-1168).
-CITED_TOOL_VERSIONS = (CITED_TOOL_VERSION, DELIMITED_TOOL_VERSION)
+CITED_TOOL_VERSIONS = (CITED_TOOL_VERSION, DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+#: Versions that quote paper text wherever it reaches the model (IR-1196).
+DELIMITED_TOOL_VERSIONS = (DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+#: Versions that may be sent a passage the reader selected (IR-581).
+SELECTION_TOOL_VERSIONS = (SELECTION_TOOL_VERSION,)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -345,8 +350,10 @@ class _Run:
         self.fresh_repairs = version in EVIDENCE_TOOL_VERSIONS
         #: research-10 numbers earlier Turns and lists what they cited (IR-1168).
         self.cites = version in CITED_TOOL_VERSIONS
-        #: research-11 quotes paper text wherever it reaches the model (IR-1196).
-        self.delimit = self.investigation.delimit = version == DELIMITED_TOOL_VERSION
+        #: research-11 and later quote paper text wherever it reaches the model (IR-1196).
+        self.delimit = self.investigation.delimit = version in DELIMITED_TOOL_VERSIONS
+        #: research-12 is told about a selected passage; no earlier pin ever is (IR-581).
+        self.selects = version in SELECTION_TOOL_VERSIONS
         #: Each earlier answer sent with its citation list -> the same answer without it.
         self.unlisted: dict = {}
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
@@ -358,7 +365,10 @@ class _Run:
         self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0),
                             attempts=spent.get("attempts", 0))
         self.task = checkpoint.task_key(question, context.prior, context.state or {},
-                                        handoff=(context.handoff or {}).get("revision"))
+                                        handoff=(context.handoff or {}).get("revision"),
+                                        selection=(context.selection.to_json() if context.selection
+                                                   else {"withdrawn": True} if context.selection_withdrawn
+                                                   else None))
         # The compact handoff the history now opens with, and the original Turns still carried whole (IR-734).
         self.handoff = (context.handoff or {}).get("body")
         self.handoff_revision = (context.handoff or {}).get("revision")
@@ -462,6 +472,9 @@ class _Run:
         also = [*handoff["shown"], *handoff["selected"], *handoff["excluded"]] if handoff else ()
         scope = getattr(self.tools, "scope", None) if self.chat else None
         asked = [*also, *([scope] if scope is not None else [])]
+        if self.selects and self.context.selection is not None:
+            # A handle for the selected paper, which need not be a Paper Chat's own (IR-581).
+            asked.append(self.context.selection.selection.record_id)
         # The same read gives every paper an earlier Turn cited a fresh handle, if still readable (IR-1168).
         cited = [rid for turn in self.prior for rid, _ in turn.cited] if self.cites else []
         shown = await self.investigation.recall(state, also=[*asked, *cited])
@@ -545,10 +558,26 @@ class _Run:
                                                        ensure_ascii=False),
                         self.investigation.recalled_sources)
             history.append(note)
+        history += self._selection(scope)
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history
 
+
+    def _selection(self, scope) -> list:
+        """The passage the reader asked about, rechecked at this claim; or that it is gone (IR-581)."""
+        assessed = self.context.selection
+        if not self.selects:
+            return []
+        if assessed is None:
+            return [User(SELECTION_WITHDRAWN)] if self.context.selection_withdrawn else []
+        chosen = assessed.selection
+        body = {"page": chosen.page, "quote": quoted(chosen.quote) if self.delimit else chosen.quote,
+                "found_on_page": assessed.found_on_page, "version": assessed.version}
+        if chosen.record_id in self.investigation.papers:
+            handle, title = self.investigation.papers[chosen.record_id]
+            body = {"paper": handle, **({} if chosen.record_id == scope else {"title": self._title(title)}), **body}
+        return [User(SELECTION_PREFIX + json.dumps(body, ensure_ascii=False), self.investigation.recalled_sources)]
 
     async def _resume(self) -> Optional[tuple[list, int]]:
         """The Conversation an earlier fence completed, verified now; None to start afresh (IR-724).

@@ -92,7 +92,7 @@ const visitEntry = (record: RecordListItem, viewed_at = "2026-11-02T08:00:00Z"):
 function signIn(id: number, role = "Student", canAuthor = role === "Student" || role === "Adviser") {
   // `can_author` is the server's flag (IR-1096); a test says what the server said.
   useAuthStore.getState().login(
-    { id, email: `reader${id}@cit.edu`, role_name: role, can_author: canAuthor } as unknown as User, "access", "refresh",
+    { id, email: `reader${id}@cit.edu`, role_name: role, can_author: canAuthor } as unknown as User, "access",
   );
 }
 

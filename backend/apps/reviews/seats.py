@@ -61,6 +61,7 @@ from core.permissions import (
 from core.text_limits import too_long, too_long_message
 
 from .models import RecordAssignment, ResubmissionRequest, Review, ReviewerSeat
+from .removal import discard_drafts
 
 #: The parties that are offices, and so have members, a pool and coordinators.
 OFFICE_PARTIES = frozenset(str(p) for p in OFFICE_PARTY_BY_ROLE.values())
@@ -142,10 +143,26 @@ def office_complete(assignment) -> bool:
     its party has no open resubmission request on the record. A pool (no seat)
     is never complete: nobody has reviewed it.
     """
-    live = list(_live_seats(assignment).values_list("state", flat=True))
-    if not live or any(state != SeatState.DONE for state in live):
+    return completes(
+        list(_live_seats(assignment).values_list("state", flat=True)),
+        has_open_resubmission=lambda: _open_resubmission(assignment),
+    )
+
+
+def completes(live_states, *, has_open_resubmission) -> bool:
+    """
+    `office_complete`'s rule over seat states already in hand: at least one,
+    all `done`, and no open resubmission (`has_open_resubmission`, asked only if
+    the seats allow it). The console asks it without the seat a coordinator
+    may withdraw, to say whether withdrawing finishes the office (IR-1226).
+    """
+    if not live_states or any(state != SeatState.DONE for state in live_states):
         return False
-    return not ResubmissionRequest.objects.filter(
+    return not has_open_resubmission()
+
+
+def _open_resubmission(assignment) -> bool:
+    return ResubmissionRequest.objects.filter(
         record_id=assignment.record_id, party=assignment.party,
         state=ResubmissionRequestState.OPEN,
     ).exists()
@@ -353,6 +370,7 @@ def withdraw(seat, coordinator) -> ReviewerSeat:
     seat.state = SeatState.WITHDRAWN
     seat.save(update_fields=["state"])
     audit.seat_moved(AuditEvent.SEAT_WITHDRAWN, seat, coordinator)
+    discard_drafts(assignment.record, seat.reviewer, assignment.party)  # IR-1226
     _close_if_complete(assignment, coordinator)
     return seat
 
@@ -381,6 +399,7 @@ def reassign(seat, coordinator, reviewer, *, reason) -> ReviewerSeat:
         assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator,
         reassigned_from=seat, reason=reason.strip(),
     )
+    discard_drafts(assignment.record, seat.reviewer, assignment.party)  # IR-1226
     audit.seat_moved(AuditEvent.SEAT_REASSIGNED, new_seat, coordinator, previous=seat)
     return new_seat
 

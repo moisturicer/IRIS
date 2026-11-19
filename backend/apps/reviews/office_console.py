@@ -23,13 +23,16 @@ from django.db.models import Prefetch
 from django.utils import timezone
 
 from apps.records.models import Record, RecordVersion
-from core.enums import OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus, SeatState
+from core.enums import (
+    OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus, ResubmissionRequestState, SeatState,
+)
 from core.permissions import is_office_coordinator, office_parties_of
 
 from .clearance_strip import attach_clearance_strips
 from .deadlines import MANILA, deadline_payload, with_deadlines
-from .models import RecordAssignment, ReviewerSeat
-from .seats import office_members
+from .models import RecordAssignment, ResubmissionRequest, ReviewerSeat
+from .removal import unresolved_many
+from .seats import completes, office_members
 
 
 class ConsoleRefused(Exception):
@@ -91,7 +94,8 @@ def _status(row, *, now) -> dict:
 
 def _actions(row) -> list[str]:
     """What the viewer may do to this row, in menu order. The server re-checks each act."""
-    acts = ["assign"] if row["kind"] == "pool" else ["reassign"]
+    # A seat row is an open seat, so it may be withdrawn as well (IR-1226).
+    acts = ["assign"] if row["kind"] == "pool" else ["reassign", "withdraw"]
     if row["can_extend"]:
         acts.append("extend")
     return acts
@@ -115,7 +119,37 @@ def _row(assignment, user, seat=None) -> dict:
         # new Version restarts (ADR-043 §5): "opened" is when it arrived.
         "opened_at": assignment.opened_at.isoformat(),
         **deadline_payload(assignment, user),
+        # Filled for the whole console at once (`_attach_removal`); None on a pool row.
+        "unresolved": None,
+        "withdraw_completes_office": None,
     }
+
+
+def _attach_removal(rows, assignments, office) -> None:
+    """
+    What each seat holder leaves if reassigned or withdrawn, and whether
+    withdrawing their seat finishes the office (IR-1226), in a fixed number of
+    queries however many rows there are. Every console assignment is active
+    and in review, so the seats already loaded decide it; `seats.withdraw`
+    decides it again under its lock.
+    """
+    seat_rows = [r for r in rows if r["kind"] == "seat"]
+    counts = unresolved_many((r["record"], r["reviewer"], office) for r in seat_rows if r["reviewer"])
+    asked = {(a.record_id, a.party) for a in assignments}
+    open_resubmission = set(
+        ResubmissionRequest.objects.filter(
+            record_id__in={record for record, _ in asked}, party=office,
+            state=ResubmissionRequestState.OPEN,
+        ).values_list("record_id", "party")
+    ) if asked else set()
+    by_pk = {a.pk: a for a in assignments}
+    for row in seat_rows:
+        assignment = by_pk[row["assignment"]]
+        row["unresolved"] = counts.get((row["record"], row["reviewer"], str(office)))
+        row["withdraw_completes_office"] = completes(
+            [s.state for s in assignment.console_seats if s.pk != row["seat"]],
+            has_open_resubmission=lambda a=assignment: (a.record_id, a.party) in open_resubmission,
+        )
 
 
 def _order(row):
@@ -147,6 +181,7 @@ def office_console(user, *, office=None) -> dict:
         # done (waiting on its author, say) has no open work to show.
         rows.extend(_row(assignment, user, s) for s in seats if s.state in OPEN_SEAT_STATES)
     rows.sort(key=_order)
+    _attach_removal(rows, assignments, office)
     attach_clearance_strips(rows)  # which clearances each record holds (IR-1083)
 
     version_of = {}

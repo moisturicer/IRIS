@@ -48,12 +48,12 @@ function standingOf(request: OwnRoleRequest | null | undefined, email: string): 
 }
 
 export function PendingApprovalPage() {
-  const { user, logout, refreshToken } = useAuth();
+  const { user, logout } = useAuth();
   const registeredId = useId();
 
   const handleLogout = async () => {
     try {
-      await authApi.logout(refreshToken ?? "");
+      await authApi.logout();
     } catch {
       // ignore — we log out regardless
     }

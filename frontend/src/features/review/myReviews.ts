@@ -131,11 +131,20 @@ export function kickerParts(row: Pick<MyReviewsRow, "authors" | "unit" | "versio
   ].filter(Boolean);
 }
 
-/** Who holds a row: the office, then you, a colleague, or nobody yet. */
-export function holderLine(row: MyReviewsRow): string {
-  if (row.kind === "pool") return `${row.party_label} · Unassigned`;
-  if (row.is_mine) return `${row.party_label} · You`;
-  return `${row.party_label} · ${row.holder_name ?? "A former member"}`;
+/**
+ * Who holds a row: the office, then you, a colleague, or nobody yet.
+ * `officeShown` is true when the card's clearance strip already names the row's
+ * office, so the office is not said twice (IR-1181).
+ */
+export function holderLine(row: MyReviewsRow, officeShown = false): string {
+  const holder =
+    row.kind === "pool" ? "Unassigned" : row.is_mine ? "You" : (row.holder_name ?? "A former member");
+  return officeShown ? holder : `${row.party_label} · ${holder}`;
+}
+
+/** Whether a row's clearance strip names the office that holds it. */
+export function stripNamesHolder(row: Pick<MyReviewsRow, "party" | "clearance_strip">): boolean {
+  return Array.isArray(row.clearance_strip) && row.clearance_strip.some((e) => e.party === row.party);
 }
 
 /** Who sent a row here and why, when the server knows. */

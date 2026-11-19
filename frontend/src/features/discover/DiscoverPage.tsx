@@ -16,11 +16,9 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
-import type { SavedFeed } from "@/api/library";
 import { canAuthor } from "@/lib/access";
 import { ASK_PATH, askHandoffState } from "@/lib/askHandoff";
 import { useAuthStore } from "@/store/auth.store";
-import { useFeedsStore } from "@/store/feeds.store";
 import { cn } from "@/lib/utils";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { DiscoverInterests, ForYouItem, RecordListItem } from "@/types/records";
@@ -38,18 +36,13 @@ import { DiscoverResultsHeader } from "./DiscoverResultsHeader";
 import { DiscoverPeopleResults } from "./DiscoverPeopleResults";
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
 import { DiscoverTabs } from "./DiscoverTabs";
-import { MyFeeds } from "./MyFeeds";
 import { PaperCiteModal } from "./PaperCiteModal";
 import {
   DEFAULT_QUERY,
   discoverQueryKey,
-  feedCriteria,
-  feedQueryOf,
-  feedSearchParams,
   listParams,
   orderOf,
   parseDiscoverQuery,
-  sameFeedQuery,
   withOrder,
   writeDiscoverQuery,
   type DiscoverOrder,
@@ -62,11 +55,14 @@ const COLUMNS_KEY = "iris.discover.columns";
 
 type ColumnCount = 1 | 2 | 3;
 
-/** Both segmented controls share one track and one height (IR-1082): the chosen
- *  segment is white and raised (the Selected role), never maroon. */
+/** The Papers / People switch shares the row's one control height (IR-1082): the
+ *  chosen segment is white and raised (the Selected role), never maroon. On a
+ *  phone each segment is an icon at 44 x 44 px, its name kept for screen readers
+ *  (IR-1190); from `sm` it carries its word. */
 const SEGMENT_TRACK = "inline-flex shrink-0 items-center rounded-control border border-stone-200 bg-stone-100 p-0 sm:h-11 sm:p-0.5";
-const segmentClass = (chosen: boolean, padding: "px-3" | "px-4" = "px-3") =>
-  cn("h-full min-h-11 rounded-control text-small font-semibold sm:min-h-0", padding, COLOUR_TRANSITION, FOCUS_RING,
+const segmentClass = (chosen: boolean) =>
+  cn("inline-flex h-full min-h-11 min-w-11 items-center justify-center gap-2 rounded-control text-small font-semibold sm:min-h-0 sm:min-w-0 sm:px-4",
+    COLOUR_TRANSITION, FOCUS_RING,
     chosen ? SELECTED_SEGMENT : "text-stone-700 hover:bg-stone-200");
 
 function readColumns(): ColumnCount {
@@ -226,72 +222,6 @@ export default function DiscoverPage() {
     if (next === "best") setSearchInput("");
   };
 
-  /* ── A saved feed is this same query under a name (IR-577) ───────────
-     `myfeed` in the URL says which one is open, so a reload or a copied link
-     keeps the context. The query itself is still the ordinary one above. */
-  const rawFeedId = searchParams.get("myfeed");
-  const feedId = rawFeedId && /^\d{1,18}$/.test(rawFeedId) ? Number(rawFeedId) : null;
-  const savedFeeds = useFeedsStore((s) => s.feeds);
-  const feedsLoad = useFeedsStore((s) => s.load);
-  const updateSavedFeed = useFeedsStore((s) => s.update);
-  const activeFeed = feedId !== null ? savedFeeds.find((f) => f.id === feedId) ?? null : null;
-  /** A feed's values that no longer exist are never queried and never dropped
-   *  for the reader: the list waits until they correct the feed. */
-  const correctionPending = activeFeed !== null && Object.keys(activeFeed.stale).length > 0;
-  /** Until the reader's feeds are known there is no telling whether this one is
-   *  stale, and a stale one's remainder can be wider than it was saved to be.
-   *  That includes a failed read: the feed stays open, with its list held back
-   *  and a way to try again, and is never quietly dropped to show a wider one. */
-  const feedsReading = feedId !== null && (feedsLoad === "idle" || feedsLoad === "loading");
-  const feedUnchecked = feedId !== null && feedsLoad === "error";
-  const awaitingFeed = feedsReading || feedUnchecked;
-  const holdResults = correctionPending || awaitingFeed;
-  /** Held back with nothing standing in for the list: the panel above says why. */
-  const holdQuietly = correctionPending || feedUnchecked;
-  const ensureFeeds = useFeedsStore((s) => s.ensureLoaded);
-  /** Filters on screen that a feed could hold: a sort alone is not one, and
-   *  saving none would only be refused. */
-  const feedHasCriteria = Object.keys(feedQueryOf(query)).some((key) => key !== "sort");
-  const [feedBusy, setFeedBusy] = useState(false);
-  const [feedError, setFeedError] = useState("");
-
-  const leaveFeed = useCallback(() => {
-    setFeedError("");
-    latestSetSearchParams.current((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("myfeed");
-      return next;
-    }, { replace: true });
-  }, []);
-
-  /* A feed that is not the reader's (or is gone) is dropped from the URL
-     without being named: it reads exactly like one that never existed. */
-  useEffect(() => {
-    if (feedId !== null && feedsLoad === "ready" && !activeFeed) leaveFeed();
-  }, [feedId, feedsLoad, activeFeed, leaveFeed]);
-
-  const openFeed = (feed: SavedFeed) => {
-    setFeedNotice("");
-    setFeedError("");
-    latestSetSearchParams.current((prev) => {
-      // Discover's own keys are replaced by the feed's; any other key stays.
-      const next = writeDiscoverQuery(prev, DEFAULT_QUERY);
-      for (const [key, value] of feedSearchParams(feed.query, feed.stale)) next.set(key, value);
-      next.set("myfeed", String(feed.id));
-      return next;
-    });
-  };
-
-  const saveToFeed = async () => {
-    if (!activeFeed) return;
-    setFeedBusy(true);
-    setFeedError("");
-    const result = await updateSavedFeed(activeFeed.id, { query: feedQueryOf(query) });
-    setFeedBusy(false);
-    if (result.ok) setFeedNotice(`Saved these filters to “${result.feed.name}”.`);
-    else setFeedError(result.message);
-  };
-
   useEffect(() => {
     let cancelled = false;
     setRefLoading(true);
@@ -392,20 +322,6 @@ export default function DiscoverPage() {
   useEffect(() => {
     const current = ++generation.current;
     position.current = null;
-    if (holdResults) {
-      // A saved feed that cannot be trusted yet is not run (IR-577): not
-      // fetched, and not replaced by a "no results" claim or a wider list.
-      setFailed(null);
-      setInterrupted(false);
-      setLoadingMore(false);
-      setLoadMoreFailed(null);
-      setNextCursor(null);
-      setRecords([]);
-      setFeedRecords([]);
-      setTotalCount(null);
-      setLoading(feedsReading);
-      return;
-    }
     const restored = feed !== "for_you" ? readPosition(queryKey) : null;
     const pages = Math.min(Math.max(restored?.pages ?? 1, 1), MAX_RESTORED_PAGES);
     // A depth past the cap comes back shorter, so its scroll offset would land
@@ -461,7 +377,7 @@ export default function DiscoverPage() {
     // `query` is fully described by `feedKey`; keying on the string keeps an
     // unrelated URL change (the Publish dialog) from refetching.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feedKey, attempt, holdResults, feedsReading]);
+  }, [feedKey, attempt]);
 
   const loadMore = useCallback(() => {
     const current = generation.current;
@@ -659,16 +575,23 @@ export default function DiscoverPage() {
   const peopleQuery = useMemo(() => searchTerms(activeQuery).join(" "), [activeQuery]);
 
   /** Ask IRIS is offered for a question once its results are in, not while they load or if they failed. */
-  const suggestAsk = !holdQuietly && !loading && !failed && looksLikeQuestion(activeQuery);
+  const suggestAsk = !loading && !failed && looksLikeQuestion(activeQuery);
 
-  /* Papers / People sit in the page header, so on a phone the toolbar row below
-     search holds only what narrows the feed (IR-1080, audit RES-01). */
+  /* Papers / People, Sort, Filters, the column toggle and Publish are ONE row
+     under search (IR-1190): it never wraps and never scrolls sideways. On a
+     phone Papers, People, Filters and Publish are icons that keep their names
+     (`sr-only` until `sm`) and a 44 px target, and Sort gives up its visible
+     label, so all of it fits 360 px; the Sort select is the one part that can
+     shrink. Over People, Sort, Filters and the columns do not apply, so only
+     the switch and Publish stay. */
+  const papersView = discoverView === "papers";
   const resultsSwitch = (
     <div role="group" aria-label="Discover results" className={SEGMENT_TRACK}>
-      {([ ["papers", "Papers"], ["people", "People"] ] as const).map(([value, label]) => (
+      {([ ["papers", "Papers", "fa-file-lines"], ["people", "People", "fa-users"] ] as const).map(([value, label, icon]) => (
         <button key={value} type="button" aria-pressed={discoverView === value} onClick={() => setDiscoverView(value)}
-          className={segmentClass(discoverView === value, "px-4")}>
-          {label}
+          className={segmentClass(discoverView === value)}>
+          <i className={cn("fas text-label sm:hidden", icon)} aria-hidden />
+          <span className="sr-only sm:not-sr-only">{label}</span>
         </button>
       ))}
     </div>
@@ -676,106 +599,58 @@ export default function DiscoverPage() {
 
   const research = (
     <>
-      {discoverView === "people" ? <DiscoverPeopleResults query={peopleQuery} /> : (
-      <>
-      <div role="group" aria-label="Discover controls"
-        className="mt-4 -mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-        <DiscoverOrderSelect value={orderOf(query)} onChange={chooseOrder} />
-        <MyFeeds
-          query={query}
-          matchCount={loading || holdQuietly ? null : totalCount}
-          options={{ classifications, colleges, recordTypes }}
-          activeFeedId={activeFeed?.id ?? null}
-          onOpen={openFeed}
-          onDeleted={(id) => { if (id === feedId) leaveFeed(); }}
-        />
-        <button type="button" onClick={() => chooseColumns(nextColumns)}
-          aria-label={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
-          title={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
-          className={cn("ml-auto hidden xl:inline-flex h-11 w-11 items-center justify-center rounded-control border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
-          <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" />
-            {columns === 2 && <path d="M8 2.75v10.5" />}
-            {columns === 3 && <path d="M5.92 2.75v10.5M10.08 2.75v10.5" />}
-          </svg>
-        </button>
-        <DiscoverFilterBar
-          className="shrink-0"
-          filters={filters}
-          onChange={setFilters}
-          options={filterOptions}
-          loading={refLoading}
-          resultCount={loading ? null : totalCount}
-          areas={hasAreas ? (closePanel) => (
-            <DiscoverAreas
-              options={interestOptions}
-              selection={interestSelection}
-              onSelectionChange={setInterestSelection}
-              loading={interestLoading}
-              loadFailed={interestLoadFailed}
-              error={interestError}
-              saving={interestSaving}
-              onSave={() => void saveInterests(closePanel)}
-              resetConfirming={resetConfirming}
-              onResetConfirmingChange={setResetConfirming}
-              resetting={resetting}
-              onReset={() => void resetInterests(closePanel)}
-            />
-          ) : undefined}
-        />
-        {canPublish && (
-          <button type="button" onClick={openPublish} aria-label="Publish"
-            className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 shrink-0 !px-4 sm:!px-5")}>
-            <i className="fas fa-plus text-label" aria-hidden />
-            <span>Publish</span>
-          </button>
-        )}
-      </div>
-      {feedUnchecked && (
-        <section aria-label="Saved feed" className="mt-3 rounded-card border border-stone-200 bg-white px-4 py-3">
-          <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-small text-stone-700">
-            <p>This feed could not be checked right now, so its list is not shown.</p>
-            <button type="button" onClick={() => void ensureFeeds(true)}
-              className={cn("font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
-              Try again
+      <div role="group" aria-label="Discover controls" className="mt-4 flex items-center gap-2">
+        {resultsSwitch}
+        {papersView && <DiscoverOrderSelect value={orderOf(query)} onChange={chooseOrder} />}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {papersView && (
+            <button type="button" onClick={() => chooseColumns(nextColumns)}
+              aria-label={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
+              title={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
+              className={cn("hidden xl:inline-flex h-11 w-11 items-center justify-center rounded-control border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+              <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" />
+                {columns === 2 && <path d="M8 2.75v10.5" />}
+                {columns === 3 && <path d="M5.92 2.75v10.5M10.08 2.75v10.5" />}
+              </svg>
             </button>
-            <button type="button" onClick={leaveFeed}
-              className={cn("font-medium text-stone-700 underline-offset-2 hover:text-brand hover:underline", FOCUS_RING)}>
-              Leave feed
-            </button>
-          </div>
-        </section>
-      )}
-      {activeFeed && (
-        <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-card border border-stone-200 bg-white px-4 py-3">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <p className="text-small font-semibold text-stone-900">Feed: {activeFeed.name}</p>
-            {!correctionPending && feedHasCriteria && !sameFeedQuery(activeFeed.query, query) && (
-              <button type="button" disabled={feedBusy} onClick={() => void saveToFeed()}
-                className={cn("text-small font-semibold text-brand underline-offset-2 hover:underline disabled:opacity-60", FOCUS_RING)}>
-                Save these filters to this feed
-              </button>
-            )}
-            <button type="button" onClick={leaveFeed}
-              className={cn("text-small font-medium text-stone-700 underline-offset-2 hover:text-brand hover:underline", FOCUS_RING)}>
-              Leave feed
-            </button>
-          </div>
-          {correctionPending && (
-            <div role="alert" className="mt-2 text-small text-stone-700">
-              <p>{describeStale(activeFeed.stale)}</p>
-              <p className="mt-1">
-                Remove them and keep the rest, or choose different filters and save them to this feed. The list is
-                held back until then, so it never shows more than the feed was saved to show.
-              </p>
-              <button type="button" disabled={feedBusy} onClick={() => void saveToFeed()} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-2")}>
-                Remove them and use the rest
-              </button>
-            </div>
           )}
-          {feedError && <p role="alert" className="mt-2 text-small text-brand">{feedError}</p>}
-        </section>
-      )}
+          {papersView && (
+            <DiscoverFilterBar
+              filters={filters}
+              onChange={setFilters}
+              options={filterOptions}
+              loading={refLoading}
+              resultCount={loading ? null : totalCount}
+              areas={hasAreas ? (closePanel) => (
+                <DiscoverAreas
+                  options={interestOptions}
+                  selection={interestSelection}
+                  onSelectionChange={setInterestSelection}
+                  loading={interestLoading}
+                  loadFailed={interestLoadFailed}
+                  error={interestError}
+                  saving={interestSaving}
+                  onSave={() => void saveInterests(closePanel)}
+                  resetConfirming={resetConfirming}
+                  onResetConfirmingChange={setResetConfirming}
+                  resetting={resetting}
+                  onReset={() => void resetInterests(closePanel)}
+                />
+              ) : undefined}
+            />
+          )}
+          {canPublish && (
+            <button type="button" onClick={openPublish}
+              className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 min-w-11 shrink-0 !px-0 sm:!px-5")}>
+              <i className="fas fa-plus text-label" aria-hidden />
+              <span className="sr-only sm:not-sr-only">Publish</span>
+            </button>
+          )}
+        </div>
+      </div>
+      {!papersView ? <DiscoverPeopleResults query={peopleQuery} /> : (
+      <>
       {feedNotice && <p role="status" className="mt-3 text-small text-stone-700">{feedNotice}</p>}
       {feed === "for_you" && feedback && (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-small text-stone-700">
@@ -811,10 +686,10 @@ export default function DiscoverPage() {
       )}
 
       {/* The count. Always mounted, so its live region exists before a count lands in it. */}
-      <DiscoverResultsHeader count={holdQuietly || loading || failed ? null : totalCount} />
+      <DiscoverResultsHeader count={loading || failed ? null : totalCount} />
 
       <div className="mt-3">
-      {holdQuietly ? null : loading ? (
+      {loading ? (
         <ResultsSkeleton columns={gridColumns} onRetry={() => setAttempt((n) => n + 1)} />
       ) : failed && interrupted ? (
         <InterruptedState framed what="research" onRetry={() => setAttempt((n) => n + 1)} />
@@ -832,16 +707,7 @@ export default function DiscoverPage() {
           }
         />
       ) : shownRecords.length === 0 ? (
-        activeFeed ? (
-          // The feed's own criteria stay in view, and there is no "Clear
-          // filters": clearing would empty the feed, not widen a search.
-          <EmptyState
-            framed
-            icon="fa-filter-circle-xmark"
-            title="No papers match this feed right now"
-            message={`Its filters: ${feedCriteria(activeFeed.query, { classifications, colleges, recordTypes }).join("; ")}. Papers appear here once they match.`}
-          />
-        ) : narrowed ? (
+        narrowed ? (
           <EmptyState
             framed
             icon="fa-filter-circle-xmark"
@@ -922,12 +788,9 @@ export default function DiscoverPage() {
       <div className={cn(PAGE_WIDTH.standard, "px-4 sm:px-7 pt-4 sm:pt-7 pb-12 flex-1")}>
         <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
-            <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
-            <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
-          </div>
-          {resultsSwitch}
+        <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
+          <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
+          <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
         </div>
 
         <DiscoverTabs
@@ -940,19 +803,6 @@ export default function DiscoverPage() {
       <PaperCiteModal record={citeRecord} isOpen={Boolean(citeRecord)} onClose={() => setCiteRecord(null)} />
     </div>
   );
-}
-
-/** What a feed holds that the taxonomy has lost, in the reader's words. */
-function describeStale(stale: SavedFeed["stale"]): string {
-  const names = { classification: "Area", college: "college", type: "type" } as const;
-  const parts = (Object.keys(names) as (keyof typeof names)[])
-    .filter((key) => stale[key]?.length)
-    .map((key) => {
-      const count = stale[key]!.length;
-      return `${count} ${names[key]}${count === 1 ? "" : "s"}`;
-    });
-  const total = Object.values(stale).reduce((sum, ids) => sum + (ids?.length ?? 0), 0);
-  return `This feed uses ${parts.join(", ")} that no longer ${total === 1 ? "exists" : "exist"}.`;
 }
 
 /** Placeholder cards in the grid's own shape, announced once as loading. */

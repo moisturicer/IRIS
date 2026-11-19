@@ -53,11 +53,13 @@ export function isReviewing(record: CapabilityInputs, viewer: Viewer | null): bo
 }
 
 /**
- * An owner, or someone taking part in the review. The server's
- * `is_participant` is ADR-032's `is_record_participant`, which also counts
- * anyone who *has* held a seat (IR-415): a reviewer whose part is done keeps
- * the Review and Files sections. The two client-side grounds cover the owner
- * and a pool member who is about to claim.
+ * Someone who may read the review. The server's `is_participant` is
+ * ADR-032's `is_record_participant`: an owner, or anyone who *has* held an
+ * office seat, withdrawn included, so a reviewer whose part is done or who was
+ * taken off keeps the Review and Files sections, read-only (IR-415, IR-1226).
+ * An Adviser seat counts only while its holder is the record's Adviser. Reading
+ * is not acting: what this viewer may do comes from `capabilities`. The
+ * client-side grounds cover the owner and a pool member about to claim.
  */
 export function isParticipant(record: CapabilityInputs, viewer: Viewer | null): boolean {
   return viewer != null && (record.is_participant || isOwner(record, viewer) || isReviewing(record, viewer) || record.review_claim != null);

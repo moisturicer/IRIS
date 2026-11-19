@@ -32,7 +32,7 @@
  * Every query goes through the accessible tree, by role and accessible name.
  */
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { importedReference } from "@/test/fixtures/importedReference";
 import { Route, Routes, useLocation } from "react-router-dom";
 
@@ -53,6 +53,7 @@ import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
 import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
+import { comment } from "./threads/threadFixtures";
 import { citationNavigationState } from "@/lib/citedPage";
 import { formatDate } from "@/lib/utils";
 
@@ -228,6 +229,10 @@ vi.mock("@/api/records", () => ({
     update:           vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
     pscedList:        vi.fn(() => Promise.resolve(page([]))),
+    // Review threads load themselves; their behaviour is `ReviewThreads.test.tsx`'s.
+    // Unread here unless a test says so (IR-1204's document threads do).
+    reviewComments:    vi.fn(() => Promise.reject(new Error("not under test"))),
+    postReviewComment: vi.fn(() => Promise.resolve({ data: {} })),
   },
 }));
 
@@ -235,6 +240,8 @@ vi.mock("@/api/records", () => ({
 vi.mock("@/api/documents", () => ({
   documentsApi: {
     downloadFile: vi.fn(() => Promise.resolve({ data: new Blob(["attachment"]) })),
+    // An image in the reader reads its bytes itself (IR-1203); a PDF's go to the reader stand-in.
+    viewFile: vi.fn(),
     slotsForRecord: vi.fn(() => Promise.resolve({ data: [] })),
     files:          vi.fn(() => Promise.resolve({ data: [] })),
   },
@@ -308,7 +315,9 @@ vi.mock("./PaperPdfReader", () => ({
     clearCorner,
     downloadControl,
     keepPlace,
+    document: shownDocument,
   }: {
+    document?: { kind: string; id: number } | null;
     clearCorner?: boolean;
     downloadControl?: ReactNode;
     keepPlace?: boolean;
@@ -323,7 +332,8 @@ vi.mock("./PaperPdfReader", () => ({
       <div>
         {toolbarStart}
         Paper reader open at page {scrollToPage ?? "none"}, {highlightRegions.length} region(s) to
-        highlight{version != null ? `, reading v${version}` : ", reading the current paper"}
+        highlight{shownDocument ? `, reading ${shownDocument.kind} ${shownDocument.id}`
+          : version != null ? `, reading v${version}` : ", reading the current paper"}
       </div>
       {/* The reader's own toolbar holds the download control it is handed. */}
       <div role="toolbar" aria-label="Reader toolbar">{downloadControl}</div>
@@ -1226,7 +1236,8 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     await openPaperTab();
 
     expect(screen.getByRole("heading", { level: 1, name: record.title })).toHaveAttribute("title", record.title);
-    expect(screen.getByText("v1")).toBeInTheDocument();
+    // The version menu, even with v1 alone (IR-1214).
+    expect(screen.getByRole("combobox", { name: "Version" })).toHaveValue("1");
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
     expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
@@ -2892,6 +2903,218 @@ describe("the Review section (IR-412)", () => {
       expect(within(pane).getByRole("tab", { name: "Documents", selected: true })).toHaveFocus();
       await expectNoBlockingA11yViolations(container);
     });
+
+    // Part (b): a document opens in the reader on the left.
+    it("opens a reviewer's document in the reader, with nothing to highlight, and goes back", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+
+      expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
+      const shown = screen.getByRole("group", { name: "Shown in the reader" });
+      expect(shown).toHaveTextContent("Consent Paper · version 2");
+      // Highlights and Ask IRIS belong to the manuscript only.
+      expect(screen.queryByRole("button", { name: /^Selection:/ })).not.toBeInTheDocument();
+
+      await userEvent.click(within(shown).getByRole("button", { name: "Back to the manuscript" }));
+      expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
+      expect(screen.queryByRole("group", { name: "Shown in the reader" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Selection: Save highlight" })).toBeInTheDocument();
+    });
+
+    it("opens an author's older version and PDF attachment, while a Word file only downloads", async () => {
+      workspaceAt(1600);
+      shownRecord = inReview;
+      signInAs(OWNER_ID, "Student");
+      vi.mocked(documentsApi.files).mockResolvedValue({ data: [
+        { id: 31, record: RECORD_ID, file: "x/survey.pdf", filename: "Survey results.pdf", uploaded_by: OWNER_ID,
+          uploaded_by_name: "Rhea Owner", created_at: "2026-11-03T08:00:00Z", can_remove: false },
+        { id: 32, record: RECORD_ID, file: "x/notes.docx", filename: "Interview notes.docx", uploaded_by: OWNER_ID,
+          uploaded_by_name: "Rhea Owner", created_at: "2026-11-03T08:00:00Z", can_remove: false },
+      ] } as never);
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(consent).getByRole("button", { name: "2 versions of Consent Paper" }));
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 1" }));
+      expect(await screen.findByText(/reading upload 11/)).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toHaveTextContent("Consent Paper · version 1");
+
+      const survey = await screen.findByRole("group", { name: "Survey results.pdf" });
+      await userEvent.click(within(survey).getByRole("button", { name: "Open Survey results.pdf" }));
+      expect(await screen.findByText(/reading file 31/)).toBeInTheDocument();
+      await expectNoBlockingA11yViolations(container);
+
+      const notes = screen.getByRole("group", { name: "Interview notes.docx" });
+      expect(within(notes).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
+      expect(within(notes).getByRole("button", { name: "Download Interview notes.docx" })).toBeInTheDocument();
+      vi.mocked(documentsApi.files).mockResolvedValue({ data: [] } as never);
+    });
+
+    // ADR-032 §7, Amendment 2026-11-18 (IR-1204): a reviewer comments on the document in the reader,
+    // as they do on the manuscript, and a thread's document opens there again.
+    it("comments on the document shown, its newest upload only, and opens a thread's document", async () => {
+      workspaceAt(1600);
+      shownRecord = {
+        ...inReview, ...reviewing,
+        capabilities: [...(inReview.capabilities ?? []), "comment_review", "finish_review", "open_general_thread"],
+      };
+      signInAs(2, "ITSO");
+      const consent = { upload: 12, slot: "Consent Paper", version: 2, label: "Consent Paper, v2", earlier: false, extension: "pdf" };
+      vi.mocked(recordsApi.reviewComments).mockResolvedValue({ data: [comment({
+        id: 70, party: "itso", party_label: "ITSO", severity: "must_fix", body: "The consent form isn't signed.", document: consent,
+      })] } as never);
+      onTestFinished(() => {
+        vi.mocked(recordsApi.reviewComments).mockImplementation(() => Promise.reject(new Error("not under test")));
+      });
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      // An older upload takes no new thread (decided 2026-11-18).
+      const row = await screen.findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(row).getByRole("button", { name: "2 versions of Consent Paper" }));
+      await userEvent.click(within(row).getByRole("button", { name: "Open Consent Paper version 1" }));
+      expect(await screen.findByText(/reading upload 11/)).toBeInTheDocument();
+      expect(within(screen.getByRole("group", { name: "Shown in the reader" }))
+        .queryByRole("button", { name: "Comment on this document" })).not.toBeInTheDocument();
+
+      // The row's own Open, the first; the versions list repeats it.
+      await userEvent.click(within(row).getAllByRole("button", { name: "Open Consent Paper version 2" })[0]);
+      expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
+      await userEvent.click(within(screen.getByRole("group", { name: "Shown in the reader" }))
+        .getByRole("button", { name: "Comment on this document" }));
+
+      expect(screen.getByRole("tab", { name: /^Threads/, selected: true })).toBeInTheDocument();
+      const form = screen.getByRole("form", { name: "New comment" });
+      expect(form).toHaveTextContent("Comment on Consent Paper, v2");
+      await userEvent.type(within(form).getByRole("textbox", { name: "Comment" }), "Sign page 2 as well.");
+      await userEvent.click(within(form).getByRole("button", { name: "Post" }));
+      expect(recordsApi.postReviewComment).toHaveBeenCalledWith(RECORD_ID, expect.objectContaining({
+        body: "Sign page 2 as well.", kind: "thread", document: 12,
+      }));
+      await expectNoBlockingA11yViolations(container);
+
+      // Back to the manuscript, then the thread's link brings the document back.
+      await userEvent.click(screen.getByRole("button", { name: "Back to the manuscript" }));
+      expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
+      const card = screen.getByRole("article", { name: /Thread 1, ITSO/ });
+      await userEvent.click(within(card).getByRole("button", { name: "Open Consent Paper, v2" }));
+      expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toHaveTextContent("Consent Paper · version 2");
+    });
+
+    // The image half (IR-1203, after IR-1220): a scan opens as an image; an SVG, which can carry script, never does.
+    it("opens a PNG or JPG attachment as an image in the reader, and never an SVG", async () => {
+      workspaceAt(1600);
+      shownRecord = inReview;
+      signInAs(OWNER_ID, "Student");
+      // jsdom has no object URLs; stubbed for this test and restored after it.
+      const { createObjectURL, revokeObjectURL } = URL;
+      URL.createObjectURL = vi.fn(() => "blob:scan");
+      URL.revokeObjectURL = vi.fn();
+      onTestFinished(() => {
+        URL.createObjectURL = createObjectURL;
+        URL.revokeObjectURL = revokeObjectURL;
+      });
+      vi.mocked(documentsApi.viewFile).mockResolvedValue({ data: new Blob(["png"], { type: "image/png" }) } as never);
+      const file = (id: number, filename: string) => ({
+        id, record: RECORD_ID, file: `x/${id}`, filename, uploaded_by: OWNER_ID,
+        uploaded_by_name: "Rhea Owner", created_at: "2026-11-03T08:00:00Z", can_remove: false,
+      });
+      vi.mocked(documentsApi.files).mockResolvedValue({ data: [
+        file(33, "Signed consent.JPG"), file(34, "diagram.svg"),
+      ] } as never);
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+
+      await screen.findByRole("group", { name: "Consent Paper" });
+      const diagram = await screen.findByRole("group", { name: "diagram.svg" });
+      expect(within(diagram).queryByRole("button", { name: /^Open/ })).not.toBeInTheDocument();
+
+      const consent = screen.getByRole("group", { name: "Signed consent.JPG" });
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Signed consent.JPG" }));
+      expect(await screen.findByRole("img", { name: "Signed consent.JPG" })).toHaveAttribute("src", "blob:scan");
+      expect(documentsApi.viewFile).toHaveBeenCalledWith(33, expect.anything());
+      // Not the PDF reader: an image has no pages to read.
+      expect(screen.queryByText(/reading file 33/)).not.toBeInTheDocument();
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toHaveTextContent("Signed consent.JPG");
+      expect(within(screen.getByRole("toolbar", { name: "Image tools" }))
+        .getByRole("button", { name: "Download Signed consent.JPG" })).toBeInTheDocument();
+      await expectNoBlockingA11yViolations(container);
+
+      await userEvent.click(screen.getByRole("button", { name: "Back to the manuscript" }));
+      expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
+      expect(screen.queryByRole("img", { name: "Signed consent.JPG" })).not.toBeInTheDocument();
+      vi.mocked(documentsApi.files).mockResolvedValue({ data: [] } as never);
+    });
+
+    it("closes the narrow pane when a document opens, so the reader is seen", async () => {
+      workspaceAt(320);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Open review pane" }));
+      const pane = screen.getByRole("dialog", { name: "Review pane" });
+      const consent = await within(pane).findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Review pane" })).not.toBeInTheDocument());
+      expect(screen.getByText(/reading upload 12/)).toBeInTheDocument();
+      // The pane that held Open is closed: focus is on what the reader now shows.
+      expect(screen.getByRole("group", { name: "Shown in the reader" })).toHaveFocus();
+    });
+
+    it("is reached and left by keyboard, focus going to the document and back to Open, with no serious axe violations", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing };
+      signInAs(2, "ITSO");
+      const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      const open = within(consent).getByRole("button", { name: "Open Consent Paper version 2" });
+      open.focus();
+      await userEvent.keyboard("{Enter}");
+
+      const shown = await screen.findByRole("group", { name: "Shown in the reader" });
+      // Focus says what the reader now shows: the strip's description names the document.
+      expect(shown).toHaveFocus();
+      expect(shown).toHaveAccessibleDescription("Consent Paper · version 2 · a supporting document, not the manuscript");
+      await expectNoBlockingA11yViolations(container);
+
+      await userEvent.tab();
+      expect(within(shown).getByRole("button", { name: "Back to the manuscript" })).toHaveFocus();
+      await userEvent.keyboard("{Enter}");
+      expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
+      await waitFor(() => expect(within(screen.getByRole("group", { name: "Consent Paper" }))
+        .getByRole("button", { name: "Open Consent Paper version 2" })).toHaveFocus());
+    });
+
+    it("opens the document's latest version over an earlier manuscript Version, and Back returns to that Version", async () => {
+      workspaceAt(1600);
+      const versionOf = (number: number) => ({
+        number, cause: number === 1 ? "submission" : "revision", cause_label: number === 1 ? "Submission" : "Revision",
+        created_at: `2026-09-0${number}T08:00:00Z`, created_by_name: "Rhea Owner",
+        manuscript_url: `/api/v1/records/${RECORD_ID}/versions/${number}/manuscript/`,
+      });
+      shownRecord = { ...inReview, ...reviewing, versions: [versionOf(1), versionOf(2)] } as RecordDetail;
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review&version=1`);
+      expect(await screen.findByText(/reading v1/)).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Version" })).toBeInTheDocument();
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+      expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
+      // The bar would describe the manuscript, so it says nothing of it while a document is shown.
+      expect(screen.queryByRole("combobox", { name: "Version" })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Back to the manuscript" }));
+      expect(await screen.findByText(/reading v1/)).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Version" })).toBeInTheDocument();
+    });
   });
 
   describe("document requests and the viewer's due date (IR-684)", () => {
@@ -3144,8 +3367,22 @@ describe("record versions (IR-416)", () => {
     signInAs(99, "Student");
   });
 
-  it("offers no picker with one version, or with none disclosed", async () => {
-    for (const versions of [[version(1, "submission")], null]) {
+  // The menu is there whenever there is a version, so every paper's header
+  // looks alike; with one version it lists that one alone (IR-1214).
+  it("offers the picker with only v1, current and chosen", async () => {
+    shownRecord = { ...record, versions: [version(1, "submission")] };
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+
+    const picker = screen.getByRole("combobox", PICKER);
+    expect(picker).toHaveValue("1");
+    expect(within(picker).getAllByRole("option").map((o) => o.textContent))
+      .toEqual([expect.stringMatching(/^v1 · Submission · .* \(current\)$/)]);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("offers no picker when no version is disclosed, or there is none", async () => {
+    for (const versions of [null, []]) {
       shownRecord = { ...record, versions };
       const { unmount } = renderPaperView();
       await waitForRecord(record.title);
@@ -3211,14 +3448,16 @@ describe("record versions (IR-416)", () => {
       expect(barOf()).not.toContainElement(picker);
     });
 
-    it("keeps a single version's label in the toolbar too, so a phone still says which it is reading", async () => {
+    it("keeps a single version's picker in the toolbar too, so a phone still says which it is reading", async () => {
       shownRecord = { ...record, versions: [version(1, "submission")] };
       workspaceAt(360);
       renderPaper(`/records/${RECORD_ID}?section=paper`);
       await screen.findByText(/paper reader open/i);
 
-      expect(readerOf()).toContainElement(screen.getByText("v1"));
-      expect(barOf()).not.toContainElement(screen.getByText("v1"));
+      const picker = screen.getByRole("combobox", PICKER);
+      expect(picker).toHaveValue("1");
+      expect(readerOf()).toContainElement(picker);
+      expect(barOf()).not.toContainElement(picker);
     });
 
     it("stays in the bar from 640px", async () => {
@@ -3460,6 +3699,25 @@ describe("the Overview's header (IR-569)", () => {
     const details = screen.getByRole("complementary", { name: "Record details" });
     expect(within(details).getByRole("heading", { name: "Institutional Governance" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Record details" })).not.toBeInTheDocument();
+  });
+
+  // jsdom does no layout, so this pins the rule that keeps the panel whole
+  // while it scrolls, not the pixels (IR-1178). The panel's own scrollbar
+  // takes ~23px from the scroller; an aside fixed at the column's full width
+  // overflowed by that much and the scroller clipped the right edge of every
+  // row. The aside may still not fall below the width it holds while the
+  // column folds, and must never outgrow what the scroller leaves it.
+  it("keeps every Record details row inside the panel when the panel scrolls (IR-1178)", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    const scroller = details.parentElement as HTMLElement;
+    expect(scroller).toHaveClass("overview-wide:overflow-y-auto", "overview-wide:overflow-x-hidden");
+    expect(scroller).toHaveClass("overview-wide:grid-cols-[minmax(0,1fr)]");
+    expect(details).toHaveClass("overview-wide:w-[clamp(17rem,25cqw,22rem)]");
+    expect(details).toHaveClass("overview-wide:max-w-full");
+    expect(details).toHaveClass("overview-wide:min-w-[15rem]");
   });
 
   it("sets the reading sections apart with spacing, and draws Comments last (IR-569)", async () => {

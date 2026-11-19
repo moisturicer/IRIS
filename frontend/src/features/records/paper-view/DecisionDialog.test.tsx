@@ -109,6 +109,27 @@ describe("DecisionDialog", () => {
     expect(within(dialog).queryByRole("list", { name: "The author flagged" })).not.toBeInTheDocument();
   });
 
+  it("says each reviewer it takes off stops acting, and whose drafts go (IR-1226)", () => {
+    open("publish", {
+      ...RDCO,
+      closes: {
+        ...RDCO.closes!,
+        assignments: [{
+          party: "ierc", label: "IERC", holders: ["Elena Reyes"],
+          leaving: [{
+            name: "Elena Reyes",
+            unresolved: { drafts: 2, open_threads: 1, document_requests: 0, revision_requests: 0 },
+          }],
+        }],
+      },
+    });
+
+    const closes = within(screen.getByRole("dialog")).getByRole("list", { name: "This also closes" });
+    expect(closes).toHaveTextContent(
+      "Elena Reyes will no longer act on this review, and 2 unsent drafts of theirs will be discarded.",
+    );
+  });
+
   // IR-878 (ADR-047 §10): Unlisted is no longer terminal, so the dialog says
   // how it is published later instead of "not yet possible in IRIS".
   it("says RDCO can publish an unlisted record later, once released", async () => {

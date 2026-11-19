@@ -196,11 +196,11 @@ export default function LoginPage() {
     }
 
     try {
-      const res = await authApi.login({ email: loginId, password: data.password });
+      const res = await authApi.login({ email: loginId, password: data.password, remember: data.remember });
       resetLoginAttempts(loginId);
       clearLockout(loginId);
       signingIn.current = true;
-      login(res.data.user, res.data.access, res.data.refresh);
+      login(res.data.user, res.data.access, res.data.remembered === true);
       // Every other request is refused until they answer, so the guard shows
       // the notice before the page loads (IR-790).
       if (res.data.notice_answer_required) useNoticeStore.getState().require();

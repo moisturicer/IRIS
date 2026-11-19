@@ -31,6 +31,7 @@ import {
   pageLine,
   readView,
   routingLine,
+  stripNamesHolder,
   viewSearch,
   waitLabel,
   type MyReviewsView,
@@ -121,6 +122,9 @@ export default function MyReviewsPage() {
 
   const go = (next: Partial<MyReviewsView>) => {
     const merged: MyReviewsView = { ...view, ...next };
+    // A filter belongs to the tab it was set on (IR-1210): a new tab starts
+    // without Overdue only, as leaving Done drops its outcome below.
+    if (merged.tab !== view.tab) merged.overdue = false;
     // Each tab keeps only its own controls: outcome on Done, sort and overdue elsewhere.
     if (merged.tab === "done") {
       merged.sort = "due";
@@ -178,6 +182,8 @@ export default function MyReviewsPage() {
 
   const officeLabel = coordinatorOffice?.toUpperCase() ?? "";
   const rows = page?.rows ?? [];
+  /** The tab has something listed, so a sort or an overdue filter has something to act on. */
+  const listed = rows.length > 0;
 
   return (
     <div>
@@ -248,6 +254,9 @@ export default function MyReviewsPage() {
             <div role="group" aria-label="Filter by outcome" className="flex flex-wrap gap-2">
               {[{ key: null, label: "All" }, ...OUTCOME_FILTERS].map((f) => {
                 const count = page?.outcome_counts?.[f.key ?? "all"];
+                // A chip that counts nothing cannot change the list (IR-1181). All stays, and
+                // so does the chosen outcome, or its filter would be applied and invisible.
+                if (f.key != null && outcome !== f.key && !count) return null;
                 return (
                   <button
                     key={f.label}
@@ -263,29 +272,35 @@ export default function MyReviewsPage() {
               })}
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <div role="group" aria-label="Sort" className="flex flex-wrap gap-2">
-                {SORTS.map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    aria-pressed={view.sort === s.key}
-                    onClick={() => go({ sort: s.key })}
-                    className={chipClass(view.sort === s.key)}
-                  >
-                    {s.label}
-                  </button>
-                ))}
+            // Sorting an empty list changes nothing, so no sort chip is offered over one
+            // (IR-1181). Overdue only stays while it is on: it is what emptied the list.
+            (listed || overdue) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {listed && (
+                  <div role="group" aria-label="Sort" className="flex flex-wrap gap-2">
+                    {SORTS.map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        aria-pressed={view.sort === s.key}
+                        onClick={() => go({ sort: s.key })}
+                        className={chipClass(view.sort === s.key)}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  aria-pressed={overdue}
+                  onClick={() => go({ overdue: !overdue })}
+                  className={chipClass(overdue)}
+                >
+                  Overdue only
+                </button>
               </div>
-              <button
-                type="button"
-                aria-pressed={overdue}
-                onClick={() => go({ overdue: !overdue })}
-                className={chipClass(overdue)}
-              >
-                Overdue only
-              </button>
-            </div>
+            )
           )}
 
           {coordinatorOffice && (
@@ -443,7 +458,7 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
 
   const status = (
     <>
-      <span className="font-semibold text-stone-800">{holderLine(row)}</span>
+      <span className="font-semibold text-stone-800">{holderLine(row, stripNamesHolder(row))}</span>
       {row.waiting_on && tab !== "done" && <Badge variant="warning">{WAITING_ON_LABEL[row.waiting_on]}</Badge>}
       {/* Overdue is said in words; the badge's tone only repeats it (IR-622). */}
       {row.is_overdue && <Badge variant="danger">{overdueLabel(row.overdue_days)}</Badge>}
@@ -488,8 +503,9 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
       </>
     );
   } else {
-    // A link, not a button: *Open review* is recorded in Paper View alone.
-    const label = tab === "in_review" ? "Continue review" : "Open review";
+    // A link, not a button: *Open review* is recorded in Paper View alone, so
+    // this link says "Examine review" and the two never share a name (IR-1211).
+    const label = tab === "in_review" ? "Continue review" : "Examine review";
     actions = (
       <Link
         to={href}

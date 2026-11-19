@@ -30,7 +30,7 @@ function deferred<T>() {
 }
 
 function signIn(id: number) {
-  useAuthStore.getState().login({ id, email: `r${id}@cit.edu`, role_name: "Student" } as unknown as User, "a", "r");
+  useAuthStore.getState().login({ id, email: `r${id}@cit.edu`, role_name: "Student" } as unknown as User, "a");
 }
 
 const isSaved = (id: number) => useSavedCallsStore.getState().items[id] !== undefined;

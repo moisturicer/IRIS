@@ -21,8 +21,7 @@ import { recordsApi } from "@/api/records";
 import { peopleApi } from "@/api/people";
 import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
-import { libraryApi, type SavedFeed } from "@/api/library";
-import { useFeedsStore } from "@/store/feeds.store";
+import { libraryApi } from "@/api/library";
 import { useLibraryStore } from "@/store/library.store";
 import type { ForYouItem, RecordListItem } from "@/types/records";
 import type { User } from "@/types/auth";
@@ -133,11 +132,6 @@ vi.mock("@/api/library", () => ({
     deleteFolder: vi.fn(),
     fileInFolder: vi.fn(),
     removeFromFolder: vi.fn(() => Promise.resolve({ status: 204 })),
-    // Saved feeds (IR-577): the menu reads them when Discover mounts.
-    feeds: vi.fn(() => Promise.resolve({ data: { results: [], limit: 10 } })),
-    createFeed: vi.fn(),
-    updateFeed: vi.fn(),
-    deleteFeed: vi.fn(),
   },
 }));
 
@@ -297,12 +291,15 @@ describe("the page head", () => {
   });
 });
 
-// IR-1080 (spec §4.6, audit RES-01): on a phone Discover is search, then ONE row of
-// named controls. jsdom loads no Tailwind, so the 44 px and "no sideways page scroll"
-// criteria are checked as the class tokens that give them; the pixels are a manual
-// check at 390 and 360 px (see the traceability file).
-describe("the phone toolbar (IR-1080)", () => {
+// IR-1080 (spec §4.6, audit RES-01), IR-1190: Discover is search, then ONE row of named
+// controls on a phone and on a desktop. jsdom loads no Tailwind, so the 44 px, "no
+// wrapping" and "no sideways scroll" criteria are checked as the class tokens that give
+// them; the pixels at 360, 768, 1280 and 1745 px are measured by the e2e smoke tier
+// (e2e/smoke/discover-toolbar.spec.ts).
+describe("the toolbar row (IR-1080, IR-1190)", () => {
   const TOUCH_HEIGHT = /(^|\s)(min-)?h-11(\s|$)/;
+  /** An icon on a phone is as wide as it is tall; a labelled segment or button is wider by its text. */
+  const TOUCH_WIDTH = /(^|\s)(min-)?w-11(\s|$)/;
 
   /** The 1/2/3 column toggle is `hidden xl:inline-flex`: out of the phone row, though jsdom still holds it. */
   const phoneControls = (row: HTMLElement) => within(row).getAllByRole("button").filter((b) => !/column/.test(b.getAttribute("aria-label") ?? ""));
@@ -321,49 +318,64 @@ describe("the phone toolbar (IR-1080)", () => {
     // IR-1187: one Sort dropdown, not three feed tabs.
     expect(within(row).getByRole("combobox", { name: "Sort" })).toBeInTheDocument();
     expect(within(row).queryByRole("group", { name: "Discover feed" })).not.toBeInTheDocument();
-    for (const name of [/^My feeds/, /^Filters/, "Publish"]) {
+    for (const name of [/^Filters/, "Publish"]) {
       expect(within(row).getByRole("button", { name })).toBeInTheDocument();
     }
-    // IR-1188: Areas live in the Filters panel, not beside it.
-    expect(phoneControls(row)).toHaveLength(3);
+    // IR-1188: Areas live in the Filters panel, not beside it. IR-1189: no My feeds.
+    // The row is Papers, People, Filters and Publish.
+    expect(phoneControls(row)).toHaveLength(4);
   });
 
-  it("moves Papers and People out of the row and into the header", async () => {
+  // IR-1190 supersedes IR-1080's header placement: Papers and People are the row's first control.
+  it("holds Papers and People in the row, first, and switches between them", async () => {
     const row = await phoneToolbar();
-    const results = screen.getByRole("group", { name: "Discover results" });
-    expect(row).not.toContainElement(results);
+    const results = within(row).getByRole("group", { name: "Discover results" });
     const heading = screen.getByRole("heading", { level: 1, name: "Discover" });
-    expect(heading.compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(results.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(row.firstElementChild).toBe(results);
     expect(within(results).getByRole("button", { name: "Papers", pressed: true })).toBeInTheDocument();
     await userEvent.click(within(results).getByRole("button", { name: "People" }));
     expect(within(results).getByRole("button", { name: "People", pressed: true })).toBeInTheDocument();
   });
 
-  it("shows Filters and Publish as visible text, with the count beside Filters", async () => {
+  it("keeps the row, with its Publish, over People, and leaves out Sort and Filters that do not apply there", async () => {
     const row = await phoneToolbar();
-    for (const [name, text] of [[/^Filters/, "Filters"], ["Publish", "Publish"]] as const) {
+    await userEvent.click(within(row).getByRole("button", { name: "People" }));
+    const peopleRow = screen.getByRole("group", { name: "Discover controls" });
+    expect(within(peopleRow).getByRole("button", { name: "Papers" })).toBeInTheDocument();
+    expect(within(peopleRow).getByRole("button", { name: "Publish" })).toBeInTheDocument();
+    expect(within(peopleRow).queryByRole("combobox", { name: "Sort" })).not.toBeInTheDocument();
+    expect(within(peopleRow).queryByRole("button", { name: /^Filters/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps a name on every control that loses its word on a phone, and the count beside Filters", async () => {
+    const row = await phoneToolbar();
+    // Below `sm` the word is `sr-only`: still the control's name, no longer drawn.
+    for (const [name, text] of [["Papers", "Papers"], ["People", "People"], [/^Filters/, "Filters"], ["Publish", "Publish"]] as const) {
       const button = within(row).getByRole("button", { name });
-      expect(within(button).getByText(text).className).not.toMatch(/(^|\s)hidden(\s|$)/);
+      expect(within(button).getByText(text).className, text).toMatch(/(^|\s)sr-only(\s|$)/);
+      expect(within(button).getByText(text).className, text).toMatch(/(^|\s)sm:not-sr-only(\s|$)/);
     }
+    expect(within(row).getByLabelText("Sort").className).not.toMatch(/(^|\s)hidden(\s|$)/);
     await userEvent.click(within(row).getByRole("button", { name: /^Filters/ }));
     await choose(/^Type/, /Thesis/);
     const filters = within(row).getByRole("button", { name: "Filters, 1 active" });
     expect(filters).toHaveTextContent(/Filters\s*1/);
-    expect(within(filters).getByText("1").className).not.toMatch(/absolute/);
+    // The count stays drawn on a phone: it is how the reader knows a filter is on.
+    expect(within(filters).getByText("1").className).not.toMatch(/(^|\s)(absolute|sr-only)(\s|$)/);
   });
 
-  it("makes every control at least 44 px tall and lets the row, not the page, scroll sideways", async () => {
+  it("makes every control 44 px square or more, and the row neither wraps nor scrolls", async () => {
     const row = await phoneToolbar();
-    expect(row.className).toMatch(/(^|\s)overflow-x-auto(\s|$)/);
+    // IR-1190: one row at every width. No wrapping at any breakpoint, no scroll container.
+    expect(row.className).not.toMatch(/(^|\s)([a-z]+:)?flex-(wrap|col)(\s|$)/);
+    expect(row.className).not.toMatch(/(^|\s)([a-z]+:)?overflow-x-(auto|scroll)(\s|$)/);
+    expect(row.className).toMatch(/(^|\s)flex(\s|$)/);
     for (const button of phoneControls(row)) {
       expect(button.className, button.textContent ?? "").toMatch(TOUCH_HEIGHT);
+      expect(button.className, button.textContent ?? "").toMatch(TOUCH_WIDTH);
     }
     expect(within(row).getByRole("combobox", { name: "Sort" }).className).toMatch(TOUCH_HEIGHT);
-    const results = screen.getByRole("group", { name: "Discover results" });
-    for (const button of within(results).getAllByRole("button")) {
-      expect(button.className, button.textContent ?? "").toMatch(TOUCH_HEIGHT);
-    }
   });
 
   it("keeps the office reviewer's row to the controls that reviewer has", async () => {
@@ -372,7 +384,8 @@ describe("the phone toolbar (IR-1080)", () => {
     await screen.findByText(publishedThesis.title);
     const row = screen.getByRole("group", { name: "Discover controls" });
     expect(within(row).queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
-    expect(phoneControls(row)).toHaveLength(2);
+    // Papers, People and Filters: no Publish, and no My feeds (IR-1189).
+    expect(phoneControls(row)).toHaveLength(3);
   });
 });
 
@@ -1551,227 +1564,29 @@ describe("continuity: the search box follows the URL", () => {
 });
 
 
-describe("saved custom feeds (IR-577)", () => {
-  const savedFeed = (overrides: Partial<SavedFeed> = {}): SavedFeed => ({
-    id: 5,
-    name: "Coastal hazards",
-    query: { q: "flood", classification: "7", sort: "viewed" },
-    stale: {},
-    created_at: "2026-11-07T00:00:00Z",
-    updated_at: "2026-11-07T00:00:00Z",
-    ...overrides,
-  });
-  const withFeeds = (...feeds: SavedFeed[]) =>
-    vi.mocked(libraryApi.feeds).mockResolvedValue({ data: { results: feeds, limit: 10 } } as never);
+// IR-1189: My feeds is no longer on Discover. Readers' saved feeds stay on the
+// server untouched; Discover neither offers nor reads them.
+describe("Discover without My feeds (IR-1189)", () => {
   const probe = () => screen.getByRole("status", { name: "Current query" });
-  const refused = (data: unknown) => Object.assign(new Error("refused"), { response: { status: 400, data } });
 
-  beforeEach(() => {
-    useFeedsStore.setState({ load: "idle", feeds: [], limit: 10, interrupted: false });
-  });
-
-  async function openFeed(name = "Coastal hazards") {
-    await userEvent.click(await screen.findByRole("button", { name: /My feeds/ }));
-    await userEvent.click(await screen.findByRole("button", { name: `Open ${name}` }));
-  }
-
-  it("opens a feed as the ordinary Discover query, asking the API for exactly its filters", async () => {
-    withFeeds(savedFeed());
-    renderDiscover();
+  it("offers no My feeds menu, saved-feed bar or save-as-feed action", async () => {
+    renderDiscover("/?q=flood");
     await screen.findByText(publishedThesis.title);
 
-    await openFeed();
-
-    await waitFor(() => expect(lastListParams()).toMatchObject({ search: "flood", classification: "7", ordering: "-access_count" }));
-    expect(probe()).toHaveTextContent("q=flood");
-    expect(probe()).toHaveTextContent("classification=7");
-    expect(probe()).toHaveTextContent("sort=viewed");
-    expect(probe()).toHaveTextContent("myfeed=5");
-    expect(await screen.findByRole("region", { name: "Feed Coastal hazards" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Search records" })).toHaveValue("flood");
+    expect(screen.queryByRole("button", { name: /My feeds/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Save these filters/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /^Feed / })).not.toBeInTheDocument();
   });
 
-  it("remembers which feed is open after a reload", async () => {
-    withFeeds(savedFeed());
+  it("opens an old saved-feed link as its plain filters and drops the feed id from the address", async () => {
     renderDiscover("/?q=flood&classification=7&sort=viewed&myfeed=5");
 
-    expect(await screen.findByRole("region", { name: "Feed Coastal hazards" })).toBeInTheDocument();
-  });
-
-  it("drops a feed that is not the reader's own from the URL without naming it", async () => {
-    withFeeds();
-    renderDiscover("/?q=flood&myfeed=999");
-
     await waitFor(() => expect(probe()).not.toHaveTextContent("myfeed"));
     expect(probe()).toHaveTextContent("q=flood");
-    expect(screen.queryByRole("region", { name: /^Feed / })).not.toBeInTheDocument();
-  });
-
-  it("holds the list back until a feed with a value that no longer exists is corrected", async () => {
-    withFeeds(savedFeed({ name: "Old Area", query: { classification: "7,99" }, stale: { classification: [99] } }));
-    renderDiscover();
-    await screen.findByText(publishedThesis.title);
-    const asked = vi.mocked(recordsApi.list).mock.calls.length;
-
-    await openFeed("Old Area");
-
-    const panel = await screen.findByRole("alert");
-    expect(panel).toHaveTextContent(/1 Area that no longer exists/);
-    expect(panel).toHaveTextContent(/never shows more than the feed was saved to show/i);
-    // The stale id is not queried, and nothing stands in for a list: no
-    // "no results" claim and no wider catalogue.
     expect(probe()).toHaveTextContent("classification=7");
-    expect(probe()).not.toHaveTextContent("99");
-    expect(vi.mocked(recordsApi.list).mock.calls.length).toBe(asked);
-    expect(screen.queryByText(publishedThesis.title)).not.toBeInTheDocument();
-    expect(screen.queryByText("No research matches these filters")).not.toBeInTheDocument();
-  });
-
-  it("corrects a stale feed by removing what is gone, then runs it", async () => {
-    const stale = savedFeed({ name: "Old Area", query: { classification: "7,99" }, stale: { classification: [99] } });
-    withFeeds(stale);
-    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...stale, query: { classification: "7" }, stale: {} } } as never);
-    renderDiscover();
-    await screen.findByText(publishedThesis.title);
-    await openFeed("Old Area");
-
-    await userEvent.click(await screen.findByRole("button", { name: "Remove them and use the rest" }));
-
-    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { classification: "7" } }));
-    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
-    await waitFor(() => expect(lastListParams()).toMatchObject({ classification: "7" }));
+    await waitFor(() => expect(lastListParams()).toMatchObject({ search: "flood", classification: "7", ordering: "-access_count" }));
     expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
-  });
-
-  it("keeps the correction on screen, with the reason, when nothing would be left", async () => {
-    const stale = savedFeed({ name: "Gone", query: { classification: "99" }, stale: { classification: [99] } });
-    withFeeds(stale);
-    vi.mocked(libraryApi.updateFeed).mockRejectedValue(
-      refused({ query: ["Add at least one Area, keyword, college, type, year or IP filter."] }),
-    );
-    renderDiscover();
-    await screen.findByText(publishedThesis.title);
-    await openFeed("Gone");
-
-    await userEvent.click(await screen.findByRole("button", { name: "Remove them and use the rest" }));
-
-    expect(await screen.findByText("Add at least one Area, keyword, college, type, year or IP filter.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove them and use the rest" })).toBeInTheDocument();
-  });
-
-  it("offers to save changed filters into the open feed, and only when they differ", async () => {
-    const feed = savedFeed({ query: { q: "flood", classification: "7" } });
-    withFeeds(feed);
-    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...feed, query: { q: "flood", classification: "7", year_from: "2026" } } } as never);
-    renderDiscover();
-    await screen.findByText(publishedThesis.title);
-    await openFeed();
-    await screen.findByRole("region", { name: "Feed Coastal hazards" });
-    expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument();
-
-    await choose(/^Year from/, /2026/);
-
-    await userEvent.click(await screen.findByRole("button", { name: "Save these filters to this feed" }));
-    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { q: "flood", classification: "7", year_from: "2026" } }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument());
-  });
-
-  it("leaves the feed and keeps the filters it set", async () => {
-    withFeeds(savedFeed());
-    renderDiscover();
-    await screen.findByText(publishedThesis.title);
-    await openFeed();
-    await screen.findByRole("region", { name: "Feed Coastal hazards" });
-
-    await userEvent.click(screen.getByRole("button", { name: "Leave feed" }));
-
-    await waitFor(() => expect(probe()).not.toHaveTextContent("myfeed"));
-    expect(probe()).toHaveTextContent("classification=7");
     expect(screen.queryByRole("region", { name: /^Feed / })).not.toBeInTheDocument();
-  });
-
-  it("leaves a feed that is deleted while it is open", async () => {
-    withFeeds(savedFeed());
-    vi.mocked(libraryApi.deleteFeed).mockResolvedValue({ data: undefined } as never);
-    renderDiscover();
-    await screen.findByText(publishedThesis.title);
-    await openFeed();
-    await screen.findByRole("region", { name: "Feed Coastal hazards" });
-
-    await userEvent.click(screen.getByRole("button", { name: /My feeds/ }));
-    await userEvent.click(await screen.findByRole("button", { name: "Delete Coastal hazards" }));
-    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete feed" }));
-
-    await waitFor(() => expect(screen.queryByRole("region", { name: /^Feed / })).not.toBeInTheDocument());
-    expect(probe()).not.toHaveTextContent("myfeed");
-  });
-
-  it("saves the filters on screen from Latest, and then shows the new feed", async () => {
-    vi.mocked(libraryApi.createFeed).mockResolvedValue({
-      data: savedFeed({ id: 8, name: "Rain", query: { q: "rain" } }),
-    } as never);
-    renderDiscover("/?q=rain");
-    await screen.findByText(publishedThesis.title);
-    await userEvent.click(screen.getByRole("button", { name: /My feeds/ }));
-    await userEvent.click(await screen.findByRole("button", { name: /Save these filters as a feed/ }));
-    const dialog = await screen.findByRole("dialog");
-
-    await userEvent.type(within(dialog).getByRole("textbox", { name: /Feed name/ }), "Rain");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Save feed" }));
-
-    await waitFor(() => expect(libraryApi.createFeed).toHaveBeenCalledWith({ name: "Rain", query: { q: "rain" } }));
-    expect(await screen.findByRole("region", { name: "Feed Rain" })).toBeInTheDocument();
-    expect(probe()).toHaveTextContent("myfeed=8");
-  });
-
-  it("says an open feed matches nothing, keeps its criteria, and does not offer to clear them", async () => {
-    withFeeds(savedFeed({ query: { q: "flood", classification: "7" } }));
-    renderDiscover();
-    await screen.findByText(publishedThesis.title);
-    listed = [];
-
-    await openFeed();
-
-    expect(await screen.findByText("No papers match this feed right now")).toBeInTheDocument();
-    // The criteria stay in view, and "Clear filters" would empty the feed.
-    expect(screen.getByText(/Keywords: flood; Areas: Applied Research/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
-    expect(screen.queryByText("No research matches these filters")).not.toBeInTheDocument();
-  });
-
-  it("does not offer to save an empty set of filters into the open feed", async () => {
-    withFeeds(savedFeed({ query: { q: "flood" } }));
-    renderDiscover("/?myfeed=5");
-
-    expect(await screen.findByRole("region", { name: "Feed Coastal hazards" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument();
-  });
-
-  it("holds a feed's list back, and keeps the feed open, when the reader's feeds cannot be checked", async () => {
-    vi.mocked(libraryApi.feeds).mockRejectedValueOnce(new Error("offline"));
-    renderDiscover("/?q=flood&myfeed=5");
-
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/could not be checked right now/i);
-    // Not fetched, and the feed is not quietly dropped to show a wider list.
-    expect(recordsApi.list).not.toHaveBeenCalled();
-    expect(probe()).toHaveTextContent("myfeed=5");
-
-    withFeeds(savedFeed({ query: { q: "flood" } }));
-    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
-
-    expect(await screen.findByRole("region", { name: "Feed Coastal hazards" })).toBeInTheDocument();
-    expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
-  });
-
-  it("has no blocking accessibility violations with a feed open and with a correction pending", async () => {
-    withFeeds(savedFeed({ name: "Old Area", query: { classification: "7,99" }, stale: { classification: [99] } }));
-    const { container } = renderDiscover();
-    await screen.findByText(publishedThesis.title);
-    await openFeed("Old Area");
-    await screen.findByRole("alert");
-
-    await expectNoBlockingA11yViolations(container);
   });
 });
 

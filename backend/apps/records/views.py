@@ -1024,7 +1024,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         GET  /records/<id>/review-comments/ -- the review discussion, oldest first.
         POST /records/<id>/review-comments/
         `{"body": str, "kind"?: "discussion" | "thread", "post_now"?: bool, "reply_to"?: id,
-          "severity"?: str, "anchor"?: {...}, "suggestion"?: str, "mentions"?: [user id]}`
+          "severity"?: str, "anchor"?: {...}, "suggestion"?: str, "mentions"?: [user id],
+          "document"?: upload id}` -- `document` names a supporting document's upload (IR-1204).
 
         Read under `may_read_review`; written by the record's participants, on
         a submitted record (`apps.reviews.comments`). A new comment answers 201.
@@ -1039,6 +1040,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                 kind=request.data.get("kind"), post_now=request.data.get("post_now"),
                 severity=request.data.get("severity"), anchor=request.data.get("anchor"),
                 suggestion=request.data.get("suggestion"), mentioned=request.data.get("mentions"),
+                document=request.data.get("document"),
             ), request.user),
             success=status.HTTP_201_CREATED,
         )

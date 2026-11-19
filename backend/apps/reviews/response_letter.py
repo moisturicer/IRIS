@@ -19,7 +19,7 @@ from core.enums import ThreadSeverity
 from core.permissions import may_read_review
 
 from .models import ResponseLetter
-from .threads import is_reviewer_thread, open_threads, party_label
+from .threads import document_label, is_reviewer_thread, open_threads, party_label
 
 
 class LetterNotFound(Exception):
@@ -37,6 +37,8 @@ def _entry(thread) -> dict:
         if (thread.anchor_version_id or thread.version_id) else None,
         "page": thread.anchor_page,
         "quote": thread.anchor_quote,
+        # A document thread's upload, "Consent form, v1" (IR-1204); None otherwise.
+        "document": document_label(thread.anchor_upload) if thread.anchor_upload_id else None,
         "answer": thread.answer or None,
         "note": thread.answer_note,
     }
@@ -48,7 +50,7 @@ def assemble(record, requests) -> list[dict]:
     threads = [
         t for t in open_threads(record)
         .filter(party__in=parties)
-        .select_related("anchor_version", "version")
+        .select_related("anchor_version", "version", "anchor_upload__slot")
         .order_by("created_at", "pk")
         if is_reviewer_thread(t)
     ]

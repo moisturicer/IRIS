@@ -32,7 +32,6 @@ function signInAs(roleRequest: OwnRoleRequest | null) {
       role_request: roleRequest,
     }),
     accessToken: "access",
-    refreshToken: "refresh-token",
     isAuthenticated: true,
   });
   return renderScreen(<PendingApprovalPage />);
@@ -46,7 +45,7 @@ const TURNAROUND = /\b(?:business days?|days?|hours?|weeks?|shortly|soon|typical
 
 afterEach(() => {
   vi.restoreAllMocks();
-  useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+  useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false });
 });
 
 describe("a pending request", () => {
@@ -141,7 +140,7 @@ describe("signing out", () => {
 
     await user.click(screen.getByRole("button", { name: "Sign out" }));
 
-    expect(logout).toHaveBeenCalledWith("refresh-token");
+    expect(logout).toHaveBeenCalledWith(); // ADR-072: the token is in its HttpOnly cookie
     await waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false));
     expect(useAuthStore.getState().user).toBeNull();
   });

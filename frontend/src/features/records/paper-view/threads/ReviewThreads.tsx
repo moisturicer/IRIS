@@ -7,7 +7,7 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import type { Capability } from "@/features/records/capabilities";
 import { errorDetail } from "@/lib/errorDetail";
 import { cn, formatDate } from "@/lib/utils";
-import type { MentionedPerson, ResponseLetter, ReviewComment, ThreadSeverity } from "@/types/records";
+import type { MentionedPerson, ResponseLetter, ReviewComment, ThreadDocument, ThreadSeverity } from "@/types/records";
 
 import { RowMenu } from "@/features/accounts/RowMenu";
 
@@ -20,7 +20,11 @@ import { SEVERITY_WORDS, filterThreads, isOpen, threadStatus, type Thread, type 
 import type { ReviewThreadsState } from "./useReviewThreads";
 
 /** What the composer comments on: a passage of a Version, or the whole record. */
-export type CommentTarget = { kind: "general" } | { kind: "passage"; version: number; passage: Passage };
+export type CommentTarget =
+  | { kind: "general" }
+  | { kind: "passage"; version: number; passage: Passage }
+  /** A supporting document's newest upload, as a whole (IR-1204): "Consent form, v1". */
+  | { kind: "document"; upload: number; label: string };
 
 export interface ReviewThreadsProps {
   recordId: number;
@@ -34,6 +38,8 @@ export interface ReviewThreadsProps {
   onChanged: () => void;
   /** Bring a thread's passage into view in the reader. */
   onShowInPaper: (thread: Thread) => void;
+  /** Show the document a thread is about in the reader (IR-1204); absent where nothing can. */
+  onShowDocument?: (document: ThreadDocument) => void;
   /** A party Readiness pointed at ("owner" for the authors), or null for every party. */
   party: string | null;
   onClearParty: () => void;
@@ -84,7 +90,9 @@ export function ReviewThreads(props: ReviewThreadsProps) {
     (Object.keys(FILTER_NAMES) as ThreadFilter[]).map((f) => [f, ofParty(filterThreads(threads.sent, f, viewer))]),
   ) as Record<ThreadFilter, Thread[]>;
   const shown = groups[filter];
-  const canComment = props.can.has("comment_review");
+  // Replying (`comment_review`) outlasts a reviewer's seat; starting a thread
+  // on a passage (`start_thread`) does not (IR-1226).
+  const canStart = props.can.has("start_thread");
   // A thread on no passage is a reviewer's (IR-1194); the authors comment on a passage.
   const canGeneral = props.can.has("open_general_thread");
 
@@ -122,7 +130,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
       </div>
       {props.composing
         ? <Composer {...props} target={props.composing} />
-        : canComment && (
+        : canStart && (
           <p className="text-small text-stone-600">
             Select a passage in the paper and press{" "}
             <kbd className="rounded-control border border-stone-300 bg-surface px-1.5 font-mono text-2xs text-stone-700">C</kbd>
@@ -266,6 +274,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
             p. {root.anchor.page} · v{root.anchor.version}
           </button>
         )}
+        {root.document && <DocumentPlace document={root.document} onShow={props.onShowDocument} />}
       </header>
 
       <div className="review-box-body space-y-2">
@@ -287,6 +296,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
             </Chip>
           )}
         {root.outdated_since != null && <Chip>Outdated since v{root.outdated_since}</Chip>}
+        {root.document?.earlier && <Chip>From an earlier upload</Chip>}
       </p>
 
       {root.anchor && (
@@ -306,7 +316,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       {root.suggestion && <SuggestedWording root={root} />}
 
       <div className="text-small text-stone-800">
-        <p className="whitespace-pre-wrap break-words">{root.body}</p>
+        <p className="text-justified whitespace-pre-wrap break-words">{root.body}</p>
         <MentionedPeople people={root.mentions} />
       </div>
 
@@ -454,7 +464,7 @@ function SuggestedWording({ root }: { root: ReviewComment }) {
   return (
     <section aria-labelledby={`${ids}-wording`} className="rounded-control bg-stone-50 px-2 py-1.5 space-y-0.5">
       <p id={`${ids}-wording`} className="text-2xs font-semibold text-stone-600">Suggested wording</p>
-      <p className="text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
+      <p className="text-justified text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
       {check && (
         <p className="text-2xs text-stone-700">
           {check.page != null
@@ -531,7 +541,7 @@ function AnswerRow({ answer, at }: { answer: ThreadAnswer; at: string | null }) 
           {addressed ? <>marked this <b className="font-semibold text-stone-900">Addressed</b></> : "declined this"}
           {at && <> <time dateTime={at} className="text-2xs text-stone-600">{formatDate(at)}</time></>}
         </p>
-        <p className="whitespace-pre-wrap break-words text-small text-stone-800">
+        <p className="text-justified whitespace-pre-wrap break-words text-small text-stone-800">
           {answer.note || <span className="italic text-stone-600">No answer given.</span>}
         </p>
       </div>
@@ -595,13 +605,30 @@ function Reply({ reply, recordId, canComment, onEdited }: {
           />
         ) : (
           <>
-            <p className="whitespace-pre-wrap break-words text-small text-stone-800">{reply.body}</p>
+            <p className="text-justified whitespace-pre-wrap break-words text-small text-stone-800">{reply.body}</p>
             <MentionedPeople people={reply.mentions} />
           </>
         )}
         {error && <p role="alert" className="text-small text-brand">{error}</p>}
       </div>
     </li>
+  );
+}
+
+/**
+ * Where a document thread points (IR-1204): its document and upload, as a link
+ * that shows it in the reader. A slot's upload is served as a PDF, so another
+ * stored type, or a page with no reader, names it without the link.
+ */
+function DocumentPlace({ document, onShow }: { document: ThreadDocument; onShow?: (document: ThreadDocument) => void }) {
+  // A document's name can be long, so it wraps within the card (the Full Text Rule, IR-1218).
+  const place = "min-w-0 break-words text-left font-semibold";
+  if (!onShow || document.extension !== "pdf") return <span className={cn(place, "text-stone-700")}>{document.label}</span>;
+  return (
+    <button type="button" onClick={() => onShow(document)} aria-label={`Open ${document.label}`}
+      className={cn(place, "text-brand underline underline-offset-2 hover:text-brand-dark", FOCUS_RING)}>
+      {document.label}
+    </button>
   );
 }
 
@@ -679,6 +706,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
             prefix: target.passage.prefix, suffix: target.passage.suffix, regions: target.passage.regions,
           },
         } : {}),
+        ...(target.kind === "document" ? { document: target.upload } : {}),
       });
       onCompose(null);
       threads.reload();
@@ -700,7 +728,9 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
       <p className="text-2xs text-stone-600">
         {target.kind === "passage"
           ? <>Comment on <b className="text-stone-800">p.{target.passage.page}</b> of v{target.version}</>
-          : "Comment on the record as a whole"}
+          : target.kind === "document"
+            ? <>Comment on <b className="text-stone-800">{target.label}</b></>
+            : "Comment on the record as a whole"}
       </p>
       {target.kind === "passage" && (
         <blockquote className="border-l-2 border-brand/40 pl-2 text-small italic text-stone-700">“{target.passage.quote}”</blockquote>

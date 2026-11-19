@@ -27,6 +27,7 @@ from rest_framework import status
 from apps.documents.models import DocumentRequest, DocumentRequestItem, RecordUpload
 from apps.notifications.models import Notification
 from apps.records.models import Record
+from apps.reviews.models import RecordAssignment
 from core.enums import PipelineStatus, RecordTypeName
 
 from .test_document_requests import DocumentRequestTestBase, SUBMIT_DOCUMENT, pdf
@@ -283,13 +284,21 @@ class OnlyTheRequestingPartyTests(DecisionTestBase):
         self.assertEqual(self.request_state(request_id), "fulfilled")
 
     def test_the_party_is_what_counts_not_the_person(self):
-        # Any IERC staffer may act for IERC, as on every other IERC action.
+        """
+        Another IERC reviewer decides on a request a colleague made: it is
+        IERC's, not theirs. Changed deliberately by IR-1226 (ADR-022
+        Amendment 7): they act once seated on IERC's review. An unseated
+        IERC member no longer does.
+        """
+        from apps.documents.tests.test_record_document_authorization import seat_on
         from apps.records.test_tracker import make_user
         from core.enums import RoleName
 
         colleague = make_user("tracker-ierc-2@cit.edu", RoleName.IERC)
-        _, _, item_id = self.one_item_uploaded()
+        record, _, item_id = self.one_item_uploaded()
+        self.assertEqual(self.decide(item_id, colleague, "accept").status_code, status.HTTP_403_FORBIDDEN)
 
+        seat_on(RecordAssignment.objects.get(record=record, party="ierc", state="active"), colleague)
         self.decided(item_id, colleague, "accept")
 
         self.assertEqual(self.item_state(item_id), "accepted")

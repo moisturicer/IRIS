@@ -294,7 +294,9 @@ class AnalyticsEndpointTests(APITestCase):
         self.client.force_authenticate(user)
         return self.client.get(reverse("reviews-analytics"), params)
 
-    def test_an_office_sees_its_own_figures_reproduced_from_the_log(self):
+    def test_one_offices_figures_are_reproduced_from_the_log(self):
+        # IR-1216: only RDCO opens the page, so one office's figures are read
+        # as RDCO narrowed to that office, the same payload an office got before.
         for record, hours in zip(self.records, (10, 20, 30, 40, 50)):
             self.turn(record, "itso", 0, hours)
             self.turn(record, "ierc", 0, 1)
@@ -304,7 +306,7 @@ class AnalyticsEndpointTests(APITestCase):
         RecordAssignment.objects.filter(pk=overdue.pk).update(due_at=yesterday, original_due_at=yesterday)
         ReviewerSeat.objects.create(assignment=overdue, reviewer=self.itso, source="claimed")
 
-        response = self.get(self.itso)
+        response = self.get(self.rdco, office="itso")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -350,9 +352,18 @@ class AnalyticsEndpointTests(APITestCase):
             ["itso"],
         )
 
-    def test_an_office_may_not_ask_for_another_office(self):
-        self.assertEqual(self.get(self.itso, office="ierc").status_code, 403)
-        self.assertEqual(self.get(self.itso, office="itso").status_code, 200)
+    def test_offices_are_refused_the_endpoint(self):
+        # IR-1216: Workflow analytics is RDCO's alone.
+        self.assertEqual(self.get(self.itso).status_code, 403)
+        self.assertEqual(self.get(self.itso, office="itso").status_code, 403)
+
+    def test_the_scoping_rule_still_keeps_an_office_to_its_own_figures(self):
+        # A second layer under the endpoint's RDCO gate: the computation itself
+        # never gives an office another office's figures (IR-626).
+        with self.assertRaises(analytics.AnalyticsRefused):
+            analytics.workflow_analytics(self.itso, {"office": "ierc"})
+        own = analytics.workflow_analytics(self.itso, {"office": "itso"})
+        self.assertEqual(own["parties"], [{"party": "itso", "label": "ITSO"}])
 
     def test_a_malformed_filter_is_refused(self):
         self.assertEqual(self.get(self.rdco, office="nobody").status_code, 400)

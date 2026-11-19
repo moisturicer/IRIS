@@ -5,6 +5,7 @@ import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
 import { formatDate, joinLabels } from "@/lib/utils";
+import { decisionLeavingLine } from "@/features/review/RemovalWarning";
 import { useAuthStore } from "@/store/auth.store";
 import type { DecisionCloses, DecisionFlags, DecisionOutcome, RecordDetail } from "@/types/records";
 
@@ -87,11 +88,13 @@ function wording(outcome: DecisionOutcome, kind: string) {
 /** Each piece of open work deciding would end, as one line. */
 export function closingLines(closes: DecisionCloses | null): string[] {
   if (!closes) return [];
-  const lines = closes.assignments.map((a) =>
+  const lines = closes.assignments.flatMap((a) => [
     a.holders.length > 0
       ? `${a.label}'s review in progress (${a.holders.join(", ")})`
       : `${a.label}'s review, not yet claimed`,
-  );
+    // What each reviewer it takes off leaves (IR-1226).
+    ...(a.leaving ?? []).map(decisionLeavingLine),
+  ]);
   if (closes.document_requests > 0) {
     lines.push(
       closes.document_requests === 1

@@ -17,8 +17,8 @@
  * only appears when two requests 401 at once -- exactly what a dashboard firing
  * parallel calls does. Clicking around will not surface it.
  */
-import { refreshOnce, __resetRefreshState, type RefreshedTokens } from "./tokenRefresh";
-import { beforeEach, test } from "vitest";
+import { refreshOnce, withRefreshLock, __resetRefreshState, type RefreshedTokens } from "./tokenRefresh";
+import { afterEach, beforeEach, describe, test, vi } from "vitest";
 
 // The hand-rolled harness called this before every case; vitest needs it
 // said once, here, or the cases leak refresh state into each other.
@@ -36,7 +36,7 @@ function assertEqual<T>(actual: T, expected: T, what: string) {
 }
 
 function assertSame(a: RefreshedTokens, b: RefreshedTokens, what: string) {
-  if (a !== b && (a.access !== b.access || a.refresh !== b.refresh)) {
+  if (a !== b && (a.access !== b.access || a.remembered !== b.remembered)) {
     throw new Error(`${what}: ${JSON.stringify(a)} !== ${JSON.stringify(b)}`);
   }
 }
@@ -89,7 +89,7 @@ test("concurrent callers share one in-flight refresh", async () => {
 
   assertEqual(r.calls, 1, "refresh call count while three callers waited");
 
-  r.release({ access: "new-access", refresh: "new-refresh" });
+  r.release({ access: "new-access", remembered: false });
   const [ra, rb, rc] = await Promise.all([a, b, c]);
 
   assertEqual(ra.access, "new-access", "first caller's access token");
@@ -100,12 +100,12 @@ test("concurrent callers share one in-flight refresh", async () => {
 test("a later refresh starts fresh once the first has settled", async () => {
   const first = deferredRefresh();
   const p = refreshOnce(first.fn);
-  first.release({ access: "one" });
+  first.release({ access: "one", remembered: false });
   await p;
 
   const second = deferredRefresh();
   const q = refreshOnce(second.fn);
-  second.release({ access: "two" });
+  second.release({ access: "two", remembered: false });
 
   assertEqual((await q).access, "two", "in-flight promise was not cleared after settling");
   assertEqual(second.calls, 1, "second refresh call count");
@@ -131,9 +131,48 @@ test("the gate reopens after a failure so a fresh login can refresh again", asyn
 
   const ok = deferredRefresh();
   const b = refreshOnce(ok.fn);
-  ok.release({ access: "recovered" });
+  ok.release({ access: "recovered", remembered: false });
 
   assertEqual((await b).access, "recovered", "the gate stayed shut after a failure");
 });
 
 // --- report ----------------------------------------------------------------
+
+// --- tabs take turns (ADR-072 decision 6) ----------------------------------
+
+describe("withRefreshLock", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  test("refreshes inside the browser-wide iris-refresh lock, one tab at a time", async () => {
+    // A LockManager that grants one holder at a time, like the browser's.
+    let tail: Promise<unknown> = Promise.resolve();
+    const names: string[] = [];
+    const locks = {
+      request: (name: string, cb: () => Promise<unknown>) => {
+        names.push(name);
+        const run = tail.then(cb);
+        tail = run.catch(() => {});
+        return run;
+      },
+    };
+    vi.stubGlobal("navigator", { ...globalThis.navigator, locks });
+
+    const order: string[] = [];
+    const first = deferredRefresh();
+    const a = withRefreshLock(async () => { order.push("a starts"); const t = await first.fn(); order.push("a ends"); return t; });
+    const b = withRefreshLock(async () => { order.push("b starts"); return { access: "b", remembered: false }; });
+
+    await Promise.resolve();
+    first.release({ access: "a", remembered: false });
+    await Promise.all([a, b]);
+
+    assertEqual(names.join(","), "iris-refresh,iris-refresh", "lock names");
+    assertEqual(order.join(" | "), "a starts | a ends | b starts", "the second refresh waited for the first");
+  });
+
+  test("runs the refresh unguarded where the Web Locks API is missing", async () => {
+    vi.stubGlobal("navigator", { ...globalThis.navigator, locks: undefined });
+    const result = await withRefreshLock(async () => ({ access: "x", remembered: true }));
+    assertEqual(result.access, "x", "the refresh ran");
+  });
+});

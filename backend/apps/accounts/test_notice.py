@@ -17,6 +17,7 @@ from apps.accounts import notice
 from apps.accounts.models import DataNotice, NoticeAnswer, User
 from apps.accounts.tests import make_unanswered, make_user
 from apps.audit.models import AuditEvent
+from apps.accounts.testing_auth import post_logout, post_refresh, tokens_of
 from core.enums import RoleName
 
 PASSWORD = "pw12345!"
@@ -38,7 +39,7 @@ def publish(number, **extra):
 def sign_in(email):
     response = APIClient().post(LOGIN, {"email": email, "password": PASSWORD}, format="json")
     assert response.status_code == 200, response.content
-    return response.json()
+    return tokens_of(response)
 
 
 def bearer(tokens):
@@ -351,7 +352,7 @@ class NobodyUsesIrisWithoutAnsweringTests(APITestCase):
     def test_signing_out_works_while_unanswered(self):
         user = self.account("leaving@cit.edu", RoleName.STUDENT)
         tokens = sign_in(user.email)
-        response = APIClient().post(LOGOUT, {"refresh": tokens["refresh"]}, format="json", **bearer(tokens))
+        response = post_logout(tokens["refresh"], tokens["access"])
         self.assertEqual(response.status_code, 200, response.content)
 
     def test_requesting_account_deletion_works_while_unanswered(self):
@@ -368,7 +369,7 @@ class NobodyUsesIrisWithoutAnsweringTests(APITestCase):
     def test_refreshing_a_token_is_not_blocked(self):
         user = self.account("refresher@cit.edu", RoleName.STUDENT)
         tokens = sign_in(user.email)
-        response = APIClient().post("/api/v1/auth/token/refresh/", {"refresh": tokens["refresh"]}, format="json")
+        response = post_refresh(tokens["refresh"])
         self.assertEqual(response.status_code, 200, response.content)
 
     def test_publishing_a_new_notice_blocks_someone_who_answered_the_old_one(self):

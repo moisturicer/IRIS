@@ -225,8 +225,8 @@ export const HELP_SECTIONS: HelpSection[] = [
     shownTo: (r) => canAccess(r.role, "reviewAnalytics"),
     body: (
       <p>
-        Workflow analytics shows how review is going: your office&rsquo;s own figures, or every
-        office&rsquo;s for RDCO. Find it in the sidebar, under My Reviews.
+        Workflow analytics shows how review is going in every office: how long papers wait at each
+        stage, and what is overdue. Open it from the RDCO section of the sidebar.
       </p>
     ),
   },

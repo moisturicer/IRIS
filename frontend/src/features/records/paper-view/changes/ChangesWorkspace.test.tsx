@@ -64,12 +64,13 @@ function StandInReader() {
 
 function openWorkspace(versions: number) {
   const onShowVersion = vi.fn();
+  const onShowManuscript = vi.fn();
   renderScreen(
     <ReviewWorkspaceLayout record={record(versions)} can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
       timelineVersion={0} onChanged={() => {}} documents={null}
-      onShowVersion={onShowVersion} />,
+      onShowVersion={onShowVersion} onShowManuscript={onShowManuscript} />,
   );
-  return { onShowVersion };
+  return { onShowVersion, onShowManuscript };
 }
 
 beforeEach(() => {
@@ -108,6 +109,16 @@ describe("the Changes tab in the review workspace", () => {
     await user.click(await screen.findByRole("button", { name: "Show in v1, p. 4" }));
     expect(onShowVersion).toHaveBeenCalledWith(1);
     expect(screen.getByText("Landed on page 4 of v1: Removed in v1, page 4, Method")).toBeInTheDocument();
+  });
+
+  // Changes compares manuscripts only (IR-1203): a document in the reader steps aside for the change.
+  it("puts the manuscript back in the reader when a document was shown there", async () => {
+    const user = userEvent.setup();
+    const { onShowManuscript } = openWorkspace(2);
+    await user.click(await screen.findByRole("tab", { name: "Changes" }));
+    expect(onShowManuscript).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: "Show in v1, p. 4" }));
+    expect(onShowManuscript).toHaveBeenCalledTimes(1);
   });
 
   it("opens a thread listed under its section in the Threads tab", async () => {

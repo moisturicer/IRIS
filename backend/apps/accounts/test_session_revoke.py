@@ -12,6 +12,7 @@ up to 30 minutes. Revoking now ends the session, which every token carrying its
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.test_session_invalidation import AccountSessionTestBase
+from apps.accounts.testing_auth import refresh_from
 
 REVOKED = "session_ended_revoked"
 
@@ -57,7 +58,7 @@ class RevokingEndsTheSessionTests(AccountSessionTestBase):
         response = self.refresh_tokens()
         self.assertEqual(response.status_code, 200)
         self.access = response.data["access"]
-        self.refresh = response.data.get("refresh", self.refresh)
+        self.refresh = refresh_from(response)  # The rotated token, from its cookie (ADR-072)
 
         self.revoke(self.refresh)
 

@@ -168,7 +168,7 @@ export const routes: RouteObject[] = [{
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewAnalytics")} />,
             children: [
-              { path: "review/analytics", element: <ReviewAnalyticsPage />, handle: { crumb: "Workflow analytics", width: "full" } },
+              { path: pathFor("reviewAnalytics"), element: <ReviewAnalyticsPage />, handle: { crumb: "Workflow analytics", width: "full" } },
             ],
           },
 
