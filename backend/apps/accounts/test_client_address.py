@@ -122,6 +122,8 @@ class ProductionSettingTests(APITestCase):
             "EMAIL_HOST_PASSWORD": "test-only",
             # Unstructured is required in production too (IR-988).
             "UNSTRUCTURED_PLATFORM_API_KEY": "uns-test",
+            # And a malware scanner (ADR-074); nothing here uploads, so none is reached.
+            "MALWARE_SCAN_HOST": "clamav",
         }
         env.pop("TRUSTED_PROXY_COUNT", None)
         env.update(extra)

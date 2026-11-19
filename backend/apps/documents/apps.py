@@ -12,6 +12,11 @@ class DocumentsConfig(AppConfig):
         from . import figures  # noqa: F401 -- connects the image clean-up (IR-845)
         from . import formulas  # noqa: F401 -- and the crop clean-up (IR-1102)
 
+        # ADR-074: with DEBUG off there is no running without a malware scanner.
+        if not settings.DEBUG:
+            from .scanning import configured_scanner
+            configured_scanner()
+
         values = [getattr(settings, name, None) for name in LIMIT_NAMES]
         if any(value is not None for value in values):
             try:

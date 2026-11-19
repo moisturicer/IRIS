@@ -294,14 +294,16 @@ def check_import_row(row: dict, choices: ImportChoices) -> tuple[dict, list[str]
     }, problems
 
 
-def check_import_pdf(row: dict, pdfs: dict, taken: dict) -> tuple[object | None, list[str]]:
+def check_import_pdf(row: dict, pdfs: dict, taken: dict, *, user) -> tuple[object | None, list[str]]:
     """
     The PDF a row names in its File Name column, and every reason it cannot be
     attached (IR-1138). `pdfs` maps a lower-cased file name to the uploaded
     file; `taken` maps a file name to the row that already uses it, so one PDF
     is never attached to two records. A blank File Name is fine: the row is
-    imported with no manuscript, as before.
+    imported with no manuscript, as before. `user` is who imports, for the
+    audit of a PDF the malware scan refuses (ADR-074).
     """
+    from apps.documents.scanning import upload_problem
     from apps.documents.validators import pdf_upload_problem
 
     name = row.get("file_name")
@@ -313,7 +315,7 @@ def check_import_pdf(row: dict, pdfs: dict, taken: dict) -> tuple[object | None,
         return None, [f'File Name "{name}" was not uploaded with the sheet']
     if key in taken:
         return None, [f'File Name "{name}" is already used by row {taken[key]}']
-    problem = pdf_upload_problem(pdf)
+    problem = pdf_upload_problem(pdf) or upload_problem(pdf, user=user, where="record_import")
     if problem:
         return None, [f'File Name "{name}": {problem}']
     taken[key] = row["row_num"]

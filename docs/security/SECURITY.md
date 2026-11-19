@@ -78,7 +78,7 @@ Files are served only through Django views that authorize the reader and write a
 
 If download throughput ever matters, the answer is `X-Accel-Redirect`, where nginx serves the bytes and Django still authorizes. It is never a public alias.
 
-- **Uploads:** a file is accepted only if it opens as a PDF with at least one page ([IR-665](https://citiris.atlassian.net/browse/IR-665)). **Uploads aren't scanned for malware. Open:** [IR-666](https://citiris.atlassian.net/browse/IR-666).
+- **Uploads:** a file is accepted only if it opens as a PDF with at least one page ([IR-665](https://citiris.atlassian.net/browse/IR-665)). Every upload is scanned for known malware by ClamAV before it is stored, and refused if flagged or if the scanner is down ([ADR-074](../adr/074-uploads-scanned-for-malware.md), [IR-666](https://citiris.atlassian.net/browse/IR-666)). ClamAV finds known malware only.
 - **Manuscript downloads:** an approved request becomes a time-limited grant, 30 days by default, used while signed in. No link is emailed ([IR-675](https://citiris.atlassian.net/browse/IR-675)).
 - **Downloaded copies:** each carries a footer naming the downloader, a diagonal "CIT-U" background and matching PDF metadata ([IR-676](https://citiris.atlassian.net/browse/IR-676)).
 
@@ -192,7 +192,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | # | Risk | Severity | Why | Closed by |
 |---|---|---|---|---|
 | 1 | Django's admin has no MFA. Since IR-782 it is served only at `/django-admin/`, and nginx's network allowlist is the one control in front of `is_staff` | **High** | One stolen staff password, from an allowlisted network, opens a separate path to the database | MFA, once CIT-U IT provides an identity provider ([IR-652](https://citiris.atlassian.net/browse/IR-652)); the allowlist is [IR-668](https://citiris.atlassian.net/browse/IR-668) |
-| 2 | Uploads aren't scanned for malware | **High** | A hostile file reaches the parser and the people who download it | [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)) |
+| 2 | Uploads are scanned for known malware only (ADR-074); a new, targeted exploit can pass ClamAV | **Medium** | A hostile file no signature knows reaches the parser and the people who download it | Scanning: [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)); the sandboxed PDF checks ([IR-830](https://citiris.atlassian.net/browse/IR-830)) remain the defence against parser exploits |
 | 3 | No backups and no rehearsed restore | **High** | A lost disk loses records that can't be recreated | [IR-167](https://citiris.atlassian.net/browse/IR-167) (parent [IR-151](https://citiris.atlassian.net/browse/IR-151)) |
 | 5 | Security-relevant sign-in events leave no audit row | **Medium** | Password guessing leaves nothing to investigate | [IR-659](https://citiris.atlassian.net/browse/IR-659) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 6 | Registration accepts any email domain | **Medium** | Anyone can get a signed-in account | [IR-660](https://citiris.atlassian.net/browse/IR-660) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
