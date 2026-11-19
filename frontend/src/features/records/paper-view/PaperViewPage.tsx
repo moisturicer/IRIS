@@ -73,7 +73,6 @@ import { EmbargoCard } from "./EmbargoCard";
 import { UnlistedCard } from "./UnlistedCard";
 import { RdcoPaperControls } from "./RdcoPaperControls";
 import { PaperGovernance } from "./PaperGovernance";
-import { PaperDocuments } from "./PaperDocuments";
 import { DocumentsTab } from "./DocumentsTab";
 import { DocumentInReader, type ShownDocumentState } from "./DocumentInReader";
 import { slotUploadDocument, type ReaderDocument } from "./readerDocument";
@@ -1462,10 +1461,8 @@ export default function PaperViewPage() {
                   onChanged={reloadRecord}
                   onWithdrawn={handleRdcoWithdrawn}
                 />
-                <PaperDocuments
-                  files={record.files}
-                  manageHref={participant ? `/records/${record.id}?section=review&documents=open` : null}
-                />
+                {/* No Documents card (IR-1244): Review's Documents tab lists them for
+                    those who may download them, and nobody else is sent them. */}
               </aside>
             </div>
           )}
