@@ -212,6 +212,10 @@ export const SCREEN_ACCESS = {
   // under My Reviews for every office; `/review/analytics` redirects here.
   reviewAnalytics: { path: "/rdco/analytics", roles: COORDINATOR,
                  nav: { label: "Workflow analytics", icon: "fa-chart-column", section: "RDCO" } },
+  // ADR-063 decision 9 (IR-971): RDCO's Setup, each record type's
+  // Requirements & Templates. Every RDCO account; the server refuses anyone else.
+  setup:         { path: "/rdco/setup", roles: COORDINATOR,
+                 nav: { label: "Setup", icon: "fa-sliders", section: "RDCO" } },
 
   // Both roles use the same Users page, with distinct addresses and server permissions.
   adminUsers:    { path: "/admin/users", roles: SYSTEM_ADMIN,
