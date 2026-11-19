@@ -218,6 +218,19 @@ Written by `backend/apps/documents/scanning.py` (a refused upload) and `scan_sto
 | `UPLOAD_REFUSED_UNSAFE` | An upload the malware scan flagged was refused and not stored (ADR-074, IR-666). `user` is who sent it | `where` (the upload path), `filename`, `sha256`, `size`, `signature`; never the bytes |
 | `FILE_QUARANTINED` | `scan_stored_uploads` took a stored file that failed out of use (ADR-074 decision 4). No `user`; one event per row that named it | `model`, `pk`, `field`, `sha256`, `size`, `signature` |
 
+`where` names the upload path. Templates use `setup_template` (RDCO's Setup, scanned since IR-975) and `my_template` (an Adviser's My Templates, IR-975).
+
+### My Templates (ADR-063 decisions 8 and 11)
+
+Written by `backend/apps/documents/adviser_templates.py`, IR-975. `user` is always the Adviser, who alone may change their Templates. Descriptions are recorded as character counts, never their text. Downloads are not logged.
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `ADVISER_TEMPLATE_ADDED` | An Adviser added a Template | `template` (id), `title`, `description_characters`, `filename`, `bytes` |
+| `ADVISER_TEMPLATE_CHANGED` | Its title or description changed, or its file was replaced. An unchanged save writes nothing | `template`, `title` (after), `changes`: `title` [before, after], `description_characters` [before, after], `file` [old name, new name] and `bytes` |
+| `ADVISER_TEMPLATES_REORDERED` | The Adviser put their Templates in a new order. The same order writes nothing | `order` (ids) |
+| `ADVISER_TEMPLATE_REMOVED` | The Adviser removed a Template; its file is deleted once that commits | `template`, `title`, `filename` |
+
 ### Withdrawal
 
 | Type | Written when | `metadata` |

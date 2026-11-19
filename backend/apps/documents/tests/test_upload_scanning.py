@@ -28,6 +28,8 @@ from apps.documents.scanning import UNAVAILABLE, UNSAFE, FakeScanner, use_scanne
 
 #: What the test scanner is told to flag inside a valid PDF or image.
 MARKER = b"%IRIS-TEST-MALWARE"
+#: A Template passes on its first bytes alone; no parser reads it (ADR-063 decision 8).
+TEMPLATE_PDF = b"%PDF-1.4\n% a form\n"
 from apps.documents.testing import pdf_upload
 from apps.documents.tests import test_record_document_authorization as _authorization
 from apps.records.models import Record, RecordOwner, RecordType
@@ -212,6 +214,56 @@ class RecordImportScanTests(_Media):
         self.assertEqual([e.metadata["where"] for e in self.refused_events()], ["record_import"])
 
 
+class SetupTemplateScanTests(_Media):
+    """
+    RDCO's Setup Templates (IR-971) are scanned like any upload (IR-975). They
+    were stored unscanned: the guard below looked only for the PDF check, and a
+    Template has its own (`template_problem`).
+    """
+
+    make_user = make_user
+
+    def setUp(self):
+        super().setUp()
+        self.rdco = self.make_user("scan-setup-rdco@cit.edu", "RDCO")
+        self.slot = UploadSlot.objects.create(
+            name="Release Form", record_type=RecordType.objects.first(), is_required=False,
+        )
+        self.client.force_authenticate(self.rdco)
+
+    def put_template(self, content):
+        return self.client.put(
+            f"/api/v1/documents/setup/requirements/{self.slot.pk}/template/",
+            {"file": SimpleUploadedFile("form.pdf", content, content_type="application/pdf")},
+            format="multipart",
+        )
+
+    def test_a_flagged_template_is_refused_stored_nowhere_and_audited(self):
+        response = self.put_template(TEMPLATE_PDF + MARKER)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertEqual(response.data["detail"], UNSAFE)
+        self.slot.refresh_from_db()
+        self.assertFalse(self.slot.template)
+        (event,) = self.refused_events()
+        self.assertEqual((event.user, event.metadata["where"]), (self.rdco, "setup_template"))
+
+    def test_a_scanner_that_is_down_refuses_the_template(self):
+        with use_scanner(FakeScanner(down=True)):
+            response = self.put_template(TEMPLATE_PDF)
+
+        self.assertEqual((response.status_code, response.data["detail"]), (status.HTTP_400_BAD_REQUEST, UNAVAILABLE))
+        self.slot.refresh_from_db()
+        self.assertFalse(self.slot.template)
+
+    def test_a_clean_template_is_stored(self):
+        response = self.put_template(TEMPLATE_PDF)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.slot.refresh_from_db()
+        self.assertTrue(self.slot.template)
+
+
 class EveryIntakePathScansTests(APITestCase):
     """
     The guard ADR-074 decision 2 asks for: every module that checks an upload
@@ -220,17 +272,28 @@ class EveryIntakePathScansTests(APITestCase):
     are tested above.)
     """
 
-    def test_every_caller_of_the_pdf_check_also_scans(self):
+    @staticmethod
+    def unscanned_callers_of(check: str, *, defined_in: str) -> list[str]:
+        """Modules that call `check` but never `upload_problem`."""
         root = Path(__file__).resolve().parents[3]  # backend/
         unscanned = []
         for path in (root / "apps").rglob("*.py"):
             if "tests" in path.parts or path.name.startswith("test") or "migrations" in path.parts:
                 continue
             source = path.read_text(encoding="utf-8")
-            if path.name == "validators.py" or "pdf_upload_problem(" not in source:
+            if path.name == defined_in or f"{check}(" not in source:
                 continue
             calls = {node.func.id for node in ast.walk(ast.parse(source))
                      if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
-            if "pdf_upload_problem" in calls and "upload_problem" not in calls:
+            if check in calls and "upload_problem" not in calls:
                 unscanned.append(str(path.relative_to(root)))
-        self.assertEqual(unscanned, [], "these check uploads as PDFs but never scan them (ADR-074)")
+        return unscanned
+
+    def test_every_caller_of_the_pdf_check_also_scans(self):
+        self.assertEqual(self.unscanned_callers_of("pdf_upload_problem", defined_in="validators.py"), [],
+                         "these check uploads as PDFs but never scan them (ADR-074)")
+
+    def test_every_caller_of_the_template_check_also_scans(self):
+        """Setup's Templates escaped the guard above, so Templates get their own (IR-975)."""
+        self.assertEqual(self.unscanned_callers_of("template_problem", defined_in="template_files.py"), [],
+                         "these check Templates but never scan them (ADR-074)")

@@ -48,6 +48,7 @@ const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage
 const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
 const CallRequestsPage = lazy(() => import("@/features/opportunities/CallRequestsPage"));
 const SetupPage = lazy(() => import("@/features/setup/SetupPage"));
+const MyTemplatesPage = lazy(() => import("@/features/myTemplates/MyTemplatesPage"));
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
 const ReportedCommentsPage = lazy(() => import("@/features/admin/ReportedCommentsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
@@ -107,6 +108,17 @@ export const routes: RouteObject[] = [{
             element: <ProtectedRoute allowedRoles={rolesFor("myCalls")} />,
             children: [
               { path: pathFor("myCalls"), element: <MyCallsPage />, handle: { crumb: "My Calls" } },
+            ],
+          },
+          {
+            // An Adviser's own proposal Templates (ADR-063 decision 8, IR-975).
+            element: <ProtectedRoute allowedRoles={rolesFor("myTemplates")} />,
+            children: [
+              {
+                path: pathFor("myTemplates"),
+                element: <DeferredPage message="Loading your Templates"><MyTemplatesPage /></DeferredPage>,
+                handle: { crumb: "My Templates" },
+              },
             ],
           },
           { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },

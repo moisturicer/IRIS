@@ -64,6 +64,17 @@ const wrap = (role: SmokeRole, extra?: (api: MockApi) => void) => (api: MockApi)
   extra?.(api);
 };
 
+/** An Adviser's Templates (IR-975): a long title, and a description holding a link. */
+const MY_TEMPLATES = [
+  {
+    id: 7, title: "Chapter 1 to 3 proposal format for the Bachelor of Science in Information Technology capstone",
+    description: "Use this for every chapter.\nSee https://cit.edu/forms/capstone-proposal-format-guidelines-2026.",
+    file_name: "capstone-proposal-format-chapters-1-to-3-bsit-2026-revised-edition.docx", position: 1,
+    updated_at: when("11-19"),
+  },
+  { id: 8, title: "Budget sheet", description: "", file_name: "budget.xlsx", position: 2, updated_at: when("11-19") },
+];
+
 /** Setup's record types (IR-971): one requirement with a long name, a Template and a description holding a link. */
 const SETUP_RECORD_TYPES = [
   {
@@ -486,6 +497,13 @@ export const SCREENS: Screen[] = [
     }),
     heading: "My Calls",
     primary: (p) => p.getByRole("button", { name: /^Edit and send again/ }).first(), primaryLabel: "Edit and send again",
+  },
+  {
+    // An Adviser's own proposal Templates (ADR-063 decision 8, IR-975).
+    id: "my-templates", path: "/my-templates", route: "/my-templates", role: "Adviser",
+    mocks: wrap("Adviser", (api) => api.on("GET", "/documents/my-templates/", MY_TEMPLATES)),
+    heading: "My Templates",
+    primary: (p) => p.getByRole("button", { name: "Add a Template" }), primaryLabel: "Add a Template",
   },
   {
     id: "notifications", path: "/notifications", route: "/notifications", role: "Student",

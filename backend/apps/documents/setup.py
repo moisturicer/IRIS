@@ -26,7 +26,6 @@ from typing import Iterable, Optional
 
 from django.db import transaction
 from django.db.models import Q, QuerySet
-from django.db.models.fields.files import FieldFile
 from django.utils import timezone
 
 from apps.audit.models import AuditEvent
@@ -34,7 +33,8 @@ from apps.audit.services import create_audit_event
 from core.enums import RequirementRemoval
 
 from .models import UploadSlot
-from .template_files import display_name, template_problem
+from .scanning import upload_problem
+from .template_files import display_name, drop_file_after_commit, template_problem
 
 MAX_DESCRIPTION_CHARS = 2000
 MAX_NAME_CHARS = 200
@@ -133,20 +133,6 @@ def _lock_type(record_type):
     return RecordType.objects.select_for_update().get(pk=record_type.pk)
 
 
-def _drop_file_after_commit(field_file) -> None:
-    """
-    Delete a replaced or removed Template's file once the change has committed,
-    so the old file is never offered again (decision 8) and a rolled-back
-    change keeps it. Reads the name now: saving a new file into the same field
-    renames this object. The copy hangs on a blank instance, so deleting it
-    never clears the field on the live row.
-    """
-    if not field_file:
-        return
-    old = FieldFile(type(field_file.instance)(), field_file.field, field_file.name)
-    transaction.on_commit(lambda: old.delete(save=False))
-
-
 # -- Requirements ---------------------------------------------------------------
 
 
@@ -231,7 +217,7 @@ def remove_requirement(slot, user) -> Removal:
             slot.save(update_fields=["hidden_at"])
             outcome = RequirementRemoval.HIDDEN
         else:
-            _drop_file_after_commit(slot.template)
+            drop_file_after_commit(slot.template)
             slot.delete()
             outcome = RequirementRemoval.DELETED
         create_audit_event(AuditEvent.REQUIREMENT_REMOVED, user, metadata={**meta, "outcome": outcome.value})
@@ -241,13 +227,21 @@ def remove_requirement(slot, user) -> Removal:
 # -- Templates ------------------------------------------------------------------
 
 
-def _replace(instance, file_field: str, name_field: str, file, user, meta: dict) -> None:
-    problem = template_problem(file)
+def _check_template(file, user) -> None:
+    """
+    Refuse a file that can't be a Template or that the malware scan won't pass
+    (ADR-074, IR-975). Called before the change's transaction opens, so the
+    audit of a file refused as unsafe is never rolled back with the change.
+    """
+    problem = template_problem(file) or upload_problem(file, user=user, where="setup_template")
     if problem:
         raise SetupError(problem)
+
+
+def _replace(instance, file_field: str, name_field: str, file, user, meta: dict) -> None:
     replaced = bool(getattr(instance, file_field))
     if replaced:
-        _drop_file_after_commit(getattr(instance, file_field))
+        drop_file_after_commit(getattr(instance, file_field))
     name = display_name(file.name)
     getattr(instance, file_field).save(name, file, save=False)
     setattr(instance, name_field, name)
@@ -261,7 +255,7 @@ def _remove(instance, file_field: str, name_field: str, user, meta: dict) -> boo
     current = getattr(instance, file_field)
     if not current:
         return False
-    _drop_file_after_commit(current)
+    drop_file_after_commit(current)
     filename = getattr(instance, name_field)
     setattr(instance, file_field, "")
     setattr(instance, name_field, "")
@@ -271,6 +265,7 @@ def _remove(instance, file_field: str, name_field: str, user, meta: dict) -> boo
 
 
 def set_requirement_template(slot, user, file) -> UploadSlot:
+    _check_template(file, user)
     with transaction.atomic():
         slot = UploadSlot.objects.select_for_update().select_related("record_type").get(pk=slot.pk)
         _replace(slot, "template", "template_name", file, user,
@@ -286,6 +281,7 @@ def remove_requirement_template(slot, user) -> bool:
 
 
 def set_manuscript_template(record_type, user, file):
+    _check_template(file, user)
     with transaction.atomic():
         record_type = _lock_type(record_type)
         _replace(record_type, "manuscript_template", "manuscript_template_name", file, user,

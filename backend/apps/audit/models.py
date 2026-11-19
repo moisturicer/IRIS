@@ -171,6 +171,18 @@ class AuditEvent(models.Model):
     TEMPLATE_REMOVED      = "TEMPLATE_REMOVED"
     RECORD_TYPE_DESCRIBED = "RECORD_TYPE_DESCRIBED"
 
+    # My Templates: an Adviser's proposal Templates (ADR-063 decisions 8 and 11,
+    # IR-975). `user` is the Adviser, who alone may change them. Metadata:
+    # `template` (id) and `title`; ADDED's `description_characters`, `filename`
+    # and `bytes`; CHANGED's `changes` ({field: [before, after]}, the
+    # description as character counts, never its text, and a replaced file as
+    # `file` names plus `bytes`); REORDERED's `order` (ids); REMOVED's
+    # `filename`. Downloads are not logged.
+    ADVISER_TEMPLATE_ADDED     = "ADVISER_TEMPLATE_ADDED"
+    ADVISER_TEMPLATE_CHANGED   = "ADVISER_TEMPLATE_CHANGED"
+    ADVISER_TEMPLATES_REORDERED = "ADVISER_TEMPLATES_REORDERED"
+    ADVISER_TEMPLATE_REMOVED   = "ADVISER_TEMPLATE_REMOVED"
+
     # Account deletion (ADR-051 §8-§12, IR-785)
     ACCOUNT_DELETION_REQUESTED = "ACCOUNT_DELETION_REQUESTED"
     ACCOUNT_DELETION_CANCELLED = "ACCOUNT_DELETION_CANCELLED"
@@ -263,6 +275,10 @@ class AuditEvent(models.Model):
         (TEMPLATE_REPLACED,            "Template Replaced"),
         (TEMPLATE_REMOVED,             "Template Removed"),
         (RECORD_TYPE_DESCRIBED,        "Record Type Description Changed"),
+        (ADVISER_TEMPLATE_ADDED,       "Adviser Template Added"),
+        (ADVISER_TEMPLATE_CHANGED,     "Adviser Template Changed"),
+        (ADVISER_TEMPLATES_REORDERED,  "Adviser Templates Reordered"),
+        (ADVISER_TEMPLATE_REMOVED,     "Adviser Template Removed"),
         (CALL_POSTED,                  "Call Posted"),
         (CALL_EDITED,                  "Call Edited"),
         (CALL_DELETED,                 "Call Deleted"),

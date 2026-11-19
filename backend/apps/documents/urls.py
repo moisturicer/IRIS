@@ -14,6 +14,10 @@ from .setup_views import (
     SetupManuscriptTemplateView, RequirementTemplateDownloadView,
     ManuscriptTemplateDownloadView,
 )
+from .adviser_template_views import (
+    MyTemplateListView, MyTemplateOrderView, MyTemplateView,
+    ShownAdviserTemplateListView, AdviserTemplateDownloadView,
+)
 
 urlpatterns = [
     path("submit/",                              SubmitDocumentView.as_view(),          name="document-submit"),
@@ -22,6 +26,13 @@ urlpatterns = [
     path("slots/<int:pk>/template/",             RequirementTemplateDownloadView.as_view(), name="upload-slot-template"),
     path("record-types/<int:pk>/manuscript-template/", ManuscriptTemplateDownloadView.as_view(),
          name="record-type-manuscript-template"),
+    # My Templates: an Adviser's own proposal Templates (ADR-063 decision 8, IR-975)
+    path("my-templates/",                        MyTemplateListView.as_view(),          name="my-templates"),
+    path("my-templates/order/",                  MyTemplateOrderView.as_view(),         name="my-template-order"),
+    path("my-templates/<int:pk>/",               MyTemplateView.as_view(),              name="my-template"),
+    # ...and the shown ones, for anyone signed in
+    path("adviser-templates/",                   ShownAdviserTemplateListView.as_view(), name="adviser-templates"),
+    path("adviser-templates/<int:pk>/file/",     AdviserTemplateDownloadView.as_view(), name="adviser-template-file"),
     # RDCO's Setup: Requirements & Templates (ADR-063 decisions 1-12, IR-971)
     path("setup/record-types/",                  SetupRecordTypeListView.as_view(),     name="setup-record-types"),
     path("setup/record-types/<int:pk>/",         SetupRecordTypeView.as_view(),         name="setup-record-type"),

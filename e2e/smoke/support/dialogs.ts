@@ -242,6 +242,12 @@ export const DIALOGS: DialogCase[] = [
     dialog: anyDialog,
   },
   {
+    id: "remove one of my Templates", screen: "my-templates",
+    sources: ["features/myTemplates/MyTemplatesPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: async (page) => { await page.getByRole("button", { name: "Remove Budget sheet" }).click(); },
+    dialog: anyDialog,
+  },
+  {
     id: "lock or unlock an account", screen: "rdco-users", sources: ["features/accounts/UserListPage.tsx", "components/shared/ConfirmDialog.tsx"],
     open: fromRowMenu(/^(Lock|Unlock)/), dialog: anyDialog,
   },
