@@ -4,7 +4,7 @@
 
 **Proposed**, 2026-11-19 ([IR-1213](https://citiris.atlassian.net/browse/IR-1213)).
 - **Already decided:** Ashlee Sean chose live push over timed polling on 2026-11-17.
-- **Drafted** by an AI agent (Claude Code) at Ashlee's request. AI does not make architecture decisions (CLAUDE.md), so the design below is a proposal. §Open questions lists what a person must settle.
+- **Drafted** by an AI agent (Claude Code) at Ashlee's request. AI does not make architecture decisions (CLAUDE.md), so the design below is a proposal. The three questions the first draft left open were settled by Ashlee on 2026-11-19 (§Questions settled while drafting); the design still awaits a person's acceptance.
 - **Not built.** IR-1213 builds it after a person accepts this ADR.
 
 ## Context
@@ -76,11 +76,12 @@
      - RDCO's request queues.
    - Discover, the public catalogue, is not live: it refetches on focus.
 
-## Open questions (for the person accepting this ADR)
+## Questions settled while drafting
 
-1. **Scope of the first build.** Are the pages in decision 8 the right first set? Anything not wired still refetches on focus.
-2. **Staleness when Redis is down.** Live updates stop silently and pages fall back to refetching on focus. Should the page say "live updates paused" instead?
-3. **Capacity proof.** The ticket asks for memory and connection counts with about 100 open tabs, measured on the stack. Should that be a gate before merging, or recorded after deploy?
+All three were left open in the first draft and decided by Ashlee Sean on 2026-11-19:
+1. **The first build wires the pages in decision 8.** Discover refetches on focus only.
+2. **Live updates pause silently when Redis is down.** Pages fall back to refetching on focus, with no notice: nothing shown is wrong, only later.
+3. **Capacity is measured before merge.** About 100 simulated open tabs on the Docker stack. Memory per backend process, open connections and Redis connections are recorded in the build PR, and a problem found there blocks the merge.
 
 ## Alternatives Considered
 
@@ -112,7 +113,7 @@
 ## Consequences
 
 - **Pages refresh themselves** for the events in decision 3 within about a second, and on focus for everything else.
-- **One long-lived HTTP connection per open tab** on the backend. With async views and one Redis subscription per process, the expected cost is tens of KB of memory per tab, with no thread or database connection while idle. To be measured (open question 3).
+- **One long-lived HTTP connection per open tab** on the backend. With async views and one Redis subscription per process, the expected cost is tens of KB of memory per tab, with no thread or database connection while idle. Measured before merge (settled question 3).
 - **Every refetch is an ordinary API call,** so a burst of activity becomes a burst of reads. Decision 8 coalesces them per tab.
 - **Workflow services gain `publish_live(...)` calls** next to their notifications, inside `on_commit`. A future act that forgets to publish still shows up on focus.
 - **Redis becomes part of the browser experience,** though not of correctness (decision 6).
