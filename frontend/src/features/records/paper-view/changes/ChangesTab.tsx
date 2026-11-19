@@ -231,7 +231,7 @@ function Comparison({ recordId, data, ids, view, threads, showUnchanged, onShowU
                   <li key={i}>
                     <button type="button" onClick={() => focusTarget(`${ids}-s${i}`)}
                       className={cn("review-control flex w-full items-baseline justify-between gap-3 text-left hover:bg-stone-100", FOCUS_RING)}>
-                      <span className="truncate text-stone-900">{sectionTitle(s)}</span>
+                      <span className="min-w-0 break-words text-stone-900">{sectionTitle(s)}</span>
                       <span className="shrink-0 text-2xs text-stone-600">
                         {s.changes.length ? countsLabel(s.counts) : sectionMarks(s, from, to).join(" · ")}
                         {viewed.isViewed(i) && " · Viewed"}

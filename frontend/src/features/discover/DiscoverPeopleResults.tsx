@@ -61,7 +61,7 @@ function PersonResult({ person }: { person: PeopleSearchResult }) {
         <Link to={personPath(person.id)} className={cn("font-semibold text-stone-900 underline-offset-2 hover:text-brand hover:underline", FOCUS_RING)}>
           {name}
         </Link>
-        {affiliation && <p className="mt-0.5 truncate text-small text-stone-600">{affiliation}</p>}
+        {affiliation && <p className="mt-0.5 break-words text-small text-stone-600">{affiliation}</p>}
         <p className="mt-0.5 text-small text-stone-600">{person.role_label} · {paperLabel}</p>
       </div>
     </article>

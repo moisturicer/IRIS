@@ -74,7 +74,7 @@ export function NotesPanel({ record, note, highlights, onOpenHighlight, canOpenV
             <i className="fas fa-xmark" aria-hidden />
           </Button>
         </div>
-        <p className="mt-2 truncate text-2xs text-stone-600">{record.title}</p>
+        <p className="mt-2 break-words text-2xs text-stone-600">{record.title}</p>
         <p id={hintId} className="mt-1 text-2xs text-stone-600">
           <i className="fas fa-lock mr-1" aria-hidden />
           Private: only you can read your notes. Not staff, the paper’s authors or Ask IRIS.

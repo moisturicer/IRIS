@@ -87,7 +87,7 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
                 className={cn("fas w-5 flex-shrink-0 text-center text-base", item.icon, iconTone)}
               />
             )}
-            <span className={cn("min-w-0 flex-1 truncate", collapsed && "md:sr-only")}>{item.label}</span>
+            <span className={cn("min-w-0 flex-1 break-words", collapsed && "md:sr-only")}>{item.label}</span>
             {badge != null && (
               <span
                 className={cn(
@@ -391,7 +391,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
           </button>
         </div>
         {/* Its own line, under the wordmark, so it never wraps beside the bell. */}
-        <p className={cn("mt-1.5 truncate pl-12 text-3xs text-stone-500", collapsed && "md:hidden")}>
+        <p className={cn("mt-1.5 break-words pl-12 text-3xs text-stone-500", collapsed && "md:hidden")}>
           Research-to-IP Platform
         </p>
         {collapsed && (

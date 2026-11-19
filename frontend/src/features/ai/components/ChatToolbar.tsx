@@ -37,10 +37,10 @@ export function ChatToolbar({
       {phoneHistory && <ConversationsToggle open={phoneHistory.open} onClick={phoneHistory.onOpen} asDialog />}
 
       <div className="min-w-0 flex-1 px-1">
-        <p className="text-label font-semibold text-stone-600 truncate">
+        <p className="text-label font-semibold text-stone-600">
           Ask IRIS
         </p>
-        <h1 className="text-body font-semibold text-stone-900 truncate">{sessionTitle}</h1>
+        <h1 className="break-words text-body font-semibold text-stone-900">{sessionTitle}</h1>
       </div>
 
       {onDownload && <DownloadConversation download={onDownload} />}

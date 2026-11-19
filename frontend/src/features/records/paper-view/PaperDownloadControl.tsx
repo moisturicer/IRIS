@@ -121,7 +121,7 @@ export function PaperDownloadControl({
     <span className="inline-flex items-center gap-2">
       {ended && note(ended)}
       {rdcoNote && (
-        <span id={rdcoNoteId} className="max-w-xs text-xs text-stone-600 line-clamp-2" title={rdcoNote}>
+        <span id={rdcoNoteId} className="min-w-0 break-words text-xs text-stone-600">
           {rdcoNote}
         </span>
       )}
