@@ -1,5 +1,5 @@
 """
-The real ClamAV refuses the EICAR test file and passes a clean PDF (IR-666, ADR-072).
+The real ClamAV refuses the EICAR test file and passes a clean PDF (IR-666, ADR-074).
 
 Runs only where a clamd is named in `MALWARE_SCAN_TEST_HOST` (and optionally
 `MALWARE_SCAN_TEST_PORT`): CI's `malware-scan` job starts the

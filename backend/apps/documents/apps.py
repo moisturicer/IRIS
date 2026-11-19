@@ -12,7 +12,7 @@ class DocumentsConfig(AppConfig):
         from . import figures  # noqa: F401 -- connects the image clean-up (IR-845)
         from . import formulas  # noqa: F401 -- and the crop clean-up (IR-1102)
 
-        # ADR-072: with DEBUG off there is no running without a malware scanner.
+        # ADR-074: with DEBUG off there is no running without a malware scanner.
         if not settings.DEBUG:
             from .scanning import configured_scanner
             configured_scanner()

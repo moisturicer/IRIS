@@ -1,6 +1,6 @@
 """
 `scan_stored_uploads`: files stored before scanning are scanned once, and any
-that fails is taken out of use (IR-666, ADR-072 decision 4).
+that fails is taken out of use (IR-666, ADR-074 decision 4).
 """
 import shutil
 import tempfile

@@ -70,7 +70,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 
 | | Threat | Control or gap |
 |---|---|---|
-| T, E | A hostile PDF exploits the parser | PDF content check ([IR-665](https://citiris.atlassian.net/browse/IR-665)), Docling isn't published. Docling has no route out ([IR-825](https://citiris.atlassian.net/browse/IR-825)). Known malware is refused at upload by ClamAV ([ADR-072](072-uploads-scanned-for-malware.md), [IR-666](https://citiris.atlassian.net/browse/IR-666)); a new, targeted exploit can still pass it |
+| T, E | A hostile PDF exploits the parser | PDF content check ([IR-665](https://citiris.atlassian.net/browse/IR-665)), Docling isn't published. Docling has no route out ([IR-825](https://citiris.atlassian.net/browse/IR-825)). Known malware is refused at upload by ClamAV ([ADR-074](074-uploads-scanned-for-malware.md), [IR-666](https://citiris.atlassian.net/browse/IR-666)); a new, targeted exploit can still pass it |
 | D | A PDF that takes the parser down | 50 MB limit, worker separation on the `extraction` queue |
 
 **Django ↔ LlamaParse** (added 2026-11-03, [IR-864](https://citiris.atlassian.net/browse/IR-864); live once [IR-842](https://citiris.atlassian.net/browse/IR-842) sets `EXTRACTION_BACKEND=llamaparse`)

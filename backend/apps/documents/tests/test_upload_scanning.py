@@ -1,5 +1,5 @@
 """
-No uploaded file is stored until it has passed a malware scan (IR-666, ADR-072).
+No uploaded file is stored until it has passed a malware scan (IR-666, ADR-074).
 
 Every intake path is driven through the API with the EICAR test file, as the
 test scanner (conftest.py) flags it: the upload is refused, nothing is
@@ -149,7 +149,7 @@ class SlotUploadScanTests(_Media):
 
 
 class ProfilePhotoScanTests(_Media):
-    """A photo is re-encoded, but it is scanned like every upload (ADR-072)."""
+    """A photo is re-encoded, but it is scanned like every upload (ADR-074)."""
 
     def setUp(self):
         super().setUp()
@@ -195,7 +195,7 @@ class RecordImportScanTests(_Media):
 
 class EveryIntakePathScansTests(APITestCase):
     """
-    The guard ADR-072 decision 2 asks for: every module that checks an upload
+    The guard ADR-074 decision 2 asks for: every module that checks an upload
     as a PDF also scans it, so a new intake path can't store a file unscanned
     by forgetting. (The office attachment, which takes any type, and the photo
     are tested above.)
@@ -214,4 +214,4 @@ class EveryIntakePathScansTests(APITestCase):
                      if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
             if "pdf_upload_problem" in calls and "upload_problem" not in calls:
                 unscanned.append(str(path.relative_to(root)))
-        self.assertEqual(unscanned, [], "these check uploads as PDFs but never scan them (ADR-072)")
+        self.assertEqual(unscanned, [], "these check uploads as PDFs but never scan them (ADR-074)")

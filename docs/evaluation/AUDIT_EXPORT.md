@@ -209,14 +209,14 @@ None has a `record`. A Call is not a paper. A reader saving a Call to their own 
 - A deleted Classification drops out of the Call's Areas.
 - A Call posted before IR-763 has no `CALL_POSTED`.
 
-### Malware scanning (ADR-072)
+### Malware scanning (ADR-074)
 
 Written by `backend/apps/documents/scanning.py` (a refused upload) and `scan_stored_uploads` (a quarantined stored file), IR-666. Neither keeps the file's bytes: a refused upload is never stored, and a quarantined file's bytes are kept outside the media folder, not in the log.
 
 | Type | Written when | `metadata` |
 |---|---|---|
-| `UPLOAD_REFUSED_UNSAFE` | An upload the malware scan flagged was refused and not stored (ADR-072, IR-666). `user` is who sent it | `where` (the upload path), `filename`, `sha256`, `size`, `signature`; never the bytes |
-| `FILE_QUARANTINED` | `scan_stored_uploads` took a stored file that failed out of use (ADR-072 decision 4). No `user`; one event per row that named it | `model`, `pk`, `field`, `sha256`, `size`, `signature` |
+| `UPLOAD_REFUSED_UNSAFE` | An upload the malware scan flagged was refused and not stored (ADR-074, IR-666). `user` is who sent it | `where` (the upload path), `filename`, `sha256`, `size`, `signature`; never the bytes |
+| `FILE_QUARANTINED` | `scan_stored_uploads` took a stored file that failed out of use (ADR-074 decision 4). No `user`; one event per row that named it | `model`, `pk`, `field`, `sha256`, `size`, `signature` |
 
 ### Withdrawal
 

@@ -1,4 +1,4 @@
-# Written for IR-666 (ADR-072 decision 4): a stored file that fails the
+# Written for IR-666 (ADR-074 decision 4): a stored file that fails the
 # one-time malware scan is taken out of use, and its uploader and RDCO are told.
 #
 # Seeds the one notice type. Reversing removes nothing it seeded: the type may

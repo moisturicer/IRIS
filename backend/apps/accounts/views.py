@@ -483,7 +483,7 @@ class MePhotoView(APIView):
     def put(self, request):
         serializer = PhotoUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        # Scanned like every upload, though it is re-encoded (ADR-072).
+        # Scanned like every upload, though it is re-encoded (ADR-074).
         from apps.documents.scanning import upload_problem
 
         problem = upload_problem(serializer.validated_data["photo"], user=request.user, where="profile_photo")

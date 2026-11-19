@@ -1,5 +1,5 @@
 """
-Every upload is scanned for malware before it is stored (IR-666, ADR-072).
+Every upload is scanned for malware before it is stored (IR-666, ADR-074).
 
 The clamd client is tested against a stand-in server speaking clamd's
 INSTREAM protocol on a real socket, so the wire format is pinned without

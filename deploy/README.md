@@ -137,7 +137,7 @@ Going back never undoes a database migration. Run `git checkout main` before the
 
 It doesn't back up the database first; do that yourself before an update that migrates.
 
-### Malware scanning (ADR-072, IR-666)
+### Malware scanning (ADR-074, IR-666)
 
 Every upload is scanned by the `clamav` service before it is stored. While ClamAV is down or still loading its signatures, **uploads are refused** with "File checking is temporarily unavailable"; reading and downloading carry on. On a fresh server its first start downloads the signatures (about 100 MB), which takes a minute or two; step 4 waits for it.
 

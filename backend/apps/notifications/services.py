@@ -1349,7 +1349,7 @@ def notify_call_lapsed(call):
 
 
 # ---------------------------------------------------------------------------
-# Malware scanning (IR-666, ADR-072 decision 4). In-app only.
+# Malware scanning (IR-666, ADR-074 decision 4). In-app only.
 # ---------------------------------------------------------------------------
 
 FILE_QUARANTINED = "File Quarantined"

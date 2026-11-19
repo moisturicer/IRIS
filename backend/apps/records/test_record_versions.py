@@ -60,7 +60,7 @@ class SourceSafetyTests(SimpleTestCase):
         apps_dir = Path(settings.BASE_DIR) / "apps"
         # The one exception: a stored file that fails the malware scan leaves
         # storage for the quarantine folder, after every row naming it has let
-        # go of it (IR-666, ADR-072 decision 4). Its rows and history stay.
+        # go of it (IR-666, ADR-074 decision 4). Its rows and history stay.
         allowed = {"documents/management/commands/scan_stored_uploads.py"}
         offenders = [
             path.relative_to(apps_dir).as_posix()

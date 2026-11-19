@@ -1,5 +1,5 @@
 """
-Scan every file stored before uploads were scanned, once (IR-666, ADR-072 decision 4).
+Scan every file stored before uploads were scanned, once (IR-666, ADR-074 decision 4).
 
     python manage.py scan_stored_uploads --dry-run   # report, change nothing
     python manage.py scan_stored_uploads             # quarantine what fails
@@ -80,7 +80,7 @@ def stored_files() -> dict[str, list[Ref]]:
 
 
 class Command(BaseCommand):
-    help = "Scan every stored upload once and quarantine any that fails (ADR-072)."
+    help = "Scan every stored upload once and quarantine any that fails (ADR-074)."
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true", help="Report what fails; change nothing.")

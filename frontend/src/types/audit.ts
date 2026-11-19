@@ -12,7 +12,7 @@ export const AUDIT_EVENT_GROUPS = {
   },
   Files: {
     ACCESS: "Record Access", UPLOAD: "File Upload", DOWNLOAD: "File Download", DELETE: "File Delete", RENAME: "File Rename",
-    // Malware scanning (ADR-072, IR-666).
+    // Malware scanning (ADR-074, IR-666).
     UPLOAD_REFUSED_UNSAFE: "Upload Refused as Unsafe", FILE_QUARANTINED: "File Quarantined",
   },
   "Download requests": {

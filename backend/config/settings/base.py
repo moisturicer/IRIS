@@ -1189,16 +1189,16 @@ PDF_VALIDATION_MEMORY_MIB = config("PDF_VALIDATION_MEMORY_MIB", default="", cast
 PDF_VALIDATION_MAX_PAGES = config("PDF_VALIDATION_MAX_PAGES", default="", cast=lambda v: int(v) if v else None)
 PDF_VALIDATION_MAX_OBJECTS = config("PDF_VALIDATION_MAX_OBJECTS", default="", cast=lambda v: int(v) if v else None)
 PDF_VALIDATION_MAX_DEPTH = config("PDF_VALIDATION_MAX_DEPTH", default="", cast=lambda v: int(v) if v else None)
-# IR-666, ADR-072: every upload is scanned by clamd before it is stored, and an
+# IR-666, ADR-074: every upload is scanned by clamd before it is stored, and an
 # upload is refused while the scanner is down (fail closed). With DEBUG off,
 # Django won't start without MALWARE_SCAN=clamd and MALWARE_SCAN_HOST; "off" is
 # for development only (development.py makes it the default there).
 MALWARE_SCAN = config("MALWARE_SCAN", default="clamd")
 MALWARE_SCAN_HOST = config("MALWARE_SCAN_HOST", default="")
 MALWARE_SCAN_PORT = config("MALWARE_SCAN_PORT", default=3310, cast=int)
-# Long enough for a 50 MB file and a signature reload, which holds scans (ADR-072 decision 5).
+# Long enough for a 50 MB file and a signature reload, which holds scans (ADR-074 decision 5).
 MALWARE_SCAN_TIMEOUT_SECONDS = config("MALWARE_SCAN_TIMEOUT_SECONDS", default=60, cast=float)
-# Where `scan_stored_uploads` moves a stored file that fails (ADR-072 decision 4):
+# Where `scan_stored_uploads` moves a stored file that fails (ADR-074 decision 4):
 # outside MEDIA_ROOT, so nothing can serve it, and kept for inspection.
 QUARANTINE_ROOT = Path(config("QUARANTINE_ROOT", default=str(BASE_DIR / "quarantine")))
 # IR-1053: the PDF evidence reader's own sandbox, beside PDF_VALIDATION_MAX_PAGES

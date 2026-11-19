@@ -415,7 +415,7 @@ def _connect_the_notice_default() -> None:
 
 @pytest.fixture(autouse=True)
 def _every_upload_is_scanned_by_the_test_scanner():
-    """Scan every upload with the test scanner, which flags EICAR (IR-666, ADR-072).
+    """Scan every upload with the test scanner, which flags EICAR (IR-666, ADR-074).
 
     Tests run with DEBUG on, where development may switch scanning off; this
     keeps every upload path going through the scan, so a path that stops

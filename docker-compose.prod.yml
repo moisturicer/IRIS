@@ -55,7 +55,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Malware scanning (ADR-072, IR-666): clamd answers the backend's scans on
+  # Malware scanning (ADR-074, IR-666): clamd answers the backend's scans on
   # `private`; freshclam, in the same container, fetches signatures over
   # `egress`, its only route out. No published port. The signatures live in a
   # volume, so a restart doesn't download them again. Uploads are refused
@@ -72,7 +72,7 @@ services:
       - CLAMD_CONF_StreamMaxLength=60M
       - CLAMD_CONF_MaxFileSize=60M
       - CLAMD_CONF_MaxScanSize=200M
-      # A reload holds scans rather than briefly doubling memory (ADR-072 decision 5).
+      # A reload holds scans rather than briefly doubling memory (ADR-074 decision 5).
       - CLAMD_CONF_ConcurrentDatabaseReload=no
     volumes:
       - clamav_db:/var/lib/clamav
@@ -114,7 +114,7 @@ services:
       - ./backend/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      # Every upload is scanned; production won't start without it (ADR-072).
+      # Every upload is scanned; production won't start without it (ADR-074).
       - MALWARE_SCAN_HOST=clamav
       - DB_HOST=db
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
@@ -141,13 +141,13 @@ services:
     command: gunicorn config.asgi:application --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --workers 4 --timeout 120
     volumes:
       - media_files:/app/media
-      # Where scan_stored_uploads keeps a file that fails (ADR-072 decision 4); never served.
+      # Where scan_stored_uploads keeps a file that fails (ADR-074 decision 4); never served.
       - quarantine:/app/quarantine
     env_file:
       - ./backend/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      # Every upload is scanned; production won't start without it (ADR-072).
+      # Every upload is scanned; production won't start without it (ADR-074).
       - MALWARE_SCAN_HOST=clamav
       - DB_HOST=db
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
@@ -279,7 +279,7 @@ services:
       - ./backend/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      # Every upload is scanned; production won't start without it (ADR-072).
+      # Every upload is scanned; production won't start without it (ADR-074).
       - MALWARE_SCAN_HOST=clamav
       - DB_HOST=db
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
@@ -329,7 +329,7 @@ services:
       - ./backend/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      # Every upload is scanned; production won't start without it (ADR-072).
+      # Every upload is scanned; production won't start without it (ADR-074).
       - MALWARE_SCAN_HOST=clamav
       - DB_HOST=db
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
@@ -377,7 +377,7 @@ services:
       - ./backend/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      # Every upload is scanned; production won't start without it (ADR-072).
+      # Every upload is scanned; production won't start without it (ADR-074).
       - MALWARE_SCAN_HOST=clamav
       - DB_HOST=db
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
@@ -419,7 +419,7 @@ services:
       - ./backend/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      # Every upload is scanned; production won't start without it (ADR-072).
+      # Every upload is scanned; production won't start without it (ADR-074).
       - MALWARE_SCAN_HOST=clamav
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - DB_HOST=db
@@ -509,7 +509,7 @@ networks:
 volumes:
   postgres_data:
   media_files:
-  # ClamAV's signatures (ADR-072).
+  # ClamAV's signatures (ADR-074).
   clamav_db:
   quarantine:
   caddy_data:

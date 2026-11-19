@@ -133,7 +133,7 @@ class AuditEvent(models.Model):
     # The daily job deleted a request whose paper deadline passed while it
     # waited or stood rejected (amendment of 2026-11-15, point 2). No actor.
     CALL_LAPSED    = "CALL_LAPSED"
-    # Malware scanning (ADR-072, IR-666). An upload the scanner flagged and
+    # Malware scanning (ADR-074, IR-666). An upload the scanner flagged and
     # refused: `user` is who sent it; metadata `where` (the upload path), the
     # file's `sha256`, `size` and `filename`, and the scanner's `signature`.
     # Never the bytes: nothing flagged is stored.

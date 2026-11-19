@@ -301,7 +301,7 @@ def check_import_pdf(row: dict, pdfs: dict, taken: dict, *, user) -> tuple[objec
     file; `taken` maps a file name to the row that already uses it, so one PDF
     is never attached to two records. A blank File Name is fine: the row is
     imported with no manuscript, as before. `user` is who imports, for the
-    audit of a PDF the malware scan refuses (ADR-072).
+    audit of a PDF the malware scan refuses (ADR-074).
     """
     from apps.documents.scanning import upload_problem
     from apps.documents.validators import pdf_upload_problem

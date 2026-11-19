@@ -1,11 +1,11 @@
 """
-Malware scanning of every upload, before it is stored (IR-666, ADR-072).
+Malware scanning of every upload, before it is stored (IR-666, ADR-074).
 
 Every path that stores bytes a person sent asks `scan_problem(file)` beside
 the PDF checks (`validators.pdf_upload_problem`): `None` means it may be
 stored; a sentence means it is refused with that sentence, and nothing is
 written. A file flagged unsafe is never stored, so it can never be downloaded,
-previewed or extracted: refusal is the quarantine (ADR-072 decision 2).
+previewed or extracted: refusal is the quarantine (ADR-074 decision 2).
 
 **Fail closed.** A scanner that doesn't answer, or answers an error, refuses
 the upload (decision 3). With `DEBUG` off there is no way to turn scanning
@@ -138,13 +138,13 @@ def configured_scanner() -> Optional[Scanner]:
     mode = str(getattr(settings, "MALWARE_SCAN", "clamd") or "").strip().lower()
     if mode == "off":
         if not settings.DEBUG:
-            raise ImproperlyConfigured("MALWARE_SCAN=off is allowed only with DEBUG on (ADR-072).")
+            raise ImproperlyConfigured("MALWARE_SCAN=off is allowed only with DEBUG on (ADR-074).")
         return None
     if mode != "clamd":
-        raise ImproperlyConfigured(f"MALWARE_SCAN must be clamd or off, not {mode!r} (ADR-072).")
+        raise ImproperlyConfigured(f"MALWARE_SCAN must be clamd or off, not {mode!r} (ADR-074).")
     host = str(getattr(settings, "MALWARE_SCAN_HOST", "") or "").strip()
     if not host:
-        raise ImproperlyConfigured("MALWARE_SCAN_HOST is required to scan uploads (ADR-072).")
+        raise ImproperlyConfigured("MALWARE_SCAN_HOST is required to scan uploads (ADR-074).")
     return ClamdScanner(
         host, int(getattr(settings, "MALWARE_SCAN_PORT", 3310)),
         timeout=float(getattr(settings, "MALWARE_SCAN_TIMEOUT_SECONDS", 60)),
@@ -178,7 +178,7 @@ def scan_verdict(file) -> Optional[Verdict]:
     """
     scanner = current_scanner()
     if scanner is None:
-        logger.warning("Upload stored unscanned: MALWARE_SCAN=off (development only, ADR-072).")
+        logger.warning("Upload stored unscanned: MALWARE_SCAN=off (development only, ADR-074).")
         return None
     data = _read_all(file)
     verdict = scanner.scan(BytesIO(data))
@@ -193,10 +193,10 @@ def scan_problem(file, *, on_unsafe: Optional[Callable[[Verdict], None]] = None)
     try:
         verdict = scan_verdict(file)
     except ScanTooLarge:
-        logger.warning("Upload refused: past the malware scanner's size limit (ADR-072).")
+        logger.warning("Upload refused: past the malware scanner's size limit (ADR-074).")
         return TOO_LARGE
     except ScanUnavailable:
-        logger.exception("Upload refused: the malware scanner is unavailable (ADR-072).")
+        logger.exception("Upload refused: the malware scanner is unavailable (ADR-074).")
         return UNAVAILABLE
     if verdict is None or verdict.clean:
         return None
