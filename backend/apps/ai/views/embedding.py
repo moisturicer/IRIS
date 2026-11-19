@@ -1,3 +1,4 @@
+from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -11,6 +12,12 @@ class EmbedRecordView(APIView):
     permission_classes = [IsAuthenticated, IsStaff]
 
     def post(self, request, pk):
+        from apps.records.models import Record
+
+        # A record the caller cannot read -- someone else's draft (IR-1227) --
+        # answers as a missing one, and nothing is queued for it.
+        if not Record.objects.visible_to(request.user).filter(pk=pk).exists():
+            raise NotFound()
         job = EmbeddingJob.objects.create(record_id=pk)
         task = embed_record.delay(pk)
         job.celery_task_id = task.id

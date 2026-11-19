@@ -534,6 +534,13 @@ export default function PaperViewPage() {
     recordsApi
       .detail(Number(id))
       .then(({ data }) => {
+        // A draft is not a paper page (IR-1227, ADR-009 decision 6). Only its
+        // owner loads one, and opening it is opening the Publish form at the
+        // step they left off -- an old `?section=review` link included.
+        if (data.pipeline_status === "draft") {
+          navigate(`/?publish=${data.id}`, { replace: true });
+          return;
+        }
         setRecord(data);
         setLoadFailed(null);
         // access_count is a global counter, so it cannot answer "what have I
@@ -883,17 +890,17 @@ export default function PaperViewPage() {
   const showRail = section === "overview" && !arriving;
   // Ask IRIS open beside the page leaves no room for the rail (IR-569).
   const railHidden = showRail && chat.open && !chatMinimized;
-  const primary = can.has("continue_draft")
-    ? "continue"
-    : can.has("create_version")
-      ? "elsewhere"
-      : can.has("open_review") && section !== "review"
-        ? "open_review"
-        : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
-          ? "elsewhere"
-          : hasPaper
-            ? "view"
-            : "save";
+  // A draft never reaches this page (it opens in Publish, IR-1227), so
+  // `continue_draft` has no action here.
+  const primary = can.has("create_version")
+    ? "elsewhere"
+    : can.has("open_review") && section !== "review"
+      ? "open_review"
+      : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
+        ? "elsewhere"
+        : hasPaper
+          ? "view"
+          : "save";
 
   // *Open review* (ADR-032 §4) records when this reviewer started -- the
   // seat moves to `in_review` and the server stamps `opened_at` -- then moves
@@ -1173,15 +1180,8 @@ export default function PaperViewPage() {
                 />
               )}
 
-              {(section !== "overview" || primary === "continue" || primary === "open_review" || can.has("edit_details")) && (
+              {(section !== "overview" || primary === "open_review" || can.has("edit_details")) && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {primary === "continue" && (
-                    <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
-                      <i className="fas fa-pen-to-square text-xs" aria-hidden />
-                      Continue
-                    </Link>
-                  )}
-
                   {primary === "open_review" && (
                     <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
                       <i className="fas fa-clipboard-check text-xs" aria-hidden />

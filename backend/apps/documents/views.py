@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from django.db import transaction
-from core.permissions import IsStaff, may_read_record_documents, owns_or_staffs_record
+from core.permissions import IsStaff, hides_draft, may_read_record_documents, owns_or_staffs_record
 from core.text_limits import too_long, too_long_message
 from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
@@ -50,6 +50,10 @@ def authorize_record_documents(request, record_id, *, reading=False):
     `reading=True` is for the listing routes only: it also admits the record's
     Adviser, who reads and downloads but never writes (IR-1200, ADR-022
     §Amendment 6). Every upload route leaves it off.
+
+    **An unsubmitted draft someone else owns is a 404**, word for word the
+    answer for a missing record (IR-1227, ADR-009 decision 6): here the id
+    would otherwise confirm that a draft exists.
     """
     from apps.records.models import Record
 
@@ -61,6 +65,8 @@ def authorize_record_documents(request, record_id, *, reading=False):
     try:
         record = Record.objects.get(pk=record_id)
     except (Record.DoesNotExist, ValueError, TypeError):
+        record = None
+    if record is None or hides_draft(request.user, record):
         return None, Response(
             {"detail": "Record not found."},
             status=status.HTTP_404_NOT_FOUND,

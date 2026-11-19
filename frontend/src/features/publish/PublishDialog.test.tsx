@@ -27,6 +27,7 @@ vi.mock("@/api/records", () => ({
     uploadManuscript: vi.fn(),
     submit: vi.fn(),
     detail: vi.fn(),
+    delete: vi.fn(),
     metadataSuggestions: vi.fn(),
     retryExtraction: vi.fn(),
     duplicateMatches: vi.fn(),
@@ -954,7 +955,7 @@ describe("closing", () => {
     expect(screen.queryByText(/Stop the upload and close/)).not.toBeInTheDocument();
   });
 
-  it("closes at once when nothing is uploading", async () => {
+  it("closes at once when nothing was entered", async () => {
     const user = userEvent.setup();
     await openNew();
     await screen.findByRole("radio", { name: /Proposal/ });
@@ -962,6 +963,120 @@ describe("closing", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  // IR-1227 (ADR-009 decision 6): closing asks what to do with the work.
+  describe("with a draft saved", () => {
+    async function closeDraft() {
+      const user = userEvent.setup();
+      renderScreen(<PublishDialog />, { route: "/?publish=42" });
+      await screen.findByRole("textbox", { name: /^Title/ });
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      return user;
+    }
+
+    it("asks whether to leave it, keeping it as a draft by default", async () => {
+      await closeDraft();
+
+      const question = screen.getByRole("alertdialog", { name: "Leave this submission?" });
+      expect(question).toHaveAccessibleDescription(
+        "Your answers are saved as a draft. You can finish it later from My submissions.",
+      );
+      await waitFor(() => expect(within(question).getByRole("button", { name: "Keep as draft" })).toHaveFocus());
+      expect(within(question).getByRole("button", { name: "Delete draft" })).toBeInTheDocument();
+      expect(within(question).getByRole("button", { name: "Keep editing" })).toBeInTheDocument();
+    });
+
+    it("closes and keeps the draft on Keep as draft", async () => {
+      const user = await closeDraft();
+
+      await user.click(screen.getByRole("button", { name: "Keep as draft" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(recordsApi.delete).not.toHaveBeenCalled();
+    });
+
+    it("goes back to the form on Keep editing", async () => {
+      const user = await closeDraft();
+
+      await user.click(screen.getByRole("button", { name: "Keep editing" }));
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: /^Title/ })).toBeInTheDocument();
+    });
+
+    it("deletes it only once confirmed, then closes", async () => {
+      vi.mocked(recordsApi.delete).mockResolvedValue({ status: 204 } as never);
+      const user = await closeDraft();
+
+      await user.click(screen.getByRole("button", { name: "Delete draft" }));
+      const confirm = screen.getByRole("alertdialog", { name: "Delete this draft?" });
+      expect(confirm).toHaveAccessibleDescription("This can't be undone.");
+      expect(recordsApi.delete).not.toHaveBeenCalled();
+      await user.click(within(confirm).getByRole("button", { name: "Delete draft" }));
+
+      expect(recordsApi.delete).toHaveBeenCalledWith(42);
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
+
+    it("keeps the draft when the deletion is cancelled", async () => {
+      const user = await closeDraft();
+
+      await user.click(screen.getByRole("button", { name: "Delete draft" }));
+      await user.click(screen.getByRole("button", { name: "Keep draft" }));
+
+      expect(recordsApi.delete).not.toHaveBeenCalled();
+      expect(screen.getByRole("alertdialog", { name: "Leave this submission?" })).toBeInTheDocument();
+    });
+
+    it("stays open and says so when the deletion fails", async () => {
+      vi.mocked(recordsApi.delete).mockRejectedValue({ response: { status: 500 } });
+      const user = await closeDraft();
+
+      await user.click(screen.getByRole("button", { name: "Delete draft" }));
+      const confirm = screen.getByRole("alertdialog", { name: "Delete this draft?" });
+      await user.click(within(confirm).getByRole("button", { name: "Delete draft" }));
+
+      expect(await within(confirm).findByRole("alert")).not.toBeEmptyDOMElement();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+  });
+
+  describe("with entries but no manuscript yet", () => {
+    async function closeUnsaved() {
+      const user = userEvent.setup();
+      await openNew();
+      await chooseType(user, /Thesis \/ Research/);
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      return user;
+    }
+
+    it("asks whether to discard them", async () => {
+      await closeUnsaved();
+
+      const question = screen.getByRole("alertdialog", { name: "Discard what you've entered?" });
+      await waitFor(() => expect(within(question).getByRole("button", { name: "Keep editing" })).toHaveFocus());
+      expect(within(question).getByRole("button", { name: "Discard" })).toBeInTheDocument();
+    });
+
+    it("closes on Discard, with nothing saved or deleted", async () => {
+      const user = await closeUnsaved();
+
+      await user.click(screen.getByRole("button", { name: "Discard" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(recordsApi.create).not.toHaveBeenCalled();
+      expect(recordsApi.delete).not.toHaveBeenCalled();
+    });
+
+    it("goes back to the form on Keep editing", async () => {
+      const user = await closeUnsaved();
+
+      await user.click(screen.getByRole("button", { name: "Keep editing" }));
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /Thesis \/ Research/ })).toBeChecked();
+    });
   });
 });
 

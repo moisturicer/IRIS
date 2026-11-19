@@ -241,6 +241,21 @@ class IsCallModerator(BasePermission):
         return is_call_moderator(request.user)
 
 
+def hides_draft(user, record) -> bool:
+    """
+    Is `record` an unsubmitted draft that `user` did not create? Then it is
+    theirs to find nowhere (IR-1227, ADR-009 decision 6), a co-owner it names
+    included: every rule below refuses it, and a route answers it as it
+    answers a missing record. `Record.objects.visible_to` holds the same
+    condition for querysets.
+    """
+    if record.pipeline_status != PipelineStatus.DRAFT:
+        return False
+    if not user or not getattr(user, "is_authenticated", False):
+        return True
+    return record.added_by_id != user.pk
+
+
 def owns_or_staffs_record(user, record) -> bool:
     """
     May `user` reach this record's documents and act on the record itself?
@@ -263,6 +278,8 @@ def owns_or_staffs_record(user, record) -> bool:
     """
     if not user or not user.is_authenticated:
         return False
+    if hides_draft(user, record):
+        return False
     if get_role_name(user) in STAFF_ROLES:
         return True
     return record.owners.filter(user=user).exists()
@@ -279,7 +296,7 @@ def may_read_record_documents(user, record) -> bool:
     when RDCO replaces them (`rdco_acts.replace_adviser` moves the field) and
     outlasts the review when nobody does.
     """
-    if not user or not getattr(user, "is_authenticated", False):
+    if not user or not getattr(user, "is_authenticated", False) or hides_draft(user, record):
         return False
     return record.adviser_id == user.pk or owns_or_staffs_record(user, record)
 
@@ -292,7 +309,7 @@ def may_read_embargo(user, record) -> bool:
     Reading a record is not enough: every signed-in user reads a published one,
     and that a paper is under an agreement is not theirs to learn from it.
     """
-    if not user or not getattr(user, "is_authenticated", False):
+    if not user or not getattr(user, "is_authenticated", False) or hides_draft(user, record):
         return False
     return record.adviser_id == user.pk or owns_or_staffs_record(user, record)
 

@@ -63,7 +63,7 @@ class DashboardStatsView(APIView):
 
     def get(self, request):
         user = request.user
-        my_ids = Record.objects.filter(owners__user=user).values_list("pk", flat=True)
+        my_ids = Record.objects.owned_by(user).values_list("pk", flat=True)
         return Response({
             "total_mine":       my_ids.count(),
             "pending_mine":     Record.objects.filter(pk__in=my_ids, pipeline_status__in=IN_REVIEW_STATUSES).count(),
