@@ -7,6 +7,8 @@ export interface DashboardStats {
   declined_mine:   number;
   /** The user's records waiting on them: a revision or document asked for (IR-534, B2). */
   needs_action_mine: number;
+  /** Reviews waiting on the user: My Reviews' To review count, its sidebar badge (IR-1208). */
+  reviews_waiting_mine?: number;
   total_published: number;
 }
 
