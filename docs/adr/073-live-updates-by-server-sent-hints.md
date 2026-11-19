@@ -2,10 +2,10 @@
 
 ## Status
 
-**Proposed**, 2026-11-19 ([IR-1213](https://citiris.atlassian.net/browse/IR-1213)).
+**Accepted**, 2026-11-19, by Lee Jasmin Adolfo ([IR-1213](https://citiris.atlassian.net/browse/IR-1213)). Accepted verbally, and recorded here by Ashlee Sean the same day; there is no written approval on the PR.
 - **Already decided:** Ashlee Sean chose live push over timed polling on 2026-11-17.
-- **Drafted** by an AI agent (Claude Code) at Ashlee's request. AI does not make architecture decisions (CLAUDE.md), so the design below is a proposal. The three questions the first draft left open were settled by Ashlee on 2026-11-19 (§Questions settled while drafting); the design still awaits a person's acceptance.
-- **Not built.** IR-1213 builds it after a person accepts this ADR.
+- **Drafted** by an AI agent (Claude Code) at Ashlee's request. AI does not make architecture decisions (CLAUDE.md), so the design below was a proposal until accepted. The three questions the first draft left open were settled by Ashlee on 2026-11-19 (§Questions settled while drafting); Lee Jasmin Adolfo then accepted the design.
+- **Not built yet.** IR-1213 builds it.
 
 ## Context
 
@@ -30,7 +30,7 @@
 - **The inactivity rule (IR-166, ADR-072)** must not count an open stream as activity.
 - **The access token lasts 30 minutes** and the refresh token is cookie-only (ADR-072), so a long-lived connection has to outlive token expiry.
 
-## Decision (proposed)
+## Decision
 
 1. **Hints, never data.**
    - The server sends a short message naming *what changed*, such as `{"topics": ["reviews", "record:42"]}`. The page then refetches what it already shows, through the normal API with its normal permission checks.
