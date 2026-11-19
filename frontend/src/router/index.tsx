@@ -48,6 +48,7 @@ const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequest
 const CallRequestsPage = lazy(() => import("@/features/opportunities/CallRequestsPage"));
 const SetupPage = lazy(() => import("@/features/setup/SetupPage"));
 const MyTemplatesPage = lazy(() => import("@/features/myTemplates/MyTemplatesPage"));
+const GuidelinesPage = lazy(() => import("@/features/guidelines/GuidelinesPage"));
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
 const ReportedCommentsPage = lazy(() => import("@/features/admin/ReportedCommentsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
@@ -119,6 +120,12 @@ export const routes: RouteObject[] = [{
                 handle: { crumb: "My Templates" },
               },
             ],
+          },
+          {
+            // What each record type needs (ADR-063 decision 7, IR-974): everyone's.
+            path: pathFor("guidelines"),
+            element: <DeferredPage message="Loading the guidelines"><GuidelinesPage /></DeferredPage>,
+            handle: { crumb: "Guidelines" },
           },
           { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },
           {

@@ -495,6 +495,8 @@ ADVISER_ONLY = row(ANON, DENY, DENY, OK, DENY, DENY, DENY, DENY, DENY, DENY)
 
 DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     "upload-slots": Entry({"GET": _case(SIGNED_IN)}),
+    # -- Guidelines: what each record type needs, read by anyone signed in (decision 7, IR-974) --
+    "guidelines": Entry({"GET": _case(SIGNED_IN)}),
 
     # -- Templates, downloaded by anyone signed in (ADR-063 decisions 7-8) --
     "upload-slot-template": Entry({"GET": _case(SIGNED_IN, kwargs=SLOT)}),

@@ -45,6 +45,11 @@ describe("role-owned addresses (IR-783)", () => {
     expect(await screen.findByRole("heading", { level: 1, name: title })).toBeInTheDocument();
   });
 
+  it.each(Object.values(ROLES))("opens /guidelines for %s (IR-974)", async (role) => {
+    visit("/guidelines", role);
+    expect(await screen.findByRole("heading", { level: 1, name: "Guidelines" })).toBeInTheDocument();
+  });
+
   it("opens /my-templates for the Adviser (IR-975)", async () => {
     visit("/my-templates", ROLES.ADVISER);
     expect(await screen.findByRole("heading", { level: 1, name: "My Templates" })).toBeInTheDocument();

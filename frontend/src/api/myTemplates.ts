@@ -11,8 +11,8 @@
  *   DELETE /documents/my-templates/<id>/
  *   GET    /documents/my-templates/<id>/file/        the Adviser's own file, shown or not
  *
- * The shown list (`GET /documents/adviser-templates/`) and its downloads have no
- * screen yet: Guidelines (IR-974) adds its own client for them.
+ * The shown list (`GET /documents/adviser-templates/`) and its downloads are
+ * read by Guidelines, through its own client (`api/guidelines.ts`, IR-974).
  */
 import { apiClient } from "./client";
 

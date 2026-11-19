@@ -12,7 +12,7 @@ from .setup_views import (
     SetupRecordTypeListView, SetupRecordTypeView, SetupRequirementCreateView,
     SetupRequirementOrderView, SetupRequirementView, SetupRequirementTemplateView,
     SetupManuscriptTemplateView, RequirementTemplateDownloadView,
-    ManuscriptTemplateDownloadView,
+    ManuscriptTemplateDownloadView, GuidelinesView,
 )
 from .adviser_template_views import (
     MyTemplateListView, MyTemplateOrderView, MyTemplateView, MyTemplateDownloadView,
@@ -22,6 +22,8 @@ from .adviser_template_views import (
 urlpatterns = [
     path("submit/",                              SubmitDocumentView.as_view(),          name="document-submit"),
     path("slots/",                               UploadSlotListView.as_view(),          name="upload-slots"),
+    # Guidelines: what each record type needs, for anyone signed in (ADR-063 decision 7, IR-974)
+    path("guidelines/",                          GuidelinesView.as_view(),              name="guidelines"),
     # Templates, as downloads, for anyone signed in (ADR-063 decision 8, IR-971)
     path("slots/<int:pk>/template/",             RequirementTemplateDownloadView.as_view(), name="upload-slot-template"),
     path("record-types/<int:pk>/manuscript-template/", ManuscriptTemplateDownloadView.as_view(),

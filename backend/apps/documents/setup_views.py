@@ -44,16 +44,38 @@ def _record_type(pk):
         return None
 
 
-def requirement_payload(slot, in_use: bool | None = None) -> dict:
-    if in_use is None:
-        in_use = slot.uploads.exists() or slot.request_items.exists()
+def shown_requirement(slot) -> dict:
+    """A Requirement as a reader sees it (Guidelines, IR-974). Setup's view adds to it."""
     return {
         "id": slot.pk,
         "name": slot.name,
         "is_required": slot.is_required,
         "description": slot.description,
-        "position": slot.position,
         "template_name": slot.template_name,
+    }
+
+
+def shown_record_type(record_type, requirements: list[dict]) -> dict:
+    """A record type as a reader sees it, with `requirements` already shaped."""
+    return {
+        "id": record_type.pk,
+        "name": record_type.name,
+        "description": record_type.description,
+        # The fixed first row (decision 4): always Required, never removable.
+        "manuscript": {
+            "description": record_type.manuscript_description,
+            "template_name": record_type.manuscript_template_name,
+        },
+        "requirements": requirements,
+    }
+
+
+def requirement_payload(slot, in_use: bool | None = None) -> dict:
+    if in_use is None:
+        in_use = slot.uploads.exists() or slot.request_items.exists()
+    return {
+        **shown_requirement(slot),
+        "position": slot.position,
         # Removing a requirement in use hides it and keeps its files (decision 5).
         "in_use": in_use,
     }
@@ -68,19 +90,9 @@ def record_type_payload(record_type) -> dict:
         has_uploads=Exists(RecordUpload.objects.filter(slot=OuterRef("pk"))),
         has_requests=Exists(DocumentRequestItem.objects.filter(slot=OuterRef("pk"))),
     )
-    return {
-        "id": record_type.pk,
-        "name": record_type.name,
-        "description": record_type.description,
-        # The fixed first row (decision 4): always Required, never removable.
-        "manuscript": {
-            "description": record_type.manuscript_description,
-            "template_name": record_type.manuscript_template_name,
-        },
-        "requirements": [
-            requirement_payload(slot, in_use=slot.has_uploads or slot.has_requests) for slot in slots
-        ],
-    }
+    return shown_record_type(record_type, [
+        requirement_payload(slot, in_use=slot.has_uploads or slot.has_requests) for slot in slots
+    ])
 
 
 class SetupRecordTypeListView(APIView):
@@ -220,6 +232,24 @@ class SetupManuscriptTemplateView(APIView):
             return _missing("Record type")
         setup.remove_manuscript_template(record_type, request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class GuidelinesView(APIView):
+    """
+    GET /documents/guidelines/ -- what each record type needs (ADR-063 decision 7, IR-974):
+    its description, the Manuscript, then the Requirements RDCO lists, in RDCO's order.
+    For anyone signed in, and only reads. Advisers' Templates are `adviser-templates/`.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from apps.records.models import RecordType
+
+        return Response([
+            shown_record_type(rt, [shown_requirement(slot) for slot in setup.listed_slots(rt.pk)])
+            for rt in RecordType.objects.order_by("pk")
+        ])
 
 
 class RequirementTemplateDownloadView(APIView):

@@ -133,7 +133,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences"]);
+    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences", "Guidelines"]);
     expect(screen.queryByText("Research Exploration")).not.toBeInTheDocument();
     expect(screen.queryByText("Tools")).not.toBeInTheDocument();
   });
@@ -256,8 +256,9 @@ describe("the sidebar's list", () => {
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
     // IR-693 adds Reported comments, after Account Deletions; IR-972 moves the Notice onto RDCO's Setup.
+    // IR-974: Guidelines is everyone's main link (ADR-063 decision 7).
     expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
-      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention"]);
+      .toEqual(["Discover", "Guidelines", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
@@ -279,7 +280,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences"]);
+    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences", "Guidelines"]);
     // jsdom applies no CSS, so the names above would be there whether the
     // labels were `md:sr-only` or `md:hidden`. The class is what keeps them
     // in the accessibility tree on the rail, so it is what is checked.
