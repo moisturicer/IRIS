@@ -331,6 +331,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     }
   };
 
+  // The box is disabled while a run is active, so focus follows once the stop has landed.
+  const focusDraft = useRef(false);
   const stop = async () => {
     if (!run) return;
     const version = ++generation.current;
@@ -339,6 +341,12 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
       const next = await api.stop(run.id);
       if (version !== generation.current) return;
       setRun(next); setError(undefined);
+      // A stopped question goes back in the box to edit and resend (IR-1236). Nothing is sent.
+      if (next.state === "cancelled" && !compactionRun(next) && next.question) {
+        // Never over text the reader has since typed.
+        if (!draftNow.current.trim()) setDraft(next.question);
+        focusDraft.current = true;
+      }
       // A final answer can win the Stop race. Reopen that committed outcome.
       if (next.state === "completed") await reopen(next.conversation_id, version);
     } catch (failure) { if (version === generation.current) fail(failure); }
@@ -405,6 +413,9 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   }, []);
 
   const blocked = busy || !!error || !!opening || !!(run && activeRun(run));
+  useEffect(() => {
+    if (focusDraft.current && !blocked) { focusDraft.current = false; composerRef.current?.focus(); }
+  }, [blocked]);
   const editQuestion = (question: string) => { setDraft(question); composerRef.current?.focus(); };
 
   return <div className={`flex h-full max-h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : "overflow-hidden"}`}>
@@ -451,11 +462,8 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
                   <AskIrisMark className={dense ? "w-4 h-4" : "w-[18px] h-[18px]"} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  {active && <ReasoningBar compact={dense}
-                    activity={current.activity ?? { phase: current.state === "queued" ? "waiting" : "working",
-                      label: current.state === "queued" ? "Waiting to start" : "Thinking",
-                      since: current.created_at ?? new Date().toISOString(), step: null }}
-                    runStartedAt={current.created_at} />}
+                  {active && <ReasoningBar compact={dense} activity={current.activity} plan={current.plan}
+                    deep={current.depth === "deep"} runStartedAt={current.created_at} />}
                   {showDraft && <CitationText text={typed.text} citations={[]} streaming={!typed.done || active}
                     className={cn(ANSWER_MARKDOWN, (active || !typed.done) && CHAT_STREAM_CARET, !typed.done && "answer-typing", active && "mt-3", dense ? "text-sm" : "text-md")} />}
                   {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
