@@ -57,7 +57,7 @@ export default function AIHubPage() {
           <span className={`px-3 py-1 text-label font-bold rounded-full mb-4 ${TONES.attention}`}>
             Coming Soon
           </span>
-          <p className="text-body text-stone-600 leading-relaxed max-w-sm">
+          <p className="text-body text-stone-600 leading-relaxed">
             RAG-powered Q&amp;A — ask a question and get an AI-generated answer with citations
             from the research corpus — is currently being developed.
           </p>
@@ -73,7 +73,7 @@ export default function AIHubPage() {
           <span className={`px-3 py-1 text-label font-bold rounded-full mb-4 ${TONES.attention}`}>
             Coming Soon
           </span>
-          <p className="text-body text-stone-600 leading-relaxed max-w-sm">
+          <p className="text-body text-stone-600 leading-relaxed">
             Semantic search — find research records by meaning using vector embeddings and
             pgvector similarity queries — is currently being developed.
           </p>

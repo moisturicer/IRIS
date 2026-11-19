@@ -325,7 +325,7 @@ function HistoryRow({ entry, updatedAt, active, pinned, onPin, onRename, onDelet
     {/* A link to the conversation's own address (IR-548), so it opens in a new tab and survives a refresh. */}
     <Link to={`/ai/conversations/${entry.id}`} aria-current={active ? "page" : undefined} title={title}
       className={cn("block min-h-10 min-w-0 flex-1 rounded-control px-3 py-2 text-left group-hover:pr-24 group-focus-within:pr-24", FOCUS_RING)}>
-      <span className={cn("block truncate text-body", active ? "font-semibold" : "font-normal")}>{title}</span>
+      <span className={cn("block break-words text-body", active ? "font-semibold" : "font-normal")}>{title}</span>
       {updatedAt && <span className="sr-only">{formatDate(updatedAt, "MMM d · h:mm a")}</span>}
     </Link>
     <span className="absolute right-1 flex items-center rounded-control opacity-0 transition-opacity

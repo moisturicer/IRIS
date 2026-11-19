@@ -194,7 +194,7 @@ export default function DownloadRequestsPage() {
                       <td className="px-4 py-3">
                         <Link
                           to={`/records/${req.record}`}
-                          className="text-brand font-medium hover:underline line-clamp-1"
+                          className="break-words text-brand font-medium hover:underline"
                         >
                           {req.record_title}
                         </Link>
@@ -203,7 +203,7 @@ export default function DownloadRequestsPage() {
                         <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
                         <p className="text-label text-stone-500">{req.requested_by_email}</p>
                       </td>
-                      <td className="px-4 py-3 max-w-xs">
+                      <td className="px-4 py-3">
                         {req.note
                           ? <p className="text-justified text-stone-700 whitespace-pre-line break-words">{req.note}</p>
                           : <p className="text-stone-500 italic">{NO_NOTE}</p>}
@@ -216,7 +216,7 @@ export default function DownloadRequestsPage() {
                           state={req.status}
                           expired={!req.grant_live && !!req.grant_expires_at}
                         />
-                        {grant && <p className="mt-1 text-label text-stone-600 whitespace-nowrap">{grant}</p>}
+                        {grant && <p className="mt-1 text-label text-stone-600">{grant}</p>}
                         {endedByRdco && <RdcoNoteLine note={req.rdco_note} />}
                       </td>
                       <td className="px-4 py-3 text-right">

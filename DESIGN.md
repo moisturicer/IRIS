@@ -297,12 +297,23 @@ The record page is a container named `reading`, and the Overview column is its o
    - Good: an abstract whose lines all end at the column's edge, at 360 px and at 1745 px.
    - Bad: a justified button label or table cell, or a heading stretched across its box.
 
-**The two allowed cuts.** These, and only these, may end in an ellipsis. Anything else needs this rule changed first.
+**The six allowed cuts.** These, and only these, may end in an ellipsis. Anything else needs this rule changed first. The guard test `src/test/fullTextRule.test.ts` fails on any `truncate`, `text-ellipsis` or `line-clamp-*` that is not one of them (IR-1219).
 - **A long file name in a table cell** may stay on one line, so one name does not make its row tall. Its full name is shown on hover and on keyboard focus (a `title` alone is not enough: it does not show on focus), and is read in full by screen readers.
   - Good: `Final_Thesis_Manuscript_Revi…` whose cell shows the whole name when hovered or focused, and is announced whole.
 - **An abstract's preview in a list card** (Discover, a person's profile) may be clamped to its few lines. The card links to the paper's page, where the whole abstract is shown, never cut.
   - Good: Discover's card ends its abstract in `…`; opening the paper shows all of it.
   - Bad: the same clamp on the paper's own page, in review, or anywhere that is not a preview with a link to the full text.
+- **A long review comment's opening** (over 300 characters) may end in `…` with a **See more** button after it, which shows the whole comment in place. The button is reachable by keyboard and says what it does. Added by IR-1219 (decided by Hermoine Zozobrado, 2026-11-19): a thread of long comments stays quick to scan.
+  - Good: a reviewer's long comment shows its first lines, and See more shows the rest without leaving the thread.
+  - Bad: a comment cut with no See more, or a See more that opens another page.
+- **A call's description on the Calls board** may be clamped to two lines, with a **Show more** button on the card that shows the whole description in place and becomes **Show less**. Added by IR-1219 (decided by Hermoine Zozobrado, 2026-11-19): board cards stay even and quick to scan. The board offers no other way to the full description (*View & apply* leaves IRIS, and not every call has it), so the button is what makes this cut allowed.
+  - Good: a long call description ends in `…` and Show more beneath it; pressing it shows all of it on the card.
+  - Bad: the clamp without Show more.
+- **Discover's rotating example search** (the hint in the empty search box) stays on one line and may end in `…`. It is decorative: hidden from screen readers, gone as soon as you type, and no example is needed to search. Added by IR-1219 (decided by Hermoine Zozobrado, 2026-11-19), so the box does not change height as the hints rotate.
+  - Bad: the same one-line cut on the search box's label, its help text, or anything a person types.
+- **A paper's title in the reading bar** (the 56px row above a paper, from the reading-split width up) stays on one line and may end in `…`. The full title shows on hover and focus, screen readers read it whole, and the Overview tab shows it in full. Added by IR-1219 (decided by Hermoine Zozobrado, 2026-11-19): the bar is one row (IR-1092), and Paper Chat's dock and the reading pane are sized from its fixed height, so a wrapped title would spill over the paper.
+  - Good: a long title ends in `…` in the bar; resting on it shows the whole title.
+  - Bad: the same cut on the Overview's own title, or a reading-bar title with no full text on hover.
 
 ## Elevation & Depth
 
@@ -398,6 +409,6 @@ The same typeset entry as your own, at `/people/:id`, with a second column. **Co
 - **Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.
 - **Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.
 - **Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.
-- **Don't** cut text off with an ellipsis, a line clamp or a fixed height, or cap it narrower than its box. The two allowed cuts are named in the Full Text Rule.
+- **Don't** cut text off with an ellipsis, a line clamp or a fixed height, or cap it narrower than its box. The six allowed cuts are named in the Full Text Rule.
 - **Don't** add a label explaining how AI text was made, or an outlined button where a ghost one is enough.
 - **Don't** put a thick accent border on a rounded shape. The one recorded exception is the entry folder's tab joined to the sheet (`EntryTab`, and register's current step), whose 2 px maroon top edge is the approved Dossier direction (the `border-accent-on-rounded` exception in `.impeccable/config.json`).

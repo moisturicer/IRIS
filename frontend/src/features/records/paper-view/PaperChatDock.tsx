@@ -229,7 +229,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
       <AskIrisMark className="h-5 w-5 shrink-0 text-brand" />
       <span className="min-w-0 flex-1">
         <span className="block font-display text-lg font-semibold leading-tight text-stone-900">Ask IRIS</span>
-        <span className="block truncate text-2xs text-stone-500">Back to the answer</span>
+        <span className="block break-words text-2xs text-stone-500">Back to the answer</span>
       </span>
       <i className="fas fa-chevron-up text-xs text-stone-500" aria-hidden />
     </button>}
@@ -263,7 +263,7 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
           <i className="fas fa-xmark" aria-hidden />
         </Button>
       </div>
-      <p className="mt-2 truncate text-2xs text-stone-600">{props.record.title}</p>
+      <p className="mt-2 break-words text-2xs text-stone-600">{props.record.title}</p>
       {props.viewingVersion != null && <p className="mt-1 text-2xs text-stone-700">
         Answers are about the current version, not v{props.viewingVersion}.</p>}
       {recentOpen && <RecentChats className="mt-2 max-h-48 overflow-y-auto" chats={recent} activeId={conversationId ?? null}

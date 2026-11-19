@@ -58,7 +58,7 @@ export function SourceContextPanel({ open, question = null, citations, sources, 
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60">
         <div className="min-w-0">
           <h2 className="text-body font-bold text-stone-800">Referenced passages</h2>
-          <p className="text-label text-stone-500 mt-0.5 line-clamp-2">
+          <p className="text-label text-stone-500 mt-0.5 break-words">
             {question ? <>For “{question}”</> : "The exact text behind the answer"}
           </p>
         </div>
@@ -106,8 +106,8 @@ function PassageRow({ citation, title }: { citation: ChatCitation; title: string
         {citation.marker}
       </span>
       <span className="min-w-0">
-        {section && <span className="block truncate text-label font-medium text-stone-600">{section}</span>}
-        <span className="line-clamp-2 block font-display text-body italic leading-snug text-stone-700">
+        {section && <span className="block break-words text-label font-medium text-stone-600">{section}</span>}
+        <span className="block break-words font-display text-body italic leading-snug text-stone-700">
           {opening ? <>“{withMathRendered(opening)}”</> : <span className="font-sans not-italic text-stone-500">Open the passage</span>}
         </span>
       </span>
@@ -152,12 +152,12 @@ export function SourcePassages({
         return (
           <section key={recordId} aria-label={title} className="py-2 first:pt-0 last:pb-0">
             <div className="flex items-baseline gap-2 px-2">
-              <Link to={`/records/${recordId}`} className="min-w-0 truncate text-small font-semibold text-stone-900 hover:text-brand hover:underline">
+              <Link to={`/records/${recordId}`} className="min-w-0 break-words text-small font-semibold text-stone-900 hover:text-brand hover:underline">
                 {title}
               </Link>
               <ResearchOriginBadge origin={card?.origin} />
             </div>
-            {byline && <p className="truncate px-2 text-label text-stone-500">{byline}</p>}
+            {byline && <p className="break-words px-2 text-label text-stone-500">{byline}</p>}
             <div className="mt-1">
               {passages.map((citation) => <PassageRow key={`${citation.chunk_id}-${citation.marker}`} citation={citation} title={title} />)}
             </div>

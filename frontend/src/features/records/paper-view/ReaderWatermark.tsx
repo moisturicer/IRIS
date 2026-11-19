@@ -235,7 +235,7 @@ export function ReaderWatermark({ width, height, scale }: { width: number; heigh
       </svg>
       {user && (
         <p
-          className="absolute inset-x-0 text-center text-stone-700 whitespace-nowrap truncate"
+          className="absolute inset-x-0 break-words px-[4%] text-center text-stone-700"
           style={{ bottom: FOOTER_MARGIN_PT * scale, fontSize: FOOTER_SIZE_PT * scale }}
         >
           {readerWatermarkLine(user)}
