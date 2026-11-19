@@ -55,7 +55,8 @@ DOCX_WITH_MACROS = zip_bytes({
 
 @pytest.fixture
 def office(tmp_path, settings):
-    """RDCO taking part in a record's review, signed in: who may attach (IR-474)."""
+    """RDCO taking part in a record's review, seated and signed in: who may attach (IR-474, IR-1226)."""
+    from apps.documents.tests.test_record_document_authorization import seat_on
     from apps.reviews.models import RecordAssignment
 
     settings.MEDIA_ROOT = str(tmp_path)
@@ -65,9 +66,11 @@ def office(tmp_path, settings):
         record_type=RecordType.objects.get_or_create(name="Thesis / Research")[0],
     )
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
-    RecordAssignment.objects.create(record=record, party="rdco")
+    member = make_user("types-office@cit.edu", "RDCO")
+    # Filing takes a seat on the assignment, not membership of the office (IR-1226).
+    seat_on(RecordAssignment.objects.create(record=record, party="rdco"), member)
     client = APIClient()
-    client.force_authenticate(make_user("types-office@cit.edu", "RDCO"))
+    client.force_authenticate(member)
     return client, record
 
 

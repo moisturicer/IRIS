@@ -7,9 +7,12 @@ anyone who has ever held a seat, or a member of an office holding the record
 now. Anyone else is told nothing, not even that a discussion exists: the
 refusal is the same 404 as a missing record (IR-153).
 
-**Who writes.** The record's participants (`is_record_participant`, §7): its
-owners and anyone who has ever held a seat. A pool member about to claim may
-read the history but not write in it -- 403, since they may see it.
+**Who writes.** Its owners and anyone whose seat on it is open
+(`may_act_on_review`, §7; IR-1226). A reviewer whose seat is done still writes
+in Conversation, replies in a thread and edits those comments
+(`may_discuss_review`, 2026-11-19), but starts, edits and resolves no thread.
+A pool member about to claim, or a reviewer taken off the paper, may read the
+history but not write in it -- 403, since they may see it.
 
 **On which records.** Every submitted one. A draft is not under review, so a
 comment on it is refused.
@@ -51,10 +54,13 @@ from django.utils import timezone
 
 from apps.records.versions import latest_version
 from core.enums import (
-    PipelineStatus, ReviewCommentKind, ReviewTextState, ThreadAnswer, ThreadPlaceOutcome,
+    PipelineStatus, ReviewCommentKind, ReviewTextState, SeatState, ThreadAnswer, ThreadPlaceOutcome,
     ThreadSeverity, ThreadState,
 )
-from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
+from core.permissions import (
+    acting_refusal, holds_seat, is_record_owner, may_act_on_review, may_discuss_review,
+    may_read_review,
+)
 
 from . import mentions, threads
 from .models import ReviewComment
@@ -195,7 +201,10 @@ class _Viewer:
         self.pk = getattr(user, "pk", None)
         self.record = record
         self.owner = is_record_owner(user, record)
-        self.participant = is_record_participant(user, record)
+        # Acting on threads needs ownership or an open seat; a done seat still
+        # discusses, in Conversation and replies (IR-1226).
+        self.acts = may_act_on_review(user, record)
+        self.discusses = self.acts or may_discuss_review(user, record)
         self.in_review = is_in_review(record)
         self._seats: dict[str, bool] = {}
         self._versions: Optional[list] = None
@@ -278,7 +287,9 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "reply_to": comment.reply_to_id,
         "created_at": comment.created_at.isoformat(),
         "edited_at": comment.edited_at.isoformat() if comment.edited_at else None,
-        "can_edit": mine,
+        # A thread is edited only from an open seat; a reply or a Conversation
+        # comment by anyone who still discusses (IR-1226).
+        "can_edit": mine and (viewer.acts if top else viewer.discusses),
         # The people it mentions (IR-877).
         "mentions": mentions.payload(comment),
         # The thread (ADR-032 §7, IR-874).
@@ -312,15 +323,15 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
              "to": e.new_value or None, "at": e.created_at.isoformat()}
             for e in comment.events.all()
         ] if sent else [],
-        "can_delete": mine and comment.is_draft,
+        "can_delete": mine and comment.is_draft and viewer.acts,
         # Its writer posts a draft on its own, before *Finish review* (IR-1194).
-        "can_post": mine and comment.is_draft and top and viewer.in_review,
+        "can_post": mine and comment.is_draft and top and viewer.in_review and viewer.acts,
         "can_change_severity": live and reviewer_thread and (
             mine if comment.is_draft else viewer.holds(comment.party)
         ),
-        "can_resolve": live and sent and viewer.participant and not (reviewer_thread and viewer.owner),
+        "can_resolve": live and sent and viewer.acts and not (reviewer_thread and viewer.owner),
         "can_reopen": sent and viewer.in_review and comment.state == ThreadState.RESOLVED
-        and viewer.participant,
+        and viewer.acts,
         "can_answer": live and sent and reviewer_thread and viewer.owner,
     }
 
@@ -358,13 +369,17 @@ def readable_comments(record, user) -> list[dict[str, Any]]:
 
 # --- writing -----------------------------------------------------------------------------
 
-def _writer(record, user) -> None:
+def _writer(record, user, *, discussing=False) -> None:
+    """
+    Refuse `user` unless they may write here: act on threads (an owner or an
+    open seat), or, when `discussing`, write in Conversation and reply (an
+    open or done seat too; IR-1226).
+    """
     if not may_read_review(user, record):
         raise CommentNotFound
-    if not is_record_participant(user, record):
-        raise CommentRefused(
-            "Only the record's owners and its reviewers take part in the review discussion."
-        )
+    allowed = may_discuss_review(user, record) if discussing else may_act_on_review(user, record)
+    if not allowed:
+        raise CommentRefused(acting_refusal(user, record))
 
 
 def _body(value) -> str:
@@ -472,9 +487,12 @@ def writer_party(record, user) -> tuple[str, bool]:
     seat = _open_seat(record, user)
     if seat is not None:
         return str(seat.assignment.party), True
+    # A done seat still discusses (IR-1226), as its own party: never a
+    # withdrawn one's, which grants nothing.
     last = (
         ReviewerSeat.objects.select_related("assignment")
         .filter(assignment__record=record, reviewer=user)
+        .exclude(state=SeatState.WITHDRAWN)
         .order_by("-assigned_at", "-pk").first()
     )
     return (str(last.assignment.party) if last else threads.OWNER), False
@@ -510,7 +528,7 @@ def _with_mentions(comment, user, people) -> ReviewComment:
 
 def mentionable(record, user) -> list[dict[str, Any]]:
     """`GET /records/<id>/review-mentionable/`: whom a writer may mention, but themselves."""
-    _writer(record, user)
+    _writer(record, user, discussing=True)
     return [{"id": u.pk, "name": u.get_full_name()}
             for u in mentions.candidates(record) if u.pk != user.pk]
 
@@ -544,13 +562,17 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
                  post_now=None, severity=None, anchor=None, suggestion=None,
                  mentioned=None, document=None) -> ReviewComment:
     """`POST /records/<id>/review-comments/`: a participant comments."""
-    _writer(record, user)
+    _writer(record, user, discussing=True)
     if record.pipeline_status == PipelineStatus.DRAFT:
         raise CommentError("A draft is not under review. Comments open once it is submitted.")
     text = _body(body)
     people = _mentioned(record, mentioned)
     kind = _kind(kind)
     names_document = document not in (None, "")
+    # A new thread takes an open seat; a reply or a Conversation comment only
+    # one that is open or done (IR-1226).
+    if reply_to in (None, "") and kind == THREAD and not may_act_on_review(user, record):
+        raise CommentRefused(acting_refusal(user, record))
 
     if reply_to not in (None, ""):
         try:
@@ -660,13 +682,19 @@ def post_draft(record, user, comment_id) -> ReviewComment:
 
 
 def _own(record, user, comment_id) -> ReviewComment:
-    """`user`'s own comment `comment_id`, or the refusal its author check gives."""
-    _writer(record, user)
+    """
+    `user`'s own comment `comment_id`, or the refusal its author check gives.
+    A thread is theirs to change only from an open seat; a reply or a
+    Conversation comment while they still discuss (IR-1226).
+    """
+    _writer(record, user, discussing=True)
     comment = _visible(record, user).filter(pk=comment_id).first()
     if comment is None:
         raise CommentNotFound
     if comment.author_id != user.pk:
         raise CommentRefused("Only the person who wrote a comment may edit it.")
+    if comment.reply_to_id is None and comment.kind == THREAD and not may_act_on_review(user, record):
+        raise CommentRefused(acting_refusal(user, record))
     return comment
 
 

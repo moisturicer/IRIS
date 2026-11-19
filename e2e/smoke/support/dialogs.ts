@@ -90,7 +90,10 @@ const consoleAction = (id: string, button: string, kind: "pool" | "seat", source
         is_overdue: false, clock_paused: false, can_extend: true,
         authors_line: "Ada Lovelace · v1", clearance_strip: [],
         status: kind === "pool" ? { kind: "unassigned", text: "Unassigned" } : { kind: "due", text: "Due in 2 days" },
-        actions: kind === "pool" ? ["assign", "extend"] : ["reassign", "extend"],
+        actions: kind === "pool" ? ["assign", "extend"] : ["reassign", "withdraw", "extend"],
+        // What the reviewer leaves, so Reassign and Withdraw are scanned with their warning (IR-1226).
+        unresolved: kind === "seat" ? { drafts: 1, open_threads: 1, document_requests: 1, revision_requests: 0 } : null,
+        withdraw_completes_office: kind === "seat" ? true : null,
       }],
       load: [{ reviewer: 5, name: "Ines Tan", open_count: 1, overdue: 0 }, { reviewer: 6, name: "Rey Cruz", open_count: 0, overdue: 0 }],
     });
@@ -406,6 +409,7 @@ export const DIALOGS: DialogCase[] = [
   },
   consoleAction("assign a reviewer", "Assign", "pool", "features/review/AssignReviewerDialog.tsx"),
   consoleAction("reassign a reviewer", "Reassign", "seat", "features/review/ReassignDialog.tsx"),
+  consoleAction("withdraw a reviewer", "Withdraw", "seat", "features/review/WithdrawSeatDialog.tsx"),
   consoleAction("extend a due date", "Extend due date", "seat", "features/review/ExtendDueDateDialog.tsx"),
   reviewAction("accept and publish a paper", "accept_publish", "Accept & publish…", "features/records/paper-view/DecisionDialog.tsx"),
   reviewAction("reject a paper", "reject", "Reject…", "features/records/paper-view/DecisionDialog.tsx"),

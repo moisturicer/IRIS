@@ -22,6 +22,7 @@ import { Modal } from "@/components/ui/Modal";
 import { LABEL, fieldClasses } from "@/components/ui/fieldClasses";
 import { capabilitiesFor } from "@/features/records/capabilities";
 import { AdviserCombobox } from "@/features/records/metadata/AdviserCombobox";
+import { RemovalWarning } from "@/features/review/RemovalWarning";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import type { AdviserOption } from "@/types/auth";
 import type { RecordDetail } from "@/types/records";
@@ -34,7 +35,7 @@ const STAY_OPEN = () => {};
 
 type Act = "adviser" | "owner" | "withdraw";
 
-type Paper = Pick<RecordDetail, "id" | "capabilities" | "adviser" | "adviser_name" | "owners">;
+type Paper = Pick<RecordDetail, "id" | "capabilities" | "adviser" | "adviser_name" | "owners" | "adviser_leaving">;
 
 interface RdcoPaperControlsProps {
   record: Paper;
@@ -294,6 +295,7 @@ function ReplaceAdviserDialog({ record, onCancel, onDone, onRefused }: ReplaceAd
         {current}&apos;s Adviser review ends and their open seat is withdrawn. The new Adviser takes over the
         same review, with everything filed so far, and starts it fresh.
       </p>
+      {record.adviser_leaving && <RemovalWarning leaving={record.adviser_leaving} role="adviser" />}
       <WhoIsTold>
         <li>{current}, that they were replaced and their review is closed.</li>
         <li>The new Adviser, that the review is waiting for them.</li>

@@ -126,6 +126,28 @@ describe("replacing the Adviser", () => {
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
+  it("warns, from the server's counts, what the Adviser leaves (IR-1226)", async () => {
+    renderCard({
+      ...paper(),
+      adviser_leaving: {
+        name: "Ramon Cruz",
+        unresolved: { drafts: 1, open_threads: 2, document_requests: 1, revision_requests: 0 },
+      },
+    } as unknown as RecordDetail);
+    await userEvent.click(screen.getByRole("button", { name: "Replace Adviser" }));
+    const dialog = screen.getByRole("dialog", { name: "Replace this paper's Adviser?" });
+
+    const warning = within(dialog).getByRole("region", { name: "What Ramon Cruz leaves" });
+    expect(within(warning).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "1 unsent draft will be discarded.",
+      "2 open threads they posted stay open, for the authors and whoever holds the seat.",
+      "1 document request they made stays open.",
+      "They will no longer read this review.",
+    ]);
+    // It warns; it never blocks.
+    expect(within(dialog).getByRole("button", { name: "Replace Adviser" })).toBeEnabled();
+  });
+
   it("asks for a choice before sending anything", async () => {
     renderCard();
     await userEvent.click(screen.getByRole("button", { name: "Replace Adviser" }));

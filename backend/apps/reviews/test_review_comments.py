@@ -120,7 +120,9 @@ class WhoReadsTests(ReviewCommentTestBase):
         self.opened_seat(record, Party.ITSO, self.itso)
         self.cleared(record, self.itso)
 
-        self.commented(record, self.itso, "Cleared; see my note on §4.")
+        # Changed deliberately by IR-1226 (2026-11-19): a finished reviewer
+        # still writes in Conversation, but starts no new thread.
+        self.discussed(record, self.itso, "Cleared; see my note on §4.")
 
         self.assertEqual(self.listed(record, self.itso).status_code, status.HTTP_200_OK)
 

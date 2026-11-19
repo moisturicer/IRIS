@@ -282,12 +282,17 @@ class DraftsTests(ThreadTestBase):
         question = self.owner_thread(record, "Is the IP form enough?")
 
         reply = self.thread(record, self.rdco, "Yes.", reply_to=question["id"])
-        former = self.thread(record, self.itso, "One more note.")
+        former = self.thread(record, self.itso, "It is.", reply_to=question["id"])
 
         self.assertFalse(reply["is_draft"])
-        self.assertEqual((former["is_draft"], former["party"]), (False, Party.ITSO))
+        self.assertFalse(former["is_draft"])
+        self.assertEqual(ReviewComment.objects.get(pk=former["id"]).party, Party.ITSO)
         self.assertIn(reply["id"], self.ids(record, self.owner))
         self.assertIn(former["id"], self.ids(record, self.owner))
+        # Changed deliberately by IR-1226 (2026-11-19): a former reviewer still
+        # replies, but starts no new thread once their part is done.
+        refused = self.comment(record, self.itso, "One more note.")
+        self.assertEqual(refused.status_code, status.HTTP_403_FORBIDDEN, refused.data)
 
 
 # --- AC: every verdict goes through its existing service ----------------------------------
@@ -411,26 +416,42 @@ class WhatMustFixBlocksTests(ThreadTestBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Must fix", response.data["detail"])
 
-    def test_an_office_s_open_must_fix_blocks_its_clear_and_nothing_else(self):
+    def test_an_office_s_open_must_fix_blocks_its_clear_and_its_finding(self):
+        """
+        Changed deliberately by IR-1226 (2026-11-19): a finding ends the seat
+        as Clear does, so it waits on the office's own open Must fix too. It
+        was never held before (IR-874).
+        """
         record = self.itso_open()
         self.must_fix_sent(record, self.itso)
 
         clear = self.review(record, self.itso)
         self.assertEqual(clear.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("ITSO has 1 open Must fix thread", clear.data["detail"])
+        finding = self.review(record, self.itso, "finding", "Prior art found.")
+        self.assertEqual(finding.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("before recording a finding", finding.data["detail"])
         flags = self.detail(record, self.itso)["office_review"]
         self.assertEqual(flags["clear_blocked"], clear.data["detail"])
+        self.assertEqual(flags["finding_blocked"], finding.data["detail"])
         self.assertIsNone(flags["blocked"])
-        # A finding doesn't approve.
-        self.assertEqual(self.found(record, self.itso).status_code, status.HTTP_200_OK)
 
-    def test_a_finding_is_never_held_by_a_thread(self):
+    def test_a_finding_waits_until_the_must_fix_is_a_suggestion(self):
         record = self.itso_open()
-        self.must_fix_sent(record, self.itso)
+        made = self.must_fix_sent(record, self.itso)
+        self.assertEqual(self.act(record, self.itso, made["id"], "severity", {"severity": SUGGEST}).status_code, 200)
 
-        self.found(record, self.itso)
-
+        self.assertEqual(self.found(record, self.itso).status_code, status.HTTP_200_OK)
         self.assertEqual(self.clearance(record, Party.ITSO), ClearanceStatus.NOT_CLEARED)
+
+    def test_a_finding_that_would_send_a_must_fix_is_refused(self):
+        record = self.itso_open()
+        self.thread(record, self.itso, "Redo the search.", severity=FIX)
+
+        response = self.finish(record, self.itso, "finding", summary="Prior art found.")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("record a finding while sending a Must fix", response.data["detail"])
 
     def test_a_revision_request_is_never_held_by_a_thread(self):
         record = self.itso_open()

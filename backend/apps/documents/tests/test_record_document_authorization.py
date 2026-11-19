@@ -231,6 +231,13 @@ class RecordDocumentAuthorizationTests(APITestCase):
                 )
 
 
+def seat_on(assignment, reviewer):
+    """Seat `reviewer` on `assignment`: acting on a review takes a seat (IR-1226)."""
+    from apps.reviews.models import ReviewerSeat
+
+    return ReviewerSeat.objects.create(assignment=assignment, reviewer=reviewer)
+
+
 class RecordFileUploadAuthorizationTests(APITestCase):
     """
     IR-474: `POST /documents/files/upload/` -- an office filing a supplementary
@@ -241,7 +248,8 @@ class RecordFileUploadAuthorizationTests(APITestCase):
     that: `owns_or_staffs_record` admits every office, so any KTTO, RDCO, ITSO or
     IERC account would still pass. ADR-032 grants `attach_file` on a record the
     office *takes part in*, so the gate is participation -- an active assignment
-    the user can staff, the same test that offers the action in Paper View.
+    the user can staff and, since IR-1226, holds a seat on, the same test that
+    offers the action in Paper View.
 
     The refusals follow ADR-022 §Amendment 4. Office staff can see every
     record, so an office that does not take part is refused with a **403**, not
@@ -285,8 +293,9 @@ class RecordFileUploadAuthorizationTests(APITestCase):
             pipeline_status="in_review",
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
-        # ITSO holds the record; KTTO has no part in it.
-        RecordAssignment.objects.create(record=self.record, party=Party.ITSO)
+        # ITSO holds the record; KTTO has no part in it. Filing takes a seat
+        # on the assignment, not membership of the office (IR-1226).
+        seat_on(RecordAssignment.objects.create(record=self.record, party=Party.ITSO), self.itso)
 
     def _attach(self, record_id=None):
         return self.client.post(
@@ -395,9 +404,10 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
         self.record_type = RecordType.objects.first()
         self.assertIsNotNone(self.record_type, "no seeded RecordType -- migrations incomplete")
         self.record = self._record("in_review")
-        # ITSO and IERC both hold the record; KTTO has no part in it.
-        RecordAssignment.objects.create(record=self.record, party=Party.ITSO)
-        RecordAssignment.objects.create(record=self.record, party=Party.IERC)
+        # ITSO and IERC both hold the record; KTTO has no part in it. Each
+        # files and removes from a seat on its assignment (IR-1226).
+        seat_on(RecordAssignment.objects.create(record=self.record, party=Party.ITSO), self.itso)
+        seat_on(RecordAssignment.objects.create(record=self.record, party=Party.IERC), self.ierc)
 
         self.itso_file = self._file(self.record, "itso", self.itso)
         self.ierc_file = self._file(self.record, "ierc", self.ierc)
@@ -485,7 +495,7 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
         from core.enums import Party
 
         record = self._record("in_review")
-        RecordAssignment.objects.create(record=record, party=Party.RDCO)
+        seat_on(RecordAssignment.objects.create(record=record, party=Party.RDCO), self.rdco)  # IR-1226
         record_file = self._file(record, "rdco", self.rdco)
         self.client.force_authenticate(self.rdco)
         self.assertRemoved(record_file, self._remove(record_file))
@@ -533,7 +543,7 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
         from core.enums import Party
 
         record = self._record("in_review")
-        RecordAssignment.objects.create(record=record, party=Party.RDCO)
+        seat_on(RecordAssignment.objects.create(record=record, party=Party.RDCO), self.rdco)  # IR-1226
         self.client.force_authenticate(self.rdco)
         response = self._attach(record)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
