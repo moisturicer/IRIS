@@ -1,7 +1,10 @@
 /**
- * RDCO's Setup page, Requirements & Templates (ADR-063 decisions 1-12, IR-971).
+ * RDCO's Setup page (ADR-063 decision 9): two sections, switched at the top
+ * and kept in the address, Requirements & Templates (IR-971) and the Notice
+ * (`?section=notice`, IR-972, in `NoticeSection.tsx`). Only the open section
+ * is read.
  *
- * One tab per record type: its description, then its requirements in order.
+ * Requirements & Templates (decisions 1-12): one tab per record type: its description, then its requirements in order.
  * The Manuscript is a fixed first row: its description and Template can be
  * edited, but it can't be removed or made Optional. RDCO adds, edits, reorders
  * and removes the rest. A requirement's label is Required or Optional and never
@@ -9,10 +12,10 @@
  * files; an unused one is deleted. A Template is a PDF, Word, spreadsheet or
  * image file up to 50 MB, and always downloads.
  *
- * Every change is saved at once and audited by the server. The Notice joins
- * this page later (ADR-063 decision 9); `/notices` still holds it.
+ * Every change is saved at once and audited by the server.
  */
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   setupApi, TEMPLATE_ACCEPT, type RequirementFields, type SetupRecordType, type SetupRequirement,
 } from "@/api/setup";
@@ -27,6 +30,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { useApiRead } from "@/hooks/useApiRead";
 import { errorDetail } from "@/lib/errorDetail";
 import { downloadBlob } from "@/lib/utils";
+import NoticeSection from "./NoticeSection";
 
 const MAX_TEMPLATE_BYTES = 50 * 1024 * 1024;
 const MAX_DESCRIPTION = 2000;
@@ -41,7 +45,73 @@ function isRecordTypeList(data: unknown): data is SetupRecordType[] {
 /** What the page says after a change: an outcome, or why it didn't happen. */
 type Outcome = { kind: "done" | "failed"; text: string } | null;
 
+const SECTIONS = [
+  { value: "requirements", label: "Requirements & Templates" },
+  { value: "notice", label: "Notice" },
+] as const;
+type Section = (typeof SECTIONS)[number]["value"];
+
 export default function SetupPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const section: Section = searchParams.get("section") === "notice" ? "notice" : "requirements";
+  const sectionsId = useId();
+  const tabRefs = useRef<Record<Section, HTMLButtonElement | null>>({ requirements: null, notice: null });
+
+  const open = (next: Section) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "requirements") params.delete("section");
+    else params.set("section", next);
+    setSearchParams(params, { replace: true });
+  };
+
+  /* The ARIA tabs pattern: arrows move between the sections. */
+  const onKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const i = SECTIONS.findIndex((s) => s.value === section);
+    const next = SECTIONS[(i + step + SECTIONS.length) % SECTIONS.length].value;
+    open(next);
+    tabRefs.current[next]?.focus();
+  };
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Setup"
+        description="What each record type asks for, the forms people download, how each type is described, and the data notice. Changes show at once wherever they appear."
+      />
+      <div role="tablist" aria-label="Setup sections" className="flex flex-wrap gap-1 border-b border-stone-200">
+        {SECTIONS.map(({ value, label }) => (
+          <button
+            key={value}
+            ref={(el) => { tabRefs.current[value] = el; }}
+            type="button"
+            role="tab"
+            id={`${sectionsId}-${value}`}
+            aria-selected={value === section}
+            aria-controls={`${sectionsId}-panel`}
+            tabIndex={value === section ? 0 : -1}
+            onClick={() => open(value)}
+            onKeyDown={onKey}
+            className={`-mb-px border-b-2 px-4 py-2 text-small font-medium transition-colors ${
+              value === section
+                ? "border-brand text-brand"
+                : "border-transparent text-stone-600 hover:text-stone-900"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`${sectionsId}-panel`} aria-labelledby={`${sectionsId}-${section}`}>
+        {section === "notice" ? <NoticeSection /> : <RequirementsSection />}
+      </div>
+    </div>
+  );
+}
+
+function RequirementsSection() {
   const read = useApiRead((signal) => setupApi.recordTypes({ signal }).then((r) => r.data), []);
   const [types, setTypes] = useState<SetupRecordType[] | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
@@ -82,11 +152,6 @@ export default function SetupPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Setup"
-        description="What each record type asks for, the forms people download, and how each type is described. Changes show at once wherever requirements show."
-      />
-
       {read.status === "interrupted" && !types ? (
         <InterruptedState what="setup" onRetry={read.retry} framed />
       ) : !types ? (

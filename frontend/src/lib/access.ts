@@ -199,21 +199,18 @@ export const SCREEN_ACCESS = {
   deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
                  nav: { label: "Delete requests", icon: "fa-trash-alt", section: "RDCO" } },
   // One page for RDCO and the System Admin (IR-693, decision 2026-11-15), each
-  // reaching it from their own section, as with Notices below.
+  // reaching it from their own section.
   reportedComments: { path: "/moderation/comments", roles: COORDINATOR,
                  nav: { label: "Reported comments", icon: "fa-flag", section: "RDCO" } },
-  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): one
-  // Notices page at one address. RDCO publishes there; the System Admin reads
-  // it from `adminNotices`, the same page, in its own sidebar section.
-  notices:       { path: "/notices", roles: COORDINATOR,
-                 nav: { label: "Notices", icon: "fa-file-signature", section: "RDCO" } },
   // Workflow analytics (IR-626): every office's figures, read by RDCO alone
   // in its own section since IR-1216 (ADR-043 amendment 2026-11-18). It was
   // under My Reviews for every office; `/review/analytics` redirects here.
   reviewAnalytics: { path: "/rdco/analytics", roles: COORDINATOR,
                  nav: { label: "Workflow analytics", icon: "fa-chart-column", section: "RDCO" } },
-  // ADR-063 decision 9 (IR-971): RDCO's Setup, each record type's
-  // Requirements & Templates. Every RDCO account; the server refuses anyone else.
+  // ADR-063 decision 9 (IR-971, IR-972): RDCO's Setup, each record type's
+  // Requirements & Templates, and the Notice (`?section=notice`), which was the
+  // Notices page (IR-800). Every RDCO account; the server refuses anyone else.
+  // An old `/notices` link redirects (router/redirects.tsx).
   setup:         { path: "/rdco/setup", roles: COORDINATOR,
                  nav: { label: "Setup", icon: "fa-sliders", section: "RDCO" } },
 
@@ -231,9 +228,6 @@ export const SCREEN_ACCESS = {
   // ADR-051 §3 and §19: the System Admin sets retention periods (IR-795).
   retention:     { path: "/admin/retention", roles: SYSTEM_ADMIN,
                  nav: { label: "Retention", icon: "fa-clock-rotate-left", section: "Administration" } },
-  // The Notices page above, read-only for the System Admin (IR-800).
-  adminNotices:  { path: "/notices", roles: SYSTEM_ADMIN,
-                 nav: { label: "Notices", icon: "fa-file-signature", section: "Administration" } },
 } as const satisfies Record<string, ScreenDef>;
 
 export type ScreenKey = keyof typeof SCREEN_ACCESS;
