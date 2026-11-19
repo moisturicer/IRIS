@@ -20,7 +20,7 @@ import { EarlierConversation } from "./components/EarlierConversations";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
 import {
-  ConversationHistoryList, ConversationSidebar, NewChatButton, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
+  ConversationHistoryList, ConversationSidebar, NewConversationButton, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
   type RenameConversation,
 } from "./components/ConversationSidebar";
 import { ASK_PHONE_MAX_PX } from "./components/answerLayout";
@@ -82,6 +82,7 @@ function RuntimeAskPage() {
   const [deleteTarget, setDeleteTarget] = useState<ReaderConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
   const [observePage, pageWidth] = useElementWidth<HTMLDivElement>();
 
   // The conversations pane (IR-1233). Beside the chat it pushes it over, open or
@@ -122,15 +123,16 @@ function RuntimeAskPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [paneShown, openSearch]);
 
-  // A conversation names the tab with its own title (IR-1073); a new chat keeps "Ask IRIS".
+  // A conversation names the tab with its own title (IR-1073); an empty page keeps "Ask IRIS".
   usePageTitle(titleOf(conversationId));
 
   if (rawRecord !== null && (!recordId || !Number.isSafeInteger(recordId))) {
     return <p role="alert" className="p-6">This paper could not be opened.</p>;
   }
 
-  const title = titleOf(conversationId) || "New chat";
-  const newChat = () => navigate("/ai");
+  const title = titleOf(conversationId) || (conversationId ? "New conversation" : "Ask IRIS");
+  // Clears the page and puts the cursor in the question box, also when already on an empty page.
+  const newConversation = () => { navigate("/ai"); setFocusRequest(n => n + 1); };
 
   const rename: RenameConversation = async (id, next) => {
     try {
@@ -150,7 +152,7 @@ function RuntimeAskPage() {
       setConversations(all => all.filter(c => c.id !== deleteTarget.id));
       if (deleteTarget.id === conversationId) navigate("/ai", { replace: true });
       setDeleteTarget(null);
-      addToast({ type: "info", message: "Chat removed." });
+      addToast({ type: "info", message: "Conversation deleted." });
     } catch {
       setDeleteError("Could not delete this conversation. Please try again.");
     } finally { setDeleting(false); }
@@ -160,17 +162,19 @@ function RuntimeAskPage() {
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
     <div className="relative flex min-h-0 min-w-0 flex-1" {...(dialogOpen ? { inert: "" } : {})}>
       {!phone && <ConversationSidebar id={paneId} conversations={conversations} activeId={conversationId ?? null}
-        open={paneOpen} search={search} searchRef={searchRef} onNewChat={newChat} onSearch={openSearch}
+        open={paneOpen} search={search} searchRef={searchRef} onNewConversation={newConversation} onSearch={openSearch}
         onToggle={() => setPane(!paneOpen)}
         onRename={rename} width={sidebarWidth} onResize={resizeSidebar}
         onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
-        <ChatToolbar sessionTitle={title}
+        <ChatToolbar sessionTitle={title} eyebrow={conversationId !== undefined}
           phoneHistory={phone ? { open: dialogOpen, onOpen: openDialog } : undefined}
+          onNewConversation={phone && conversationId && !dialogOpen ? newConversation : undefined}
           onDownload={conversationId ? () => api.download(conversationId) : undefined} />
         <div className="flex min-h-0 flex-1 flex-col">
           <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
             initialDraft={conversationId ? undefined : draft ?? undefined}
+            focusRequest={focusRequest}
             onAnswered={() => void refreshList()}
             onTitle={retitle}
             onConversation={id => {
@@ -181,10 +185,10 @@ function RuntimeAskPage() {
       </div>
     </div>
 
-    {phone && dialogOpen && <ChatDrawer title="Chat history" side="start" closeLabel="Close chat history"
+    {phone && dialogOpen && <ChatDrawer title="Conversations" side="start" closeLabel="Close conversations"
       onClose={() => setDialogOpen(false)} returnTo={dialogOpener.current}>
       <div className="flex shrink-0 px-3 pt-3">
-        <NewChatButton onClick={() => { setDialogOpen(false); newChat(); }} />
+        <NewConversationButton onClick={() => { setDialogOpen(false); newConversation(); }} />
       </div>
       <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={search}
         searchRef={searchRef}

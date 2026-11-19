@@ -43,7 +43,7 @@ interface ConversationSidebarProps {
   searchRef?:       RefObject<HTMLInputElement>;
   onDelete:         (id: string) => void;
   onRename:         RenameConversation;
-  onNewChat:        () => void;
+  onNewConversation: () => void;
   /** The strip's Search: the page opens the pane and focuses the search box. */
   onSearch:         () => void;
   /** Opens a closed pane and closes an open one. */
@@ -85,12 +85,12 @@ export function ConversationsToggle({ open, onClick, controls, asDialog = false 
 
 /**
  * The pane pushes the chat over, never covers it. Open it is the toggle and
- * New chat over Search, Pinned and Recents; closed it narrows to a strip of the
- * toggle, a New chat icon and a Search icon. The list keeps its own width while
+ * New conversation over Search, Pinned and Recents; closed it narrows to a strip of the
+ * toggle, a New conversation icon and a Search icon. The list keeps its own width while
  * the column animates, so it slides rather than reflows.
  */
 export function ConversationSidebar({
-  conversations, activeId, open, search, id, searchRef, onDelete, onRename, onNewChat, onSearch, onToggle, width, onResize,
+  conversations, activeId, open, search, id, searchRef, onDelete, onRename, onNewConversation, onSearch, onToggle, width, onResize,
 }: ConversationSidebarProps) {
   // A drag must follow the pointer, so the width eases only while the pane opens or closes.
   // Decided while rendering, so the render that changes the width already carries the transition.
@@ -111,17 +111,14 @@ export function ConversationSidebar({
         "relative shrink-0 flex flex-col bg-stone-50 border-r border-stone-200",
         easing && "transition-[width] duration-200 ease-out motion-reduce:transition-none",
       )}
-      aria-label="Chat history"
+      aria-label="Conversations"
     >
       <div className="h-full min-h-0 w-full overflow-hidden">
         {/* Fixed width, so the list does not reflow while the column animates. */}
         <div className="relative flex h-full min-h-0 flex-col" style={{ width: Math.max(width, STRIP_WIDTH) }}>
           <div className="flex h-14 shrink-0 items-center gap-1 border-b border-stone-200/80 px-2.5">
             <ConversationsToggle open={open} onClick={onToggle} controls={id} />
-            {open && <button type="button" onClick={onNewChat} className={cn(NAV_ITEM, "flex-1")}>
-              <i className="fas fa-plus w-4 text-center text-label" aria-hidden />
-              <span className="font-medium">New chat</span>
-            </button>}
+            {open && <NewConversationButton onClick={onNewConversation} />}
           </div>
 
           {/* Hidden, not unmounted, so a search and the scroll position survive a close. */}
@@ -132,8 +129,8 @@ export function ConversationSidebar({
           </div>
 
           {!open && <div className="absolute left-0 top-14 flex flex-col items-center gap-1 pt-3" style={{ width: STRIP_WIDTH }}>
-            <Tooltip label="New chat">
-              <button type="button" onClick={onNewChat} aria-label="New chat" className={ICON_BUTTON}>
+            <Tooltip label="New conversation">
+              <button type="button" onClick={onNewConversation} aria-label="New conversation" className={ICON_BUTTON}>
                 <i className="fas fa-plus text-label" aria-hidden />
               </button>
             </Tooltip>
@@ -154,7 +151,7 @@ export function ConversationSidebar({
 function SidebarResizer({ width, onChange }: { width: number; onChange: (width: number) => void }) {
   const clamp = (n: number) => Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.round(n)));
   return <div
-    role="separator" aria-orientation="vertical" aria-label="Resize chat history"
+    role="separator" aria-orientation="vertical" aria-label="Resize conversations"
     aria-valuemin={SIDEBAR_MIN} aria-valuemax={SIDEBAR_MAX} aria-valuenow={width} tabIndex={0}
     onPointerDown={e => e.currentTarget.setPointerCapture?.(e.pointerId)}
     onPointerMove={e => {
@@ -258,7 +255,7 @@ export function ConversationHistoryList({
       )}
       {conversations.length === 0 && search.state === "ready" && (
         <p className="px-3 py-6 text-small text-stone-500 text-center">
-          {search.query ? `No conversations match “${search.query}”.` : "Your past chats will appear here."}
+          {search.query ? `No conversations match “${search.query}”.` : "Your past conversations will appear here."}
         </p>
       )}
       {recents.length > 0 && <nav aria-label="Past conversations">
@@ -354,12 +351,12 @@ function RowAction({ label, hint, onClick, children, buttonRef }: {
 }
 
 /** Starts a new conversation; heads the history list wherever it is shown. */
-export function NewChatButton({ onClick }: { onClick: () => void }) {
+export function NewConversationButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
       className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-card bg-brand px-3 text-control font-semibold text-white transition-colors hover:bg-brand-dark">
       <i className="fas fa-plus text-label" aria-hidden />
-      New chat
+      New conversation
     </button>
   );
 }

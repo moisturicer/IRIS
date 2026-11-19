@@ -56,9 +56,8 @@ export function EarlierConversation({ id }: { id: number }) {
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 px-6 py-4">
       <div className="min-w-0">
         <h1 className="font-display text-2xl text-stone-900 break-words">{conversation?.title || "Earlier conversation"}</h1>
-        <p className="text-sm text-stone-600">An earlier conversation. You can read it here; to continue, ask in a new conversation.</p>
+        <p className="text-sm text-stone-600">An earlier conversation, kept to read. To keep going, start a new conversation.</p>
       </div>
-      <Link to="/ai" className="inline-flex min-h-11 items-center text-sm text-brand underline">New conversation</Link>
     </header>
     {failure === "unavailable" && <p role="alert" className="p-6">This conversation is not available. It may have been deleted, or the link may be wrong.</p>}
     {failure === "failed" && <div role="alert" className="space-y-3 p-6">
