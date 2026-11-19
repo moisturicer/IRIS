@@ -18,6 +18,7 @@ import { AssignReviewerDialog } from "./AssignReviewerDialog";
 import { ExtendDueDateDialog } from "./ExtendDueDateDialog";
 import { ReassignDialog } from "./ReassignDialog";
 import { WithdrawSeatDialog } from "./WithdrawSeatDialog";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 type Load = "loading" | "ready" | "interrupted" | "failed" | "refused";
 
@@ -67,6 +68,8 @@ export default function OfficeConsolePage() {
   useEffect(() => {
     void load();
   }, [load]);
+  // Live updates (ADR-073): the office's pool and seats, reloaded quietly.
+  useLiveRefresh(["reviews"], () => { void load(); });
 
   const retry = () => {
     setState("loading");

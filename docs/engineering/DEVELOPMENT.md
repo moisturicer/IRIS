@@ -218,6 +218,8 @@ npm run preview    # serve the built output
 npm run lint       # eslint src --ext ts,tsx
 ```
 
+**Which port for Ask IRIS (IR-1240).** `http://localhost:8080` is the dev nginx edge (production routing in front of Vite) and `http://localhost:5173` is Vite itself; Ask IRIS works on both. Vite's proxy (`frontend/vite.config.ts`) sends `/api/v1/ai/runtime` to the edge, which still does the Django grant check and adds the gateway secret, and everything else under `/api` to Django (`VITE_PROXY_TARGET`, default `http://localhost:8000`). The edge target is `VITE_RUNTIME_PROXY_TARGET`, default `http://localhost:8080` for Vite run on the host; Compose sets `http://edge:8080` for the `frontend` container, so recreate it (`docker compose up -d frontend`) after pulling. With the edge stopped, Ask IRIS on :5173 answers 502 while the rest of the app is unaffected.
+
 **There is no `npm test`.** No test runner is installed. Do not add one casually — a frontend test harness is currently P3 and deliberately deferred.
 
 `npm run build` runs `tsc` first, so **a type error fails the build**. That is the intended behaviour; do not weaken it to get a build through.

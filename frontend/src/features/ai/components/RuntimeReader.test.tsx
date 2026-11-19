@@ -22,9 +22,10 @@ test("reader sees persisted work, stops by keyboard and can ask more deeply", as
     String(path).endsWith("cancel") ? stopped : queued }));
   const user = userEvent.setup();
   render(<MemoryRouter><RuntimeReader conversationId="conversation-1" /></MemoryRouter>);
-  // The plan stays internal; the reader sees what the run is doing now.
-  expect(await screen.findByText("Thinking")).toBeInTheDocument();
-  expect(screen.queryByText("Compare methods")).not.toBeInTheDocument();
+  // The reader sees what the run reports (IR-1236): its plan, under a heading, and no step the run did not report.
+  expect(await screen.findByRole("heading", { name: "Researching…" })).toBeInTheDocument();
+  expect(screen.getByText("Compare methods")).toBeInTheDocument();
+  expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /compact/i })).not.toBeInTheDocument();
   expect(screen.getByText(/can make mistakes/)).toBeInTheDocument();
   screen.getByRole("button", { name: "Stop research" }).focus();
@@ -32,6 +33,9 @@ test("reader sees persisted work, stops by keyboard and can ask more deeply", as
   expect(await screen.findByText("Stopped before an answer was ready.")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Research depth: Standard" }));
   await user.click(screen.getByRole("menuitemradio", { name: /Thorough/ }));
+  // The stopped question is back in the box (IR-1236); the reader edits it before sending again.
+  expect(screen.getByRole("textbox")).toHaveValue("Compare");
+  await user.clear(screen.getByRole("textbox"));
   await user.type(screen.getByRole("textbox"), "Compare further");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(post).toHaveBeenCalledWith("/ai/runtime/runs", expect.objectContaining({

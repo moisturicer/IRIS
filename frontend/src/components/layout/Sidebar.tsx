@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { dashboardApi, type QueueCounts } from "@/api/dashboard";
 import { onQueueCountsChanged } from "@/lib/queueCounts";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
@@ -239,6 +240,11 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // rather than a stale one.
   const showsQueues = canAccess(roleName as never, "roleRequests")
     || canAccess(roleName as never, "adminReportedComments");
+  // Live updates (ADR-073): a hint re-runs the reads below, as the address does.
+  const [queuesTick, setQueuesTick] = useState(0);
+  const [statsTick, setStatsTick] = useState(0);
+  useLiveRefresh(["queues"], () => setQueuesTick((t) => t + 1), showsQueues);
+  useLiveRefresh(["reviews", "library"], () => setStatsTick((t) => t + 1));
   useEffect(() => {
     if (!showsQueues) { setQueueCounts(NO_QUEUES); return; }
     let live = true;
@@ -251,7 +257,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     read();
     const off = onQueueCountsChanged(read);
     return () => { live = false; off(); };
-  }, [showsQueues, pathname, search]);
+  }, [showsQueues, pathname, search, queuesTick]);
 
   // My Library's dot: some record of the user's waits on them -- a revision or
   // a document was asked for (B2, `needs_action_mine`). The same read carries
@@ -274,7 +280,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       })
       .catch(() => { if (live) { setNeedsAction(false); setReviewsWaiting(undefined); } });
     return () => { live = false; };
-  }, [pathname, search, showsLibrary]);
+  }, [pathname, search, showsLibrary, statsTick]);
 
   // Badges are the only per-item state the map does not carry: the map answers
   // "may this role open it", never "how many are waiting". RDCO's three request

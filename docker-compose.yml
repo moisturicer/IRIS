@@ -143,6 +143,8 @@ services:
       - VITE_USE_POLLING=1
       # Inside the container localhost is the container itself; reach the backend by service name.
       - VITE_PROXY_TARGET=http://backend:8000
+      # Ask IRIS (/api/v1/ai/runtime) goes to the dev edge, which does the grant check (IR-1240).
+      - VITE_RUNTIME_PROXY_TARGET=http://edge:8080
 
   # Development edge, the production nginx routing in front of Vite (IR-957).
   # Browse http://localhost:8080. It adds the gateway secret and the reader

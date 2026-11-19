@@ -249,7 +249,7 @@ npm install
 npm run dev
 ```
 
-With `docker compose up`, browse **http://localhost:8080**: a dev nginx edge (the production routing in front of Vite) that makes Ask IRIS work. Vite alone at http://localhost:5173 cannot reach the AI runtime.
+With `docker compose up`, browse **http://localhost:8080**: a dev nginx edge (the production routing in front of Vite) that makes Ask IRIS work. http://localhost:5173 works for Ask IRIS too (IR-1240): Vite hands `/api/v1/ai/runtime` to that edge and everything else under `/api` to Django. The target is `VITE_RUNTIME_PROXY_TARGET` (default `http://localhost:8080`; Compose sets `http://edge:8080` for the frontend container), so the edge must be running.
 
 Frontend runs at **http://localhost:5173**
 

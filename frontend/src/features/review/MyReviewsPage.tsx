@@ -37,6 +37,7 @@ import {
   type MyReviewsView,
 } from "./myReviews";
 import { SELECTED } from "@/components/ui/highlightRoles";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 /**
  * My Reviews (IR-268; ADR-032 §9 and its 2026-10-08 Amendment, ui-ux/16 §5).
@@ -100,6 +101,8 @@ export default function MyReviewsPage() {
       return false;
     }
   }, [tab, outcome, office, sort, overdue]);
+  // Live updates (ADR-073): a reviews hint, reconnect or focus reloads the tab quietly.
+  useLiveRefresh(["reviews"], () => { void load(); });
 
   useEffect(() => {
     let cancelled = false;

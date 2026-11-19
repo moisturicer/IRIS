@@ -127,3 +127,39 @@ describe("useApiRead", () => {
     expect(result.current.status).toBe("loading");
   });
 });
+
+// ADR-073: a live-update hint refreshes quietly.
+describe("useApiRead's refresh", () => {
+  it("keeps showing the current data while it reads, then shows the new answer", async () => {
+    let answer = "first";
+    const { result } = renderHook(() => useApiRead(async () => answer, []));
+    await waitFor(() => expect(result.current.data).toBe("first"));
+
+    answer = "second";
+    act(() => result.current.refresh());
+    expect(result.current.status).toBe("ready");
+    expect(result.current.data).toBe("first");
+    await waitFor(() => expect(result.current.data).toBe("second"));
+  });
+
+  it("leaves the shown data in place when the refresh fails", async () => {
+    let fail = false;
+    const { result } = renderHook(() =>
+      useApiRead(async () => { if (fail) throw new Error("offline"); return "kept"; }, []),
+    );
+    await waitFor(() => expect(result.current.data).toBe("kept"));
+
+    fail = true;
+    act(() => result.current.refresh());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(result.current.status).toBe("ready");
+    expect(result.current.data).toBe("kept");
+  });
+
+  it("retry still shows loading, as before", async () => {
+    const { result } = renderHook(() => useApiRead(async () => "x", []));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    act(() => result.current.retry());
+    expect(result.current.status).toBe("loading");
+  });
+});
