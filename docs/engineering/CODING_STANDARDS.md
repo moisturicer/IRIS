@@ -20,11 +20,11 @@ If the response is not the shape the screen depends on (a list that is an object
 
 ### F2. Text fills its box, reflows, and is never cut off
 
-Follow DESIGN.md's **Full Text Rule**: text runs to the end of its box before breaking, re-wraps only when the space changes, and is never cut off or hidden. Only the two cuts that rule names are allowed (a long file name in a table cell, and an abstract preview in a list card), each with what it must still provide.
+Follow DESIGN.md's **Full Text Rule**: text runs to the end of its box before breaking, re-wraps only when the space changes, and is never cut off or hidden. Only the five cuts that rule names are allowed (a long file name in a table cell, an abstract preview in a list card, a long review comment's opening with See more, a call's description on the Calls board with Show more, and Discover's rotating example search), each with what it must still provide. `src/test/fullTextRule.test.ts` enforces the ellipsis classes (IR-1219); width caps, fixed heights and `whitespace-nowrap` stay a review check.
 
 *Why:* IR-1218, from Hermoine Zozobrado on 2026-11-17: text should flex to the end of the screen or box and keep moving when the window is resized, never be cut short.
 
-*A reviewer looks for:* `truncate`, `text-ellipsis`, `line-clamp-*`, `whitespace-nowrap`, a fixed height or `overflow-hidden` around text, and a `max-w-*` or fixed `w-*` on a text element narrower than its container. Each one is either one of the two named cuts, with its full-text access, or a change to make.
+*A reviewer looks for:* `truncate`, `text-ellipsis`, `line-clamp-*`, `whitespace-nowrap`, a fixed height or `overflow-hidden` around text, and a `max-w-*` or fixed `w-*` on a text element narrower than its container. Each one is either one of the five named cuts, with its full-text access, or a change to make.
 
 ## Backend
 
