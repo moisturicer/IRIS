@@ -89,7 +89,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     - Processing stops when the first cell of a row equals "END OF RECORDS".
       The template no longer ships one; staff may add it.
     - Completely blank rows are silently skipped.
-    - Authors should be comma-separated (e.g. "Juan Dela Cruz, Maria Santos").
+    - Authors are separated by commas or semicolons (e.g. "Juan Dela Cruz; Maria Santos").
     - Boolean columns accept: TRUE / FALSE / YES / NO / 1 / 0 (case-insensitive).
 
     This only reads the sheet. Whether a row's values can be accepted --

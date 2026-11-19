@@ -353,6 +353,32 @@ class ImportRefusesValuesItCannotAcceptTests(ImportTestCase):
         self.assertEqual((response.data["created"], response.data["skipped"]), (0, 0), response.data["log"])
         self.assertFalse(Record.objects.exists())
 
+    def test_the_example_row_copied_onto_the_records_sheet_imports(self):
+        """
+        The example names only what this database has, so copying it is a
+        working start rather than a skipped row (IR-639). It hard-coded
+        "Applied Sciences", which `seed_demo` never creates.
+        """
+        Classification.objects.all().delete()
+        PSCEDClassification.objects.all().delete()
+        Classification.objects.create(name="Maritime Studies")
+        PSCEDClassification.objects.create(name="Fisheries Science")
+        response = self.client.get(reverse("record-download-template"))
+        book = openpyxl.load_workbook(BytesIO(response.content))
+        example = [c.value for c in book["How to fill this in"][2]]
+        book["Records"].append(example)
+        buffer = BytesIO()
+        book.save(buffer)
+
+        response = self.post(buffer.getvalue(), name="iris_import_template.xlsx")
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 0), response.data["log"])
+        record = Record.objects.get()
+        self.assertEqual(
+            (record.record_type.name, record.classification.name, record.psced.name),
+            (RecordTypeName.THESIS_RESEARCH, "Maritime Studies", "Fisheries Science"),
+        )
+
     def test_only_the_first_sheet_is_imported(self):
         """Rows on any later sheet, as the template's example is, are never read (IR-639)."""
         wb = openpyxl.Workbook()

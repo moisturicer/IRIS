@@ -1893,8 +1893,9 @@ class RecordViewSet(viewsets.ModelViewSet):
           holds the header row alone. Staff type one paper per row under it.
         - "How to fill this in" holds the same headers over an example row,
           what each column takes, and the names each named column accepts.
-          Those are read here, at download, so they match what the import
-          will accept (`ImportChoices`) and cannot go stale or be misspelled.
+          The names, and those in the example, are read here from
+          `ImportChoices`, the importer's own lookup, so they cannot go stale
+          or be misspelled, and a copied example imports.
         """
         try:
             import openpyxl
@@ -1936,27 +1937,37 @@ class RecordViewSet(viewsets.ModelViewSet):
             right=Side(style="thin",  color="CCCCCC"),
         )
 
-        for col_idx, (header, width) in enumerate(zip(HEADERS, WIDTHS), start=1):
-            cell = ws.cell(row=1, column=col_idx, value=header)
-            cell.font      = header_font
-            cell.fill      = header_fill
-            cell.alignment = header_align
-            cell.border    = thin_border
-            ws.column_dimensions[cell.column_letter].width = width
+        def write_headers(sheet):
+            for col_idx, (header, width) in enumerate(zip(HEADERS, WIDTHS), start=1):
+                cell = sheet.cell(row=1, column=col_idx, value=header)
+                cell.font      = header_font
+                cell.fill      = header_fill
+                cell.alignment = header_align
+                cell.border    = thin_border
+                sheet.column_dimensions[cell.column_letter].width = width
+            sheet.row_dimensions[1].height = 30
+            sheet.freeze_panes = "A2"
 
-        ws.row_dimensions[1].height = 30
-        ws.freeze_panes = "A2"
+        write_headers(ws)
 
         # ---- How to fill this in: the same columns, never imported ----------
         guide = wb.create_sheet("How to fill this in")
-        for col_idx, (header, width) in enumerate(zip(HEADERS, WIDTHS), start=1):
-            cell = guide.cell(row=1, column=col_idx, value=header)
-            cell.font      = header_font
-            cell.fill      = header_fill
-            cell.alignment = header_align
-            cell.border    = thin_border
-            guide.column_dimensions[cell.column_letter].width = width
-        guide.row_dimensions[1].height = 30
+        write_headers(guide)
+
+        # What each named column accepts, as the importer looks it up.
+        choices  = ImportChoices()
+        accepted = {
+            "Record Type":          choices.record_types,
+            "Classification":       choices.classifications,
+            "PSCED Classification": choices.psced,
+        }
+        accepted = {header: sorted((c.name for c in names.values()), key=str.lower) for header, names in accepted.items()}
+        accepted["Origin"] = list(Record.Origin.values)
+
+        def example(header, preferred=None):
+            """`preferred` when this database has it, else its first name, else blank."""
+            names = accepted[header]
+            return preferred if preferred in names else (names[0] if names else None)
 
         # ---- Example data row ----------------------------------------------
         guide.append([
@@ -1964,9 +1975,9 @@ class RecordViewSet(viewsets.ModelViewSet):
             "This study proposes a tamper-proof academic credential system using distributed ledger technology.",
             2024,
             2024,
-            RecordTypeName.THESIS_RESEARCH,
-            "Applied Sciences",
-            "Information and Communication Technologies",
+            example("Record Type", RecordTypeName.THESIS_RESEARCH),
+            example("Classification"),
+            example("PSCED Classification"),
             "FALSE",
             "FALSE",
             "FALSE",
@@ -2004,14 +2015,6 @@ class RecordViewSet(viewsets.ModelViewSet):
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
         # ---- What each named column accepts, one per row under it ----------
-        from .models import Classification, PSCEDClassification, RecordType
-
-        accepted = {
-            "Record Type":          RecordType.objects.order_by("name").values_list("name", flat=True),
-            "Classification":       Classification.objects.order_by("name").values_list("name", flat=True),
-            "PSCED Classification": PSCEDClassification.objects.order_by("name").values_list("name", flat=True),
-            "Origin":               Record.Origin.values,
-        }
         guide.append([])
         guide.append(["Accepted values: each column below lists every name the import accepts."])
         guide.cell(row=guide.max_row, column=1).font = Font(bold=True)
@@ -2020,7 +2023,6 @@ class RecordViewSet(viewsets.ModelViewSet):
             col_idx = HEADERS.index(header) + 1
             for offset, name in enumerate(names):
                 guide.cell(row=first + offset, column=col_idx, value=name)
-        guide.freeze_panes = "A2"
 
         # ---- Serialize and return ------------------------------------------
         buffer = BytesIO()
