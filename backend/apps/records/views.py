@@ -1925,8 +1925,16 @@ class RecordViewSet(viewsets.ModelViewSet):
     def download_template(self, request):
         """
         GET /records/download_template/
-        Returns a pre-formatted .xlsx import template with a sample data row
-        and an END OF RECORDS sentinel so users know where to stop.
+        Returns the .xlsx import template (IR-639). Uploaded unchanged, it
+        imports nothing: the import publishes with no review.
+
+        - "Records", the first sheet and the only one the importer reads,
+          holds the header row alone. Staff type one paper per row under it.
+        - "How to fill this in" holds the same headers over an example row,
+          what each column takes, and the names each named column accepts.
+          The names, and those in the example, are read here from
+          `ImportChoices`, the importer's own lookup, so they cannot go stale
+          or be misspelled, and a copied example imports.
         """
         try:
             import openpyxl
@@ -1968,25 +1976,47 @@ class RecordViewSet(viewsets.ModelViewSet):
             right=Side(style="thin",  color="CCCCCC"),
         )
 
-        for col_idx, (header, width) in enumerate(zip(HEADERS, WIDTHS), start=1):
-            cell = ws.cell(row=1, column=col_idx, value=header)
-            cell.font      = header_font
-            cell.fill      = header_fill
-            cell.alignment = header_align
-            cell.border    = thin_border
-            ws.column_dimensions[cell.column_letter].width = width
+        def write_headers(sheet):
+            for col_idx, (header, width) in enumerate(zip(HEADERS, WIDTHS), start=1):
+                cell = sheet.cell(row=1, column=col_idx, value=header)
+                cell.font      = header_font
+                cell.fill      = header_fill
+                cell.alignment = header_align
+                cell.border    = thin_border
+                sheet.column_dimensions[cell.column_letter].width = width
+            sheet.row_dimensions[1].height = 30
+            sheet.freeze_panes = "A2"
 
-        ws.row_dimensions[1].height = 30
+        write_headers(ws)
+
+        # ---- How to fill this in: the same columns, never imported ----------
+        guide = wb.create_sheet("How to fill this in")
+        write_headers(guide)
+
+        # What each named column accepts, as the importer looks it up.
+        choices  = ImportChoices()
+        accepted = {
+            "Record Type":          choices.record_types,
+            "Classification":       choices.classifications,
+            "PSCED Classification": choices.psced,
+        }
+        accepted = {header: sorted((c.name for c in names.values()), key=str.lower) for header, names in accepted.items()}
+        accepted["Origin"] = list(Record.Origin.values)
+
+        def example(header, preferred=None):
+            """`preferred` when this database has it, else its first name, else blank."""
+            names = accepted[header]
+            return preferred if preferred in names else (names[0] if names else None)
 
         # ---- Example data row ----------------------------------------------
-        ws.append([
+        guide.append([
             "Blockchain-Based Verification of Academic Credentials",
             "This study proposes a tamper-proof academic credential system using distributed ledger technology.",
             2024,
             2024,
-            RecordTypeName.THESIS_RESEARCH,
-            "Applied Sciences",
-            "Information and Communication Technologies",
+            example("Record Type", RecordTypeName.THESIS_RESEARCH),
+            example("Classification"),
+            example("PSCED Classification"),
             "FALSE",
             "FALSE",
             "FALSE",
@@ -2004,35 +2034,34 @@ class RecordViewSet(viewsets.ModelViewSet):
             "Optional",
             "e.g. 2024",
             "e.g. 2024",
-            "Project, Proposal or Thesis / Research",
-            "Exact name from the system",
-            "Exact name from the system",
+            "One of the names below; blank is Project",
+            "Blank, or one of the names below",
+            "Blank, or one of the names below",
             "TRUE or FALSE",
             "TRUE or FALSE",
             "TRUE or FALSE",
-            "Comma-separated names",
-            "unknown / institutional / imported_reference / synthetic",
+            "Separated by semicolons or commas",
+            "Blank (unknown), or one of the values below",
             "Optional; separate from completion year",
             "Optional; the PDF's name, uploaded with the sheet",
         ]
-        ws.append(note_row)
-        note_row_idx = ws.max_row
+        guide.append(note_row)
+        note_row_idx = guide.max_row
         for col_idx in range(1, len(HEADERS) + 1):
-            cell = ws.cell(row=note_row_idx, column=col_idx)
+            cell = guide.cell(row=note_row_idx, column=col_idx)
             cell.fill = notes_fill
             cell.font = notes_font
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-        # ---- Sentinel row --------------------------------------------------
-        ws.append(["END OF RECORDS"])
-        sentinel_font = Font(bold=True, color="FFFFFF")
-        sentinel_fill = PatternFill(start_color="333333", end_color="333333", fill_type="solid")
-        sentinel_cell = ws.cell(row=ws.max_row, column=1)
-        sentinel_cell.font = sentinel_font
-        sentinel_cell.fill = sentinel_fill
-
-        # ---- Freeze header row ---------------------------------------------
-        ws.freeze_panes = "A2"
+        # ---- What each named column accepts, one per row under it ----------
+        guide.append([])
+        guide.append(["Accepted values: each column below lists every name the import accepts."])
+        guide.cell(row=guide.max_row, column=1).font = Font(bold=True)
+        first = guide.max_row + 1
+        for header, names in accepted.items():
+            col_idx = HEADERS.index(header) + 1
+            for offset, name in enumerate(names):
+                guide.cell(row=first + offset, column=col_idx, value=name)
 
         # ---- Serialize and return ------------------------------------------
         buffer = BytesIO()
