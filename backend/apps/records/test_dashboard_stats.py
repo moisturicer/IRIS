@@ -91,3 +91,43 @@ class NeedsActionMineTests(DecisionTestBase):
         self.client.force_authenticate(self.adviser)
         response = self.client.get(reverse("dashboard-stats"))
         self.assertEqual(response.data["needs_action_mine"], 0)
+
+
+class ReviewsWaitingCountTests(DecisionTestBase):
+    """
+    IR-1208: `reviews_waiting_mine` is the sidebar's My Reviews badge, the same
+    number as My Reviews' To review tab, so the two never disagree.
+    """
+
+    def stats_for(self, user):
+        self.client.force_authenticate(user)
+        response = self.client.get(reverse("dashboard-stats"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        return response.data
+
+    def to_review_tab(self, user):
+        self.client.force_authenticate(user)
+        response = self.client.get(reverse("reviews-mine"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        return response.data["counts"]["to_review"]
+
+    def test_an_adviser_with_a_record_waiting_is_counted(self):
+        self.new_model()  # sent to the Adviser, seat not yet opened: To review
+        self.assertEqual(self.stats_for(self.adviser)["reviews_waiting_mine"], 1)
+
+    def test_the_count_is_the_to_review_tab(self):
+        self.new_model()
+        self.new_model()
+        self.assertEqual(self.to_review_tab(self.adviser), 2)
+        self.assertEqual(self.stats_for(self.adviser)["reviews_waiting_mine"], 2)
+
+    def test_a_review_already_opened_is_no_longer_waiting(self):
+        self.at_adviser()  # the Adviser opened it: In review, not To review
+        self.assertEqual(self.stats_for(self.adviser)["reviews_waiting_mine"], 0)
+
+    def test_an_adviser_with_nothing_waiting_counts_zero(self):
+        self.assertEqual(self.stats_for(self.adviser)["reviews_waiting_mine"], 0)
+
+    def test_the_owner_is_not_counted_for_their_own_record(self):
+        self.new_model()
+        self.assertEqual(self.stats_for(self.owner)["reviews_waiting_mine"], 0)
