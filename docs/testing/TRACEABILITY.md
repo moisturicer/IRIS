@@ -385,6 +385,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1215** | A person whose session is still valid who opens the login page goes straight to their landing page (or the saved page their role may open) — extends IR-1207; no FR- id | [details](traceability/IR-1215.md) | **PARTIAL** |
 | **IR-1222** | Staying signed in across tabs and restarts: the refresh token only in an HttpOnly cookie; "Keep me signed in" lasts 30 days from sign-in outside the idle rule; refresh and logout check Origin and `X-IRIS-Auth`; tabs refresh in turn — ADR-072; no FR- id (NFR-S2 label) | [details](traceability/IR-1222.md) | **PARTIAL** |
 | **IR-1206** | On Review the paper's owners get the reviewers' frame: Back and the title above the reader, tabs Readiness · Conversation · Threads · Details, and Edit details, lineage and Continue as moved into Details — IR-1199; no FR- id | [details](traceability/IR-1206.md) | **IMPLEMENTED** |
+| **IR-1241** | A Discover row's thumbnail is a small first-page image the server draws in the PDF sandbox (`GET /records/<id>/first-page/`, `visible_to`, `no-store`), never the whole manuscript, and writes no audit event; the browser keeps it for the session — no FR- id (NFR-S4) | [details](traceability/IR-1241.md) | **PARTIAL** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
