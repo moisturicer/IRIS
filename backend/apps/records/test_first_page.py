@@ -165,7 +165,7 @@ class DrawTests(APITestCase):
             abstract_file=_pdf(), manuscript_revision=uuid.uuid4(), manuscript_sha256=SHA,
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
-        cache.set(first_page.key("pending", SHA), True)
+        cache.set(first_page.key("drawing", SHA), True)
 
     def _draw(self, sha=SHA):
         return first_page.draw(self.record.pk, self.owner.pk, sha)
@@ -176,7 +176,7 @@ class DrawTests(APITestCase):
 
         render.assert_called_once_with(PDF)
         self.assertEqual(cache.get(first_page.key("image", SHA)), WEBP)
-        self.assertIsNone(cache.get(first_page.key("pending", SHA)))
+        self.assertIsNone(cache.get(first_page.key("drawing", SHA)))
 
     def test_a_failed_drawing_is_remembered(self):
         with mock.patch.object(first_page, "render", return_value=(None, "encrypted")):
@@ -184,7 +184,7 @@ class DrawTests(APITestCase):
 
         self.assertEqual(cache.get(first_page.key("failed", SHA)), "encrypted")
         self.assertIsNone(cache.get(first_page.key("image", SHA)))
-        self.assertIsNone(cache.get(first_page.key("pending", SHA)))
+        self.assertIsNone(cache.get(first_page.key("drawing", SHA)))
 
     def test_a_file_replaced_since_it_was_asked_for_is_not_drawn_under_the_old_hash(self):
         with mock.patch.object(first_page, "render") as render:
@@ -202,7 +202,7 @@ class DrawTests(APITestCase):
 
     def test_a_deleted_record_draws_nothing(self):
         self.assertEqual(first_page.draw(self.record.pk + 10_000, self.owner.pk, SHA), "gone")
-        self.assertIsNone(cache.get(first_page.key("pending", SHA)))
+        self.assertIsNone(cache.get(first_page.key("drawing", SHA)))
 
 
 def test_the_drawing_runs_on_the_extraction_worker():

@@ -42,10 +42,10 @@ FAILED_SECONDS = 24 * 60 * 60
 #: A WebP of one page at 192 px is ~10-25 KB; anything far larger is refused.
 MAX_IMAGE_BYTES = 512 * 1024
 
-READY = "ready"
-PENDING = "pending"
+READY = "drawn"
+PENDING = "drawing"
 NO_MANUSCRIPT = "no_manuscript"
-UNAVAILABLE = "unavailable"
+UNAVAILABLE = "cannot_draw"
 
 
 @dataclass(frozen=True)
@@ -79,14 +79,14 @@ def lookup(record, user) -> Lookup:
         return Lookup(READY, image)
     if cache.get(key("failed", sha256)):
         return Lookup(UNAVAILABLE)
-    if cache.add(key("pending", sha256), True, PENDING_SECONDS):
+    if cache.add(key("drawing", sha256), True, PENDING_SECONDS):
         from .tasks import draw_first_page
 
         try:
             draw_first_page.delay(record.pk, user.pk, sha256)
         except Exception:
             # The broker is down: let the next request try again.
-            cache.delete(key("pending", sha256))
+            cache.delete(key("drawing", sha256))
             logger.warning("first page of record %s was not queued", record.pk, exc_info=True)
     return Lookup(PENDING)
 
@@ -126,7 +126,7 @@ def draw(record_id: int, user_id: int, sha256: str) -> str:
     except (Record.DoesNotExist, get_user_model().DoesNotExist):
         return "gone"
     finally:
-        cache.delete(key("pending", sha256))
+        cache.delete(key("drawing", sha256))
 
 
 def render(pdf_bytes: bytes) -> tuple[bytes | None, str]:
