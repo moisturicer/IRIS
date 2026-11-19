@@ -144,9 +144,13 @@ test.describe("Ask IRIS", () => {
       override: (a) => a.on("GET", "/ai/runtime/conversations", { detail: "smoke: down" }, 500),
     });
     // The history is a convenience: the reader can still ask, and nothing claims the chat failed.
+    // The list says so once, with its own Try again (IR-1238); the chat has none.
     await expect(page.getByText("What would you like to investigate?")).toBeVisible();
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeEnabled();
-    await expect(retryControl(page)).toHaveCount(0);
+    const listFailed = page.getByRole("alert").filter({ hasText: "Your new questions still work." });
+    await expect(listFailed).toHaveCount(1);
+    await expect(listFailed.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(retryControl(page)).toHaveCount(1);
   });
 
   test("an answer with nothing to cite offers no Sources button, and the reader can ask again", async ({ page, api }) => {

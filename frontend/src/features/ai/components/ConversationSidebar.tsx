@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { PanelLeftIcon } from "./AskIrisIcons";
 import { EarlierConversationList } from "./EarlierConversations";
 import { usePinnedConversations, type Pin } from "../hooks/usePinnedConversations";
+import type { TroubleKind } from "../runtime/trouble";
 
 /** The history search and paging, from `useConversationHistory`. */
 export interface HistorySearch {
@@ -15,6 +16,12 @@ export interface HistorySearch {
   onText:      (text: string) => void;
   query:       string;
   state:       "loading" | "ready" | "error";
+  /** Why the list request failed, while `state` is "error" (IR-1238). */
+  failure?:    TroubleKind;
+  /** Asks for the first page again; the "Try again" of a failed list. */
+  onRetry:     () => void;
+  /** The chat is already telling the reader this failure, so the list stays quiet about it (IR-1238). */
+  quiet?:      boolean;
   hasMore:     boolean;
   loadingMore: boolean;
   onMore:      () => void;
@@ -231,7 +238,7 @@ export function ConversationHistoryList({
         <span className="sr-only">Search your past conversations</span>
         <input id={searchId} ref={searchRef} type="search" value={search.text} onChange={e => search.onText(e.target.value)}
           onKeyDown={e => { if (e.key === "Escape") { search.onText(""); e.currentTarget.blur(); } }}
-          placeholder="Search" autoComplete="off" maxLength={200}
+          placeholder="Search" autoComplete="off" maxLength={200} disabled={search.state === "error"}
           className="min-w-0 flex-1 bg-transparent text-body text-stone-900 placeholder:text-stone-700 focus:outline-none" />
         <kbd aria-hidden className="shrink-0 font-sans text-2xs text-stone-500">Ctrl+K</kbd>
       </label>
@@ -253,8 +260,12 @@ export function ConversationHistoryList({
       </div>}
 
       <p className="mt-3 px-3 py-1 text-label font-medium text-stone-500">{search.query ? "Results" : "Recents"}</p>
-      {search.state === "error" && (
-        <p className="px-3 py-3 text-small text-stone-700">Could not load your conversations. Try again.</p>
+      {search.state === "error" && !search.quiet && (
+        <div role="alert" className="space-y-1 px-3 py-3 text-small text-stone-700">
+          <p>{"IRIS couldn't load your conversations. Your new questions still work."}</p>
+          <button type="button" onClick={search.onRetry}
+            className={cn("min-h-11 rounded-control text-brand underline", FOCUS_RING)}>Try again</button>
+        </div>
       )}
       {conversations.length === 0 && search.state === "ready" && (
         <p className="px-3 py-6 text-small text-stone-500 text-center">

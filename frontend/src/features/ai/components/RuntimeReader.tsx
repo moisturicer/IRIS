@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun, type SelectionRequest } from "@/api/runtimeReader";
+import { activeRun, compactionRun, ProtocolMismatch, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun, type SelectionRequest } from "@/api/runtimeReader";
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { failureMessage, readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
@@ -24,6 +24,7 @@ import { AskedPassage, SELECTION_QUESTION, SELECTION_REFUSALS, SelectionChip, se
 import { conversationTotals, toMessages, useCitedRecords } from "../runtime/messages";
 import { useDraft } from "../runtime/useDraft";
 import { useTypewriter } from "../runtime/useTypewriter";
+import { trouble, type Trouble, type TroubleKind } from "../runtime/trouble";
 
 const DEPTHS: readonly ModelPillOption<Depth>[] = [
   { value: "ordinary", short: "Standard", label: "Standard", description: "A shorter search for a quicker answer", icon: "far fa-lightbulb" },
@@ -83,31 +84,6 @@ export function CompactionStatus({ run }: { run: ReaderRun }) {
   </section>;
 }
 
-/** What went wrong, in the reader's terms, and whether reconnecting can help (IR-863). */
-interface Trouble { message: string; retry: boolean; missing?: boolean }
-
-function trouble(failure: unknown): Trouble {
-  if (failure instanceof ProtocolMismatch) return { message: failure.message, retry: false };
-  const response = isAxiosError(failure) ? failure.response : undefined;
-  const code = (response?.data as { status?: unknown } | undefined)?.status;
-  if (response?.status === 429 || (response?.status === 503 && code === "busy")) {
-    return { message: "IRIS is busy right now. Reconnect in a moment to try again.", retry: true };
-  }
-  if (response?.status === 401) return { message: "Your session has ended. Sign in again to continue.", retry: false };
-  if (response?.status === 403) {
-    return { message: "Ask IRIS can't open research for you right now.", retry: false };
-  }
-  if (response?.status === 404) {
-    return { message: "This conversation is not available. It may have been deleted, or the link may be wrong.",
-      retry: false, missing: true };
-  }
-  if (response?.status === 406) return { message: RELOAD_TO_RECONNECT, retry: false };
-  if (response && response.status >= 500) {
-    return { message: "Ask IRIS is unavailable right now. Reconnect to try again later.", retry: true };
-  }
-  return { message: "IRIS could not connect. Reconnect to try again.", retry: true };
-}
-
 interface Props {
   recordId?: number;
   conversationId?: string;
@@ -130,6 +106,11 @@ interface Props {
   onAnswered?: (message: ChatMessage) => void;
   /** The Conversation's title as the server holds it, each time it is reopened (IR-1160). */
   onTitle?: (id: string, title: string) => void;
+  /**
+   * The problem the chat is showing, or undefined once it is gone (IR-1238). A page
+   * uses it to say a failure the chat and its history list both met only once.
+   */
+  onProblem?: (kind: TroubleKind | undefined) => void;
   /** Paper Chat's this-paper / all-papers switch, shown beside the depth. */
   scopeToggle?: { allPapers: boolean; onChange: (allPapers: boolean) => void; locked?: boolean };
   /** A passage the reader chose to ask about (IR-581): sent with the next question, never on its own. */
@@ -142,7 +123,7 @@ interface Props {
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
-  selectedId = null, onSelectSources, sourcePanel, onAnswered, onTitle, scopeToggle, selection = null, onSelectionChange, focusRequest = 0 }: Props) {
+  selectedId = null, onSelectSources, sourcePanel, onAnswered, onTitle, onProblem, scopeToggle, selection = null, onSelectionChange, focusRequest = 0 }: Props) {
   // The research scope: this paper, or every paper once the reader widens. Read on each request, so
   // widening continues the same conversation instead of starting another.
   const scope = scopeToggle?.allPapers ? undefined : recordId;
@@ -167,6 +148,13 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   useEffect(() => { if (focusRequest > 0) composerRef.current?.focus(); }, [focusRequest]);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
+  const reportProblem = useRef(onProblem);
+  reportProblem.current = onProblem;
+  const problemKind = error?.kind;
+  useEffect(() => {
+    reportProblem.current?.(problemKind);
+    return () => reportProblem.current?.(undefined);
+  }, [problemKind]);
   // Why the chosen passage was refused; the question stays editable and nothing else is blocked (IR-581).
   const [selectionNote, setSelectionNote] = useState<string>();
   const draftNow = useRef(draft);
@@ -274,7 +262,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
           try { await reopen(request.conversation.id, version); } catch (reopenFailure) { fail(reopenFailure); }
         }
         if (version === generation.current) {
-          setError({ message: "This conversation changed. Reconnect, then send your question again.", retry: true });
+          setError({ kind: "conflict", message: "This conversation changed. Reconnect, then send your question again.", retry: true });
         }
       } else {
         const next = trouble(failure);
@@ -326,7 +314,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         pendingRetry.current = undefined;
         try { await reopen(request.run.conversation_id, version); } catch (reopenFailure) { fail(reopenFailure); }
         if (version === generation.current) {
-          setError({ message: "This conversation changed. Reconnect, then ask your question again.", retry: true });
+          setError({ kind: "conflict", message: "This conversation changed. Reconnect, then ask your question again.", retry: true });
         }
       } else {
         const next = trouble(failure);
@@ -437,7 +425,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
           {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
         {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}
         {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" onRetry={() => setOpenAttempt(n => n + 1)} />}
-        {opening === "unavailable" && <div className="py-10 text-center">
+        {opening === "unavailable" && <div role="alert" className="py-10 text-center">
           <h2 className="font-display text-xl text-stone-900">This conversation is not available.</h2>
           <p className="mt-2 text-sm text-stone-600">It may have been deleted, or the link may be wrong.</p>
           <Link to="/ai" className={cn(PILL_SECONDARY, FOCUS_RING, "mt-5 inline-flex")}>Start a new conversation</Link>
