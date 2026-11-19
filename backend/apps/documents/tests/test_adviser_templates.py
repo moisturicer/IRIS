@@ -153,6 +153,37 @@ class AnAdviserChangesTheirTemplatesTests(AdviserTemplateBase):
         event = self._events(AuditEvent.ADVISER_TEMPLATE_CHANGED).get()
         self.assertEqual(event.metadata["changes"]["file"], ["format.pdf", "v2.docx"])
 
+    def test_a_replaced_file_leaves_storage_once_the_change_commits(self):
+        old = AdviserTemplate.objects.get(pk=self.first["id"]).file
+        self.assertTrue(old.storage.exists(old.name))
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.patch(f"{MINE}/{self.first['id']}/", {"file": upload("v2.docx", DOCX)}, format="multipart")
+
+        self.assertFalse(old.storage.exists(old.name))
+        new = AdviserTemplate.objects.get(pk=self.first["id"]).file
+        self.assertTrue(new.storage.exists(new.name))
+
+    def test_the_adviser_downloads_their_own_file_even_while_it_is_not_shown(self):
+        """An Adviser not yet verified opens My Templates but shows nothing to others."""
+        User.objects.filter(pk=self.adviser.pk).update(is_verified=False)
+
+        own = self.client.get(f"{MINE}/{self.first['id']}/file/")
+        self.assertEqual(own.status_code, status.HTTP_200_OK)
+        self.assertEqual(b"".join(own.streaming_content), PDF)
+        self.assertTrue(own["Content-Disposition"].startswith("attachment"))
+        self.assertEqual(self.client.get(f"{SHOWN}/{self.first['id']}/file/").status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_template_removed_meanwhile_is_not_found(self):
+        """Another tab removed it between the lookup and the change: a 404, never a 500."""
+        from apps.documents import adviser_templates
+
+        stale = AdviserTemplate.objects.get(pk=self.first["id"])
+        AdviserTemplate.objects.filter(pk=stale.pk).delete()
+        for change in (lambda: adviser_templates.edit_template(stale, self.adviser, {"title": "Late"}),
+                       lambda: adviser_templates.remove_template(stale, self.adviser)):
+            with self.assertRaises(adviser_templates.TemplateGone):
+                change()
+
     def test_a_replacement_the_scan_flags_keeps_the_old_file(self):
         response = self.client.patch(f"{MINE}/{self.first['id']}/",
                                      {"file": upload(content=PDF + MARKER)}, format="multipart")
@@ -171,16 +202,20 @@ class AnAdviserChangesTheirTemplatesTests(AdviserTemplateBase):
         self.assertEqual(event.metadata["order"], order)
 
     def test_an_order_that_misses_or_repeats_a_template_is_refused(self):
-        for order in ([self.first["id"]], [self.first["id"], self.first["id"]], ["x"]):
+        both = f"{self.first['id']}{self.second['id']}"
+        for order in ([self.first["id"]], [self.first["id"], self.first["id"]], ["x"], both, {"a": 1}):
             with self.subTest(order=order):
                 response = self.client.put(f"{MINE}/order/", {"order": order}, format="json")
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual([t["title"] for t in self._mine()], ["First", "Second"])
 
     def test_a_removed_template_is_gone_with_its_file_and_audited(self):
-        response = self.client.delete(f"{MINE}/{self.first['id']}/")
+        stored = AdviserTemplate.objects.get(pk=self.first["id"]).file
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.delete(f"{MINE}/{self.first['id']}/")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(stored.storage.exists(stored.name))
         self.assertEqual([t["title"] for t in self._mine()], ["Second"])
         self.assertEqual(self.client.get(f"{SHOWN}/{self.first['id']}/file/").status_code,
                          status.HTTP_404_NOT_FOUND)
@@ -203,14 +238,15 @@ class NobodyElseChangesAnAdvisersTemplatesTests(AdviserTemplateBase):
         self.template = self._add("Ada's format").data
 
     def test_rdco_and_another_adviser_can_neither_change_nor_remove_it(self):
-        for someone in (self._user("templates-rdco@cit.edu", "RDCO"),
-                        self._user("templates-other@cit.edu", "Adviser", "Ben")):
+        # RDCO is refused by the role gate; another Adviser finds nothing of theirs.
+        for someone, refused in ((self._user("templates-rdco@cit.edu", "RDCO"), status.HTTP_403_FORBIDDEN),
+                                 (self._user("templates-other@cit.edu", "Adviser", "Ben"), status.HTTP_404_NOT_FOUND)):
             with self.subTest(someone.role.name):
                 self.client.force_authenticate(someone)
                 edit = self.client.patch(f"{MINE}/{self.template['id']}/", {"title": "Mine now"}, format="json")
                 remove = self.client.delete(f"{MINE}/{self.template['id']}/")
-                self.assertIn(edit.status_code, (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND))
-                self.assertIn(remove.status_code, (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND))
+                own_file = self.client.get(f"{MINE}/{self.template['id']}/file/")
+                self.assertEqual((edit.status_code, remove.status_code, own_file.status_code), (refused,) * 3)
         self.assertEqual(AdviserTemplate.objects.get().title, "Ada's format")
         self.assertFalse(self._events(AuditEvent.ADVISER_TEMPLATE_REMOVED).exists())
 

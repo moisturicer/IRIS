@@ -114,16 +114,20 @@ function TemplateList({ templates, act }: { templates: MyTemplate[]; act: Act })
   const titleId = useId();
   const [removing, setRemoving] = useState<MyTemplate | null>(null);
   const [busy, setBusy] = useState(false);
+  /* One move at a time: a second built from the list before the first saved would send a stale order. */
+  const [moving, setMoving] = useState(false);
 
-  const move = (index: number, by: -1 | 1) => {
+  const move = async (index: number, by: -1 | 1) => {
     const order = templates.map((t) => t.id);
     const [moved] = order.splice(index, 1);
     order.splice(index + by, 0, moved);
-    void act(
+    setMoving(true);
+    await act(
       () => myTemplatesApi.reorder(order),
       `${templates[index].title} moved ${by < 0 ? "up" : "down"}.`,
       "The order wasn't saved. Try again.",
     );
+    setMoving(false);
   };
 
   const remove = async () => {
@@ -148,8 +152,8 @@ function TemplateList({ templates, act }: { templates: MyTemplate[]; act: Act })
               <TemplateRow
                 template={template}
                 act={act}
-                onMoveUp={index > 0 ? () => move(index, -1) : undefined}
-                onMoveDown={index < templates.length - 1 ? () => move(index, 1) : undefined}
+                onMoveUp={index > 0 && !moving ? () => void move(index, -1) : undefined}
+                onMoveDown={index < templates.length - 1 && !moving ? () => void move(index, 1) : undefined}
                 onRemove={() => setRemoving(template)}
               />
             </li>
@@ -249,7 +253,7 @@ function FileControls({ template, act }: { template: MyTemplate; act: Act }) {
   const save = async () => {
     setProblem(null);
     try {
-      const { data } = await myTemplatesApi.download(template.id);
+      const { data } = await myTemplatesApi.downloadOwn(template.id);
       downloadBlob(data, template.file_name);
     } catch (err) {
       setProblem(errorDetail(err, "The Template didn't download. Try again."));

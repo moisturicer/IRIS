@@ -637,6 +637,24 @@ def notifications(user) -> dict:
     }
 
 
+def templates_shared(user) -> list[dict]:
+    """An Adviser's My Templates (IR-975): what they wrote. The file downloads in the app."""
+    from apps.documents.models import AdviserTemplate
+
+    return [
+        {
+            "id": row.pk,
+            "title": row.title,
+            "description": row.description,
+            "file_name": row.file_name,
+            "position": row.position,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+        for row in AdviserTemplate.objects.filter(owner=user).order_by("position", "pk")
+    ]
+
+
 def opportunities_posted(user) -> list[dict]:
     from apps.opportunities.models import Opportunity
 
@@ -841,6 +859,7 @@ SECTIONS: dict[str, Callable] = {
     "delete_requests": delete_requests,
     "notifications": notifications,
     "opportunities_posted": opportunities_posted,
+    "templates_shared": templates_shared,
     "saved_calls": saved_calls,
     "workflow_acts": workflow_acts,
     "consent": consent,

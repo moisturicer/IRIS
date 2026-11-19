@@ -15,7 +15,7 @@ from .setup_views import (
     ManuscriptTemplateDownloadView,
 )
 from .adviser_template_views import (
-    MyTemplateListView, MyTemplateOrderView, MyTemplateView,
+    MyTemplateListView, MyTemplateOrderView, MyTemplateView, MyTemplateDownloadView,
     ShownAdviserTemplateListView, AdviserTemplateDownloadView,
 )
 
@@ -30,6 +30,7 @@ urlpatterns = [
     path("my-templates/",                        MyTemplateListView.as_view(),          name="my-templates"),
     path("my-templates/order/",                  MyTemplateOrderView.as_view(),         name="my-template-order"),
     path("my-templates/<int:pk>/",               MyTemplateView.as_view(),              name="my-template"),
+    path("my-templates/<int:pk>/file/",          MyTemplateDownloadView.as_view(),      name="my-template-file"),
     # ...and the shown ones, for anyone signed in
     path("adviser-templates/",                   ShownAdviserTemplateListView.as_view(), name="adviser-templates"),
     path("adviser-templates/<int:pk>/file/",     AdviserTemplateDownloadView.as_view(), name="adviser-template-file"),

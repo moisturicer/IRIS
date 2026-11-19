@@ -539,6 +539,7 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
         "PATCH": _case(ADVISER_ONLY, kwargs=ADVISER_TEMPLATE, data={"title": "Renamed"}),
         "DELETE": _case(ADVISER_ONLY, kwargs=ADVISER_TEMPLATE),
     }),
+    "my-template-file": Entry({"GET": _case(ADVISER_ONLY, kwargs=ADVISER_TEMPLATE)}),
     # ...shown to, and downloaded by, anyone signed in
     "adviser-templates": Entry({"GET": _case(SIGNED_IN)}),
     "adviser-template-file": Entry({"GET": _case(SIGNED_IN, kwargs=ADVISER_TEMPLATE)}),

@@ -108,14 +108,34 @@ class MyTemplateView(APIView):
             )
         except templates.TemplateError as error:
             return _refused(error)
+        except templates.TemplateGone:
+            return _missing()
         return Response(template_payload(template))
 
     def delete(self, request, pk):
         template = templates.own_template(request.user, pk)
         if template is None:
             return _missing()
-        templates.remove_template(template, request.user)
+        try:
+            templates.remove_template(template, request.user)
+        except templates.TemplateGone:
+            return _missing()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MyTemplateDownloadView(APIView):
+    """
+    GET /documents/my-templates/<id>/file/ -- the Adviser's own file, as a download,
+    whether or not it shows to others yet (an unverified account shows nothing).
+    """
+
+    permission_classes = [IsAuthenticated, IsAdviser]
+
+    def get(self, request, pk):
+        template = templates.own_template(request.user, pk)
+        if template is None:
+            return _missing()
+        return template_response(template.file, template.file_name)
 
 
 class ShownAdviserTemplateListView(APIView):

@@ -40,6 +40,10 @@ class TemplateError(Exception):
     """A change My Templates refuses, with the reason shown to the Adviser. 400."""
 
 
+class TemplateGone(Exception):
+    """The Template was removed meanwhile (another tab). 404, as if never found."""
+
+
 # -- reading ------------------------------------------------------------------
 
 
@@ -109,11 +113,18 @@ def _meta(template) -> dict:
     return {"template": template.pk, "title": template.title}
 
 
-def _lock_owner(user):
-    """Serialise one Adviser's changes to their list (positions)."""
+def _lock_owner_row(user) -> None:
+    """Take a row lock on the Adviser, so one Adviser's changes to their list's positions run one at a time."""
     from apps.accounts.models import User
 
-    User.objects.select_for_update().filter(pk=user.pk).first()
+    list(User.objects.select_for_update().filter(pk=user.pk).values_list("pk", flat=True))
+
+
+def _locked(template) -> AdviserTemplate:
+    try:
+        return AdviserTemplate.objects.select_for_update().get(pk=template.pk)
+    except AdviserTemplate.DoesNotExist:
+        raise TemplateGone
 
 
 # -- changes ----------------------------------------------------------------------
@@ -123,7 +134,7 @@ def add_template(user, *, title, description="", file=None) -> AdviserTemplate:
     clean_title, clean_description = _title(title), _description(description)
     _check_file(file, user)
     with transaction.atomic():
-        _lock_owner(user)
+        _lock_owner_row(user)
         last = my_templates(user).order_by("-position").values_list("position", flat=True).first()
         name = display_name(file.name)
         template = AdviserTemplate(
@@ -149,7 +160,7 @@ def edit_template(template, user, changes: dict, file=None) -> AdviserTemplate:
     if file is not None:
         _check_file(file, user)
     with transaction.atomic():
-        template = AdviserTemplate.objects.select_for_update().get(pk=template.pk)
+        template = _locked(template)
         diff = {}
         if title is not None and title != template.title:
             diff["title"] = [template.title, title]
@@ -174,12 +185,14 @@ def edit_template(template, user, changes: dict, file=None) -> AdviserTemplate:
 
 def reorder_templates(user, order: Iterable) -> list[int]:
     """Put the Adviser's Templates in `order`, which must name each of theirs exactly once."""
+    if not isinstance(order, (list, tuple)):
+        raise TemplateError("Give your Templates' ids in their new order.")
     try:
         ids = [int(pk) for pk in order]
     except (TypeError, ValueError):
         raise TemplateError("Give your Templates' ids in their new order.")
     with transaction.atomic():
-        _lock_owner(user)
+        _lock_owner_row(user)
         current = list(my_templates(user).values_list("pk", flat=True))
         if len(ids) != len(set(ids)) or set(ids) != set(current):
             raise TemplateError("The order must list each of your Templates once.")
@@ -193,7 +206,7 @@ def reorder_templates(user, order: Iterable) -> list[int]:
 def remove_template(template, user) -> None:
     """Delete the Template and, once that commits, its file. No paper points at one."""
     with transaction.atomic():
-        template = AdviserTemplate.objects.select_for_update().get(pk=template.pk)
+        template = _locked(template)
         meta = {**_meta(template), "filename": template.file_name}
         drop_file_after_commit(template.file)
         template.delete()

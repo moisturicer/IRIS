@@ -158,6 +158,31 @@ describe("changing a Template", () => {
     await waitFor(() => expect(reorder).toHaveBeenCalledWith([8, 7]));
   });
 
+  it("holds both Move buttons while a reorder saves, so a second move can't send a stale order", async () => {
+    load();
+    let finish: (value: unknown) => void = () => {};
+    const reorder = vi.spyOn(myTemplatesApi, "reorder").mockReturnValue(new Promise((r) => { finish = r; }) as never);
+    const { user } = await openPage();
+
+    await user.click(within(template("Budget sheet")).getByRole("button", { name: "Move up Budget sheet" }));
+
+    expect(within(template("Chapter 1 format")).getByRole("button", { name: "Move down Chapter 1 format" })).toBeDisabled();
+    expect(reorder).toHaveBeenCalledTimes(1);
+    finish({ data: { order: [8, 7] } });
+    await waitFor(() => expect(within(template("Chapter 1 format"))
+      .getByRole("button", { name: "Move down Chapter 1 format" })).toBeEnabled());
+  });
+
+  it("downloads the Adviser's own file from their own address", async () => {
+    load();
+    const own = vi.spyOn(myTemplatesApi, "downloadOwn").mockResolvedValue({ data: new Blob(["x"]) } as never);
+    const { user } = await openPage();
+
+    await user.click(screen.getByRole("button", { name: "Download Budget sheet, budget.xlsx" }));
+
+    await waitFor(() => expect(own).toHaveBeenCalledWith(8));
+  });
+
   it("removes a Template only once the Adviser confirms", async () => {
     load();
     const remove = vi.spyOn(myTemplatesApi, "remove").mockResolvedValue({ data: null } as never);

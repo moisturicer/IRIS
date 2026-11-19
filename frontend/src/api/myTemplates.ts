@@ -9,8 +9,10 @@
  *   PUT    /documents/my-templates/order/            {order: [ids]}
  *   PATCH  /documents/my-templates/<id>/             {title?, description?} or multipart `file`
  *   DELETE /documents/my-templates/<id>/
- *   GET    /documents/adviser-templates/[?shared_by=<user id>]   the shown ones
- *   GET    /documents/adviser-templates/<id>/file/   a download
+ *   GET    /documents/my-templates/<id>/file/        the Adviser's own file, shown or not
+ *
+ * The shown list (`GET /documents/adviser-templates/`) and its downloads have no
+ * screen yet: Guidelines (IR-974) adds its own client for them.
  */
 import { apiClient } from "./client";
 
@@ -22,10 +24,6 @@ export interface MyTemplate {
   file_name: string;
   position: number;
   updated_at: string;
-}
-
-export interface ShownTemplate extends MyTemplate {
-  shared_by: { id: number; name: string };
 }
 
 export type TemplateFields = Pick<MyTemplate, "title" | "description">;
@@ -58,11 +56,6 @@ export const myTemplatesApi = {
 
   remove: (id: number) => apiClient.delete(`/documents/my-templates/${id}/`),
 
-  shown: (sharedBy?: number, options: { signal?: AbortSignal } = {}) =>
-    apiClient.get<ShownTemplate[]>("/documents/adviser-templates/", {
-      ...options, params: sharedBy === undefined ? undefined : { shared_by: sharedBy },
-    }),
-
-  download: (id: number) =>
-    apiClient.get<Blob>(`/documents/adviser-templates/${id}/file/`, { responseType: "blob" }),
+  downloadOwn: (id: number) =>
+    apiClient.get<Blob>(`/documents/my-templates/${id}/file/`, { responseType: "blob" }),
 };
