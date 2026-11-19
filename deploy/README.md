@@ -144,15 +144,7 @@ Every upload is scanned by the `clamav` service before it is stored. While ClamA
 - **Memory:** about 1.0 GiB with the signatures loaded (measured 2026-11-16, `clamav/clamav:stable`, on a development machine; **not yet measured on the demo host**, so check `docker stats clamav` at the first deploy); the limit is 1.5 GB.
 - **Is it up?** `docker compose -f docker-compose.prod.yml ps clamav` shows `healthy`.
 
-**Once, right after the update that adds scanning**, scan the files stored before it:
-
-```bash
-cd ~/IRIS
-docker compose -f docker-compose.prod.yml exec backend python manage.py scan_stored_uploads --dry-run
-docker compose -f docker-compose.prod.yml exec backend python manage.py scan_stored_uploads
-```
-
-The dry run lists what fails and changes nothing. The real run moves each failing file to the `quarantine` volume (never served), empties it from every row that names it, drops what IRIS read from it (a Manuscript's extracted text, Figures and chunks; a slot upload's extracted text), audits it as `FILE_QUARANTINED`, and tells its uploader and RDCO. It stops, changing nothing more, if ClamAV doesn't answer. Running it again is harmless.
+Files stored before scanning started are not re-scanned: `scan_stored_uploads` was removed on 2026-11-19 (ADR-074 amendment, IR-975). A server that ran an earlier release keeps an unused `quarantine` volume, which `docker volume ls` lists; `docker volume rm` removes it once you have checked it is empty.
 
 ## aws/iris-demo.yaml
 

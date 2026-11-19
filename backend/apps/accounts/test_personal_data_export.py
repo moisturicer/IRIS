@@ -265,6 +265,25 @@ class ExportContentTests(APITestCase):
         self.assertTrue(saved["available"])
         self.assertIn("saved_at", saved)
 
+    def test_an_advisers_shared_templates_are_their_own(self):
+        """IR-975: what the Adviser wrote on My Templates; the file itself is a download in the app."""
+        from apps.documents.models import AdviserTemplate
+
+        mine = AdviserTemplate.objects.create(
+            owner=self.adviser, title="Chapter 1 format", description="Use this first.",
+            file="templates/x.pdf", file_name="chapter-1.pdf", position=1,
+        )
+        AdviserTemplate.objects.create(owner=self.stranger, title="Not theirs", file="templates/y.pdf",
+                                       file_name="y.pdf", position=1)
+        self.client.force_authenticate(self.adviser)
+
+        [shared] = self.export()["templates_shared"]
+        self.assertEqual(
+            (shared["id"], shared["title"], shared["description"], shared["file_name"], shared["position"]),
+            (mine.pk, "Chapter 1 format", "Use this first.", "chapter-1.pdf", 1),
+        )
+        self.assertIn("created_at", shared)
+
     def test_a_saved_call_no_longer_confirmed_is_listed_without_its_title(self):
         from apps.opportunities.models import SavedCall
         from apps.opportunities.tests import make_opportunity

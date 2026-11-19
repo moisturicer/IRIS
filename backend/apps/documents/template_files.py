@@ -17,6 +17,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+from django.db import transaction
+from django.db.models.fields.files import FieldFile
 from django.http import FileResponse
 
 MAX_TEMPLATE_BYTES = 50 * 1024 * 1024
@@ -75,6 +77,20 @@ def template_problem(file) -> Optional[str]:
 def display_name(name: str) -> str:
     """The name a Template downloads under: the uploader's file name, without any path."""
     return Path((name or "").replace("\\", "/")).name[:255] or "template"
+
+
+def drop_file_after_commit(field_file) -> None:
+    """
+    Delete a replaced or removed Template's file once the change has committed,
+    so the old file is never offered again (decision 8) and a rolled-back
+    change keeps it. Reads the name now: saving a new file into the same field
+    renames this object. The copy hangs on a blank instance, so deleting it
+    never clears the field on the live row.
+    """
+    if not field_file:
+        return
+    old = FieldFile(type(field_file.instance)(), field_file.field, field_file.name)
+    transaction.on_commit(lambda: old.delete(save=False))
 
 
 def template_response(field_file, filename: str) -> FileResponse:

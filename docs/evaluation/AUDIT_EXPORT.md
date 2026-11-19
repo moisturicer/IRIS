@@ -211,12 +211,25 @@ None has a `record`. A Call is not a paper. A reader saving a Call to their own 
 
 ### Malware scanning (ADR-074)
 
-Written by `backend/apps/documents/scanning.py` (a refused upload) and `scan_stored_uploads` (a quarantined stored file), IR-666. Neither keeps the file's bytes: a refused upload is never stored, and a quarantined file's bytes are kept outside the media folder, not in the log.
+Written by `backend/apps/documents/scanning.py` (a refused upload), IR-666. Neither keeps the file's bytes: a refused upload is never stored, and a quarantined file's bytes are kept outside the media folder, not in the log.
 
 | Type | Written when | `metadata` |
 |---|---|---|
 | `UPLOAD_REFUSED_UNSAFE` | An upload the malware scan flagged was refused and not stored (ADR-074, IR-666). `user` is who sent it | `where` (the upload path), `filename`, `sha256`, `size`, `signature`; never the bytes |
-| `FILE_QUARANTINED` | `scan_stored_uploads` took a stored file that failed out of use (ADR-074 decision 4). No `user`; one event per row that named it | `model`, `pk`, `field`, `sha256`, `size`, `signature` |
+| `FILE_QUARANTINED` | **No longer written** (ADR-074 amendment 2026-11-19, IR-975). `scan_stored_uploads` took a stored file that failed out of use. No `user`; one event per row that named it | `model`, `pk`, `field`, `sha256`, `size`, `signature` |
+
+`where` names the upload path. Templates use `setup_template` (RDCO's Setup, scanned since IR-975) and `my_template` (an Adviser's My Templates, IR-975).
+
+### My Templates (ADR-063 decisions 8 and 11)
+
+Written by `backend/apps/documents/adviser_templates.py`, IR-975. `user` is always the Adviser, who alone may change their Templates. Descriptions are recorded as character counts, never their text. Downloads are not logged.
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `ADVISER_TEMPLATE_ADDED` | An Adviser added a Template | `template` (id), `title`, `description_characters`, `filename`, `bytes` |
+| `ADVISER_TEMPLATE_CHANGED` | Its title or description changed, or its file was replaced. An unchanged save writes nothing | `template`, `title` (after), `changes`: `title` [before, after], `description_characters` [before, after], `file` [old name, new name] and `bytes` |
+| `ADVISER_TEMPLATES_REORDERED` | The Adviser put their Templates in a new order. The same order writes nothing | `order` (ids) |
+| `ADVISER_TEMPLATE_REMOVED` | The Adviser removed a Template; its file is deleted once that commits | `template`, `title`, `filename` |
 
 ### Withdrawal
 

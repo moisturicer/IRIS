@@ -176,6 +176,11 @@ export const SCREEN_ACCESS = {
                   nav: { label: "Office console", icon: "fa-users-gear", section: "Main",
                          parent: "reviewQueue", needsCoordinator: true } },
 
+  // An Adviser's own proposal Templates (ADR-063 decision 8, IR-975). Only
+  // the Adviser's; the server refuses anyone else, RDCO included.
+  myTemplates: { path: "/my-templates", roles: [ROLES.ADVISER],
+                 nav: { label: "My Templates", icon: "fa-file-lines", section: "Main" } },
+
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,

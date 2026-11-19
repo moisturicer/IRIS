@@ -488,6 +488,10 @@ RECORD_FILE = {"pk": Ref("record_file")}
 
 RECORD_TYPE = {"pk": Ref("record_type")}
 SLOT = {"pk": Ref("slot")}
+ADVISER_TEMPLATE = {"pk": Ref("adviser_template")}
+#: The Adviser alone (`IsAdviser`, before any lookup): My Templates is the
+#: Adviser's own (ADR-063 decision 8, IR-975). RDCO is refused like anyone else.
+ADVISER_ONLY = row(ANON, DENY, DENY, OK, DENY, DENY, DENY, DENY, DENY, DENY)
 
 DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     "upload-slots": Entry({"GET": _case(SIGNED_IN)}),
@@ -521,6 +525,24 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
         "PUT": _case(RDCO_ONLY, kwargs=SLOT, data={"file": Upload("form.pdf")}, format="multipart"),
         "DELETE": _case(RDCO_ONLY, kwargs=SLOT),
     }),
+
+    # -- My Templates (ADR-063 decision 8, IR-975): the Adviser's own --
+    "my-templates": Entry({
+        "GET": _case(ADVISER_ONLY),
+        "POST": _case(ADVISER_ONLY, data={"title": "Chapter 1 format", "file": Upload("format.pdf")},
+                      format="multipart"),
+    }),
+    "my-template-order": Entry({
+        "PUT": _case(ADVISER_ONLY, data={"order": Ref("adviser_template", "order")}),
+    }),
+    "my-template": Entry({
+        "PATCH": _case(ADVISER_ONLY, kwargs=ADVISER_TEMPLATE, data={"title": "Renamed"}),
+        "DELETE": _case(ADVISER_ONLY, kwargs=ADVISER_TEMPLATE),
+    }),
+    "my-template-file": Entry({"GET": _case(ADVISER_ONLY, kwargs=ADVISER_TEMPLATE)}),
+    # ...shown to, and downloaded by, anyone signed in
+    "adviser-templates": Entry({"GET": _case(SIGNED_IN)}),
+    "adviser-template-file": Entry({"GET": _case(SIGNED_IN, kwargs=ADVISER_TEMPLATE)}),
 
     # -- a record's documents, named by the caller (the recorded exception) --
     "document-submit": Entry(

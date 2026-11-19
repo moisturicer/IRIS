@@ -62,6 +62,37 @@ class UploadSlot(models.Model):
         return f"{self.record_type.name} | {self.name}"
 
 
+class AdviserTemplate(models.Model):
+    """
+    A proposal Template an Adviser shares on My Templates (ADR-063 decision 8, IR-975).
+
+    The Adviser's own: only its `owner` changes or removes it, RDCO included
+    (`apps.documents.adviser_templates`). It shows to everyone signed in only
+    while the owner is an active Adviser (`shown_templates`). Separate from
+    RDCO's requirements: no paper ever points at one.
+    """
+    owner       = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="adviser_templates",
+    )
+    title       = models.CharField(max_length=200)
+    #: Plain text; line breaks kept, links made clickable by the screen (decision 10).
+    description = models.TextField(blank=True, default="")
+    #: The one current file. Only the newest is ever offered (decision 8).
+    file        = models.FileField(upload_to=template_path)
+    file_name   = models.CharField(max_length=255)
+    #: Its place in the owner's list.
+    position    = models.PositiveIntegerField(default=0)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["position", "pk"]
+        indexes = [models.Index(fields=["owner", "position"])]
+
+    def __str__(self):
+        return self.title
+
+
 class UploadStatus(models.Model):
     """Seed: Pending, For Application, Reviewed, Filed, Disapproved, Approved."""
     name = models.CharField(max_length=100, unique=True)

@@ -124,9 +124,10 @@ test("every role shares one short main list, in the spec's order", () => {
   ]);
   // The Adviser included since IR-534: Discover is its home, so the Submit
   // Disclosure shortcut it kept until then is gone. No office, so nothing
-  // nests under My Reviews.
+  // nests under My Reviews. My Templates is the Adviser's alone (IR-975).
   expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: My Templates",
+    "Main: Calls & Conferences",
   ]);
   // An office member has the same list: Workflow analytics is RDCO's alone
   // since IR-1216, and the console is the coordinator's alone.
@@ -214,6 +215,15 @@ test("no role has a Notices link, and the Notice is RDCO's, on Setup", () => {
   }
   expect(canAccess(ROLES.RDCO, "setup")).toBe(true);
   expect(canAccess(ROLES.SYSTEM_ADMIN, "setup")).toBe(false);
+});
+
+// IR-975 (ADR-063 decision 8): My Templates is the Adviser's own; RDCO included, nobody else has it.
+test("My Templates is the Adviser's alone", () => {
+  only("myTemplates", [ROLES.ADVISER]);
+  for (const role of Object.values(ROLES)) {
+    const listed = navFor(role, REVIEW_WORK).some((item) => item.to === "/my-templates");
+    assertEqual(listed, role === ROLES.ADVISER, `${role} has a My Templates link`);
+  }
 });
 
 test("Profile and Settings are in the account menu, not the nav, and their pages stay open (IR-933)", () => {

@@ -58,15 +58,12 @@ class SourceSafetyTests(SimpleTestCase):
     def test_no_source_deletes_a_manuscript_file(self):
         pattern = re.compile(r"(abstract_file|manuscript)\.delete\(|storage\.delete\(")
         apps_dir = Path(settings.BASE_DIR) / "apps"
-        # The one exception: a stored file that fails the malware scan leaves
-        # storage for the quarantine folder, after every row naming it has let
-        # go of it (IR-666, ADR-074 decision 4). Its rows and history stay.
-        allowed = {"documents/management/commands/scan_stored_uploads.py"}
+        # No exception since ADR-074's amendment of 2026-11-19 (IR-975)
+        # removed `scan_stored_uploads`, which moved a failing file to quarantine.
         offenders = [
             path.relative_to(apps_dir).as_posix()
             for path in apps_dir.rglob("*.py")
             if "test" not in path.name and "tests" not in path.parts
-            and path.relative_to(apps_dir).as_posix() not in allowed
             and pattern.search(path.read_text(encoding="utf-8"))
         ]
         self.assertEqual(offenders, [])

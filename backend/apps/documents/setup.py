@@ -26,18 +26,16 @@ from typing import Iterable, Optional
 
 from django.db import transaction
 from django.db.models import Q, QuerySet
-from django.db.models.fields.files import FieldFile
 from django.utils import timezone
 
 from apps.audit.models import AuditEvent
 from apps.audit.services import create_audit_event
 from core.enums import RequirementRemoval
 
+from . import template_rules as rules
 from .models import UploadSlot
-from .template_files import display_name, template_problem
+from .template_files import display_name, drop_file_after_commit
 
-MAX_DESCRIPTION_CHARS = 2000
-MAX_NAME_CHARS = 200
 MANUSCRIPT = "Manuscript"
 
 
@@ -87,11 +85,7 @@ def requirement(pk) -> Optional[UploadSlot]:
 
 
 def _name(value, record_type_id, *, exclude_pk=None) -> str:
-    name = (value or "").strip() if isinstance(value, str) else ""
-    if not name:
-        raise SetupError("Give the requirement a name.")
-    if len(name) > MAX_NAME_CHARS:
-        raise SetupError(f"Keep the name to {MAX_NAME_CHARS} characters.")
+    name = rules.name(value, what="name", missing="Give the requirement a name.", error=SetupError)
     if name.casefold() == MANUSCRIPT.casefold():
         raise SetupError("The Manuscript is always the first requirement.")
     clash = listed_slots(record_type_id).filter(name__iexact=name)
@@ -103,14 +97,7 @@ def _name(value, record_type_id, *, exclude_pk=None) -> str:
 
 
 def _description(value) -> str:
-    if value is None:
-        return ""
-    if not isinstance(value, str):
-        raise SetupError("A description is plain text.")
-    text = value.strip()
-    if len(text) > MAX_DESCRIPTION_CHARS:
-        raise SetupError(f"Keep the description to {MAX_DESCRIPTION_CHARS} characters.")
-    return text
+    return rules.description(value, error=SetupError)
 
 
 def _required(value) -> bool:
@@ -131,20 +118,6 @@ def _lock_type(record_type):
     from apps.records.models import RecordType
 
     return RecordType.objects.select_for_update().get(pk=record_type.pk)
-
-
-def _drop_file_after_commit(field_file) -> None:
-    """
-    Delete a replaced or removed Template's file once the change has committed,
-    so the old file is never offered again (decision 8) and a rolled-back
-    change keeps it. Reads the name now: saving a new file into the same field
-    renames this object. The copy hangs on a blank instance, so deleting it
-    never clears the field on the live row.
-    """
-    if not field_file:
-        return
-    old = FieldFile(type(field_file.instance)(), field_file.field, field_file.name)
-    transaction.on_commit(lambda: old.delete(save=False))
 
 
 # -- Requirements ---------------------------------------------------------------
@@ -171,10 +144,7 @@ def add_requirement(record_type, user, *, name, is_required, description="") -> 
 
 def edit_requirement(slot, user, changes: dict) -> UploadSlot:
     """Change a Requirement's name, label or description. Unknown fields are refused."""
-    allowed = {"name", "is_required", "description"}
-    unknown = set(changes) - allowed
-    if unknown:
-        raise SetupError(f"These can't be changed here: {', '.join(sorted(unknown))}.")
+    rules.only_fields(changes, {"name", "is_required", "description"}, error=SetupError)
     with transaction.atomic():
         slot = UploadSlot.objects.select_for_update().select_related("record_type").get(pk=slot.pk)
         diff = {}
@@ -203,15 +173,12 @@ def edit_requirement(slot, user, changes: dict) -> UploadSlot:
 
 def reorder_requirements(record_type, user, order: Iterable) -> list[int]:
     """Put the record type's Requirements in `order`, which must name each one exactly once."""
-    try:
-        ids = [int(pk) for pk in order]
-    except (TypeError, ValueError):
-        raise SetupError("Give the requirements' ids in their new order.")
+    ids = rules.order_ids(order, error=SetupError, ask="Give the requirements' ids in their new order.")
     with transaction.atomic():
         record_type = _lock_type(record_type)
         current = list(listed_slots(record_type.pk).values_list("pk", flat=True))
-        if len(ids) != len(set(ids)) or set(ids) != set(current):
-            raise SetupError("The order must list every requirement of this record type once.")
+        rules.check_complete_order(ids, current, error=SetupError,
+                                   mismatch="The order must list every requirement of this record type once.")
         for position, pk in enumerate(ids, start=1):
             UploadSlot.objects.filter(pk=pk).update(position=position)
         if ids != current:
@@ -231,7 +198,7 @@ def remove_requirement(slot, user) -> Removal:
             slot.save(update_fields=["hidden_at"])
             outcome = RequirementRemoval.HIDDEN
         else:
-            _drop_file_after_commit(slot.template)
+            drop_file_after_commit(slot.template)
             slot.delete()
             outcome = RequirementRemoval.DELETED
         create_audit_event(AuditEvent.REQUIREMENT_REMOVED, user, metadata={**meta, "outcome": outcome.value})
@@ -241,13 +208,14 @@ def remove_requirement(slot, user) -> Removal:
 # -- Templates ------------------------------------------------------------------
 
 
+def _check_template(file, user) -> None:
+    rules.check_file(file, user, where="setup_template", error=SetupError)
+
+
 def _replace(instance, file_field: str, name_field: str, file, user, meta: dict) -> None:
-    problem = template_problem(file)
-    if problem:
-        raise SetupError(problem)
     replaced = bool(getattr(instance, file_field))
     if replaced:
-        _drop_file_after_commit(getattr(instance, file_field))
+        drop_file_after_commit(getattr(instance, file_field))
     name = display_name(file.name)
     getattr(instance, file_field).save(name, file, save=False)
     setattr(instance, name_field, name)
@@ -261,7 +229,7 @@ def _remove(instance, file_field: str, name_field: str, user, meta: dict) -> boo
     current = getattr(instance, file_field)
     if not current:
         return False
-    _drop_file_after_commit(current)
+    drop_file_after_commit(current)
     filename = getattr(instance, name_field)
     setattr(instance, file_field, "")
     setattr(instance, name_field, "")
@@ -271,6 +239,7 @@ def _remove(instance, file_field: str, name_field: str, user, meta: dict) -> boo
 
 
 def set_requirement_template(slot, user, file) -> UploadSlot:
+    _check_template(file, user)
     with transaction.atomic():
         slot = UploadSlot.objects.select_for_update().select_related("record_type").get(pk=slot.pk)
         _replace(slot, "template", "template_name", file, user,
@@ -286,6 +255,7 @@ def remove_requirement_template(slot, user) -> bool:
 
 
 def set_manuscript_template(record_type, user, file):
+    _check_template(file, user)
     with transaction.atomic():
         record_type = _lock_type(record_type)
         _replace(record_type, "manuscript_template", "manuscript_template_name", file, user,
@@ -306,9 +276,7 @@ def remove_manuscript_template(record_type, user) -> bool:
 def describe_record_type(record_type, user, changes: dict):
     """Change a record type's description or its Manuscript's description."""
     allowed = {"description", "manuscript_description"}
-    unknown = set(changes) - allowed
-    if unknown:
-        raise SetupError(f"These can't be changed here: {', '.join(sorted(unknown))}.")
+    rules.only_fields(changes, allowed, error=SetupError)
     with transaction.atomic():
         record_type = _lock_type(record_type)
         diff = {}

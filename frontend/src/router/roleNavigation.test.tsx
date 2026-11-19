@@ -45,6 +45,11 @@ describe("role-owned addresses (IR-783)", () => {
     expect(await screen.findByRole("heading", { level: 1, name: title })).toBeInTheDocument();
   });
 
+  it("opens /my-templates for the Adviser (IR-975)", async () => {
+    visit("/my-templates", ROLES.ADVISER);
+    expect(await screen.findByRole("heading", { level: 1, name: "My Templates" })).toBeInTheDocument();
+  });
+
   it.each([
     ["/admin/users", "Users"],
     ["/admin/audit", "Audit Log"],
@@ -69,6 +74,8 @@ describe("role-owned addresses (IR-783)", () => {
     [ROLES.SYSTEM_ADMIN, "/rdco/delete-requests", false],
     [ROLES.SYSTEM_ADMIN, "/rdco/setup", false],
     [ROLES.ADVISER, "/rdco/setup", false],
+    [ROLES.RDCO, "/my-templates", false],
+    [ROLES.STUDENT, "/my-templates", false],
     [ROLES.KTTO, "/rdco/setup", false],
     [ROLES.SYSTEM_ADMIN, "/review", false],
     [ROLES.SYSTEM_ADMIN, "/review/analytics", false],

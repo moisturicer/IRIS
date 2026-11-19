@@ -11,6 +11,7 @@
   "/ai/conversations/:conversationId",
   "/login",
   "/moderation/comments",
+  "/my-templates",
   "/notifications",
   "/opportunities",
   "/opportunities/mine",
