@@ -256,14 +256,37 @@
   mix-blend-mode: multiply;
 }
 
-/* The reader's own highlight (IR-583): a stone wash with an Ink underline. The
-   prototype has no such mark, and yellow is for matches only and rose for a
-   reviewer's pen (IR-1097, D6), so it takes neither hue. Over the text layer
-   without taking its pointer. */
+/* The reader's own highlight (IR-583, restyled IR-581): one Binding Maroon
+   wash at low opacity, no edge or underline, multiplied into the page so the
+   ink stays dark. Yellow stays for matches and a reviewer's pen keeps its rose
+   fill, underline and pin (IR-1097, D6), so the two never read alike. Over the
+   text layer without taking its pointer. The swatch is the same colour, where
+   the interface names a highlight (the selection menu, Notes). */
+:root {
+  --reader-highlight: rgb(107 15 18 / 0.15);
+}
 .reader-highlight {
-  background-color: rgb(120 113 108 / 0.22);
-  box-shadow: inset 0 -2px 0 rgb(28 25 23 / 0.7);
+  background-color: var(--reader-highlight);
+  border-radius: 2px;
   mix-blend-mode: multiply;
+}
+.highlight-swatch {
+  background-color: var(--reader-highlight);
+  box-shadow: inset 0 0 0 1px rgb(107 15 18 / 0.22);
+}
+
+/* The selection menu floats over the paper: the one lifted control here, a
+   soft offset shadow and a hairline, rising into place. */
+.selection-menu {
+  box-shadow: 0 8px 24px -8px rgb(41 37 36 / 0.28), 0 0 0 1px rgb(41 37 36 / 0.08);
+  animation: selection-menu-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes selection-menu-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .selection-menu { animation: none; }
 }
 
 /* A thread's pin grows and shrinks with the page, so at a low zoom it no

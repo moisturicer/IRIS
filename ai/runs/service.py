@@ -15,7 +15,9 @@ import asyncpg
 
 from ai.admission import scope as admission
 from ai.agent.budget import Bounds
+from ai.agent.executor import SELECTION_TOOL_VERSIONS
 from ai.research.tools import ResearchTools
+from ai.runs import anchor
 from ai.runs import config as runs_config
 from ai.runs import stream
 from ai.runs.dispatch import Notifier, PollingNotifier
@@ -96,18 +98,25 @@ class RunService:
             raise ValueError("bounds") from None
 
     async def submit(self, grant, *, key, question, conversation_id, base_revision,
-                     depth=runs_config.DEFAULT_DEPTH):
+                     depth=runs_config.DEFAULT_DEPTH, selection=None):
         """The run's projection, and whether this submission admitted it."""
+        pinned = self.pinned(depth)
+        if selection is not None and (pinned.get("agent") or {}).get("tool_version") not in SELECTION_TOOL_VERSIONS:
+            # Admitted, it would be answered without the passage the reader asked about (IR-581).
+            raise anchor.Refused(anchor.UNSUPPORTED)
         return await self._enqueue(grant, key=key, question=question, conversation_id=conversation_id,
-                                   base_revision=base_revision, depth=depth, pinned=self.pinned(depth))
+                                   base_revision=base_revision, depth=depth, pinned=pinned,
+                                   selection=selection)
 
-    async def _enqueue(self, grant, *, key, question, conversation_id, base_revision, depth, pinned):
+    async def _enqueue(self, grant, *, key, question, conversation_id, base_revision, depth, pinned,
+                       selection=None):
         dispatch = self.cfg.dispatch
         row, created = await self.store.admit(
             grant, key=key, question=question, conversation_id=conversation_id,
             base_revision=base_revision, deadline_seconds=self.cfg.limits.deadline_for(depth),
             allowance=self.cfg.limits.allowance(), pinned=pinned, depth=depth,
             max_queued=dispatch.max_queued, max_active_per_reader=dispatch.max_active_per_reader,
+            selection=selection,
         )
         return await self._queued(grant, row, created)
 
@@ -163,8 +172,9 @@ class RunService:
         """Commit a compact handoff under the claim's fence (IR-734)."""
         return await self.store.commit_handoff(claim.run_id, claim.fence, handoff)
 
-    def _context(self, claim: Claim, bounds) -> RunContext:
+    def _context(self, claim: Claim, bounds, asked=None) -> RunContext:
         return RunContext(
+            selection=asked, selection_withdrawn=claim.selection is not None and asked is None,
             allowance=claim.allowance, remaining_seconds=claim.remaining_seconds,
             depth=claim.depth, prior=claim.prior, state=claim.state or {},
             bounds=bounds, checkpoint=claim.checkpoint, spent=claim.spent or {},
@@ -201,12 +211,15 @@ class RunService:
                                   reranker=self.reranker, follow_stored_grant=True,
                                   cache_query_vectors=getattr(self.cfg, "query_vector_cache", False),
                                   selection=getattr(self.cfg, "selection", None))
+            # Rechecked under the grant the run reads with now, before any model call (IR-581).
+            asked = await tools.recheck_selection(claim.selection) if claim.selection is not None else None
             # Every provider attempt inside is admitted against this run (IR-725).
             with admission.bound(admission.RunBinding(run_id, claim.fence)), stream.bound(sink):
                 if compacting:
                     result = await executor.compact(tools, self._context(claim, bounds))
                 elif getattr(executor, "takes_context", False):
-                    result = await executor.answer(claim.question, tools, context=self._context(claim, bounds))
+                    result = await executor.answer(claim.question, tools,
+                                                   context=self._context(claim, bounds, asked))
                 else:
                     result = await executor.answer(claim.question, tools)
         except Unavailable as refused:

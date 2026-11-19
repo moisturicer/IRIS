@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Skeleton } from "@/components/ui";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,7 @@ import {
 import { bindTextSelection } from "@/lib/textSelection";
 import type { Region } from "@/types/ai";
 import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
-import { CitationOverlay } from "./CitationOverlay";
+import { CitationOverlay, type LandingLook } from "./CitationOverlay";
 import { FIND_HIT_CURRENT_CLASS, paintFindHits } from "./findHighlights";
 import { HighlightMarks, type ReaderHighlight } from "./ReaderHighlights";
 import { SelectionMenu, menuPosition, type MenuPosition, type SelectionAction } from "./SelectionMenu";
@@ -186,6 +186,7 @@ function PdfPageView({
   pageNumber,
   scale,
   regions,
+  landingLook,
   marks,
   landing,
   landingFocusRef,
@@ -200,6 +201,7 @@ function PdfPageView({
   pageNumber: number;
   scale: number;
   regions: Region[];
+  landingLook: LandingLook;
   /** Review threads' highlights and pins (IR-875); empty outside Review. */
   marks: ReaderMark[];
   /** The passage Review showed (IR-1195), on the Version shown; null outside Review. */
@@ -232,7 +234,7 @@ function PdfPageView({
       {/* Over the paper, under the reader's own highlights and citations (IR-1128). */}
       <ReaderWatermark width={width} height={height} scale={scale} />
       <HighlightMarks highlights={highlights} page={pageNumber} />
-      <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
+      <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} look={landingLook} />
       <ThreadMarks marks={marks} page={pageNumber} />
       <LandingMark landing={landing} page={pageNumber} focusRef={landingFocusRef} />
     </div>
@@ -264,6 +266,8 @@ export interface PaperPdfReaderProps {
   keepPlace?: boolean;
   /** Regions to highlight, already page-tagged -- filtered per page below. */
   highlightRegions: Region[];
+  /** Whether `highlightRegions` are a citation's (outlined) or the reader's own highlight (no outline). */
+  landingLook?: LandingLook;
   /**
    * Changes on every navigation that should re-scroll, even to the same
    * page — a second click on the same citation still means "look here." A
@@ -316,6 +320,14 @@ export interface PaperPdfReaderProps {
    * are not what a highlight is bound to.
    */
   selectionActions?: SelectionAction[];
+  /**
+   * Whether the saved highlights are drawn (IR-581). A plain click on the
+   * paper hides them and the toolbar's Highlights control brings them back;
+   * the caller holds it, so opening one from Notes can show them again.
+   * Hiding never deletes anything.
+   */
+  highlightsShown?: boolean;
+  onHighlightsShownChange?: (shown: boolean) => void;
 }
 
 /**
@@ -353,6 +365,7 @@ function PaperPdfReaderSource({
   scrollToPage,
   keepPlace = false,
   highlightRegions,
+  landingLook = "citation",
   navKey,
   contained = false,
   fill = false,
@@ -362,6 +375,8 @@ function PaperPdfReaderSource({
   bottomInset = 0,
   highlights = NO_HIGHLIGHTS,
   selectionActions = NO_ACTIONS,
+  highlightsShown = true,
+  onHighlightsShownChange,
 }: PaperPdfReaderProps) {
   const [attempt, setAttempt] = useState(0);
   const { status, pageCount, pages, pageProxy, prioritize, revision } = usePdfDocument({
@@ -647,6 +662,15 @@ function PaperPdfReaderSource({
   const menuOffered = menuActions.length > 0;
   const [menuAt, setMenuAt] = useState<MenuPosition | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The passage the composer acts on, kept while the reader types in it: the
+  // browser's selection leaves the paper once its text box has focus (IR-581).
+  const [held, setHeld] = useState<Passage | null>(null);
+  const [holding, setHolding] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Pressed inside the composer: its text box is about to take focus, and the selection with it.
+  const pressingMenu = useRef(false);
+  // The primary button is down: a selection is still being dragged out.
+  const pointerHeld = useRef(false);
 
   useEffect(() => {
     if (!onComment && !menuOffered) return;
@@ -654,6 +678,15 @@ function PaperPdfReaderSource({
       const passage = currentPassageRef.current();
       setCommentable(passage !== null);
       if (!menuOffered) return;
+      // Still dragging: the composer waits for the button to come up (IR-581).
+      if (passage && pointerHeld.current) return;
+      if (!passage && (pressingMenu.current || menuRef.current?.contains(document.activeElement))) {
+        // Typing in the composer: the passage stays, drawn as a pending mark.
+        setHolding(true);
+        return;
+      }
+      setHolding(false);
+      setHeld(passage);
       setMenuOpen(passage !== null);
       const range = passage ? currentRangeRef.current() : null;
       // jsdom's ranges have no layout at all.
@@ -664,19 +697,60 @@ function PaperPdfReaderSource({
         : null;
       setMenuAt((previous) => (previous?.top === at?.top && previous?.left === at?.left ? previous : at));
     };
+    const press = (e: globalThis.PointerEvent) => { if (e.button === 0) pointerHeld.current = true; };
+    const release = () => {
+      if (!pointerHeld.current) return;
+      pointerHeld.current = false;
+      arm();
+    };
     arm();
     document.addEventListener("selectionchange", arm);
-    return () => document.removeEventListener("selectionchange", arm);
+    document.addEventListener("pointerdown", press, true);
+    document.addEventListener("pointerup", release, true);
+    document.addEventListener("pointercancel", release, true);
+    return () => {
+      document.removeEventListener("selectionchange", arm);
+      document.removeEventListener("pointerdown", press, true);
+      document.removeEventListener("pointerup", release, true);
+      document.removeEventListener("pointercancel", release, true);
+    };
   }, [onComment, menuOffered, findMatch, find.hitsByPage, painted]);
 
-  const chooseAction = (action: SelectionAction) => {
-    const passage = currentPassageRef.current();
-    if (!passage) return;
-    action.run(passage, revision);
-    // Done with the passage: the menu goes with the selection.
+  const closeMenu = () => {
     window.getSelection()?.removeAllRanges();
     setMenuOpen(false);
+    setHeld(null);
+    setHolding(false);
+    pressingMenu.current = false;
   };
+  const chooseAction = (action: SelectionAction, text = "") => {
+    const passage = currentPassageRef.current() ?? held;
+    if (!passage) return;
+    action.run(passage, revision, text);
+    // Done with the passage: the composer goes with the selection.
+    closeMenu();
+  };
+
+  // A plain click on the paper (no drag, no selection) closes the composer and
+  // hides the saved highlights, until the toolbar brings them back (IR-581).
+  const pressedAt = useRef<{ x: number; y: number } | null>(null);
+  const onPaperPointerDown = (e: ReactPointerEvent) => {
+    pressedAt.current = { x: e.clientX, y: e.clientY };
+    pressingMenu.current = false;
+  };
+  const onPaperPointerUp = (e: ReactPointerEvent) => {
+    const from = pressedAt.current;
+    pressedAt.current = null;
+    if (!from || Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) return;
+    if (e.target instanceof Element && e.target.closest("a,button,input,textarea,[role=button]")) return;
+    if (!(window.getSelection()?.isCollapsed ?? true)) return;
+    if (menuOpen) closeMenu();
+    if (highlightsShown && highlights.length > 0) onHighlightsShownChange?.(false);
+  };
+  const drawn = useMemo(() => {
+    const shown = highlightsShown ? highlights : NO_HIGHLIGHTS;
+    return holding && held ? [...shown, { key: "held", regions: held.regions }] : shown;
+  }, [highlightsShown, highlights, holding, held]);
 
   const comment = () => {
     const passage = currentPassageRef.current();
@@ -796,6 +870,18 @@ function PaperPdfReaderSource({
           >
             <SearchGlyph className="h-3.5 w-3.5" />
           </Button>
+          {onHighlightsShownChange && highlights.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onHighlightsShownChange(!highlightsShown)}
+              aria-pressed={highlightsShown}
+              aria-label={highlightsShown ? "Hide your highlights" : "Show your highlights"}
+              title={highlightsShown ? "Hide your highlights" : "Show your highlights"}
+            >
+              <i aria-hidden className={cn("fas fa-highlighter text-small", highlightsShown ? "text-brand" : "text-stone-500")} />
+            </Button>
+          )}
           {onComment && (
             <Button
               variant={commentable ? "outline" : "ghost"}
@@ -842,6 +928,8 @@ function PaperPdfReaderSource({
           through it (axe: scrollable-region-focusable). */}
       <div
         ref={scrollAreaCallbackRef}
+        onPointerDown={onPaperPointerDown}
+        onPointerUp={onPaperPointerUp}
         role="region"
         aria-label={ready ? `Paper, ${pageCount} page${pageCount === 1 ? "" : "s"}` : "Paper"}
         tabIndex={0}
@@ -878,17 +966,21 @@ function PaperPdfReaderSource({
               pageNumber={index + 1}
               scale={scale}
               regions={highlightRegions}
+              landingLook={landingLook}
               marks={marks}
               landing={threadLanding}
               landingFocusRef={landingFocusRef}
               hits={find.hitsByPage.get(index + 1) ?? NO_HITS}
-              highlights={highlights}
+              highlights={drawn}
               registerRef={registerRef}
             />
           ))}
       </div>
 
-      {menuOffered && menuOpen && <SelectionMenu actions={menuActions} position={menuAt} onChoose={chooseAction} />}
+      {menuOffered && menuOpen && (
+        <SelectionMenu actions={menuActions} position={menuAt} onChoose={chooseAction} onDismiss={closeMenu}
+          menuRef={menuRef} onPress={() => { pressingMenu.current = true; }} />
+      )}
     </div>
   );
 }

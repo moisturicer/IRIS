@@ -32,6 +32,7 @@ from typing import Mapping
 import asyncpg
 
 from ai.admission.scope import run_key
+from ai.runs import anchor
 from ai.infrastructure import db
 from ai.runs.config import KIND_COMPACT
 from ai.runs.executor import Compacted, PriorTurn, Result
@@ -266,6 +267,27 @@ class Claim:
     compactions: int = 0
     #: Handoff revisions this run committed.
     committed: frozenset = frozenset()
+    #: The passage the reader asked about, as admitted; rechecked before it reaches a model (IR-581).
+    selection: anchor.Selection | None = None
+
+
+#: The Manuscript revision a stored selection's Record is indexed from, for this reader, now (IR-581).
+SELECTION_REVISION = ("CASE WHEN {col} IS NULL THEN NULL"
+                      " ELSE iris_ai.research_source_revision((({col})->>'record_id')::bigint) END")
+
+
+def selection_view(raw: dict | None, current: str | None) -> dict | None:
+    """A stored selection as the reader is shown it: whole while readable, withheld otherwise (IR-581).
+
+    `current` is the revision the Record is indexed from now; a different one
+    keeps the passage but says it was selected on an earlier version.
+    """
+    if not raw:
+        return None
+    if current is None:
+        return {"available": False}
+    return {"available": True, "record_id": raw["record_id"], "page": raw["page"], "quote": raw["quote"],
+            "manuscript_revision": raw["revision"], "current": current == raw["revision"]}
 
 
 def _sources_json(sources) -> list[dict] | None:
@@ -282,11 +304,15 @@ def _sources_from_json(raw) -> frozenset:
     return frozenset(Source(**s) for s in raw or ())
 
 
-def request_hash(question: str | None, conversation_id, base_revision, *, compaction: bool = False) -> str:
+def request_hash(question: str | None, conversation_id, base_revision, *, compaction: bool = False,
+                 selection=None) -> str:
     body = {"q": question, "c": str(conversation_id) if conversation_id else None, "r": base_revision}
     if compaction:
         # An Ask's identity is unchanged; a compaction can never replay as one under the same key (IR-754).
         body["k"] = "compact"
+    if selection is not None:
+        # Absent from a plain question's identity, so every stored hash still matches (IR-581).
+        body["s"] = selection.to_json()
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
@@ -362,7 +388,7 @@ class RunStore:
                     deadline_seconds: int, allowance: dict, pinned: dict, depth: str = "ordinary",
                     max_queued: int | None = None,
                     max_active_per_reader: int | None = None,
-                    compaction: bool = False) -> tuple[dict, bool]:
+                    compaction: bool = False, selection: anchor.Selection | None = None) -> tuple[dict, bool]:
         """The run for this request identity, and whether it is new.
 
         The queued run is committed before this returns; a caller notifies
@@ -373,7 +399,7 @@ class RunStore:
         under the same rules as an Ask -- one active run per Conversation, the
         revision the reader saw, the population bounds -- and its own allowance.
         """
-        digest = request_hash(question, conversation_id, base_revision, compaction=compaction)
+        digest = request_hash(question, conversation_id, base_revision, compaction=compaction, selection=selection)
         bounds = (max_queued, max_active_per_reader)
         async with self._connect() as conn:
             for _ in range(2):
@@ -381,7 +407,7 @@ class RunStore:
                     async with conn.transaction():
                         return await self._admit(
                             conn, grant, key, question, conversation_id, base_revision,
-                            digest, deadline_seconds, allowance, pinned, depth, bounds, compaction,
+                            digest, deadline_seconds, allowance, pinned, depth, bounds, compaction, selection,
                         )
                 except _Raced:
                     continue
@@ -404,7 +430,7 @@ class RunStore:
             raise Busy("queue_full")
 
     async def _admit(self, conn, grant, key, question, conversation_id, base_revision,
-                     digest, deadline_seconds, allowance, pinned, depth, bounds, compaction=False):
+                     digest, deadline_seconds, allowance, pinned, depth, bounds, compaction=False, selection=None):
         claims = await self._verify(conn, grant)
         reader, scope = self._reader(claims)
         existing = await conn.fetchrow(
@@ -458,13 +484,14 @@ class RunStore:
             f"""INSERT INTO iris_ai.ask_run
                     (id, reader_id, conversation_id, request_key, request_hash, question,
                      base_revision, deadline_at, allowance, pinned, depth,
-                     reader_grant, grant_expires_at)
+                     reader_grant, grant_expires_at, selection)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(secs => $8), $9, $10,
-                        $11, $12, to_timestamp($13))
+                        $11, $12, to_timestamp($13), $14)
                 ON CONFLICT (reader_id, request_key) DO NOTHING
                 RETURNING {RUN_COLUMNS}""",
             uuid.uuid4(), reader, conversation_id, key, digest, question, revision,
             float(deadline_seconds), allowance, pinned, depth, grant, claims["exp"],
+            selection.to_json() if selection is not None else None,
         )
         if row is None:
             # A concurrent submission with this identity won; read it instead.
@@ -539,9 +566,10 @@ class RunStore:
             f"""INSERT INTO iris_ai.ask_run
                     (id, reader_id, conversation_id, request_key, request_hash, question,
                      base_revision, deadline_at, allowance, pinned, depth,
-                     reader_grant, grant_expires_at, retry_of)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(secs => $8), $9, $10,
-                        $11, $12, to_timestamp($13), $14)
+                     reader_grant, grant_expires_at, retry_of, selection)
+                SELECT $1, $2, $3, $4, $5, $6, $7, now() + make_interval(secs => $8), $9, $10,
+                       $11, $12, to_timestamp($13), $14, o.selection
+                  FROM iris_ai.ask_run o WHERE o.id = $14
                 ON CONFLICT (reader_id, request_key) DO NOTHING
                 RETURNING {RUN_COLUMNS}""",
             uuid.uuid4(), reader, original["conversation_id"], key, original["request_hash"],
@@ -585,7 +613,7 @@ class RunStore:
                   AND r.state IN ('queued', 'running') AND r.deadline_at > now()
                   AND (r.lease_expires_at IS NULL OR r.lease_expires_at <= now())
             RETURNING r.fence, r.question, r.allowance, r.pinned, r.reader_grant, r.reader_id, c.scope_record_id,
-                      r.depth, r.conversation_id, c.state,
+                      r.depth, r.conversation_id, c.state, r.selection,
                       extract(epoch FROM r.deadline_at - now()) AS remaining""",
             run_id, worker, float(lease_seconds),
         )
@@ -674,7 +702,8 @@ class RunStore:
                      state=row["state"], checkpoint=dict(checkpoint) if checkpoint else None,
                      spent={k: int(v) for k, v in spent.items()},
                      handoff=dict(handoff) if handoff else None, compactions=int(compactions),
-                     committed=frozenset(r["revision"] for r in committed))
+                     committed=frozenset(r["revision"] for r in committed),
+                     selection=anchor.Selection.from_json(row["selection"]) if row["selection"] else None)
 
     async def claim_next(self, *, worker: str, lease_seconds: int, executor: str | None,
                          reserved_units: int | Mapping[str, int], deep_concurrency: int,
@@ -902,8 +931,8 @@ class RunStore:
                 ordinal = conversation["revision"] + 1
                 await conn.execute(
                     """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer, kind, facts,
-                                                sources)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
+                                                sources, selection)
+                       SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, r.selection FROM iris_ai.ask_run r WHERE r.id = $3""",
                     turn_id, conversation_id, run_id, ordinal, run["question"], result.answer, result.kind,
                     list(result.facts), _sources_json(result.sources),
                 )
@@ -1020,6 +1049,11 @@ class RunStore:
         }
         evidence = {}
         if reader:
+            chosen = await conn.fetchrow(
+                f"SELECT selection, {SELECTION_REVISION.format(col='selection')} AS current"
+                " FROM iris_ai.ask_run WHERE id = $1", run_id,
+            )
+            evidence["selection"] = selection_view(chosen["selection"], chosen["current"])
             # Recheck every evidence dependency under begin_research's live RLS,
             # including papers read but not finally cited (ADR-049 §8), since the
             # last rebuild: what a rebuilt investigation discarded backs nothing (IR-724).
@@ -1108,7 +1142,8 @@ class RunStore:
                 revision = found["revision"]
                 turns = await conn.fetch(
                     f"""SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.facts, t.created_at, r.pinned,
-                              {CURRENT_SOURCE_TURN} AS sources_available
+                              {CURRENT_SOURCE_TURN} AS sources_available, t.selection,
+                              {SELECTION_REVISION.format(col='t.selection')} AS selection_revision
                          FROM iris_ai.turn t JOIN iris_ai.ask_run r ON r.id = t.run_id
                         WHERE t.conversation_id = $1 ORDER BY t.ordinal""",
                     conversation_id,
@@ -1166,6 +1201,7 @@ class RunStore:
                 "kind": t["kind"],
                 "created_at": t["created_at"].isoformat(),
                 "pinned": t["pinned"],
+                "selection": selection_view(t["selection"], t["selection_revision"]),
                 "citations": by_turn.get(t["id"], []) if t["sources_available"] else [],
                 "facts": shown_facts(t["facts"]) if t["sources_available"] else [],
                 "papers": [{"title": title, "record_id": by_title[title.lower()]}
@@ -1266,7 +1302,7 @@ class RunStore:
         await conn.execute("DELETE FROM iris_ai.turn WHERE conversation_id = $1", conversation_id)
         await conn.execute(
             # The hash would let a short question be guessed back.
-            "UPDATE iris_ai.ask_run SET question = NULL, request_hash = '' WHERE conversation_id = $1",
+            "UPDATE iris_ai.ask_run SET question = NULL, request_hash = '', selection = NULL WHERE conversation_id = $1",
             conversation_id,
         )
 

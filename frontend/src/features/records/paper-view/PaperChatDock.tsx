@@ -9,6 +9,7 @@ import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { Button } from "@/components/ui";
 import { RecentChats } from "./RecentChats";
 import { DownloadConversation } from "@/features/ai/components/DownloadConversation";
+import type { AskSelection } from "@/features/ai/components/SelectionChip";
 import { CONTROL_BASE } from "./controls";
 
 /** A square icon control in the panel's header: quiet at rest, a grey wash on hover. */
@@ -60,6 +61,8 @@ export function usePaperChat() {
   const [minimized, setMinimized] = useState(false);
   const [draft, setDraft] = useState("");
   const [width, setWidthState] = useState(readWidth);
+  // A passage the reader chose to ask about (IR-581): shown over the composer until sent or removed.
+  const [selection, setSelection] = useState<AskSelection | null>(null);
 
   const setOpen = (next: boolean) => {
     setOpenState(next);
@@ -83,7 +86,14 @@ export function usePaperChat() {
     }
   };
 
-  return { open, setOpen, tool, openNotes, minimized, setMinimized, draft, setDraft, width, setWidth };
+  /** "Ask about selection": opens Ask IRIS with the passage over an editable question. Nothing is sent. */
+  const askAbout = (next: AskSelection) => {
+    setSelection(next);
+    setOpen(true);
+  };
+
+  return { open, setOpen, tool, openNotes, minimized, setMinimized, draft, setDraft, width, setWidth,
+    selection, setSelection, askAbout };
 }
 
 /**
@@ -141,6 +151,9 @@ interface PaperChatPanelProps {
    * same answer a request again.
    */
   returnTo?: AnswerReturn | null;
+  /** A passage to ask about, and the way to drop it once it is sent or removed (IR-581). */
+  selection?: AskSelection | null;
+  onSelectionChange?: (next: AskSelection | null) => void;
   /**
    * Switch this panel's place to the reader's private Notes (IR-580). Absent
    * where Notes is not offered, and the control is not drawn.
@@ -168,6 +181,8 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
   useEffect(() => {
     try { setConversationId(sessionStorage.getItem(storageKey) ?? undefined); } catch { setConversationId(undefined); }
   }, [storageKey]);
+  // A passage is asked about within its paper: choosing one narrows a widened chat back to it.
+  useEffect(() => { if (props.selection) setAllPapers(false); }, [props.selection]);
   // A chat that began across all papers cannot narrow to this one; a chat that began on this paper can widen and narrow freely.
   const [startedAll, setStartedAll] = useState(() => {
     try { return sessionStorage.getItem(`${storageKey}:all`) === "1"; } catch { return false; }
@@ -259,7 +274,8 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
       <RuntimeReader key={`${conversationId ?? "new"}:${fresh}`} dense conversationId={conversationId}
         recordId={props.record.id}
         scopeToggle={{ allPapers: allPapers || locked, locked, onChange: next => { setRecentOpen(false); setAllPapers(next); } }}
-        initialDraft={props.draft} onDraftChange={props.onDraftChange} onConversation={remember} />
+        initialDraft={props.draft} onDraftChange={props.onDraftChange} onConversation={remember}
+        selection={props.selection} onSelectionChange={props.onSelectionChange} />
     </div>
   </aside>;
 }

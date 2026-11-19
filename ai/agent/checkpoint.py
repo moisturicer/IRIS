@@ -59,16 +59,20 @@ def prefix_digest(instructions: str, tools) -> str:
     return hashlib.sha256(body.encode()).hexdigest()
 
 
-def task_key(question: str, prior, state: dict, *, handoff: Optional[int] = None) -> str:
+def task_key(question: str, prior, state: dict, *, handoff: Optional[int] = None,
+             selection: Optional[dict] = None) -> str:
     """What the run is answering: the reader's words and the Conversation they follow.
 
     `handoff` is the compact handoff revision the Conversation opens with (IR-734).
+    `selection` is the passage asked about as this claim found it (IR-581), so a
+    step taken with it is never resumed once it is withdrawn.
     """
     body = json.dumps({
         "question": question,
         "prior": [[t.question, t.answer, t.kind] for t in prior],
         "state": state or {},
         **({"handoff": handoff} if handoff is not None else {}),
+        **({"selection": selection} if selection is not None else {}),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(body.encode()).hexdigest()
 

@@ -22,6 +22,7 @@ import asyncpg
 from ai.infrastructure import db
 from ai.research import metadata
 from ai.research.selection import Hit, Policy, choose, neighbour_positions, select
+from ai.runs import anchor
 from ai.runs.store import CURRENT_HANDOFF, CURRENT_SOURCE_TURN, RunStore
 
 log = logging.getLogger(__name__)
@@ -469,6 +470,18 @@ class ResearchTools:
                         or run["reader_id"] != int(claims["sub"])):
                     raise _Refused("run_ended")
                 yield conn
+
+    async def recheck_selection(self, selection):
+        """What this run's grant finds about `selection` now, or None if its paper may not be read (IR-581).
+
+        Read under the grant the run reads with today, so visibility, the
+        disclosure gate and a Paper Chat scope are exactly the tools'.
+        """
+        try:
+            async with self._session() as conn:
+                return await anchor.assess(conn, selection)
+        except _Refused:
+            return None
 
     async def _call(self, name: str, body) -> ToolResult:
         try:

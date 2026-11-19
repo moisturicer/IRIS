@@ -64,7 +64,8 @@ import { AskIrisFab, CORNER_CLEARANCE_CLASS, NotesFab } from "./AskIrisFab";
 import { NotesPanel } from "./NotesPanel";
 import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
 import { useReadingNote } from "./useReadingNote";
-import type { SelectionAction } from "./SelectionMenu";
+import { HighlightSwatch, type SelectionAction } from "./SelectionMenu";
+import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { ContactPersonCard } from "./ContactPersonCard";
@@ -241,6 +242,20 @@ export default function PaperViewPage() {
   // draft, and read only once Notes is first opened.
   const [notesWanted, setNotesWanted] = useState(false);
   const note = useReadingNote(Number(id), notesWanted);
+  // Saved highlights are drawn until a plain click on the paper hides them (IR-581).
+  const [highlightsShown, setHighlightsShown] = useState(true);
+  // Lines a Highlight's note adds to the reader's Notes once their note has loaded (IR-581).
+  const pendingNote = useRef<string[]>([]);
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const appendPendingNote = () => {
+    const current = noteRef.current;
+    if (current.phase !== "ready" || pendingNote.current.length === 0) return;
+    const lines = pendingNote.current;
+    pendingNote.current = [];
+    current.setText([current.text.trimEnd(), ...lines].filter(Boolean).join("\n\n"));
+  };
+  useEffect(appendPendingNote, [note.phase]);
   // Focus follows a swap of Ask IRIS and Notes into the new panel, in every
   // layout: the control that was clicked is gone with the old panel.
   const focusPanel = useRef(false);
@@ -679,13 +694,44 @@ export default function PaperViewPage() {
   const drawnHighlights = highlights.items
     .filter((h) => (viewedVersion ? h.state === "stale" && h.open_version === viewedVersion.number : h.state === "current"))
     .map((h) => ({ key: h.id, regions: h.regions }));
+  // The menu is offered on the current paper only (ADR-065 §8), so this names the current version.
+  const currentVersionLabel = record.manuscript_unsubmitted
+    ? "Unsubmitted upload"
+    : latestVersion ? `Version ${latestVersion.number}` : "Current version";
   const selectionActions: SelectionAction[] = [
+    // Wherever Ask IRIS is offered (IR-581). A typed question is sent with the passage at once,
+    // from the composer's own Send; with nothing typed, Paper Chat opens on an editable question.
+    ...(onReviewTab ? [] : [{
+      id: "ask-selection", label: "Ask about selection", short: "Ask IRIS",
+      placeholder: "Ask IRIS about this passage…",
+      icon: <AskIrisMark className="size-4" />,
+      run: (passage, manuscriptRevision, question) => {
+        focusPanel.current = true;
+        chat.askAbout({
+          recordId: record.id, title: record.title, versionLabel: currentVersionLabel, manuscriptRevision,
+          page: passage.page, quote: passage.quote,
+          ...(question ? { question, send: true } : {}),
+        });
+      },
+    } satisfies SelectionAction]),
     {
-      id: "save-highlight", label: "Save highlight", icon: "fa-highlighter",
-      run: (passage, manuscriptRevision) => void highlights.save(passage, manuscriptRevision),
+      id: "save-highlight", label: "Save highlight", short: "Highlight", sendIcon: "fa-check",
+      placeholder: "Add a note to your Notes (optional)…",
+      icon: <HighlightSwatch />,
+      run: (passage, manuscriptRevision, text) => {
+        setHighlightsShown(true);
+        void highlights.save(passage, manuscriptRevision);
+        // The reader's own words go to their Notes, never into the highlight (ADR-065 §1).
+        if (text) {
+          pendingNote.current = [...pendingNote.current, `Page ${passage.page}: ${text}`];
+          setNotesWanted(true);
+          appendPendingNote();
+        }
+      },
     },
   ];
   const openHighlight = (h: ReadableHighlight) => {
+    setHighlightsShown(true);
     const version = h.state === "stale" ? h.open_version : null;
     setOpened((last) => ({
       key: (last?.key ?? 0) + 1, page: h.page, regions: h.regions, version, arrival: arrivalKey.current,
@@ -793,9 +839,12 @@ export default function PaperViewPage() {
           // is never put back only to jump to the citation after.
           keepPlace={resolution.status !== "loading"}
           highlightRegions={highlightRegions}
+          landingLook={openedInShown ? "highlight" : "citation"}
           navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
           highlights={drawnHighlights}
           selectionActions={selectionActions}
+          highlightsShown={highlightsShown}
+          onHighlightsShownChange={setHighlightsShown}
           contained={onPaperTab || reviewWorkspace || tier === "wide"}
           fill={onPaperTab || reviewWorkspace}
           // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
@@ -1027,12 +1076,13 @@ export default function PaperViewPage() {
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
-              // takes its place: the rail folds away and the page widens into it.
+              // takes its place: the rail folds away, and the page sits centred
+              // in the room the panel leaves rather than against its left edge.
               showRail &&
                 cn(
                   "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   railHidden
-                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-between overview-wide:gap-x-0"
+                    ? "gap-y-0 overview-wide:grid-cols-[minmax(0,60rem)_0rem] overview-wide:justify-center overview-wide:gap-x-0"
                     : "overview-wide:grid-cols-[minmax(0,60rem)_clamp(17rem,25cqw,22rem)] overview-wide:justify-between overview-wide:gap-x-8",
                 ),
             )}
@@ -1048,9 +1098,10 @@ export default function PaperViewPage() {
               "min-w-0",
               onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
               // The Overview reads in one column, up to 60rem, flush left with
-              // the rail beside it; spare room falls to the right, so the
-              // page keeps its place whether Ask IRIS is open or not.
+              // the rail beside it. With Ask IRIS open the rail is gone, so the
+              // column is centred in the room that is left.
               showRail && "w-full max-w-[60rem]",
+              railHidden && "mx-auto",
             )}
           >
             {/* Editorial header (IR-356): what it is, who wrote it, then
@@ -1472,6 +1523,8 @@ export default function PaperViewPage() {
           viewingVersion={viewedVersion?.number ?? null}
           returnTo={chatReturn}
           onOpenNotes={onReviewTab ? undefined : openNotes}
+          selection={chat.selection}
+          onSelectionChange={chat.setSelection}
           className={chatPanelClass}
         />
       )}
