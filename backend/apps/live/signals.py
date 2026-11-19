@@ -16,6 +16,8 @@ including ones a future act adds without remembering to publish:
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from core.enums import RoleName
+
 from . import channels as ch
 from .publish import publish
 
@@ -57,7 +59,7 @@ def seat_saved(sender, instance, **kwargs):
 
 
 def _rdco_queue_changed(sender, instance, **kwargs):
-    publish([ch.role_channel("RDCO")], [ch.QUEUES])
+    publish([ch.role_channel(RoleName.RDCO)], [ch.QUEUES])
 
 
 for _model in ("accounts.RoleRequest", "records.DownloadRequest", "records.DeleteRequest",

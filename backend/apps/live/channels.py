@@ -7,11 +7,13 @@ publish names the people or the role that should refetch. IRIS's offices are
 roles (ITSO, IERC, KTTO, RDCO), so an office's pool and its role share one
 channel, `live:role:<role>`.
 """
+from core.enums import Party
+
 PREFIX = "live:"
 
 #: Parties that are offices, whose pool has a channel. The Adviser party is a
 #: person, never a pool: their changes go to the seat holder's own channel.
-OFFICE_PARTIES = frozenset({"itso", "ierc", "ktto", "rdco"})
+OFFICE_PARTIES = frozenset(str(p) for p in (Party.ITSO, Party.IERC, Party.KTTO, Party.RDCO))
 
 
 def user_channel(user_id) -> str:
