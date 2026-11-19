@@ -11,7 +11,7 @@ import { PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUN
 import { EMPTY_REVIEWS, TRACKER } from "./support/states";
 
 const screen = (id: string) => SCREENS.find((s) => s.id === id)!;
-const COMPOSER = "Ask about the research corpus";
+const COMPOSER = "Ask about the research in IRIS";
 const SECOND = { ...PAPER, id: 102, title: "Rainwater harvesting for terraced farms" };
 const searchOf = (request: Request) => new URL(request.url()).searchParams;
 const retryControl = (page: Page) => page.getByRole("button", { name: /^(Try again|Retry)$/ });
@@ -144,9 +144,13 @@ test.describe("Ask IRIS", () => {
       override: (a) => a.on("GET", "/ai/runtime/conversations", { detail: "smoke: down" }, 500),
     });
     // The history is a convenience: the reader can still ask, and nothing claims the chat failed.
+    // The list says so once, with its own Try again (IR-1238); the chat has none.
     await expect(page.getByText("What would you like to investigate?")).toBeVisible();
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeEnabled();
-    await expect(retryControl(page)).toHaveCount(0);
+    const listFailed = page.getByRole("alert").filter({ hasText: "Your new questions still work." });
+    await expect(listFailed).toHaveCount(1);
+    await expect(listFailed.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(retryControl(page)).toHaveCount(1);
   });
 
   test("an answer with nothing to cite offers no Sources button, and the reader can ask again", async ({ page, api }) => {
@@ -206,6 +210,8 @@ test.describe("Paper View · review timeline", () => {
         a.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER);
       },
     });
+    // A participant's Review opens on Documents (IR-1203); the timeline is the Conversation tab.
+    await page.getByRole("tab", { name: "Conversation" }).click();
     await expect(page.getByText("Nothing has happened in this review yet.")).toBeVisible();
     await expect(retryControl(page)).toHaveCount(0);
   });

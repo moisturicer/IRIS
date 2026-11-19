@@ -9,7 +9,7 @@
  *
  * Why this file exists: the defect IR-160 closes is that `Sidebar` and the router
  * each decided access independently -- the sidebar from `is_staff`, the router
- * from role names -- so ITSO and IERC were shown Role Requests and Audit Log and
+ * from role names -- so ITSO and IERC were shown Role requests and Audit Log and
  * then bounced by a 403. A menu item the user cannot open is a bug that only
  * appears for the roles you don't happen to test as, and there are six of them.
  * Asserting the matrix here is what stops it recurring silently.
@@ -19,6 +19,7 @@
  */
 
 import {
+  canOpenPath,
   ALL_SCREENS,
   SCREEN_ACCESS,
   canAccess,
@@ -127,51 +128,48 @@ test("every role shares one short main list, in the spec's order", () => {
   expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
   ]);
-  // An office member also has its Workflow analytics, nested under My Reviews
-  // (IR-1085, D5); the console is the coordinator's alone.
+  // An office member has the same list: Workflow analytics is RDCO's alone
+  // since IR-1216, and the console is the coordinator's alone.
   for (const role of [ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
     expect(labels(role, REVIEW_WORK)).toEqual([
-      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
-      "Main: Workflow analytics", "Main: Calls & Conferences",
+      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
     ]);
   }
 });
 
-test("RDCO's coordination screens, Import Records included, are one RDCO group", () => {
+test("RDCO's coordination screens, Import records included, are one RDCO group", () => {
+  // Workflow analytics is in this group since IR-1216, not under My Reviews.
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews",
-    "Main: Workflow analytics", "Main: Calls & Conferences",
-    "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
-    "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments", "RDCO: Setup",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+    "RDCO: Import records", "RDCO: Users", "RDCO: Role requests", "RDCO: Download requests",
+    "RDCO: Call requests", "RDCO: Delete requests", "RDCO: Reported comments",
+    "RDCO: Workflow analytics", "RDCO: Setup",
   ]);
 });
 
-// IR-1085, D5: Office console and Workflow analytics nest under My Reviews, for
-// the roles that already have them, and keep the addresses they had.
+// IR-1085, D5: Office console nests under My Reviews for coordinators, at the
+// address it had. Workflow analytics nested here too until IR-1216 moved it to
+// RDCO's group (below).
 describe("the pages nested under My Reviews (IR-1085, D5)", () => {
   const nested = (role: RoleName, access?: { my_reviews: boolean; is_coordinator?: boolean } | null) =>
     navFor(role, access)
       .filter((item) => item.parent === "reviewQueue")
       .map(({ label, to }) => ({ label, to }));
 
-  test("a coordinator reaches the console and analytics at their existing addresses", () => {
+  test("a coordinator reaches the console at its existing address, and nothing else nests", () => {
     expect(nested(ROLES.ITSO, COORDINATOR_WORK)).toEqual([
       { label: "Office console", to: "/review/office" },
-      { label: "Workflow analytics", to: "/review/analytics" },
     ]);
   });
 
-  test("RDCO's coordinator gets them too, and a missing flag is not a coordinator", () => {
-    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label))
-      .toEqual(["Office console", "Workflow analytics"]);
-    expect(nested(ROLES.RDCO, { my_reviews: true, is_coordinator: undefined }).map((i) => i.label))
-      .toEqual(["Workflow analytics"]);
+  test("RDCO's coordinator gets it too, and a missing flag is not a coordinator", () => {
+    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label)).toEqual(["Office console"]);
+    expect(nested(ROLES.RDCO, { my_reviews: true, is_coordinator: undefined })).toEqual([]);
   });
 
-  test("an office member who is not a coordinator sees analytics but not the console", () => {
-    expect(nested(ROLES.IERC, REVIEW_WORK).map((i) => i.label)).toEqual(["Workflow analytics"]);
-    expect(nested(ROLES.IERC, { my_reviews: true, is_coordinator: false }).map((i) => i.label))
-      .toEqual(["Workflow analytics"]);
+  test("an office member who is not a coordinator has nothing nested", () => {
+    expect(nested(ROLES.IERC, REVIEW_WORK)).toEqual([]);
+    expect(nested(ROLES.IERC, { my_reviews: true, is_coordinator: false })).toEqual([]);
   });
 
   test("roles without the screens see neither, even with the flags set", () => {
@@ -190,11 +188,11 @@ describe("the pages nested under My Reviews (IR-1085, D5)", () => {
   });
 });
 
-test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Reported Comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972)", () => {
+test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Reported comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972)", () => {
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
     "Main: Discover",
     "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
-    "Administration: Reported Comments", "Administration: Retention",
+    "Administration: Reported comments", "Administration: Retention",
   ]);
 });
 
@@ -202,7 +200,7 @@ test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, R
 // System Admin's navigation and nobody else's.
 test("the Reported comments page is RDCO's and the System Admin's alone, at /moderation/comments", () => {
   for (const role of Object.values(ROLES)) {
-    const page = navFor(role).filter((item) => item.label === "Reported Comments");
+    const page = navFor(role).filter((item) => item.label === "Reported comments");
     const allowed = role === ROLES.RDCO || role === ROLES.SYSTEM_ADMIN;
     expect(page.map((item) => item.to), role).toEqual(allowed ? ["/moderation/comments"] : []);
   }
@@ -233,8 +231,11 @@ test("the review queue is every reviewer, and excludes Student", () => {
   only("reviewQueue", [ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
 });
 
-test("workflow analytics is the four offices, not the Adviser (IR-626)", () => {
-  only("reviewAnalytics", [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
+test("workflow analytics is RDCO's alone, in its own section at /rdco/analytics (IR-626, IR-1216)", () => {
+  only("reviewAnalytics", [ROLES.RDCO]);
+  expect(navFor(ROLES.RDCO, REVIEW_WORK).filter((item) => item.key === "reviewAnalytics"))
+    .toMatchObject([{ section: "RDCO", to: "/rdco/analytics" }]);
+  expect(navFor(ROLES.RDCO, REVIEW_WORK).find((item) => item.key === "reviewAnalytics")?.parent).toBeUndefined();
 });
 
 test("My Reviews is listed only when the server says the user has review work", () => {
@@ -328,13 +329,49 @@ test("Student sees no administration section at all", () => {
 // IR-783: each office has its own addresses and named section.
 test("RDCO coordination links use the RDCO section and addresses", () => {
   expect(navFor(ROLES.RDCO).filter((item) => item.section !== "Main").map(({ label, to, section }) => ({ label, to, section }))).toEqual([
-    { label: "Import Records", to: "/records/import", section: "RDCO" },
+    { label: "Import records", to: "/records/import", section: "RDCO" },
     { label: "Users", to: "/rdco/users", section: "RDCO" },
-    { label: "Role Requests", to: "/rdco/role-requests", section: "RDCO" },
-    { label: "Download Requests", to: "/rdco/download-requests", section: "RDCO" },
-    { label: "Call Requests", to: "/rdco/call-requests", section: "RDCO" },
-    { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
-    { label: "Reported Comments", to: "/moderation/comments", section: "RDCO" },
+    { label: "Role requests", to: "/rdco/role-requests", section: "RDCO" },
+    { label: "Download requests", to: "/rdco/download-requests", section: "RDCO" },
+    { label: "Call requests", to: "/rdco/call-requests", section: "RDCO" },
+    { label: "Delete requests", to: "/rdco/delete-requests", section: "RDCO" },
+    { label: "Reported comments", to: "/moderation/comments", section: "RDCO" },
+    { label: "Workflow analytics", to: "/rdco/analytics", section: "RDCO" },
     { label: "Setup", to: "/rdco/setup", section: "RDCO" },
   ]);
+});
+
+describe("canOpenPath: may this role open this address? (IR-1207)", () => {
+  test("a role may open a page its screen allows, with query and fragment", () => {
+    expect(canOpenPath(ROLES.RDCO, "/rdco/users?page=2#row-4")).toBe(true);
+    expect(canOpenPath(ROLES.KTTO, "/review")).toBe(true);
+  });
+
+  test("a role may not open a page its screen refuses", () => {
+    expect(canOpenPath(ROLES.STUDENT, "/rdco/users")).toBe(false);
+    expect(canOpenPath(ROLES.KTTO, "/admin/audit")).toBe(false);
+  });
+
+  test("a page's own entry wins over a pattern that also matches it", () => {
+    // `/records/:id` (everyone) matches `/records/import` too; the import
+    // screen is RDCO's alone, and the router sends the address there.
+    expect(canOpenPath(ROLES.STUDENT, "/records/import")).toBe(false);
+    expect(canOpenPath(ROLES.STUDENT, "/records/42")).toBe(true);
+  });
+
+  test("a page two screens share is open to both screens' roles", () => {
+    expect(canOpenPath(ROLES.SYSTEM_ADMIN, "/moderation/comments")).toBe(true);
+    expect(canOpenPath(ROLES.RDCO, "/moderation/comments")).toBe(true);
+    expect(canOpenPath(ROLES.STUDENT, "/moderation/comments")).toBe(false);
+  });
+
+  test("an address no screen names is left to the router", () => {
+    // Retired addresses redirect, and unknown ones show Not Found; neither is
+    // a refusal, so the login screen may still go there.
+    expect(canOpenPath(ROLES.STUDENT, "/review/12/evaluate")).toBe(true);
+  });
+
+  test("no role opens nothing", () => {
+    expect(canOpenPath(null, "/")).toBe(false);
+  });
 });

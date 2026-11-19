@@ -26,7 +26,7 @@ from django.utils import timezone
 from apps.audit import workflow as audit
 from core.enums import DocumentRequestItemState, DocumentRequestState
 
-from .models import DocumentRequest, DocumentRequestItem, UploadSlot
+from .models import DocumentRejection, DocumentRequest, DocumentRequestItem, UploadSlot
 
 
 class DocumentRequestError(Exception):
@@ -280,10 +280,14 @@ def may_fulfil(record, user) -> bool:
 
 
 def is_requester(request: DocumentRequest, user) -> bool:
-    """`user` can staff the party that asked. The party counts, not the person."""
-    from apps.reviews.tracker import staffable_parties
+    """
+    `user` holds a seat that was not withdrawn on the party that asked
+    (ADR-022 Amendment 7, IR-1226). The party counts, not the person: any seat
+    holder of it decides or withdraws, and `requested_by` decides nothing.
+    """
+    from core.permissions import acting_parties
 
-    return request.party in staffable_parties(request.record, user)
+    return request.party in acting_parties(user, request.record)
 
 
 def request_on_visible_record(request_id, user) -> Optional[DocumentRequest]:
@@ -348,10 +352,19 @@ def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequ
     """
     with transaction.atomic():
         item, request = _lock_decidable(item)
+        now = timezone.now()
+        # The history (IR-1201): the item forgets its upload below, so this
+        # row is what remembers which file was rejected and why. An uploaded
+        # item whose file a superuser removed in admin has nothing to name.
+        if item.upload_id is not None:
+            DocumentRejection.objects.create(
+                item=item, upload_id=item.upload_id, rejected_by=user, reason=reason,
+                created_at=now,
+            )
         item.state = DocumentRequestItemState.MISSING
         item.upload = None
         item.rejection_reason = reason
-        item.decided_at = timezone.now()
+        item.decided_at = now
         item.save(update_fields=["state", "upload", "rejection_reason", "decided_at"])
         if request.state != DocumentRequestState.OPEN:
             # Resolved is final (ADR-069, IR-1075): the request's notification

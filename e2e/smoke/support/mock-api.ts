@@ -21,6 +21,17 @@ const API_PREFIX = "/api/v1";
 export const test = base.extend<{ api: MockApi }>({
   api: async ({ page }, use) => {
     const handlers = new Map<string, { reply: unknown | Handler; status: number }>();
+    // Every page load asks the server for a session (ADR-072), which a browser
+    // with no cookie is refused as `no_session`: signed out, not a session that
+    // ended. A test that signs in overrides it (`signedIn` in fixtures.ts).
+    handlers.set("POST /auth/token/refresh/", {
+      reply: { detail: "Not signed in.", code: "no_session" },
+      status: 401,
+    });
+    // Every signed-in page opens the live hint stream (ADR-073). There is no
+    // server to hold it open, so it answers 503 and the client backs off
+    // quietly; pages still load and refetch on focus as they would.
+    handlers.set("GET /live/", { reply: { detail: "smoke: no live stream" }, status: 503 });
     const seen: string[] = [];
     const unmocked: string[] = [];
 

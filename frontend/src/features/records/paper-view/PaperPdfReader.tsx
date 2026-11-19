@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Skeleton } from "@/components/ui";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { cn } from "@/lib/utils";
@@ -9,19 +9,25 @@ import {
   type PdfPage,
   type TextLayerHandle,
 } from "@/lib/pdf";
+import { bindTextSelection } from "@/lib/textSelection";
 import type { Region } from "@/types/ai";
 import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
-import { CitationOverlay } from "./CitationOverlay";
+import { CitationOverlay, type LandingLook } from "./CitationOverlay";
 import { FIND_HIT_CURRENT_CLASS, paintFindHits } from "./findHighlights";
 import { HighlightMarks, type ReaderHighlight } from "./ReaderHighlights";
 import { SelectionMenu, menuPosition, type MenuPosition, type SelectionAction } from "./SelectionMenu";
 import { passageFromRange, type Passage } from "./threads/passage";
-import { ThreadMarks, useReaderAnnotations, type ReaderMark } from "./threads/readerAnnotations";
+import {
+  LandingMark, ThreadMarks, useReaderAnnotations, type ReaderLanding, type ReaderMark,
+} from "./threads/readerAnnotations";
 import type { FindHit } from "./findInPaper";
+import { readerDocumentKey, type ReaderDocument } from "./readerDocument";
 import { PaperFind } from "./PaperFind";
+import { ReaderLoadError, ZoomControls } from "./ReaderControls";
 import { ReaderWatermark } from "./ReaderWatermark";
 import {
   PANE_TOP_PX,
+  READER_TOOLBAR_FILL,
   READER_TOOLBAR_TOP,
   READING_PANE_HEIGHT,
   READING_SPLIT_PX,
@@ -29,13 +35,17 @@ import {
 import {
   MAX_SCALE,
   MIN_SCALE,
+  SCALE_STEP,
   anchorDelta,
+  centredLandingDelta,
   citationLandingDelta,
   firstRegionOn,
   fitScale,
   liveWindow,
+  passageBand,
   regionInView,
   windowReadingBand,
+  type PassageBand,
   type ReadingAnchor,
   type RegionBand,
 } from "./readerGeometry";
@@ -46,7 +56,6 @@ import { useReadingResume } from "./useReadingResume";
 import { useAuthStore } from "@/store/auth.store";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 
-const SCALE_STEP = 0.2;
 /**
  * The zoom a paper opens at (IR-569), and what an unmeasured pane uses. A
  * pane narrower than `READING_SPLIT_PX` -- a phone -- opens fitted instead,
@@ -114,13 +123,24 @@ function LivePageLayers({ page, scale, hits, onPaint }: {
     if (!container) return;
     const layer = renderTextLayer(page, container, scaleRef.current);
     layerRef.current = layer;
+    // A drag across the gaps between spans stays on the text the reader is
+    // dragging through (IR-1209): bound once the spans are drawn, and let go
+    // of before the layer is cleared for another page.
+    let unbindSelection: (() => void) | null = null;
+    let current = true;
     layer.promise.then(
-      () => setTextReady(true),
+      () => {
+        if (!current) return;
+        unbindSelection = bindTextSelection(container);
+        setTextReady(true);
+      },
       () => {
         /* cancelled, or a page pdf.js could not read text from -- it stays unselectable */
       },
     );
     return () => {
+      current = false;
+      unbindSelection?.();
       layer.cancel();
       layerRef.current = null;
       container.replaceChildren();
@@ -166,7 +186,10 @@ function PdfPageView({
   pageNumber,
   scale,
   regions,
+  landingLook,
   marks,
+  landing,
+  landingFocusRef,
   highlights,
   hits,
   registerRef,
@@ -178,8 +201,12 @@ function PdfPageView({
   pageNumber: number;
   scale: number;
   regions: Region[];
+  landingLook: LandingLook;
   /** Review threads' highlights and pins (IR-875); empty outside Review. */
   marks: ReaderMark[];
+  /** The passage Review showed (IR-1195), on the Version shown; null outside Review. */
+  landing: ReaderLanding | null;
+  landingFocusRef: (el: HTMLElement | null) => void;
   /** The reader's own saved highlights (IR-583). */
   highlights: ReaderHighlight[];
   hits: FindHit[];
@@ -207,8 +234,9 @@ function PdfPageView({
       {/* Over the paper, under the reader's own highlights and citations (IR-1128). */}
       <ReaderWatermark width={width} height={height} scale={scale} />
       <HighlightMarks highlights={highlights} page={pageNumber} />
-      <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
+      <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} look={landingLook} />
       <ThreadMarks marks={marks} page={pageNumber} />
+      <LandingMark landing={landing} page={pageNumber} focusRef={landingFocusRef} />
     </div>
   );
 }
@@ -221,6 +249,12 @@ export interface PaperPdfReaderProps {
    * to the current paper, so the caller passes neither with a version.
    */
   version?: number | null;
+  /**
+   * A supporting document to read instead of the manuscript (IR-1203). It
+   * carries none of the manuscript's: no place kept, no thread pins, no
+   * Comment; the caller passes no highlights or selection actions with it.
+   */
+  document?: ReaderDocument | null;
   /** The page to scroll to once the document is ready, or `null` for none. */
   scrollToPage: number | null;
   /**
@@ -232,6 +266,8 @@ export interface PaperPdfReaderProps {
   keepPlace?: boolean;
   /** Regions to highlight, already page-tagged -- filtered per page below. */
   highlightRegions: Region[];
+  /** Whether `highlightRegions` are a citation's (outlined) or the reader's own highlight (no outline). */
+  landingLook?: LandingLook;
   /**
    * Changes on every navigation that should re-scroll, even to the same
    * page — a second click on the same citation still means "look here." A
@@ -284,6 +320,14 @@ export interface PaperPdfReaderProps {
    * are not what a highlight is bound to.
    */
   selectionActions?: SelectionAction[];
+  /**
+   * Whether the saved highlights are drawn (IR-581). A plain click on the
+   * paper hides them and the toolbar's Highlights control brings them back;
+   * the caller holds it, so opening one from Notes can show them again.
+   * Hiding never deletes anything.
+   */
+  highlightsShown?: boolean;
+  onHighlightsShownChange?: (shown: boolean) => void;
 }
 
 /**
@@ -310,15 +354,18 @@ export interface PaperPdfReaderProps {
  */
 export function PaperPdfReader(props: PaperPdfReaderProps) {
   const epoch = useAuthStore((state) => state.sessionEpoch);
-  return <PaperPdfReaderSource key={`${epoch}:${props.recordId}:${props.version ?? "current"}`} {...props} />;
+  const shows = props.document ? readerDocumentKey(props.document) : props.version ?? "current";
+  return <PaperPdfReaderSource key={`${epoch}:${props.recordId}:${shows}`} {...props} />;
 }
 
 function PaperPdfReaderSource({
   recordId,
   version = null,
+  document: shownDocument = null,
   scrollToPage,
   keepPlace = false,
   highlightRegions,
+  landingLook = "citation",
   navKey,
   contained = false,
   fill = false,
@@ -328,11 +375,14 @@ function PaperPdfReaderSource({
   bottomInset = 0,
   highlights = NO_HIGHLIGHTS,
   selectionActions = NO_ACTIONS,
+  highlightsShown = true,
+  onHighlightsShownChange,
 }: PaperPdfReaderProps) {
   const [attempt, setAttempt] = useState(0);
   const { status, pageCount, pages, pageProxy, prioritize, revision } = usePdfDocument({
     recordId,
     version,
+    document: shownDocument,
     attempt,
     firstPage: scrollToPage,
   });
@@ -349,13 +399,18 @@ function PaperPdfReaderSource({
   const [findLanding, setFindLanding] = useState<{ page: number; region: RegionBand } | null>(null);
   // Review's threads (IR-875): drawn only on the Version they quote, and a
   // thread the workspace asks to show is landed on like a find match.
-  const annotations = useReaderAnnotations();
+  // A supporting document is not the manuscript the threads are on (IR-1203).
+  const reviewAnnotations = useReaderAnnotations();
+  const annotations = shownDocument ? null : reviewAnnotations;
   const shownVersion = version ?? annotations?.currentVersion ?? null;
   const marks = useMemo(
     () => (annotations?.marks ?? []).filter((m) => m.version === shownVersion),
     [annotations?.marks, shownVersion],
   );
-  const threadLanding = annotations?.landing ?? null;
+  // Drawn and landed on only on its own Version: a removed passage is in v1, an added one in v2.
+  const threadLanding = annotations?.landing?.version === shownVersion ? annotations.landing : null;
+  const landingFocus = useRef<HTMLElement | null>(null);
+  const landingFocusRef = useCallback((el: HTMLElement | null) => { landingFocus.current = el; }, []);
   const [commentable, setCommentable] = useState(false);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const paneRef = useRef<HTMLDivElement>(null);
@@ -407,7 +462,7 @@ function PaperPdfReaderSource({
   const signedIn = useAuthStore((state) => state.isAuthenticated);
   const resume = useReadingResume({
     recordId,
-    enabled: keepPlace && version === null && signedIn,
+    enabled: keepPlace && version === null && shownDocument === null && signedIn,
     explicitLanding: scrollToPage != null,
     revision,
     ready: status === "ready",
@@ -439,14 +494,17 @@ function PaperPdfReaderSource({
    */
   const land = (
     pageNumber: number,
-    target: RegionBand | { anchor: ReadingAnchor } | null,
+    target: RegionBand | { anchor: ReadingAnchor } | { centre: PassageBand } | null,
     behavior: ScrollBehavior,
     onlyIfHidden = false,
   ): boolean => {
     const anchor = target && "anchor" in target ? target.anchor : null;
-    const region = target && "anchor" in target ? null : target;
+    const centre = target && "centre" in target ? target.centre : null;
+    const region = target && !("anchor" in target) && !("centre" in target) ? target : null;
     const delta = (pageBox: { top: number; height: number }, view: { top: number; bottom: number }) =>
-      anchor ? anchorDelta(pageBox, anchor.fraction, view.top) : citationLandingDelta(pageBox, region, view);
+      anchor ? anchorDelta(pageBox, anchor.fraction, view.top)
+        : centre ? centredLandingDelta(pageBox, centre, view, centre.start)
+          : citationLandingDelta(pageBox, region, view);
     const page = pageRefs.current.get(pageNumber);
     const toolbar = toolbarRef.current;
     if (!page || !toolbar) return false;
@@ -541,14 +599,19 @@ function PaperPdfReaderSource({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [findLanding, painted, scale]);
 
-  // A thread's passage, once its page is painted at this zoom (IR-875).
+  // A passage Review showed -- a change or a thread's (IR-875, IR-1195) --
+  // once its page is painted at this zoom: centred, then focused where it
+  // lies, so a screen reader says where the reader landed. The scroll is
+  // the landing's own, so focusing doesn't scroll again.
   const landedThreadRef = useRef<number | null>(null);
   useEffect(() => {
     if (!threadLanding || landedThreadRef.current === threadLanding.key) return;
     if (painted.get(threadLanding.page) !== scale) return;
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (land(threadLanding.page, threadLanding, reduceMotion ? "auto" : "smooth")) {
+    const band = passageBand(threadLanding.regions, threadLanding.page);
+    if (land(threadLanding.page, band ? { centre: band } : null, reduceMotion ? "auto" : "smooth")) {
       landedThreadRef.current = threadLanding.key;
+      landingFocus.current?.focus({ preventScroll: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadLanding, painted, scale]);
@@ -599,6 +662,15 @@ function PaperPdfReaderSource({
   const menuOffered = menuActions.length > 0;
   const [menuAt, setMenuAt] = useState<MenuPosition | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The passage the composer acts on, kept while the reader types in it: the
+  // browser's selection leaves the paper once its text box has focus (IR-581).
+  const [held, setHeld] = useState<Passage | null>(null);
+  const [holding, setHolding] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Pressed inside the composer: its text box is about to take focus, and the selection with it.
+  const pressingMenu = useRef(false);
+  // The primary button is down: a selection is still being dragged out.
+  const pointerHeld = useRef(false);
 
   useEffect(() => {
     if (!onComment && !menuOffered) return;
@@ -606,6 +678,15 @@ function PaperPdfReaderSource({
       const passage = currentPassageRef.current();
       setCommentable(passage !== null);
       if (!menuOffered) return;
+      // Still dragging: the composer waits for the button to come up (IR-581).
+      if (passage && pointerHeld.current) return;
+      if (!passage && (pressingMenu.current || menuRef.current?.contains(document.activeElement))) {
+        // Typing in the composer: the passage stays, drawn as a pending mark.
+        setHolding(true);
+        return;
+      }
+      setHolding(false);
+      setHeld(passage);
       setMenuOpen(passage !== null);
       const range = passage ? currentRangeRef.current() : null;
       // jsdom's ranges have no layout at all.
@@ -616,19 +697,60 @@ function PaperPdfReaderSource({
         : null;
       setMenuAt((previous) => (previous?.top === at?.top && previous?.left === at?.left ? previous : at));
     };
+    const press = (e: globalThis.PointerEvent) => { if (e.button === 0) pointerHeld.current = true; };
+    const release = () => {
+      if (!pointerHeld.current) return;
+      pointerHeld.current = false;
+      arm();
+    };
     arm();
     document.addEventListener("selectionchange", arm);
-    return () => document.removeEventListener("selectionchange", arm);
+    document.addEventListener("pointerdown", press, true);
+    document.addEventListener("pointerup", release, true);
+    document.addEventListener("pointercancel", release, true);
+    return () => {
+      document.removeEventListener("selectionchange", arm);
+      document.removeEventListener("pointerdown", press, true);
+      document.removeEventListener("pointerup", release, true);
+      document.removeEventListener("pointercancel", release, true);
+    };
   }, [onComment, menuOffered, findMatch, find.hitsByPage, painted]);
 
-  const chooseAction = (action: SelectionAction) => {
-    const passage = currentPassageRef.current();
-    if (!passage) return;
-    action.run(passage, revision);
-    // Done with the passage: the menu goes with the selection.
+  const closeMenu = () => {
     window.getSelection()?.removeAllRanges();
     setMenuOpen(false);
+    setHeld(null);
+    setHolding(false);
+    pressingMenu.current = false;
   };
+  const chooseAction = (action: SelectionAction, text = "") => {
+    const passage = currentPassageRef.current() ?? held;
+    if (!passage) return;
+    action.run(passage, revision, text);
+    // Done with the passage: the composer goes with the selection.
+    closeMenu();
+  };
+
+  // A plain click on the paper (no drag, no selection) closes the composer and
+  // hides the saved highlights, until the toolbar brings them back (IR-581).
+  const pressedAt = useRef<{ x: number; y: number } | null>(null);
+  const onPaperPointerDown = (e: ReactPointerEvent) => {
+    pressedAt.current = { x: e.clientX, y: e.clientY };
+    pressingMenu.current = false;
+  };
+  const onPaperPointerUp = (e: ReactPointerEvent) => {
+    const from = pressedAt.current;
+    pressedAt.current = null;
+    if (!from || Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) return;
+    if (e.target instanceof Element && e.target.closest("a,button,input,textarea,[role=button]")) return;
+    if (!(window.getSelection()?.isCollapsed ?? true)) return;
+    if (menuOpen) closeMenu();
+    if (highlightsShown && highlights.length > 0) onHighlightsShownChange?.(false);
+  };
+  const drawn = useMemo(() => {
+    const shown = highlightsShown ? highlights : NO_HIGHLIGHTS;
+    return holding && held ? [...shown, { key: "held", regions: held.regions }] : shown;
+  }, [highlightsShown, highlights, holding, held]);
 
   const comment = () => {
     const passage = currentPassageRef.current();
@@ -679,17 +801,11 @@ function PaperPdfReaderSource({
 
   if (status === "error") {
     return (
-      <div className="flex flex-col items-center gap-3 py-16 px-6 text-center rounded-card border border-stone-200 bg-stone-50">
-        <i className="fas fa-file-circle-exclamation text-2xl text-stone-300" aria-hidden />
-        <p className="text-sm font-semibold text-stone-700">Could not load the paper</p>
-        <p className="text-xs text-stone-500 max-w-sm">
-          The file could not be read. Try again, or open it from Documents on the record.
-        </p>
-        <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>
-          <i className="fas fa-rotate-right" aria-hidden />
-          Try again
-        </Button>
-      </div>
+      <ReaderLoadError
+        title="Could not load the paper"
+        hint="The file could not be read. Try again, or open it from Documents on the record."
+        onRetry={() => setAttempt((n) => n + 1)}
+      />
     );
   }
 
@@ -715,7 +831,7 @@ function PaperPdfReaderSource({
         aria-label="Paper tools"
         className={cn(
           fill
-            ? "shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-stone-100 border-b border-stone-200"
+            ? READER_TOOLBAR_FILL
             : cn(
                 "sticky z-10 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 px-2 py-1.5",
                 "rounded-card bg-overlay border border-stone-200",
@@ -733,40 +849,15 @@ function PaperPdfReaderSource({
         )}
         {fill && <span aria-hidden className="w-px h-5 bg-stone-300 mx-1" />}
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={zoomOut}
-            disabled={!ready || scale <= MIN_SCALE}
-            aria-label="Zoom out"
-          >
-            <i className="fas fa-minus" aria-hidden />
-          </Button>
-          {/* The percentage gives way below `sm`, so the toolbar keeps its
-              44px controls on one row at 360px. */}
-          <span className={cn("text-2xs font-semibold text-stone-600 w-10 text-center tabular-nums", !fill && "hidden sm:inline")}>
-            {Math.round(scale * 100)}%
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={zoomIn}
-            disabled={!ready || scale >= MAX_SCALE}
-            aria-label="Zoom in"
-          >
-            <i className="fas fa-plus" aria-hidden />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setZoom("fit")}
-            disabled={!ready}
-            aria-label="Fit to width"
-            aria-pressed={fitting}
-            title="Fit to width"
-          >
-            <i className="fas fa-arrows-left-right-to-line" aria-hidden />
-          </Button>
+          <ZoomControls
+            scale={scale}
+            ready={ready}
+            fitting={fitting}
+            onZoomOut={zoomOut}
+            onZoomIn={zoomIn}
+            onFit={() => setZoom("fit")}
+            compactPercent={!fill}
+          />
           <Button
             ref={find.toggleRef}
             variant="ghost"
@@ -779,6 +870,18 @@ function PaperPdfReaderSource({
           >
             <SearchGlyph className="h-3.5 w-3.5" />
           </Button>
+          {onHighlightsShownChange && highlights.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onHighlightsShownChange(!highlightsShown)}
+              aria-pressed={highlightsShown}
+              aria-label={highlightsShown ? "Hide your highlights" : "Show your highlights"}
+              title={highlightsShown ? "Hide your highlights" : "Show your highlights"}
+            >
+              <i aria-hidden className={cn("fas fa-highlighter text-small", highlightsShown ? "text-brand" : "text-stone-500")} />
+            </Button>
+          )}
           {onComment && (
             <Button
               variant={commentable ? "outline" : "ghost"}
@@ -825,6 +928,8 @@ function PaperPdfReaderSource({
           through it (axe: scrollable-region-focusable). */}
       <div
         ref={scrollAreaCallbackRef}
+        onPointerDown={onPaperPointerDown}
+        onPointerUp={onPaperPointerUp}
         role="region"
         aria-label={ready ? `Paper, ${pageCount} page${pageCount === 1 ? "" : "s"}` : "Paper"}
         tabIndex={0}
@@ -861,15 +966,21 @@ function PaperPdfReaderSource({
               pageNumber={index + 1}
               scale={scale}
               regions={highlightRegions}
+              landingLook={landingLook}
               marks={marks}
+              landing={threadLanding}
+              landingFocusRef={landingFocusRef}
               hits={find.hitsByPage.get(index + 1) ?? NO_HITS}
-              highlights={highlights}
+              highlights={drawn}
               registerRef={registerRef}
             />
           ))}
       </div>
 
-      {menuOffered && menuOpen && <SelectionMenu actions={menuActions} position={menuAt} onChoose={chooseAction} />}
+      {menuOffered && menuOpen && (
+        <SelectionMenu actions={menuActions} position={menuAt} onChoose={chooseAction} onDismiss={closeMenu}
+          menuRef={menuRef} onPress={() => { pressingMenu.current = true; }} />
+      )}
     </div>
   );
 }

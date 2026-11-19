@@ -187,6 +187,18 @@ export const CitationConversationContext = createContext<number | null>(null);
 export const CitationTurnContext = createContext<number | null>(null);
 
 /**
+ * A Sources panel beside the answer (IR-1237). Where one is provided, a citation
+ * chip opens it at its own marker instead of leaving the conversation; where it
+ * is not (Paper Chat, the AI Overview) a chip stays a link to the paper.
+ * `active` is the marker the panel is showing, or `null` when it highlights none.
+ */
+export interface CitationPanel {
+  active: number | null;
+  open: (marker: number) => void;
+}
+export const CitationPanelContext = createContext<CitationPanel | null>(null);
+
+/**
  * Where a citation rendered here links to, and the router state it carries.
  * The one place a citation link is built, so every surface carries its
  * origin and its answer the same way.

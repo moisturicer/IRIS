@@ -12,4 +12,16 @@
 #     expires: 2026-12-31          # YYYY-MM-DD; at most 90 days out
 #
 # Process: docs/testing/TEST_PLAN.md §Security gate.
-entries: []
+entries:
+  # IR-1223: blocks every PR from 2026-11-18. Remove once a fixed picomatch
+  # is published, then upgrade the lockfile.
+  - id: GHSA-fc5q-39xc-vjpf
+    reason: >-
+      ReDoS in picomatch's extglob handling. picomatch is a build and test
+      dependency only, reached through vite, vitest, tailwindcss and
+      tinyglobby: it is not in the browser bundle and does not run on the
+      server, and it only matches glob patterns from IRIS's own config, so no
+      user can supply a crafted pattern. No patched release exists yet; the
+      latest, 4.0.7, is affected.
+    owner: Ashlee Sean
+    expires: 2026-12-18

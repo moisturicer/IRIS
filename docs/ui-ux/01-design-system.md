@@ -125,6 +125,7 @@ Decided on 2026-11-14 by **Lee Jasmin Adolfo** (project lead and frontend owner)
 | Reference | Maroon text on white with a Rule Stone hairline; maroon fill on hover | `--maroon` |
 | Match | Highlight Yellow `#f7e08f`, the current match `#f2c94c`; Ink text on it 14:1 | `--hl`, `--hl-now` |
 | Pen | Rose fill `#fbeaea`, 2 px underline `#b4474b` (5.3:1 on white), a numbered pin; the open thread's passage `#f5d5d6` | `--pen-wash`, `--pen`, `--pen-now` |
+| Highlight (the reader's own, IR-583) | Binding Maroon at 15% opacity, multiplied into the page; no edge, underline or pin, so it never reads as a reviewer's Pen. Its swatch names it in the selection menu and in Notes. Restyled from a stone wash with an Ink underline at Jive's request (IR-581, 2026-11-19) | `--reader-highlight`, `.reader-highlight`, `.highlight-swatch` |
 | Status | White chip, tone in text and outline; only Attention is filled | — |
 
 Also added: `--maroon-press` `#5a0c0f` for a pressed filled button, and `--field` `#8f8884`. Gold and stray hexes are removed. The **Four Inks Rule** now reads: white, black, stone and maroon, plus one yellow highlighter for matches and one rose pen for a reviewer's marks. Where the prototype (`iris-uiux-audit/prototype/styles.css`) and the audit's prose differ, the prototype's values are the decision.

@@ -92,11 +92,12 @@ class SubmitOwnershipTests(APITestCase):
         red test green: this asserted that office staff *could* submit a
         student's draft, which recorded the staff member as the one who gave
         the student's Data Privacy Act consent. Submission is an owner's alone.
-        RDCO can see the draft, so the refusal is a 403 (ADR-022 §Amendment 4).
+        Since IR-1227 a draft is its creator's alone, so RDCO cannot see it and
+        the refusal is the 404 of a missing record (ADR-009 decision 6).
         """
         self.client.force_authenticate(self.rdco)
         response = self._submit()
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND, response.data)
         self.record.refresh_from_db()
         self.assertEqual(self.record.pipeline_status, "draft")
         self.assertIsNone(self.record.dpa_accepted_at)
@@ -570,14 +571,14 @@ class RecordVisibilityTests(APITestCase):
         self.assertEqual(refused.status_code, missing.status_code)
         self.assertEqual(refused.data, missing.data)
 
-    def test_assigned_adviser_can_retrieve_the_draft(self):
+    def test_assigned_adviser_cannot_retrieve_the_draft(self):
         """
-        The adviser is not in STAFF_ROLES, but `adviser_review` is the first
-        gate in the Proposal pipeline -- excluding them would break the
-        workflow this system exists to run.
+        Reversed deliberately by IR-1227 (ADR-009 decision 6): a draft is its
+        creator's alone. The Adviser it names reads it from Submit on, when
+        their review begins.
         """
         self.client.force_authenticate(self.adviser)
-        self.assertEqual(self._get(self.draft).status_code, status.HTTP_200_OK)
+        self.assertEqual(self._get(self.draft).status_code, status.HTTP_404_NOT_FOUND)
 
     def test_unassigned_adviser_cannot_retrieve_the_draft(self):
         """Holding the Adviser role is not the same as being *this* record's adviser."""
@@ -585,10 +586,13 @@ class RecordVisibilityTests(APITestCase):
         self.client.force_authenticate(other_adviser)
         self.assertEqual(self._get(self.draft).status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_office_staff_can_retrieve_any_draft(self):
-        """RDCO performs intake review; it cannot review what it cannot open."""
+    def test_office_staff_cannot_retrieve_a_draft(self):
+        """
+        Reversed deliberately by IR-1227 (ADR-009 decision 6): RDCO's intake
+        review starts at Submit, and a draft is its creator's alone until then.
+        """
         self.client.force_authenticate(self.rdco)
-        self.assertEqual(self._get(self.draft).status_code, status.HTTP_200_OK)
+        self.assertEqual(self._get(self.draft).status_code, status.HTTP_404_NOT_FOUND)
 
     def test_anyone_authenticated_can_retrieve_a_published_record(self):
         self.client.force_authenticate(self.stranger)

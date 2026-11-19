@@ -43,7 +43,7 @@ export function RecentChats({
               FOCUS_RING,
             )}
           >
-            <span className="min-w-0 truncate">{recentChatLabel(c)}</span>
+            <span className="min-w-0 break-words">{recentChatLabel(c)}</span>
             <span className="shrink-0 text-2xs text-stone-500">{when(c.updated_at)}</span>
           </button>
         </li>

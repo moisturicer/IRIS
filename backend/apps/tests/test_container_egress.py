@@ -27,6 +27,8 @@ EXPECTED = {
     "celery-embedding": ["private", "egress"],
     "ai-runs-worker": ["private", "egress"],
     "caddy": ["private", "egress"],
+    # freshclam downloads ClamAV's signatures (IR-666, ADR-074).
+    "clamav": ["private", "egress"],
 }
 
 
@@ -41,6 +43,13 @@ def _networks_by_service():
 
 def test_each_service_joins_only_the_networks_it_needs():
     assert _networks_by_service() == EXPECTED
+
+
+def test_the_malware_scanner_publishes_no_port_and_keeps_its_memory_limit():
+    # ADR-074 decision 6: only Django reaches it, over `private`; decision 5: its limit.
+    body = PROD.split("\n  clamav:\n", 1)[1].split("\n\n  ", 1)[0]
+    assert "ports:" not in body
+    assert re.search(r"^          memory: 1536M$", body, re.MULTILINE)
 
 
 def test_the_private_network_has_no_route_out():

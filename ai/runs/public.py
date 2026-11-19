@@ -194,6 +194,7 @@ def run(snapshot, *, manual_compaction=False, after=None, reserved_tokens=None, 
         "retry_of": snapshot.get("retry_of"),
         "retried_by": snapshot.get("retried_by"),
         "sources_available": snapshot.get("sources_available", True),
+        "selection": snapshot.get("selection"),
         "capabilities": {"manual_compaction": manual_compaction},
     }
 
@@ -202,14 +203,33 @@ def conversation(snapshot, *, manual_compaction=False, reserved_tokens=None, com
     available = {item["id"]: item.get("sources_available", True) for item in snapshot["runs"]}
     return {
         "protocol": PROTOCOL, "id": snapshot["id"], "revision": snapshot["revision"],
+        "title": snapshot.get("title", ""),
         "runs": [run(item, manual_compaction=manual_compaction, reserved_tokens=reserved_tokens,
                      compacts_at_tokens=compacts_at_tokens)
                  for item in snapshot["runs"]],
         "turns": [{**{key: turn[key] for key in (
             "id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations",
         )}, "facts": turn.get("facts", []), "papers": turn.get("papers", []),
+            "selection": turn.get("selection"),
             **({} if available[turn["run_id"]] else {
                 "answer": "This answer is unavailable because its sources changed or are no longer readable.",
                 "citations": [], "facts": [], "papers": [],
             })} for turn in snapshot["turns"]],
     }
+
+
+def _quote(text: str) -> str:
+    return "\n".join(f"> {line}" if line else ">" for line in text.splitlines() or [""])
+
+
+def markdown(view) -> str:
+    """The reader's download (IR-1167), built only from `conversation(...)`'s reader view."""
+    lines = [f"# {view['title'] or 'Untitled conversation'}", ""]
+    for turn in view["turns"]:
+        lines += ["## Question", "", turn["question"], "", "## Answer", "", turn["answer"], ""]
+        if turn["citations"]:
+            lines += ["### Sources", ""]
+            for n, c in enumerate(turn["citations"], start=1):
+                title = c.get("title") or f"Record {c['record_id']}"
+                lines += [f"[{n}] {title}, page {c['page']}", "", _quote(c["quote"]), ""]
+    return "\n".join(lines).rstrip() + "\n"

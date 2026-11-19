@@ -455,7 +455,7 @@ export default function SignupPage() {
         wide
         tabs={<EntrySteps steps={STEPS.map(({ name, shortName }) => ({ name, shortName, state: "completed" }))} />}
       >
-        <div className="max-w-2xl">
+        <div>
           <h2
             ref={confirmationRef}
             tabIndex={-1}

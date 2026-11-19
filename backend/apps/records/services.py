@@ -84,9 +84,12 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
       Is IP, For Commercialization, Community Extension, Authors
 
     Rules:
+    - Only the first sheet is read. The template's second sheet, "How to fill
+      this in", holds an example row that must never import (IR-639).
     - Processing stops when the first cell of a row equals "END OF RECORDS".
+      The template no longer ships one; staff may add it.
     - Completely blank rows are silently skipped.
-    - Authors should be comma-separated (e.g. "Juan Dela Cruz, Maria Santos").
+    - Authors are separated by commas or semicolons (e.g. "Juan Dela Cruz; Maria Santos").
     - Boolean columns accept: TRUE / FALSE / YES / NO / 1 / 0 (case-insensitive).
 
     This only reads the sheet. Whether a row's values can be accepted --
@@ -116,7 +119,8 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
             text = text.decode("utf-8-sig") if isinstance(text, bytes) else text
             all_rows = [tuple(r) for r in csv.reader(io.StringIO(text))]
         else:
-            all_rows = pyexcel.get_array(file_stream=file, file_type=file_type)
+            book = pyexcel.get_book(file_stream=file, file_type=file_type)
+            all_rows = book.sheet_by_index(0).to_array()
     except Exception as exc:
         return [], [f"Could not open file: {exc}. Make sure it is a valid .xls, .xlsx or UTF-8 .csv file."]
 
@@ -294,14 +298,16 @@ def check_import_row(row: dict, choices: ImportChoices) -> tuple[dict, list[str]
     }, problems
 
 
-def check_import_pdf(row: dict, pdfs: dict, taken: dict) -> tuple[object | None, list[str]]:
+def check_import_pdf(row: dict, pdfs: dict, taken: dict, *, user) -> tuple[object | None, list[str]]:
     """
     The PDF a row names in its File Name column, and every reason it cannot be
     attached (IR-1138). `pdfs` maps a lower-cased file name to the uploaded
     file; `taken` maps a file name to the row that already uses it, so one PDF
     is never attached to two records. A blank File Name is fine: the row is
-    imported with no manuscript, as before.
+    imported with no manuscript, as before. `user` is who imports, for the
+    audit of a PDF the malware scan refuses (ADR-074).
     """
+    from apps.documents.scanning import upload_problem
     from apps.documents.validators import pdf_upload_problem
 
     name = row.get("file_name")
@@ -313,7 +319,7 @@ def check_import_pdf(row: dict, pdfs: dict, taken: dict) -> tuple[object | None,
         return None, [f'File Name "{name}" was not uploaded with the sheet']
     if key in taken:
         return None, [f'File Name "{name}" is already used by row {taken[key]}']
-    problem = pdf_upload_problem(pdf)
+    problem = pdf_upload_problem(pdf) or upload_problem(pdf, user=user, where="record_import")
     if problem:
         return None, [f'File Name "{name}": {problem}']
     taken[key] = row["row_num"]

@@ -17,6 +17,7 @@ coordinator who is seated nowhere.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -189,6 +190,15 @@ def _record(title, owner, adviser=None, *, status=PipelineStatus.DRAFT, **extra)
     return record
 
 
+def _fingerprint(*records: Record) -> None:
+    """Give each record, and its versions, the SHA-256 of the file they hold."""
+    digest = hashlib.sha256(PDF_BYTES).hexdigest()
+    for record in records:
+        Record.objects.filter(pk=record.pk).update(manuscript_sha256=digest)
+        record.versions.update(manuscript_sha256=digest)
+        record.manuscript_sha256 = digest
+
+
 def _at_itso(title, users) -> Record:
     """A Thesis the Adviser accepted and routed to ITSO, whose reviewer opened it."""
     owner, adviser, itso = users["owner"], users["adviser"], users["seated"]
@@ -298,6 +308,10 @@ def build_world() -> World:
     o["published"] = published = _record(
         "Matrix: a published Thesis", owner, users["adviser"], status=PipelineStatus.PUBLISHED,
     )
+    # The fingerprint an upload through the API stores, which `_record`'s ORM
+    # write skips. The first-page image is keyed by it (IR-1241), so without
+    # one a permitted reader is told there is nothing to draw.
+    _fingerprint(record, published)
     # The owner's Comment on the published paper (IR-690): only its writer edits or deletes it.
     from apps.records.models import PublicComment
     o["public_comment"] = PublicComment.objects.create(record=published, author=owner, body="Thanks for reading.")

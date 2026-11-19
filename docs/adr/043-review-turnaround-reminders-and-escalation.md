@@ -8,6 +8,8 @@
 
 Amends ADR-032 by adding a time dimension to its assignments. It changes no ADR-032 decision: no act, state, routing edge or visibility rule.
 
+**Amended 2026-11-18 (IR-1216, decided by Ashlee Sean; accepted 2026-11-18 by Lee Jasmin Adolfo, verbally, recorded by Ashlee Sean):** Workflow analytics is RDCO's alone. It moved from under My Reviews to the sidebar's RDCO section, at `/rdco/analytics` (`/review/analytics` redirects there). ITSO, IERC and KTTO no longer see the page or its link, and `GET /reviews/analytics/` refuses them with 403. Read the "Decided before this ADR" line "Office staff see their own office, and RDCO sees every office" as "RDCO sees every office". Why: for an office, the page added little to what My Reviews already shows (its own overdue items), and with pilot volumes its medians mostly read "too few records"; the turnaround figures matter to RDCO, which coordinates every office, and to the ADR-011 evaluation. `analytics.workflow_analytics` still keeps any other caller to its own office, as a second layer under the endpoint's gate.
+
 **Amended 2026-11-01 (IR-767, ADR-047):** RDCO's turnaround starts when the Adviser sends the record. RDCO's clock runs alongside specialist-office clocks. The hand-back no longer opens an assignment. Cutover assignments start a new clock at cutover and are identifiable by the migration reason.
 
 **Corrected and amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted):**
@@ -28,7 +30,7 @@ Decided before this ADR (IR-612, 2026-10-28):
 - The reviewer gets an in-app reminder before the due date and on it.
 - Once overdue, the office coordinator is notified.
 - **A deadline never decides anything.** It does not clear, reject, record a finding, route or withdraw. Human review stays the gate.
-- Analytics read IR-144's workflow `AuditEvent`s. Office staff see their own office, and RDCO sees every office. There is no backfill before IR-144.
+- Analytics read IR-144's workflow `AuditEvent`s. Office staff see their own office, and RDCO sees every office. There is no backfill before IR-144. *(Amended 2026-11-18, IR-1216: RDCO alone; see the amendment under Status.)*
 
 ## Decision
 

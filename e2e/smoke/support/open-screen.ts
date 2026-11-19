@@ -94,6 +94,7 @@ export async function openScreen(page: Page, api: MockApi, screen: Screen, optio
   screen.mocks?.(api);
   options.override?.(api);
   await page.goto(screen.path);
+  await screen.open?.(page);
 }
 
 /** A screen that crashed into the error boundary can be accessible; it is not the screen under test. */

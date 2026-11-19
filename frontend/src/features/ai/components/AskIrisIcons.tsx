@@ -80,3 +80,47 @@ export function SynthesisIcon({
 }: IconProps & { spinning?: boolean }) {
   return <AskIrisGlyph className={className} title={title} answering={spinning} />;
 }
+
+/* ── 5. Conversations pane toggle (IR-1233) ──────────────────────────────── */
+
+/**
+ * A window with its left panel marked: the one toggle that opens and closes the
+ * conversations pane. Stroked at 1.75 in `currentColor`, and decorative: the
+ * button that holds it carries the name.
+ */
+/** The right-hand panel's icon (IR-1237): the left-panel mark, mirrored. */
+export function PanelRightIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...a11y()}
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M15 3v18" />
+    </svg>
+  );
+}
+
+export function PanelLeftIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...a11y()}
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+    </svg>
+  );
+}

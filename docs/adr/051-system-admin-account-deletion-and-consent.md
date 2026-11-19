@@ -68,6 +68,8 @@ Observed on `main`, 2026-11-01:
    | A paper with another owner | That owner carries on (decision 28 covers the Contact person) |
    | Open reviews as an Adviser or office reviewer | Reassigned first |
 
+   *Amended by [ADR-009](009-authorization-model.md) decision 6, 2026-11-19 (IR-1227):* a draft is its creator's alone, so every draft the person created is deleted with the account, including one that names co-owners, who could never open it. A draft someone else created, naming this person as a co-owner, stays its creator's.
+
 10. **RDCO gains three acts on any paper,** so every blocker can be cleared: replace its Adviser, add an owner to a paper in review, and withdraw a paper in review with a required reason.
 11. **On confirmation, the account's personal details and private data go, and the person can't sign in.** The row stays, because deleting it would cascade into ownership and review history. What others see afterwards:
 

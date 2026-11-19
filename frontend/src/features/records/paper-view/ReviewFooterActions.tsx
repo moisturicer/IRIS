@@ -34,8 +34,12 @@ interface Choice {
  * and *Keep unlisted*, *Request revision* and *Reject* all do. Everyone else
  * finishes with one *Finish review…*. The other acts (Request documents, Add
  * a colleague, Withdraw revision request) are in the menu.
+ *
+ * While the reviewer has drafts, **Send N comments…** opens *Finish review* on
+ * *Comment only*, so sending them never waits on choosing a verdict
+ * (ADR-032 §7 as amended 2026-11-16, IR-1194).
  */
-export function ReviewFooterActions({ record, can, actions, finishing, onFinish, lead, onChanged }: {
+export function ReviewFooterActions({ record, can, actions, finishing, onFinish, lead, onChanged, drafts = 0 }: {
   record: RecordDetail;
   can: ReadonlySet<Capability>;
   /** The review acts the footer may offer, in `REVIEW_ACTIONS`' order. */
@@ -46,6 +50,8 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
   /** Open review or Claim: the primary, when the host offers it. */
   lead?: ReactNode;
   onChanged: () => void;
+  /** How many of the viewer's draft threads wait to be sent. */
+  drafts?: number;
 }) {
   const ids = useId();
   const runner = useReviewActionRunner(record, onChanged);
@@ -64,8 +70,13 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
 
   let primary: Choice | null = null;
   let secondary: Choice | null = null;
+  let send: Choice | null = null;
   const menu: Choice[] = [];
   if (finishing) {
+    if (drafts > 0) {
+      send = { key: "send", label: `Send ${drafts} ${drafts === 1 ? "comment" : "comments"}…`, icon: "fa-paper-plane",
+        blocked: null, onSelect: () => onFinish("comment_only") };
+    }
     const publishes = can.has("accept_publish");
     const unlists = can.has("keep_unlisted");
     if (publishes || unlists) {
@@ -100,7 +111,7 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
   const reasonId = `${ids}-held`;
   const heldReason = primary?.blocked ?? secondary?.blocked ?? null;
 
-  if (!lead && !primary && !secondary && menu.length === 0) return runner.portal;
+  if (!lead && !primary && !secondary && !send && menu.length === 0) return runner.portal;
 
   const pill = (c: Choice, filled: boolean) => (
     <button key={c.key} type="button" disabled={c.blocked != null} onClick={c.onSelect}
@@ -114,6 +125,7 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
     <>
       <div role="toolbar" aria-label="Review actions" className="ml-auto flex flex-wrap items-center justify-end gap-2">
         {menu.length > 0 && <MoreMenu choices={menu} />}
+        {send && pill(send, false)}
         {secondary && pill(secondary, false)}
         {lead}
         {primary && pill(primary, !lead)}

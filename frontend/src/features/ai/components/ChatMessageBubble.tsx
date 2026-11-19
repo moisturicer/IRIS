@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ChatMessage } from "@/types/chat";
-import { CitationTurnContext } from "@/lib/citedPage";
+import { CitationPanelContext, CitationTurnContext } from "@/lib/citedPage";
 import { cn } from "@/lib/utils";
+import type { ChatCitation } from "@/types/ai";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
 import { CandidateList } from "./CandidateList";
 import { ComparisonTable } from "./ComparisonTable";
-import { CopyButton } from "./CopyButton";
+import { CopyButton, MESSAGE_ACTION } from "./CopyButton";
 import {
   DegradedNotice,
   PartialAnswerNotice,
@@ -38,6 +39,13 @@ interface ChatMessageBubbleProps {
   onSelectSources?: (message: ChatMessage) => void;
   /** The sources open beneath the answer itself, rather than in a panel. */
   inlineSources?: boolean;
+  /**
+   * A Sources panel sits beside the chat (IR-1237): the answer's count and chips
+   * open it, at a marker or at none, and `openMarker` is the one it highlights.
+   * Ask again then belongs to the answer, and the question keeps Edit and Copy.
+   */
+  onOpenSources?: (message: ChatMessage, marker: number | null) => void;
+  openMarker?: number | null;
   /** Send this question again as a new Turn (IR-1162). */
   onAskAgain?: (question: string) => void;
   /** Put this question in the input to change and send (IR-1162). */
@@ -85,6 +93,19 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
   );
 }
 
+/** "3 passages from 2 papers": the answer's evidence in one count, and the way to the panel (IR-1237). */
+function PassageCount({ citations, open, onOpen }: { citations: ChatCitation[]; open: boolean; onOpen: () => void }) {
+  const papers = new Set(citations.map((citation) => citation.record_id)).size;
+  const label = `${citations.length} ${citations.length === 1 ? "passage" : "passages"} from ${papers} ${papers === 1 ? "paper" : "papers"}`;
+  return (
+    <button type="button" onClick={onOpen} aria-expanded={open}
+      className={cn("inline-flex min-h-8 items-center gap-1.5 rounded-control px-2 -ml-2 text-small font-medium transition-colors",
+        open ? "text-brand" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")}>
+      {label}
+    </button>
+  );
+}
+
 /**
  * Ask a question again, or edit it and send it (IR-1162). Neither replaces
  * anything: the earlier Turn stays and a new one follows.
@@ -99,25 +120,28 @@ export function QuestionControls({
   className?: string;
 }) {
   if (!onAskAgain && !onEdit) return null;
-  const button = "inline-flex items-center gap-1.5 min-h-8 px-2 rounded-control text-small font-medium text-stone-600 " +
-    "hover:text-stone-900 hover:bg-stone-100 disabled:opacity-50 disabled:cursor-not-allowed";
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn("flex items-center gap-0.5", className)}>
       {onAskAgain && (
-        <button type="button" disabled={disabled} onClick={() => onAskAgain(question)} className={button}>
+        <button type="button" disabled={disabled} onClick={() => onAskAgain(question)}
+          aria-label="Ask again" title="Ask again" className={MESSAGE_ACTION}>
           <i className="fas fa-rotate-right text-label" aria-hidden />
-          Ask again
         </button>
       )}
       {onEdit && (
-        <button type="button" disabled={disabled} onClick={() => onEdit(question)} className={button}>
+        <button type="button" disabled={disabled} onClick={() => onEdit(question)}
+          aria-label="Edit" title="Edit" className={MESSAGE_ACTION}>
           <i className="fas fa-pen text-label" aria-hidden />
-          Edit
         </button>
       )}
+      <CopyButton text={question} label="Copy question" />
     </div>
   );
 }
+
+/** Message actions fade in on hover or focus; touch has no hover, so they stay shown there. */
+const REVEAL_ON_HOVER =
+  "opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 motion-reduce:transition-none";
 
 /**
  * The way to ask a question again: for a queued run that ended unanswered
@@ -152,15 +176,20 @@ function RetryButton({ onRetry, disabled }: { onRetry?: () => void; disabled?: b
  */
 export function ChatMessageBubble({
   message, compact = false, retryDisabled, onRetry, sourcesSelected = false, onSelectSources, inlineSources = false,
-  onAskAgain, onEdit, controlsDisabled,
+  onOpenSources, openMarker = null, onAskAgain, onEdit, controlsDisabled,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
   const [expanded, setExpanded] = useState(false);
   const markers = [...new Set((message.citations ?? []).map((citation) => citation.marker))];
+  const inPanelMode = !!onOpenSources;
+  const panel = useMemo(() => onOpenSources
+    ? { active: sourcesSelected ? openMarker : null, open: (marker: number) => onOpenSources(message, marker) }
+    : null, [onOpenSources, sourcesSelected, openMarker, message]);
 
   return (
     // Its citations name this answer, the way back to it (IR-578).
     <CitationTurnContext.Provider value={message.turnId ?? null}>
+    <CitationPanelContext.Provider value={panel}>
     <div
       data-turn={isUser ? undefined : message.turnId}
       className={cn(
@@ -186,31 +215,29 @@ export function ChatMessageBubble({
         )}
       </div>
 
-      <div
-        className={cn(
-          compact ? "text-sm leading-relaxed" : "text-md leading-relaxed",
-          isUser
-            ? cn(
-                "max-w-[85%] rounded-card",
-                compact ? "bg-stone-100 rounded-tr-none px-3.5 py-2.5" : "bg-stone-100 px-4 py-3",
-              )
-            : "min-w-0 flex-1",
-        )}
-      >
-        {!isUser && <ReasoningSummary summary={message.reasoningSummary} compact={compact} />}
-        {!isUser && message.comparison && <ComparisonTable comparison={message.comparison} />}
-        {isUser ? (
-          <>
+      {isUser && (
+        <div className="flex max-w-[85%] flex-col items-end">
+          <div className={cn(
+            "rounded-card bg-stone-100",
+            compact ? "text-sm leading-relaxed rounded-tr-none px-3.5 py-2.5" : "text-md leading-relaxed px-4 py-3",
+          )}>
             <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
-            <QuestionControls
-              question={message.content}
-              disabled={controlsDisabled}
-              onAskAgain={onAskAgain}
-              onEdit={onEdit}
-              className="mt-1 -mb-1 -ml-2"
-            />
-          </>
-        ) : !message.listing || message.listing.count ? (
+          </div>
+          <QuestionControls
+            question={message.content}
+            disabled={controlsDisabled}
+            onAskAgain={inPanelMode ? undefined : onAskAgain}
+            onEdit={onEdit}
+            className={cn("mt-1 -mr-1", REVEAL_ON_HOVER)}
+          />
+        </div>
+      )}
+
+      {!isUser && (
+      <div className={cn(compact ? "text-sm leading-relaxed" : "text-md leading-relaxed", "min-w-0 flex-1")}>
+        <ReasoningSummary summary={message.reasoningSummary} compact={compact} />
+        {message.comparison && <ComparisonTable comparison={message.comparison} />}
+        {!message.listing || message.listing.count ? (
           <CitationText
             text={message.content}
             citations={message.citations ?? []}
@@ -256,30 +283,39 @@ export function ChatMessageBubble({
 
         {!isUser && (
           <div className="mt-1.5 flex items-center gap-2 motion-safe:animate-fade-in-up">
-            {inlineSources && markers.length > 0 && (
+            {inPanelMode && markers.length > 0 && (
+              <PassageCount citations={message.citations ?? []} open={sourcesSelected && openMarker === null}
+                onOpen={() => onOpenSources(message, null)} />
+            )}
+            {!inPanelMode && inlineSources && markers.length > 0 && (
               <SourcesButton markers={markers} selected={expanded} onSelect={() => setExpanded(v => !v)} />
             )}
-            {!inlineSources && onSelectSources && markers.length > 0 && (
+            {!inPanelMode && !inlineSources && onSelectSources && markers.length > 0 && (
               <SourcesButton
                 markers={markers}
                 selected={sourcesSelected}
                 onSelect={() => onSelectSources(message)}
               />
             )}
-            {/* Touch has no hover, so Copy stays visible there. */}
-            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-200">
-              <CopyButton text={message.content} label="Copy answer" />
-            </div>
+            <CopyButton text={message.content} label="Copy answer" className={cn(!markers.length && "-ml-1.5")} />
+            {inPanelMode && onAskAgain && message.question && (
+              <button type="button" disabled={controlsDisabled} onClick={() => onAskAgain(message.question as string)}
+                aria-label="Ask again" title="Ask again" className={MESSAGE_ACTION}>
+                <i className="fas fa-rotate-right text-label" aria-hidden />
+              </button>
+            )}
           </div>
         )}
-        {!isUser && inlineSources && expanded && (
+        {!isUser && !inPanelMode && inlineSources && expanded && (
           <div className="mt-2 origin-top border-t border-stone-200 pt-2.5 motion-safe:animate-[sources-open_260ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <SourcePassages citations={message.citations ?? []} sources={message.sources ?? []} answered
               className="-mx-2" />
           </div>
         )}
       </div>
+      )}
     </div>
+    </CitationPanelContext.Provider>
     </CitationTurnContext.Provider>
   );
 }

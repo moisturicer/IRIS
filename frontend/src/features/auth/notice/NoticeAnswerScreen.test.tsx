@@ -48,7 +48,6 @@ beforeEach(() => {
   useAuthStore.setState({
     user: null,
     accessToken: validToken(),
-    refreshToken: "refresh-1",
     isAuthenticated: true,
     authReady: true,
   });
@@ -149,7 +148,7 @@ describe("the notice screen", () => {
     await user.click(screen.getByRole("button", { name: "Sign out" }));
 
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
-    expect(logout).toHaveBeenCalledWith("refresh-1");
+    expect(logout).toHaveBeenCalledWith(); // ADR-072: the token is in its HttpOnly cookie
     expect(useAuthStore.getState().accessToken).toBeNull();
     expect(useNoticeStore.getState().required).toBe(false);
   });

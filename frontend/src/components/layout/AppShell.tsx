@@ -13,6 +13,9 @@ import { useSidebarMode } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
 
+/** The id of `main`, the skip link's target (IR-1184). */
+const MAIN_ID = "main-content";
+
 /**
  * The menu button, the IRIS mark and the bell, for phones (IR-519). The mark
  * links to Discover, so the phone has a brand and a way home (audit RES-04).
@@ -93,6 +96,7 @@ export function AppShell() {
   const drawerOpen = mode !== "desktop" && sidebarOpen;
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   // Set only when the reader dismissed the drawer (Escape, Close menu, the
   // backdrop). Choosing a link also closes it, and then focus belongs to the
   // page that opened, not to Open menu -- which Ask IRIS does not even render.
@@ -134,6 +138,29 @@ export function AppShell() {
 
   return (
     <div className={cn("flex bg-canvas font-sans", isAskIris ? "h-dvh overflow-hidden" : "min-h-screen")}>
+      {/* The first tab stop on every page (IR-1184, WCAG 2.4.1): the sidebar
+          comes before `main`, and an office user would otherwise tab through
+          all of it on every page. Off screen until focused, then a white-on-
+          maroon chip (12.3:1) at the top left, above the drawer and its
+          backdrop. The click moves focus itself rather than leaving it to the
+          `#main-content` fragment, so it needs no router and no hash change.
+          An open drawer makes the page behind it inert, and so this link. */}
+      <a
+        href={`#${MAIN_ID}`}
+        onClick={(e) => {
+          e.preventDefault();
+          mainRef.current?.focus();
+        }}
+        {...(drawerOpen ? { inert: "" } : {})}
+        className={cn(
+          "sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100]",
+          "rounded-control bg-brand px-4 py-2 text-sm font-medium text-white shadow-lg",
+          FOCUS_RING,
+        )}
+      >
+        Skip to content
+      </a>
+
       {sidebarOpen && (
         // A pointer target only: the drawer's own Close menu button and Escape
         // are the keyboard route, so this is kept out of the tab order and the
@@ -175,7 +202,13 @@ export function AppShell() {
             descendant inert. No overflow value at all, not `overflow-x-clip`:
             a wide table with no scroll wrapper of its own must stay reachable
             by scrolling the window sideways, not be cut off. */}
-        <main className={cn("flex-1", isFullBleed ? "p-0" : "p-4 sm:p-7", isAskIris && "min-h-0")}>
+        {/* `tabIndex={-1}` makes main a focus target for the skip link without
+            adding a tab stop; it is not a control, so it draws no ring. */}
+        <main
+          id={MAIN_ID}
+          ref={mainRef}
+          tabIndex={-1}
+          className={cn("flex-1 focus:outline-none", isFullBleed ? "p-0" : "p-4 sm:p-7", isAskIris && "min-h-0")}>
           {isFullBleed ? (
             <Outlet />
           ) : (

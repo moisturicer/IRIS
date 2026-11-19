@@ -45,11 +45,12 @@ IR-877).
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from apps.audit import workflow as audit
 from apps.records.versions import latest_version
-from core.enums import OPEN_SEAT_STATES, ReviewVerdict, SeatState, ThreadSeverity
+from core.enums import OPEN_SEAT_STATES, ReviewCommentKind, ReviewVerdict, SeatState, ThreadSeverity
 from core.permissions import may_read_review
 from core.text_limits import too_long, too_long_message
 
@@ -132,7 +133,8 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
 
     drafts = list(
         ReviewComment.objects.select_for_update()
-        .filter(record=record, author=actor, is_draft=True, reply_to__isnull=True)
+        .filter(record=record, author=actor, is_draft=True, reply_to__isnull=True,
+                kind=ReviewCommentKind.THREAD)
         .order_by("created_at", "pk")
     )
     if verdict == ReviewVerdict.COMMENT_ONLY and not summary and not drafts:
@@ -142,6 +144,12 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
         raise FinishError(
             "You can't approve while sending a Must fix comment. Change it to Suggestion, "
             "or request a revision."
+        )
+    # A finding ends the seat too, so it can't leave a Must fix of its own open (IR-1226).
+    if verdict == ReviewVerdict.FINDING and must_fix:
+        raise FinishError(
+            "You can't record a finding while sending a Must fix comment. Change it to "
+            "Suggestion, or request a revision."
         )
 
     party = str(seat.assignment.party)
@@ -191,7 +199,11 @@ def _notify_unannounced(record, actor, round_, threads, *, comment_only):
 
 
 def round_payload(round_) -> dict:
-    """One finished review, as the tracker's timeline shows it. Review content."""
+    """One finished review, as the tracker's timeline shows it. Review content.
+    Conversation's line for it counts its threads and their *Must fix* (IR-1194)."""
+    counts = round_.threads.aggregate(
+        threads=Count("pk"), must_fix=Count("pk", filter=Q(severity=ThreadSeverity.MUST_FIX)),
+    )
     return {
         "id": round_.pk,
         "party": round_.party,
@@ -201,7 +213,8 @@ def round_payload(round_) -> dict:
         "verdict": round_.verdict,
         "summary": round_.summary,
         "review": round_.review_id,
-        "threads": round_.threads.count(),
+        "threads": counts["threads"],
+        "must_fix": counts["must_fix"],
         "created_at": round_.created_at.isoformat(),
     }
 

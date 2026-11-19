@@ -3,6 +3,15 @@ import { apiClient } from "./client";
 export const READER_PROTOCOL = "runs-reader-1";
 
 export type Depth = "ordinary" | "deep";
+/**
+ * The passage a question was asked about, as the server shows it (IR-581): whole while the
+ * paper is readable, `current` false once it was replaced; only `available: false` otherwise.
+ */
+export type ReaderSelection =
+  | { available: true; record_id: number; page: number; quote: string; manuscript_revision: string; current: boolean }
+  | { available: false };
+/** What a question about a selection sends; the server verifies every field (IR-581). */
+export interface SelectionRequest { record_id: number; manuscript_revision: string | null; page: number; quote: string }
 export interface ReaderRun {
   protocol: typeof READER_PROTOCOL;
   id: string;
@@ -34,6 +43,8 @@ export interface ReaderRun {
   /** Older context condensed into a summary; the original Turns stay (IR-735). Absent from older servers. */
   compaction?: null | { compactions: number; turns_compacted: number; last: "compacted" | "kept" };
   capabilities: { manual_compaction: boolean };
+  /** The passage this question was asked about, if any (IR-581). Absent from older servers. */
+  selection?: ReaderSelection | null;
 }
 export interface ReaderActivity {
   phase: "waiting" | "working";
@@ -59,12 +70,23 @@ export interface ReaderConversation {
   protocol: typeof READER_PROTOCOL;
   id: string;
   revision: number;
+  /** The reader's own name for it, or its first question (IR-1160). Absent from older servers. */
+  title?: string;
   runs: ReaderRun[];
   turns: { id: string; run_id: string; ordinal: number; question: string; answer: string; kind: string;
     citations: { record_id: number; page: number; quote: string; revision: string;
+      /** The paper's title while the reader can read it (IR-1167). */
+      title?: string | null;
       regions?: { page: number; left: number; top: number; right: number; bottom: number }[] }[];
     papers?: { title: string; record_id: number }[] }[];
 }
+
+/** The longest title a reader may give a Conversation (IR-1160). */
+export const TITLE_MAX = 200;
+export const TITLE_TOO_LONG = `A title can be at most ${TITLE_MAX} characters.`;
+
+/** A Conversation saved as a file (IR-1167). */
+export interface ConversationFile { blob: Blob; filename: string }
 
 export const activeRun = (run: ReaderRun) => run.state === "queued" || run.state === "running";
 /** Ended without an answer, so the reader may ask the same question again. */
@@ -93,9 +115,11 @@ export function runtimeReader(scope?: number | (() => number | undefined)) {
   };
   const base = "/ai/runtime";
   return {
-    async submit(question: string, depth: Depth, key: string, conversation?: ReaderConversation) {
+    async submit(question: string, depth: Depth, key: string, conversation?: ReaderConversation,
+      selection?: SelectionRequest) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs`, {
         question, depth, ...(conversation ? { conversation_id: conversation.id, base_revision: conversation.revision } : {}),
+        ...(selection ? { selection } : {}),
       }, { ...config(), headers: { ...config().headers, "Idempotency-Key": key } });
       return checked(data);
     },
@@ -121,6 +145,19 @@ export function runtimeReader(scope?: number | (() => number | undefined)) {
         });
       checked(data);
       return { conversations: data.conversations, next: data.next ?? null };
+    },
+    /** Renames a Conversation; blank restores its first question. Resolves to the title now shown (IR-1160). */
+    async rename(id: string, title: string) {
+      const { data } = await apiClient.patch<{ protocol: string; title: string }>(
+        `${base}/conversations/${encodeURIComponent(id)}`, { title }, config());
+      return checked(data).title;
+    },
+    /** The Conversation as the reader sees it, as a Markdown file (IR-1167). */
+    async download(id: string): Promise<ConversationFile> {
+      const response = await apiClient.get<Blob>(`${base}/conversations/${encodeURIComponent(id)}/export`,
+        { ...config(), responseType: "blob" });
+      const match = /filename="([^"]+)"/.exec(String(response.headers?.["content-disposition"] ?? ""));
+      return { blob: response.data, filename: match?.[1] ?? "conversation.md" };
     },
     async remove(id: string) {
       await apiClient.delete(`${base}/conversations/${encodeURIComponent(id)}`, config());

@@ -49,6 +49,7 @@ import { formatDate }  from "@/lib/utils";
 import type { DeleteRequest } from "@/types/records";
 
 import { RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 type Tab = "pending" | "approved" | "declined" | "all";
 const TABS: readonly (readonly [Tab, string])[] = [
@@ -90,6 +91,8 @@ export default function DeleteRequestsPage() {
   );
   const loading = read.status === "loading";
   const requests = read.rows;
+  // Live updates (ADR-073): RDCO's queues, reloaded quietly.
+  useLiveRefresh(["queues"], read.refresh);
 
   // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
   // the server's own reason on a refusal.
@@ -118,7 +121,7 @@ export default function DeleteRequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Delete Requests"
+        title="Delete requests"
         description="Authors asking RDCO to remove a published record. Approving removes it from Discover and Ask IRIS; the audit log keeps the decision."
       />
 
@@ -208,11 +211,11 @@ export default function DeleteRequestsPage() {
               <tbody className="divide-y divide-stone-100">
                 {requests.map((req) => (
                   <tr key={req.id} className="hover:bg-stone-50 transition-colors">
-                    <td className="px-4 py-3 max-w-[200px]">
+                    <td className="px-4 py-3">
                       {/* Record may already be soft-deleted; link still works for detail if accessible */}
                       <Link
                         to={`/records/${req.record}`}
-                        className="text-brand font-medium hover:underline line-clamp-2 leading-snug"
+                        className="break-words text-brand font-medium hover:underline leading-snug"
                       >
                         {req.record_title}
                       </Link>
@@ -221,9 +224,9 @@ export default function DeleteRequestsPage() {
                       <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
                       <p className="text-label text-stone-500">{req.requested_by_email}</p>
                     </td>
-                    <td className="px-4 py-3 max-w-[180px]">
+                    <td className="px-4 py-3">
                       {req.reason ? (
-                        <p className="text-stone-600 line-clamp-2 text-small">{req.reason}</p>
+                        <p className="whitespace-pre-line break-words text-stone-600 text-small">{req.reason}</p>
                       ) : (
                         <span className="text-stone-500 italic text-small">No reason given</span>
                       )}

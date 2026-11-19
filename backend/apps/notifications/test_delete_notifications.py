@@ -25,9 +25,9 @@ from rest_framework import status
 
 from apps.accounts.models import User
 from apps.documents.models import DocumentRequest
-from apps.records.models import RecordOwner
+from apps.records.models import Record, RecordOwner
 from apps.reviews.test_decisions import DecisionTestBase
-from core.enums import DocumentRequestState, Party, RoleName
+from core.enums import DocumentRequestState, Party, PipelineStatus, RoleName
 
 NOTIFICATIONS = "/api/v1/notifications/"
 SEND_EMAIL = "apps.notifications.services.send_email_async"
@@ -134,8 +134,20 @@ class WithdrawingARecordInReviewTests(DeleteNotificationTestBase):
 
 class DeletingADraftTests(DeleteNotificationTestBase):
 
-    def test_the_other_owner_is_told_in_app_and_by_email(self):
+    def test_its_co_owner_is_not_told(self):
+        # A draft is its creator's alone (IR-1227, ADR-009 decision 6): a
+        # co-owner it names never saw it, and the notice would name it.
         record = self.co_owned(self.make_record())
+
+        emails = self.delete_as_owner(record)
+
+        self.assertEqual(self.notices(self.reader, "Record Deleted"), [])
+        self.assertEqual(self.notices(self.owner, "Record Deleted"), [])
+        self.assertEqual(emails, [])
+
+    def test_a_rejected_record_s_other_owner_is_still_told_in_app_and_by_email(self):
+        record = self.co_owned(self.make_record())
+        Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.REJECTED)
 
         emails = self.delete_as_owner(record)
 

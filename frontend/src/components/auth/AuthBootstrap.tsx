@@ -5,6 +5,8 @@ import { reloadPage } from "@/lib/readFailure";
 import { authApi } from "@/api/auth";
 import { startHeartbeat, startIdleWatch, trackActivity } from "@/lib/activity";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
+import { startLive, stopLive } from "@/lib/live";
+import { refreshSession } from "@/api/client";
 
 /**
  * Restores the session from sessionStorage (refresh token) before the router
@@ -20,6 +22,7 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
   const authReady       = useAuthStore((s) => s.authReady);
   const hydrateAuth     = useAuthStore((s) => s.hydrateAuth);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const remembered      = useAuthStore((s) => s.remembered);
 
   useEffect(() => {
     void hydrateAuth();
@@ -29,7 +32,9 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const unwatch = startIdleWatch(() => {
+    // "Keep me signed in" (ADR-072): the server doesn't end a remembered
+    // session for idleness, so neither does the browser.
+    const unwatch = remembered ? () => {} : startIdleWatch(() => {
       useAuthStore.getState().logout();
       redirectToLoginSessionExpired();
     });
@@ -38,6 +43,14 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
     // handled by the client's interceptor like any other.
     const stopHeartbeat = startHeartbeat(() => { void authApi.me().catch(() => {}); });
     return () => { unwatch(); stopHeartbeat(); };
+  }, [isAuthenticated, remembered]);
+
+  // Live updates (ADR-073): one hint stream per tab while signed in, opened
+  // with the current access token and refreshed through the one refresh path.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    startLive({ token: () => useAuthStore.getState().accessToken, refresh: refreshSession });
+    return () => stopLive();
   }, [isAuthenticated]);
 
   if (!authReady) {

@@ -89,8 +89,10 @@ def make_record(*, title, text, embedder, space, status=PipelineStatus.PUBLISHED
     record with no recovered rectangles produces (IR-334) -- the case every
     other suite here is unaffected by. A test about highlighting passes both.
     """
+    # The owner is its creator, as Publish makes it (`added_by`): a draft is
+    # its creator's alone (IR-1227).
     record = Record.objects.create(
-        title=title, abstract=f"An abstract for {title}.", pipeline_status=status
+        title=title, abstract=f"An abstract for {title}.", pipeline_status=status, added_by=owner,
     )
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)

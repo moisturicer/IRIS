@@ -63,7 +63,7 @@ def run(runtime, token, extractor=None, *, pipeline='synthetic-v1', lease=60):
 
 def source():
     owner = make_user('pending-runtime-owner@cit.edu')
-    record = Record.objects.create(title='Synthetic', abstract_file='manuscripts/synthetic.pdf')
+    record = Record.objects.create(added_by=owner, title='Synthetic', abstract_file='manuscripts/synthetic.pdf')
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     work = ManuscriptWork.objects.get(record=record, revoked_at=None)
     return owner, record, authority.issue_grant(work.pk).token

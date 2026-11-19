@@ -123,7 +123,7 @@ test("search finds published papers by what they say, and never an unpublished o
   await expect(page.getByRole("heading", { name: "No research matches these filters" })).toHaveCount(0);
 });
 
-test("filters narrow the results, the address holds them, and Clear all undoes them", async ({ page }, testInfo) => {
+test("filters narrow the results, the address holds them, and Clear filters undoes them", async ({ page }, testInfo) => {
   await openDiscover(page);
   await search(page, stem);
   await expect(paperLink(page, thesisTitle)).toBeVisible();
@@ -137,8 +137,8 @@ test("filters narrow the results, the address holds them, and Clear all undoes t
   await expect(page).toHaveURL(/[?&]type=\d+/);
   await a11y.scan(page, testInfo, "discover-filters-open");
 
-  // Clear all restores both.
-  await sheet.getByRole("button", { name: "Clear all" }).click();
+  // Clear filters restores both (IR-1188 renamed it from Clear all: the panel holds Areas too).
+  await sheet.getByRole("button", { name: "Clear filters" }).click();
   await expect(paperLink(page, thesisTitle)).toBeVisible();
   await expect(paperLink(page, projectTitle)).toBeVisible();
   await expect(filtersButton(page)).toHaveAccessibleName("Filters");
@@ -163,6 +163,11 @@ test("filters narrow the results, the address holds them, and Clear all undoes t
   await expect(paperLink(page, projectTitle)).toHaveCount(0);
   await expect(filtersButton(page)).toHaveAccessibleName("Filters, 1 active");
   await a11y.reflow360(page, "discover-filtered");
+
+  // The panel, now holding the reader's Areas as well, fits 360 px (IR-1188).
+  await filtersButton(page).click();
+  await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();
+  await a11y.reflow360(page, "discover-filters-panel");
 });
 
 test("a card opens its paper, and Back returns to the same search", async ({ page }) => {

@@ -50,7 +50,7 @@ test("the search box has an accessible name, searches by keyboard and says plain
 test("a reader with no conversations is told so, not that a search failed", async () => {
   serve(reply([]));
   render(<History />);
-  expect(await screen.findByText("Your past chats will appear here.")).toBeInTheDocument();
+  expect(await screen.findByText("Your past conversations will appear here.")).toBeInTheDocument();
 });
 
 test("Load more reaches older conversations and keeps the search", async () => {
@@ -65,10 +65,20 @@ test("Load more reaches older conversations and keeps the search", async () => {
   expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
 });
 
-test("a failed load says so", async () => {
-  vi.spyOn(apiClient, "get").mockImplementation(async (url) => { if (url === "/ai/conversations/") return { data: [] }; throw new Error("down"); });
+test("a failed load says so, and Try again asks for the list once more (IR-1238)", async () => {
+  let attempts = 0;
+  vi.spyOn(apiClient, "get").mockImplementation(async (url) => {
+    if (url === "/ai/conversations/") return { data: [] };
+    if (++attempts === 1) throw new Error("down");
+    return reply(["Flood methods"]) as never;
+  });
+  const user = userEvent.setup();
   render(<History />);
-  expect(await screen.findByText(/Could not load your conversations/)).toBeInTheDocument();
+  expect(await screen.findByRole("alert")).toHaveTextContent("IRIS couldn't load your conversations. Your new questions still work.");
+  expect(screen.getByRole("searchbox", { name: "Search your past conversations" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  expect(await screen.findByRole("link", { name: /Flood methods/ })).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 test("a late answer to an older search is ignored", async () => {

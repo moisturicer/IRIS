@@ -45,6 +45,11 @@ export const REDIRECTS: ReadonlyArray<{
     byRole: { [ROLES.SYSTEM_ADMIN]: "/admin/audit?event_type=NOTICE_PUBLISHED" },
     why: "The Notices page became Setup's Notice section; the System Admin reads publications in the Audit Log (ADR-063 decision 9, IR-972)",
   },
+  {
+    path: "review/analytics",
+    to: "/rdco/analytics",
+    why: "Workflow analytics left My Reviews for RDCO's own section, RDCO alone (IR-1216)",
+  },
 ];
 
 function RetiredUrl({ to, byRole }: { to: string; byRole?: Partial<Record<RoleName, string>> }) {

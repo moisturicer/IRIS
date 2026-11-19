@@ -32,7 +32,7 @@ export const NO_NOTE = "No note recorded";
 /** RDCO's note under a decided row's status, or that there is none (older rows). */
 export function RdcoNoteLine({ note }: { note: string }) {
   return (
-    <p className="mt-1 text-label max-w-xs break-words">
+    <p className="mt-1 text-label break-words">
       <span className="text-stone-500">RDCO's note: </span>
       {note
         ? <span className="text-stone-700">{note}</span>

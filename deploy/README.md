@@ -137,6 +137,23 @@ Going back never undoes a database migration. Run `git checkout main` before the
 
 It doesn't back up the database first; do that yourself before an update that migrates.
 
+### Malware scanning (ADR-074, IR-666)
+
+Every upload is scanned by the `clamav` service before it is stored. While ClamAV is down or still loading its signatures, **uploads are refused** with "File checking is temporarily unavailable"; reading and downloading carry on. On a fresh server its first start downloads the signatures (about 100 MB), which takes a minute or two; step 4 waits for it.
+
+- **Memory:** about 1.0 GiB with the signatures loaded (measured 2026-11-16, `clamav/clamav:stable`, on a development machine; **not yet measured on the demo host**, so check `docker stats clamav` at the first deploy); the limit is 1.5 GB.
+- **Is it up?** `docker compose -f docker-compose.prod.yml ps clamav` shows `healthy`.
+
+**Once, right after the update that adds scanning**, scan the files stored before it:
+
+```bash
+cd ~/IRIS
+docker compose -f docker-compose.prod.yml exec backend python manage.py scan_stored_uploads --dry-run
+docker compose -f docker-compose.prod.yml exec backend python manage.py scan_stored_uploads
+```
+
+The dry run lists what fails and changes nothing. The real run moves each failing file to the `quarantine` volume (never served), empties it from every row that names it, drops what IRIS read from it (a Manuscript's extracted text, Figures and chunks; a slot upload's extracted text), audits it as `FILE_QUARANTINED`, and tells its uploader and RDCO. It stops, changing nothing more, if ClamAV doesn't answer. Running it again is harmless.
+
 ## aws/iris-demo.yaml
 
 **Why:** the first server (2026-11-10) was clicked together in the EC2 console: instance, firewall, fixed IP. This template makes the same server in any AWS account from one file, and deleting it removes everything it made.

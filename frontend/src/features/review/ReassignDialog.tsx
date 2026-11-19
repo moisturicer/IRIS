@@ -6,13 +6,17 @@ import { Button, Modal, Skeleton } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
-import type { AddReviewerOptions } from "@/types/records";
+import type { AddReviewerOptions, RemovalLeaving } from "@/types/records";
+
+import { RemovalWarning } from "./RemovalWarning";
 
 interface ReassignDialogProps {
   seatId:       number;
   assignmentId: number;
   recordTitle:  string;
   holderName:   string | null;
+  /** What the holder leaves, from the console row (IR-1226). */
+  leaving?:     RemovalLeaving | null;
   onClose:      () => void;
   /** Reassigned: to whom. */
   onReassigned: (name: string) => void;
@@ -29,7 +33,7 @@ interface ReassignDialogProps {
  * listed but cannot be chosen.
  */
 export function ReassignDialog({
-  seatId, assignmentId, recordTitle, holderName, onClose, onReassigned,
+  seatId, assignmentId, recordTitle, holderName, leaving, onClose, onReassigned,
 }: ReassignDialogProps) {
   const ids = useId();
   const [options, setOptions] = useState<AddReviewerOptions | null>(null);
@@ -102,6 +106,7 @@ export function ReassignDialog({
           {holderName ? ` is with ${holderName}.` : "."} The person you choose takes it over and finds it in their
           To review. Its due date does not change.
         </p>
+        {leaving && <RemovalWarning leaving={leaving} role="office" />}
 
         {loadFailed ? (
           <LoadFailedAlert message={loadFailed} onRetry={() => setAttempt((n) => n + 1)} />

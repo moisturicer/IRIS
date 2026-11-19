@@ -4,16 +4,27 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from django.db import transaction
-from core.permissions import IsStaff, owns_or_staffs_record
+from core.permissions import IsStaff, hides_draft, may_read_record_documents, owns_or_staffs_record
 from core.text_limits import too_long, too_long_message
 from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
-from .validators import is_pdf_upload, pdf_upload_problem
+from .scanning import FILE_GONE, upload_problem
+from .validators import pdf_upload_problem, supplementary_file_problem
+
+#: The type an office file is served as, by extension, for the types Review's
+#: reader shows (IR-1203); the frontend's ``readerFormat`` lists the same ones.
+#: Any other file is served as ``application/octet-stream``, and never inline.
+READER_CONTENT_TYPES = {
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+}
 
 
-def authorize_record_documents(request, record_id):
+def authorize_record_documents(request, record_id, *, reading=False):
     """
     Resolve `record_id` and confirm the caller may reach that record's documents.
 
@@ -36,6 +47,14 @@ def authorize_record_documents(request, record_id):
     is deliberate: the caller named the record id themselves, so a 404 would
     hide nothing, and 403 says what actually happened. `RecordViewSet` has the
     opposite problem -- there, the id is the thing being probed.
+
+    `reading=True` is for the listing routes only: it also admits the record's
+    Adviser, who reads and downloads but never writes (IR-1200, ADR-022
+    §Amendment 6). Every upload route leaves it off.
+
+    **An unsubmitted draft someone else owns is a 404**, word for word the
+    answer for a missing record (IR-1227, ADR-009 decision 6): here the id
+    would otherwise confirm that a draft exists.
     """
     from apps.records.models import Record
 
@@ -47,11 +66,14 @@ def authorize_record_documents(request, record_id):
     try:
         record = Record.objects.get(pk=record_id)
     except (Record.DoesNotExist, ValueError, TypeError):
+        record = None
+    if record is None or hides_draft(request.user, record):
         return None, Response(
             {"detail": "Record not found."},
             status=status.HTTP_404_NOT_FOUND,
         )
-    if not owns_or_staffs_record(request.user, record):
+    allowed = may_read_record_documents if reading else owns_or_staffs_record
+    if not allowed(request.user, record):
         return None, Response(
             {"detail": "Permission denied."},
             status=status.HTTP_403_FORBIDDEN,
@@ -184,12 +206,15 @@ class SubmitDocumentView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+            # Checked and scanned before the item is locked: a scan can take
+            # seconds, and the locks would be held for all of it.
+            problem = pdf_upload_problem(file) or upload_problem(
+                file, user=request.user, where="requested_document", record=record)
+            if problem:
+                return Response({"file": [problem], "detail": problem}, status=400)
             try:
                 with transaction.atomic():
                     item, slot = resolve_item_for_upload(record, item_id, slot_id)
-                    problem = pdf_upload_problem(file)
-                    if problem:
-                        return Response({"file": [problem], "detail": problem}, status=400)
                     upload = create_upload(record, slot, file, uploaded_by=request.user)
                     fulfil_item(item, upload, uploaded_by=request.user)
             except DocumentRequestError as exc:
@@ -198,7 +223,8 @@ class SubmitDocumentView(APIView):
             slot, missing = _slot_for_record(record, slot_id)
             if missing:
                 return missing
-            problem = pdf_upload_problem(file)
+            problem = pdf_upload_problem(file) or upload_problem(
+                file, user=request.user, where="upload_slot", record=record)
             if problem:
                 return Response({"file": [problem], "detail": problem}, status=400)
             upload = _store_slot_upload(record, slot, file, request.user)
@@ -251,7 +277,7 @@ class RecordSlotListView(APIView):
 
         # IR-153: this returned the full upload history of any record to any
         # authenticated caller -- the serializer embeds every upload per slot.
-        record, denied = authorize_record_documents(request, pk)
+        record, denied = authorize_record_documents(request, pk, reading=True)
         if denied:
             return denied
         from .setup import slots_for_record
@@ -274,7 +300,9 @@ class RecordUploadListView(generics.ListAPIView):
         # because get_queryset() can only narrow rows, and narrowing to nothing
         # would answer a stranger with an empty 200 -- indistinguishable from a
         # record that genuinely has no uploads. A refusal should say so.
-        _, denied = authorize_record_documents(request, request.query_params.get("record"))
+        _, denied = authorize_record_documents(
+            request, request.query_params.get("record"), reading=True,
+        )
         if denied:
             return denied
         return super().list(request, *args, **kwargs)
@@ -363,7 +391,8 @@ class RecordUploadCreateView(APIView):
         if missing:
             return missing
 
-        problem = pdf_upload_problem(file)
+        problem = pdf_upload_problem(file) or upload_problem(
+            file, user=request.user, where="upload_version", record=record)
         if problem:
             return Response({"file": [problem], "detail": problem}, status=400)
 
@@ -380,7 +409,7 @@ class RecordUploadDownloadView(APIView):
     GET /documents/uploads/<id>/download/
     GET /documents/uploads/<id>/download/?inline=true  -- serve for in-browser viewing
 
-    Permission: any record owner OR staff (KTTO, RDCO, ITSO, IERC, Django staff).
+    Permission: any record owner, staff (KTTO, RDCO, ITSO, IERC), or its Adviser (IR-1200).
     Refusals follow ADR-022 §Amendment 4 (IR-627): see `_on_visible_record`.
     """
     permission_classes = [IsAuthenticated]
@@ -392,8 +421,11 @@ class RecordUploadDownloadView(APIView):
         if upload is None:
             return Response({"detail": "Upload not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not owns_or_staffs_record(request.user, upload.record):
+        if not may_read_record_documents(request.user, upload.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        if not upload.file:
+            # Taken out of use by the malware scan (ADR-074 decision 4).
+            return Response({"detail": FILE_GONE}, status=status.HTTP_404_NOT_FOUND)
 
         inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
 
@@ -420,7 +452,9 @@ class RecordFileListView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         # IR-153, same reasoning as RecordUploadListView.list().
-        _, denied = authorize_record_documents(request, request.query_params.get("record"))
+        _, denied = authorize_record_documents(
+            request, request.query_params.get("record"), reading=True,
+        )
         if denied:
             return denied
         return super().list(request, *args, **kwargs)
@@ -463,10 +497,15 @@ class RecordFileUploadView(APIView):
                 {"detail": "Only an office taking part in this record's review may attach a file."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if is_pdf_upload(file):
-            problem = pdf_upload_problem(file)
-            if problem:
-                return Response({"file": [problem], "detail": problem}, status=400)
+        # PDF, Word, PNG or JPG, by name and by bytes, and a PDF's safety check
+        # (IR-1220, ADR-032 §10 as amended 2026-11-18).
+        problem = supplementary_file_problem(file)
+        if problem:
+            return Response({"file": [problem], "detail": problem}, status=400)
+        # Then every accepted type is scanned for malware, not only a PDF (ADR-074).
+        problem = upload_problem(file, user=request.user, where="office_attachment", record=record)
+        if problem:
+            return Response({"file": [problem], "detail": problem}, status=400)
         record_file = RecordFile.objects.create(
             record=record,
             file=file,
@@ -525,7 +564,7 @@ class RecordFileDownloadView(APIView):
     GET /documents/files/<id>/download/
     GET /documents/files/<id>/download/?inline=true  -- serve for in-browser viewing
 
-    Permission: any record owner OR staff.
+    Permission: any record owner, staff, or its Adviser (IR-1200).
     Refusals follow ADR-022 §Amendment 4 (IR-627): see `_on_visible_record`.
     """
     permission_classes = [IsAuthenticated]
@@ -535,27 +574,33 @@ class RecordFileDownloadView(APIView):
         if record_file is None:
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not owns_or_staffs_record(request.user, record_file.record):
+        if not may_read_record_documents(request.user, record_file.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        if not record_file.file:
+            # Taken out of use by the malware scan (ADR-074 decision 4).
+            return Response({"detail": FILE_GONE}, status=status.HTTP_404_NOT_FOUND)
 
-        inline = request.query_params.get("inline", "").lower() in ("1", "true", "yes")
         filename = record_file.filename or record_file.file.name.split("/")[-1]
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-        content_type = "application/pdf" if ext == "pdf" else "application/octet-stream"
+        # Only these are ever shown in the browser (IR-1203): Review's reader
+        # draws a PDF or an image. Anything else, an SVG stored before IR-1220
+        # included, is an attachment of no renderable type, and nosniff
+        # (SECURE_CONTENT_TYPE_NOSNIFF) keeps the browser from guessing one.
+        shown_as = READER_CONTENT_TYPES.get(ext)
+        inline = shown_as is not None and (
+            request.query_params.get("inline", "").lower() in ("1", "true", "yes")
+        )
 
         create_audit_event(
             "DOWNLOAD", request.user, record=record_file.record,
             metadata={"file_id": pk, "filename": filename},
         )
-        response = FileResponse(
+        return FileResponse(
             record_file.file.open(),
-            content_type=content_type,
+            content_type=shown_as or "application/octet-stream",
             as_attachment=not inline,
             filename=filename,
         )
-        if inline and ext == "pdf":
-            response["Content-Disposition"] = f'inline; filename="{filename}"'
-        return response
 
 
 class RecordFileDeleteView(APIView):
@@ -611,11 +656,12 @@ class RecordFileDownloadAllView(APIView):
         # old best-effort lookup that logged the audit event with record=None
         # when the id did not resolve.
         record_id = request.query_params.get("record")
-        record, denied = authorize_record_documents(request, record_id)
+        record, denied = authorize_record_documents(request, record_id, reading=True)
         if denied:
             return denied
 
-        files = RecordFile.objects.filter(record_id=record.pk)
+        # A file the malware scan took out of use has none (ADR-074 decision 4).
+        files = RecordFile.objects.filter(record_id=record.pk).exclude(file="")
         buffer = build_zip(files)
         response = HttpResponse(buffer, content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="record_{record.pk}_files.zip"'

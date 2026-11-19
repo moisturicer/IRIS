@@ -260,6 +260,8 @@ def test_a_paper_the_reader_cannot_read_is_never_read(research):
     owner, other = make_user("read-owner@cit.edu"), make_user("read-other@cit.edu")
     draft = manuscript("Private levee study", [(1, "levee breaches worsened the flood")],
                        status=PipelineStatus.DRAFT)
+    # Its creator, as Publish makes it: a draft is its creator's alone (IR-1227).
+    Record.objects.filter(pk=draft.pk).update(added_by=owner)
     RecordOwner.objects.create(record=draft, user=owner, is_primary=True)
     kept = {}
 

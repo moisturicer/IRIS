@@ -1,6 +1,6 @@
 import { INSTITUTION } from "@/config/institution";
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -105,6 +105,19 @@ export default function SettingsPage() {
               </button>
             );
           })}
+          {/* Help lives here, not in the sidebar (IR-1217). A link, not a
+              tab: it leaves Settings for the Help page. */}
+          <Link
+            to={pathFor("help")}
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2.5 rounded-control text-body font-medium",
+              "whitespace-nowrap transition-colors text-left text-stone-600 hover:bg-stone-50",
+              FOCUS_RING,
+            )}
+          >
+            <i className="fas fa-circle-question text-small w-4 shrink-0" aria-hidden />
+            Help
+          </Link>
         </nav>
 
         <div className="flex-1 min-w-0 w-full">

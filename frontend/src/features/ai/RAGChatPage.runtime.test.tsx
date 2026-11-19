@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AxiosAdapter, InternalAxiosRequestConfig } from "axios";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { apiClient } from "@/api/client";
 import recorded from "@/test/fixtures/runtimeReader.recorded.json";
@@ -30,6 +30,8 @@ function runtime(config: InternalAxiosRequestConfig): Reply {
   const url = config.url ?? "";
   // Earlier Django conversations, listed under a new one (IR-957): none here.
   if (url === "/ai/conversations/" && config.method === "get") return { data: [] };
+  // The history list: empty. It used to fail here unseen; a failed list now says so (IR-1238).
+  if (url === "/ai/runtime/conversations" && config.method === "get") return { data: { protocol: "runs-reader-1", next: null, conversations: [] } };
   if (url === "/ai/runtime/runs" && config.method === "post") return { status: 201, data: live };
   if (url === `/ai/runtime/runs/${live.id}`) return { data: live };
   if (url === CONVERSATION) return { data: conversation };
@@ -58,17 +60,21 @@ function renderAsk(at: string) {
 const answerText = () => screen.findByText((_, element) =>
   element?.tagName === "P" && /^Both studies sample water/.test(element.textContent ?? ""));
 
-/** What a reader sees of the answer: its text, then each cited passage in order, with the sources opened. */
+/** What a reader sees of the answer: its text, then each cited passage in order, with the Sources panel opened (IR-1237). */
 async function answerAsRead(user: ReturnType<typeof userEvent.setup>) {
   const answer = (await answerText()).textContent;
-  const toggle = screen.getByRole("button", { name: /sources? for this answer/ });
-  if (toggle.getAttribute("aria-expanded") !== "true") await user.click(toggle);
-  // The passage rows, not the numbered chips in the text that link to the same pages.
-  const passages = screen.getAllByRole("link").filter(link =>
-    link.getAttribute("href")?.includes("page=") && (link.textContent ?? "").length > 3);
+  if (!screen.queryByRole("complementary", { name: "Sources" })) {
+    await user.click(screen.getByRole("button", { name: /^\d+ passages? from \d+ papers?$/ }));
+  }
+  // The panel's own links to the cited pages, not the numbered chips in the text.
+  const panel = screen.getByRole("complementary", { name: "Sources" });
+  const passages = within(panel).getAllByRole("link").filter(link => link.getAttribute("href")?.includes("page="));
   return {
     answer,
-    citations: passages.map(link => ({ link: link.getAttribute("href"), text: link.textContent })),
+    citations: passages.map(link => ({
+      link: link.getAttribute("href"),
+      text: link.closest("li")?.textContent ?? "",
+    })),
   };
 }
 
@@ -98,7 +104,7 @@ afterEach(() => {
 it("delivers a question through the runtime and reopens the same answer after a reload", async () => {
   const user = userEvent.setup();
   const first = renderAsk("/ai");
-  const box = await screen.findByRole("textbox", { name: "Ask about the research corpus" });
+  const box = await screen.findByRole("textbox", { name: "Ask about the research in IRIS" });
   await user.type(box, live.question);
   await user.click(screen.getByRole("button", { name: "Send message" }));
 
@@ -138,7 +144,7 @@ it.each([
   route = (config) => (config.url === "/ai/runtime/runs" ? reply : runtime(config));
   const user = userEvent.setup();
   const { container } = renderAsk("/ai");
-  await user.type(await screen.findByRole("textbox", { name: "Ask about the research corpus" }), "Compare");
+  await user.type(await screen.findByRole("textbox", { name: "Ask about the research in IRIS" }), "Compare");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(message);
   expect(screen.queryByRole("button", { name: "Reconnect" }) !== null).toBe(canReconnect);
@@ -150,7 +156,7 @@ it("a conversation that cannot be opened says so and offers a new one", async ()
   route = (config) => (config.url === CONVERSATION ? { status: 404, data: { status: "not_found" } } : runtime(config));
   renderAsk(`/ai/conversations/${conversation.id}`);
   expect(await screen.findByRole("heading", { name: "This conversation is not available." })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Start a new chat" })).toHaveAttribute("href", "/ai");
+  expect(screen.getByRole("link", { name: "Start a new conversation" })).toHaveAttribute("href", "/ai");
 });
 
 it("a stopped run reads as stopped, from a keyboard-operated Stop", async () => {
@@ -196,7 +202,9 @@ describe("conversations Django answered before the switch (IR-957)", () => {
     expect(screen.getByText("Do gauges help?")).toBeInTheDocument();
     expect(screen.getByText(/ended without an answer when Ask IRIS changed/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "New conversation" })).toHaveAttribute("href", "/ai");
+    // IR-1234: the banner offers no button; it says how to continue.
+    expect(screen.getByText("An earlier conversation, kept to read. To keep going, start a new conversation.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "New conversation" })).not.toBeInTheDocument();
     expect(sent.every((config) => config.method === "get")).toBe(true);
     await expectNoBlockingA11yViolations(container);
   });
@@ -217,3 +225,37 @@ describe("conversations Django answered before the switch (IR-957)", () => {
     expect(screen.getByRole("link", { name: "Gauges" })).toHaveAttribute("href", "/ai/conversations/12");
   });
 });
+
+describe("the open conversation's toolbar (IR-1167)", () => {
+  it("downloads the conversation as Markdown through the runtime, by keyboard", async () => {
+    route = (config) => (config.url === `${CONVERSATION}/export`
+      ? { data: new Blob(["# Title"]) } : runtime(config));
+    Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderAsk(`/ai/conversations/${conversation.id}`);
+    await answerText();
+    screen.getByRole("button", { name: "Download conversation as Markdown" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(click).toHaveBeenCalled());
+    const request = sent.find(config => config.url === `${CONVERSATION}/export`);
+    expect(request?.responseType).toBe("blob");
+    expect(request?.headers["X-IRIS-Reader-Grant"]).toBeUndefined();
+  });
+
+  it("offers no download before a conversation exists", async () => {
+    renderAsk("/ai");
+    await screen.findByRole("textbox", { name: "Ask about the research in IRIS" });
+    expect(screen.queryByRole("button", { name: "Download conversation as Markdown" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the open conversation's title (IR-1160)", () => {
+  it("is the one the server holds, even when the history list has not loaded it", async () => {
+    route = (config) => (config.url === CONVERSATION
+      ? { data: { ...conversation, title: "Estuary notes" } } : runtime(config));
+    renderAsk(`/ai/conversations/${conversation.id}`);
+    expect(await screen.findByRole("heading", { level: 1, name: "Estuary notes" })).toBeInTheDocument();
+  });
+});
+

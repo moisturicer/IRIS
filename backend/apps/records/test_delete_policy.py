@@ -61,15 +61,19 @@ class DeletePolicyTestBase(DecisionTestBase):
 class OnlyAnOwnerDeletesTests(DeletePolicyTestBase):
 
     def test_no_office_deletes_or_requests_deletion_of_a_record_that_is_not_theirs(self):
-        """A draft, a record in review, a published one: every office can see all three."""
+        """A draft, a record in review, a published one. An office sees the last
+        two and is refused (403); a draft is its creator's alone (IR-1227), so
+        to an office it is a missing record (404)."""
         for state in ("make_record", "at_adviser", "published"):
             record = getattr(self, state)()
             before = record.pipeline_status
+            refused = (status.HTTP_404_NOT_FOUND if state == "make_record"
+                       else status.HTTP_403_FORBIDDEN)
             for office in (self.itso, self.ierc, self.rdco):
                 with self.subTest(state=state, office=office.email):
                     response = self.delete(record, office)
 
-                    self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+                    self.assertEqual(response.status_code, refused, response.data)
                     stored = self.stored(record)
                     self.assertFalse(stored.is_deleted)
                     self.assertEqual(stored.pipeline_status, before)

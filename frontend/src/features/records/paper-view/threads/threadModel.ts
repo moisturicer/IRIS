@@ -7,6 +7,9 @@
 import type { Capability } from "@/features/records/capabilities";
 import type { DecisionOutcome, Party, RecordDetail, ReviewComment, ReviewVerdict, ThreadSeverity } from "@/types/records";
 
+/** Conversation's, not a thread (IR-1194). A comment with no `kind` is an older payload's thread. */
+export const isDiscussion = (c: ReviewComment) => c.kind === "discussion";
+
 /** A top-level comment and its replies, with the pin it shows on the paper. */
 export interface Thread {
   root:    ReviewComment;
@@ -19,6 +22,7 @@ export interface Thread {
  * The viewer's comments as threads: sent ones numbered in the order they were
  * sent, the viewer's own drafts apart. The server lists oldest first and never
  * sends another person's draft, so a draft here is always the viewer's.
+ * Conversation's discussion is not a thread and is left out (IR-1194).
  */
 export function groupThreads(comments: readonly ReviewComment[]): { sent: Thread[]; drafts: Thread[] } {
   const replies = new Map<number, ReviewComment[]>();
@@ -29,7 +33,7 @@ export function groupThreads(comments: readonly ReviewComment[]): { sent: Thread
   const sent: Thread[] = [];
   const drafts: Thread[] = [];
   for (const c of comments) {
-    if (c.reply_to !== null) continue;
+    if (c.reply_to !== null || isDiscussion(c)) continue;
     const list = c.is_draft ? drafts : sent;
     list.push({ root: c, replies: replies.get(c.id) ?? [], pin: `${c.is_draft ? "D" : ""}${list.length + 1}` });
   }
@@ -112,6 +116,8 @@ export interface VerdictOption {
 /** `finish_review.py` refuses this before anything is written, in these words. */
 const OWN_MUST_FIX =
   "You can't approve while sending a Must fix comment. Change it to Suggestion, or request a revision.";
+const OWN_MUST_FIX_FINDING =
+  "You can't record a finding while sending a Must fix comment. Change it to Suggestion, or request a revision.";
 
 
 /**
@@ -168,7 +174,10 @@ export function verdictOptions(
     });
     add({
       verdict: "finding", label: "Record a finding", description: "A reasoned concern. It goes to RDCO, which decides.",
-      unavailable: flags.office_review.blocked, reasonRequired: true,
+      // A finding ends the seat as Clear does, so it waits on the office's own Must fix (IR-1226).
+      unavailable: flags.office_review.blocked ?? flags.office_review.finding_blocked
+        ?? (ownMustFix && OWN_MUST_FIX_FINDING),
+      reasonRequired: true,
     });
   }
   if (can.has("request_revision") || can.has("withdraw_revision")) add({

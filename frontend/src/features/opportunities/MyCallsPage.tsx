@@ -135,7 +135,7 @@ function MyCallRow({ call: o, onEdit, onDelete }: { call: Opportunity; onEdit: (
       </div>
 
       {o.status === "rejected" && o.review_reason && (
-        <p className="text-small max-w-prose break-words">
+        <p className="text-small break-words">
           <span className="font-semibold text-stone-900">RDCO's reason: </span>
           <span className="text-stone-700">{o.review_reason}</span>
         </p>

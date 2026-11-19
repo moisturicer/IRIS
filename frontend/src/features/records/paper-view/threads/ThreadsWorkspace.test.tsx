@@ -16,7 +16,7 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
 import type { RecordDetail, ReviewComment } from "@/types/records";
 
-import { ReviewWorkspace } from "../ReviewWorkspace";
+import { ReviewWorkspaceLayout } from "../ReviewWorkspaceLayout";
 import { useReaderAnnotations } from "./readerAnnotations";
 import { comment } from "./threadFixtures";
 
@@ -83,6 +83,7 @@ function StandInReader() {
   const a = useReaderAnnotations();
   return (
     <div>
+      {a?.landing && <p>{`Landed on page ${a.landing.page} of v${a.landing.version}: ${a.landing.label}`}</p>}
       {a?.marks.filter((m) => m.version === a.currentVersion).map((m) => (
         <button key={m.key} type="button" onClick={m.onActivate} aria-label={m.label}>{m.pin}</button>
       ))}
@@ -95,10 +96,12 @@ function StandInReader() {
   );
 }
 
-function openWorkspace(caps: Capability[] = ["comment_review", "finish_review", "office_review", "request_revision"]) {
+function openWorkspace(
+  caps: Capability[] = ["comment_review", "start_thread", "finish_review", "office_review", "request_revision"],
+) {
   return renderScreen(
-    <ReviewWorkspace record={record} can={new Set(caps)} reader={<StandInReader />} timelineVersion={0}
-      onChanged={() => {}} documents={null} documentsOpen={false} onDocuments={() => {}} />,
+    <ReviewWorkspaceLayout record={record} can={new Set(caps)} reader={<StandInReader />} timelineVersion={0}
+      onChanged={() => {}} documents={null} />,
   );
 }
 
@@ -118,8 +121,9 @@ describe("threads in the review workspace", () => {
     expect(form.getByRole("radio", { name: "Suggestion" })).toBeChecked();
   });
 
-  it("offers no Comment without comment_review", async () => {
-    openWorkspace(["finish_review"]);
+  // A finished reviewer still replies (`comment_review`) but starts no thread (IR-1226).
+  it("offers no Comment without start_thread", async () => {
+    openWorkspace(["comment_review", "finish_review"]);
     await screen.findByRole("tab", { name: /Threads/ });
     expect(screen.queryByRole("button", { name: "Comment" })).toBeNull();
   });
@@ -130,6 +134,14 @@ describe("threads in the review workspace", () => {
     await user.click(await screen.findByRole("button", { name: "Thread 1, ITSO, Must fix" }));
     expect(screen.getByRole("tab", { name: /Threads/ })).toHaveAttribute("aria-selected", "true");
     await waitFor(() => expect(screen.getByRole("article", { name: "Thread 1, ITSO" })).toHaveFocus());
+  });
+
+  it("lands the reader on a thread's passage, named for the reader, from Show in paper (IR-1195)", async () => {
+    const user = userEvent.setup();
+    openWorkspace();
+    await user.click(await screen.findByRole("tab", { name: /Threads/ }));
+    await user.click(await screen.findByRole("button", { name: "Show in paper: “a sample of 40”" }));
+    expect(screen.getByText("Landed on page 4 of v2: Thread 1, ITSO, Must fix, page 4")).toBeInTheDocument();
   });
 
   it("shows a party's open threads from Readiness, which Details holds (IR-1094)", async () => {
@@ -169,9 +181,8 @@ describe("threads in the review workspace", () => {
   it("asks a seat not yet opened to open it, and offers no Finish review", async () => {
     const assigned = { ...record, my_seats: [{ ...record.my_seats[0], state: "assigned" }] } as RecordDetail;
     renderScreen(
-      <ReviewWorkspace record={assigned} can={new Set<Capability>(["open_review", "finish_review", "office_review"])}
-        reader={<StandInReader />} timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false}
-        onDocuments={() => {}} />,
+      <ReviewWorkspaceLayout record={assigned} can={new Set<Capability>(["open_review", "finish_review", "office_review"])}
+        reader={<StandInReader />} timelineVersion={0} onChanged={() => {}} documents={null} />,
     );
     const footer = within(await screen.findByRole("contentinfo", { name: "Your part" }));
     expect(footer.getByRole("button", { name: "Open review" })).toBeInTheDocument();
@@ -187,8 +198,8 @@ describe("threads in the review workspace", () => {
   it("gives the owner Readiness, whose open-thread link opens Threads", async () => {
     const user = userEvent.setup();
     renderScreen(
-      <ReviewWorkspace record={record} authorView can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
-        timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false} onDocuments={() => {}} />,
+      <ReviewWorkspaceLayout record={record} authorView can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
+        timelineVersion={0} onChanged={() => {}} documents={null} />,
     );
     await user.click(await screen.findByRole("button", { name: "Show threads" }));
     expect(screen.getByRole("tab", { name: /Threads/ })).toHaveAttribute("aria-selected", "true");
@@ -212,11 +223,12 @@ describe("the response to reviewers when a reviewer looks again (IR-876)", () =>
     expect(letter).toHaveTextContent("Addressed: Section 3.2 names it.");
   });
 
-  it("stays on the conversation when the letter is an older Version's", async () => {
+  // Changed on purpose by IR-1203: a reviewer opens on Documents, and an older letter leaves them there.
+  it("stays on the tab the reviewer opens on when the letter is an older Version's", async () => {
     api.responseLetters.mockResolvedValue({ data: [LETTER(1)] });
     openWorkspace();
     await waitFor(() => expect(api.responseLetters).toHaveBeenCalled());
-    expect(screen.getByRole("tab", { name: /Conversation/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Documents" })).toHaveAttribute("aria-selected", "true");
   });
 });
 });

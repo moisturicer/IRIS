@@ -36,10 +36,9 @@ type Phase = "loading" | "failed" | "ready";
 const NEWER_NOTICE = "A newer notice was published while this one was open. Read it, then answer again.";
 
 export function NoticeAnswerScreen() {
-  const refreshToken = useAuthStore((s) => s.refreshToken);
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
-  const logout = useAuthStore((s) => s.logout);
+  const signOut = useAuthStore((s) => s.signOut);
   const clearNotice = useNoticeStore((s) => s.clear);
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -132,11 +131,6 @@ export function NoticeAnswerScreen() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const signOut = async () => {
-    await authApi.logout(refreshToken ?? "").catch(() => {});
-    logout();
   };
 
   const requestDeletion = async () => {

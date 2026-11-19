@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReaderConversationSummary, runtimeReader } from "@/api/runtimeReader";
+import { trouble, type TroubleKind } from "../runtime/trouble";
 
 const DEBOUNCE_MS = 250;
 
@@ -11,6 +12,8 @@ export function useConversationHistory(api: ReturnType<typeof runtimeReader>, ac
   const [next, setNext] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [loadingMore, setLoadingMore] = useState(false);
+  // Why the last list request failed (IR-1238), so a page can say a shared failure once.
+  const [failure, setFailure] = useState<TroubleKind>();
   const request = useRef(0);
   const titles = useRef(new Map<string, string>());
   const shown = useRef({ ready: false, ids: new Set<string>() });
@@ -28,10 +31,10 @@ export function useConversationHistory(api: ReturnType<typeof runtimeReader>, ac
       const page = await api.list({ q: query });
       if (mine !== request.current) return;
       page.conversations.forEach(c => titles.current.set(c.id, c.title));
-      setConversations(page.conversations); setNext(page.next); setState("ready");
-    } catch {
+      setConversations(page.conversations); setNext(page.next); setState("ready"); setFailure(undefined);
+    } catch (cause) {
       // The list is a convenience; the reader still works.
-      if (mine === request.current) setState("error");
+      if (mine === request.current) { setFailure(trouble(cause).kind); setState("error"); }
     }
   }, [api, query]);
 
@@ -42,6 +45,9 @@ export function useConversationHistory(api: ReturnType<typeof runtimeReader>, ac
     if (activeId && shown.current.ready && !shown.current.ids.has(activeId)) void refresh();
   }, [activeId, refresh]);
 
+  /** Try again: the first page of the current search, with the list showing it is loading. */
+  const retry = useCallback(() => { setState("loading"); void refresh(); }, [refresh]);
+
   const loadMore = useCallback(async () => {
     if (!next || loadingMore) return;
     const mine = request.current;
@@ -51,8 +57,8 @@ export function useConversationHistory(api: ReturnType<typeof runtimeReader>, ac
       if (mine !== request.current) return;
       page.conversations.forEach(c => titles.current.set(c.id, c.title));
       setConversations(all => [...all, ...page.conversations]); setNext(page.next);
-    } catch {
-      if (mine === request.current) setState("error");
+    } catch (cause) {
+      if (mine === request.current) { setFailure(trouble(cause).kind); setState("error"); }
     } finally { setLoadingMore(false); }
   }, [api, query, next, loadingMore]);
 
@@ -60,6 +66,11 @@ export function useConversationHistory(api: ReturnType<typeof runtimeReader>, ac
     conversations, setConversations, refresh, loadMore,
     /** A title seen on any page, so the open Conversation keeps its name while a search hides it. */
     titleOf: (id?: string) => (id ? titles.current.get(id) : undefined),
-    search: { text, onText: setText, query, state, hasMore: next !== null, loadingMore, onMore: () => void loadMore() },
+    /** Shows a title the reader just chose (IR-1160) wherever the Conversation is listed. */
+    retitle: useCallback((id: string, title: string) => {
+      titles.current.set(id, title);
+      setConversations(all => all.map(c => (c.id === id ? { ...c, title } : c)));
+    }, []),
+    search: { text, onText: setText, query, state, failure, onRetry: retry, hasMore: next !== null, loadingMore, onMore: () => void loadMore() },
   };
 }

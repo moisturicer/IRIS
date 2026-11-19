@@ -11,7 +11,6 @@
  */
 import { useId } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { authApi } from "@/api/auth";
 import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { Button } from "@/components/ui/Button";
 import type { OwnRoleRequest } from "@/types/auth";
@@ -48,17 +47,10 @@ function standingOf(request: OwnRoleRequest | null | undefined, email: string): 
 }
 
 export function PendingApprovalPage() {
-  const { user, logout, refreshToken } = useAuth();
+  const { user, signOut } = useAuth();
   const registeredId = useId();
 
-  const handleLogout = async () => {
-    try {
-      await authApi.logout(refreshToken ?? "");
-    } catch {
-      // ignore — we log out regardless
-    }
-    logout();
-  };
+  const handleLogout = () => signOut();
 
   // The route guard renders this only for a signed-in user (IR-537).
   if (!user) return null;

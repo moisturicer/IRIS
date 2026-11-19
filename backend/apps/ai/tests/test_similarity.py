@@ -68,6 +68,7 @@ def make_record(*, title, abstract, embedder, status=PipelineStatus.PUBLISHED,
     which includes every paper with no embargo answer (ADR-052).
     """
     record = Record.objects.create(
+        added_by=owner,
         title=title, abstract=abstract, pipeline_status=status
     )
     if owner is not None:

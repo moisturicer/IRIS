@@ -27,7 +27,7 @@ import type { Locator, Page, Route } from "@playwright/test";
 const screenOf = (state: UiState) => {
   const screen = SCREENS.find((s) => s.id === state.screen);
   if (!screen) throw new Error(`states.ts names a screen that screens.ts does not have: ${state.screen}`);
-  return { ...screen, path: state.path ?? screen.path };
+  return { ...screen, path: state.path ?? screen.path, open: state.open ?? screen.open };
 };
 
 /** The other states this same read can leave the same view in. A screen is in one at a time. */
@@ -217,5 +217,5 @@ test("Ask IRIS: a Conversation whose access is withdrawn after it was opened rea
   await page.reload();
   await expect(page.getByRole("heading", { name: "This conversation is not available." })).toBeVisible();
   await expect(anyRetry(page)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Start a new chat" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start a new conversation" })).toBeVisible();
 });

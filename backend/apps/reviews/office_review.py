@@ -19,8 +19,9 @@ outcome is refused.
 - an office with its own document request still open. An office never
   finishes while it is still asking the author for something; likewise an
   office with its own revision request open (IR-272);
-- *Clear* while the office has an open *Must fix* review thread (ADR-032 §7,
-  IR-874). A finding is not held: it doesn't approve.
+- *Clear* or a finding while the office has an open *Must fix* review
+  thread (ADR-032 §7, IR-874; the finding since IR-1226, 2026-11-19), so no
+  reviewer finishes with their own Must fix still open.
 
 **When an office completes** -- every seat it did not withdraw is done, by the
 last verdict or by a coordinator withdrawing the last unfinished seat --
@@ -136,15 +137,19 @@ def office_review_flags(record, user) -> dict:
     """
     party = _seated_specialist(record, user) if routing.is_in_review(record) else None
     if party is None:
-        return {"party": None, "label": None, "blocked": None, "clear_blocked": None, "assignment": None}
+        return {
+            "party": None, "label": None, "blocked": None, "clear_blocked": None, "finding_blocked": None,
+            "assignment": None,
+        }
     seat = _open_seat(record, user, party)
     return {
         "party": party,
         "label": _label(party),
         "blocked": _blocked_reason(record, user, party),
-        # Clear alone, held by the office's own open Must fix (ADR-032 §7,
-        # IR-874). Record a finding is never held by a thread.
+        # Clear and a finding, held by the office's own open Must fix
+        # (ADR-032 §7, IR-874; the finding since IR-1226).
         "clear_blocked": approval_blocked_reason(record, party),
+        "finding_blocked": approval_blocked_reason(record, party, act="recording a finding"),
         "assignment": seat.assignment_id if seat else None,
     }
 
@@ -180,8 +185,8 @@ def record_office_review(record, actor, *, outcome, comment="", threads=0):
         raise OfficeReviewError(too_long_message("An office comment"))
 
     seat = _open_seat(record, actor, party)
-    blocked = _blocked_reason(record, actor, party) or (
-        approval_blocked_reason(record, party) if outcome == CLEARED else None
+    blocked = _blocked_reason(record, actor, party) or approval_blocked_reason(
+        record, party, act="approving" if outcome == CLEARED else "recording a finding",
     )
     if blocked:
         raise OfficeReviewError(blocked)

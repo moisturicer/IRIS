@@ -210,6 +210,7 @@ def test_all_pdf_routes_share_acceptance_and_refusals_store_nothing(manuscript, 
     from django.core.files.uploadedfile import SimpleUploadedFile
     from pypdf import PdfWriter
     from apps.documents.models import RecordFile, RecordUpload, UploadSlot
+    from apps.documents.tests.test_record_document_authorization import seat_on
     from apps.reviews.models import RecordAssignment
 
     client, record = manuscript
@@ -229,8 +230,12 @@ def test_all_pdf_routes_share_acceptance_and_refusals_store_nothing(manuscript, 
     slot = UploadSlot.objects.create(name="Supporting paper", record_type=record.record_type)
     body = {"record": record.pk, "slot": slot.pk, "file": file}
     if route == "general":
+        # An office files on a submitted record: a draft is its creator's alone (IR-1227).
+        record.pipeline_status = "in_review"
+        record.save(update_fields=["pipeline_status"])
         office = make_user("office@cit.edu", "RDCO")
-        RecordAssignment.objects.create(record=record, party="rdco")
+        # Filing takes a seat on the assignment, not membership of the office (IR-1226).
+        seat_on(RecordAssignment.objects.create(record=record, party="rdco"), office)
         client.force_authenticate(office)
     if route == "manuscript":
         response = client.patch(reverse("record-detail", args=[record.pk]), {"abstract_file": file}, format="multipart")
@@ -270,17 +275,34 @@ def test_unauthorized_uploader_is_refused_before_parsing(manuscript, monkeypatch
     assert response.status_code in {403, 404}
 
 
-def test_general_attachment_non_pdf_policy_is_unchanged(manuscript):
+def test_general_attachment_non_pdf_policy_is_word_png_or_jpg(manuscript):
+    """An office's own file need not be a PDF, but it is Word, PNG or JPG.
+
+    Changed deliberately by IR-1220: this asserted that a .txt file was
+    accepted, the "any type" ADR-032 §10 allowed until its 2026-11-18
+    amendment. test_supplementary_file_types.py covers the types in full.
+    """
     from django.core.files.uploadedfile import SimpleUploadedFile
+    from apps.documents.tests.test_record_document_authorization import seat_on
     from apps.reviews.models import RecordAssignment
 
     client, record = manuscript
-    client.force_authenticate(make_user("office@cit.edu", "RDCO"))
-    RecordAssignment.objects.create(record=record, party="rdco")
+    # An office files on a submitted record: a draft is its creator's alone (IR-1227).
+    record.pipeline_status = "in_review"
+    record.save(update_fields=["pipeline_status"])
+    office = make_user("office@cit.edu", "RDCO")
+    client.force_authenticate(office)
+    # Filing takes a seat on the assignment, not membership of the office (IR-1226).
+    seat_on(RecordAssignment.objects.create(record=record, party="rdco"), office)
+    response = client.post(reverse("record-file-upload"), {
+        "record": record.pk,
+        "file": SimpleUploadedFile("notes.png", b"\x89PNG\r\n\x1a\nOffice notes", content_type="image/png"),
+    }, format="multipart")
+    assert response.status_code == 201, response.data
     response = client.post(reverse("record-file-upload"), {
         "record": record.pk, "file": SimpleUploadedFile("notes.txt", b"Office notes", content_type="text/plain"),
     }, format="multipart")
-    assert response.status_code == 201, response.data
+    assert response.status_code == 400, response.data
 
 
 def test_different_original_bytes_with_identical_text_get_current_source_chunks(manuscript, monkeypatch):

@@ -50,6 +50,51 @@ export function clearLockout(identifier: string): void {
   sessionStorage.removeItem(`${LOCKOUT_KEY_PREFIX}${loginKey(identifier)}`);
 }
 
+const SESSION_ACCOUNT_KEY = "iris_session_account";
+
+/**
+ * Whose session this tab last held (IR-1242).
+ *
+ * The login screen sends a person back to the page their session ended on
+ * (IR-236), but on a shared lab machine the person signing in next may be
+ * someone else, and the page the last account left open is not theirs to land
+ * on. The account id is the only thing kept: it says whose page it was, and
+ * nothing about it. `sessionStorage` because the idle-timeout path reaches the
+ * login screen through a full page load, which nothing in memory survives, and
+ * because it ends with the tab.
+ *
+ * Storage can be unavailable (a locked-down browser); then nothing is known,
+ * and the login screen behaves as it did before this was kept.
+ */
+export function rememberSessionAccount(id: number): void {
+  try {
+    sessionStorage.setItem(SESSION_ACCOUNT_KEY, String(id));
+  } catch {
+    // Nothing kept; see above.
+  }
+}
+
+/** Forgotten on a deliberate sign-out: nobody's page is waiting to be returned to. */
+export function forgetSessionAccount(): void {
+  try {
+    sessionStorage.removeItem(SESSION_ACCOUNT_KEY);
+  } catch {
+    // Nothing was kept.
+  }
+}
+
+/** The account this tab last held a session for, or `null` when none is known. */
+export function sessionAccount(): number | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_ACCOUNT_KEY);
+    if (raw === null || !/^\d+$/.test(raw)) return null;
+    const id = Number(raw);
+    return Number.isSafeInteger(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * What the login screen says for each reason the server gives for refusing a
  * session (IR-645, `apps/accounts/sessions.py`). Inactivity is the default:

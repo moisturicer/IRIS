@@ -10,7 +10,11 @@ export const AUDIT_EVENT_GROUPS = {
     ACCOUNT_DELETION_CONFIRMED: "Account Deleted",
     ACCOUNT_DELETION_REJECTED: "Account Deletion Rejected",
   },
-  Files: { ACCESS: "Record Access", UPLOAD: "File Upload", DOWNLOAD: "File Download", DELETE: "File Delete", RENAME: "File Rename" },
+  Files: {
+    ACCESS: "Record Access", UPLOAD: "File Upload", DOWNLOAD: "File Download", DELETE: "File Delete", RENAME: "File Rename",
+    // Malware scanning (ADR-074, IR-666).
+    UPLOAD_REFUSED_UNSAFE: "Upload Refused as Unsafe", FILE_QUARANTINED: "File Quarantined",
+  },
   "Download requests": {
     DOWNLOAD_REQUEST_CANCELLED: "Download Request Cancelled",
     DOWNLOAD_GRANT_REVOKED: "Download Access Revoked",

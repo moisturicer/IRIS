@@ -81,6 +81,7 @@ LOCAL_APPS = [
     "apps.ai",
     "apps.opportunities",
     "apps.library",
+    "apps.live",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -254,6 +255,13 @@ SIMPLE_JWT = {
 # the token lifetimes above (IR-166, apps/accounts/sessions.py). The interface
 # signs itself out on the same figure: frontend/src/lib/activity.ts.
 SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30, cast=int)
+# ADR-072: "Keep me signed in" lasts this many days from sign-in, outside the
+# idle rule. The refresh token travels only in this HttpOnly cookie, scoped to
+# the auth endpoints; Secure everywhere except DEBUG's plain-http localhost.
+REMEMBERED_SESSION_DAYS = config("REMEMBERED_SESSION_DAYS", default=30, cast=int)
+REFRESH_COOKIE_NAME = "iris_refresh"
+REFRESH_COOKIE_PATH = "/api/v1/auth/"
+REFRESH_COOKIE_SECURE = config("REFRESH_COOKIE_SECURE", default=not DEBUG, cast=bool)
 
 # ---- Browser security headers (IR-663, ASVS 14.4.3/4/6/7) ----------------
 #
@@ -304,9 +312,11 @@ CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default=FRONTEND_URL, cast=csv_list
 )
 CORS_ALLOW_CREDENTIALS = True
-# The interface reports the user's idle time on every request (IR-166); a
-# cross-origin deployment's preflight refuses any header not listed here.
-CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds")
+# The interface reports the user's idle time on every request (IR-166), and
+# marks refresh and logout as its own (`X-IRIS-Auth`, ADR-072); a cross-origin
+# deployment's preflight refuses any header not listed here. Origins stay the
+# allowlist above, so a page on any other origin still can't send either.
+CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds", "x-iris-auth")
 
 # ---- Email --------------------------------------------------------------
 
@@ -352,6 +362,8 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
     "apps.documents.tasks.extract_manuscript_text": {"queue": "extraction"},
+    # IR-1241: Discover's first-page image, drawn in the PDF sandbox.
+    "apps.records.tasks.draw_first_page": {"queue": "extraction"},
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
@@ -492,6 +504,12 @@ LOGGING = {
 # Redis as Celery, on a different database number, so flushing a queue cannot
 # take the query-embedding cache with it.
 REDIS_CACHE_URL = config("REDIS_CACHE_URL", default="redis://localhost:6379/1")
+
+# ADR-073 (IR-1213): live-update hints, published on commit and streamed per tab
+# through one Redis subscription per process. The test harness turns publishing
+# off (CI has no Redis); pages then simply refetch on focus.
+LIVE_ENABLED = config("LIVE_ENABLED", default=True, cast=bool)
+LIVE_REDIS_URL = config("LIVE_REDIS_URL", default=REDIS_URL)
 
 CACHES = {
     "default": {
@@ -1189,6 +1207,18 @@ PDF_VALIDATION_MEMORY_MIB = config("PDF_VALIDATION_MEMORY_MIB", default="", cast
 PDF_VALIDATION_MAX_PAGES = config("PDF_VALIDATION_MAX_PAGES", default="", cast=lambda v: int(v) if v else None)
 PDF_VALIDATION_MAX_OBJECTS = config("PDF_VALIDATION_MAX_OBJECTS", default="", cast=lambda v: int(v) if v else None)
 PDF_VALIDATION_MAX_DEPTH = config("PDF_VALIDATION_MAX_DEPTH", default="", cast=lambda v: int(v) if v else None)
+# IR-666, ADR-074: every upload is scanned by clamd before it is stored, and an
+# upload is refused while the scanner is down (fail closed). With DEBUG off,
+# Django won't start without MALWARE_SCAN=clamd and MALWARE_SCAN_HOST; "off" is
+# for development only (development.py makes it the default there).
+MALWARE_SCAN = config("MALWARE_SCAN", default="clamd")
+MALWARE_SCAN_HOST = config("MALWARE_SCAN_HOST", default="")
+MALWARE_SCAN_PORT = config("MALWARE_SCAN_PORT", default=3310, cast=int)
+# Long enough for a 50 MB file and a signature reload, which holds scans (ADR-074 decision 5).
+MALWARE_SCAN_TIMEOUT_SECONDS = config("MALWARE_SCAN_TIMEOUT_SECONDS", default=60, cast=float)
+# Where `scan_stored_uploads` moves a stored file that fails (ADR-074 decision 4):
+# outside MEDIA_ROOT, so nothing can serve it, and kept for inspection.
+QUARANTINE_ROOT = Path(config("QUARANTINE_ROOT", default=str(BASE_DIR / "quarantine")))
 # IR-1053: the PDF evidence reader's own sandbox, beside PDF_VALIDATION_MAX_PAGES
 # and the 50 MB upload cap. Required: unset, extraction stores no evidence.
 PDF_EVIDENCE_WALL_SECONDS = config("PDF_EVIDENCE_WALL_SECONDS", default="", cast=lambda v: float(v) if v else None)

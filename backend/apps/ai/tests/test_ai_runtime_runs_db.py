@@ -303,7 +303,7 @@ def test_stop_ends_a_run_and_no_later_commit_publishes(api, runtime):
     again = client.post(f"/api/v1/ai/runs/{row['id']}/cancel", headers=as_reader(grant))
     assert again.json()["state"] == "cancelled"
     reopened = client.get(f"/api/v1/ai/conversations/{row['conversation_id']}", headers=as_reader(grant))
-    assert reopened.json() == {"id": str(row["conversation_id"]), "revision": 0, "turns": []}
+    assert reopened.json() == {"id": str(row["conversation_id"]), "revision": 0, "title": "q", "turns": []}
 
 
 def test_missing_limits_refuse_every_submission(api, monkeypatch):
@@ -352,8 +352,9 @@ def test_turn_citations_revision_and_journal_commit_together(runtime):
     reopened = run(RunStore(runtime).reopen(grant, run_["conversation_id"]))
     assert reopened["revision"] == 1
     assert reopened["turns"][0]["citations"] == [
-        {"record_id": 11, "page": 3, "quote": "a", "revision": None, "regions": []},
-        {"record_id": 12, "page": None, "quote": "b", "revision": None, "regions": []},
+        # No such paper, so no title (IR-1167).
+        {"record_id": 11, "page": 3, "quote": "a", "revision": None, "regions": [], "title": None},
+        {"record_id": 12, "page": None, "quote": "b", "revision": None, "regions": [], "title": None},
     ]
 
     # The second citation violates a constraint after the Turn row is written.

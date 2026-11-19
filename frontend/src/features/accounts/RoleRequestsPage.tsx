@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadMore } from "@/components/shared/LoadMore";
 import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 export default function RoleRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
@@ -32,6 +33,8 @@ export default function RoleRequestsPage() {
   // error would tell RDCO there is nothing to decide when there may be.
   const loadFailed = read.status === "failed" || read.status === "interrupted";
   const load = read.retry;
+  // Live updates (ADR-073): RDCO's queues, reloaded quietly.
+  useLiveRefresh(["queues"], read.refresh);
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
   const [_acting,   setActing]    = useState(false);
 
@@ -57,7 +60,7 @@ export default function RoleRequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Role Requests"
+        title="Role requests"
         description="People asking for a different role, such as office reviewer."
       />
 

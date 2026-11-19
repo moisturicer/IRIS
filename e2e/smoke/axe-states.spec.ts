@@ -16,7 +16,7 @@ for (const state of STATES) {
     const screen = SCREENS.find((s) => s.id === state.screen);
     if (!screen) throw new Error(`states.ts names a screen that screens.ts does not have: ${state.screen}`);
 
-    await openScreen(page, api, { ...screen, path: state.path ?? screen.path }, {
+    await openScreen(page, api, { ...screen, path: state.path ?? screen.path, open: state.open ?? screen.open }, {
       override: state.override,
       // Only the read under test times out: on a slow machine another read that did would put a second failure on screen.
       timeOut: state.timeOut ? { only: state.read.path } : undefined,

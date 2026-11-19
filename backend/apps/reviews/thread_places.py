@@ -25,7 +25,7 @@ from django.db import transaction
 
 from apps.records.models import RecordVersion
 from apps.records.review_text import readings
-from core.enums import ThreadPlaceOutcome, ThreadState
+from core.enums import ReviewCommentKind, ThreadPlaceOutcome, ThreadState
 
 from . import comparison, placement
 from .models import ReviewComment, ThreadPlace
@@ -69,7 +69,8 @@ def _followable(record, previous, version) -> list:
     anchored on ``previous``, or placed there and still followed."""
     done = ThreadPlace.objects.filter(version=version).values("thread_id")
     threads = (ReviewComment.objects
-               .filter(record=record, reply_to__isnull=True, state=ThreadState.OPEN)
+               .filter(record=record, reply_to__isnull=True, kind=ReviewCommentKind.THREAD,
+                       state=ThreadState.OPEN)
                .exclude(anchor_version__isnull=True).exclude(anchor_quote="")
                .exclude(pk__in=done))
     out = []

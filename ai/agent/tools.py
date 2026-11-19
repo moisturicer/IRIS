@@ -18,7 +18,7 @@ from typing import Optional
 
 import asyncpg
 
-from ai.agent.prompts import TOOL_DESCRIPTIONS as _SAYS
+from ai.agent.prompts import TOOL_DESCRIPTIONS as _SAYS, quoted
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
 from ai.research.tools import (
@@ -274,6 +274,8 @@ class Investigation:
     #: Tools that failed during the run, in order of first failure (IR-731).
     outages: list[str] = field(default_factory=list)
     recalled_sources: frozenset = frozenset()
+    #: Wrap paper text in the paper-text markers (the research-11 tool version, IR-1196).
+    delimit: bool = False
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
@@ -525,10 +527,13 @@ class Investigation:
         body["coverage"] = {"returned": coverage.returned, "total": coverage.total,
                             "truncated": coverage.truncated}
         self.figures.update(str(n) for n in (coverage.returned, coverage.total) if n is not None)
-        return Outcome(json.dumps(body, ensure_ascii=False), progress=new,
+        return Outcome(self._dump(body), progress=new,
                        dependencies=result.dependencies,
                        control_only=not (result.dependencies or result.records
                                          or result.passages or result.sections))
+
+    def _dump(self, body: dict) -> str:
+        return json.dumps(_framed(body) if self.delimit else body, ensure_ascii=False)
 
     def _read_into(self, result: Evidence, call_id: Optional[str], body: dict) -> bool:
         """Fold one manuscript read into the run's coverage and say it to the model (IR-733)."""
@@ -584,7 +589,7 @@ class Investigation:
             "papers": [{"paper": self.papers[r.record_id][0], "title": r.title, "year": r.year}
                        for r in result.records],
         }
-        return Outcome(json.dumps(body, ensure_ascii=False), progress=new, metadata_only=True)
+        return Outcome(self._dump(body), progress=new, metadata_only=True)
 
     def _status(self, result: Evidence) -> tuple[dict, Optional[Count]]:
         self._ended(result)
@@ -664,3 +669,18 @@ class Investigation:
         if "excluded" in chosen:
             self.excluded = chosen["excluded"]
         return Outcome(json.dumps({"status": "ok"}), control_only=True)
+
+
+#: Fields that carry text from a paper, or derived from one, wherever they appear (IR-1196).
+_PAPER_TEXT = frozenset({"text", "title", "heading", "question", "answer"})
+
+
+def _framed(value, key=None, within=None):
+    """`value` with every paper-text field quoted; handles, ids and numbers untouched."""
+    if isinstance(value, dict):
+        return {k: _framed(v, k, key or within) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_framed(v, None, key) for v in value]
+    if isinstance(value, str) and (key in _PAPER_TEXT or (key == "section" and within == "passages")):
+        return quoted(value)
+    return value

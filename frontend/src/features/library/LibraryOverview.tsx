@@ -189,11 +189,11 @@ export function LibraryOverview({
                   <div className="min-w-0">
                     <Link
                       to={`/records/${record.id}`}
-                      className={cn("line-clamp-2 rounded-control font-display text-heading font-semibold leading-snug text-stone-900 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
+                      className={cn("break-words rounded-control font-display text-heading font-semibold leading-snug text-stone-900 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
                     >
                       {record.title}
                     </Link>
-                    <p className="truncate text-label text-stone-600">
+                    <p className="break-words text-label text-stone-600">
                       {formatAuthorList(record.authors, 2)} · {recordYearLabel(record)}
                     </p>
                   </div>
@@ -210,7 +210,7 @@ export function LibraryOverview({
                   <li key={record.id}>
                     <Link
                       to={`/records/${record.id}`}
-                      className={cn("block truncate rounded-control text-small font-semibold text-stone-800 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
+                      className={cn("block break-words rounded-control text-small font-semibold text-stone-800 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
                     >
                       {record.title}
                     </Link>
@@ -233,7 +233,7 @@ export function LibraryOverview({
                       className={cn("flex min-h-9 w-full items-center gap-3 rounded-control px-2 text-left text-small text-stone-700 hover:bg-stone-50", COLOUR_TRANSITION, FOCUS_RING)}
                     >
                       <i className="fas fa-folder w-4 text-center text-stone-500" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                      <span className="min-w-0 flex-1 break-words">{f.name}</span>
                     </button>
                   </li>
                 ))}

@@ -11,7 +11,7 @@ import { checkReachable, measureOverflow } from "../support/viewport";
 import { manuscriptPdf } from "../support/pdf";
 
 const QUESTION = "What soil sensors were tested?";
-const COMPOSER = "Ask about the research corpus";
+const COMPOSER = "Ask about the research in IRIS";
 const TAB_STOPS = "a[href], button:not(:disabled), input:not([type=hidden]):not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])";
 
 const screen = (id: string) => {

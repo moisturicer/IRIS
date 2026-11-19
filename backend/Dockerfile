@@ -97,6 +97,7 @@ RUN SECRET_KEY=build-time-only \
     CORS_ALLOWED_ORIGINS=http://localhost \
     TRUSTED_PROXY_COUNT=1 \
     REGISTRATION_EMAIL_DOMAINS=build.invalid \
+    MALWARE_SCAN_HOST=build.invalid \
     python manage.py collectstatic --noinput
 
 EXPOSE 8000

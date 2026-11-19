@@ -15,7 +15,7 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 mb-section">
       <div className="min-w-0">
         <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">{title}</h1>
-        {description && <p className="text-body text-stone-600 mt-1 max-w-prose">{description}</p>}
+        {description && <p className="text-body text-stone-600 mt-1">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

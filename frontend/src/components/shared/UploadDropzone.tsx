@@ -15,6 +15,10 @@
  * - **After a failure:** pass `upload={{ status: "failed", fileName, error,
  *   onRetry }}`. The author retries without choosing the file again.
  *
+ * With `compact` the zone is drawn as one small Upload button, still a drop
+ * target, for a row that has no room for a drop area (IR-1203's Documents
+ * tab). Validation, progress and retry are the same.
+ *
  * One live region stays mounted throughout, so a screen reader hears the
  * upload start and finish. Keyboard focus follows the zone into the progress
  * bar and back, rather than dropping to the page.
@@ -48,6 +52,8 @@ interface UploadDropzoneProps {
    */
   hint?:     string;
   upload?:   UploadState | null;
+  /** One small Upload button instead of a drop area (IR-1203). */
+  compact?:  boolean;
 }
 
 function acceptedPatterns(accept: string | undefined): string[] {
@@ -106,6 +112,7 @@ export function UploadDropzone({
   maxBytes,
   hint,
   upload,
+  compact = false,
 }: UploadDropzoneProps) {
   const [dragging, setDragging] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
@@ -203,21 +210,37 @@ export function UploadDropzone({
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
+          title={compact ? shownHint : undefined}
           className={cn(
-            "flex flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed px-6 py-10 select-none",
+            compact
+              ? cn(PILL_SECONDARY, "px-3 reading-split:min-h-9 select-none", dragging && "ring-brand bg-stone-100")
+              : cn(
+                "flex flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed px-6 py-10 select-none",
+                dragging ? "border-brand bg-stone-100" : "border-stone-300 bg-stone-50",
+                !disabled && "hover:border-stone-500",
+              ),
             COLOUR_TRANSITION,
             FOCUS_RING,
-            dragging ? "border-brand bg-stone-100" : "border-stone-300 bg-stone-50",
-            disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-stone-500",
+            disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
           )}
         >
-          <i className="fas fa-cloud-arrow-up text-3xl text-stone-500" aria-hidden="true" />
-          {/* The name is the content, so it contains every word drawn on the zone (WCAG 2.5.3 Label in Name, IR-908); the label leads it. */}
-          {label && <span className="sr-only">{label}</span>}
-          <p className="text-body text-stone-700 font-medium">
-            Drag and drop here, or <span className="text-brand underline underline-offset-2">browse</span>
-          </p>
-          {shownHint && <p className="text-small text-stone-600">{shownHint}</p>}
+          {compact ? (
+            <>
+              <i className="fas fa-upload text-2xs" aria-hidden="true" />
+              {/* "Upload" is drawn, so the name starts with it (WCAG 2.5.3, IR-908). */}
+              {label ? <><span aria-hidden="true">Upload</span><span className="sr-only">{label}</span></> : "Upload"}
+            </>
+          ) : (
+            <>
+              <i className="fas fa-cloud-arrow-up text-3xl text-stone-500" aria-hidden="true" />
+              {/* The name is the content, so it contains every word drawn on the zone (WCAG 2.5.3 Label in Name, IR-908); the label leads it. */}
+              {label && <span className="sr-only">{label}</span>}
+              <p className="text-body text-stone-700 font-medium">
+                Drag and drop here, or <span className="text-brand underline underline-offset-2">browse</span>
+              </p>
+              {shownHint && <p className="text-small text-stone-600">{shownHint}</p>}
+            </>
+          )}
           <input
             ref={inputRef}
             type="file"
@@ -280,8 +303,8 @@ const ProgressPanel = forwardRef<HTMLDivElement, ProgressPanelProps>(function Pr
       className={cn("rounded-card border border-stone-200 bg-surface px-5 py-4", FOCUS_RING)}
     >
       <div className="flex items-center justify-between gap-3 text-small" aria-hidden="true">
-        <span className="font-medium text-stone-800 truncate">{name}</span>
-        <span className="text-stone-600 tabular-nums">{percent}%</span>
+        <span className="min-w-0 break-words font-medium text-stone-800">{name}</span>
+        <span className="shrink-0 text-stone-600 tabular-nums">{percent}%</span>
       </div>
       <ProgressBar label={name} progress={progress} className="mt-2 h-1.5 bg-stone-100" />
     </div>

@@ -10,6 +10,8 @@ import { READER_TOOLBAR_TOP_PX } from "./paneLayout";
  *  fit-to-width still fits a US Letter page on a 360px phone (NFR-U3). */
 export const MIN_SCALE = 0.4;
 export const MAX_SCALE = 2.4;
+/** How far one press of zoom in or zoom out moves. */
+export const SCALE_STEP = 0.2;
 
 /** A page's 1px border, each side, which is drawn outside its canvas. */
 const PAGE_BORDER = 2;
@@ -119,6 +121,49 @@ export function citationLandingDelta(
   const spare = view.bottom - view.top - regionHeight;
   const context = Math.min(CITATION_CONTEXT, Math.max(0, spare));
   return regionTop - view.top - context;
+}
+
+/**
+ * A passage's extent on one page, as fractions of its height (IR-1195): from
+ * its highest line to its lowest, and `start`, where its first region in
+ * reading order begins. In a two-column paper the two differ: a passage can
+ * start low in the left column and carry on at the top of the right one.
+ */
+export interface PassageBand extends RegionBand {
+  start: number;
+}
+
+export function passageBand<R extends Pick<Region, "page" | "top" | "bottom">>(regions: readonly R[], page: number): PassageBand | null {
+  const on = regions.filter((region) => region.page === page);
+  if (on.length === 0) return null;
+  return {
+    top: Math.min(...on.map((region) => region.top)),
+    bottom: Math.max(...on.map((region) => region.bottom)),
+    start: on[0].top,
+  };
+}
+
+/**
+ * How far to scroll so a passage shown from Review lands in the middle of
+ * the view (IR-1195). Positive scrolls down.
+ *
+ * A reviewer sent to a change wants it where the eye rests, with what comes
+ * before and after it in sight, not pinned under the toolbar as a citation
+ * is. A passage taller than the view can't be centred: it lands where it
+ * starts (`startTop`, a fraction of the page), just below the view's top.
+ */
+export function centredLandingDelta(
+  page: PageBox,
+  band: RegionBand,
+  view: ReadingBand,
+  startTop = band.top,
+): number {
+  const top = page.top + band.top * page.height;
+  const height = (band.bottom - band.top) * page.height;
+  if (height >= view.bottom - view.top - 2 * PAGE_LANDING_GAP) {
+    return page.top + startTop * page.height - view.top - PAGE_LANDING_GAP;
+  }
+  return top + height / 2 - (view.top + view.bottom) / 2;
 }
 
 /**

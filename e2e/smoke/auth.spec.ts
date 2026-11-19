@@ -30,7 +30,7 @@ test("rejected credentials keep the visitor on sign-in with an explanation", asy
 
 test("valid credentials land on Discover", async ({ page, api }) => {
   mockShell(api);
-  api.on("POST", "/auth/login/", { user: student(), access: token(), refresh: "refresh-1" });
+  api.on("POST", "/auth/login/", { user: student(), access: token(), remembered: false });
   await page.goto("/login");
   await page.getByLabel("Email Address").fill("student@cit.edu");
   await page.getByLabel("Password", { exact: true }).fill("any-password");
@@ -39,7 +39,7 @@ test("valid credentials land on Discover", async ({ page, api }) => {
   await expect(page.getByRole("heading", { name: "Discover", level: 1 })).toBeVisible();
 });
 
-test("a reload restores the session from the stored refresh token", async ({ page, api }) => {
+test("a load restores the session from the server's cookie (ADR-072)", async ({ page, api }) => {
   await signedIn(page, api);
   mockShell(api);
   await page.goto("/");

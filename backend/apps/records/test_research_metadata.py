@@ -41,7 +41,8 @@ def test_origin_does_not_grant_metadata_edit_permission():
     client = APIClient()
     client.force_authenticate(other)
     response = client.patch(reverse("record-detail", args=[record.pk]), {"origin": "institutional"}, format="json")
-    assert response.status_code == 403
+    # An office cannot see the draft at all: a draft is its creator's alone (IR-1227, ADR-009 decision 6).
+    assert response.status_code == 404
     client.force_authenticate(owner)
     response = client.patch(reverse("record-detail", args=[record.pk]), {"origin": "imported_reference", "publication_year": 2017}, format="json")
     assert response.status_code == 200, response.data

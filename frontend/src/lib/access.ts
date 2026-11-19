@@ -1,8 +1,10 @@
 /**
  * Who may reach which screen (IR-160).
  *
- * **One map, two consumers.** `router/index.tsx` reads `rolesFor()` to gate a
- * route; `components/layout/Sidebar.tsx` reads `navFor()` to build the menu.
+ * **One map, three consumers.** `router/index.tsx` reads `rolesFor()` to gate a
+ * route; `components/layout/Sidebar.tsx` reads `navFor()` to build the menu;
+ * and the login screen reads `canOpenPath()` to decide whether the page saved
+ * before sign-in is one the new account may open (IR-1207).
  * Before this file they decided separately -- the sidebar from Django's
  * `is_staff` flag, the router from application role names -- and disagreed:
  * migration `accounts/0005` set `is_staff = True` on all four office roles, so
@@ -23,6 +25,7 @@
  * Source of truth: `docs/ui-ux/02-information-architecture.md` section 5, as
  * amended 2026-09-06. Asserted by `access.test.ts`.
  */
+import { matchPath } from "react-router-dom";
 import { ROLES, type RoleName } from "./constants";
 
 const EVERYONE: RoleName[] = [
@@ -174,13 +177,6 @@ export const SCREEN_ACCESS = {
                   nav: { label: "Office console", icon: "fa-users-gear", section: "Main",
                          parent: "reviewQueue", needsCoordinator: true } },
 
-  // Workflow analytics (IR-626): an office's own figures, every office's for
-  // RDCO. Nested under My Reviews in the sidebar (IR-1085, D5), still reached
-  // from the page's own header link too.
-  reviewAnalytics: { path: "/review/analytics", roles: OFFICES,
-                     nav: { label: "Workflow analytics", icon: "fa-chart-column", section: "Main",
-                            parent: "reviewQueue" } },
-
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,
@@ -190,22 +186,27 @@ export const SCREEN_ACCESS = {
 
   // --- RDCO coordination (ADR-051, IR-783) ----------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
-                 nav: { label: "Import Records", icon: "fa-file-import", section: "RDCO" } },
+                 nav: { label: "Import records", icon: "fa-file-import", section: "RDCO" } },
   users:         { path: "/rdco/users", roles: COORDINATOR,
                  nav: { label: "Users", icon: "fa-users", section: "RDCO" } },
   roleRequests:  { path: "/rdco/role-requests", roles: COORDINATOR,
-                 nav: { label: "Role Requests", icon: "fa-user-check", section: "RDCO" } },
+                 nav: { label: "Role requests", icon: "fa-user-check", section: "RDCO" } },
   downloadRequests: { path: "/rdco/download-requests", roles: COORDINATOR,
-                 nav: { label: "Download Requests", icon: "fa-download", section: "RDCO" } },
+                 nav: { label: "Download requests", icon: "fa-download", section: "RDCO" } },
   // ADR-050 decision 8 and ADR-051: Advisers' Calls waiting for RDCO (IR-765).
   callRequests:  { path: "/rdco/call-requests", roles: COORDINATOR,
-                 nav: { label: "Call Requests", icon: "fa-bullhorn", section: "RDCO" } },
+                 nav: { label: "Call requests", icon: "fa-bullhorn", section: "RDCO" } },
   deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
-                 nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "RDCO" } },
+                 nav: { label: "Delete requests", icon: "fa-trash-alt", section: "RDCO" } },
   // One page for RDCO and the System Admin (IR-693, decision 2026-11-15), each
   // reaching it from their own section.
   reportedComments: { path: "/moderation/comments", roles: COORDINATOR,
-                 nav: { label: "Reported Comments", icon: "fa-flag", section: "RDCO" } },
+                 nav: { label: "Reported comments", icon: "fa-flag", section: "RDCO" } },
+  // Workflow analytics (IR-626): every office's figures, read by RDCO alone
+  // in its own section since IR-1216 (ADR-043 amendment 2026-11-18). It was
+  // under My Reviews for every office; `/review/analytics` redirects here.
+  reviewAnalytics: { path: "/rdco/analytics", roles: COORDINATOR,
+                 nav: { label: "Workflow analytics", icon: "fa-chart-column", section: "RDCO" } },
   // ADR-063 decision 9 (IR-971, IR-972): RDCO's Setup, each record type's
   // Requirements & Templates, and the Notice (`?section=notice`), which was the
   // Notices page (IR-800). Every RDCO account; the server refuses anyone else.
@@ -223,7 +224,7 @@ export const SCREEN_ACCESS = {
                  nav: { label: "Account Deletions", icon: "fa-user-slash", section: "Administration" } },
   // The Reported comments page above, shared (IR-693).
   adminReportedComments: { path: "/moderation/comments", roles: SYSTEM_ADMIN,
-                 nav: { label: "Reported Comments", icon: "fa-flag", section: "Administration" } },
+                 nav: { label: "Reported comments", icon: "fa-flag", section: "Administration" } },
   // ADR-051 §3 and §19: the System Admin sets retention periods (IR-795).
   retention:     { path: "/admin/retention", roles: SYSTEM_ADMIN,
                  nav: { label: "Retention", icon: "fa-clock-rotate-left", section: "Administration" } },
@@ -260,6 +261,27 @@ export function personPath(id: number): string {
 export function canAccess(role: RoleName | null | undefined, key: ScreenKey): boolean {
   if (!role) return false;
   return (SCREEN_ACCESS[key].roles as readonly RoleName[]).includes(role);
+}
+
+/**
+ * May this role open this address (IR-1207)? Used by the login screen to
+ * decide whether to send a person back to the page saved before sign-in,
+ * which may be a page of the account that signed out.
+ *
+ * Read from the same table the route guards read, matched the way the router
+ * matches: a screen whose path has no `:param` outranks one that only matches
+ * through a parameter, so `/records/import` is RDCO's import screen, not a
+ * paper whose id is "import". An address no screen names is left to the
+ * router (a retired address redirects, an unknown one says Not Found), so it
+ * answers true. UX only, like every check here: the API decides.
+ */
+export function canOpenPath(role: RoleName | null | undefined, address: string): boolean {
+  if (!role) return false;
+  const pathname = address.split(/[?#]/, 1)[0];
+  const matches = ALL_SCREENS.filter((key) => matchPath({ path: SCREEN_ACCESS[key].path, end: true }, pathname));
+  if (matches.length === 0) return true;
+  const exact = matches.filter((key) => !SCREEN_ACCESS[key].path.includes(":"));
+  return (exact.length > 0 ? exact : matches).some((key) => canAccess(role, key));
 }
 
 export interface NavEntry {

@@ -67,7 +67,7 @@ def make_user(email, role_name=None):
 def make_record(*, title, status, owner=None, adviser=None, embedder=None, space=None,
                 text="sampling procedure for tilapia ponds"):
     """A record with one active chunk set, one chunk and its vector."""
-    record = Record.objects.create(title=title, pipeline_status=status, adviser=adviser)
+    record = Record.objects.create(added_by=owner, title=title, pipeline_status=status, adviser=adviser)
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
 
@@ -116,13 +116,19 @@ class VisibilityTests:
         results = retriever.retrieve("sampling procedure", author)
         assert [p.record_title for p in results.passages] == ["My Draft"]
 
-    def test_office_staff_receive_everything(self, retriever, embedder, space):
+    def test_office_staff_receive_every_submitted_record(self, retriever, embedder, space):
+        # A draft is its creator's alone (IR-1227, ADR-009 decision 6), so an
+        # office receives a record once it is submitted, and a draft never.
         author = make_user("author@cit.edu", ROLE_STUDENT)
         make_record(title="Someone's Draft", status=PipelineStatus.DRAFT,
                     owner=author, embedder=embedder, space=space)
         ktto = make_user("ktto@cit.edu", ROLE_KTTO)
+        assert retriever.retrieve("sampling procedure", ktto).passages == ()
 
-        assert len(retriever.retrieve("sampling procedure", ktto).passages) == 1
+        make_record(title="Someone's Submission", status=PipelineStatus.IN_REVIEW,
+                    owner=author, embedder=embedder, space=space)
+        titles = [p.record_title for p in retriever.retrieve("sampling procedure", ktto).passages]
+        assert titles == ["Someone's Submission"]
 
     def test_the_assigned_adviser_receives_the_record_they_advise(
         self, retriever, embedder, space
@@ -131,6 +137,11 @@ class VisibilityTests:
         other_adviser = make_user("other@cit.edu", ROLE_ADVISER)
         author = make_user("author@cit.edu", ROLE_STUDENT)
         make_record(title="Advised Draft", status=PipelineStatus.DRAFT, owner=author,
+                    adviser=adviser, embedder=embedder, space=space)
+        assert retriever.retrieve("sampling procedure", adviser).passages == (), (
+            "a draft is its creator's alone (IR-1227), the Adviser it names included"
+        )
+        make_record(title="Advised Submission", status=PipelineStatus.IN_REVIEW, owner=author,
                     adviser=adviser, embedder=embedder, space=space)
 
         assert len(retriever.retrieve("sampling procedure", adviser).passages) == 1

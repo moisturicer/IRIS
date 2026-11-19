@@ -4,6 +4,10 @@
 
 **Accepted** — 2026-11-16, approved verbally by Ashlee Sean, relayed and recorded by Hermoine Zozobrado. Proposed 2026-11-07 (IR-946, under IR-557). Records decisions already built in IR-567, IR-576 and IR-575 (IR-575 is in PR #596, not merged when this was written); it does not authorise anything new. The semantic extension (IR-582) is deliberately out of scope here and stays deferred.
 
+### Amendment 2026-11-16 (IR-1187): For you is shown as "Best"
+
+**Proposed**, awaiting a reviewer's approval. Discover's For you / Latest / Trending tabs and the separate Sort select become one Sort control with four options: **Best**, Newest, Most viewed and Trending. **Best is this ADR's For you feed under a reader-facing label**: the same endpoint (`/records/for_you/`), recipe, reasons, cursor and snapshot, and the same Latest fallback with its notice when there is no usable signal (decision 3). Nothing in decisions 1 to 10 changes behaviour. The only wording this ADR fixes, decision 7's reset confirmation, now reads "the papers you saved still shape Best until you unsave them". "For you" stays the name of the feed in code and in this ADR; the URL keeps `feed=for_you`, so existing links open Best.
+
 ## Context
 
 Discover's catalogue orders by added date or lifetime access count. IR-557 adds a **For you** feed that learns from what a reader has told IRIS, with a reason on every item, reversible feedback and stable pagination. Three tickets built it in slices:

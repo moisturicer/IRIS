@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/v1/opportunities/", include("apps.opportunities.urls")),
     path("api/v1/library/",       include("apps.library.urls")),
     path("api/v1/dashboard/",     include("apps.records.urls_dashboard")),
+    path("api/v1/live/",          include("apps.live.urls")),  # ADR-073
     path("api/v1/moderation/",    include("apps.records.urls_moderation")),
 ]
 

@@ -17,8 +17,9 @@ export type { Capability } from "@/types/records";
 /**
  * Paper View's sections, in tab order (spec §4.6). Participants see Overview ·
  * Review; everyone else Overview · Paper (ADR-032 §10, 2026-11-04; IR-879).
- * Files lives in Review's Documents drawer now, so it is no section: an old
- * `?section=files` link is a participant's Review with the drawer open.
+ * Files lives in Review's Documents tab now (IR-1203; a drawer from IR-879),
+ * so it is no section: an old `?section=files` link is a participant's Review
+ * on that tab.
  */
 export const PAPER_SECTIONS = ["overview", "paper", "review"] as const;
 export type PaperSection = (typeof PAPER_SECTIONS)[number];
@@ -52,11 +53,13 @@ export function isReviewing(record: CapabilityInputs, viewer: Viewer | null): bo
 }
 
 /**
- * An owner, or someone taking part in the review. The server's
- * `is_participant` is ADR-032's `is_record_participant`, which also counts
- * anyone who *has* held a seat (IR-415): a reviewer whose part is done keeps
- * the Review and Files sections. The two client-side grounds cover the owner
- * and a pool member who is about to claim.
+ * Someone who may read the review. The server's `is_participant` is
+ * ADR-032's `is_record_participant`: an owner, or anyone who *has* held an
+ * office seat, withdrawn included, so a reviewer whose part is done or who was
+ * taken off keeps the Review and Files sections, read-only (IR-415, IR-1226).
+ * An Adviser seat counts only while its holder is the record's Adviser. Reading
+ * is not acting: what this viewer may do comes from `capabilities`. The
+ * client-side grounds cover the owner and a pool member about to claim.
  */
 export function isParticipant(record: CapabilityInputs, viewer: Viewer | null): boolean {
   return viewer != null && (record.is_participant || isOwner(record, viewer) || isReviewing(record, viewer) || record.review_claim != null);

@@ -256,14 +256,19 @@ class BlockerTests(DeletionBase):
         self.assertEqual(len(blockers), 1)
         self.assertIn("RDCO must replace the Adviser", blockers[0]["message"])
 
-    def test_a_draft_nobody_else_waits_on_does_not_block_and_is_deleted(self):
+    def test_the_drafts_they_created_do_not_block_and_are_deleted(self):
+        # A draft is its creator's alone (IR-1227, ADR-009 decision 6), so one
+        # they created goes with them even when it names a co-owner, who could
+        # never open it; a draft someone else created stays theirs.
         draft = self.paper("My draft", owners=[self.student], status=PipelineStatus.DRAFT)
         shared = self.paper("Our draft", owners=[self.student, self.coowner], status=PipelineStatus.DRAFT)
+        theirs = self.paper("Their draft", owners=[self.coowner, self.student], status=PipelineStatus.DRAFT)
         self.ask(self.student)
         self.assertEqual(self.confirm(self.sysadmin, self.pending_for(self.student).pk)[0].status_code,
                          status.HTTP_200_OK)
         self.assertFalse(Record.objects.filter(pk=draft.pk).exists())
-        self.assertTrue(Record.objects.filter(pk=shared.pk).exists())
+        self.assertFalse(Record.objects.filter(pk=shared.pk).exists())
+        self.assertTrue(Record.objects.filter(pk=theirs.pk).exists())
 
 
 class ConfirmTests(DeletionBase):

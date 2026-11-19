@@ -65,6 +65,7 @@ test("a conversation that has begun offers no starters", async () => {
     plan: null, context: null, capabilities: { manual_compaction: false } }] } });
   render(<MemoryRouter><RuntimeReader conversationId="c" /></MemoryRouter>);
 
-  await screen.findByText("Thinking");
+  // A run that reports nothing yet shows the heading alone (IR-1236); the page invents no "Thinking".
+  await screen.findByRole("heading", { name: "Researching…" });
   expect(screen.queryByRole("group", { name: "Suggested questions" })).not.toBeInTheDocument();
 });

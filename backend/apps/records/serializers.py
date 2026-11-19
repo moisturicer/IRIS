@@ -3,6 +3,7 @@ from rest_framework import serializers
 from core.enums import PipelineStatus, ReviewDecision
 from core.text_limits import FREE_TEXT_MAX_LENGTH, too_long_message
 
+from apps.documents.scanning import upload_problem
 from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, record_versions, resubmission_payload
 
@@ -262,6 +263,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # on an Unlisted paper, and `None` to everyone else. A rendering hint;
     # `publish-unlisted/` re-checks it.
     publish_unlisted     = serializers.SerializerMethodField()
+    # What the Adviser leaves if RDCO replaces them (IR-1226): `{name,
+    # unresolved}` beside the `replace_adviser` offer, so *Replace Adviser*
+    # warns with the server's counts; `None` to anyone not offered the act.
+    adviser_leaving      = serializers.SerializerMethodField()
     # What the viewer may be offered (ADR-032 §10, IR-418): `core.permissions`
     # assembles it from the blocks above. A rendering hint; every action
     # endpoint re-checks its own predicate, so the server stays authoritative.
@@ -410,15 +415,24 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return self._once(obj, "publish_unlisted", lambda: offer_payload(obj, self._viewer()))
 
+    def get_adviser_leaving(self, obj):
+        from apps.reviews.removal import leaving
+        from core.enums import Party
+
+        if "replace_adviser" not in self.get_capabilities(obj) or obj.adviser is None:
+            return None
+        return leaving(obj, obj.adviser, Party.ADVISER)
+
     def get_capabilities(self, obj):
         from core.permissions import record_capabilities
 
-        return record_capabilities(
+        # Once per record: `adviser_leaving` reads it too (IR-1226).
+        return self._once(obj, "capabilities", lambda: record_capabilities(
             obj, self._viewer(), workflow=self._workflow(obj),
             my_seats=self.get_my_seats(obj), routing=self.get_routing(obj),
             office_review=self.get_office_review(obj), revision=self.get_revision(obj),
             decision=self.get_decision(obj), publish_unlisted=self.get_publish_unlisted(obj),
-        )
+        ))
 
     def get_readiness(self, obj):
         from apps.reviews import readiness, routing
@@ -473,11 +487,14 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         material: `None` -- not disclosed, which is not `[]` -- to a viewer
         who may not read the review (IR-479).
         """
+        from apps.documents.requests import may_read_requests
+
         from .versions import versions_payload
 
         if not self._readable(obj):
             return None
-        return versions_payload(obj)
+        # Each document's rejections are request data (IR-1201, ADR-022 §Amendment 5).
+        return versions_payload(obj, disclose_requests=may_read_requests(obj, self._viewer()))
 
     def get_paper_details(self, obj):
         from .paper_details import paper_details
@@ -555,11 +572,16 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         # the nginx block and Django's DEBUG route -- every one of these links
         # was a 404 (IR-334).
         from apps.documents.attachments import may_remove, removable_parties
+        from core.permissions import may_read_record_documents
 
+        user = getattr(self.context.get("request"), "user", None)
+        # Only those who may download the attachments are told of them (IR-1244):
+        # a reader of a published paper would get filenames and links that 403.
+        if not may_read_record_documents(user, obj):
+            return []
         files = list(obj.files.all().order_by("-created_at"))
         if not files:
             return []
-        user = getattr(self.context.get("request"), "user", None)
         # The delete view's own rule (IR-476), asked once for the record.
         removable = removable_parties(obj, user)
         return [
@@ -620,7 +642,8 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "review_claim", "is_participant", "routing",
-            "office_review", "revision", "decision", "publish_unlisted", "capabilities", "readiness", "keywords",
+            "office_review", "revision", "decision", "publish_unlisted", "adviser_leaving", "capabilities",
+            "readiness", "keywords",
             "dpa_accepted", "dpa_accepted_at", "details_revision", "metadata_sources",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
@@ -715,7 +738,8 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             )
         if not file:
             return file
-        problem = pdf_upload_problem(file)
+        problem = pdf_upload_problem(file) or upload_problem(
+            file, user=user, where="manuscript", record=self.instance)
         if problem:
             raise serializers.ValidationError(problem)
         return file

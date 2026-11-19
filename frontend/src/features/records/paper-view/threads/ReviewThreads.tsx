@@ -7,9 +7,12 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import type { Capability } from "@/features/records/capabilities";
 import { errorDetail } from "@/lib/errorDetail";
 import { cn, formatDate } from "@/lib/utils";
-import type { MentionedPerson, ResponseLetter, ReviewComment, ThreadSeverity } from "@/types/records";
+import type { MentionedPerson, ResponseLetter, ReviewComment, ThreadDocument, ThreadSeverity } from "@/types/records";
 
-import { MentionPicker, MentionedPeople } from "../Mentions";
+import { RowMenu } from "@/features/accounts/RowMenu";
+
+import { initials } from "../commentThreads";
+import { MentionPicker, MentionedPeople, changedMentions, peopleIn } from "../Mentions";
 import { SavedReplies } from "../SavedReplies";
 import type { Passage } from "./passage";
 import { ResponseLetterPanel } from "./ResponseLetter";
@@ -17,7 +20,11 @@ import { SEVERITY_WORDS, filterThreads, isOpen, threadStatus, type Thread, type 
 import type { ReviewThreadsState } from "./useReviewThreads";
 
 /** What the composer comments on: a passage of a Version, or the whole record. */
-export type CommentTarget = { kind: "general" } | { kind: "passage"; version: number; passage: Passage };
+export type CommentTarget =
+  | { kind: "general" }
+  | { kind: "passage"; version: number; passage: Passage }
+  /** A supporting document's newest upload, as a whole (IR-1204): "Consent form, v1". */
+  | { kind: "document"; upload: number; label: string };
 
 export interface ReviewThreadsProps {
   recordId: number;
@@ -31,6 +38,8 @@ export interface ReviewThreadsProps {
   onChanged: () => void;
   /** Bring a thread's passage into view in the reader. */
   onShowInPaper: (thread: Thread) => void;
+  /** Show the document a thread is about in the reader (IR-1204); absent where nothing can. */
+  onShowDocument?: (document: ThreadDocument) => void;
   /** A party Readiness pointed at ("owner" for the authors), or null for every party. */
   party: string | null;
   onClearParty: () => void;
@@ -47,10 +56,11 @@ const FILTER_NAMES: Record<ThreadFilter, string> = { open: "Open", yours: "Yours
  * viewer's drafts, and every sent thread under Open / Yours / Resolved / All.
  *
  * **Every control is the server's call.** A thread's Resolve, Reopen, answer,
- * severity and Discard appear exactly where its `can_*` flag is true; the
- * composer's severity choice and its "held as a draft" note appear exactly
- * where `finish_review` is granted, which is when the server holds a new
- * thread as a draft. Nothing here compares a role.
+ * severity, Post and Discard appear exactly where its `can_*` flag is true;
+ * the composer's severity choice and its Post / Save as draft pair appear
+ * exactly where `finish_review` is granted, which is when the server can hold
+ * a new thread as a draft, and *New comment* where `open_general_thread` is.
+ * Nothing here compares a role.
  */
 export function ReviewThreads(props: ReviewThreadsProps) {
   const { threads, viewer, party, focus } = props;
@@ -80,7 +90,11 @@ export function ReviewThreads(props: ReviewThreadsProps) {
     (Object.keys(FILTER_NAMES) as ThreadFilter[]).map((f) => [f, ofParty(filterThreads(threads.sent, f, viewer))]),
   ) as Record<ThreadFilter, Thread[]>;
   const shown = groups[filter];
-  const canComment = props.can.has("comment_review");
+  // Replying (`comment_review`) outlasts a reviewer's seat; starting a thread
+  // on a passage (`start_thread`) does not (IR-1226).
+  const canStart = props.can.has("start_thread");
+  // A thread on no passage is a reviewer's (IR-1194); the authors comment on a passage.
+  const canGeneral = props.can.has("open_general_thread");
 
   return (
     <section aria-labelledby={headingId} className="space-y-4">
@@ -107,7 +121,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
             </button>
           ))}
         </div>
-        {canComment && !props.composing && (
+        {canGeneral && !props.composing && (
           <Button variant="outline" size="sm" onClick={() => props.onCompose({ kind: "general" })}>
             <i className="fas fa-note-sticky" aria-hidden />
             New comment
@@ -116,11 +130,11 @@ export function ReviewThreads(props: ReviewThreadsProps) {
       </div>
       {props.composing
         ? <Composer {...props} target={props.composing} />
-        : canComment && (
+        : canStart && (
           <p className="text-small text-stone-600">
             Select a passage in the paper and press{" "}
             <kbd className="rounded-control border border-stone-300 bg-surface px-1.5 font-mono text-2xs text-stone-700">C</kbd>
-            , or use New comment.
+            {canGeneral ? ", or use New comment." : ". A remark on the whole paper goes in Conversation."}
           </p>
         )}
       {party !== null && (
@@ -145,7 +159,7 @@ export function ReviewThreads(props: ReviewThreadsProps) {
         <section aria-label="Your drafts" className="space-y-2">
           <p className="flex flex-wrap items-baseline gap-x-2 text-small">
             <span className="font-semibold text-stone-900">Your drafts</span>
-            <span className="text-2xs text-stone-600">Only you see these until you finish</span>
+            <span className="text-2xs text-stone-600">Only you see these until you post them or finish your review</span>
           </p>
           {threads.drafts.map((t) => <ThreadItem key={t.root.id} thread={t} {...props} />)}
         </section>
@@ -168,12 +182,25 @@ export const threadDomId = (id: number) => `review-thread-${id}`;
 
 const pinWords = (thread: Thread) => (thread.root.is_draft ? `Draft ${thread.pin}` : `Thread ${thread.pin}`);
 
-function Chip({ children, tone = "quiet" }: { children: ReactNode; tone?: "quiet" | "brand" | "ink" }) {
+type ChipTone = "quiet" | "brand" | "ink" | "answered";
+
+/** The icon an answer is marked by, on its badge and its history row: never colour alone (IR-1191). */
+const ANSWER_ICON: Record<ThreadAnswer["kind"], string> = { addressed: "fa-check", declined: "fa-xmark" };
+
+/** A settled thread inked; an open one outlined dark once answered, else quiet. */
+function statusTone(root: ReviewComment): ChipTone {
+  if (root.state !== "open") return "ink";
+  return root.answer ? "answered" : "quiet";
+}
+
+function Chip({ children, tone = "quiet" }: { children: ReactNode; tone?: ChipTone }) {
   return (
     <span className={cn(
       "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold",
-      tone === "brand" && "bg-surface text-brand ring-1 ring-stone-300",
+      // Must fix, filled, as the prototype's card has it (IR-1191).
+      tone === "brand" && "bg-brand text-white",
       tone === "ink" && "bg-stone-900 text-white",
+      tone === "answered" && "bg-surface text-stone-900 ring-1 ring-stone-900",
       tone === "quiet" && "text-stone-700 ring-1 ring-stone-300",
     )}>
       {children}
@@ -188,8 +215,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<null | "reply" | "addressed" | "declined">(null);
   const status = threadStatus(root);
-  // Replies and what happened to the thread, in the order they happened. The
-  // answer is shown on its own above, so its event is not repeated.
+  // Replies, the answer and what happened to the thread, in the order they happened.
   const history = threadHistory(root, replies);
   const canReply = props.can.has("comment_review") && !root.is_draft && root.state === "open";
 
@@ -214,7 +240,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
 
   // Whether the foot has anything to hold: the box draws no empty foot.
   const anyAction = root.can_answer || root.can_resolve || root.can_reopen
-    || (root.can_change_severity && Boolean(root.severity)) || canReply || root.can_delete;
+    || (root.can_change_severity && Boolean(root.severity)) || canReply || root.can_post || root.can_delete;
 
   // The same box as the Conversation's comments (IR-1131): who and which
   // party in its head, the passage and what was said in its body, and the
@@ -248,15 +274,29 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
             p. {root.anchor.page} · v{root.anchor.version}
           </button>
         )}
+        {root.document && <DocumentPlace document={root.document} onShow={props.onShowDocument} />}
       </header>
 
       <div className="review-box-body space-y-2">
       <p className="flex flex-wrap items-center gap-1.5">
-        {root.severity && <Chip tone={root.severity === "must_fix" ? "brand" : "quiet"}>{SEVERITY_WORDS[root.severity]}</Chip>}
+        {root.severity && (
+          <Chip tone={root.severity === "must_fix" ? "brand" : "quiet"}>
+            {root.severity === "must_fix" && <i className="fas fa-triangle-exclamation text-label" aria-hidden />}
+            {SEVERITY_WORDS[root.severity]}
+          </Chip>
+        )}
         {root.is_draft
           ? <Chip><i className="fas fa-pen text-label" aria-hidden />Draft</Chip>
-          : status && <Chip tone={root.state === "open" ? "quiet" : "ink"}>{status}</Chip>}
+          : status && (
+            <Chip tone={statusTone(root)}>
+              {root.state === "open" && root.answer && (
+                <i className={cn("fas text-label", ANSWER_ICON[root.answer.kind])} aria-hidden />
+              )}
+              {status}
+            </Chip>
+          )}
         {root.outdated_since != null && <Chip>Outdated since v{root.outdated_since}</Chip>}
+        {root.document?.earlier && <Chip>From an earlier upload</Chip>}
       </p>
 
       {root.anchor && (
@@ -276,29 +316,38 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       {root.suggestion && <SuggestedWording root={root} />}
 
       <div className="text-small text-stone-800">
-        <p className="whitespace-pre-wrap break-words">{root.body}</p>
+        <p className="text-justified whitespace-pre-wrap break-words">{root.body}</p>
         <MentionedPeople people={root.mentions} />
       </div>
 
-      {root.answer && (
-        <p className="rounded-control bg-stone-50 px-2 py-1.5 text-small text-stone-800">
-          <span className="font-semibold">
-            {root.answer.by ?? "The authors"} {root.answer.kind === "addressed" ? "marked it addressed" : "declined it"}:
-          </span>{" "}
-          <span className="whitespace-pre-wrap">{root.answer.note}</span>
-        </p>
-      )}
       {root.state === "closed" && root.closed_reason && (
         <p className="text-small text-stone-700">Closed by the Decision: {root.closed_reason}</p>
       )}
+      </div>
+
+      {/* Replies, the authors' answer and what happened to the thread, in the
+          order they happened (IR-1191), each row in the Conversation's shape
+          (IR-1192). */}
       {history.length > 0 && (
-        <ol aria-label="Replies and history" className="space-y-1.5 border-l border-stone-200 pl-3">
-          {history.map((h) => h.reply
-            ? <Reply key={`r${h.reply.id}`} reply={h.reply} />
-            : <li key={h.key} className="text-2xs text-stone-600">{eventWords(h.event!)} · {formatDate(h.at)}</li>)}
+        <ol aria-label="Replies and history" className="review-box-replies">
+          {history.map((h) => {
+            if (h.reply) {
+              return <Reply key={h.key} reply={h.reply} recordId={id} canComment={props.can.has("comment_review")}
+                onEdited={() => { props.threads.reload(); props.onChanged(); }} />;
+            }
+            if (h.answer) return <AnswerRow key={h.key} answer={h.answer} at={h.at} />;
+            return (
+              <li key={h.key} className="review-box-rep review-box-event">
+                <span aria-hidden className="review-event-ic"><i className="fas fa-circle-info" /></span>
+                <p className="text-2xs text-stone-600">{eventWords(h.event!)} · {formatDate(h.at)}</p>
+              </li>
+            );
+          })}
         </ol>
       )}
 
+      {(form !== null || error) && (
+      <div className="review-box-body space-y-2 border-t border-stone-200">
       {form === "reply" && (
         <TextForm
           label="Reply" submitLabel="Reply" required busy={busy} savedReplies mentionsRecordId={id}
@@ -321,6 +370,7 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       )}
       {error && <p role="alert" className="text-small text-brand">{error}</p>}
       </div>
+      )}
 
       {form === null && anyAction && (
         <div className="review-box-foot flex flex-wrap gap-1.5" role="group" aria-label={`${pinWords(thread)} actions`}>
@@ -352,7 +402,21 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
               Change to {SEVERITY_WORDS[otherSeverity]}
             </Button>
           )}
-          {canReply && <Button size="sm" variant="ghost" onClick={() => setForm("reply")}>Reply</Button>}
+          {canReply && (
+            // How many replies the thread has, on its Reply control (IR-1192).
+            <Button size="sm" variant="ghost" onClick={() => setForm("reply")}
+              aria-label={replies.length ? `Reply, ${replies.length} ${replies.length === 1 ? "reply" : "replies"}` : undefined}>
+              Reply
+              {replies.length > 0 && <span aria-hidden className="review-count ml-0">{replies.length}</span>}
+            </Button>
+          )}
+          {root.can_post && (
+            // One draft sent on its own, before *Finish review* (IR-1194).
+            <Button size="sm" variant="outline" disabled={busy}
+              onClick={() => act(() => recordsApi.postThread(id, root.id), "The draft could not be posted.")}>
+              Post
+            </Button>
+          )}
           {root.can_delete && (
             <Button size="sm" variant="ghost" disabled={busy}
               onClick={() => act(() => recordsApi.deleteReviewComment(id, root.id), "The draft could not be discarded.")}>
@@ -400,7 +464,7 @@ function SuggestedWording({ root }: { root: ReviewComment }) {
   return (
     <section aria-labelledby={`${ids}-wording`} className="rounded-control bg-stone-50 px-2 py-1.5 space-y-0.5">
       <p id={`${ids}-wording`} className="text-2xs font-semibold text-stone-600">Suggested wording</p>
-      <p className="text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
+      <p className="text-justified text-small text-stone-900 whitespace-pre-wrap break-words">“{root.suggestion}”</p>
       {check && (
         <p className="text-2xs text-stone-700">
           {check.page != null
@@ -412,15 +476,33 @@ function SuggestedWording({ root }: { root: ReviewComment }) {
   );
 }
 
-type HistoryItem = { key: string; at: string; reply?: ReviewComment; event?: NonNullable<ReviewComment["events"]>[number] };
+type ThreadAnswer = NonNullable<ReviewComment["answer"]>;
+type HistoryItem = {
+  key: string;
+  /** When it happened; null for an answer with no time, which goes last. */
+  at: string | null;
+  reply?: ReviewComment;
+  answer?: ThreadAnswer;
+  event?: NonNullable<ReviewComment["events"]>[number];
+};
 
-/** A thread's replies and events, oldest first; a tie keeps a reply before an event. */
+/**
+ * A thread's replies, its answer and its events, oldest first (IR-1191). The
+ * current answer is one row, at the time it was given: its own `at`, else the
+ * latest "answered" event's, else last of all. That event is not listed
+ * besides, so the answer is said once; an earlier answer, since replaced or
+ * cleared, stays as its event line. A tie keeps a reply first.
+ */
 export function threadHistory(root: ReviewComment, replies: ReviewComment[]): HistoryItem[] {
+  const events = root.events ?? [];
+  const lastAnswered = root.answer ? events.map((e) => e.kind).lastIndexOf("answered") : -1;
+  const answeredAt = root.answer ? root.answer.at ?? events[lastAnswered]?.at ?? null : null;
   const items: HistoryItem[] = [
     ...replies.map((r) => ({ key: `r${r.id}`, at: r.created_at, reply: r })),
-    ...(root.events ?? []).filter((e) => e.kind !== "answered").map((e, i) => ({ key: `e${i}`, at: e.at, event: e })),
+    ...events.flatMap((e, i) => (i === lastAnswered ? [] : [{ key: `e${i}`, at: e.at, event: e }])),
+    ...(root.answer ? [{ key: "answer", at: answeredAt, answer: root.answer }] : []),
   ];
-  const time = (h: HistoryItem) => Date.parse(h.at) || 0;
+  const time = (h: HistoryItem) => (h.at === null ? Infinity : Date.parse(h.at) || 0);
   return items.sort((a, b) => time(a) - time(b) || (a.reply ? -1 : 0) - (b.reply ? -1 : 0));
 }
 
@@ -440,29 +522,130 @@ function eventWords(e: NonNullable<ReviewComment["events"]>[number]): string {
   }
 }
 
-function Reply({ reply }: { reply: ReviewComment }) {
+/**
+ * The authors' answer as a row of the history (IR-1191). Still a formal act,
+ * not a reply: it is told apart by its icon -- a check for Addressed, a cross
+ * for Declined -- and its wording, not by colour alone.
+ */
+function AnswerRow({ answer, at }: { answer: ThreadAnswer; at: string | null }) {
+  const addressed = answer.kind === "addressed";
+  const who = answer.by ?? "The authors";
   return (
-    <li className="text-small text-stone-800">
-      <p className="text-2xs text-stone-600">
-        {reply.author_name ?? "Someone"} · {formatDate(reply.created_at)}{reply.edited_at ? " · edited" : ""}
-      </p>
-      <p className="whitespace-pre-wrap break-words">{reply.body}</p>
-      <MentionedPeople people={reply.mentions} />
+    <li className="review-box-rep review-box-answer">
+      <span aria-hidden className="review-event-ic">
+        <i className={cn("fas", ANSWER_ICON[answer.kind])} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-small text-stone-700">
+          <b className="font-semibold text-stone-900">{who}</b>{" "}
+          {addressed ? <>marked this <b className="font-semibold text-stone-900">Addressed</b></> : "declined this"}
+          {at && <> <time dateTime={at} className="text-2xs text-stone-600">{formatDate(at)}</time></>}
+        </p>
+        <p className="text-justified whitespace-pre-wrap break-words text-small text-stone-800">
+          {answer.note || <span className="italic text-stone-600">No answer given.</span>}
+        </p>
+      </div>
     </li>
   );
 }
 
-function TextForm({ label, submitLabel, hint, required, busy, savedReplies, mentionsRecordId, onSubmit, onCancel }: {
+/**
+ * A reply, in the Conversation's shape (IR-1192): an avatar, the writer, who
+ * they are in this review as the server words it, and the date. Where the
+ * server says the reply is the viewer's, a ⋯ menu at its far right offers Edit,
+ * which swaps the text for a form in place.
+ */
+function Reply({ reply, recordId, canComment, onEdited }: {
+  reply: ReviewComment; recordId: number; canComment: boolean; onEdited: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const who = reply.author_name ?? "Someone";
+  const canEdit = canComment && reply.can_edit;
+  const before = peopleIn(reply.mentions);
+
+  const save = async (body: string, mentions: number[]) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const changed = changedMentions(before, mentions);
+      await recordsApi.editReviewComment(recordId, reply.id, changed ? { body, mentions: changed } : { body });
+      setEditing(false);
+      onEdited();
+    } catch (err) {
+      setError(errorDetail(err, "Your reply could not be saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="review-box-rep">
+      <span aria-hidden className="review-avatar review-avatar-brand">{initials(reply.author_name)}</span>
+      <div className="min-w-0">
+        <div className="flex items-start gap-2">
+          <p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-2xs text-stone-600">
+            <span className="text-small font-semibold text-stone-900">{who}</span>
+            {reply.party_label && <span className="review-label">{reply.party_label}</span>}
+            <time dateTime={reply.created_at}>{formatDate(reply.created_at)}</time>
+            {reply.edited_at && <span>· edited</span>}
+          </p>
+          {canEdit && !editing && (
+            <RowMenu label={`Actions for ${who}'s reply`} compact
+              items={[{ key: "edit", label: "Edit", onSelect: () => setEditing(true) }]} />
+          )}
+        </div>
+        {editing ? (
+          <TextForm
+            label="Edit your reply" submitLabel="Save" required busy={busy}
+            initial={reply.body} initialMentions={before} mentionsRecordId={recordId}
+            onCancel={() => { setEditing(false); setError(null); }}
+            onSubmit={save}
+          />
+        ) : (
+          <>
+            <p className="text-justified whitespace-pre-wrap break-words text-small text-stone-800">{reply.body}</p>
+            <MentionedPeople people={reply.mentions} />
+          </>
+        )}
+        {error && <p role="alert" className="text-small text-brand">{error}</p>}
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Where a document thread points (IR-1204): its document and upload, as a link
+ * that shows it in the reader. A slot's upload is served as a PDF, so another
+ * stored type, or a page with no reader, names it without the link.
+ */
+function DocumentPlace({ document, onShow }: { document: ThreadDocument; onShow?: (document: ThreadDocument) => void }) {
+  // A document's name can be long, so it wraps within the card (the Full Text Rule, IR-1218).
+  const place = "min-w-0 break-words text-left font-semibold";
+  if (!onShow || document.extension !== "pdf") return <span className={cn(place, "text-stone-700")}>{document.label}</span>;
+  return (
+    <button type="button" onClick={() => onShow(document)} aria-label={`Open ${document.label}`}
+      className={cn(place, "text-brand underline underline-offset-2 hover:text-brand-dark", FOCUS_RING)}>
+      {document.label}
+    </button>
+  );
+}
+
+function TextForm({ label, submitLabel, hint, required, busy, savedReplies, mentionsRecordId, initial = "", initialMentions, onSubmit, onCancel }: {
   label: string; submitLabel: string; hint?: string; required?: boolean; busy: boolean;
   /** Offer saved replies (IR-877): a reply is a comment; an answer's note is not. */
   savedReplies?: boolean;
   /** Offer mentions on this record (IR-877): a reply's, never an answer note's. */
   mentionsRecordId?: number;
+  /** What an edit starts from (IR-1192). */
+  initial?: string;
+  initialMentions?: MentionedPerson[];
   onSubmit: (text: string, mentions: number[]) => void; onCancel: () => void;
 }) {
   const id = useId();
-  const [text, setText] = useState("");
-  const [mentioned, setMentioned] = useState<MentionedPerson[]>([]);
+  const [text, setText] = useState(initial);
+  const [mentioned, setMentioned] = useState<MentionedPerson[]>(initialMentions ?? []);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => ref.current?.focus(), []);
   const submit = (e: FormEvent) => {
@@ -487,9 +670,10 @@ function TextForm({ label, submitLabel, hint, required, busy, savedReplies, ment
 
 /**
  * Comment on a passage, or the record as a whole. Where `finish_review` is
- * granted the server holds a new thread as a draft, so the reviewer chooses
- * its severity -- *Suggestion* unless they say *Must fix* (decided for IR-875)
- * -- and is told it waits for *Finish review*.
+ * granted the reviewer chooses its severity -- *Suggestion* unless they say
+ * *Must fix* (decided for IR-875) -- and whether to **Post** it now, which
+ * tells the authors, or **Save as draft** for their next *Finish review*
+ * (ADR-032 §7 as amended 2026-11-16, IR-1194).
  */
 function Composer({ recordId, can, target, onCompose, threads, onChanged }: ReviewThreadsProps & { target: CommentTarget }) {
   const ids = useId();
@@ -505,15 +689,15 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => ref.current?.focus(), [target]);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const send = async (postNow: boolean) => {
     if (!body.trim() || busy) return;
     setBusy(true);
     setError(null);
     try {
       await recordsApi.postReviewComment(recordId, {
         body: body.trim(),
-        ...(drafting ? { severity } : {}),
+        kind: "thread",
+        ...(drafting ? { severity, post_now: postNow } : {}),
         ...(canSuggest && wording.trim() ? { suggestion: wording.trim() } : {}),
         ...(mentioned.length ? { mentions: mentioned.map((p) => p.id) } : {}),
         ...(target.kind === "passage" ? {
@@ -522,6 +706,7 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
             prefix: target.passage.prefix, suffix: target.passage.suffix, regions: target.passage.regions,
           },
         } : {}),
+        ...(target.kind === "document" ? { document: target.upload } : {}),
       });
       onCompose(null);
       threads.reload();
@@ -532,13 +717,20 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
       setBusy(false);
     }
   };
+  // Enter, or the primary button, posts: the comment is meant to be read.
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    void send(true);
+  };
 
   return (
     <form onSubmit={submit} aria-label="New comment" className="rounded-control border border-stone-300 bg-white p-3 space-y-2">
       <p className="text-2xs text-stone-600">
         {target.kind === "passage"
           ? <>Comment on <b className="text-stone-800">p.{target.passage.page}</b> of v{target.version}</>
-          : "Comment on the record as a whole"}
+          : target.kind === "document"
+            ? <>Comment on <b className="text-stone-800">{target.label}</b></>
+            : "Comment on the record as a whole"}
       </p>
       {target.kind === "passage" && (
         <blockquote className="border-l-2 border-brand/40 pl-2 text-small italic text-stone-700">“{target.passage.quote}”</blockquote>
@@ -566,16 +758,25 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
           <textarea id={`${ids}-wording`} rows={2} value={wording} onChange={(e) => setWording(e.target.value)}
             aria-describedby={`${ids}-wording-hint`} className={fieldClasses(false)} />
           <p id={`${ids}-wording-hint`} className="text-2xs text-stone-600">
-            The text you&rsquo;d put in its place. You can change it until you finish your review.
+            The text you&rsquo;d put in its place. You can change it while the comment is a draft.
           </p>
         </div>
       )}
       {error && <p role="alert" className="text-small text-brand">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="secondary" onClick={() => onCompose(null)} disabled={busy}>Cancel</Button>
-        <Button type="submit" size="sm" disabled={busy || !body.trim()}>{drafting ? "Add to review" : "Comment"}</Button>
+        {drafting && (
+          <Button type="button" size="sm" variant="outline" disabled={busy || !body.trim()} onClick={() => void send(false)}>
+            Save as draft
+          </Button>
+        )}
+        <Button type="submit" size="sm" disabled={busy || !body.trim()}>{drafting ? "Post" : "Comment"}</Button>
       </div>
-      {drafting && <p className="text-2xs text-stone-600">Held as a draft until you finish your review.</p>}
+      {drafting && (
+        <p className="text-2xs text-stone-600">
+          Post sends it now and tells the authors. A draft is seen only by you until you send it or finish your review.
+        </p>
+      )}
     </form>
   );
 }

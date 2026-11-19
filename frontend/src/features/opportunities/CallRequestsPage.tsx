@@ -30,13 +30,16 @@ import type { Opportunity } from "@/types/opportunities";
 import { FeaturedToggle, posterOf, useCallList, useFeaturedToggle, useReportCallFailure } from "./callActions";
 import { CallDetails } from "./CallDetails";
 import { formatDueDate } from "./opportunityUtils";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 const readRequests = () => opportunitiesApi.requests();
 
 export default function CallRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
-  const { items, setItems, loading, failed, load } = useCallList(readRequests);
+  const { items, setItems, loading, failed, load, refresh } = useCallList(readRequests);
   const report = useReportCallFailure(load);
+  // Live updates (ADR-073): RDCO's queues, reloaded quietly.
+  useLiveRefresh(["queues"], refresh);
 
   const [confirming, setConfirming] = useState<Opportunity | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -66,7 +69,7 @@ export default function CallRequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Call Requests"
+        title="Call requests"
         description="Advisers' calls for papers waiting for RDCO, oldest first. A request leaves this list when its paper deadline passes."
       />
 

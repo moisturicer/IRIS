@@ -5,8 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DEFAULT_QUERY, feedCriteria, feedQueryOf, feedSearchParams, listParams, parseDiscoverQuery, sameFeedQuery,
-  writeDiscoverQuery,
+  DEFAULT_QUERY, ORDER_OPTIONS, listParams, orderOf, parseDiscoverQuery, withOrder, writeDiscoverQuery,
 } from "./discoverQuery";
 
 const parse = (search: string) => parseDiscoverQuery(new URLSearchParams(search));
@@ -65,6 +64,41 @@ describe("parseDiscoverQuery", () => {
   });
 });
 
+describe("one sort for Discover (IR-1187)", () => {
+  it("offers Best, Newest, Most viewed and Trending, in that order", () => {
+    expect(ORDER_OPTIONS.map((o) => o.label)).toEqual(["Best", "Newest", "Most viewed", "Trending"]);
+  });
+
+  it.each([
+    ["", "newest"],
+    ["sort=viewed", "viewed"],
+    ["feed=latest", "newest"],
+    ["feed=for_you", "best"],
+    ["feed=trending", "trending"],
+  ])("reads an old link %s as %s", (search, order) => {
+    expect(orderOf(parse(search))).toBe(order);
+  });
+
+  it("lands an old tab link carrying a sort on the tab, the order it showed", () => {
+    // The tab ignored the sort, so the link showed the tab's own order.
+    expect(orderOf(parse("feed=trending&sort=viewed"))).toBe("trending");
+    expect(orderOf(parse("feed=for_you&sort=viewed"))).toBe("best");
+    expect(writeDiscoverQuery(new URLSearchParams(), parse("feed=trending&sort=viewed")).toString()).toBe("feed=trending");
+  });
+
+  it.each([
+    ["best", { feed: "for_you", sort: "newest" }, { ordering: "-created_at" }],
+    ["newest", { feed: "latest", sort: "newest" }, { ordering: "-created_at" }],
+    ["viewed", { feed: "latest", sort: "viewed" }, { ordering: "-access_count" }],
+    ["trending", { feed: "trending", sort: "newest" }, { ordering: "trending" }],
+  ] as const)("asks for %s exactly as its tab or sort did", (order, shape, params) => {
+    const query = withOrder(parse("sort=viewed&type=2"), order);
+    expect(query).toMatchObject({ ...shape, filters: { recordType: "2" } });
+    expect(listParams(query)).toMatchObject(params);
+    expect(orderOf(parseDiscoverQuery(writeDiscoverQuery(new URLSearchParams(), query)))).toBe(order);
+  });
+});
+
 describe("writeDiscoverQuery", () => {
   it("round-trips: what it writes parses back to the same query", () => {
     const query = parse("q=rain&type=2&college=4,5&year_from=2019&year_to=2019&ip=has_ip&sort=viewed");
@@ -79,84 +113,18 @@ describe("writeDiscoverQuery", () => {
     expect(writeDiscoverQuery(new URLSearchParams("year=2026&q=rain"), parse("q=rain")).toString()).toBe("q=rain");
   });
 
+  it("removes an old saved-feed id, keeping that link's filters (IR-1189)", () => {
+    const old = new URLSearchParams("q=flood&classification=7&myfeed=5");
+    expect(writeDiscoverQuery(old, parseDiscoverQuery(old)).toString()).toBe("q=flood&classification=7");
+  });
+
     it("leaves keys it does not own, such as the Publish dialog's", () => {
     const written = writeDiscoverQuery(new URLSearchParams("publish=new&sort=bogus"), DEFAULT_QUERY);
     expect(written.toString()).toBe("publish=new");
   });
 });
 
-describe("saved feeds use Discover's own query (IR-577)", () => {
-  it("stores a query in Discover's spelling, without the tab", () => {
-    const query = parse("q=flood&classification=7,4&college=5&year_from=2018&ip=patent&type=2&sort=viewed&feed=for_you");
-
-    expect(feedQueryOf(query)).toEqual({
-      q: "flood", type: "2", college: "5", classification: "4,7", year_from: "2018", ip: "patent", sort: "viewed",
-    });
-  });
-
-  it("saves Trending as most viewed and omits the default sort", () => {
-    expect(feedQueryOf(parse("q=flood&feed=trending"))).toEqual({ q: "flood", sort: "viewed" });
-    expect(feedQueryOf(parse("q=flood"))).toEqual({ q: "flood" });
-  });
-
-  it("opens a feed as the URL Discover would have written for it", () => {
-    const params = feedSearchParams({ q: "flood", classification: "4,7", sort: "viewed" }, {});
-
-    expect(params.toString()).toBe(writeDiscoverQuery(new URLSearchParams(), parse("q=flood&classification=4,7&sort=viewed")).toString());
-    expect(params.get("feed")).toBeNull();
-  });
-
-  it("leaves a stale value out of the URL, so it is corrected rather than silently queried", () => {
-    const stale = { classification: [7], college: [5] };
-
-    const params = feedSearchParams({ q: "flood", classification: "4,7", college: "5" }, stale);
-
-    expect(params.get("classification")).toBe("4");
-    expect(params.has("college")).toBe(false);
-    expect(params.get("q")).toBe("flood");
-  });
-
-  it("tells whether the filters on screen are the feed's own", () => {
-    const stored = { q: "flood", classification: "4,7" };
-
-    expect(sameFeedQuery(stored, parse("classification=7,4&q=flood"))).toBe(true);
-    expect(sameFeedQuery(stored, parse("classification=4&q=flood"))).toBe(false);
-    expect(sameFeedQuery(stored, parse("q=flood&classification=4,7&sort=viewed"))).toBe(false);
-  });
-
-  it("describes a feed in words, naming a value that no longer exists as unavailable", () => {
-    const options = {
-      classifications: [{ value: "4", label: "Civil Engineering" }],
-      colleges: [{ value: "5", label: "College of Engineering" }],
-      recordTypes: [{ value: "2", label: "Thesis" }],
-    };
-
-    expect(
-      feedCriteria({ q: "flood", classification: "4,7", college: "5", type: "2", year_from: "2018", ip: "has_ip", sort: "viewed" }, options),
-    ).toEqual([
-      "Keywords: flood",
-      "Areas: Civil Engineering, no longer available",
-      "Colleges: College of Engineering",
-      "Type: Thesis",
-      "Years: 2018 onward",
-      "Intellectual property: any",
-      "Sorted by: Most viewed",
-    ]);
-  });
-});
-
-describe("a year range in words and in the list request (IR-947)", () => {
-  const noOptions = { classifications: [], colleges: [], recordTypes: [] };
-
-  it.each([
-    [{ year_from: "2018", year_to: "2021" }, "Years: 2018 to 2021"],
-    [{ year_from: "2018" }, "Years: 2018 onward"],
-    [{ year_to: "2021" }, "Years: up to 2021"],
-    [{ year_from: "2019", year_to: "2019" }, "Year: 2019"],
-  ])("describes %o as %s", (stored, line) => {
-    expect(feedCriteria(stored, noOptions)).toEqual([line]);
-  });
-
+describe("a year range in the list request (IR-947)", () => {
   it("asks the list endpoint for each end the reader set, and only those", () => {
     const at = (search: string) => listParams(parse(search));
 
