@@ -277,10 +277,14 @@ export default function MyReviewsPage() {
           ) : (
             // Sorting an empty list changes nothing, so no sort chip is offered over one
             // (IR-1181). Overdue only stays while it is on: it is what emptied the list.
+            // The sort orders the list and the filter narrows it, and they combine, so
+            // each is named on screen and the filter is drawn as a toggle, not a third
+            // sort chip (IR-1243).
             (listed || overdue) && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 {listed && (
-                  <div role="group" aria-label="Sort" className="flex flex-wrap gap-2">
+                  <div role="group" aria-labelledby={`${ids}-sort`} className="flex flex-wrap items-center gap-2">
+                    <span id={`${ids}-sort`} className={CONTROL_LABEL}>Sort</span>
                     {SORTS.map((s) => (
                       <button
                         key={s.key}
@@ -294,14 +298,30 @@ export default function MyReviewsPage() {
                     ))}
                   </div>
                 )}
-                <button
-                  type="button"
-                  aria-pressed={overdue}
-                  onClick={() => go({ overdue: !overdue })}
-                  className={chipClass(overdue)}
+                <div
+                  role="group"
+                  aria-labelledby={`${ids}-filter`}
+                  className={cn("flex items-center gap-2", listed && "border-l border-stone-200 pl-4")}
                 >
-                  Overdue only
-                </button>
+                  <span id={`${ids}-filter`} className={CONTROL_LABEL}>Filter</span>
+                  <button
+                    type="button"
+                    aria-pressed={overdue}
+                    onClick={() => go({ overdue: !overdue })}
+                    className={toggleClass(overdue)}
+                  >
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-none border",
+                        overdue ? "border-current" : "border-stone-400",
+                      )}
+                    >
+                      {overdue && <i className="fas fa-check text-2xs" />}
+                    </span>
+                    Overdue only
+                  </button>
+                </div>
               </div>
             )
           )}
@@ -404,12 +424,25 @@ export default function MyReviewsPage() {
 /** A filter or sort chip: pressed is an Ink outline, and its label says what it is. */
 function chipClass(pressed: boolean) {
   return cn(
-    "min-h-9 px-3 rounded-full border text-small font-medium",
+    "min-h-11 md:min-h-9 touch:min-h-11 px-3 rounded-full border text-small font-medium",
     COLOUR_TRANSITION,
     FOCUS_RING,
     pressed ? SELECTED : "border-stone-200 text-stone-600 hover:border-stone-400",
   );
 }
+
+/** An on/off filter: square-cornered with a check box, so it does not read as one more pill (IR-1243). */
+function toggleClass(pressed: boolean) {
+  return cn(
+    "inline-flex min-h-11 md:min-h-9 touch:min-h-11 items-center gap-2 px-3 rounded-control border text-small font-medium",
+    COLOUR_TRANSITION,
+    FOCUS_RING,
+    pressed ? SELECTED : "border-stone-200 text-stone-600 hover:border-stone-400",
+  );
+}
+
+/** The visible name of a row of controls. */
+const CONTROL_LABEL = "text-label font-semibold uppercase tracking-wide text-stone-500";
 
 const EMPTY_ICON: Record<MyReviewsTab, string> = {
   to_review: "fa-inbox",
