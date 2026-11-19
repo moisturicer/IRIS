@@ -15,15 +15,16 @@
  * renders it as a heading — role plus accessible name, the same pair a screen
  * reader would announce — rather than being read out of router internals.
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 
+import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/auth.store";
 import { ROLES } from "@/lib/constants";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { expiredToken, makeUser, validToken } from "@/test/authFixtures";
-import { renderScreen, screen } from "@/test/render";
+import { act, renderScreen, screen } from "@/test/render";
 
 import { ProtectedRoute } from "./ProtectedRoute";
 
@@ -69,7 +70,9 @@ beforeEach(() => {
     isAuthenticated: false,
     authReady: false,
     sessionLost: null,
+    signedOut: false,
   });
+  sessionStorage.clear();
 });
 
 describe("the route guard", () => {
@@ -175,6 +178,32 @@ describe("the route guard", () => {
     renderGuardAt("/review/12/evaluate");
 
     expect(screen.getByRole("heading", { name: "reason none" })).toBeInTheDocument();
+  });
+
+  it("carries no destination and no reason after a deliberate sign-out (IR-1242)", async () => {
+    // Signing out is not a visitor asking for this page: the next person to
+    // sign in on this device must not be sent back to it.
+    vi.spyOn(authApi, "logout").mockResolvedValue({} as never);
+    useAuthStore.getState().login(makeUser(), validToken());
+    useAuthStore.setState({ authReady: true });
+    renderGuardAt("/review/12/evaluate");
+    expect(screen.getByRole("heading", { name: "Evaluate" })).toBeInTheDocument();
+
+    await act(() => useAuthStore.getState().signOut());
+
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "destination none" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "reason none" })).toBeInTheDocument();
+  });
+
+  it("carries the destination again once someone signs in after a sign-out (IR-1242)", () => {
+    useAuthStore.setState({ signedOut: true });
+    useAuthStore.getState().login(makeUser(), validToken());
+    useAuthStore.setState({ authReady: true, accessToken: null });
+
+    renderGuardAt("/review/12/evaluate");
+
+    expect(screen.getByRole("heading", { name: "destination /review/12/evaluate" })).toBeInTheDocument();
   });
 
   it("renders the route for a valid token with a permitted role", () => {

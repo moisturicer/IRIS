@@ -38,7 +38,7 @@ const NEWER_NOTICE = "A newer notice was published while this one was open. Read
 export function NoticeAnswerScreen() {
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
-  const logout = useAuthStore((s) => s.logout);
+  const signOut = useAuthStore((s) => s.signOut);
   const clearNotice = useNoticeStore((s) => s.clear);
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -131,11 +131,6 @@ export function NoticeAnswerScreen() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const signOut = async () => {
-    await authApi.logout().catch(() => {});
-    logout();
   };
 
   const requestDeletion = async () => {

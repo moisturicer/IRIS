@@ -20,10 +20,13 @@ import { noticeApi } from "@/api/notice";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { landingPathFor } from "@/lib/landing";
+import { rememberSessionAccount } from "@/lib/authSession";
+import { ROLES } from "@/lib/constants";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { makeUser } from "@/test/authFixtures";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { expiredToken, makeUser, validToken } from "@/test/authFixtures";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 
 import LoginPage from "./LoginPage";
 
@@ -509,6 +512,109 @@ describe("where the login screen sends you", () => {
       expect(
         screen.getByRole("heading", { name: "landed on /review/12/evaluate" }),
       ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * One device, two accounts, one after the other (IR-1242).
+   *
+   * These run the real route guard in front of a page every role may open,
+   * because that is where the leak was: Help passed IR-1207's role check, so
+   * the next account landed on the page the previous one left open.
+   */
+  describe("after another account on this device", () => {
+    const RDCO_USER = makeUser({ id: 21, email: "rdco@cit.edu", role_name: ROLES.RDCO });
+
+    function acceptPasswordFor(account: typeof KTTO_USER) {
+      return vi.spyOn(authApi, "login").mockResolvedValue({
+        data: { access: validToken(), remembered: false, user: account },
+      } as Awaited<ReturnType<typeof authApi.login>>);
+    }
+
+    function renderAppAt(route: string) {
+      return renderScreen(
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.KTTO, ROLES.RDCO]} />}>
+            <Route path="/help" element={<h1>Help page</h1>} />
+          </Route>
+          <Route path="*" element={<LandedOn />} />
+        </Routes>,
+        { route },
+      );
+    }
+
+    function signedInAs(account: typeof KTTO_USER) {
+      useAuthStore.getState().login(account, validToken());
+      useAuthStore.setState({ authReady: true });
+    }
+
+    afterEach(() => {
+      sessionStorage.clear();
+      useAuthStore.setState({ signedOut: false, authReady: false });
+    });
+
+    it("lands the next account on its own home page after a sign-out, not the page left open", async () => {
+      vi.spyOn(authApi, "logout").mockResolvedValue({} as never);
+      signedInAs(RDCO_USER);
+      renderAppAt("/help");
+      expect(screen.getByRole("heading", { name: "Help page" })).toBeInTheDocument();
+
+      await act(() => useAuthStore.getState().signOut());
+      acceptPasswordFor(KTTO_USER);
+      await signIn();
+
+      expect(await screen.findByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Help page" })).not.toBeInTheDocument();
+    });
+
+    it("lands the same account on its home page too after a sign-out", async () => {
+      vi.spyOn(authApi, "logout").mockResolvedValue({} as never);
+      signedInAs(KTTO_USER);
+      renderAppAt("/help");
+
+      await act(() => useAuthStore.getState().signOut());
+      acceptPasswordFor(KTTO_USER);
+      await signIn();
+
+      expect(await screen.findByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+    });
+
+    it("returns the same account to the page its expired session was on", async () => {
+      signedInAs(KTTO_USER);
+      renderAppAt("/help");
+
+      act(() => useAuthStore.setState({ accessToken: expiredToken() }));
+      await closeSignedOutDialog();
+      acceptPasswordFor(KTTO_USER);
+      await signIn();
+
+      expect(await screen.findByRole("heading", { name: "Help page" })).toBeInTheDocument();
+    });
+
+    it("sends a different account to its own home page when the last session expired", async () => {
+      signedInAs(RDCO_USER);
+      renderAppAt("/help");
+
+      act(() => useAuthStore.setState({ accessToken: expiredToken() }));
+      await closeSignedOutDialog();
+      acceptPasswordFor(KTTO_USER);
+      await signIn();
+
+      expect(await screen.findByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
+    });
+
+    it("sends a different account home from a page that survived a full page load in the query string", async () => {
+      // The idle-timeout path reloads the page, so only this tab's storage
+      // still knows whose session it was.
+      rememberSessionAccount(RDCO_USER.id);
+      acceptAnyPassword();
+      renderLoginAt("/login?reason=session_expired&next=%2Frecords%2F42");
+
+      await closeSignedOutDialog();
+      await signIn();
+
+      expect(await screen.findByRole("heading", { name: `landed on ${ROLE_DEFAULT}` })).toBeInTheDocument();
     });
   });
 });

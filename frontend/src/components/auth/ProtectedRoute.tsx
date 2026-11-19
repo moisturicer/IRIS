@@ -41,6 +41,7 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   const user        = useAuthStore((s) => s.user);
   const authReady     = useAuthStore((s) => s.authReady);
   const sessionLost   = useAuthStore((s) => s.sessionLost);
+  const signedOut     = useAuthStore((s) => s.signedOut);
   const noticeRequired = useNoticeStore((s) => s.required);
   const location      = useLocation();
   /**
@@ -114,6 +115,13 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     return (
       <Navigate to="/login" replace state={{ reason: "session_expired", from: attempted }} />
     );
+  }
+
+  // The person signed out on purpose (IR-1242). The page they were on is not
+  // one anybody asked for, so none is carried: whoever signs in next on this
+  // device, them or someone else, starts from their own home page.
+  if (!accessToken && signedOut) {
+    return <Navigate to="/login" replace />;
   }
 
   // A session that was stored in this tab but could not be restored on load

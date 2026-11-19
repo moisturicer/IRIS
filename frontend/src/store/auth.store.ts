@@ -4,6 +4,7 @@ import { isAcceptanceRequired } from "@/lib/noticeErrors";
 import type { User } from "@/types/auth";
 import { authApi } from "@/api/auth";
 import { clearAuthSession } from "@/lib/authStorage";
+import { forgetSessionAccount, rememberSessionAccount } from "@/lib/authSession";
 import { __resetRefreshState, refreshOnce, withRefreshLock } from "@/lib/tokenRefresh";
 import { clearOldBrowserLibrary } from "@/lib/recordLibrary";
 import { REVIEWER_ROLES, STAFF_ROLES, type RoleName } from "@/lib/constants";
@@ -39,9 +40,23 @@ interface AuthState {
    * reload that ended on sign-in said nothing. Cleared by the next sign-in.
    */
   sessionLost: { code: string | null } | null;
+  /**
+   * True after the person signed out on purpose (IR-1242), until the next
+   * sign-in. The route guard reads it so a sign-out is not mistaken for a
+   * visitor asking for the page they were on: without it the guard saved that
+   * page, and whoever signed in next on this device was sent back to it.
+   */
+  signedOut: boolean;
 
   login:      (user: User, access: string, remembered?: boolean) => void;
-  logout:     () => void;
+  /**
+   * Ends the session in this browser. `deliberate` is for the person's own
+   * sign-out, through `signOut`; every other caller is a session that ended on
+   * its own, which keeps the return trip for the same account (IR-1242).
+   */
+  logout:     (options?: { deliberate?: boolean }) => void;
+  /** The person's own sign-out: revoke the session on the server, then end it here. */
+  signOut:    () => Promise<void>;
   updateUser: (user: User) => void;
   setTokens:  (access: string, remembered?: boolean) => void;
   clearTokens: () => void;
@@ -56,8 +71,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   authReady:       false,
   sessionEpoch:    0,
   sessionLost:     null,
+  signedOut:       false,
 
   login: (user, access, remembered = false) => {
+    rememberSessionAccount(user.id);
     // The refresh token is in the server's HttpOnly cookie (ADR-072); this only
     // clears keys earlier versions stored.
     clearAuthSession();
@@ -76,11 +93,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       remembered,
       isAuthenticated: true,
       sessionLost: null,
+      signedOut: false,
       sessionEpoch: s.sessionEpoch + 1,
     }));
   },
 
-  logout: () => {
+  logout: (options) => {
+    const deliberate = options?.deliberate === true;
     // Drop any refresh already in flight so a *future* caller doesn't join it.
     // This alone is not enough: a request already `await`ing the old promise in
     // client.ts still resolves and would otherwise call setTokens after logout,
@@ -90,13 +109,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     useNoticeStore.getState().clear();
     clearAuthSession();
     clearOldBrowserLibrary();
+    if (deliberate) forgetSessionAccount();
+    // One update, so the guard never renders "no session" without knowing why.
     set((s) => ({
       user: null,
       accessToken: null,
       remembered: false,
       isAuthenticated: false,
+      signedOut: deliberate,
       sessionEpoch: s.sessionEpoch + 1,
     }));
+  },
+
+  signOut: async () => {
+    // Signed out here whether or not the server could be told: the person
+    // asked to leave, and a failed revoke must not keep them signed in.
+    await authApi.logout().catch(() => {});
+    get().logout({ deliberate: true });
   },
 
   updateUser: (user) => set({ user }),
@@ -150,6 +179,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       });
 
       const { data: user } = await authApi.me();
+      rememberSessionAccount(user.id);
       set({ user });
     } catch (err) {
       // The session is good but the current data notice is unanswered, so the
