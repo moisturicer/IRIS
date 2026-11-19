@@ -30,6 +30,8 @@ function runtime(config: InternalAxiosRequestConfig): Reply {
   const url = config.url ?? "";
   // Earlier Django conversations, listed under a new one (IR-957): none here.
   if (url === "/ai/conversations/" && config.method === "get") return { data: [] };
+  // The history list: empty. It used to fail here unseen; a failed list now says so (IR-1238).
+  if (url === "/ai/runtime/conversations" && config.method === "get") return { data: { protocol: "runs-reader-1", next: null, conversations: [] } };
   if (url === "/ai/runtime/runs" && config.method === "post") return { status: 201, data: live };
   if (url === `/ai/runtime/runs/${live.id}`) return { data: live };
   if (url === CONVERSATION) return { data: conversation };

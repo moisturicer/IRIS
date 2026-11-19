@@ -27,6 +27,7 @@ import {
 } from "./components/ConversationSidebar";
 import { ASK_PHONE_MAX_PX, ASK_SOURCES_BESIDE_MIN_PX } from "./components/answerLayout";
 import { useConversationHistory } from "./hooks/useConversationHistory";
+import { CONNECTION_WIDE, type TroubleKind } from "./runtime/trouble";
 
 const RUNTIME_ID = /^[0-9a-f-]{36}$/i;
 const SIDEBAR_KEY = "iris-ask-sidebar-width";
@@ -86,6 +87,20 @@ function RuntimeAskPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
   const [observePage, pageWidth] = useElementWidth<HTMLDivElement>();
+
+  // A failure of the whole connection (session ended, busy, reload) can reach the chat
+  // and the list at once. The chat says it, so the list stays quiet about the same one,
+  // and asks again once the chat's problem is gone (IR-1238).
+  const [chatProblem, setChatProblem] = useState<TroubleKind>();
+  const sharedFailure = !!chatProblem && CONNECTION_WIDE.includes(chatProblem) && chatProblem === search.failure;
+  const listFailed = search.state === "error";
+  const askAgain = search.onRetry;
+  useEffect(() => {
+    if (!chatProblem && listFailed) askAgain();
+    // Only when the chat's problem goes away; a list that fails on its own keeps its Try again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatProblem]);
+  const historySearch = { ...search, quiet: sharedFailure };
 
   // The conversations pane (IR-1233). Beside the chat it pushes it over, open or
   // closed to a strip, and the choice is kept per browser. On a phone it is a
@@ -192,7 +207,7 @@ function RuntimeAskPage() {
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
     <div className="relative flex min-h-0 min-w-0 flex-1" {...(dialogOpen || sourcesDialog ? { inert: "" } : {})}>
       {!phone && <ConversationSidebar id={paneId} conversations={conversations} activeId={conversationId ?? null}
-        open={paneOpen} search={search} searchRef={searchRef} onNewConversation={newConversation} onSearch={openSearch}
+        open={paneOpen} search={historySearch} searchRef={searchRef} onNewConversation={newConversation} onSearch={openSearch}
         onToggle={() => setPane(!paneOpen)}
         onRename={rename} width={sidebarWidth} onResize={resizeSidebar}
         onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
@@ -208,7 +223,7 @@ function RuntimeAskPage() {
             focusRequest={focusRequest}
             sourcePanel={{ selectedId: sourcesOpen ? shown?.id ?? null : null, marker: picked?.marker ?? null, onOpen: openSources }}
             onAnswered={message => { setLatest(message); void refreshList(); }}
-            onTitle={retitle}
+            onTitle={retitle} onProblem={setChatProblem}
             onConversation={id => {
               void refreshList();
               if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true });
@@ -229,7 +244,7 @@ function RuntimeAskPage() {
       <div className="flex shrink-0 px-3 pt-3">
         <NewConversationButton onClick={() => { setDialogOpen(false); newConversation(); }} />
       </div>
-      <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={search}
+      <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={historySearch}
         searchRef={searchRef}
         onRename={rename} onDelete={id => { setDialogOpen(false); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
     </ChatDrawer>}
