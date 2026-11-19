@@ -612,6 +612,11 @@ class DetailFlagTests(DecisionTestBase):
             [{
                 "party": Party.RDCO, "label": seats._label(Party.RDCO),
                 "holders": [self.rdco2.get_full_name()],
+                # IR-1226 adds what each of them leaves, for the dialog's warning.
+                "leaving": [{
+                    "name": self.rdco2.get_full_name(),
+                    "unresolved": {"drafts": 0, "open_threads": 0, "document_requests": 0, "revision_requests": 0},
+                }],
             }],
         )
 

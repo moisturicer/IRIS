@@ -116,6 +116,8 @@ export interface VerdictOption {
 /** `finish_review.py` refuses this before anything is written, in these words. */
 const OWN_MUST_FIX =
   "You can't approve while sending a Must fix comment. Change it to Suggestion, or request a revision.";
+const OWN_MUST_FIX_FINDING =
+  "You can't record a finding while sending a Must fix comment. Change it to Suggestion, or request a revision.";
 
 
 /**
@@ -172,7 +174,10 @@ export function verdictOptions(
     });
     add({
       verdict: "finding", label: "Record a finding", description: "A reasoned concern. It goes to RDCO, which decides.",
-      unavailable: flags.office_review.blocked, reasonRequired: true,
+      // A finding ends the seat as Clear does, so it waits on the office's own Must fix (IR-1226).
+      unavailable: flags.office_review.blocked ?? flags.office_review.finding_blocked
+        ?? (ownMustFix && OWN_MUST_FIX_FINDING),
+      reasonRequired: true,
     });
   }
   if (can.has("request_revision") || can.has("withdraw_revision")) add({

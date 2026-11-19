@@ -194,6 +194,7 @@ def run(snapshot, *, manual_compaction=False, after=None, reserved_tokens=None, 
         "retry_of": snapshot.get("retry_of"),
         "retried_by": snapshot.get("retried_by"),
         "sources_available": snapshot.get("sources_available", True),
+        "selection": snapshot.get("selection"),
         "capabilities": {"manual_compaction": manual_compaction},
     }
 
@@ -209,6 +210,7 @@ def conversation(snapshot, *, manual_compaction=False, reserved_tokens=None, com
         "turns": [{**{key: turn[key] for key in (
             "id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations",
         )}, "facts": turn.get("facts", []), "papers": turn.get("papers", []),
+            "selection": turn.get("selection"),
             **({} if available[turn["run_id"]] else {
                 "answer": "This answer is unavailable because its sources changed or are no longer readable.",
                 "citations": [], "facts": [], "papers": [],

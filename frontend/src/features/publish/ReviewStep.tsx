@@ -91,7 +91,7 @@ export function ReviewStep({
       <Group title="Details" editLabel="Edit details" onEdit={onEditDetails}>
         <Row term="Title">{summary.title}</Row>
         <Row term="Abstract">
-          <span className="whitespace-pre-line">{summary.abstract}</span>
+          <span className="text-justified block whitespace-pre-line">{summary.abstract}</span>
         </Row>
         <Row term="Adviser">{summary.adviserName}</Row>
         <Row term="Authors">{summary.authors.join(", ")}</Row>

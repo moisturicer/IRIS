@@ -157,7 +157,9 @@ describe("MyReviewsPage", () => {
 
   it("opens a review in Paper View, never on the old decision form", async () => {
     show();
-    const open = await screen.findByRole("link", { name: "Open review: Smart Campus Energy Monitor" });
+    // IR-1211: "Examine review" here, so it isn't confused with the review
+    // page's own Open review act, which records when the review starts.
+    const open = await screen.findByRole("link", { name: "Examine review: Smart Campus Energy Monitor" });
     expect(open).toHaveAttribute("href", "/records/7?section=review");
     for (const link of screen.getAllByRole("link")) {
       expect(link.getAttribute("href")).not.toContain("/evaluate");
@@ -336,7 +338,73 @@ describe("MyReviewsPage", () => {
     expect(within(chips).getByRole("button", { name: /^All\s*4$/ })).toBeInTheDocument();
     expect(within(chips).getByRole("button", { name: /^Cleared\s*2$/ })).toBeInTheDocument();
     expect(within(chips).getByRole("button", { name: /^Finding recorded\s*1$/ })).toBeInTheDocument();
-    expect(within(chips).getByRole("button", { name: /^Rejected\s*0$/ })).toBeInTheDocument();
+    // IR-1181: a chip that counts nothing is not offered. This line used to expect "Rejected 0".
+    expect(within(chips).queryByRole("button", { name: /^Rejected/ })).not.toBeInTheDocument();
+    expect(within(chips).queryByRole("button", { name: /^Published/ })).not.toBeInTheDocument();
+  });
+
+  it("offers only All and the one outcome a Done tab has (IR-1181)", async () => {
+    mine.mockResolvedValue(page([row({ outcome: "accepted", outcome_label: "Accepted" })], {
+      outcome_counts: { all: 2, cleared: 0, finding: 0, accepted: 2, rejected: 0, published: 0 },
+    }));
+    show("/review?tab=done");
+
+    const chips = await screen.findByRole("group", { name: "Filter by outcome" });
+    const buttons = within(chips).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent?.replace(/\d+$/, "").trim())).toEqual(["All", "Accepted"]);
+    expect(buttons[1]).toHaveTextContent(/^Accepted\s*2$/);
+  });
+
+  it("keeps All on an empty Done tab, and keeps the outcome that is chosen (IR-1181)", async () => {
+    mine.mockResolvedValue(page([], {
+      outcome_counts: { all: 0, cleared: 0, finding: 0, accepted: 0, rejected: 0, published: 0 },
+    }));
+    show("/review?tab=done&outcome=rejected");
+
+    const chips = await screen.findByRole("group", { name: "Filter by outcome" });
+    expect(within(chips).getByRole("button", { name: /^All\s*0$/ })).toBeInTheDocument();
+    // Hiding the chosen chip would leave a filter nobody can see or clear.
+    expect(within(chips).getByRole("button", { name: /^Rejected\s*0$/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(chips).queryByRole("button", { name: /^Cleared/ })).not.toBeInTheDocument();
+  });
+
+  it("offers no sort or overdue chip over an empty list (IR-1181)", async () => {
+    mine.mockResolvedValue(page([], { counts: { to_review: 0, in_review: 0, done: 2 } }));
+    show();
+
+    expect(await screen.findByText("Nothing waiting for you")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Sort" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Overdue only" })).not.toBeInTheDocument();
+  });
+
+  it("keeps Overdue only while it is the filter that emptied the list (IR-1181)", async () => {
+    mine.mockResolvedValue(page([]));
+    show("/review?overdue=1");
+
+    expect(await screen.findByText("Nothing overdue")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("group", { name: "Sort" })).not.toBeInTheDocument();
+  });
+
+  it("names the office once on a card whose strip already names it (IR-1181)", async () => {
+    mine.mockResolvedValue(page([
+      row({ clearance_strip: [RESET, { ...KEPT, party: "itso", kind: "reviewing", text: "Reviewing v2", note: null }] }),
+      row({ key: "seat:2", record: 9, title: "No Strip Paper" }),
+      // A strip that names only another office does not say who holds this one.
+      row({ key: "seat:3", record: 10, title: "Other Office Paper", clearance_strip: [RESET] }),
+    ]));
+    show();
+
+    const withStrip = await screen.findByRole("article", { name: "Smart Campus Energy Monitor" });
+    expect(within(withStrip).getByText("You")).toBeInTheDocument();
+    expect(within(withStrip).queryByText("ITSO · You")).not.toBeInTheDocument();
+    expect(within(withStrip).getByRole("list", { name: "Clearances" })).toHaveTextContent("ITSO: Reviewing v2");
+
+    // With no strip the holder line is the only place the office is named.
+    const bare = screen.getByRole("article", { name: "No Strip Paper" });
+    expect(within(bare).getByText("ITSO · You")).toBeInTheDocument();
+    const other = screen.getByRole("article", { name: "Other Office Paper" });
+    expect(within(other).getByText("ITSO · You")).toBeInTheDocument();
   });
 
   it("offers Mine / All of the office to a coordinator, on the toolbar's right (IR-1135)", async () => {
@@ -418,6 +486,22 @@ describe("MyReviewsPage due dates (IR-622)", () => {
     );
     expect(screen.getByLabelText("Location")).toHaveValue("/review?sort=waiting&overdue=1");
     expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("clears Overdue only when the tab changes, as leaving Done clears its outcome (IR-1210)", async () => {
+    show();
+    const overdueOnly = await screen.findByRole("button", { name: "Overdue only" });
+    await userEvent.click(overdueOnly);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true"));
+
+    await userEvent.click(screen.getByRole("tab", { name: /In review/ }));
+
+    // The highlight and the list agree: neither filters by overdue any more.
+    await waitFor(() =>
+      expect(mine).toHaveBeenLastCalledWith({ tab: "in_review", outcome: null, office: null, cursor: null, sort: "due", overdue: false }),
+    );
+    expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByLabelText("Location")).not.toHaveValue(expect.stringContaining("overdue=1"));
   });
 
   it("comes back to the sort and filter it left, from the URL", async () => {

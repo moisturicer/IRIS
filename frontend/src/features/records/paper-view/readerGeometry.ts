@@ -10,6 +10,8 @@ import { READER_TOOLBAR_TOP_PX } from "./paneLayout";
  *  fit-to-width still fits a US Letter page on a 360px phone (NFR-U3). */
 export const MIN_SCALE = 0.4;
 export const MAX_SCALE = 2.4;
+/** How far one press of zoom in or zoom out moves. */
+export const SCALE_STEP = 0.2;
 
 /** A page's 1px border, each side, which is drawn outside its canvas. */
 const PAGE_BORDER = 2;

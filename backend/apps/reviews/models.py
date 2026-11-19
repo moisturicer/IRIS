@@ -517,6 +517,15 @@ class ReviewComment(models.Model):
     anchor_prefix  = models.TextField(blank=True, default="")
     anchor_suffix  = models.TextField(blank=True, default="")
     anchor_regions = models.JSONField(default=list, blank=True)
+    #: A thread on a supporting document instead (ADR-032 §7, Amendment
+    #: 2026-11-18; IR-1204): one upload of one of the record's slot documents,
+    #: as a whole, never a passage. `RESTRICT`, so no thread loses the document
+    #: it names (`records.versions.deletion_refused_reason`); deleting the whole
+    #: Record still removes both.
+    anchor_upload  = models.ForeignKey(
+        "documents.RecordUpload", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="review_threads",
+    )
 
     state       = models.CharField(
         max_length=20, choices=ThreadState.choices, default=ThreadState.OPEN,
@@ -554,6 +563,13 @@ class ReviewComment(models.Model):
         indexes  = [
             models.Index(fields=["record", "created_at"]),
             models.Index(fields=["record", "state", "severity"]),
+        ]
+        constraints = [
+            # A thread names a manuscript passage, a document upload or neither (IR-1204).
+            models.CheckConstraint(
+                condition=models.Q(anchor_version__isnull=True) | models.Q(anchor_upload__isnull=True),
+                name="review_thread_names_one_place",
+            ),
         ]
 
     def __str__(self):

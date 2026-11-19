@@ -91,11 +91,12 @@ describe("Help", () => {
     expect(section("Reviewing records")).not.toBeInTheDocument();
   });
 
-  it("shows an office member reviewing and analytics, but not coordination or publishing", () => {
+  it("shows an office member reviewing, but not analytics, coordination or publishing", () => {
     renderAs({ role_name: ROLES.ITSO, review_access: { my_reviews: true, offices: ["itso"], is_coordinator: false } });
 
     expect(section("Reviewing records")).toBeInTheDocument();
-    expect(section("Workflow analytics")).toBeInTheDocument();
+    // Workflow analytics is RDCO's alone since IR-1216.
+    expect(section("Workflow analytics")).not.toBeInTheDocument();
     expect(section("Coordinating your office")).not.toBeInTheDocument();
     expect(section("Publishing your research")).not.toBeInTheDocument();
   });
@@ -110,6 +111,7 @@ describe("Help", () => {
 
     expect(section("Coordinating your office")).toBeInTheDocument();
     expect(section("RDCO")).toBeInTheDocument();
+    expect(section("Workflow analytics")).toHaveTextContent("RDCO section of the sidebar");
   });
 
   it("shows the System Admin its own administration (IR-783)", () => {

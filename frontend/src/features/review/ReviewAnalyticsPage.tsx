@@ -17,8 +17,9 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("en-US", {
  * Workflow analytics (IR-626, ADR-043).
  *
  * Every figure is the server's, computed from the workflow audit log
- * (`backend/apps/reviews/analytics.py`); this page only lays it out. An
- * office sees its own figures and RDCO every party's. Three things are said
+ * (`backend/apps/reviews/analytics.py`); this page only lays it out. It is
+ * RDCO's alone, in its own sidebar section, with every party's figures
+ * (IR-1216; offices saw their own before). Three things are said
  * on the page rather than left to be assumed: when the log starts (always
  * visible) and, in the "How these numbers are counted" disclosure (IR-1091),
  * that time in stage is elapsed time rather than effort and how many records a

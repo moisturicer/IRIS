@@ -247,9 +247,11 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # took no part in `record`, so sees it but not its requests.
     "record-document-requests": Entry({
         "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
-        # Asked by an active assignment the caller can staff: ITSO's, here.
+        # Asked by an active assignment the caller can staff and holds a seat
+        # on (IR-1226): ITSO's seated reviewer here; the pool, the coordinator
+        # and RDCO, seated nowhere, are refused.
         "POST": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD,
+            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE), kwargs=RECORD,
             data={"message": "Please attach it.", "items": [{"label": "Endorsement"}]},
         ),
     }),
@@ -299,12 +301,20 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # (participants, and the pool of a party holding the record now), written by
     # participants alone, so ITSO's unseated pool reads and is refused. RDCO
     # holds an assignment from the Adviser’s send (ADR-047), but this account has no Seat. An edit is its author’s.
+    # The Adviser's seat on `record` is done, so since IR-1226 (2026-11-19) they
+    # still write in Conversation but start, resolve and reopen no thread.
     "record-review-comments": Entry({
         "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
-        "POST": _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
-            kwargs=RECORD, data={"body": "Which version is this?"},
-        ),
+        "POST": [
+            _case(
+                row(ANON, HIDE, OK, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
+                kwargs=RECORD, data={"body": "Which version is this?"},
+            ),
+            _case(
+                row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+                kwargs=RECORD, data={"body": "Which version is this?", "kind": "discussion"},
+            ),
+        ],
     }),
     # Whom a writer may mention (IR-877): the writers of the discussion only,
     # so a pool member who reads it is refused, as POST above refuses them.
@@ -329,15 +339,15 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # participant resolves it. On the owner's own thread any participant resolves.
     "record-review-thread-act": Entry({"POST": [
         _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, OK, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment"), "act": "resolve"},
         ),
         _case(
-            row(ANON, HIDE, DENY, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "resolve"},
         ),
         _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, OK, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "reopen"},
         ),
         _case(
@@ -506,16 +516,19 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
             kwargs=RECORD_FILE,
         ),
     }),
-    # The office that filed it, while it takes part (IR-476): ITSO's pool.
+    # The office that filed it, while it takes part (IR-476), from a seat on
+    # it (IR-1226): ITSO's seated reviewer, not its unseated pool or coordinator.
     "record-file-delete": Entry({
-        "DELETE": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE), kwargs=RECORD_FILE),
+        "DELETE": _case(row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE), kwargs=RECORD_FILE),
     }),
 
     # -- office acts on documents ----------------------------------------
-    # An office taking part files its own supplementary file (IR-474); RDCO is now active by ADR-047.
+    # An office taking part files its own supplementary file (IR-474), from a
+    # seat on its assignment (IR-1226): RDCO's assignment is active by ADR-047,
+    # but `rdco` is seated nowhere, so it is refused like ITSO's unseated pool.
     "record-file-upload": Entry(
         {"POST": _case(
-            row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY, DENY),
+            row(ANON, DENY, DENY, DENY, OK, DENY, DENY, DENY, DENY, DENY),
             data={"record": Ref("record"), "file": Upload("note.pdf")}, format="multipart",
         )},
         waiver=DOCUMENTS_EXCEPTION,
@@ -528,16 +541,17 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
 
     # -- deciding a document request (ADR-022 Â§Amendment 4) -------------
     # 404 off a visible Record; 403 to a visible reader who is not the
-    # requesting party; the party, not the person: ITSO's whole pool.
+    # requesting party; the party, not the person, but from a seat on it
+    # (IR-1226, ADR-022 Amendment 7): ITSO's seated reviewer, not its pool.
     "document-request-detail": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE),
+            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("document_request")}, data={"action": "withdraw"},
         ),
     }),
     "document-request-item-detail": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE),
+            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("document_request_item")}, data={"action": "accept"},
         ),
     }),
@@ -574,7 +588,9 @@ ACCOUNTS = {
     "auth-register": Entry({"POST": _case(PUBLIC, data={})}),
     # Missing credentials are rejected for every caller, including signed-in users.
     "auth-login": Entry({"POST": _case(row(*([ANON]*10)), data={})}),
-    "auth-logout": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # ADR-072: logout and refresh are first-party only (X-IRIS-Auth); the
+    # header is sent so the cell measures who may call them, not the header.
+    "auth-logout": Entry({"POST": _case(SIGNED_IN, data={}, headers={"HTTP_X_IRIS_AUTH": "1"})}),
     # ADR-054 (IR-789): the notice is public (registration shows it) and answering
     # is every signed-in account's own act, office staff and System Admin included.
     # An empty body is refused as invalid, which is not an access denial.
@@ -594,7 +610,9 @@ ACCOUNTS = {
         "PUT": _case(RDCO_ONLY, data={}),
         "DELETE": _case(RDCO_ONLY),
     }),
-    "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
+    # ADR-072: the token is read from the cookie, never the body; with no cookie
+    # every caller is answered 401 no_session, signed in or not.
+    "token-refresh": Entry({"POST": _case(row(*([ANON]*10)), data={}, headers={"HTTP_X_IRIS_AUTH": "1"})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),
     "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),
@@ -688,7 +706,8 @@ REVIEWS = {
     }),
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
-    "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
+    # IR-1216: Workflow analytics moved to RDCO's section, for RDCO alone.
+    "reviews-analytics": Entry({"GET": _case(RDCO_ONLY)}),
     "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE), kwargs=ASSIGNMENT, data={})}),
     "assignment-assign": Entry({m: _case(COORDINATOR, kwargs=ASSIGNMENT,
                                        **({} if m == "GET" else {"data": {"reviewer": Ref("reviewer_target")}}))

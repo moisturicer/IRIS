@@ -516,6 +516,7 @@ class DocumentRequestTests(AuditTestBase):
 
     def test_the_whole_document_request_lifecycle_is_recorded(self):
         record = self.routed(Party.IERC)
+        self.opened_seat(record, Party.IERC, self.ierc)  # asking for documents takes a seat (IR-1226)
         ethics = self.ethics_slot(record)
         asked = self.ask_for_documents(
             record, self.ierc, [{"label": "Consent form"}, {"slot": ethics.pk}],
@@ -570,6 +571,7 @@ class DocumentRequestTests(AuditTestBase):
 
     def test_a_request_item_upload_that_answers_the_last_item_fulfils_the_request(self):
         record = self.routed(Party.IERC)
+        self.opened_seat(record, Party.IERC, self.ierc)  # asking for documents takes a seat (IR-1226)
         asked = self.ask_for_documents(record, self.ierc, [{"label": "Consent form"}])
         [item] = asked["items"]
 
@@ -590,6 +592,7 @@ class KeptApartTests(AuditTestBase):
 
     def test_a_document_request_writes_no_revision_event(self):
         record = self.routed(Party.IERC)
+        self.opened_seat(record, Party.IERC, self.ierc)  # asking for documents takes a seat (IR-1226)
         asked = self.ask_for_documents(record, self.ierc, [{"label": "Consent form"}])
         self.upload(record, request_item=asked["items"][0]["id"])
 
@@ -689,6 +692,7 @@ class AuditFailureTests(AuditTestBase):
 
     def test_a_document_request_succeeds_when_its_event_cannot_be_written(self):
         record = self.routed(Party.IERC)
+        self.opened_seat(record, Party.IERC, self.ierc)  # asking for documents takes a seat (IR-1226)
         before = AuditEvent.objects.filter(record=record).count()
 
         with patch.object(AuditEvent, "save", _fail_insert):

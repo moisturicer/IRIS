@@ -9,9 +9,9 @@
 //   - its PRIMARY ACTION: the one control a visitor came to this screen to use.
 //     "Reachable" is judged on that control at every width (see checkReachable),
 //   - for table-heavy screens, the small-screen behaviour (see TABLE_BEHAVIOUR).
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
-import { mockReadingHistory, PAPER, PAPER_DETAIL, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
+import { mockReadingHistory, PAPER, PAPER_DETAIL, SCAN_PNG, RUNTIME_CONVERSATION, RUNTIME_CONVERSATION_ID, RUNTIME_CONVERSATION_PATH, paginated, type SmokeRole } from "./fixtures";
 
 export interface Screen {
   /** Stable name in the results table. */
@@ -63,6 +63,50 @@ const wrap = (role: SmokeRole, extra?: (api: MockApi) => void) => (api: MockApi)
   shell(api, role);
   extra?.(api);
 };
+
+/**
+ * The owner's Review with its documents (IR-1203): one slot version, one
+ * attachment with a long unbroken name (the Full Text Rule, IR-1218).
+ */
+const reviewDocumentsMocks = (api: MockApi) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
+      api.on("GET", `/records/${PAPER.id}/tracker/`, {
+        record_id: PAPER.id, record_type: "Thesis / Research", workflow_state: "in_review", workflow_state_label: "In review",
+        current_holders: [], parties: [], routing_history: [], routing_recorded_from: null,
+        reviews: [], versions: [], review_comments: [], resubmissions: [],
+      });
+      api.on("GET", `/documents/records/${PAPER.id}/slots/`, [{
+        id: 2, name: "Ethics clearance", record_type: 1, is_required: true, uploads: [{
+          id: 9, record: PAPER.id, slot: 2, slot_name: "Ethics clearance", file: "ethics.pdf", version: 1, status: null,
+          status_name: null, uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00",
+          reviews: [], delete_refused: null,
+        }],
+      }]);
+      // One long, unbroken file name: it must wrap in its row, never run off it (the Full Text Rule, IR-1218).
+      api.on("GET", "/documents/files/", [{
+        id: 31, record: PAPER.id, file: "x.pdf", filename: "Final_Thesis_Manuscript_Revised_Signed_Adviser_Copy_v3.pdf",
+        uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
+      }]);
+      api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
+      api.on("GET", "/library/saves/", { results: [] });
+      api.on("GET", "/library/folders/", { results: [], limit: 10 });
+      api.on("GET", `/library/highlights/${PAPER.id}/`, { results: [] });
+      api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
+      api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
+};
+
+/** A one-page PDF pdf.js opens: enough for the reader to draw a page. */
+const ONE_PAGE_PDF = Buffer.from(
+  "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+  "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
+);
+const pdfReply = (route: Route) =>
+  route.fulfill({ status: 200, headers: { "content-type": "application/pdf" }, body: ONE_PAGE_PDF });
 
 const USERS = Array.from({ length: 6 }, (_, i) => ({
   id: 10 + i,
@@ -233,7 +277,6 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/library/saves/", { results: [] });
       // IR-572: folders are read with the saves.
       api.on("GET", "/library/folders/", { results: [], limit: 10 });
-      api.on("GET", "/library/feeds/", { results: [], limit: 10 });
     },
     heading: "Discover",
     primary: (p) => p.getByRole("button", { name: "Publish" }), primaryLabel: "Publish",
@@ -298,40 +341,105 @@ export const SCREENS: Screen[] = [
     // tab, and a narrow window opens the pane to it.
     id: "paper-view-review-documents", path: `/records/${PAPER.id}?section=review&documents=open`, route: "/records/:id",
     role: "Student",
-    mocks: wrap("Student", (api) => {
-      api.on("GET", `/records/${PAPER.id}/`, {
-        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
-        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
-        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
-      });
-      api.on("POST", `/records/${PAPER.id}/increment_access/`, {});
-      api.on("GET", `/records/${PAPER.id}/tracker/`, {
-        record_id: PAPER.id, record_type: "Thesis / Research", workflow_state: "in_review", workflow_state_label: "In review",
-        current_holders: [], parties: [], routing_history: [], routing_recorded_from: null,
-        reviews: [], versions: [], review_comments: [], resubmissions: [],
-      });
-      api.on("GET", `/documents/records/${PAPER.id}/slots/`, [{
-        id: 2, name: "Ethics clearance", record_type: 1, is_required: true, uploads: [{
-          id: 9, record: PAPER.id, slot: 2, slot_name: "Ethics clearance", file: "ethics.pdf", version: 1, status: null,
-          status_name: null, uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00",
-          reviews: [], delete_refused: null,
-        }],
-      }]);
-      // One long, unbroken file name: it must wrap in its row, never run off it (the Full Text Rule, IR-1218).
-      api.on("GET", "/documents/files/", [{
-        id: 31, record: PAPER.id, file: "x.pdf", filename: "Final_Thesis_Manuscript_Revised_Signed_Adviser_Copy_v3.pdf",
-        uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
-      }]);
-      api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
-      api.on("GET", "/library/saves/", { results: [] });
-      api.on("GET", "/library/folders/", { results: [], limit: 10 });
-      api.on("GET", `/library/highlights/${PAPER.id}/`, { results: [] });
-      api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
-      api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
-    }),
+    mocks: wrap("Student", reviewDocumentsMocks),
     heading: PAPER.title,
     primary: (p) => p.getByRole("tab", { name: "Documents", selected: true }).filter({ visible: true }).first(),
     primaryLabel: "Documents (tab, selected)",
+  },
+  {
+    // IR-1203 part (b): a document opened from Documents is read in the
+    // reader in place of the manuscript, named above it with the way back.
+    // A narrow window closes the pane so the reader is seen.
+    id: "paper-view-review-document-open", path: `/records/${PAPER.id}?section=review&documents=open`, route: "/records/:id",
+    role: "Student",
+    mocks: wrap("Student", (api) => {
+      reviewDocumentsMocks(api);
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        abstract_file: "/media/manuscript.pdf",
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("GET", `/records/${PAPER.id}/manuscript/`, pdfReply);
+      api.on("GET", "/documents/uploads/9/download/", pdfReply);
+    }),
+    open: async (page) => {
+      await page.getByRole("button", { name: "Open Ethics clearance version 1" }).filter({ visible: true }).first().click();
+    },
+    heading: PAPER.title,
+    primary: (p) => p.getByRole("button", { name: "Back to the manuscript" }).filter({ visible: true }).first(),
+    primaryLabel: "Back to the manuscript",
+  },
+  {
+    // IR-1203's image half: a scanned PNG opens in the reader as an image,
+    // with zoom and the watermark, where a PDF would get pages.
+    id: "paper-view-review-image-open", path: `/records/${PAPER.id}?section=review&documents=open`, route: "/records/:id",
+    role: "Student",
+    mocks: wrap("Student", (api) => {
+      reviewDocumentsMocks(api);
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        abstract_file: "/media/manuscript.pdf",
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("GET", `/records/${PAPER.id}/manuscript/`, pdfReply);
+      api.on("GET", "/documents/files/", [{
+        id: 32, record: PAPER.id, file: "x.png", filename: "Signed consent form.png",
+        uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
+      }]);
+      api.on("GET", "/documents/files/32/download/", (route: Route) =>
+        route.fulfill({ status: 200, headers: { "content-type": "image/png" }, body: SCAN_PNG }));
+    }),
+    open: async (page) => {
+      await page.getByRole("button", { name: "Open Signed consent form.png" }).filter({ visible: true }).first().click();
+      await page.getByRole("img", { name: "Signed consent form.png" }).waitFor();
+    },
+    heading: PAPER.title,
+    primary: (p) => p.getByRole("button", { name: "Back to the manuscript" }).filter({ visible: true }).first(),
+    primaryLabel: "Back to the manuscript",
+  },
+  {
+    // IR-1204: a reviewer's Must fix on a supporting document, as the author
+    // reads it in Threads. The document's long name wraps in the card, and its
+    // link opens the document in the reader.
+    id: "paper-view-review-document-thread", path: `/records/${PAPER.id}?section=review`, route: "/records/:id",
+    role: "Student",
+    mocks: wrap("Student", (api) => {
+      reviewDocumentsMocks(api);
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review",
+        stage_label: "In review", is_participant: true, capabilities: ["cite", "edit_details"],
+        abstract_file: "/media/manuscript.pdf",
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+      api.on("GET", `/records/${PAPER.id}/manuscript/`, pdfReply);
+      api.on("GET", "/documents/uploads/9/download/", pdfReply);
+      api.on("GET", `/records/${PAPER.id}/review-comments/`, [{
+        id: 70, kind: "thread", author: 2, author_name: "Ina Ercilla", body: "The consent form isn't signed on page 2.",
+        version: 1, reply_to: null, created_at: "2026-11-05T08:00:00+08:00", edited_at: null, can_edit: false, mentions: [],
+        party: "ierc", party_label: "IERC", severity: "must_fix", is_draft: false, round: null, anchor: null,
+        document: {
+          upload: 9, slot: "Certificate of Informed Consent and Ethics Clearance", version: 1,
+          label: "Certificate of Informed Consent and Ethics Clearance, v1", earlier: true, extension: "pdf",
+        },
+        suggestion: "", place: null, outdated_since: null, wording_check: null, not_followed: null,
+        state: "open", resolved_by: null, resolved_at: null, closed_by_decision: null, closed_reason: null,
+        answer: null, events: [], can_delete: false, can_post: false, can_change_severity: false,
+        can_resolve: false, can_reopen: false, can_answer: true,
+      }]);
+    }),
+    open: async (page) => {
+      // Narrower than the side-by-side workspace, the pane is a drawer: open it first.
+      const drawer = page.getByRole("button", { name: "Open review pane" }).filter({ visible: true });
+      if (await drawer.count()) await drawer.first().click();
+      await page.getByRole("tab", { name: /^Threads/ }).filter({ visible: true }).first().click();
+      await page.getByText("From an earlier upload").filter({ visible: true }).first().waitFor();
+    },
+    heading: PAPER.title,
+    primary: (p) => p.getByRole("button", { name: "Open Certificate of Informed Consent and Ethics Clearance, v1" })
+      .filter({ visible: true }).first(),
+    primaryLabel: "Open Certificate of Informed Consent and Ethics Clearance, v1",
   },
   {
     id: "my-library", path: "/records/mine", route: "/records/mine", role: "Student",
@@ -464,7 +572,7 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
   },
   {
-    id: "workflow-analytics", path: "/review/analytics", route: "/review/analytics", role: "RDCO",
+    id: "workflow-analytics", path: "/rdco/analytics", route: "/rdco/analytics", role: "RDCO",
     mocks: wrap("RDCO", (api) =>
       api.on("GET", "/reviews/analytics/", {
         parties: [{ party: "rdco", label: "RDCO" }], data_since: null, generated_at: when("11-05"),

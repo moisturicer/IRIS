@@ -19,10 +19,10 @@ from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from apps.accounts.models import RecoveryIntent, RecoveryToken, User, UserSession
+from apps.accounts.testing_auth import post_refresh, tokens_of
 from apps.accounts.recovery.delivery import deliver_recovery_intent
 
 LOGIN = "/api/v1/auth/login/"
-REFRESH = "/api/v1/auth/token/refresh/"
 CHANGE = "/api/v1/auth/password/change/"
 REQUEST = "/api/v1/auth/password/reset/request/"
 CONFIRM = "/api/v1/auth/password/reset/confirm/"
@@ -73,13 +73,13 @@ class CredentialTests(APITestCase):
     def sign_in(self, password=OLD):
         response = APIClient().post(LOGIN, {"email": "reader@cit.edu", "password": password}, format="json")
         self.assertEqual(response.status_code, 200, response.content)
-        return response.json()
+        return tokens_of(response)
 
     def me(self, access):
         return APIClient().get(ME, HTTP_AUTHORIZATION=f"Bearer {access}")
 
     def refresh(self, refresh):
-        return APIClient().post(REFRESH, {"refresh": refresh}, format="json")
+        return post_refresh(refresh)
 
     def reset(self):
         token = emailed_reset_token(self.client, "reader@cit.edu")
@@ -89,7 +89,7 @@ class CredentialTests(APITestCase):
 
     def test_a_reset_ends_every_device_access_and_refresh_alike(self):
         laptop, phone = self.sign_in(), self.sign_in()
-        rotated = self.refresh(phone["refresh"]).json()
+        rotated = tokens_of(self.refresh(phone["refresh"]))
 
         self.reset()
 
@@ -144,22 +144,22 @@ class ResetVersusSignInRaceTests(TransactionTestCase):
     def test_a_refresh_racing_reset_cannot_leave_live_credentials(self):
         from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
         token = emailed_reset_token(APIClient(), "race@cit.edu")
-        signed_in = APIClient().post(LOGIN, {"email": "race@cit.edu", "password": OLD}, format="json").json()
+        signed_in = tokens_of(APIClient().post(LOGIN, {"email": "race@cit.edu", "password": OLD}, format="json"))
         barrier = threading.Barrier(2)
         results = {}
 
-        def run(name, path, body):
+        def run(name, call):
             try:
                 barrier.wait(10)
-                results[name] = APIClient().post(path, body, format="json")
+                results[name] = call()
             finally:
                 connection.close()
 
         threads = [
-            threading.Thread(target=run, args=("refresh", REFRESH, {"refresh": signed_in["refresh"]})),
-            threading.Thread(target=run, args=("reset", CONFIRM, {
+            threading.Thread(target=run, args=("refresh", lambda: post_refresh(signed_in["refresh"]))),
+            threading.Thread(target=run, args=("reset", lambda: APIClient().post(CONFIRM, {
                 "token": token, "new_password": NEW, "confirm_password": NEW,
-            })),
+            }, format="json"))),
         ]
         with patch("apps.accounts.recovery.service.enqueue"):
             for thread in threads:

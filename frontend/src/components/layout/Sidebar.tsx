@@ -10,7 +10,7 @@ import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { NotificationBell } from "./NotificationBell";
 import { AccountMenu } from "./AccountMenu";
-import { ASK_IRIS_ICON, navFor, canAccess, pathFor, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
+import { ASK_IRIS_ICON, navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
 import { AskIrisGlyph, IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { isRail, useSidebarMode } from "@/lib/layout";
@@ -28,14 +28,13 @@ interface NavItem {
    */
   dot?: string;
   /**
-   * Pages listed under this row (IR-1085, D5): My Reviews' Office console and
-   * Workflow analytics. A list inside the row, so it reads as part of it.
+   * Pages listed under this row (IR-1085, D5): My Reviews' Office console
+   * (Workflow analytics moved to the RDCO group, IR-1216). A list inside the
+   * row, so it reads as part of it.
    */
   children?: NavItem[];
 }
 
-/** Help's own link in the sidebar's footer, outside the nav list (IR-1085). */
-const HELP_ITEM: NavItem = { to: pathFor("help"), label: "Help", icon: "fa-circle-question" };
 
 // There is no `comingSoon` flag. Nav items are derived from `lib/access.ts`,
 // which maps a role to screens that exist and are routed -- so a dead-end entry
@@ -188,9 +187,10 @@ interface SidebarProps {
  * The app's navigation (IR-413, spec §4.1).
  *
  * Discover and research links, RDCO's coordination group, and the System
- * Admin's Administration group. My Reviews carries the Office console and
- * Workflow analytics under it, for the roles that have them (IR-1085, D5). The
- * bell is at the top (IR-519); Help and the account menu are at the bottom. Below `md` it is a
+ * Admin's Administration group. My Reviews carries the Office console under
+ * it for coordinators (IR-1085, D5); Workflow analytics is RDCO's (IR-1216). The
+ * bell is at the top (IR-519); the account menu is at the bottom, and Help is
+ * in Settings (IR-1217). Below `md` it is a
  * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
  * rail, and the IRIS mark opens the full sidebar over the page (IR-1086). From
  * 1024 px it is at full width, or as the rail if the user chooses (stored per
@@ -221,6 +221,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const onMark = mode !== "rail" ? toggleCollapsed : collapsed ? () => setSidebarOpen(true) : dismiss;
   const [queueCounts, setQueueCounts] = useState<QueueCounts>(NO_QUEUES);
   const [needsAction, setNeedsAction] = useState(false);
+  /** My Reviews' To review count, from the same stats read (IR-1208). */
+  const [reviewsWaiting, setReviewsWaiting] = useState<number | undefined>(undefined);
   const { pathname, search } = useLocation();
 
   // Every nav decision comes from lib/access.ts, the same map the router gates
@@ -249,18 +251,25 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   }, [showsQueues, pathname, search]);
 
   // My Library's dot: some record of the user's waits on them -- a revision or
-  // a document was asked for (B2, `needs_action_mine`). Asked again whenever
+  // a document was asked for (B2, `needs_action_mine`). The same read carries
+  // My Reviews' count, the reviews waiting on the user (IR-1208, the To review
+  // tab's own number, `reviews_waiting_mine`). Asked again whenever
   // the address changes, query string included -- Paper View's sections are
   // `?section=` -- so answering the request clears it without a reload.
   // A failed read shows no dot rather than a stale one.
   const showsLibrary = nav.some((entry) => entry.key === "library");
   useEffect(() => {
-    if (!showsLibrary) { setNeedsAction(false); return; }
+    if (!showsLibrary) { setNeedsAction(false); setReviewsWaiting(undefined); return; }
     let live = true;
     dashboardApi
       .stats()
-      .then(({ data }) => { if (live) setNeedsAction((data.needs_action_mine ?? 0) > 0); })
-      .catch(() => { if (live) setNeedsAction(false); });
+      .then(({ data }) => {
+        if (!live) return;
+        setNeedsAction((data.needs_action_mine ?? 0) > 0);
+        // The same number as My Reviews' To review tab (IR-1208).
+        setReviewsWaiting(data.reviews_waiting_mine);
+      })
+      .catch(() => { if (live) { setNeedsAction(false); setReviewsWaiting(undefined); } });
     return () => { live = false; };
   }, [pathname, search, showsLibrary]);
 
@@ -268,6 +277,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // "may this role open it", never "how many are waiting". RDCO's three request
   // queues are the counts that are someone's to act on.
   const BADGES: Partial<Record<NavEntry["key"], number | undefined>> = {
+    // Reviews waiting on the user, for every reviewer with work (IR-1208).
+    reviewQueue: reviewsWaiting,
     roleRequests: queueCounts.role_change_requests,
     downloadRequests: queueCounts.download_requests,
     deleteRequests: queueCounts.delete_requests,
@@ -390,11 +401,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
         ))}
       </nav>
 
-      {/* ── Footer: Help, then the account menu ───────────────────────── */}
+      {/* ── Footer: the account menu. Help is in Settings (IR-1217). ─── */}
       <div className={cn("border-t border-stone-200 p-3", collapsed && "md:px-2")}>
-        <ul role="list" className="mb-2">
-          <NavItemLink item={HELP_ITEM} collapsed={collapsed} onNavigate={closeSidebar} />
-        </ul>
         <AccountMenu collapsed={collapsed} onNavigate={closeSidebar} />
       </div>
     </aside>

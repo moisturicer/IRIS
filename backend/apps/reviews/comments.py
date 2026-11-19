@@ -7,9 +7,12 @@ anyone who has ever held a seat, or a member of an office holding the record
 now. Anyone else is told nothing, not even that a discussion exists: the
 refusal is the same 404 as a missing record (IR-153).
 
-**Who writes.** The record's participants (`is_record_participant`, §7): its
-owners and anyone who has ever held a seat. A pool member about to claim may
-read the history but not write in it -- 403, since they may see it.
+**Who writes.** Its owners and anyone whose seat on it is open
+(`may_act_on_review`, §7; IR-1226). A reviewer whose seat is done still writes
+in Conversation, replies in a thread and edits those comments
+(`may_discuss_review`, 2026-11-19), but starts, edits and resolves no thread.
+A pool member about to claim, or a reviewer taken off the paper, may read the
+history but not write in it -- 403, since they may see it.
 
 **On which records.** Every submitted one. A draft is not under review, so a
 comment on it is refused.
@@ -51,10 +54,13 @@ from django.utils import timezone
 
 from apps.records.versions import latest_version
 from core.enums import (
-    PipelineStatus, ReviewCommentKind, ReviewTextState, ThreadAnswer, ThreadPlaceOutcome,
+    PipelineStatus, ReviewCommentKind, ReviewTextState, SeatState, ThreadAnswer, ThreadPlaceOutcome,
     ThreadSeverity, ThreadState,
 )
-from core.permissions import holds_seat, is_record_owner, is_record_participant, may_read_review
+from core.permissions import (
+    acting_refusal, holds_seat, is_record_owner, may_act_on_review, may_discuss_review,
+    may_read_review,
+)
 
 from . import mentions, threads
 from .models import ReviewComment
@@ -99,6 +105,25 @@ def _anchor_payload(comment) -> Optional[dict]:
         "prefix": comment.anchor_prefix,
         "suffix": comment.anchor_suffix,
         "regions": comment.anchor_regions,
+    }
+
+
+def _document_payload(comment, viewer: "_Viewer") -> Optional[dict]:
+    """
+    The document upload a thread names (IR-1204), and whether a newer upload of
+    that document has replaced it: the thread stays on the upload it names and
+    reads "from an earlier upload" (ADR-032 §7, Amendment 2026-11-18, point 5).
+    """
+    upload = comment.anchor_upload
+    if upload is None:
+        return None
+    name = upload.file.name.rsplit("/", 1)[-1]
+    return {
+        "upload": upload.pk, "slot": upload.slot.name, "version": upload.version,
+        "label": threads.document_label(upload),
+        "earlier": viewer.newest_upload_versions.get(upload.slot_id, upload.version) > upload.version,
+        # How the reader opens it; a stored name with no extension is a PDF, as slots were.
+        "extension": name.rsplit(".", 1)[-1].lower() if "." in name else "pdf",
     }
 
 
@@ -176,11 +201,15 @@ class _Viewer:
         self.pk = getattr(user, "pk", None)
         self.record = record
         self.owner = is_record_owner(user, record)
-        self.participant = is_record_participant(user, record)
+        # Acting on threads needs ownership or an open seat; a done seat still
+        # discusses, in Conversation and replies (IR-1226).
+        self.acts = may_act_on_review(user, record)
+        self.discusses = self.acts or may_discuss_review(user, record)
         self.in_review = is_in_review(record)
         self._seats: dict[str, bool] = {}
         self._versions: Optional[list] = None
         self._owner_ids: Optional[set] = None
+        self._newest_uploads: Optional[dict] = None
 
     @property
     def versions(self) -> list:
@@ -198,6 +227,20 @@ class _Viewer:
         if self._owner_ids is None:
             self._owner_ids = set(self.record.owners.values_list("user_id", flat=True))
         return self._owner_ids
+
+    @property
+    def newest_upload_versions(self) -> dict:
+        """Each slot document's newest upload version, by slot id, read once (IR-1204)."""
+        if self._newest_uploads is None:
+            from django.db.models import Max
+
+            from apps.documents.models import RecordUpload
+
+            self._newest_uploads = dict(
+                RecordUpload.objects.filter(record=self.record)
+                .values("slot_id").annotate(newest=Max("version")).values_list("slot_id", "newest")
+            )
+        return self._newest_uploads
 
     def holds(self, party) -> bool:
         if party not in self._seats:
@@ -244,7 +287,9 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "reply_to": comment.reply_to_id,
         "created_at": comment.created_at.isoformat(),
         "edited_at": comment.edited_at.isoformat() if comment.edited_at else None,
-        "can_edit": mine,
+        # A thread is edited only from an open seat; a reply or a Conversation
+        # comment by anyone who still discusses (IR-1226).
+        "can_edit": mine and (viewer.acts if top else viewer.discusses),
         # The people it mentions (IR-877).
         "mentions": mentions.payload(comment),
         # The thread (ADR-032 §7, IR-874).
@@ -254,6 +299,8 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "is_draft": comment.is_draft,
         "round": comment.round_id,
         "anchor": _anchor_payload(comment) if top else None,
+        # The supporting document it is about, as a whole (IR-1204).
+        "document": _document_payload(comment, viewer) if top else None,
         # Its suggested wording, where its passage is now, and whether it is
         # Outdated (IR-876).
         "suggestion": comment.suggestion if top else "",
@@ -276,15 +323,15 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
              "to": e.new_value or None, "at": e.created_at.isoformat()}
             for e in comment.events.all()
         ] if sent else [],
-        "can_delete": mine and comment.is_draft,
+        "can_delete": mine and comment.is_draft and viewer.acts,
         # Its writer posts a draft on its own, before *Finish review* (IR-1194).
-        "can_post": mine and comment.is_draft and top and viewer.in_review,
+        "can_post": mine and comment.is_draft and top and viewer.in_review and viewer.acts,
         "can_change_severity": live and reviewer_thread and (
             mine if comment.is_draft else viewer.holds(comment.party)
         ),
-        "can_resolve": live and sent and viewer.participant and not (reviewer_thread and viewer.owner),
+        "can_resolve": live and sent and viewer.acts and not (reviewer_thread and viewer.owner),
         "can_reopen": sent and viewer.in_review and comment.state == ThreadState.RESOLVED
-        and viewer.participant,
+        and viewer.acts,
         "can_answer": live and sent and reviewer_thread and viewer.owner,
     }
 
@@ -303,7 +350,10 @@ def comments_payload(record, user) -> list[dict[str, Any]]:
     """
     rows = (
         _visible(record, user)
-        .select_related("author", "version", "anchor_version", "resolved_by", "answered_by", "record")
+        .select_related(
+            "author", "version", "anchor_version", "anchor_upload__slot",
+            "resolved_by", "answered_by", "record",
+        )
         .prefetch_related("events__actor", "places__version", "mentions__user")
     )
     viewer = _Viewer(record, user)
@@ -319,13 +369,17 @@ def readable_comments(record, user) -> list[dict[str, Any]]:
 
 # --- writing -----------------------------------------------------------------------------
 
-def _writer(record, user) -> None:
+def _writer(record, user, *, discussing=False) -> None:
+    """
+    Refuse `user` unless they may write here: act on threads (an owner or an
+    open seat), or, when `discussing`, write in Conversation and reply (an
+    open or done seat too; IR-1226).
+    """
     if not may_read_review(user, record):
         raise CommentNotFound
-    if not is_record_participant(user, record):
-        raise CommentRefused(
-            "Only the record's owners and its reviewers take part in the review discussion."
-        )
+    allowed = may_discuss_review(user, record) if discussing else may_act_on_review(user, record)
+    if not allowed:
+        raise CommentRefused(acting_refusal(user, record))
 
 
 def _body(value) -> str:
@@ -374,6 +428,32 @@ def _anchor(record, value) -> dict:
     }
 
 
+def _document(record, value):
+    """
+    The upload a document thread names, validated, or `CommentError`: one of
+    this record's slot documents, and its newest upload, so a new thread is
+    never born "from an earlier upload" (decided 2026-11-18, IR-1204). An
+    office's own attachment is a different file and can't be named (point 1).
+    """
+    from apps.documents.models import RecordUpload
+
+    missing = CommentError("That is not one of this record's documents.")
+    if not _is_int(value):
+        raise missing
+    upload = RecordUpload.objects.select_related("slot").filter(record=record, pk=int(value)).first()
+    if upload is None:
+        raise missing
+    newest = (
+        RecordUpload.objects.filter(record=record, slot_id=upload.slot_id)
+        .order_by("-version", "-pk").values_list("pk", flat=True).first()
+    )
+    if newest != upload.pk:
+        raise CommentError(
+            "Comment on the newest upload of this document: a newer one has replaced it."
+        )
+    return upload
+
+
 def _regions(value) -> list[dict]:
     """ADR-031's page-fraction rectangles, `{page, left, top, right, bottom}`, each 0-1."""
     if not isinstance(value, list) or len(value) > MAX_REGIONS:
@@ -407,9 +487,12 @@ def writer_party(record, user) -> tuple[str, bool]:
     seat = _open_seat(record, user)
     if seat is not None:
         return str(seat.assignment.party), True
+    # A done seat still discusses (IR-1226), as its own party: never a
+    # withdrawn one's, which grants nothing.
     last = (
         ReviewerSeat.objects.select_related("assignment")
         .filter(assignment__record=record, reviewer=user)
+        .exclude(state=SeatState.WITHDRAWN)
         .order_by("-assigned_at", "-pk").first()
     )
     return (str(last.assignment.party) if last else threads.OWNER), False
@@ -445,7 +528,7 @@ def _with_mentions(comment, user, people) -> ReviewComment:
 
 def mentionable(record, user) -> list[dict[str, Any]]:
     """`GET /records/<id>/review-mentionable/`: whom a writer may mention, but themselves."""
-    _writer(record, user)
+    _writer(record, user, discussing=True)
     return [{"id": u.pk, "name": u.get_full_name()}
             for u in mentions.candidates(record) if u.pk != user.pk]
 
@@ -468,22 +551,28 @@ def _announce(record, actor, thread) -> None:
     from apps.notifications.services import notify_thread_posted
 
     label, severity, page = threads.party_label(thread.party), thread.severity, thread.anchor_page
+    document = threads.document_label(thread.anchor_upload) if thread.anchor_upload_id else None
     transaction.on_commit(lambda: notify_thread_posted(
-        record, actor=actor, party_label=label, severity=severity, page=page,
+        record, actor=actor, party_label=label, severity=severity, page=page, document=document,
     ))
 
 
 @transaction.atomic
 def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=None,
                  post_now=None, severity=None, anchor=None, suggestion=None,
-                 mentioned=None) -> ReviewComment:
+                 mentioned=None, document=None) -> ReviewComment:
     """`POST /records/<id>/review-comments/`: a participant comments."""
-    _writer(record, user)
+    _writer(record, user, discussing=True)
     if record.pipeline_status == PipelineStatus.DRAFT:
         raise CommentError("A draft is not under review. Comments open once it is submitted.")
     text = _body(body)
     people = _mentioned(record, mentioned)
     kind = _kind(kind)
+    names_document = document not in (None, "")
+    # A new thread takes an open seat; a reply or a Conversation comment only
+    # one that is open or done (IR-1226).
+    if reply_to in (None, "") and kind == THREAD and not may_act_on_review(user, record):
+        raise CommentRefused(acting_refusal(user, record))
 
     if reply_to not in (None, ""):
         try:
@@ -498,9 +587,11 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
                 # Someone else's draft does not exist, as far as this caller knows.
                 raise CommentError("That comment is not in this record's review discussion.")
             raise CommentError("Finish your review to send this thread before replying to it.")
-        if severity not in (None, "") or anchor is not None or suggestion not in (None, ""):
+        if (severity not in (None, "") or anchor is not None or suggestion not in (None, "")
+                or names_document):
             raise CommentError(
-                "A reply belongs to its thread: it has no severity, anchor or suggested wording."
+                "A reply belongs to its thread: it has no severity, anchor, document "
+                "or suggested wording."
             )
         # Replies post immediately and are never held (ADR-032 §7). The
         # writer's party is kept for the reply's label (IR-1192); its kind is
@@ -514,10 +605,11 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
     party, seated = writer_party(record, user)
     if kind == DISCUSSION:
         # Conversation's: posted at once, by anyone who writes here (IR-1194).
-        if severity not in (None, "") or anchor is not None or suggestion not in (None, ""):
+        if (severity not in (None, "") or anchor is not None or suggestion not in (None, "")
+                or names_document):
             raise CommentError(
-                "A Conversation comment has no severity, passage or suggested wording. "
-                "Comment in Threads to raise a review item."
+                "A Conversation comment has no severity, passage, document or suggested "
+                "wording. Comment in Threads to raise a review item."
             )
         return _with_mentions(ReviewComment.objects.create(
             record=record, author=user, body=text, kind=DISCUSSION,
@@ -527,6 +619,16 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
     wording = _suggestion(suggestion)
     if wording and anchor is None:
         raise CommentError("Suggest wording on a passage: select the text it would replace.")
+    upload = None
+    if names_document:
+        # A reviewer's, on the whole document (ADR-032 §7, Amendment 2026-11-18).
+        if party == threads.OWNER:
+            raise CommentError(
+                "A thread on a document is a reviewer's. Ask about a document in Conversation."
+            )
+        if anchor is not None:
+            raise CommentError("A thread is on a passage or a document, not both.")
+        upload = _document(record, document)
     if party == threads.OWNER:
         if anchor is None:
             raise CommentError(
@@ -545,7 +647,7 @@ def post_comment(record, user, *, body, reply_to: Optional[int] = None, kind=Non
     draft = seated and not _flag(post_now)
     thread = _with_mentions(ReviewComment.objects.create(
         record=record, author=user, body=text, version=latest_version(record), kind=THREAD,
-        party=party, severity=severity, is_draft=draft, suggestion=wording,
+        party=party, severity=severity, is_draft=draft, suggestion=wording, anchor_upload=upload,
         **(_anchor(record, anchor) if anchor is not None else {}),
     ), user, people)
     if party != threads.OWNER and not draft:
@@ -580,13 +682,19 @@ def post_draft(record, user, comment_id) -> ReviewComment:
 
 
 def _own(record, user, comment_id) -> ReviewComment:
-    """`user`'s own comment `comment_id`, or the refusal its author check gives."""
-    _writer(record, user)
+    """
+    `user`'s own comment `comment_id`, or the refusal its author check gives.
+    A thread is theirs to change only from an open seat; a reply or a
+    Conversation comment while they still discuss (IR-1226).
+    """
+    _writer(record, user, discussing=True)
     comment = _visible(record, user).filter(pk=comment_id).first()
     if comment is None:
         raise CommentNotFound
     if comment.author_id != user.pk:
         raise CommentRefused("Only the person who wrote a comment may edit it.")
+    if comment.reply_to_id is None and comment.kind == THREAD and not may_act_on_review(user, record):
+        raise CommentRefused(acting_refusal(user, record))
     return comment
 
 

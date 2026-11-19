@@ -89,7 +89,21 @@ describe("Finish review", () => {
   it("won't approve while sending the reviewer's own Must fix draft", () => {
     open(["office_review"], [comment({ is_draft: true, severity: "must_fix" })]);
     expect(screen.getByRole("radio", { name: /Clear for ITSO/ })).toHaveAccessibleDescription(/Change it to Suggestion/);
-    expect(screen.getByRole("radio", { name: /Record a finding/ })).toBeEnabled();
+    // Changed deliberately by IR-1226 (2026-11-19): a finding ends the seat as
+    // Clear does, so it waits on the reviewer's own Must fix too.
+    const finding = screen.getByRole("radio", { name: /Record a finding/ });
+    expect(finding).toBeDisabled();
+    expect(finding).toHaveAccessibleDescription(/can't record a finding while sending a Must fix/);
+  });
+
+  it("holds Record a finding while the office has an open Must fix (IR-1226)", () => {
+    const why = "ITSO has 1 open Must fix thread. Resolve each one, or change it to Suggestion, before recording a finding.";
+    open(["office_review"], [], record({
+      office_review: { party: "itso", label: "ITSO", blocked: null, clear_blocked: why, finding_blocked: why, assignment: 3 },
+    } as Partial<RecordDetail>));
+    const finding = screen.getByRole("radio", { name: /Record a finding/ });
+    expect(finding).toBeDisabled();
+    expect(finding).toHaveAccessibleDescription(`Unavailable: ${why}`);
   });
 
   it("asks for a summary or a comment before Comment only", async () => {
@@ -138,6 +152,8 @@ describe("a Decision with open threads", () => {
         threads: [
           { id: 1, party: "itso", label: "ITSO", severity: "must_fix", anchored: true },
           { id: 2, party: "adviser", label: "Adviser", severity: "suggestion", anchored: false },
+          // A thread on a supporting document is named by it (IR-1204).
+          { id: 3, party: "ierc", label: "IERC", severity: "must_fix", anchored: false, document: "Consent form, v1" },
         ],
       },
     },
@@ -149,8 +165,9 @@ describe("a Decision with open threads", () => {
     await user.click(screen.getByRole("radio", { name: /Keep unlisted/ }));
     const closes = screen.getByRole("region", { name: "What this Decision closes" });
     expect(closes).toHaveTextContent("IERC's review in progress (Elena Reyes)");
-    expect(closes).toHaveTextContent("2 open threads, 1 Must fix:");
+    expect(closes).toHaveTextContent("3 open threads, 2 Must fix:");
     expect(closes).toHaveTextContent("ITSO, on a passage");
+    expect(closes).toHaveTextContent("IERC, on Consent form, v1");
     expect(closes).toHaveTextContent("Your summary is the reason each open Must fix thread closes with.");
 
     const send = screen.getByRole("button", { name: "Keep unlisted" });

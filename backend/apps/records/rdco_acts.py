@@ -166,6 +166,11 @@ def replace_adviser(record: Record, adviser_id, *, actor, reason="") -> dict:
 
     record.adviser = adviser
     record.save(update_fields=["adviser", "updated_at"])
+    # Their unsent drafts as Adviser go with them (IR-1226), whatever their
+    # seat's state: they no longer read the review, so they can't send them.
+    from apps.reviews.removal import discard_drafts
+
+    discard_drafts(record, previous, Party.ADVISER)
 
     audit.adviser_replaced(
         record, actor, previous_adviser=previous, adviser=adviser,

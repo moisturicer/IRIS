@@ -608,13 +608,23 @@ def _done_rows(scope, outcome, cursor) -> tuple[list[dict], str | None]:
 
 # --- the endpoint's one call ----------------------------------------------------------
 
+def _to_review_count(scope) -> int:
+    return _current_seats(scope, SeatState.ASSIGNED).count() + _pool(scope).count()
+
+
+def waiting_count(user) -> int:
+    """
+    How many reviews wait on `user`: My Reviews' To review tab, unnarrowed.
+    The sidebar's My Reviews badge reads it (IR-1208), so the badge and the
+    tab are one number by construction.
+    """
+    return _to_review_count(_scope(user, None))
+
+
 def _counts(scope) -> dict:
     """Every tab's size in this view. `office` narrows them; `outcome` never does."""
     return {
-        MyReviewsTab.TO_REVIEW.value: (
-            _current_seats(scope, SeatState.ASSIGNED).count()
-            + _pool(scope).count()
-        ),
+        MyReviewsTab.TO_REVIEW.value: _to_review_count(scope),
         MyReviewsTab.IN_REVIEW.value: _current_seats(scope, SeatState.IN_REVIEW).count(),
         MyReviewsTab.DONE.value: _done_seats(scope).count() + _seatless_reviews(scope).count(),
     }

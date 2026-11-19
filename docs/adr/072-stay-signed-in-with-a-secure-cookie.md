@@ -5,7 +5,7 @@
 **Accepted**, 2026-11-18, by Lee Jasmin Adolfo ([IR-1222](https://citiris.atlassian.net/browse/IR-1222)).
 - **How it was accepted:** verbally, to Ashlee Sean, who recorded it here the same day. There is no written approval on the PR.
 - **Who decided what.** The choices in §Decision were made by Ashlee Sean on 2026-11-18: storage, the "Keep me signed in" checkbox and the 30-day limit. The ADR was drafted by an AI agent (Claude Code) at Ashlee's request. AI does not make architecture decisions (CLAUDE.md). The two questions the first draft left open were settled by Ashlee (§Questions settled while drafting).
-- **Not built yet.** IR-1222 builds it.
+- **Built by IR-1222** (PR #873). Two implementation notes: refresh answers a refused session `401` (it declares a `WWW-Authenticate` header, as simplejwt's own view did); and refresh refuses inside one transaction, as the idle rule always has, so an expired session's `ended_reason` is recorded by the next authenticated request rather than by the refused refresh.
 
 Amends [IR-166](https://citiris.atlassian.net/browse/IR-166)'s inactivity rule for remembered sessions only. Corrects `docs/security/SECURITY.md` §2 (see §Context, "The 7-day limit is not absolute").
 

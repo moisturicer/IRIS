@@ -338,7 +338,10 @@ export type Capability =
   | "set_visibility"
   | "tag_ip"
   | "attach_file"
+  /** Write in Conversation and reply in a thread: an open or a finished seat (IR-1226). */
   | "comment_review"
+  /** Start a thread on a passage: an owner, or an open seat (IR-1226). */
+  | "start_thread"
   /** A thread on no passage, from *New comment*: a reviewer's; an owner's threads are on a passage (IR-1194). */
   | "open_general_thread"
   | "finish_review"
@@ -586,6 +589,12 @@ export interface RecordDetail extends RecordListItem {
    */
   publish_unlisted?:    { blocked: string | null } | null;
   /**
+   * What the Adviser leaves if RDCO replaces them (IR-1226): beside the
+   * `replace_adviser` offer, so the dialog warns with the server's counts.
+   * Null to anyone not offered the act. Optional: a fixture may leave it out.
+   */
+  adviser_leaving?:     RemovalLeaving | null;
+  /**
    * The record's versions, oldest first (ADR-032 §5, IR-416). Review
    * material: null to a viewer who may not read the review (IR-479), and
    * empty before the record is first submitted.
@@ -680,15 +689,38 @@ export interface DecisionFlags {
   embargo?:     RecordEmbargo | null;
 }
 
+/** What someone taken off a paper leaves unresolved (IR-1226), counted by the server. */
+export interface RemovalUnresolved {
+  /** Unsent drafts: discarded with the seat. */
+  drafts:            number;
+  /** Open threads they posted, document and revision requests they made: these stay open. */
+  open_threads:      number;
+  document_requests: number;
+  revision_requests: number;
+}
+
+/** One person a removal would take off a paper, and what they leave (IR-1226). */
+export interface RemovalLeaving {
+  name:       string;
+  unresolved: RemovalUnresolved;
+}
+
 export interface DecisionCloses {
-  /** Each review a decision would end, with whoever is reviewing there now. */
-  assignments:       { party: Party; label: string; holders: string[] }[];
+  /**
+   * Each review a decision would end, with whoever is reviewing there now,
+   * and what each of them leaves (IR-1226; absent from older fixtures).
+   */
+  assignments:       { party: Party; label: string; holders: string[]; leaving?: RemovalLeaving[] }[];
   /** How many open document requests it would withdraw. */
   document_requests: number;
   revision_requests?: { id: number; party: Party; label: string; reason: string }[];
   findings?: { party: Party; label: string; comment: string }[];
   /** The open threads deciding closes, the decider's own drafts included (IR-874). */
-  threads?: { id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean }[];
+  threads?: {
+    id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean;
+    /** The supporting document a thread is on, "Consent form, v1" (IR-1204). */
+    document?: string | null;
+  }[];
 }
 
 export interface OfficeReviewFlags {
@@ -697,8 +729,10 @@ export interface OfficeReviewFlags {
   label:      string | null;
   /** Why the act cannot be taken yet (an unopened seat, an open document request). */
   blocked:    string | null;
-  /** Why *Clear* alone is held: the office's own open Must fix threads (IR-874). */
+  /** Why *Clear* is held: the office's own open Must fix threads (IR-874). */
   clear_blocked?: string | null;
+  /** Why *Record a finding* is held, for the same reason (IR-1226). */
+  finding_blocked?: string | null;
   assignment: number | null;
 }
 
@@ -745,6 +779,8 @@ export interface ResponseLetterEntry {
   version:     number | null;
   page:        number | null;
   quote:       string;
+  /** A document thread's upload, "Consent form, v1" (IR-1204); absent from older letters. */
+  document?:   string | null;
   /** Null: no answer given. */
   answer:      ThreadAnswerPayload["kind"] | null;
   note:        string;
@@ -992,6 +1028,8 @@ export interface ReviewComment {
   round?:                number | null;
   /** The passage it is about; null for a general thread. */
   anchor?:               ThreadAnchor | null;
+  /** The supporting document it is about instead, as a whole (IR-1204); null otherwise. */
+  document?:             ThreadDocument | null;
   state?:                ThreadState | null;
   resolved_by?:          string | null;
   resolved_at?:          string | null;
@@ -1139,6 +1177,22 @@ export interface VersionComparisonPayload {
   notices?:  ComparisonNotice[];
   counts?:   ChangeCounts & { sections_renamed: number; sections_moved: number };
   threads?:  PlacedThread[];
+}
+
+/**
+ * A supporting document a reviewer's thread is about, as a whole (ADR-032 §7,
+ * Amendment 2026-11-18; IR-1204): one upload of one of the record's slots.
+ */
+export interface ThreadDocument {
+  upload:    number;
+  slot:      string;
+  version:   number;
+  /** "Consent form, v1". */
+  label:     string;
+  /** A newer upload of the document has replaced this one: "From an earlier upload". */
+  earlier:   boolean;
+  /** The stored file's extension, lower-cased: whether the reader can show it. */
+  extension: string;
 }
 
 /** A passage of one Version: where an anchored thread points. */

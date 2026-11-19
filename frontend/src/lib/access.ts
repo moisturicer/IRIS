@@ -177,13 +177,6 @@ export const SCREEN_ACCESS = {
                   nav: { label: "Office console", icon: "fa-users-gear", section: "Main",
                          parent: "reviewQueue", needsCoordinator: true } },
 
-  // Workflow analytics (IR-626): an office's own figures, every office's for
-  // RDCO. Nested under My Reviews in the sidebar (IR-1085, D5), still reached
-  // from the page's own header link too.
-  reviewAnalytics: { path: "/review/analytics", roles: OFFICES,
-                     nav: { label: "Workflow analytics", icon: "fa-chart-column", section: "Main",
-                            parent: "reviewQueue" } },
-
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,
@@ -214,6 +207,11 @@ export const SCREEN_ACCESS = {
   // it from `adminNotices`, the same page, in its own sidebar section.
   notices:       { path: "/notices", roles: COORDINATOR,
                  nav: { label: "Notices", icon: "fa-file-signature", section: "RDCO" } },
+  // Workflow analytics (IR-626): every office's figures, read by RDCO alone
+  // in its own section since IR-1216 (ADR-043 amendment 2026-11-18). It was
+  // under My Reviews for every office; `/review/analytics` redirects here.
+  reviewAnalytics: { path: "/rdco/analytics", roles: COORDINATOR,
+                 nav: { label: "Workflow analytics", icon: "fa-chart-column", section: "RDCO" } },
 
   // Both roles use the same Users page, with distinct addresses and server permissions.
   adminUsers:    { path: "/admin/users", roles: SYSTEM_ADMIN,

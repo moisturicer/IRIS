@@ -21,8 +21,27 @@
 
 export interface RefreshedTokens {
   access: string;
-  /** Present when the server rotated the refresh token, which it does by default. */
-  refresh?: string;
+  /** Whether the session was kept with "Keep me signed in" (ADR-072). */
+  remembered: boolean;
+}
+
+/** Refresh and logout read the cookie, so they say they come from IRIS itself (ADR-072 decision 5). */
+export const FIRST_PARTY = { "X-IRIS-Auth": "1" } as const;
+
+/**
+ * Run ``fn`` while holding the browser-wide refresh lock (ADR-072 decision 6).
+ *
+ * Rotation blacklists the refresh token presented, and every tab presents the
+ * same cookie, so two tabs refreshing at once would leave the slower one with a
+ * refused token and sign it out. Holding one lock across tabs makes them take
+ * turns; a tab that waited sends the cookie the first one just replaced. Where
+ * the Web Locks API is missing (very old browsers, some test environments) the
+ * refresh runs unguarded, as it did before.
+ */
+export async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = globalThis.navigator?.locks;
+  if (!locks) return fn();
+  return await locks.request("iris-refresh", fn);
 }
 
 export type RefreshFn = () => Promise<RefreshedTokens>;

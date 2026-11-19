@@ -90,6 +90,13 @@ describe("holderLine", () => {
       .toBe("ITSO · Unassigned");
   });
 
+  // IR-1181: a card whose clearance strip already names the office does not say it twice.
+  it("leaves the office out when the card's strip already names it", () => {
+    expect(holderLine(row(), true)).toBe("You");
+    expect(holderLine(row({ is_mine: false }), true)).toBe("Ana Reyes");
+    expect(holderLine(row({ kind: "pool", holder: null, holder_name: null, is_mine: false }), true))
+      .toBe("Unassigned");
+  });
 });
 
 describe("pageLine (IR-1135)", () => {

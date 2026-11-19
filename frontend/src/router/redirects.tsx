@@ -34,6 +34,11 @@ export const REDIRECTS: ReadonlyArray<{ path: string; to: string; why: string }>
     to: "/review",
     why: "ADR-032 retired the Proposal complete act, and with it the Approved Proposals page (IR-534)",
   },
+  {
+    path: "review/analytics",
+    to: "/rdco/analytics",
+    why: "Workflow analytics left My Reviews for RDCO's own section, RDCO alone (IR-1216)",
+  },
 ];
 
 function RetiredUrl({ to }: { to: string }) {

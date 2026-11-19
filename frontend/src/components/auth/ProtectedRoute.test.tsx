@@ -66,7 +66,6 @@ beforeEach(() => {
   useAuthStore.setState({
     user: null,
     accessToken: null,
-    refreshToken: null,
     isAuthenticated: false,
     authReady: false,
     sessionLost: null,

@@ -30,7 +30,7 @@ const unread: Notification = {
 };
 
 function signedInWithUnread() {
-  useAuthStore.getState().login(makeUser({ id: 1 }), validToken({ user_id: 1 }), "refresh");
+  useAuthStore.getState().login(makeUser({ id: 1 }), validToken({ user_id: 1 }));
   useNotificationsStore.getState().setItems([unread]);
   expect(useNotificationsStore.getState().unreadCount).toBe(1);
 }
@@ -45,7 +45,7 @@ describe("unread notifications across session changes", () => {
     ["the session being invalidated", () => useAuthStore.getState().clearTokens()],
     [
       "another account signing in over it",
-      () => useAuthStore.getState().login(makeUser({ id: 2 }), validToken({ user_id: 2 }), "refresh"),
+      () => useAuthStore.getState().login(makeUser({ id: 2 }), validToken({ user_id: 2 })),
     ],
   ])("are emptied by %s", (_, endSession) => {
     signedInWithUnread();
