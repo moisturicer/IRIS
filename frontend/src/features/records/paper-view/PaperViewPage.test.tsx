@@ -3630,6 +3630,20 @@ describe("the Overview's header (IR-569)", () => {
     expect(within(header).queryByText(/\d+ views?$/)).not.toBeInTheDocument();
   });
 
+  it("lists no documents in Record details: they are Review's to show (IR-1244)", async () => {
+    shownRecord = {
+      ...record,
+      files: [{ id: 88, filename: "consent.pdf", url: "/api/v1/documents/files/88/download/" } as RecordDetail["files"][number]],
+    };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).queryByText("Documents")).not.toBeInTheDocument();
+    expect(within(details).queryByText("consent.pdf")).not.toBeInTheDocument();
+    expect(within(details).queryByRole("link", { name: "Manage documents" })).not.toBeInTheDocument();
+  });
+
   it("keeps governance fields in Record details and out of the header (IR-1089)", async () => {
     shownRecord = {
       ...record, is_ip: true, ip_type: "patent", for_commercialization: true, community_extension: true,

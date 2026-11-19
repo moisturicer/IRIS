@@ -603,6 +603,25 @@ class RecordFileRemovalAuthorizationTests(APITestCase):
                 self.assertEqual(response.status_code, status.HTTP_200_OK)
                 self.assertEqual(self._can_remove_by_id(response.data["files"]), can_remove)
 
+    def test_a_reader_who_may_not_download_is_sent_no_file_list(self):
+        """
+        IR-1244: a signed-in reader of a published paper, who is not on it, may
+        not download its attachments (IR-1200), so the detail payload names none:
+        not their filenames, and no link that would only refuse.
+        """
+        published = self._record("published")
+        attachment = self._file(published, "itso", self.itso)
+
+        self.client.force_authenticate(self.stranger)
+        response = self.client.get(f"/api/v1/records/{published.pk}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["files"], [])
+
+        # Whoever may download still gets the list.
+        self.client.force_authenticate(self.owner)
+        response = self.client.get(f"/api/v1/records/{published.pk}/")
+        self.assertEqual([f["id"] for f in response.data["files"]], [attachment.pk])
+
 
 class RecordFileAdminTests(APITestCase):
     """
