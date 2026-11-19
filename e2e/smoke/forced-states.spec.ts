@@ -217,5 +217,5 @@ test("Ask IRIS: a Conversation whose access is withdrawn after it was opened rea
   await page.reload();
   await expect(page.getByRole("heading", { name: "This conversation is not available." })).toBeVisible();
   await expect(anyRetry(page)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Start a new chat" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start a new conversation" })).toBeVisible();
 });

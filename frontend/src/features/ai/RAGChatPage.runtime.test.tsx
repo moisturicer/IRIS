@@ -154,7 +154,7 @@ it("a conversation that cannot be opened says so and offers a new one", async ()
   route = (config) => (config.url === CONVERSATION ? { status: 404, data: { status: "not_found" } } : runtime(config));
   renderAsk(`/ai/conversations/${conversation.id}`);
   expect(await screen.findByRole("heading", { name: "This conversation is not available." })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Start a new chat" })).toHaveAttribute("href", "/ai");
+  expect(screen.getByRole("link", { name: "Start a new conversation" })).toHaveAttribute("href", "/ai");
 });
 
 it("a stopped run reads as stopped, from a keyboard-operated Stop", async () => {
@@ -200,7 +200,9 @@ describe("conversations Django answered before the switch (IR-957)", () => {
     expect(screen.getByText("Do gauges help?")).toBeInTheDocument();
     expect(screen.getByText(/ended without an answer when Ask IRIS changed/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "New conversation" })).toHaveAttribute("href", "/ai");
+    // IR-1234: the banner offers no button; it says how to continue.
+    expect(screen.getByText("An earlier conversation, kept to read. To keep going, start a new conversation.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "New conversation" })).not.toBeInTheDocument();
     expect(sent.every((config) => config.method === "get")).toBe(true);
     await expectNoBlockingA11yViolations(container);
   });

@@ -136,11 +136,13 @@ interface Props {
   selection?: AskSelection | null;
   /** The reader removed the selection, or a question carrying it was admitted. */
   onSelectionChange?: (next: AskSelection | null) => void;
+  /** Each time this changes to a number above zero the question box takes focus (IR-1234: New conversation). */
+  focusRequest?: number;
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
-  selectedId = null, onSelectSources, sourcePanel, onAnswered, onTitle, scopeToggle, selection = null, onSelectionChange }: Props) {
+  selectedId = null, onSelectSources, sourcePanel, onAnswered, onTitle, scopeToggle, selection = null, onSelectionChange, focusRequest = 0 }: Props) {
   // The research scope: this paper, or every paper once the reader widens. Read on each request, so
   // widening continues the same conversation instead of starting another.
   const scope = scopeToggle?.allPapers ? undefined : recordId;
@@ -162,6 +164,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   const pendingRetry = useRef<{ key: string; run: ReaderRun }>();
   const sending = useRef(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (focusRequest > 0) composerRef.current?.focus(); }, [focusRequest]);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
   // Why the chosen passage was refused; the question stays editable and nothing else is blocked (IR-581).
@@ -437,7 +440,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         {opening === "unavailable" && <div className="py-10 text-center">
           <h2 className="font-display text-xl text-stone-900">This conversation is not available.</h2>
           <p className="mt-2 text-sm text-stone-600">It may have been deleted, or the link may be wrong.</p>
-          <Link to="/ai" className={cn(PILL_SECONDARY, FOCUS_RING, "mt-5 inline-flex")}>Start a new chat</Link>
+          <Link to="/ai" className={cn(PILL_SECONDARY, FOCUS_RING, "mt-5 inline-flex")}>Start a new conversation</Link>
         </div>}
         {opening === "failed" && <EmptyState icon="fa-plug-circle-xmark" tone="error" title="Could not load this conversation"
           message={failureMessage(openFailure)}

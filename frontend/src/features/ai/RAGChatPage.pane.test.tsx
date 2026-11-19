@@ -87,7 +87,7 @@ describe("on a page wider than a phone", () => {
     await flood();
     const hide = screen.getByRole("button", { name: "Hide conversations" });
     expect(hide).toHaveAttribute("aria-expanded", "true");
-    expect(hide).toHaveAttribute("aria-controls", screen.getByRole("complementary", { name: "Chat history" }).id);
+    expect(hide).toHaveAttribute("aria-controls", screen.getByRole("complementary", { name: "Conversations" }).id);
     // The chat's own header carries no second toggle on these widths.
     expect(screen.getAllByRole("button", { name: /conversations$/ })).toHaveLength(1);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -127,7 +127,7 @@ describe("on a page wider than a phone", () => {
     renderAsk("/ai/conversations/11111111-1111-1111-1111-111111111111");
     await flood();
     await user.click(screen.getByRole("button", { name: "Hide conversations" }));
-    await user.click(screen.getByRole("button", { name: "New chat" }));
+    await user.click(screen.getByRole("button", { name: "New conversation" }));
     expect(address).toBe("/ai");
   });
 
@@ -222,7 +222,7 @@ describe("on a phone", () => {
     const user = userEvent.setup();
     renderAsk();
     await user.click(await screen.findByRole("button", { name: "Show conversations" }));
-    await user.click(await screen.findByRole("button", { name: "Close chat history" }));
+    await user.click(await screen.findByRole("button", { name: "Close conversations" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show conversations" })).toHaveFocus();
   });

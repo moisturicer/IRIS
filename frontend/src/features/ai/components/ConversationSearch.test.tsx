@@ -50,7 +50,7 @@ test("the search box has an accessible name, searches by keyboard and says plain
 test("a reader with no conversations is told so, not that a search failed", async () => {
   serve(reply([]));
   render(<History />);
-  expect(await screen.findByText("Your past chats will appear here.")).toBeInTheDocument();
+  expect(await screen.findByText("Your past conversations will appear here.")).toBeInTheDocument();
 });
 
 test("Load more reaches older conversations and keeps the search", async () => {

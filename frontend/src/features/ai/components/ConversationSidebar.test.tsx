@@ -1,4 +1,4 @@
-/** New chat, Search, Pinned and Recents, rename in place (IR-1160) and a resizable column. */
+/** New conversation, Search, Pinned and Recents, rename in place (IR-1160) and a resizable column. */
 import { useState } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -21,8 +21,8 @@ const search: HistorySearch = {
 const entries = (...titles: string[]): ReaderConversationSummary[] =>
   titles.map(title => ({ id: `id-${title}`, title, record_id: null, updated_at: "2026-11-01T10:00:00+00:00" }));
 
-function Sidebar({ titles = ["Flood methods", "Pond sampling"], onRename, onNewChat = () => undefined }: {
-  titles?: string[]; onRename?: RenameConversation; onNewChat?: () => void;
+function Sidebar({ titles = ["Flood methods", "Pond sampling"], onRename, onNewConversation = () => undefined }: {
+  titles?: string[]; onRename?: RenameConversation; onNewConversation?: () => void;
 }) {
   const [conversations, setConversations] = useState(entries(...titles));
   const [width, setWidth] = useState(280);
@@ -33,7 +33,7 @@ function Sidebar({ titles = ["Flood methods", "Pond sampling"], onRename, onNewC
   };
   return <MemoryRouter>
     <ConversationSidebar id="pane" conversations={conversations} activeId={null} open search={search}
-      onDelete={() => undefined} onRename={rename} onNewChat={onNewChat} onSearch={() => undefined}
+      onDelete={() => undefined} onRename={rename} onNewConversation={onNewConversation} onSearch={() => undefined}
       onToggle={() => undefined} width={width} onResize={setWidth} />
   </MemoryRouter>;
 }
@@ -89,7 +89,7 @@ describe("renaming a conversation in the list (IR-1160)", () => {
   });
 });
 
-describe("New chat, Search, Pinned and Recents", () => {
+describe("New conversation, Search, Pinned and Recents", () => {
   test("a pinned conversation moves under Pinned and is still pinned after a reload", async () => {
     const user = userEvent.setup();
     const view = render(<Sidebar />);
@@ -105,12 +105,12 @@ describe("New chat, Search, Pinned and Recents", () => {
     expect(screen.queryByRole("navigation", { name: "Pinned conversations" })).not.toBeInTheDocument();
   });
 
-  test("New chat starts one and Ctrl+K goes to search", async () => {
-    const onNewChat = vi.fn();
+  test("New conversation starts one and Ctrl+K goes to search", async () => {
+    const onNewConversation = vi.fn();
     const user = userEvent.setup();
-    render(<Sidebar onNewChat={onNewChat} />);
-    await user.click(screen.getByRole("button", { name: "New chat" }));
-    expect(onNewChat).toHaveBeenCalled();
+    render(<Sidebar onNewConversation={onNewConversation} />);
+    await user.click(screen.getByRole("button", { name: "New conversation" }));
+    expect(onNewConversation).toHaveBeenCalled();
     await user.keyboard("{Control>}k{/Control}");
     expect(screen.getByRole("searchbox", { name: "Search your past conversations" })).toHaveFocus();
   });
@@ -118,12 +118,12 @@ describe("New chat, Search, Pinned and Recents", () => {
   test("the column resizes by keyboard within its bounds", async () => {
     const user = userEvent.setup();
     render(<Sidebar />);
-    const edge = screen.getByRole("separator", { name: "Resize chat history" });
+    const edge = screen.getByRole("separator", { name: "Resize conversations" });
     edge.focus();
     await user.keyboard("{ArrowRight}");
     expect(edge).toHaveAttribute("aria-valuenow", "304");
     await user.keyboard("{End}");
     expect(edge).toHaveAttribute("aria-valuenow", String(SIDEBAR_MAX));
-    expect(screen.getByRole("complementary", { name: "Chat history" })).toHaveStyle({ width: `${SIDEBAR_MAX}px` });
+    expect(screen.getByRole("complementary", { name: "Conversations" })).toHaveStyle({ width: `${SIDEBAR_MAX}px` });
   });
 });

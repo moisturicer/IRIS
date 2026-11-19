@@ -482,14 +482,14 @@ export const SCREENS: Screen[] = [
   {
     id: "ask-iris", path: "/ai", route: "/ai", role: "Student",
     mocks: askIrisMocks,
-    heading: "New chat",
+    heading: "Ask IRIS",
     primary: (p) => p.getByRole("button", { name: "Send message" }), primaryLabel: "Send message",
   },
   {
     // The address a bookmark or a chat in the history lands on directly.
     id: "ask-iris-conversation", path: `/ai/conversations/${RUNTIME_CONVERSATION_ID}`, route: "/ai/conversations/:conversationId", role: "Student",
     mocks: askIrisMocks,
-    heading: "New chat",
+    heading: "New conversation",
     primary: (p) => p.getByRole("button", { name: "Send message" }), primaryLabel: "Send message",
   },
   {
