@@ -33,6 +33,7 @@ import { queueCountsChanged } from "@/lib/queueCounts";
 import type { DownloadRequest } from "@/types/records";
 
 import { NO_NOTE, RdcoNoteDialog, RdcoNoteLine } from "./RdcoNoteDialog";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 type Filter = "" | "pending" | "approved" | "declined" | "revoked";
 const FILTERS: readonly Filter[] = ["pending", "approved", "declined", "revoked", ""];
@@ -88,6 +89,8 @@ export default function DownloadRequestsPage() {
   );
   const requests = read.rows;
   const loading = read.status === "loading";
+  // Live updates (ADR-073): RDCO's queues, reloaded quietly.
+  useLiveRefresh(["queues"], read.refresh);
 
   // Asked in ConfirmDialog (IR-1028); the result is a toast either way, with
   // the server's own reason on a refusal.

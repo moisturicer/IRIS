@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { notificationsApi } from "@/api/notifications";
 import { useAuthStore } from "@/store/auth.store";
+import { useLiveRefresh } from "./useLiveRefresh";
 
 /**
  * Fetches the unread notifications into the shared store, once per signed-in
@@ -13,12 +14,15 @@ import { useAuthStore } from "@/store/auth.store";
  *
  * Keyed on `sessionEpoch` as well as `isAuthenticated`, so signing in as
  * someone else without signing out first still fetches for the new session.
- * TODO: replace with WebSocket subscription when channels is implemented.
+ * Fetched again on a `notifications` hint, a reconnect or focus (ADR-073,
+ * which also covers IR-1033's refetch on focus).
  */
 export function useUnreadNotificationsFetch() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const sessionEpoch = useAuthStore((s) => s.sessionEpoch);
   const setItems = useNotificationsStore((s) => s.setItems);
+  const [tick, setTick] = useState(0);
+  useLiveRefresh(["notifications"], () => setTick((t) => t + 1), isAuthenticated);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -36,5 +40,5 @@ export function useUnreadNotificationsFetch() {
            fetch leaves the bell empty rather than showing anyone else's
            notifications. The next session, or page load, tries again. */
       });
-  }, [isAuthenticated, sessionEpoch, setItems]);
+  }, [isAuthenticated, sessionEpoch, setItems, tick]);
 }
