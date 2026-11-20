@@ -11,10 +11,14 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
+import { forgetReferenceLists } from "@/api/referenceLists";
+
 // Without this, each test's markup stays in the shared jsdom `document` and
 // the next `getByRole` sees two matching controls. The failure reads as an
 // ambiguous query rather than as leaked state, which is a long way to travel
 // for a missing line.
 afterEach(() => {
   cleanup();
+  // Reference lists are kept per session (IR-1249): each test starts with none.
+  forgetReferenceLists();
 });

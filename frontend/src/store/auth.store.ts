@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { forgetReferenceLists } from "@/api/referenceLists";
 import { useNoticeStore } from "./notice.store";
 import { isAcceptanceRequired } from "@/lib/noticeErrors";
 import type { User } from "@/types/auth";
@@ -110,6 +111,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     clearAuthSession();
     clearOldBrowserLibrary();
     if (deliberate) forgetSessionAccount();
+    // Reference lists are kept per session (IR-1249); the next account asks afresh.
+    forgetReferenceLists();
     // One update, so the guard never renders "no session" without knowing why.
     set((s) => ({
       user: null,
