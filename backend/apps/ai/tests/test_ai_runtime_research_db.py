@@ -22,7 +22,7 @@ from apps.ai.grants import issue  # noqa: E402
 from apps.ai.models.chunk import ChunkSet, DocumentChunk  # noqa: E402
 from apps.records.models import Record, RecordOwner  # noqa: E402
 from core.enums import PipelineStatus  # noqa: E402
-from .corpus import make_user  # noqa: E402
+from .corpus import make_user, released_for_ai  # noqa: E402
 from . import test_ai_runtime_runs_db as runs_db  # noqa: E402
 from .test_ai_runtime_runs_db import as_reader, service, submit  # noqa: E402
 
@@ -37,7 +37,8 @@ POND = "sampling procedure for tilapia ponds stocked in brackish water"
 
 
 def paper(title, pages, *, status=PipelineStatus.PUBLISHED, owner=None, revision="1"):
-    record = Record.objects.create(added_by=owner, title=title, abstract="", pipeline_status=status)
+    record = released_for_ai(
+        Record.objects.create(added_by=owner, title=title, abstract="", pipeline_status=status))
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     write_source(record, pages, revision)
@@ -226,33 +227,140 @@ def test_a_bounded_page_read_says_it_is_partial(research, monkeypatch):
 
 # --- What a reader may not see ------------------------------------------------
 
-def test_another_readers_paper_and_handles_disclose_nothing(research):
+def test_a_draft_discloses_nothing_even_to_its_owner(research):
+    """Only a published paper reaches the AI (IR-1252), so a draft is hidden from
+    the person who wrote it too, not only from another reader. Before IR-1252 its
+    owner found it; that a handle can't cross runs is the next test's."""
     owner = make_user("tools-owner@cit.edu")
     reader = make_user("tools-stranger@cit.edu")
     draft = paper("Secret flooding draft", {4: [("Methods", FLOOD)]},
                   status=PipelineStatus.DRAFT, owner=owner)
 
-    async def owners(tools):
-        return None if (await tools.search("flooding")).records else Result(answer="none")
-
-    _, seen, _ = ask(research, owner, owners, key="tools-owner")
-    owners_handle = seen[0][1].passages[0].handle
-    owners_record = seen[0][1].records[0].handle
-
-    async def strangers(tools):
+    async def script(tools):
         await tools.search("flooding")
-        await tools.open_passage(owners_handle)
-        await tools.read_page(owners_record, 4)
         await tools.open_passage("P" + "0" * 20)
 
-    _, seen, _ = ask(research, reader, strangers, key="tools-stranger")
-    (_, search), (_, foreign), (_, page), (_, forged) = seen
-    assert search.status == "no_match" and search.records == () and search.dependencies == set()
-    assert search.coverage.inspected_records == 0
-    for result in (foreign, page, forged):
+    for person, key in ((owner, "tools-owner"), (reader, "tools-stranger")):
+        _, seen, _ = ask(research, person, script, key=key)
+        (_, search), (_, forged) = seen
+        assert search.status == "no_match" and search.records == () and search.dependencies == set()
+        assert search.coverage.inspected_records == 0
+        assert (forged.status, forged.reason) == ("unavailable", "unknown_handle")
+        assert forged.records == () and forged.passages == () and forged.dependencies == set()
+        assert draft.title not in repr(seen)
+
+
+# Every kind of paper that may not reach the AI (ADR-052 as amended, IR-1252),
+# each given readable text, read by its own creator: none is found, counted,
+# listed or resolved, while a published, released paper beside it still is.
+REFUSED = {
+    "in review": {"pipeline_status": PipelineStatus.IN_REVIEW},
+    "kept unlisted": {"pipeline_status": PipelineStatus.COMPLETED},
+    "embargoed": {"is_embargoed": True, "embargo_released_at": None},
+    "no consent": {"ai_consent": None},
+    "said no": {"ai_consent": False},
+    "IP not released": {"is_ip": True, "ip_released_at": None},
+}
+
+
+@pytest.mark.parametrize("kind", list(REFUSED))
+def test_a_paper_that_may_not_reach_the_ai_is_never_found_even_by_its_owner(research, kind):
+    owner = make_user("tools-refused@cit.edu")
+    held = paper("Held flooding paper", {4: [("Methods", FLOOD)]}, owner=owner)
+    Record.objects.filter(pk=held.pk).update(**REFUSED[kind])
+    shown = paper("Shown flooding paper", {4: [("Methods", FLOOD)]})
+
+    async def script(tools):
+        await tools.search("flooding")
+        await tools.count({})
+        await tools.list_records({})
+        await tools.resolve(["Held flooding paper"], record_ids=[held.pk])
+
+    _, seen, _ = ask(research, owner, script, key=f"tools-refused-{kind}")
+    (_, found), (_, counted), (_, listed), (_, resolved) = seen
+    assert [r.record_id for r in found.records] == [shown.pk]
+    assert counted.count.total == 1 and counted.count.population == frozenset({shown.pk})
+    assert [r.record_id for r in listed.records] == [shown.pk]
+    assert held.pk not in {r.record_id for r in resolved.records}
+    assert "Held flooding paper" not in repr(seen)
+
+
+def test_a_paper_embargoed_again_stops_being_read_but_stays_in_discover(research):
+    """Its chunks stay stored; the AI stops reading them (IR-1252)."""
+    from rest_framework.test import APIClient
+
+    reader = make_user("tools-again@cit.edu")
+    flood = paper("Flood forecasting", {4: [("Methods", FLOOD)]})
+
+    async def script(tools):
+        await tools.search("flooding")
+
+    _, seen, _ = ask(research, reader, script, key="tools-again-1")
+    assert [r.record_id for r in seen[0][1].records] == [flood.pk]
+
+    Record.objects.filter(pk=flood.pk).update(is_embargoed=True, embargo_released_at=None)
+    _, seen, _ = ask(research, reader, script, key="tools-again-2")
+    assert seen[0][1].records == () and seen[0][1].status == "no_match"
+
+    assert DocumentChunk.objects.filter(record=flood, chunk_set__is_active=True).exists()
+    client = APIClient()
+    client.force_authenticate(reader)
+    listed = client.get("/api/v1/records/").data
+    assert flood.pk in {row["id"] for row in listed.get("results", listed)}
+
+
+@pytest.mark.parametrize("change", [
+    {"is_embargoed": True, "embargo_released_at": None},
+    {"pipeline_status": PipelineStatus.PENDING_DELETE},
+])
+def test_a_paper_that_stops_qualifying_mid_run_is_refused_at_the_next_read(research, change):
+    """Like a reader who loses access (IR-880): the next read refuses it."""
+    reader = make_user("tools-midrun@cit.edu")
+    flood = paper("Flood forecasting", {4: [("Methods", FLOOD)]})
+
+    def withdraw():
+        try:
+            Record.objects.filter(pk=flood.pk).update(**change)
+        finally:
+            connection.close()
+
+    async def script(tools):
+        found = await tools.search("flooding")
+        await asyncio.to_thread(withdraw)
+        await tools.open_passage(found.passages[0].handle)
+        await tools.read_page(found.records[0].handle, 4)
+
+    _, seen, _ = ask(research, reader, script, key="tools-midrun")
+    (_, found), (_, opened), (_, page) = seen
+    assert [r.record_id for r in found.records] == [flood.pk]
+    for result in (opened, page):
+        assert result.status == "unavailable"
+        assert result.records == () and result.passages == ()
+        assert FLOOD not in repr(result)
+
+
+def test_another_readers_handles_disclose_nothing(research):
+    """A handle is bound to the run that made it, so another reader can't use it.
+
+    Before IR-1252 this was shown with the owner's draft; a draft now gives no handle."""
+    first = make_user("tools-first@cit.edu")
+    second = make_user("tools-second@cit.edu")
+    paper("Flood forecasting", {4: [("Methods", FLOOD)]})
+
+    async def finds(tools):
+        await tools.search("flooding")
+
+    _, seen, _ = ask(research, first, finds, key="tools-first")
+    passage, record = seen[0][1].passages[0].handle, seen[0][1].records[0].handle
+
+    async def borrows(tools):
+        await tools.open_passage(passage)
+        await tools.read_page(record, 4)
+
+    _, seen, _ = ask(research, second, borrows, key="tools-second")
+    for _, result in seen:
         assert (result.status, result.reason) == ("unavailable", "unknown_handle")
         assert result.records == () and result.passages == () and result.dependencies == set()
-    assert draft.title not in repr(seen)
 
 
 def test_a_handle_belongs_to_its_run_and_expires_with_it(research):

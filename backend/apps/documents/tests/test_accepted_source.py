@@ -13,6 +13,7 @@ from apps.documents.models import PdfExtraction
 from apps.documents.testing import pdf_upload
 from apps.records.models import Record, RecordOwner, RecordType
 from apps.records.tests import make_user
+from core.enums import PipelineStatus
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -363,12 +364,20 @@ def test_replacement_during_embedding_cannot_persist_old_vectors(manuscript, mon
         extraction = PdfExtraction.objects.get(record=record)
         assert chunk_extraction.apply(args=[extraction.pk, revision]).successful()
         chunks = ChunkSet.objects.get(record=record, is_active=True)
+        # Only a published paper is embedded (IR-1252), so it is published where
+        # the gate is first asked. Only a draft takes an upload, so the replacement
+        # steps back to one and is published again before the vectors return.
+        published = dict(pipeline_status=PipelineStatus.PUBLISHED)
+        Record.objects.filter(pk=record.pk).update(**published)
         class ReplacingEmbedder(DeterministicEmbeddingProvider):
             def embed_document_chunks(self, documents):
+                Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.DRAFT)
                 assert attach(client, record, b"B").status_code == 200
+                Record.objects.filter(pk=record.pk).update(**published)
                 return super().embed_document_chunks(documents)
         result = embed_active_chunk_set(record.pk, provider=ReplacingEmbedder(),
                                         chunk_set_id=chunks.pk, source_revision=revision)
-        assert result.refused
+        # Refused for the replacement, not for the paper's state.
+        assert (result.refused, result.reason) == (True, "The manuscript source has changed.")
         assert not ChunkEmbedding.objects.filter(chunk__record=record).exists()
         assert status(client, record)["manuscript_revision"] != revision

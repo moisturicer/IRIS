@@ -1073,6 +1073,37 @@ describe("the submitter's own status (IR-625)", () => {
   });
 });
 
+// Ask IRIS reads published papers only (ADR-052 as amended, IR-1252), so a
+// paper not yet published offers it nowhere on its page: the Ask IRIS page
+// in the sidebar still searches the published papers.
+describe("Ask IRIS beside a paper not yet published (IR-1252)", () => {
+  beforeEach(() => {
+    // The fixture the Paper workspace tests read, held back from publication.
+    shownRecord = { ...record, pipeline_status: "in_review" };
+    signInAs(99, "Student");
+    useUIStore.setState({ sidebarCollapsed: false, sidebarOpen: false, readingRail: null });
+  });
+
+  it("isn't opened on entering Paper, offered as an icon, or linked from Notes", async () => {
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open/i);
+
+    expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Notes" }));
+    await screen.findByRole("heading", { name: "Notes" });
+    expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+  });
+
+  it("is offered again once the paper is published", async () => {
+    shownRecord = record;
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+
+    expect(await screen.findByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
+  });
+});
+
 // Ask IRIS on the Overview is the Paper workspace's panel, as a column the
 // page makes room for (IR-569): the same heading, composer and width, beside
 // a page that narrows to fit rather than sitting under it.

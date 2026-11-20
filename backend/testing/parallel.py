@@ -16,7 +16,7 @@ ROLE_MODULES = frozenset({
     "test_runtime_reader_e2e.py",
     "test_manuscript_publication.py",
     "test_research_grants_db.py", "test_research_read_policy_db.py",
-    "test_research_reads.py", "test_ai_runtime_runs_db.py",
+    "test_research_reads.py", "test_ai_disclosure_reads_db.py", "test_ai_runtime_runs_db.py",
     "test_ai_runtime_research_db.py", "test_ai_runtime_admission_db.py",
     "test_ai_runtime_dispatch_db.py", "test_ai_runtime_agent_db.py",
     "test_ai_runtime_agent_loop_db.py", "test_ai_runtime_openai_agent_db.py",

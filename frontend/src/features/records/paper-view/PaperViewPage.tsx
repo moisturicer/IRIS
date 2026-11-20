@@ -16,6 +16,7 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useUIStore } from "@/store/ui.store";
+import { PIPELINE_STATUS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
   answerReference,
@@ -402,6 +403,9 @@ export default function PaperViewPage() {
   const arriving = loading || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
   const onReviewTab = section === "review";
+  // Ask IRIS reads published papers only (ADR-052 as amended, IR-1252), so it isn't
+  // offered beside any other: the Ask IRIS page still searches the published ones.
+  const askOffered = record?.pipeline_status === PIPELINE_STATUS.PUBLISHED;
   // The reader draws the reader's own highlights wherever the paper shows, so
   // they are read then, and when Notes lists them (IR-583).
   const highlights = useReadingHighlights(Number(id), !arriving && (onPaperTab || onReviewTab || notesWanted));
@@ -446,7 +450,7 @@ export default function PaperViewPage() {
     }
     if (arriving || enteredPaper.current) return;
     enteredPaper.current = true;
-    chat.setOpen(true);
+    if (askOffered) chat.setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onPaperTab, arriving]);
 
@@ -710,7 +714,7 @@ export default function PaperViewPage() {
   const selectionActions: SelectionAction[] = [
     // Wherever Ask IRIS is offered (IR-581). A typed question is sent with the passage at once,
     // from the composer's own Send; with nothing typed, Paper Chat opens on an editable question.
-    ...(onReviewTab ? [] : [{
+    ...(onReviewTab || !askOffered ? [] : [{
       id: "ask-selection", label: "Ask about selection", short: "Ask IRIS",
       placeholder: "Ask IRIS about this passage…",
       icon: <AskIrisMark className="size-4" />,
@@ -1490,7 +1494,7 @@ export default function PaperViewPage() {
           className="hidden reading-split:block reading-wide:hidden absolute inset-0 z-30 bg-stone-900/25"
         />
       )}
-      {chat.open && chat.tool === "ask" && (
+      {chat.open && chat.tool === "ask" && askOffered && (
         <PaperChatPanel
           record={record}
           // Whether a citation inside the chat brought the reader here, which
@@ -1537,7 +1541,7 @@ export default function PaperViewPage() {
           canOpenVersion={(n) => versions.some((v) => v.number === n && v.manuscript_url && (v !== latestVersion || record.manuscript_unsubmitted))}
           onClose={closeChat}
           onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
-          onOpenAsk={openAskFromNotes}
+          onOpenAsk={askOffered ? openAskFromNotes : undefined}
           panelRef={panelRef}
           modal={chatModal}
           resize={
@@ -1554,7 +1558,7 @@ export default function PaperViewPage() {
       {!chat.open && !onReviewTab && (
         <>
           <NotesFab onOpen={openNotes} buttonRef={notesButtonRef} />
-          <AskIrisFab onOpen={() => chat.setOpen(true)} buttonRef={askButtonRef} />
+          {askOffered && <AskIrisFab onOpen={() => chat.setOpen(true)} buttonRef={askButtonRef} />}
         </>
       )}
       </div>

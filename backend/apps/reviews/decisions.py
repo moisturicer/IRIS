@@ -580,7 +580,11 @@ def decide(record, actor, *, outcome, comment="", token=None, thread_count=0) ->
     record.pipeline_status = new_status
     record.save(update_fields=["pipeline_status", "updated_at"])
     if new_status in PUBLICLY_VISIBLE_STATUSES:
+        from apps.ai.tasks import send_to_ai_on_commit
+
         audit.published(record, actor, party=party)
+        # Publishing opens the disclosure gate (ADR-052 as amended, IR-1252).
+        send_to_ai_on_commit(record.pk)
 
     _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off,
             closed_revisions=[{"id": r.pk, "label": _label(r.party)} for r in closed_revisions],

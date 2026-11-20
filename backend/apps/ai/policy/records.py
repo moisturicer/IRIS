@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.enums import PUBLICLY_VISIBLE_STATUSES
+
 from .disclosure import Decision, DisclosureInputs, Reason, may_disclose
 
 #: The one refusal a reader is told (ADR-054 decision 8).
@@ -31,12 +33,18 @@ def inputs_for_record(record: Any) -> DisclosureInputs:
     change later without moving a paper, and not the old per-paper stamp
     (``Record.dpa_accepted``), which stopped counting. Only ``True`` is consent:
     ``False`` is a No, and ``None`` is no answer stored, which is refused too.
+
+    Publication is what Discover lists (``PUBLICLY_VISIBLE_STATUSES``) on a paper
+    that isn't deleted (ADR-052 as amended 2026-11-21, IR-1252). A released paper
+    still in review, or accepted but kept unlisted, is refused.
     """
     return DisclosureInputs(
         is_ip=bool(record.is_ip),
         ip_released=bool(record.ip_released),
         embargo=record.embargo_state,
         consent_given=record.ai_consent is True,
+        published=(record.pipeline_status in PUBLICLY_VISIBLE_STATUSES
+                   and not record.is_deleted),
     )
 
 

@@ -8,14 +8,17 @@ ability to run them anywhere. Real rows are in ``test_embargo_rows.py``.
 import pytest
 
 from apps.ai.policy.records import decision_for_record, inputs_for_record
-from core.enums import EmbargoState
+from core.enums import EmbargoState, PipelineStatus
 
 
 class _Record:
     """The attributes the adapter reads, and nothing else."""
 
     def __init__(self, *, is_ip=False, ip_released=False, ai_consent=True,
-                 embargo_state=EmbargoState.RELEASED):
+                 embargo_state=EmbargoState.RELEASED, pipeline_status=PipelineStatus.PUBLISHED,
+                 is_deleted=False):
+        self.pipeline_status = pipeline_status
+        self.is_deleted = is_deleted
         self.is_ip = is_ip
         self.ip_released = ip_released
         self.ai_consent = ai_consent
@@ -41,6 +44,15 @@ class RecordAdapterTests:
     @pytest.mark.parametrize("state", list(EmbargoState))
     def test_it_hands_over_the_embargo_state(self, state):
         assert inputs_for_record(_Record(embargo_state=state)).embargo is state
+
+    @pytest.mark.parametrize("status", list(PipelineStatus))
+    def test_only_a_published_paper_is_published(self, status):
+        """What Discover lists (IR-1252, ADR-052 as amended 2026-11-21)."""
+        published = inputs_for_record(_Record(pipeline_status=status)).published
+        assert published is (status == PipelineStatus.PUBLISHED)
+
+    def test_a_deleted_paper_is_not_published(self):
+        assert inputs_for_record(_Record(is_deleted=True)).published is False
 
     def test_the_verdict_is_the_policy_applied_to_those_inputs(self):
         assert decision_for_record(_Record()).allowed is True

@@ -39,6 +39,7 @@ from django.utils import timezone
 
 from core.enums import (
     DELETE_REVIEW_STATUSES,
+    PUBLICLY_VISIBLE_STATUSES,
     ClearanceStatus,
     Party,
     PipelineStatus,
@@ -317,6 +318,12 @@ def apply(record, event: WorkflowEvent, actor=None, *, restore_to=None, reason=N
     if destination != record.pipeline_status:
         record.pipeline_status = destination
         record.save(update_fields=["pipeline_status", "updated_at"])
+        if destination in PUBLICLY_VISIBLE_STATUSES:
+            # A declined delete request restoring a published paper opens the
+            # disclosure gate again (ADR-052 as amended, IR-1252).
+            from apps.ai.tasks import send_to_ai_on_commit
+
+            send_to_ai_on_commit(record.pk)
 
     if event is WorkflowEvent.SOFT_DELETE:
         from apps.reviews.withdrawal import withdraw_review

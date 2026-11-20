@@ -17,6 +17,7 @@ from apps.publication import authority
 from apps.publication.models import ManuscriptWork
 from apps.records.models import Record, RecordOwner
 from .corpus import make_user
+from core.enums import PipelineStatus
 from ai.ingestion.indexing import Bounds, process
 from ai.runs.executor import Citation, Result
 
@@ -63,7 +64,8 @@ class Recording:
         return Response([[1.0] + [0.0] * 1023 for _ in texts])
 
 
-def permitted():
+def permitted(status=PipelineStatus.PUBLISHED):
+    """A paper the AI may index: published (IR-1252), released and consented."""
     import uuid
 
     owner = make_user(f"indexed-{uuid.uuid4().hex[:10]}@cit.edu")
@@ -72,7 +74,7 @@ def permitted():
         title="Pond research",
         abstract="Ponds sampled weekly",
         abstract_file="manuscripts/pond.pdf",
-        ai_consent=True,
+        ai_consent=True, pipeline_status=status,
         is_embargoed=False, embargo_released_at=timezone.now(),
     )
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
@@ -181,7 +183,7 @@ def test_resume_keeps_completed_batch_and_reader_cites_active_revision(runtime, 
     assert "no longer readable" in revoked["turns"][0]["answer"]
 
 
-@pytest.mark.parametrize("change", ["replace", "delete", "consent", "summary"])
+@pytest.mark.parametrize("change", ["replace", "delete", "consent", "unpublish", "summary"])
 def test_late_indexing_cannot_activate_changed_source(runtime, change):
     owner, record, token = permitted()
     assert extraction.run(runtime, token) == "extracted"
@@ -194,6 +196,8 @@ def test_late_indexing_cannot_activate_changed_source(runtime, change):
         Record.objects.filter(pk=record.pk).update(is_deleted=True)
     elif change == "consent":
         Record.objects.filter(pk=record.pk).update(ai_consent=None)
+    elif change == "unpublish":
+        Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PENDING_DELETE)
     else:
         Record.objects.filter(pk=record.pk).update(abstract="Updated results")
     late = Recording()
@@ -219,6 +223,16 @@ def test_wrong_space_and_disclosure_call_no_provider(runtime):
         ManuscriptWork.objects.get(record=record, revoked_at=None).pk
     ).token
     assert index(runtime, token, Recording()) == "withheld"
+
+
+@pytest.mark.parametrize("status", [PipelineStatus.IN_REVIEW, PipelineStatus.COMPLETED])
+def test_a_released_paper_that_is_not_published_is_not_indexed(runtime, status):
+    """Only a published paper reaches the AI (IR-1252): released and consented is not enough."""
+    owner, record, token = permitted(status)
+    assert extraction.run(runtime, token) == "extracted"
+    provider = Recording()
+    assert index(runtime, token, provider) == "withheld"
+    assert not provider.calls
 
 
 def independent(runtime, token):
