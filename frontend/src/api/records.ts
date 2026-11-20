@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { once } from "./referenceLists";
 import type {
   RecordListItem, RecordDetail, RecordFormData, MyResearchItem, RecordEmbargo,
   IpReleaseResult,
@@ -374,9 +375,12 @@ export const recordsApi = {
   downloadTemplate: () => apiClient.get("/records/download_template/", { responseType: "blob" }),
 
   // Reference data
-  classifications: (params?: { page: number }) => apiClient.get<PaginatedResponse<Classification>>("/records/classifications/", params ? { params } : undefined),
-  pscedList:       () => apiClient.get<PaginatedResponse<PSCEDClassification>>("/records/psced-classifications/"),
-  recordTypes:     () => apiClient.get<PaginatedResponse<RecordType>>("/records/record-types/"),
+  // Reference lists: one request per session (IR-1249). A paged request is not kept.
+  classifications: (params?: { page: number }) => params
+    ? apiClient.get<PaginatedResponse<Classification>>("/records/classifications/", { params })
+    : once("classifications", () => apiClient.get<PaginatedResponse<Classification>>("/records/classifications/")),
+  pscedList:       () => once("psced", () => apiClient.get<PaginatedResponse<PSCEDClassification>>("/records/psced-classifications/")),
+  recordTypes:     () => once("recordTypes", () => apiClient.get<PaginatedResponse<RecordType>>("/records/record-types/")),
 
   // Download requests
   requestDownload:         (recordId: number, note: string) =>
