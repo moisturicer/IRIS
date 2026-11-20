@@ -399,6 +399,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1245** | Help is a Settings section: opening it never leaves Settings, and `/help` redirects there keeping its section — no FR- id | [details](traceability/IR-1245.md) | **PARTIAL** |
 | **IR-1246** | On a phone, Settings' sections wrap so the open one, Help included, is always in view — no FR- id | [details](traceability/IR-1246.md) | **PARTIAL** |
 | **IR-1247** | pdf.js and the paper reader load only when a paper or Publish preview is shown, not in the main bundle (1,035 → 570 KB) — no FR- id | [details](traceability/IR-1247.md) | **PARTIAL** |
+| **IR-1248** | Screens load on demand, prefetched on sidebar hover/focus; the main bundle keeps only Discover and Sign in (570 → 356 KB) — no FR- id | [details](traceability/IR-1248.md) | **PARTIAL** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
