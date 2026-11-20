@@ -94,6 +94,10 @@ npm run test:changed # vitest run --changed origin/main: every test that imports
                      # pushing; a narrow single-file run missed a router test in IR-913.
                      # CI still runs the whole suite and is the gate.
 npm run test:watch   # vitest in watch mode
+npm run preview:local  # production build served at :4173 against the local stack (IR-1250);
+                     # judge speed and look here, not on the dev server (0.2 s vs 2.5-4.5 s
+                     # a screen, measured 2026-11-20). No reload on change; needs compose up.
+                     # Verified 2026-11-20
 # Queries go through the accessible tree (role + accessible name), never a class
 # or a test id. axe-core fails the build on serious/critical only, and cannot
 # check colour contrast under jsdom — contrast stays a manual check.

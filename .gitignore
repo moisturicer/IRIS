@@ -43,6 +43,7 @@ node_modules/
 .reader-benchmark-*/
 dist/
 dist-ssr/
+dist-local/
 *.local
 
 # ── IDE / Editor ─────────────────────────────────────────────────────────
