@@ -10,6 +10,8 @@
 
 **Amended again 2026-11-04 (Hermoine Zozobrado, IR-879 design session; Accepted): every paper is embargoed by default.** Decisions 2, 3, 5 and 16 and the IR-816 and IR-812 amendments change. See *Amendment — 2026-11-04 (IR-879): embargoed by default* at the end. Built by IR-882.
 
+**Amended 2026-11-21 (Hermoine Zozobrado; IR-1252; Accepted 2026-11-21): only a published paper reaches the AI.** Merged in PR #933 and approved by Ashlee Sean and, verbally, Jive Tyler I. Revalde, as relayed by Hermoine Zozobrado. Not built yet: IR-1252 builds it. A release no longer sends a paper to the AI on its own; publishing a released paper does, and Ask IRIS reads nothing else, not even a title. Decision 10 changes. See *Amendment — 2026-11-21 (IR-1252): only a published paper reaches the AI* at the end.
+
 **Amended 2026-11-13 by [ADR-066](066-ip-applications-beside-publishing.md) (IR-978; Accepted): starting an IP application sets the IP mark.** The mark still never clears, and filing doesn't release the paper: KTTO's IP release (decisions 11–13) stays a separate act.
 
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
@@ -212,3 +214,34 @@ Decided by Hermoine Zozobrado in the review-workspace design session. Transcribe
 - **The Decision's half of the first 2026-11-04 amendment is built here:** RDCO's Decision offers no *Accept & publish* on an embargoed paper, and `decide/` refuses it with *"Under embargo [until <date>]. Release the embargo, then publish."* `publish_unlisted` (ADR-047 §10) is IR-878's.
 - **An embargo never unpublishes.** It keeps a paper from the AI and stops RDCO publishing it, nothing more. A published paper put under embargo again, by *Embargo again*, stays listed in Discover, and keyword search still finds it (ADR-008). Only Ask IRIS, the AI Overview and LlamaParse stop until it is released again. For the same reason, a paper `load_corpus` loads without `--clear-for-ai` is published and embargoed at once. Decision 14 (as amended) and [ADR-047](047-rdco-routes-and-decides-at-any-time.md) §10 stop the act of publishing; neither takes a published paper out of Discover. Raised in review of PR #533 and confirmed by Hermoine Zozobrado.
 - **Extraction waits for the release too.** LlamaParse reads a PDF only once the gate passes, so a paper under review has no extracted text until it is released. ~~Whether review text should be read inside IRIS instead is an open question for ADR-058, not decided here.~~ Settled by [ADR-058](058-each-version-keeps-its-text-and-its-files.md) §1's amendment of 2026-11-05 (IR-871): reviewers' text is read on campus with pdfplumber, apart from the Extraction, so review doesn't wait for a release.
+
+## Amendment — 2026-11-21 (IR-1252): only a published paper reaches the AI
+
+**Decided by Hermoine Zozobrado on 2026-11-21. Accepted 2026-11-21**: PR #933 merged, approved by Ashlee Sean and, verbally, Jive Tyler I. Revalde, as relayed by Hermoine Zozobrado. To be built by IR-1252.
+
+**What changes.** A paper reaches the AI only while it is **published** (`PUBLICLY_VISIBLE_STATUSES`, what Discover lists), **and** every existing condition still holds: its embargo is released, it has consent, an IP mark has KTTO's release, and it isn't deleted. A released paper that is still in review, or accepted but kept unlisted, reaches nothing. "The AI" means every path that sends a paper's text or details out of IRIS, or hands them to a model:
+- Unstructured's read;
+- Voyage's vectors and reranking;
+- the AI Overview, paper briefs, figure descriptions and formula transcription;
+- **Ask IRIS and Paper Chat**: their search, passages, whole-paper reading, paper lists, counts and title lookups.
+
+**Decision 10, as amended: publishing sends the paper to the AI, and releasing doesn't.** Since an embargo stops publishing (decision 14, as amended on 2026-11-04), a published paper has always been released first, so publishing is the one act that queues its reading and indexing. A release on a paper that is already published queues it as before. No separate job looks for papers.
+
+**Why.** Ask IRIS should see what users can see. A paper under embargo is one its authors don't want out yet, and a paper still in review isn't public, so neither belongs in an answer. That holds for every reader, the paper's own authors, Adviser and office staff included. Consent to AI processing is given at sign-up, for papers that are published.
+
+**What stays the same.**
+- **The release:** only the Adviser or RDCO releases an embargo (decision 6), and an embargo still stops RDCO publishing (decision 14, as amended).
+- **Embargoed again:** an embargo never unpublishes. A published paper put under embargo again stays in Discover, and the AI stops reading it until it is released again.
+- **Review:** review doesn't wait for publication. Reviewers' text is read on campus with pdfplumber ([ADR-058](058-each-version-keeps-its-text-and-its-files.md) §1, as amended), and it never reaches a model.
+
+**What it costs.**
+- **No AI help before publication.** Ask IRIS and Paper Chat can't count, list or read a paper before it is published, even for RDCO or its author. Office work on such a paper happens in the review screens.
+- **A short wait after publishing.** A newly published paper isn't in Ask IRIS until its reading and indexing finish, usually minutes.
+- **No suggestions in Publish.** Publish can't suggest details from the paper's own text, since nothing reads it before publication. Under the 2026-11-04 default embargo it already couldn't.
+
+**What it supersedes.**
+- Decision 10's "Releasing sends the paper to the AI" and the 2026-11-04 (IR-879) amendment's "Releasing queues the paper for the AI (decision 10)".
+- That amendment's line that only Ask IRIS, the AI Overview and LlamaParse stop under an embargo, which now applies to every path above.
+- Decision 14 (as amended)'s "The release has already queued it for the AI": the publication queues it.
+
+**Found by reading the code, 2026-11-20.** The AI runtime's reads applied only visibility (`iris_authz.research_record_ids()`), never the disclosure gate. So text already stored for an unreleased paper, and any unreleased paper's details, could reach the agent model for a reader who may open the paper. On iris-demo, 0 papers with live text were unreleased that day, so only details were exposed. IR-1252 builds this amendment and closes that gap.
