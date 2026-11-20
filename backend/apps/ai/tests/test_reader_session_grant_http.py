@@ -7,7 +7,7 @@ from django.urls import reverse
 from apps.ai.grants import database
 from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
-from .corpus import make_user
+from .corpus import make_user, released_for_ai
 from .grant_support import enable_grants
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
@@ -48,7 +48,9 @@ def test_the_session_reads_what_the_reader_may_read(grant_keys, client_for):
     # IR-719 deliberately replaces IR-722's "reads no Record": local tools read under it.
     reader = make_user("session-grant-reads@cit.edu")
     other = make_user("session-grant-reads-other@cit.edu")
-    public = Record.objects.create(title="Public paper", pipeline_status=PipelineStatus.PUBLISHED)
+    # Released and consented: the AI runtime reads only what may reach the AI (IR-1252).
+    public = released_for_ai(Record.objects.create(title="Public paper",
+                                                   pipeline_status=PipelineStatus.PUBLISHED))
     draft = Record.objects.create(title="Someone's draft", pipeline_status=PipelineStatus.DRAFT)
     RecordOwner.objects.create(record=draft, user=other, is_primary=True)
     token = open_session(client_for(reader)).json()["grant"]
@@ -58,8 +60,9 @@ def test_the_session_reads_what_the_reader_may_read(grant_keys, client_for):
 def test_a_paper_chat_session_reads_its_record_alone(grant_keys, client_for):
     reader = make_user("session-grant-scope@cit.edu")
     other = make_user("session-grant-scope-other@cit.edu")
-    chosen = Record.objects.create(title="Chosen", pipeline_status=PipelineStatus.PUBLISHED)
-    Record.objects.create(title="Elsewhere", pipeline_status=PipelineStatus.PUBLISHED)
+    chosen = released_for_ai(Record.objects.create(title="Chosen",
+                                                   pipeline_status=PipelineStatus.PUBLISHED))
+    released_for_ai(Record.objects.create(title="Elsewhere", pipeline_status=PipelineStatus.PUBLISHED))
     private = Record.objects.create(title="Private", pipeline_status=PipelineStatus.DRAFT)
     RecordOwner.objects.create(record=private, user=other, is_primary=True)
     response = open_session(client_for(reader), record_id=chosen.pk)

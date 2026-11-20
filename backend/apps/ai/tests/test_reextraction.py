@@ -13,6 +13,7 @@ from apps.ai.extraction.tests.fixtures import FIXTURES, pdf_bytes
 from apps.ai.reextraction import plan_cutover
 from apps.documents.models import DocumentKind, PdfExtraction
 from apps.records.models import Record, RecordType
+from core.enums import PipelineStatus
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -32,7 +33,7 @@ def priced(settings):
 
 def _record(title="A thesis", *, consent=True, embargo=None, released=True, extractor="docling"):
     record = Record.objects.create(
-        title=title,
+        title=title, pipeline_status=PipelineStatus.PUBLISHED,  # read only once published (IR-1252)
         record_type=RecordType.objects.get_or_create(name="Thesis")[0],
         abstract_file=SimpleUploadedFile("thesis.pdf", PDF),
         # Embargoed by default (IR-882): released only when asked, and never with a date.

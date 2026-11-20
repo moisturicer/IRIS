@@ -30,6 +30,7 @@ from apps.ai.promotion import PromotionRefused, promote, records_missing_vectors
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.repositories import DjangoChunkRepository
 from apps.records.models import Record
+from core.enums import PipelineStatus
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -79,8 +80,9 @@ def _deterministic_provider(monkeypatch):
 
 
 def _record(title="A thesis", chunks=("alpha", "beta")) -> Record:
+    # Published, released and consented: what the gate permits (IR-1252).
     record = Record.objects.create(
-        title=title,
+        title=title, pipeline_status=PipelineStatus.PUBLISHED,
         abstract="An abstract.",
         is_ip=False,
         ai_consent=True,
@@ -318,8 +320,9 @@ class StubUploadTests:
         from apps.records.models import RecordType
 
         record_type, _ = RecordType.objects.get_or_create(name="Thesis / Research")
+        # Published, so only the missing manuscript decides it (IR-1252).
         record = Record.objects.create(
-            title="Stub only",
+            title="Stub only", pipeline_status=PipelineStatus.PUBLISHED,
             record_type=record_type,
             ai_consent=True,
             is_embargoed=False, embargo_released_at=timezone.now(),

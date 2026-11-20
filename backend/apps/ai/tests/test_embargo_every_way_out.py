@@ -37,7 +37,7 @@ from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedLLM
 from apps.ai.providers.ports import RerankedCandidate, Reranker
 from apps.ai.tasks import index_record
 from apps.records.management.commands.load_corpus import DEFAULT_OWNER_EMAIL
-from apps.records.management.commands.seed_demo import AT_RDCO_TITLE, PROPOSAL_AT_ADVISER_TITLE
+from apps.records.management.commands.seed_demo import AT_RDCO_TITLE, CATALOGUE
 from apps.accounts.models import User
 from apps.records.models import Record, RecordOwner
 from core.enums import RoleName
@@ -283,7 +283,8 @@ class TestTestData:
 
     def test_a_seeded_paper_is_indexed_and_the_embargoed_one_is_not(self, space):
         call_command("seed_demo", force=True, stdout=StringIO())
-        ordinary = Record.objects.get(title=PROPOSAL_AT_ADVISER_TITLE)
+        # A published catalogue paper with no IP mark: only a published paper is indexed (IR-1252).
+        ordinary = Record.objects.get(title=next(entry[0] for entry in CATALOGUE if not entry[4]))
         embargoed = Record.objects.get(title=AT_RDCO_TITLE)
         vendor = _RecordingEmbedder()
 

@@ -28,7 +28,7 @@ from apps.documents.testing import real_pdf_bytes
 from apps.records.ai_answer import store_on_new_draft
 from apps.records.models import Record, RecordOwner, RecordType
 from apps.records.testing import released_embargo
-from core.enums import RoleName
+from core.enums import PipelineStatus, RoleName
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -61,9 +61,14 @@ def create_draft(user, **body):
 
 
 def paper(contact, *, ai_consent, title="A paper", released=True):
-    """A paper `contact` is Contact person of, storing `ai_consent`."""
+    """A published paper `contact` is Contact person of, storing `ai_consent`.
+
+    Published, so only what a test varies decides the gate: a draft is refused
+    for being unpublished whatever its answer (ADR-052 as amended, IR-1252).
+    """
     record = Record.objects.create(
         title=title, abstract="An abstract.", is_ip=False, ai_consent=ai_consent,
+        pipeline_status=PipelineStatus.PUBLISHED,
         record_type=RecordType.objects.get_or_create(name="Thesis / Research")[0],
     )
     RecordOwner.objects.create(record=record, user=contact, is_primary=True)
@@ -354,8 +359,10 @@ class TestANoticeAnswerOffersTheSameChoice:
 # --- AC 5: everything runs at upload when the check allows it ---------------------
 
 class TestUploadRunsWhenTheCheckAllows:
-    @pytest.mark.parametrize(("given", "held"), [(True, False), (False, True)], ids=["yes", "no"])
-    def test_a_released_paper_is_read_at_upload_only_with_a_yes(self, student, given, held):
+    # IR-1252: a draft is unpublished, so a Yes no longer lets it be read at upload.
+    # Publishing queues the read (`apps/reviews/test_publishing_sends_to_ai.py`).
+    @pytest.mark.parametrize("given", [True, False], ids=["yes", "no"])
+    def test_a_released_draft_is_held_at_upload_whatever_its_answer(self, student, given):
         answer(student, given)
         record = create_draft(student)
         released_embargo(record.pk)
@@ -369,7 +376,7 @@ class TestUploadRunsWhenTheCheckAllows:
 
         assert response.status_code == status.HTTP_200_OK, response.data
         extraction = PdfExtraction.objects.get(record=record, kind=DocumentKind.MANUSCRIPT)
-        assert (extraction.phase == ExtractionPhase.AWAITING_DISCLOSURE) is held
+        assert extraction.phase == ExtractionPhase.AWAITING_DISCLOSURE
 
 
 # --- AC 9: changing an answer is audited ------------------------------------------

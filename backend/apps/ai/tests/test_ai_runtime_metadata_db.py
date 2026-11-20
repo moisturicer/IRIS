@@ -21,10 +21,13 @@ from ai.runs import config as runs_config  # noqa: E402
 from ai.runs.executor import Result  # noqa: E402
 from ai.runs.service import RunService  # noqa: E402
 from ai.runs.store import RunStore  # noqa: E402
+from django.utils import timezone  # noqa: E402
+
 from apps.ai.grants import issue  # noqa: E402
+from apps.ai.policy.outbound import disclosure_permits  # noqa: E402
 from apps.records.models import Classification, Record, RecordOwner  # noqa: E402
 from core.enums import PipelineStatus  # noqa: E402
-from .corpus import make_user  # noqa: E402
+from .corpus import make_user, released_for_ai  # noqa: E402
 from . import test_ai_runtime_agent_loop_db as loop_db  # noqa: E402
 from . import test_ai_runtime_runs_db as runs_db  # noqa: E402
 from .test_ai_runtime_context_contract import RESERVES  # noqa: E402
@@ -46,7 +49,8 @@ def research(api, runtime):
 
 def bare(title, *, status=PipelineStatus.PUBLISHED, owner=None, **fields):
     """A Record with no Manuscript read yet."""
-    record = Record.objects.create(added_by=owner, title=title, abstract="", pipeline_status=status, **fields)
+    record = released_for_ai(
+        Record.objects.create(added_by=owner, title=title, abstract="", pipeline_status=status, **fields))
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     return record
@@ -92,12 +96,12 @@ def test_a_short_name_shared_by_several_papers_is_ambiguous_and_never_shows_a_de
     # Withheld and unknown look the same: nothing says a draft exists.
     assert (by_id.kind, by_id.match, by_id.records) == ("record_id", "none", ())
 
+    # Its owner is told the same: a draft never reaches the AI (IR-1252).
     _, seen, _ = ask(research, owner, script, key="resolve-owner")
     (_, found), = seen
     assert sorted(r.title for r in found.matches[0].records) == [
-        "MeshKV: caching for edge devices", "MeshKV: routing across meshes",
-        "MeshKV: unpublished results"]
-    assert [r.record_id for r in found.matches[1].records] == [draft.pk]
+        "MeshKV: caching for edge devices", "MeshKV: routing across meshes"]
+    assert found.matches[1].records == ()
 
 
 def test_a_paper_with_no_manuscript_is_named_but_has_nothing_to_read(research):
@@ -162,17 +166,20 @@ def test_an_area_count_is_exact_over_each_readers_own_population(research):
     assert grouped.count.groups == (("Ecology", 1), ("Hydrology", 2))
     assert (grouped.count.total, grouped.count.ungrouped) == (4, 1)
 
+    # Its owner's count leaves the draft out too (IR-1252).
     _, seen, _ = ask(research, owner, script, key="count-owner")
     (_, area_count), (_, grouped) = seen
-    assert area_count.count.total == 3 and draft.pk in area_count.count.population
-    assert grouped.count.groups == (("Ecology", 1), ("Hydrology", 3))
+    assert area_count.count.total == 2 and draft.pk not in area_count.count.population
+    assert grouped.count.groups == (("Ecology", 1), ("Hydrology", 2))
 
 
 def test_filters_narrow_a_count_and_an_unknown_value_is_refused_not_zero(research):
     reader = make_user("count-filters@cit.edu")
     hydrology = area("Hydrology")
     area("Astronomy")
-    bare("Flood gauges", classification=hydrology, year_completed=2022, is_ip=True)
+    # Released by KTTO, as an IP mark must be before the AI may count it (IR-1252).
+    bare("Flood gauges", classification=hydrology, year_completed=2022, is_ip=True,
+         ip_released_at=timezone.now())
     bare("River sediment", classification=hydrology, year_completed=2024)
 
     async def script(tools):
@@ -354,8 +361,11 @@ def conversation_of(client, holder, dsn, grant, reader_key):
     return client.get(f"/api/v1/ai/conversations/{conversation}", headers=as_reader(grant)).json()["turns"]
 
 
-def test_two_readers_name_a_paper_count_an_area_and_get_a_sample_each_from_their_own_population(
+def test_two_readers_name_a_paper_count_an_area_and_get_a_sample_from_the_same_published_papers(
         api, runtime):
+    """Before IR-1252 each reader got their own population; the owner's draft was
+    theirs alone. Now only published papers reach the AI, and every reader may
+    read those, so both readers get the same answer."""
     client, holder = api
     owner, other = make_user("demo-owner@cit.edu"), make_user("demo-other@cit.edu")
     hydrology = area("Hydrology")
@@ -368,8 +378,9 @@ def test_two_readers_name_a_paper_count_an_area_and_get_a_sample_each_from_their
     for reader, key in ((other, "demo-other"), (owner, "demo-owner")):
         grant = issue.reader_session_grant(reader).token
         which, count, sample = conversation_of(client, holder, runtime, grant, key)
-        # The authorized database result, by Django's own visibility predicate.
-        expected = Record.objects.visible_to(reader).filter(classification=hydrology).count()
+        # The authorized result: what the reader may open that may reach the AI.
+        expected = sum(1 for r in Record.objects.visible_to(reader).filter(classification=hydrology)
+                       if disclosure_permits(r))
 
         assert which["answer"] == "That is «Flood forecasting»."
         assert count["answer"] == f"Of the records you can see, there are {expected} Hydrology papers."
@@ -381,7 +392,7 @@ def test_two_readers_name_a_paper_count_an_area_and_get_a_sample_each_from_their
         assert sample["facts"] == [{"kind": "keyword_sample", "papers": len(cited), "exhaustive": False}]
         assert cited <= set(Record.objects.visible_to(reader).values_list("pk", flat=True))
 
-    assert expected == 3 and cited == {flood.pk, levee.pk}
+    assert expected == 2 and cited == {flood.pk}
 
 
 def test_a_listing_names_every_readable_match_with_an_exact_total(research):
@@ -409,9 +420,10 @@ def test_a_listing_names_every_readable_match_with_an_exact_total(research):
     assert (len(short.records), short.coverage.total, short.coverage.truncated) == (1, 2, True)
     assert (unknown.status, unknown.reason) == ("unavailable", "unknown_filter_value")
 
+    # Its owner's listing leaves the draft out too (IR-1252).
     _, seen, _ = ask(research, owner, script, key="list-owner")
     (_, listed), *_ = seen
-    assert draft.pk in {r.record_id for r in listed.records} and listed.count.total == 3
+    assert draft.pk not in {r.record_id for r in listed.records} and listed.count.total == 2
 
 
 # --- Forgiving names (IR-995) --------------------------------------------------------

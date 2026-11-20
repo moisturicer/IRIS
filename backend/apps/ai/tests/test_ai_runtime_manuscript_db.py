@@ -30,7 +30,7 @@ from apps.ai.grants import issue  # noqa: E402
 from apps.ai.models.chunk import ChunkSet, DocumentChunk  # noqa: E402
 from apps.records.models import Record, RecordOwner  # noqa: E402
 from core.enums import PipelineStatus  # noqa: E402
-from .corpus import make_user  # noqa: E402
+from .corpus import make_user, released_for_ai  # noqa: E402
 from . import test_ai_runtime_agent_loop_db as loop_db  # noqa: E402
 from . import test_ai_runtime_runs_db as runs_db  # noqa: E402
 from .test_ai_runtime_context_contract import MILLION, RESERVES  # noqa: E402
@@ -61,7 +61,7 @@ def filler(title, n):
 
 def manuscript(title, passages, *, page_sizes=None, revision="1", status=PipelineStatus.PUBLISHED):
     """A Record whose active Manuscript holds `passages`: (page, text[, element kinds]) in order."""
-    record = Record.objects.create(title=title, abstract="", pipeline_status=status)
+    record = released_for_ai(Record.objects.create(title=title, abstract="", pipeline_status=status))
     write(record, passages, page_sizes=page_sizes, revision=revision)
     return record
 
@@ -257,21 +257,28 @@ def test_access_revoked_mid_run_stops_the_read_and_its_continuation(research):
 
 
 def test_a_paper_the_reader_cannot_read_is_never_read(research):
+    """A draft is never read, even by its creator: only a published paper reaches
+    the AI (IR-1252; before it, the creator read it here). A handle to a paper
+    one reader read is still unknown to another."""
     owner, other = make_user("read-owner@cit.edu"), make_user("read-other@cit.edu")
     draft = manuscript("Private levee study", [(1, "levee breaches worsened the flood")],
                        status=PipelineStatus.DRAFT)
     # Its creator, as Publish makes it: a draft is its creator's alone (IR-1227).
     Record.objects.filter(pk=draft.pk).update(added_by=owner)
     RecordOwner.objects.create(record=draft, user=owner, is_primary=True)
+    published = manuscript("Levee breach survey", [(1, "levee breaches were mapped")])
     kept = {}
 
     async def owned(tools):
-        found = await tools.resolve([], record_ids=[draft.pk])
+        await tools.resolve([], record_ids=[draft.pk])
+        found = await tools.resolve([], record_ids=[published.pk])
         kept["paper"] = found.records[0].handle
         await tools.read_manuscript(kept["paper"], max_bytes=1_000_000)
 
     _, seen, _ = ask(research, owner, owned, key="read-owned")
-    assert seen[1][1].status == "ok"
+    (_, own_draft), _, (_, read) = seen
+    assert own_draft.records == () and draft.title not in repr(seen)
+    assert read.status == "ok"
 
     async def foreign(tools):
         await tools.read_manuscript(kept["paper"], max_bytes=1_000_000)

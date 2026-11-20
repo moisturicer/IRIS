@@ -77,6 +77,21 @@ def make_user(email, role_name=ROLE_STUDENT):
 LETTER = {"4": [612.0, 792.0]}
 
 
+def released_for_ai(record):
+    """Release `record`'s embargo and store a Yes, so the AI may read it once published.
+
+    Every paper starts embargoed with no answer (ADR-052), and the AI runtime reads
+    only published papers that are released and consented (IR-1252). A test about
+    something else uses this so its published papers stay readable.
+    """
+    from django.utils import timezone
+
+    Record.objects.filter(pk=record.pk).update(
+        is_embargoed=False, embargo_released_at=timezone.now(), ai_consent=True)
+    record.refresh_from_db()
+    return record
+
+
 def make_record(*, title, text, embedder, space, status=PipelineStatus.PUBLISHED,
                 owner=None, bboxes=None, page_sizes=None, content_hash=None):
     """A record with one active chunk set, one chunk, and both vectors.
