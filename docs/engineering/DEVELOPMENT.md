@@ -215,12 +215,30 @@ npm install
 npm run dev        # vite dev server
 npm run build      # tsc && vite build  — type errors fail the build
 npm run preview    # serve the built output
+npm run preview:local  # build for production and serve it against the local stack (IR-1250)
 npm run lint       # eslint src --ext ts,tsx
+npm test           # vitest run; npm run test:changed before pushing
 ```
+
+**Judge speed and look on the production build, not the dev server (IR-1250).** `npm run preview:local` builds the frontend as the server does, into `frontend/dist-local/`, and serves it at `http://localhost:4173`. It proxies `/api` to the local backend at `127.0.0.1:8000`, so `docker compose up -d` must be running. The dev server is not what users get. Measured 2026-11-20 against the same local backend:
+
+| | Dev server (`:5173`) | `preview:local` (`:4173`) |
+|---|---|---|
+| Heading shows | 2.5–4.5 s | 0.15–0.3 s |
+| Page settled | 5–12 s | 0.2–0.45 s |
+| Script requests per page | ~270 | ~10 |
+
+The dev server is slower for three reasons: it serves every module separately, React StrictMode runs each request twice in development, and in Docker on Windows it reads a bind-mounted folder. Use `preview:local` to check how a screen looks and how fast it is, and the dev server to edit, since `preview:local` does not reload on a change: stop it with Ctrl+C and run it again.
+
+- It skips the type check `npm run build` runs.
+- It never writes `dist/`, which CI's bundle scan reads.
+- `PREVIEW_PORT` picks another port, and `VITE_PROXY_TARGET` another backend.
+- Ask IRIS's runtime routes go to the edge on `:8080` (`VITE_RUNTIME_PROXY_TARGET`), as on the dev server, so Ask IRIS works only while the edge is running.
+- `127.0.0.1` rather than `localhost` is deliberate: on Windows, `localhost` tries IPv6 first and added about 190 ms to every API request.
 
 **Which port for Ask IRIS (IR-1240).** `http://localhost:8080` is the dev nginx edge (production routing in front of Vite) and `http://localhost:5173` is Vite itself; Ask IRIS works on both. Vite's proxy (`frontend/vite.config.ts`) sends `/api/v1/ai/runtime` to the edge, which still does the Django grant check and adds the gateway secret, and everything else under `/api` to Django (`VITE_PROXY_TARGET`, default `http://localhost:8000`). The edge target is `VITE_RUNTIME_PROXY_TARGET`, default `http://localhost:8080` for Vite run on the host; Compose sets `http://edge:8080` for the `frontend` container, so recreate it (`docker compose up -d frontend`) after pulling. With the edge stopped, Ask IRIS on :5173 answers 502 while the rest of the app is unaffected.
 
-**There is no `npm test`.** No test runner is installed. Do not add one casually — a frontend test harness is currently P3 and deliberately deferred.
+**Tests.** `npm test` runs vitest (IR-210): jsdom, queries through the accessible tree, axe-core on serious and critical issues. `npm run test:changed` runs every test that imports a changed file. An earlier line here said there was no `npm test`; corrected by IR-1250, since vitest has been installed since IR-210.
 
 `npm run build` runs `tsc` first, so **a type error fails the build**. That is the intended behaviour; do not weaken it to get a build through.
 
