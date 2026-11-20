@@ -83,9 +83,11 @@ export default function SettingsPage() {
       />
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
+        {/* Below lg the sections wrap rather than scroll sideways, so the open one
+            is always in view, Help included (IR-1246). */}
         <nav
           className="w-full lg:w-[260px] shrink-0 bg-white rounded-card border border-stone-200 p-2
-            flex lg:flex-col gap-1 overflow-x-auto scrollbar-thin"
+            flex flex-wrap lg:flex-col lg:flex-nowrap gap-1"
           aria-label="Settings sections"
         >
           {TABS.map((t) => {
