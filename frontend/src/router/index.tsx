@@ -1,4 +1,3 @@
-import { lazy } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
@@ -6,54 +5,29 @@ import { RouteTitle } from "@/components/layout/RouteTitle";
 import { pathFor, rolesFor } from "@/lib/access";
 import { redirectRoutes } from "./redirects";
 
-// Auth pages
-import LoginPage         from "@/features/auth/LoginPage";
-import SignupPage        from "@/features/auth/SignupPage";
-import VerifyEmailPage from "@/features/auth/VerifyEmailPage";
-import ResendVerificationPage from "@/features/auth/ResendVerificationPage";
-import ForgotPasswordPage from "@/features/auth/ForgotPasswordPage";
-import ResetPasswordPage  from "@/features/auth/ResetPasswordPage";
+// The two screens a visit can open on stay in the main bundle (IR-1248):
+// deferring the first screen would add a second download before anything is drawn.
+import LoginPage from "@/features/auth/LoginPage";
+import HomePage  from "@/features/dashboard/HomePage";
 
 // App shell (sidebar + header wrapper)
 import { AppShell } from "@/components/layout/AppShell";
-
-// Feature pages
-import HomePage             from "@/features/dashboard/HomePage";
-import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
-import { MyCallsPage } from "@/features/opportunities/MyCallsPage";
-import MyLibraryPage        from "@/features/library/MyLibraryPage";
-import MyReviewsPage        from "@/features/review/MyReviewsPage";
-import ReviewAnalyticsPage  from "@/features/review/ReviewAnalyticsPage";
-import OfficeConsolePage    from "@/features/review/OfficeConsolePage";
-
-import NotificationsPage    from "@/features/notifications/NotificationsPage";
-import SettingsPage         from "@/features/settings/SettingsPage";
-import ProfilePage          from "@/features/profile/ProfilePage";
-import EditProfilePage      from "@/features/profile/EditProfilePage";
-import PersonProfilePage    from "@/features/profile/PersonProfilePage";
 
 // Error screens (IR-745)
 import { NotFoundScreen }   from "@/features/errors/NotFoundScreen";
 import { RouteErrorScreen } from "@/features/errors/RouteErrorScreen";
 import { DeferredPage } from "./DeferredPage";
 
-// IR-749: defer the screens with the heaviest route-level dependencies.
-// These imports do not start until the authenticated/authorized route renders.
-const PaperViewPage = lazy(() => import("@/features/records/paper-view/PaperViewPage"));
-const RAGChatPage = lazy(() => import("@/features/ai/RAGChatPage"));
-const ImportRecordsPage = lazy(() => import("@/features/records/ImportRecordsPage"));
-const UserListPage = lazy(() => import("@/features/accounts/UserListPage"));
-const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage"));
-const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
-const CallRequestsPage = lazy(() => import("@/features/opportunities/CallRequestsPage"));
-const SetupPage = lazy(() => import("@/features/setup/SetupPage"));
-const MyTemplatesPage = lazy(() => import("@/features/myTemplates/MyTemplatesPage"));
-const GuidelinesPage = lazy(() => import("@/features/guidelines/GuidelinesPage"));
-const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
-const ReportedCommentsPage = lazy(() => import("@/features/admin/ReportedCommentsPage"));
-const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
-const AccountDeletionRequestsPage = lazy(() => import("@/features/admin/AccountDeletionRequestsPage"));
-const RetentionPage = lazy(() => import("@/features/admin/RetentionPage"));
+// Every other screen loads on demand, from one registry that also lets the
+// sidebar prefetch it (IR-749, IR-1248).
+import {
+  AccountDeletionRequestsPage, AuditLogPage, CallRequestsPage, CallsAndConferencesPage,
+  DeleteRequestsPage, DownloadRequestsPage, EditProfilePage, ForgotPasswordPage, GuidelinesPage,
+  ImportRecordsPage, MyCallsPage, MyLibraryPage, MyReviewsPage, MyTemplatesPage, NotificationsPage,
+  OfficeConsolePage, PaperViewPage, PersonProfilePage, ProfilePage, RAGChatPage, ReportedCommentsPage,
+  ResendVerificationPage, ResetPasswordPage, RetentionPage, ReviewAnalyticsPage, RoleRequestsPage,
+  SettingsPage, SetupPage, SignupPage, UserListPage, VerifyEmailPage,
+} from "./lazyScreens";
 
 export const routes: RouteObject[] = [{
   // The last resort (IR-745): a crash outside the shell's own boundary below,
@@ -64,17 +38,17 @@ export const routes: RouteObject[] = [{
   element: <RouteTitle />,
   children: [
   { path: "/login",  element: <LoginPage />,  handle: { title: "Sign in" } },
-  { path: "/signup", element: <SignupPage />, handle: { title: "Create account" } },
+  { path: "/signup", element: <DeferredPage message="Loading sign-up"><SignupPage /></DeferredPage>, handle: { title: "Create account" } },
   // ADR-045 (IR-643). Public: verifying never requires signing in.
-  { path: "/verify-email", element: <VerifyEmailPage />, handle: { title: "Verify your email" } },
-  { path: "/verify-email/resend", element: <ResendVerificationPage />, handle: { title: "Send a new verification email" } },
+  { path: "/verify-email", element: <DeferredPage message="Loading email verification"><VerifyEmailPage /></DeferredPage>, handle: { title: "Verify your email" } },
+  { path: "/verify-email/resend", element: <DeferredPage message="Loading email verification"><ResendVerificationPage /></DeferredPage>, handle: { title: "Send a new verification email" } },
   // Retired link shapes (IR-643, ADR-045 §8): the same page, which strips the
   // address and offers a new email. Nothing on them verifies.
-  { path: "/activate", element: <VerifyEmailPage />, handle: { title: "Verify your email" } },
-  { path: "/activate/:uidb64/:token", element: <VerifyEmailPage />, handle: { title: "Verify your email" } },
+  { path: "/activate", element: <DeferredPage message="Loading email verification"><VerifyEmailPage /></DeferredPage>, handle: { title: "Verify your email" } },
+  { path: "/activate/:uidb64/:token", element: <DeferredPage message="Loading email verification"><VerifyEmailPage /></DeferredPage>, handle: { title: "Verify your email" } },
   // ADR-045 (IR-642). Public: recovery must never require signing in.
-  { path: "/password/forgot", element: <ForgotPasswordPage />, handle: { title: "Reset your password" } },
-  { path: "/password/reset",  element: <ResetPasswordPage />,  handle: { title: "Choose a new password" } },
+  { path: "/password/forgot", element: <DeferredPage message="Loading password reset"><ForgotPasswordPage /></DeferredPage>, handle: { title: "Reset your password" } },
+  { path: "/password/reset",  element: <DeferredPage message="Loading password reset"><ResetPasswordPage /></DeferredPage>,  handle: { title: "Choose a new password" } },
 
   {
     // Every gate below comes from `lib/access.ts`, which the sidebar reads too.
@@ -102,12 +76,12 @@ export const routes: RouteObject[] = [{
             element: <DeferredPage message="Opening the paper"><PaperViewPage /></DeferredPage>,
             handle: { title: "Paper", width: "full" },
           },
-          { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
-          { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
+          { path: "records/mine",          element: <DeferredPage message="Loading your Library"><MyLibraryPage /></DeferredPage>,   handle: { crumb: "My Library" } },
+          { path: "opportunities",         element: <DeferredPage message="Loading calls and conferences"><CallsAndConferencesPage /></DeferredPage>, handle: { crumb: "Calls & Conferences" } },
           {
             element: <ProtectedRoute allowedRoles={rolesFor("myCalls")} />,
             children: [
-              { path: pathFor("myCalls"), element: <MyCallsPage />, handle: { crumb: "My Calls" } },
+              { path: pathFor("myCalls"), element: <DeferredPage message="Loading your calls"><MyCallsPage /></DeferredPage>, handle: { crumb: "My Calls" } },
             ],
           },
           {
@@ -127,7 +101,7 @@ export const routes: RouteObject[] = [{
             element: <DeferredPage message="Loading the guidelines"><GuidelinesPage /></DeferredPage>,
             handle: { crumb: "Guidelines" },
           },
-          { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },
+          { path: "notifications",         element: <DeferredPage message="Loading notifications"><NotificationsPage /></DeferredPage>, handle: { crumb: "Notifications" } },
           {
             // `/ai` picks a conversation and replaces itself with that
             // conversation's own address (IR-548). Both render the same page,
@@ -148,13 +122,13 @@ export const routes: RouteObject[] = [{
             // Edit profile sits under Profile, so its breadcrumb reads Profile > Edit profile.
             path: "profile", handle: { crumb: "Profile" },
             children: [
-              { index: true,  element: <ProfilePage /> },
-              { path: "edit", element: <EditProfilePage />, handle: { crumb: "Edit profile" } },
+              { index: true,  element: <DeferredPage message="Loading your profile"><ProfilePage /></DeferredPage> },
+              { path: "edit", element: <DeferredPage message="Loading your profile"><EditProfilePage /></DeferredPage>, handle: { crumb: "Edit profile" } },
             ],
           },
-          { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings" } },
+          { path: "settings",              element: <DeferredPage message="Loading settings"><SettingsPage /></DeferredPage>,    handle: { crumb: "Settings" } },
           // Another person's Profile (IR-700); its breadcrumb is Discover / People (IR-1133).
-          { path: "people/:id",            element: <PersonProfilePage />, handle: { crumb: "People" } },
+          { path: "people/:id",            element: <DeferredPage message="Loading the profile"><PersonProfilePage /></DeferredPage>, handle: { crumb: "People" } },
 
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
@@ -163,7 +137,7 @@ export const routes: RouteObject[] = [{
                 // Only a user with review work (IR-413); anyone else goes to Discover.
                 element: <ReviewAccessRoute />,
                 children: [
-                  { path: "review",          element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
+                  { path: "review",          element: <DeferredPage message="Loading My Reviews"><MyReviewsPage /></DeferredPage>,       handle: { crumb: "My Reviews" } },
                 ],
               },
             ],
@@ -177,7 +151,7 @@ export const routes: RouteObject[] = [{
               {
                 element: <ReviewAccessRoute />,
                 children: [
-                  { path: "review/office", element: <OfficeConsolePage />, handle: { crumb: "Office console" } },
+                  { path: "review/office", element: <DeferredPage message="Loading the office console"><OfficeConsolePage /></DeferredPage>, handle: { crumb: "Office console" } },
                 ],
               },
             ],
@@ -185,7 +159,7 @@ export const routes: RouteObject[] = [{
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewAnalytics")} />,
             children: [
-              { path: pathFor("reviewAnalytics"), element: <ReviewAnalyticsPage />, handle: { crumb: "Workflow analytics", width: "full" } },
+              { path: pathFor("reviewAnalytics"), element: <DeferredPage message="Loading workflow analytics"><ReviewAnalyticsPage /></DeferredPage>, handle: { crumb: "Workflow analytics", width: "full" } },
             ],
           },
 

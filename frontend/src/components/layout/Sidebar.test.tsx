@@ -27,6 +27,8 @@ import { AppShell } from "./AppShell";
 vi.mock("@/api/client", () => ({ apiClient: { get: vi.fn() } }));
 vi.mock("@/api/notifications", () => ({ notificationsApi: { list: vi.fn() } }));
 vi.mock("@/api/auth", () => ({ authApi: { logout: vi.fn() } }));
+vi.mock("@/router/lazyScreens", () => ({ preloadScreen: vi.fn(() => Promise.resolve()) }));
+const { preloadScreen } = await import("@/router/lazyScreens");
 
 const { apiClient } = await import("@/api/client");
 const { notificationsApi } = await import("@/api/notifications");
@@ -146,6 +148,22 @@ describe("the sidebar's list", () => {
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: "My Library" })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "Discover" })).not.toHaveAttribute("aria-current");
+  });
+
+  // IR-1248: screens load on demand, so a link starts its screen's download
+  // when it is pointed at or focused, before the click.
+  it("prefetches a link's screen on hover and on focus (IR-1248)", async () => {
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+    await screen.findByRole("heading", { name: "My Library" });
+    vi.mocked(preloadScreen).mockClear();
+    const nav = screen.getByRole("navigation", { name: "Main" });
+
+    await userEvent.hover(within(nav).getByRole("link", { name: "Calls & Conferences" }));
+    expect(preloadScreen).toHaveBeenCalledWith("/opportunities");
+
+    act(() => within(nav).getByRole("link", { name: "Guidelines" }).focus());
+    expect(preloadScreen).toHaveBeenCalledWith("/guidelines");
   });
 
   it("shows My Reviews to an office member with review work", async () => {
