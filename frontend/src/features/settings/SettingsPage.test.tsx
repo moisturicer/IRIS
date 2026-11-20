@@ -230,6 +230,17 @@ describe("settings and profile are separate", () => {
     expect(screen.getByRole("region", { name: "Finding research" })).toBeInTheDocument();
   });
 
+  // jsdom draws no layout, so this pins the rule that keeps every section in
+  // view on a phone; the screen itself is checked by hand (IR-1246).
+  it("wraps its sections on a narrow screen rather than scrolling one out of view (IR-1246)", () => {
+    renderScreen(<SettingsPage />, { route: "/settings?tab=help" });
+
+    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    expect(nav).toHaveClass("flex-wrap", "lg:flex-col");
+    expect(nav).not.toHaveClass("overflow-x-auto");
+    expect(within(nav).getByRole("button", { name: "Help" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("opens straight on Help from its address, and on the section it names", () => {
     const original = Element.prototype.scrollIntoView;
     const scrolled = vi.fn();
