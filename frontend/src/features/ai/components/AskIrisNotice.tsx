@@ -5,5 +5,5 @@ export const ASK_IRIS_NOTICE =
 
 /** The persistent notice below a prompt box, in Ask IRIS and Paper Chat (IR-596). */
 export function AskIrisNotice({ className }: { className?: string }) {
-  return <p className={cn("text-label leading-snug text-stone-500 text-pretty break-words", className)}>{ASK_IRIS_NOTICE}</p>;
+  return <p className={cn("text-small leading-snug text-stone-500 text-pretty break-words", className)}>{ASK_IRIS_NOTICE}</p>;
 }

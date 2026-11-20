@@ -4,6 +4,7 @@ import "katex/dist/katex.min.css";
 import type { ChatCitation, Citation } from "@/types/ai";
 import { openCitationLabel, useCitationLink } from "@/lib/citedPage";
 import { MAX_FORMULA_CHARS } from "./mathLimit";
+import { ArrowRightIcon, WarningIcon, LayersIcon, ArrowTurnDownIcon, HalfCircleIcon } from "./AskIrisIcons";
 
 /**
  * The pieces every surface that shows a Passage needs (IR-284).
@@ -69,7 +70,7 @@ export function PassageQuote({ text, className = "" }: { text: string; className
     <blockquote
       title={text}
       className={
-        "text-xs text-stone-600 leading-relaxed break-words border-l-2 " +
+        "text-small text-stone-600 leading-relaxed break-words border-l-2 " +
         "border-[#6B0F12]/25 pl-2 italic " +
         className
       }
@@ -113,13 +114,13 @@ export function OpenPassageLink({
       to={to}
       state={state}
       className={
-        "inline-flex items-center gap-1.5 text-xs font-semibold text-brand " +
+        "inline-flex items-center gap-1.5 text-small font-semibold text-brand " +
         "hover:underline " +
         className
       }
     >
       {openCitationLabel(citation, title)}
-      <i className="fas fa-arrow-right text-2xs" aria-hidden />
+      <ArrowRightIcon inline />
     </Link>
   );
 }
@@ -133,8 +134,8 @@ export function OpenPassageLink({
  */
 export function DegradedNotice({ subject }: { subject: "answer" | "summary" }) {
   return (
-    <p className="mt-2 flex items-start gap-1.5 text-xs text-brand">
-      <i className="fas fa-triangle-exclamation text-2xs mt-0.5" aria-hidden />
+    <p className="mt-2 flex items-start gap-1.5 text-small text-brand">
+      <WarningIcon inline className="mt-0.5" />
       <span>
         Found by keyword matching, not meaning — the search service was unavailable, so
         weigh this {subject} accordingly.
@@ -152,8 +153,8 @@ export function DegradedNotice({ subject }: { subject: "answer" | "summary" }) {
  */
 export function ScopeNotice() {
   return (
-    <p className="mt-2 flex items-start gap-1.5 text-xs text-stone-500">
-      <i className="fas fa-layer-group text-2xs mt-0.5" aria-hidden />
+    <p className="mt-2 flex items-start gap-1.5 text-small text-stone-500">
+      <LayersIcon inline className="mt-0.5" />
       <span>Searched all papers, not just the one open — you asked to widen the search.</span>
     </p>
   );
@@ -169,8 +170,8 @@ export function ScopeNotice() {
  */
 export function ResolvedQuestionNotice({ question }: { question: string }) {
   return (
-    <p className="mt-2 flex items-start gap-1.5 text-xs text-stone-500">
-      <i className="fas fa-arrow-turn-down text-2xs mt-0.5" aria-hidden />
+    <p className="mt-2 flex items-start gap-1.5 text-small text-stone-500">
+      <ArrowTurnDownIcon inline className="mt-0.5" />
       <span>
         Searched for: <span className="italic text-stone-600">{question}</span>
       </span>
@@ -182,8 +183,8 @@ export function ResolvedQuestionNotice({ question }: { question: string }) {
  *  the text above is whatever arrived before the cutoff, live or replayed. */
 export function PartialAnswerNotice() {
   return (
-    <p className="mt-2 flex items-start gap-1.5 text-xs text-brand">
-      <i className="fas fa-circle-half-stroke text-2xs mt-0.5" aria-hidden />
+    <p className="mt-2 flex items-start gap-1.5 text-small text-brand">
+      <HalfCircleIcon inline className="mt-0.5" />
       <span>This answer was cut off before it finished — it may be incomplete.</span>
     </p>
   );

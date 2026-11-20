@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { StreamingState } from "../conversation/streamingState";
 import { cn } from "@/lib/utils";
+import { StopIcon } from "./AskIrisIcons";
 
 /** "12s" or "1m 05s". */
 export function formatElapsed(ms: number): string {
@@ -36,7 +37,7 @@ export function StreamStatusRow({
   const elapsed = useElapsed(state.startedAt);
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 text-body font-medium text-stone-500", className)}>
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 text-small font-medium text-stone-500", className)}>
       <span className="inline-flex items-center gap-2">
         <span
           aria-hidden
@@ -52,7 +53,7 @@ export function StreamStatusRow({
           className="inline-flex items-center gap-1.5 rounded-control border border-stone-200 px-3 py-1.5
             text-small font-medium text-stone-600 hover:border-stone-300 hover:text-stone-900"
         >
-          <i className="fas fa-stop text-label" aria-hidden />
+          <StopIcon inline />
           Stop answering
         </button>
       )}

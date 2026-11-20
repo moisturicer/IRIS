@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import type { ConversationFile } from "@/api/runtimeReader";
+import { DownloadIcon, SpinnerIcon } from "./AskIrisIcons";
 
 /**
  * Saves a Conversation as Markdown (IR-1167). The file comes from the runtime
@@ -32,8 +33,8 @@ export function DownloadConversation({ download, className }: {
       aria-label="Download conversation as Markdown" title="Download as Markdown"
       className={cn("relative inline-flex size-9 shrink-0 items-center justify-center rounded-control text-stone-600",
         "hover:bg-stone-100 hover:text-stone-900 disabled:cursor-wait", COLOUR_TRANSITION, FOCUS_RING, className)}>
-      <i className={cn("fas text-small", state === "busy" ? "fa-spinner fa-spin" : "fa-download")} aria-hidden />
+      {state === "busy" ? <SpinnerIcon inline className="animate-spin motion-reduce:animate-none" /> : <DownloadIcon inline />}
     </button>
-    {state === "failed" && <span role="alert" className="text-label text-brand-dark">Download failed. Try again.</span>}
+    {state === "failed" && <span role="alert" className="text-small text-brand-dark">Download failed. Try again.</span>}
   </>;
 }

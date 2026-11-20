@@ -55,8 +55,8 @@ export function EarlierConversation({ id }: { id: number }) {
   return <div className="flex h-full min-h-0 flex-col">
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 px-6 py-4">
       <div className="min-w-0">
-        <h1 className="font-display text-2xl text-stone-900 break-words">{conversation?.title || "Earlier conversation"}</h1>
-        <p className="text-sm text-stone-600">An earlier conversation, kept to read. To keep going, start a new conversation.</p>
+        <h1 className="font-display text-title text-stone-900 break-words">{conversation?.title || "Earlier conversation"}</h1>
+        <p className="text-control text-stone-600">An earlier conversation, kept to read. To keep going, start a new conversation.</p>
       </div>
     </header>
     {failure === "unavailable" && <p role="alert" className="p-6">This conversation is not available. It may have been deleted, or the link may be wrong.</p>}
@@ -64,7 +64,7 @@ export function EarlierConversation({ id }: { id: number }) {
       <p>{failureMessage(failedWith, { lead: "This conversation could not be loaded." })}</p>
       <Button type="button" variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>Try again</Button>
     </div>}
-    {!conversation && !failure && <p role="status" className="p-6 text-sm text-stone-600">Opening conversation…</p>}
+    {!conversation && !failure && <p role="status" className="p-6 text-control text-stone-600">Opening conversation…</p>}
     {conversation && <CitationConversationContext.Provider value={conversation.id}>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <ChatMessageList messages={earlierTranscript(conversation)} isLoading={false} />
@@ -84,7 +84,7 @@ export function EarlierConversationList() {
   }, []);
 
   if (conversations.length === 0) return null;
-  return <details className="shrink-0 border-t border-stone-200 px-3 py-2 text-sm">
+  return <details className="shrink-0 border-t border-stone-200 px-3 py-2 text-control">
     <summary className="min-h-11 cursor-pointer py-2 text-stone-700">Earlier conversations ({conversations.length})</summary>
     <ul className="mt-2 space-y-1">
       {conversations.map(c => <li key={c.id} className="min-w-0">

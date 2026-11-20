@@ -38,6 +38,13 @@ export const OVERVIEW_MARKDOWN = [
   "[&_p]:text-justified",
 ].join(" ");
 
+/**
+ * The reading role for an answer's text (IR-1235): 16 px on a 1.75 line. The
+ * column, not the text, sets the measure (DESIGN.md, the Flush Column Rule), so
+ * there is no `ch` cap here.
+ */
+export const ANSWER_TEXT = "text-md leading-[1.75]";
+
 // The thread's width: one literal, so Tailwind sees the whole class.
 const CHAT_MEASURE = "max-w-[min(92vw,136ch)]";
 

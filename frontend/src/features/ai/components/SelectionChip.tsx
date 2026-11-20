@@ -13,6 +13,7 @@
 import { cn } from "@/lib/utils";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import type { ReaderSelection } from "@/api/runtimeReader";
+import { QuoteIcon, CloseIcon } from "./AskIrisIcons";
 
 export interface AskSelection {
   recordId: number;
@@ -57,16 +58,16 @@ export function SelectionChip({ selection, onRemove, note }: {
   const where = `${selection.title} · ${selection.versionLabel} · page ${selection.page}`;
   return (
     <div role="group" aria-label={`Asking about a selection from ${where}`}
-      className="rounded-card border border-stone-300 bg-white px-3 py-2 text-sm">
+      className="rounded-card border border-stone-300 bg-white px-3 py-2 text-control">
       <div className="flex items-start gap-2">
-        <i aria-hidden className="fas fa-quote-left mt-1 text-label text-brand" />
+        <QuoteIcon inline className="mt-1 text-brand" />
         <div className="min-w-0 flex-1">
           <p className="break-words text-small text-stone-600">{where}</p>
           <p className="mt-0.5 break-words text-stone-800">“{selection.quote}”</p>
         </div>
         <button type="button" onClick={onRemove} aria-label="Remove selection" title="Remove selection"
           className={cn("inline-flex size-8 shrink-0 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100", FOCUS_RING)}>
-          <i aria-hidden className="fas fa-xmark" />
+          <CloseIcon inline />
         </button>
       </div>
       {note && <p role="alert" className="mt-2 text-stone-700">{note}</p>}
@@ -80,7 +81,7 @@ export function AskedPassage({ selection }: { selection: ReaderSelection }) {
   }
   return (
     // As wide as the question it sits over (ChatMessageBubble's 85%).
-    <figure className="ml-auto max-w-[85%] border-l-2 border-brand/40 pl-3 text-sm text-stone-700">
+    <figure className="ml-auto max-w-[85%] border-l-2 border-brand/40 pl-3 text-body text-stone-700">
       <blockquote className="break-words">“{selection.quote}”</blockquote>
       <figcaption className="mt-1 text-small text-stone-600">
         Page {selection.page}{selection.current ? "" : " · selected on an earlier version"}

@@ -45,7 +45,7 @@ function PageCitation({ source, record }: {
   return (
     <Link to={to} state={state}
       aria-label={label} title={label}
-      className="inline-flex rounded-control px-1.5 py-0.5 text-xs font-medium text-brand bg-surface ring-1 ring-stone-300 hover:bg-brand hover:text-white hover:ring-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
+      className="inline-flex rounded-control px-1.5 py-0.5 text-small font-medium text-brand bg-surface ring-1 ring-stone-300 hover:bg-brand hover:text-white hover:ring-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
       {source.page === null ? "Source" : `p. ${source.page}`}
     </Link>
   );
@@ -73,7 +73,7 @@ function Cell({ cell, record, unavailable }: {
         </li>
       ))}
       </ul>
-      {cell.state === "unsupported" && <p className="mt-1 text-xs text-stone-600">Some claims could not be verified.</p>}
+      {cell.state === "unsupported" && <p className="mt-1 text-small text-stone-600">Some claims could not be verified.</p>}
     </div>
   );
 }
@@ -88,7 +88,7 @@ export function ComparisonTable({ comparison }: { comparison: AnswerComparison }
       {records.length > 0 && (
         <div role="region" aria-labelledby={captionId} tabIndex={0}
           className="max-w-full overflow-x-auto rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
-          <table className="w-full border-collapse text-left text-sm text-stone-800">
+          <table className="w-full border-collapse text-left text-body text-stone-800">
             <caption id={captionId} className="pb-3 text-left font-semibold text-stone-800">Paper comparison</caption>
             <thead className="bg-stone-50">
               <tr className="border-y border-stone-200">
@@ -115,7 +115,7 @@ export function ComparisonTable({ comparison }: { comparison: AnswerComparison }
           </table>
         </div>
       )}
-      <aside aria-label="Comparison coverage" className="mt-3 text-xs text-stone-600">
+      <aside aria-label="Comparison coverage" className="mt-3 text-small text-stone-600">
         <p className="font-medium text-stone-700">Reading coverage</p>
         <ul className="mt-1 space-y-1">
           {comparison.coverage.map((item, index) => {

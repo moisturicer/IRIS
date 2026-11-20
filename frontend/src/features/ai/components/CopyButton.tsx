@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { CheckIcon, CopyIcon } from "./AskIrisIcons";
 
 /** A square, label-less action under a message; its name is its `aria-label`. */
 export const MESSAGE_ACTION =
@@ -31,7 +32,7 @@ export function CopyButton({ text, label, className }: CopyButtonProps) {
   return (
     <button type="button" onClick={handleCopy} aria-label={label} title={copied ? "Copied" : label}
       className={cn(MESSAGE_ACTION, className)}>
-      <i className={`fas ${copied ? "fa-check" : "fa-copy"} text-label`} aria-hidden />
+      {copied ? <CheckIcon inline /> : <CopyIcon inline />}
       <span aria-live="polite" className="sr-only">{copied ? "Copied" : ""}</span>
     </button>
   );

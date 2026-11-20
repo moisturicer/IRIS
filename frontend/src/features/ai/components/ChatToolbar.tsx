@@ -2,7 +2,7 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 import { DownloadConversation } from "./DownloadConversation";
 import type { ConversationFile } from "@/api/runtimeReader";
 import { ConversationsToggle, SOURCES_TOGGLE_CLASS } from "./ConversationSidebar";
-import { PanelRightIcon } from "./AskIrisIcons";
+import { PanelRightIcon, PlusIcon } from "./AskIrisIcons";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
 
@@ -47,15 +47,15 @@ export function ChatToolbar({
       {phoneHistory && <ConversationsToggle open={phoneHistory.open} onClick={phoneHistory.onOpen} asDialog />}
 
       <div className="min-w-0 flex-1 px-1">
-        {eyebrow && <p className="text-label font-semibold text-stone-600">
+        {eyebrow && <p className="text-small font-semibold text-stone-600">
           Ask IRIS
         </p>}
-        <h1 className="break-words text-body font-semibold text-stone-900">{sessionTitle}</h1>
+        <h1 className="break-words font-display text-title font-semibold text-stone-900">{sessionTitle}</h1>
       </div>
 
       {onNewConversation && <button type="button" onClick={onNewConversation} aria-label="New conversation"
         className="inline-flex size-11 shrink-0 items-center justify-center rounded-control text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 focus-visible:outline-brand">
-        <i className="fas fa-plus text-label" aria-hidden />
+        <PlusIcon />
       </button>}
       {onDownload && <DownloadConversation download={onDownload} />}
 

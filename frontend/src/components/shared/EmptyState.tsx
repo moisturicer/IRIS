@@ -3,8 +3,11 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
-  /** A Font Awesome icon class, e.g. `fa-inbox`. Decorative only. */
-  icon?:    string;
+  /**
+   * A Font Awesome icon class, e.g. `fa-inbox`, or an icon element (IR-1235:
+   * Ask IRIS draws its own set). Decorative only.
+   */
+  icon?:    ReactNode;
   title:    string;
   message?: ReactNode;
   /** The next step, when there is one: a button or link the caller renders. */
@@ -50,7 +53,7 @@ export function EmptyState({
           error ? "bg-stone-100 text-brand" : "bg-stone-100 text-stone-600",
         )}
       >
-        <i className={cn("fas", icon)} aria-hidden="true" />
+        {typeof icon === "string" ? <i className={cn("fas", icon)} aria-hidden="true" /> : icon}
       </div>
       <h2 className="text-heading font-semibold text-stone-900">{title}</h2>
       {message && <p className="text-small text-stone-600 mt-1">{message}</p>}

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { ReaderActivity, ReaderRun } from "@/api/runtimeReader";
 import { cn } from "@/lib/utils";
+import { BookIcon, CheckIcon, CircleDotIcon, CircleIcon, HistoryIcon, LayersIcon, OutlineIcon, SearchIcon, WarningIcon } from "./AskIrisIcons";
 
-const STEP_ICONS: Record<NonNullable<ReaderActivity["step"]>["kind"], string> = {
-  read: "fas fa-book-open",
-  search: "fas fa-magnifying-glass",
-  catalogue: "fas fa-layer-group",
-  recall: "fas fa-clock-rotate-left",
+const STEP_ICONS: Record<NonNullable<ReaderActivity["step"]>["kind"], OutlineIcon> = {
+  read: BookIcon,
+  search: SearchIcon,
+  catalogue: LayersIcon,
+  recall: HistoryIcon,
 };
 
 /** Seconds since `since`, to a tenth, refreshed while the run works. */
@@ -26,11 +27,11 @@ function useSeconds(since: string | undefined): string | null {
 type PlanStep = NonNullable<ReaderRun["plan"]>["steps"][number];
 
 /** What each plan status looks like: a mark that differs by shape, never by colour alone, and its word for a screen reader. */
-const PLAN_STATUS: Record<PlanStep["status"], { word: string; mark: string }> = {
-  done: { word: "Done", mark: "fas fa-check text-brand" },
-  in_progress: { word: "In progress", mark: "fas fa-circle text-brand" },
-  pending: { word: "Upcoming", mark: "far fa-circle text-stone-400" },
-  blocked: { word: "Blocked", mark: "fas fa-triangle-exclamation text-stone-700" },
+const PLAN_STATUS: Record<PlanStep["status"], { word: string; Mark: OutlineIcon; tone: string }> = {
+  done: { word: "Done", Mark: CheckIcon, tone: "text-brand" },
+  in_progress: { word: "In progress", Mark: CircleDotIcon, tone: "text-brand" },
+  pending: { word: "Upcoming", Mark: CircleIcon, tone: "text-stone-400" },
+  blocked: { word: "Blocked", Mark: WarningIcon, tone: "text-stone-700" },
 };
 
 /**
@@ -51,6 +52,7 @@ export function ReasoningBar({ activity, plan, deep = false, runStartedAt, compa
   const elapsed = useSeconds(runStartedAt ?? activity?.since);
   const step = activity?.step;
   const steps = plan?.steps ?? [];
+  const StepIcon = step ? STEP_ICONS[step.kind] : null;
   return (
     <section aria-label="Research progress" className={cn("relative pl-4", compact ? "text-small" : "text-control")}>
       {/* The thread: a quiet rule with a pulse travelling down it while IRIS works. */}
@@ -67,7 +69,7 @@ export function ReasoningBar({ activity, plan, deep = false, runStartedAt, compa
         {activity && <p key={activity.label} className="text-stone-700 motion-safe:animate-fade-in">{activity.label}</p>}
         {step && <div key={`${step.kind}:${step.label}`} className="motion-safe:animate-fade-in-up">
           <span className="inline-flex items-center gap-1.5 rounded-control bg-surface px-2 py-0.5 text-small font-medium text-brand ring-1 ring-stone-300">
-            <i className={cn(STEP_ICONS[step.kind], "text-small")} aria-hidden />{step.label}
+            {StepIcon && <StepIcon inline />}{step.label}
           </span>
           {step.detail.length > 0 && <ul className="mt-1 space-y-0.5 text-small text-stone-600">
             {step.detail.map(title => <li key={title} className="[overflow-wrap:anywhere]">{title}</li>)}
@@ -75,11 +77,11 @@ export function ReasoningBar({ activity, plan, deep = false, runStartedAt, compa
         </div>}
         {steps.length > 0 && <ol aria-label="Research plan" className="space-y-1.5">
           {steps.map(item => {
-            const { word, mark } = PLAN_STATUS[item.status];
+            const { word, Mark, tone } = PLAN_STATUS[item.status];
             return <li key={item.id} aria-current={item.status === "in_progress" ? "step" : undefined}
               className={cn("flex items-baseline gap-2.5 break-words [overflow-wrap:anywhere]",
                 item.status === "in_progress" ? "text-stone-900" : item.status === "pending" ? "text-stone-500" : "text-stone-700")}>
-              <i aria-hidden className={cn(mark, "w-4 shrink-0 text-center text-small")} />
+              <Mark inline className={cn("self-center", tone)} />
               <span className="min-w-0">{item.title}{" "}<span className={item.status === "blocked" ? "text-small text-stone-600" : "sr-only"}>{word}</span></span>
             </li>;
           })}

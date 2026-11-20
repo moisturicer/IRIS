@@ -1,6 +1,7 @@
 import { useId, useRef, type ReactNode } from "react";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
+import { CloseIcon } from "./AskIrisIcons";
 
 interface ChatDrawerProps {
   /** The drawer's name, its heading and its accessible name. */
@@ -56,7 +57,7 @@ export function ChatDrawer({ title, description, side, closeLabel, onClose, retu
         <div className="shrink-0 flex items-start gap-2 pl-4 pr-1.5 py-1.5 min-h-[56px] border-b border-stone-200">
           <div className="min-w-0 flex-1 py-2">
             <h2 id={headingId} className="text-heading font-semibold text-stone-900">{title}</h2>
-            {description && <p className="text-2xs text-stone-500 mt-0.5">{description}</p>}
+            {description && <p className="text-small text-stone-500 mt-0.5">{description}</p>}
           </div>
           <button
             type="button"
@@ -65,7 +66,7 @@ export function ChatDrawer({ title, description, side, closeLabel, onClose, retu
             className="shrink-0 w-11 h-11 rounded-control flex items-center justify-center text-stone-500
               hover:bg-stone-100 hover:text-stone-800 transition-colors"
           >
-            <i className="fas fa-xmark text-base" aria-hidden />
+            <CloseIcon />
           </button>
         </div>
         <div className="flex-1 min-h-0 flex flex-col">{children}</div>

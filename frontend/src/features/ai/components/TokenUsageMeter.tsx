@@ -76,14 +76,14 @@ export function TokenUsageMeter({ usage }: { usage: ReaderUsage }) {
           "motion-safe:animate-fade-in-up")}>
         <span className="relative inline-flex shrink-0">
           <Ring used={share} reserved={reserved} size={52} stroke={5} />
-          <span className="absolute inset-0 flex items-center justify-center font-display text-body tabular-nums text-stone-900">{percent}%</span>
+          <span className="absolute inset-0 flex items-center justify-center font-display text-small tabular-nums text-stone-900">{percent}%</span>
         </span>
         <span className="min-w-0">
-          <span className="block font-display text-body leading-tight text-stone-900">Context window</span>
+          <span className="block font-display text-small leading-tight text-stone-900">Context window</span>
           <span className="mt-1 block text-small tabular-nums text-stone-600">
             <strong className="font-semibold text-stone-800">{shortTokens(used)}</strong> / {shortTokens(capacity)} tokens
           </span>
-          {reserved > 0 && <span className="mt-1 flex items-center gap-1.5 text-label text-stone-600">
+          {reserved > 0 && <span className="mt-1 flex items-center gap-1.5 text-small text-stone-600">
             <svg aria-hidden width="14" height="6" className="shrink-0"><line x1="1" y1="3" x2="13" y2="3"
               className="stroke-brand/30" strokeWidth="4" strokeLinecap="round" strokeDasharray="2 2" /></svg>
             Reserved for response

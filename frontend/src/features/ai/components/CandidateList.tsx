@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { AnswerListing, CandidateRow, CandidateState } from "@/types/ai";
 import { cn } from "@/lib/utils";
+import { CheckIcon, CloseIcon, OutlineIcon, QuestionIcon, SpinnerIcon, WarningIcon } from "./AskIrisIcons";
 
 /** What each state says, in words: colour and icons never carry it alone (IR-546). */
 export const STATE_LABEL: Record<CandidateState, string> = {
@@ -11,12 +12,12 @@ export const STATE_LABEL: Record<CandidateState, string> = {
   unassessed: "Could not be assessed",
 };
 
-const STATE_ICON: Record<CandidateState, string> = {
-  pending: "fa-circle-notch animate-spin motion-reduce:animate-none text-stone-400",
-  included: "fa-check text-brand",
-  excluded: "fa-xmark text-stone-400",
-  uncertain: "fa-circle-question text-stone-500",
-  unassessed: "fa-triangle-exclamation text-stone-500",
+const STATE_ICON: Record<CandidateState, { Icon: OutlineIcon; tone: string }> = {
+  pending: { Icon: SpinnerIcon, tone: "animate-spin motion-reduce:animate-none text-stone-400" },
+  included: { Icon: CheckIcon, tone: "text-brand" },
+  excluded: { Icon: CloseIcon, tone: "text-stone-400" },
+  uncertain: { Icon: QuestionIcon, tone: "text-stone-500" },
+  unassessed: { Icon: WarningIcon, tone: "text-stone-500" },
 };
 
 export function candidateHref(row: CandidateRow): string {
@@ -26,16 +27,17 @@ export function candidateHref(row: CandidateRow): string {
 
 function Item({ row }: { row: CandidateRow }) {
   const label = STATE_LABEL[row.state];
+  const { Icon, tone } = STATE_ICON[row.state];
   return (
-    <li className="flex items-baseline gap-2 text-sm">
-      <i aria-hidden className={cn("fas text-2xs shrink-0", STATE_ICON[row.state])} />
+    <li className="flex items-baseline gap-2 text-control">
+      <Icon inline className={cn("self-center", tone)} />
       <span className="min-w-0">
         <Link to={candidateHref(row)} className="text-brand hover:underline">
           {row.restricted ? "A paper IRIS may not read" : row.title}
         </Link>
-        <span className="text-xs text-stone-500"> · {label}</span>
+        <span className="text-small text-stone-500"> · {label}</span>
         {row.quote && (
-          <q className="block text-xs italic text-stone-500">{row.quote}</q>
+          <q className="block text-small italic text-stone-500">{row.quote}</q>
         )}
       </span>
     </li>
@@ -52,7 +54,7 @@ export function LiveCandidates({ candidates, compact = false }: { candidates: Ca
   if (candidates.length === 0) return null;
   return (
     <section aria-label="Candidate papers" className={compact ? "mt-1 mb-2" : "mt-1 mb-3"}>
-      <p className="text-xs font-medium text-stone-500">Candidate papers</p>
+      <p className="text-small font-medium text-stone-500">Candidate papers</p>
       <ul aria-label="Candidates" className="mt-1.5 space-y-1">
         {candidates.map((row) => (
           <Item key={row.record_id} row={row} />
@@ -69,7 +71,7 @@ export function CandidateList({ listing }: { listing: AnswerListing }) {
   const others = rows.filter((row) => row.state !== "included");
   return (
     <div className="mt-3">
-      <p className="text-sm text-stone-600">{listing.wording}</p>
+      <p className="text-control text-stone-600">{listing.wording}</p>
       {matches.length > 0 && (
         <ul aria-label="Matching papers" className="mt-2 space-y-1">
           {matches.map((row) => (
@@ -79,7 +81,7 @@ export function CandidateList({ listing }: { listing: AnswerListing }) {
       )}
       {others.length > 0 && (
         <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-medium text-stone-500 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 rounded-control">
+          <summary className="cursor-pointer text-small font-medium text-stone-500 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 rounded-control">
             {`Other candidates (${others.length})`}
           </summary>
           <ul aria-label="Other candidates" className="mt-1.5 space-y-1">

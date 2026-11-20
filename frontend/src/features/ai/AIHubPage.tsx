@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TONES } from "@/components/ui/statusTones";
+import { AskIrisMark, SearchIcon } from "@/features/ai/components/AskIrisIcons";
 
 type Mode = "search" | "ask";
 
@@ -25,9 +26,9 @@ export default function AIHubPage() {
               : "bg-stone-100 text-stone-700 hover:bg-stone-200"
             }`}
         >
-          <i className="fa fa-search" aria-hidden />
+          <SearchIcon inline />
           Semantic Search
-          <span className={`px-1.5 py-0.5 text-label font-bold rounded-full leading-none ${TONES.attention}`}>
+          <span className={`px-1.5 py-0.5 text-small font-bold rounded-full leading-none ${TONES.attention}`}>
             soon
           </span>
         </button>
@@ -40,9 +41,9 @@ export default function AIHubPage() {
               : "bg-stone-100 text-stone-700 hover:bg-stone-200"
             }`}
         >
-          <i className="fa fa-robot" aria-hidden />
+          <AskIrisMark className="size-4" />
           Ask a Question
-          <span className={`px-1.5 py-0.5 text-label font-bold rounded-full leading-none ${TONES.attention}`}>
+          <span className={`px-1.5 py-0.5 text-small font-bold rounded-full leading-none ${TONES.attention}`}>
             soon
           </span>
         </button>
@@ -52,9 +53,9 @@ export default function AIHubPage() {
       {mode === "ask" && (
         <div className="flex flex-col items-center text-center py-16 px-6 bg-surface rounded-card border border-stone-200">
           <div className="w-14 h-14 rounded-full bg-stone-50 border border-stone-200 flex items-center justify-center mb-5">
-            <i className="fas fa-robot text-2xl text-stone-600" aria-hidden />
+            <AskIrisMark className="size-7 text-stone-600" />
           </div>
-          <span className={`px-3 py-1 text-label font-bold rounded-full mb-4 ${TONES.attention}`}>
+          <span className={`px-3 py-1 text-small font-bold rounded-full mb-4 ${TONES.attention}`}>
             Coming Soon
           </span>
           <p className="text-body text-stone-600 leading-relaxed">
@@ -68,9 +69,9 @@ export default function AIHubPage() {
       {mode === "search" && (
         <div className="flex flex-col items-center text-center py-16 px-6 bg-surface rounded-card border border-stone-200">
           <div className="w-14 h-14 rounded-full bg-stone-50 border border-stone-200 flex items-center justify-center mb-5">
-            <i className="fas fa-search text-2xl text-stone-600" aria-hidden />
+            <SearchIcon className="text-stone-600" />
           </div>
-          <span className={`px-3 py-1 text-label font-bold rounded-full mb-4 ${TONES.attention}`}>
+          <span className={`px-3 py-1 text-small font-bold rounded-full mb-4 ${TONES.attention}`}>
             Coming Soon
           </span>
           <p className="text-body text-stone-600 leading-relaxed">

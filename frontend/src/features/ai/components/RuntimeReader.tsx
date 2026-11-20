@@ -11,11 +11,11 @@ import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ChatInput } from "./ChatInput";
-import { ANSWER_MARKDOWN, CHAT_COLUMN, CHAT_OPENING, CHAT_OPENING_COLUMN, CHAT_STREAM_CARET } from "./answerLayout";
+import { ANSWER_MARKDOWN, ANSWER_TEXT, CHAT_COLUMN, CHAT_OPENING, CHAT_OPENING_COLUMN, CHAT_STREAM_CARET } from "./answerLayout";
 import { CitationText } from "./CitationText";
 import { ModelPill, type ModelPillOption } from "./ModelPill";
 import { ChatMessageBubble } from "./ChatMessageBubble";
-import { AskIrisMark } from "./AskIrisIcons";
+import { AskIrisMark, BookIcon, FileTextIcon, LayersIcon, PencilIcon, RetryIcon, SearchIcon, UnplugIcon } from "./AskIrisIcons";
 import { ReasoningBar } from "./ReasoningBar";
 import { StarterQuestions } from "./StarterQuestions";
 import { ASK_STARTERS, PAPER_STARTERS } from "./askStarters";
@@ -27,8 +27,8 @@ import { useTypewriter } from "../runtime/useTypewriter";
 import { trouble, type Trouble, type TroubleKind } from "../runtime/trouble";
 
 const DEPTHS: readonly ModelPillOption<Depth>[] = [
-  { value: "ordinary", short: "Standard", label: "Standard", description: "A shorter search for a quicker answer", icon: "far fa-lightbulb" },
-  { value: "deep", short: "Thorough", label: "Thorough research", description: "Searches and reads more before answering", icon: "fas fa-book-open-reader" },
+  { value: "ordinary", short: "Standard", label: "Standard", description: "A shorter search for a quicker answer", icon: SearchIcon },
+  { value: "deep", short: "Thorough", label: "Thorough research", description: "Searches and reads more before answering", icon: BookIcon },
 ];
 
 const STATES: Record<ReaderRun["state"], string> = {
@@ -39,7 +39,7 @@ const STATES: Record<ReaderRun["state"], string> = {
 const TASKS = { pending: "Pending", in_progress: "In progress", done: "Done", blocked: "Blocked" };
 
 export function ResearchProgress({ run }: { run: ReaderRun }) {
-  return <section aria-label="Research progress" className="min-w-0 border-l-2 border-brand/30 pl-4 py-1 text-sm text-stone-600">
+  return <section aria-label="Research progress" className="min-w-0 border-l-2 border-brand/30 pl-4 py-1 text-control text-stone-600">
     <p role="status" aria-live="polite" className="font-medium text-stone-900">{STATES[run.state]}</p>
     {run.awaiting_reader && <p>Reconnect to continue research.</p>}
     {run.sources_available === false && <p>Some sources changed or are no longer readable.</p>}
@@ -47,12 +47,12 @@ export function ResearchProgress({ run }: { run: ReaderRun }) {
       <ol aria-label="Research tasks" className="mt-3 space-y-2">
         {run.plan.steps.map(step => <li key={step.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 break-words">
           <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{step.title}</span>
-          <span className="text-xs text-stone-500">{TASKS[step.status]}</span>
+          <span className="text-small text-stone-500">{TASKS[step.status]}</span>
         </li>)}
       </ol>
-      <p className="mt-2 text-xs">Task status is the assistant’s assessment of its work.</p>
+      <p className="mt-2 text-small">Task status is the assistant’s assessment of its work.</p>
     </>}
-    {run.compaction && run.compaction.compactions > 0 && <p className="mt-1 text-xs">
+    {run.compaction && run.compaction.compactions > 0 && <p className="mt-1 text-small">
       Earlier conversation was condensed into a summary to make room. The original answers are kept, and a
       summary is never used as a source for exact details.</p>}
   </section>;
@@ -71,7 +71,7 @@ export function CompactionStatus({ run }: { run: ReaderRun }) {
     : run.state === "conflict" ? "Conversation changed"
     : run.state === "deleted" ? "Conversation removed"
     : "Compaction unavailable";
-  return <section aria-label="Conversation compaction" className="min-w-0 border-l-2 border-brand/30 pl-4 py-1 text-sm text-stone-600">
+  return <section aria-label="Conversation compaction" className="min-w-0 border-l-2 border-brand/30 pl-4 py-1 text-control text-stone-600">
     <p role="status" aria-live="polite" className="font-medium text-stone-900">{message}</p>
     {activeRun(run) && run.awaiting_reader && <p>Reconnect to continue.</p>}
     {activeRun(run) && <p>The conversation stays as it is until this finishes. You can stop it.</p>}
@@ -421,16 +421,16 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     }} className={cn(dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
       centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin")}>
       <div ref={column} className={cn(dense ? "space-y-5" : `${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} space-y-6`)}>
-        {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
+        {centered && <p className={cn("font-display text-title text-stone-900", dense && "text-left")}>
           {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
         {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}
         {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" onRetry={() => setOpenAttempt(n => n + 1)} />}
         {opening === "unavailable" && <div role="alert" className="py-10 text-center">
-          <h2 className="font-display text-xl text-stone-900">This conversation is not available.</h2>
-          <p className="mt-2 text-sm text-stone-600">It may have been deleted, or the link may be wrong.</p>
+          <h2 className="font-display text-title text-stone-900">This conversation is not available.</h2>
+          <p className="mt-2 text-control text-stone-600">It may have been deleted, or the link may be wrong.</p>
           <Link to="/ai" className={cn(PILL_SECONDARY, FOCUS_RING, "mt-5 inline-flex")}>Start a new conversation</Link>
         </div>}
-        {opening === "failed" && <EmptyState icon="fa-plug-circle-xmark" tone="error" title="Could not load this conversation"
+        {opening === "failed" && <EmptyState icon={<UnplugIcon />} tone="error" title="Could not load this conversation"
           message={failureMessage(openFailure)}
           action={<button type="button" onClick={() => setOpenAttempt(n => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>} />}
         {opening === "interrupted" && <InterruptedState what="conversation" onRetry={() => setOpenAttempt(n => n + 1)} />}
@@ -462,27 +462,27 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
                   {active && <ReasoningBar compact={dense} activity={current.activity} plan={current.plan}
                     deep={current.depth === "deep"} runStartedAt={current.created_at} />}
                   {showDraft && <CitationText text={typed.text} citations={[]} streaming={!typed.done || active}
-                    className={cn(ANSWER_MARKDOWN, (active || !typed.done) && CHAT_STREAM_CARET, !typed.done && "answer-typing", active && "mt-3", dense ? "text-sm" : "text-md")} />}
-                  {current.awaiting_reader && <p className="mt-2 text-sm text-stone-600">Reconnect to continue research.</p>}
+                    className={cn(ANSWER_MARKDOWN, ANSWER_TEXT, (active || !typed.done) && CHAT_STREAM_CARET, !typed.done && "answer-typing", active && "mt-3")} />}
+                  {current.awaiting_reader && <p className="mt-2 text-control text-stone-600">Reconnect to continue research.</p>}
                 </div>
               </div>;
             })()}
           </div>;
         })}
-        {busy && !run && !opening && <p role="status" className="text-sm text-stone-600">Connecting to Ask IRIS…</p>}
-        {error && <div role="alert" className="space-y-2 text-sm text-stone-700">
+        {busy && !run && !opening && <p role="status" className="text-control text-stone-600">Connecting to Ask IRIS…</p>}
+        {error && <div role="alert" className="space-y-2 text-control text-stone-700">
           <p>{error.message}</p>
           {error.retry && <button type="button" disabled={busy} onClick={() => void reconnect()} className="min-h-11 underline text-brand">Reconnect</button>}
           {error.missing && <Link to="/ai" className="inline-flex min-h-11 items-center underline text-brand">Start a new conversation</Link>}
         </div>}
         {canRetry && run && <div className="flex justify-end gap-1">
           <button type="button" onClick={() => setDraft(run.question)} aria-label="Edit this question" title="Edit"
-            className={ICON_ACTION}><i aria-hidden className="fas fa-pen text-small" /></button>
+            className={ICON_ACTION}><PencilIcon inline /></button>
           <button type="button" onClick={() => void retryRun()} aria-label="Try this question again" title="Retry"
-            className={ICON_ACTION}><i aria-hidden className="fas fa-rotate-right text-small" /></button>
+            className={ICON_ACTION}><RetryIcon inline /></button>
         </div>}
         {run && activeRun(run) && compactionRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
-          className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
+          className="min-h-11 rounded-full border border-stone-300 px-5 text-control text-stone-800 focus-visible:outline-brand">
           Stop compaction</button>}
       </div>
     </div>
@@ -501,9 +501,9 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         aria-pressed={scopeToggle.allPapers}
         aria-label={scopeToggle.allPapers ? "Searching all papers. Search only this paper" : "Searching this paper. Search all papers"}
         title={scopeToggle.locked ? "This chat started across all papers" : scopeToggle.allPapers ? "All papers" : "This paper"}
-        className={cn("inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-label font-medium transition-colors focus-visible:outline-brand",
+        className={cn("inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-small font-medium transition-colors focus-visible:outline-brand",
           scopeToggle.allPapers ? "bg-brand text-white hover:bg-brand-dark" : "text-stone-600 hover:bg-stone-100")}>
-        <i aria-hidden className={cn("text-label", scopeToggle.allPapers ? "fas fa-layer-group" : "far fa-file-lines")} />
+        {scopeToggle.allPapers ? <LayersIcon inline /> : <FileTextIcon inline />}
         {scopeToggle.allPapers ? "All papers" : "This paper"}
       </button>}
     </ChatInput>

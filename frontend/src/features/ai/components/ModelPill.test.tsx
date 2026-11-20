@@ -4,11 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen } from "@/test/render";
 
+import { PlusIcon } from "./AskIrisIcons";
 import { ModelPill } from "./ModelPill";
 
 const options = [
-  { value: "a", short: "Alpha", label: "Alpha run", description: "First", icon: "fas fa-plus" },
-  { value: "b", short: "Beta", label: "Beta run", description: "Second", icon: "fas fa-plus" },
+  { value: "a", short: "Alpha", label: "Alpha run", description: "First", icon: PlusIcon },
+  { value: "b", short: "Beta", label: "Beta run", description: "Second", icon: PlusIcon },
 ] as const;
 
 describe("the composer's setting pill", () => {

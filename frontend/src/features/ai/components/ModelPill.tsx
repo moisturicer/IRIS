@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
+import { ChevronUpIcon, type OutlineIcon } from "./AskIrisIcons";
 
 export interface ModelPillOption<T extends string> {
   value: T;
@@ -8,7 +9,8 @@ export interface ModelPillOption<T extends string> {
   short: string;
   label: string;
   description: string;
-  icon: string;
+  /** One of the Ask IRIS outline icons. */
+  icon: OutlineIcon;
 }
 
 interface ModelPillProps<T extends string> {
@@ -70,14 +72,14 @@ export function ModelPill<T extends string>({ name, value, options, onChange, no
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((was) => !was)}
         className={cn(
-          "inline-flex min-h-11 items-center gap-1.5 rounded-full bg-stone-100 px-3 text-small font-medium text-stone-700 hover:bg-stone-200 hover:text-stone-900 [@media(pointer:fine)]:min-h-9",
+          "inline-flex min-h-11 items-center gap-1.5 rounded-full bg-stone-100 px-3 text-control font-medium text-stone-700 hover:bg-stone-200 hover:text-stone-900 [@media(pointer:fine)]:min-h-9",
           COLOUR_TRANSITION,
           FOCUS_RING,
         )}
       >
-        <i className={cn(current.icon, "text-xs")} aria-hidden />
+        <current.icon inline />
         {current.short}
-        <i className={cn("fas fa-chevron-up text-label transition-transform duration-150 motion-reduce:transition-none", open || "rotate-180")} aria-hidden />
+        <ChevronUpIcon inline className={cn("transition-transform duration-150 motion-reduce:transition-none", open || "rotate-180")} />
       </button>
 
       {open && (
@@ -108,15 +110,15 @@ export function ModelPill<T extends string>({ name, value, options, onChange, no
                   FOCUS_RING,
                 )}
               >
-                <i className={cn(option.icon, "mt-1 w-4 text-center text-sm")} aria-hidden />
+                <option.icon inline className="mt-1" />
                 <span className="min-w-0">
-                  <span className="block text-small font-semibold">{option.label}</span>
+                  <span className="block text-control font-semibold">{option.label}</span>
                   <span className={cn("block text-small", selected ? "text-brand" : "text-stone-600")}>{option.description}</span>
                 </span>
               </button>
             );
           })}
-          {note && <p className="mt-1.5 border-t border-stone-200 px-3 pb-1 pt-2 text-2xs text-stone-600">{note}</p>}
+          {note && <p className="mt-1.5 border-t border-stone-200 px-3 pb-1 pt-2 text-small text-stone-600">{note}</p>}
         </div>
       )}
     </div>

@@ -5,7 +5,7 @@ import { TITLE_MAX, TITLE_TOO_LONG, type ReaderConversationSummary } from "@/api
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { HERE } from "@/components/ui/highlightRoles";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { PanelLeftIcon } from "./AskIrisIcons";
+import { ChevronDownIcon, PanelLeftIcon, PencilIcon, PinIcon, PlusIcon, SearchIcon, TrashIcon } from "./AskIrisIcons";
 import { EarlierConversationList } from "./EarlierConversations";
 import { usePinnedConversations, type Pin } from "../hooks/usePinnedConversations";
 import type { TroubleKind } from "../runtime/trouble";
@@ -141,12 +141,12 @@ export function ConversationSidebar({
           {!open && <div className="absolute left-0 top-14 flex flex-col items-center gap-1 pt-3" style={{ width: STRIP_WIDTH }}>
             <Tooltip label="New conversation">
               <button type="button" onClick={onNewConversation} aria-label="New conversation" className={ICON_BUTTON}>
-                <i className="fas fa-plus text-label" aria-hidden />
+                <PlusIcon />
               </button>
             </Tooltip>
             <Tooltip label="Search conversations (Ctrl+K)">
               <button type="button" onClick={onSearch} aria-label="Search conversations" className={ICON_BUTTON}>
-                <i className="fas fa-magnifying-glass text-label" aria-hidden />
+                <SearchIcon />
               </button>
             </Tooltip>
           </div>}
@@ -234,15 +234,15 @@ export function ConversationHistoryList({
   return (<>
     <div className="shrink-0 space-y-0.5 px-2 pt-2">
       <label htmlFor={searchId} className={cn(NAV_ITEM, "cursor-text focus-within:bg-stone-200/70")}>
-        <i className="fas fa-magnifying-glass w-4 text-center text-label" aria-hidden />
+        <SearchIcon inline />
         <span className="sr-only">Search your past conversations</span>
         <input id={searchId} ref={searchRef} type="search" value={search.text} onChange={e => search.onText(e.target.value)}
           onKeyDown={e => { if (e.key === "Escape") { search.onText(""); e.currentTarget.blur(); } }}
           placeholder="Search" autoComplete="off" maxLength={200} disabled={search.state === "error"}
           className="min-w-0 flex-1 bg-transparent text-body text-stone-900 placeholder:text-stone-700 focus:outline-none" />
-        <kbd aria-hidden className="shrink-0 font-sans text-2xs text-stone-500">Ctrl+K</kbd>
+        <kbd aria-hidden className="shrink-0 font-sans text-small text-stone-500">Ctrl+K</kbd>
       </label>
-      <p role="status" aria-live="polite" className="px-3 text-label text-stone-600">
+      <p role="status" aria-live="polite" className="px-3 text-small text-stone-600">
         {search.query && search.state === "ready" ? `${conversations.length}${search.hasMore ? "+" : ""} found` : ""}
       </p>
     </div>
@@ -250,16 +250,16 @@ export function ConversationHistoryList({
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-2 pb-2">
       {!search.query && pins.length > 0 && <div className="mt-2">
         <button type="button" aria-expanded={pinnedOpen} onClick={() => setPinnedOpen(v => !v)}
-          className={cn("flex items-center gap-1.5 rounded-control px-3 py-1 text-label font-medium text-stone-500 hover:text-stone-800", FOCUS_RING)}>
+          className={cn("flex items-center gap-1.5 rounded-control px-3 py-1 text-small font-medium text-stone-500 hover:text-stone-800", FOCUS_RING)}>
           Pinned
-          <i className={cn("fas fa-chevron-down text-2xs transition-transform", !pinnedOpen && "-rotate-90")} aria-hidden />
+          <ChevronDownIcon inline className={cn("transition-transform motion-reduce:transition-none", !pinnedOpen && "-rotate-90")} />
         </button>
         {pinnedOpen && <nav aria-label="Pinned conversations">
           <ul className="mt-0.5 space-y-0.5">{pins.map(pin => row(pin))}</ul>
         </nav>}
       </div>}
 
-      <p className="mt-3 px-3 py-1 text-label font-medium text-stone-500">{search.query ? "Results" : "Recents"}</p>
+      <p className="mt-3 px-3 py-1 text-small font-medium text-stone-500">{search.query ? "Results" : "Recents"}</p>
       {search.state === "error" && !search.quiet && (
         <div role="alert" className="space-y-1 px-3 py-3 text-small text-stone-700">
           <p>{"IRIS couldn't load your conversations. Your new questions still work."}</p>
@@ -327,7 +327,7 @@ function HistoryRow({ entry, updatedAt, active, pinned, onPin, onRename, onDelet
         disabled={saving} aria-label="Conversation title" aria-invalid={!!problem}
         aria-describedby={problem ? problemId : undefined}
         className="min-h-10 w-full rounded-control border border-brand/40 bg-surface px-3 text-body text-stone-900 focus:outline-none focus:ring-2 focus:ring-brand/30" />
-      {problem && <p id={problemId} role="alert" className="px-1 pt-1 text-label text-brand-dark">{problem}</p>}
+      {problem && <p id={problemId} role="alert" className="px-1 pt-1 text-small text-brand-dark">{problem}</p>}
     </li>;
   }
 
@@ -342,13 +342,13 @@ function HistoryRow({ entry, updatedAt, active, pinned, onPin, onRename, onDelet
     <span className="absolute right-1 flex items-center rounded-control opacity-0 transition-opacity
       group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:static [@media(hover:none)]:opacity-100">
       <RowAction label={pinned ? `Unpin ${title}` : `Pin ${title}`} hint={pinned ? "Unpin" : "Pin"} onClick={onPin}>
-        <i className={cn("fas fa-thumbtack text-2xs", pinned && "text-brand")} aria-hidden />
+        <PinIcon inline className={cn(pinned && "text-brand")} />
       </RowAction>
       {onRename && <RowAction label={`Rename ${title}`} hint="Rename" onClick={start} buttonRef={renameRef}>
-        <i className="fas fa-pen text-2xs" aria-hidden />
+        <PencilIcon inline />
       </RowAction>}
       <RowAction label={`Delete ${title}`} hint="Delete" onClick={onDelete}>
-        <i className="fas fa-trash text-2xs" aria-hidden />
+        <TrashIcon inline />
       </RowAction>
     </span>
   </li>;
@@ -369,7 +369,7 @@ export function NewConversationButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
       className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-card bg-brand px-3 text-control font-semibold text-white transition-colors hover:bg-brand-dark">
-      <i className="fas fa-plus text-label" aria-hidden />
+      <PlusIcon inline />
       New conversation
     </button>
   );

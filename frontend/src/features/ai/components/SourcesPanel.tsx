@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { SELECTED_RING } from "@/components/ui/highlightRoles";
 import { ChatDrawer } from "./ChatDrawer";
 import { withMathRendered } from "./PassageQuote";
+import { ArrowRightIcon, CloseIcon } from "./AskIrisIcons";
 
 /** Where the panel sits: beside the chat, over it (a dialog), or a phone's bottom sheet. */
 export type SourcesMode = "beside" | "over" | "sheet";
@@ -49,13 +50,13 @@ function SourceItem({ citation, card, active }: { citation: ChatCitation; card?:
       className={cn("rounded-card border bg-surface p-3 transition-colors duration-150",
         active ? "border-stone-900 ring-1 ring-stone-900" : "border-stone-200")}>
       <div className="flex items-start gap-2.5">
-        <span aria-hidden className={cn("mt-0.5 grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-control px-1 text-2xs font-semibold tabular-nums leading-none",
+        <span aria-hidden className={cn("mt-0.5 grid h-5 min-w-5 shrink-0 place-items-center rounded-control px-1 text-small font-semibold tabular-nums leading-none",
           active ? SELECTED_RING : "bg-stone-100 text-brand")}>
           {citation.marker}
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-body font-semibold leading-snug text-stone-900">{title}</h3>
-          {byline && <p className="mt-0.5 text-label text-stone-500">{byline}</p>}
+          {byline && <p className="mt-0.5 text-small text-stone-500">{byline}</p>}
           {hasCitationQuote(citation) && (
             <blockquote className="mt-2 border-l-2 border-brand/25 pl-2.5 text-small leading-relaxed text-stone-700">
               {withMathRendered(citation.text)}
@@ -66,7 +67,7 @@ function SourceItem({ citation, card, active }: { citation: ChatCitation; card?:
             aria-label={`${citation.page != null ? `Open at page ${citation.page}` : "Open paper"} in ${title}`}
             className="mt-2 inline-flex items-center gap-1.5 text-small font-semibold text-brand hover:underline">
             {citation.page != null ? `Open at page ${citation.page}` : "Open paper"}
-            <i className="fas fa-arrow-right text-2xs" aria-hidden />
+            <ArrowRightIcon inline />
           </Link>
         </div>
       </div>
@@ -124,11 +125,11 @@ export function SourcesPanel({ mode, id, citations, sources, active, question, o
       <div className="flex min-h-[56px] shrink-0 items-start gap-2 border-b border-stone-200/80 py-1.5 pl-4 pr-1.5">
         <div className="min-w-0 flex-1 py-2">
           <h2 className="text-heading font-semibold text-stone-900">Sources</h2>
-          <p className="mt-0.5 text-2xs text-stone-500">{subtitle}</p>
+          <p className="mt-0.5 text-small text-stone-500">{subtitle}</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Close sources"
           className="flex size-11 shrink-0 items-center justify-center rounded-control text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800">
-          <i className="fas fa-xmark text-base" aria-hidden />
+          <CloseIcon />
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">{body}</div>

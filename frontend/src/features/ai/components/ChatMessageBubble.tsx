@@ -4,9 +4,9 @@ import type { ChatMessage } from "@/types/chat";
 import { CitationPanelContext, CitationTurnContext } from "@/lib/citedPage";
 import { cn } from "@/lib/utils";
 import type { ChatCitation } from "@/types/ai";
-import { AskIrisMark } from "./AskIrisIcons";
+import { AskIrisMark, ChevronDownIcon, PencilIcon, RetryIcon, UserIcon } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
-import { ANSWER_MARKDOWN } from "./answerLayout";
+import { ANSWER_MARKDOWN, ANSWER_TEXT } from "./answerLayout";
 import { CandidateList } from "./CandidateList";
 import { ComparisonTable } from "./ComparisonTable";
 import { CopyButton, MESSAGE_ACTION } from "./CopyButton";
@@ -69,7 +69,7 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
       aria-expanded={selected}
       aria-label={`${label} for this answer`}
       className={cn(
-        "inline-flex items-center gap-2 min-h-8 px-2 -ml-2 rounded-control text-small font-medium transition-colors",
+        "inline-flex items-center gap-2 min-h-8 px-2 -ml-2 rounded-control text-control font-medium transition-colors",
         selected ? "text-brand" : "text-stone-600 hover:text-stone-900 hover:bg-stone-100",
       )}
     >
@@ -79,7 +79,7 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
           <span
             key={marker}
             className={cn(
-              "grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-2xs font-semibold leading-none tabular-nums ring-2 ring-surface",
+              "grid h-5 min-w-5 place-items-center rounded-full px-1 text-small font-semibold leading-none tabular-nums ring-2 ring-surface",
               selected ? SELECTED_RING : "bg-stone-100 text-stone-700",
             )}
           >
@@ -88,7 +88,7 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
         ))}
       </span>
       {label}
-      <i aria-hidden className={cn("fas fa-chevron-down text-label transition-transform duration-200", selected && "rotate-180")} />
+      <ChevronDownIcon inline className={cn("transition-transform duration-200 motion-reduce:transition-none", selected && "rotate-180")} />
     </button>
   );
 }
@@ -99,7 +99,7 @@ function PassageCount({ citations, open, onOpen }: { citations: ChatCitation[]; 
   const label = `${citations.length} ${citations.length === 1 ? "passage" : "passages"} from ${papers} ${papers === 1 ? "paper" : "papers"}`;
   return (
     <button type="button" onClick={onOpen} aria-expanded={open}
-      className={cn("inline-flex min-h-8 items-center gap-1.5 rounded-control px-2 -ml-2 text-small font-medium transition-colors",
+      className={cn("inline-flex min-h-8 items-center gap-1.5 rounded-control px-2 -ml-2 text-control font-medium transition-colors",
         open ? "text-brand" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")}>
       {label}
     </button>
@@ -125,13 +125,13 @@ export function QuestionControls({
       {onAskAgain && (
         <button type="button" disabled={disabled} onClick={() => onAskAgain(question)}
           aria-label="Ask again" title="Ask again" className={MESSAGE_ACTION}>
-          <i className="fas fa-rotate-right text-label" aria-hidden />
+          <RetryIcon inline />
         </button>
       )}
       {onEdit && (
         <button type="button" disabled={disabled} onClick={() => onEdit(question)}
           aria-label="Edit" title="Edit" className={MESSAGE_ACTION}>
-          <i className="fas fa-pen text-label" aria-hidden />
+          <PencilIcon inline />
         </button>
       )}
       <CopyButton text={question} label="Copy question" />
@@ -156,10 +156,10 @@ function RetryButton({ onRetry, disabled }: { onRetry?: () => void; disabled?: b
         onClick={onRetry}
         disabled={disabled}
         className="inline-flex items-center gap-1.5 rounded-control border border-stone-200 px-3 py-1.5
-          text-small font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900
+          text-control font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900
           disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <i className="fas fa-rotate-right text-label" aria-hidden />
+        <RetryIcon inline />
         Retry
       </button>
     </div>
@@ -203,13 +203,13 @@ export function ChatMessageBubble({
       <div
         className={cn(
           "rounded-full shrink-0 flex items-center justify-center",
-          compact ? "w-7 h-7 text-2xs" : "w-8 h-8 text-xs",
+          compact ? "w-7 h-7" : "w-8 h-8",
           isUser ? "bg-stone-100 text-stone-600" : "bg-stone-100 text-brand",
         )}
         aria-hidden
       >
         {isUser ? (
-          <i className="fas fa-user" aria-hidden />
+          <UserIcon inline />
         ) : (
           <AskIrisMark className={compact ? "w-4 h-4" : "w-[18px] h-[18px]"} />
         )}
@@ -219,7 +219,7 @@ export function ChatMessageBubble({
         <div className="flex max-w-[85%] flex-col items-end">
           <div className={cn(
             "rounded-card bg-stone-100",
-            compact ? "text-sm leading-relaxed rounded-tr-none px-3.5 py-2.5" : "text-md leading-relaxed px-4 py-3",
+            "text-body leading-relaxed", compact ? "rounded-tr-none px-3.5 py-2.5" : "px-4 py-3",
           )}>
             <p className="whitespace-pre-wrap text-stone-800">{message.content}</p>
           </div>
@@ -234,7 +234,7 @@ export function ChatMessageBubble({
       )}
 
       {!isUser && (
-      <div className={cn(compact ? "text-sm leading-relaxed" : "text-md leading-relaxed", "min-w-0 flex-1")}>
+      <div className={cn("min-w-0 flex-1", ANSWER_TEXT)}>
         <ReasoningSummary summary={message.reasoningSummary} compact={compact} />
         {message.comparison && <ComparisonTable comparison={message.comparison} />}
         {!message.listing || message.listing.count ? (
@@ -249,7 +249,7 @@ export function ChatMessageBubble({
         {!isUser && message.listing?.candidates && <CandidateList listing={message.listing} />}
         {!isUser && message.listing && !message.listing.count && !message.listing.candidates && (
           <div className="mt-3">
-            <p className="text-sm text-stone-600">{message.listing.wording}</p>
+            <p className="text-control text-stone-600">{message.listing.wording}</p>
             {message.listing.records.length === 0 && <p className="mt-2">No papers are listed for this answer.</p>}
             <ul className="mt-2 space-y-1">
               {message.listing.records.map((record) => (
@@ -301,7 +301,7 @@ export function ChatMessageBubble({
             {inPanelMode && onAskAgain && message.question && (
               <button type="button" disabled={controlsDisabled} onClick={() => onAskAgain(message.question as string)}
                 aria-label="Ask again" title="Ask again" className={MESSAGE_ACTION}>
-                <i className="fas fa-rotate-right text-label" aria-hidden />
+                <RetryIcon inline />
               </button>
             )}
           </div>

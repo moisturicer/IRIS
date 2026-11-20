@@ -2,6 +2,7 @@ import { useState, type FormEvent, type KeyboardEvent, type ReactNode, type Ref 
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { CHAT_COLUMN, CHAT_COMPOSER_FIELD, CHAT_COMPOSER_ICON, CHAT_COMPOSER_SURFACE, CHAT_OPENING_COLUMN } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
+import { ArrowUpIcon, PlusIcon } from "./AskIrisIcons";
 
 interface ChatInputProps {
   centered?: boolean;
@@ -85,7 +86,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, beside, ab
             aria-label={ATTACH_CLOSED}
             className={`${CHAT_COMPOSER_ICON} border border-stone-200 text-stone-400 cursor-not-allowed`}
           >
-            <i className="fas fa-plus text-sm" aria-hidden />
+            <PlusIcon />
           </button>
           {children}
         </div>
@@ -110,7 +111,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, beside, ab
             transition-[background-color,color,transform] duration-150 motion-reduce:transition-none ${FOCUS_RING}`}
           aria-label="Send message"
         >
-          <i className="fas fa-arrow-up text-sm" aria-hidden />
+          <ArrowUpIcon />
         </button>}
         </div>
       </div>

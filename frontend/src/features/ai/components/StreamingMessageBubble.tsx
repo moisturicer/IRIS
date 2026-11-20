@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import type { StreamingState } from "../conversation/streamingState";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
-import { ANSWER_MARKDOWN, CHAT_STREAM_CARET } from "./answerLayout";
+import { ANSWER_MARKDOWN, ANSWER_TEXT, CHAT_STREAM_CARET } from "./answerLayout";
 import { StreamStatusRow } from "./StreamStatusRow";
 import { LiveCandidates } from "./CandidateList";
 
@@ -31,7 +31,7 @@ export function StreamingMessageBubble({
         <AskIrisMark className={compact ? "w-4 h-4" : "w-[18px] h-[18px]"} />
       </div>
 
-      <div className={cn("min-w-0 flex-1 leading-relaxed", compact ? "text-sm" : "text-md")}>
+      <div className={cn("min-w-0 flex-1", ANSWER_TEXT)}>
         {state.candidates && <LiveCandidates candidates={state.candidates} compact={compact} />}
 
         {state.text && (

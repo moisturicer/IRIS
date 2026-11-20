@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { withMathRendered } from "./PassageQuote";
 import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
+import { CloseIcon, ArrowRightIcon } from "./AskIrisIcons";
 
 interface SourceContextPanelProps {
   open:       boolean;
@@ -58,7 +59,7 @@ export function SourceContextPanel({ open, question = null, citations, sources, 
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60">
         <div className="min-w-0">
           <h2 className="text-body font-bold text-stone-800">Referenced passages</h2>
-          <p className="text-label text-stone-500 mt-0.5 break-words">
+          <p className="text-small text-stone-500 mt-0.5 break-words">
             {question ? <>For “{question}”</> : "The exact text behind the answer"}
           </p>
         </div>
@@ -68,7 +69,7 @@ export function SourceContextPanel({ open, question = null, citations, sources, 
           className="p-2 rounded-control text-stone-400 hover:bg-stone-100 hover:text-stone-700"
           aria-label="Hide sources panel"
         >
-          <i className="fas fa-xmark text-body" aria-hidden />
+          <CloseIcon />
         </button>
       </div>
 
@@ -102,18 +103,18 @@ function PassageRow({ citation, title }: { citation: ChatCitation; title: string
     <Link to={to} state={state} title={snippet || undefined}
       aria-label={openCitationLabel(citation, title)}
       className="group/row grid grid-cols-[1.375rem_minmax(0,1fr)_auto] items-start gap-x-2.5 rounded-control px-2 py-1.5 transition-colors duration-150 hover:bg-stone-100">
-      <span aria-hidden className="mt-0.5 grid h-[18px] place-items-center rounded-control bg-surface text-2xs font-semibold tabular-nums leading-none text-brand ring-1 ring-stone-300">
+      <span aria-hidden className="mt-0.5 grid h-5 min-w-5 place-items-center rounded-control bg-surface px-1 text-small font-semibold tabular-nums leading-none text-brand ring-1 ring-stone-300">
         {citation.marker}
       </span>
       <span className="min-w-0">
-        {section && <span className="block break-words text-label font-medium text-stone-600">{section}</span>}
+        {section && <span className="block break-words text-small font-medium text-stone-600">{section}</span>}
         <span className="block break-words font-display text-body italic leading-snug text-stone-700">
           {opening ? <>“{withMathRendered(opening)}”</> : <span className="font-sans not-italic text-stone-500">Open the passage</span>}
         </span>
       </span>
-      <span className="mt-0.5 flex items-center gap-1.5 text-label font-medium tabular-nums text-stone-500">
+      <span className="mt-0.5 flex items-center gap-1.5 text-small font-medium tabular-nums text-stone-500">
         {citation.page != null && <>p. {citation.page}</>}
-        <i aria-hidden className="fas fa-arrow-right text-label opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-visible/row:opacity-100" />
+        <ArrowRightIcon inline className="opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-visible/row:opacity-100 motion-reduce:transition-none" />
       </span>
     </Link>
   );
@@ -157,7 +158,7 @@ export function SourcePassages({
               </Link>
               <ResearchOriginBadge origin={card?.origin} />
             </div>
-            {byline && <p className="break-words px-2 text-label text-stone-500">{byline}</p>}
+            {byline && <p className="break-words px-2 text-small text-stone-500">{byline}</p>}
             <div className="mt-1">
               {passages.map((citation) => <PassageRow key={`${citation.chunk_id}-${citation.marker}`} citation={citation} title={title} />)}
             </div>

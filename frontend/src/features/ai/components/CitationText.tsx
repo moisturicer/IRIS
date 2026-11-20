@@ -97,7 +97,7 @@ function CitationChip({ citation, page = false }: { citation: ChatCitation; page
         className={
           "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mx-0.5 rounded-control " +
           `${panel.active === citation.marker ? SELECTED_RING : REFERENCE} ` +
-          "text-2xs font-semibold tabular-nums align-text-bottom leading-none"
+          "text-small font-semibold tabular-nums align-text-bottom leading-none"
         }
       >
         {citation.marker}
@@ -117,11 +117,11 @@ function CitationChip({ citation, page = false }: { citation: ChatCitation; page
       aria-label={label}
       className={
         page
-          ? "inline-flex items-center px-1 mx-0.5 rounded-control text-2xs font-semibold tabular-nums " +
+          ? "inline-flex items-center px-1 mx-0.5 rounded-control text-small font-semibold tabular-nums " +
             "text-brand leading-5 align-baseline no-underline hover:bg-stone-100 hover:underline transition-colors duration-150"
           : // min-w: a marker can run to three digits.
             "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mx-0.5 rounded-control " +
-            `${REFERENCE} text-2xs font-semibold tabular-nums align-text-bottom leading-none no-underline`
+            `${REFERENCE} text-small font-semibold tabular-nums align-text-bottom leading-none no-underline`
       }
     >
       {page ? `p${citation.marker}` : citation.marker}

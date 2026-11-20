@@ -21,6 +21,15 @@ describe("EmptyState", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("draws an icon element in place of a Font Awesome class (IR-1235)", () => {
+    const { container } = renderScreen(
+      <EmptyState title="Could not load" icon={<svg data-testid="own-icon" aria-hidden="true" />} />,
+    );
+
+    expect(screen.getByTestId("own-icon")).toBeInTheDocument();
+    expect(container.querySelector("i")).toBeNull();
+  });
+
   it("offers the next step through its action slot", async () => {
     const onReset = vi.fn();
     renderScreen(
