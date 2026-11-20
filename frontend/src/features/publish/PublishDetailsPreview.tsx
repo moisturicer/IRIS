@@ -1,10 +1,13 @@
-import { createContext, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, Suspense, useContext, useRef, useState, type ReactNode } from "react";
 
+import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
-import { PaperPdfReader } from "@/features/records/paper-view/PaperPdfReader";
+// Lazy (IR-1247): Publish is reachable from every page, so a static import put
+// pdf.js in the main bundle that every visitor downloads.
+import { PaperPdfReader } from "@/features/records/paper-view/lazyReader";
 import type { Region } from "@/types/ai";
 
 type PublishPane = "details" | "preview";
@@ -129,15 +132,17 @@ export function PublishDetailsPreview({
               </p>
             </div>
             <div className="flex min-h-0 flex-1 [container-type:inline-size] [container-name:reading]">
-              <PaperPdfReader
-                key={`publish:${recordId}:${sourceKey}`}
-                recordId={recordId}
-                scrollToPage={focus?.page ?? null}
-                highlightRegions={focus?.regions ?? []}
-                navKey={`publish:${recordId}:${sourceKey}:${focus?.turn ?? 0}`}
-                contained
-                fill
-              />
+              <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
+                <PaperPdfReader
+                  key={`publish:${recordId}:${sourceKey}`}
+                  recordId={recordId}
+                  scrollToPage={focus?.page ?? null}
+                  highlightRegions={focus?.regions ?? []}
+                  navKey={`publish:${recordId}:${sourceKey}:${focus?.turn ?? 0}`}
+                  contained
+                  fill
+                />
+              </Suspense>
             </div>
           </section>
 
