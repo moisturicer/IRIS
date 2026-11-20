@@ -317,3 +317,22 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
     run: withdrawRevision,
   },
 ];
+
+/** *Add reviewer*, as a reviewer's footer menu and the Reviewers list name it (IR-1139). */
+export const ADD_COLLEAGUE: readonly ReviewAction[] = REVIEW_ACTIONS.filter((a) => a.capability === "add_reviewer")
+  .map((a) => ({ ...a, label: "Add a colleague…" }));
+
+/**
+ * What a reviewer's footer may offer. With *Finish review* granted every
+ * verdict goes through it, so the drafts go with it (ADR-032 §7, IR-875);
+ * `ReviewFooterActions` turns those into buttons that open it. *Add a
+ * colleague* is in the footer's menu too, as the prototype has it (IR-1139),
+ * besides the Reviewers list in Details. Two acts are not here: *Request
+ * review*, which is the Reviewers list's (IR-685), and *Request documents*,
+ * which is the Documents tab's, beside the requests it makes (ADR-032 §7 as
+ * amended 2026-11-21, IR-1254).
+ */
+export const REVIEWER_FOOTER_ACTIONS: readonly ReviewAction[] = [
+  ...REVIEW_ACTIONS.filter((a) => !["route", "add_reviewer", "request_document"].includes(a.capability)),
+  ...ADD_COLLEAGUE,
+];
