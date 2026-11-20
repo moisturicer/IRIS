@@ -34,7 +34,7 @@ export const routes: RouteObject[] = [{
   // in a public page or in the shell itself, is drawn with no shell at all.
   errorElement: <RouteErrorScreen standalone />,
   // Names the browser tab for every page below, public or not (IR-1073): from
-  // the deepest `handle.title`, else `handle.crumb`.
+  // the deepest `handle.title`.
   element: <RouteTitle />,
   children: [
   { path: "/login",  element: <LoginPage />,  handle: { title: "Sign in" } },
@@ -65,23 +65,23 @@ export const routes: RouteObject[] = [{
         // shell, so the sidebar and in-memory state survive it (IR-745).
         errorElement: <RouteErrorScreen />,
         children: [
-          { index: true, element: <HomePage />, handle: { crumb: "Discover" } },
+          { index: true, element: <HomePage />, handle: { title: "Discover" } },
           // Retired URLs (spec §4.1). Outside the role gates: a redirect only
           // moves the address, and the page it lands on applies its own.
           ...redirectRoutes,
-          // No crumb: the reading header is this page's navigation (IR-569).
+          // The reading header is this page's navigation (IR-569).
           // The tab reads the paper's own title once it loads (IR-1073).
           {
             path: "records/:id",
             element: <DeferredPage message="Opening the paper"><PaperViewPage /></DeferredPage>,
             handle: { title: "Paper", width: "full" },
           },
-          { path: "records/mine",          element: <DeferredPage message="Loading your Library"><MyLibraryPage /></DeferredPage>,   handle: { crumb: "My Library" } },
-          { path: "opportunities",         element: <DeferredPage message="Loading calls and conferences"><CallsAndConferencesPage /></DeferredPage>, handle: { crumb: "Calls & Conferences" } },
+          { path: "records/mine",          element: <DeferredPage message="Loading your Library"><MyLibraryPage /></DeferredPage>,   handle: { title: "My Library" } },
+          { path: "opportunities",         element: <DeferredPage message="Loading calls and conferences"><CallsAndConferencesPage /></DeferredPage>, handle: { title: "Calls & Conferences" } },
           {
             element: <ProtectedRoute allowedRoles={rolesFor("myCalls")} />,
             children: [
-              { path: pathFor("myCalls"), element: <DeferredPage message="Loading your calls"><MyCallsPage /></DeferredPage>, handle: { crumb: "My Calls" } },
+              { path: pathFor("myCalls"), element: <DeferredPage message="Loading your calls"><MyCallsPage /></DeferredPage>, handle: { title: "My Calls" } },
             ],
           },
           {
@@ -91,7 +91,7 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("myTemplates"),
                 element: <DeferredPage message="Loading your Templates"><MyTemplatesPage /></DeferredPage>,
-                handle: { crumb: "My Templates" },
+                handle: { title: "My Templates" },
               },
             ],
           },
@@ -99,14 +99,14 @@ export const routes: RouteObject[] = [{
             // What each record type needs (ADR-063 decision 7, IR-974): everyone's.
             path: pathFor("guidelines"),
             element: <DeferredPage message="Loading the guidelines"><GuidelinesPage /></DeferredPage>,
-            handle: { crumb: "Guidelines" },
+            handle: { title: "Guidelines" },
           },
-          { path: "notifications",         element: <DeferredPage message="Loading notifications"><NotificationsPage /></DeferredPage>, handle: { crumb: "Notifications" } },
+          { path: "notifications",         element: <DeferredPage message="Loading notifications"><NotificationsPage /></DeferredPage>, handle: { title: "Notifications" } },
           {
             // `/ai` picks a conversation and replaces itself with that
             // conversation's own address (IR-548). Both render the same page,
             // in the same position, so moving between them keeps its state.
-            path: "ai", handle: { crumb: "Ask IRIS" },
+            path: "ai", handle: { title: "Ask IRIS" },
             children: [
               {
                 index: true,
@@ -119,16 +119,16 @@ export const routes: RouteObject[] = [{
             ],
           },
           {
-            // Edit profile sits under Profile, so its breadcrumb reads Profile > Edit profile.
-            path: "profile", handle: { crumb: "Profile" },
+            // Edit profile sits under Profile; its Cancel returns there.
+            path: "profile", handle: { title: "Profile" },
             children: [
               { index: true,  element: <DeferredPage message="Loading your profile"><ProfilePage /></DeferredPage> },
-              { path: "edit", element: <DeferredPage message="Loading your profile"><EditProfilePage /></DeferredPage>, handle: { crumb: "Edit profile" } },
+              { path: "edit", element: <DeferredPage message="Loading your profile"><EditProfilePage /></DeferredPage>, handle: { title: "Edit profile" } },
             ],
           },
-          { path: "settings",              element: <DeferredPage message="Loading settings"><SettingsPage /></DeferredPage>,    handle: { crumb: "Settings" } },
-          // Another person's Profile (IR-700); its breadcrumb is Discover / People (IR-1133).
-          { path: "people/:id",            element: <DeferredPage message="Loading the profile"><PersonProfilePage /></DeferredPage>, handle: { crumb: "People" } },
+          { path: "settings",              element: <DeferredPage message="Loading settings"><SettingsPage /></DeferredPage>,    handle: { title: "Settings" } },
+          // Another person's Profile (IR-700, IR-1133).
+          { path: "people/:id",            element: <DeferredPage message="Loading the profile"><PersonProfilePage /></DeferredPage>, handle: { title: "People" } },
 
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
@@ -137,7 +137,7 @@ export const routes: RouteObject[] = [{
                 // Only a user with review work (IR-413); anyone else goes to Discover.
                 element: <ReviewAccessRoute />,
                 children: [
-                  { path: "review",          element: <DeferredPage message="Loading My Reviews"><MyReviewsPage /></DeferredPage>,       handle: { crumb: "My Reviews" } },
+                  { path: "review",          element: <DeferredPage message="Loading My Reviews"><MyReviewsPage /></DeferredPage>,       handle: { title: "My Reviews" } },
                 ],
               },
             ],
@@ -151,7 +151,7 @@ export const routes: RouteObject[] = [{
               {
                 element: <ReviewAccessRoute />,
                 children: [
-                  { path: "review/office", element: <DeferredPage message="Loading the office console"><OfficeConsolePage /></DeferredPage>, handle: { crumb: "Office console" } },
+                  { path: "review/office", element: <DeferredPage message="Loading the office console"><OfficeConsolePage /></DeferredPage>, handle: { title: "Office console" } },
                 ],
               },
             ],
@@ -159,7 +159,7 @@ export const routes: RouteObject[] = [{
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewAnalytics")} />,
             children: [
-              { path: pathFor("reviewAnalytics"), element: <DeferredPage message="Loading workflow analytics"><ReviewAnalyticsPage /></DeferredPage>, handle: { crumb: "Workflow analytics", width: "full" } },
+              { path: pathFor("reviewAnalytics"), element: <DeferredPage message="Loading workflow analytics"><ReviewAnalyticsPage /></DeferredPage>, handle: { title: "Workflow analytics", width: "full" } },
             ],
           },
 
@@ -171,32 +171,32 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("importRecords"),
                 element: <DeferredPage message="Loading the import page"><ImportRecordsPage /></DeferredPage>,
-                handle: { crumb: "Import records" },
+                handle: { title: "Import records" },
               },
               {
                 path: pathFor("roleRequests"),
                 element: <DeferredPage message="Loading role requests"><RoleRequestsPage /></DeferredPage>,
-                handle: { crumb: "Role requests", width: "full" },
+                handle: { title: "Role requests", width: "full" },
               },
               {
                 path: pathFor("downloadRequests"),
                 element: <DeferredPage message="Loading download requests"><DownloadRequestsPage /></DeferredPage>,
-                handle: { crumb: "Download requests", width: "full" },
+                handle: { title: "Download requests", width: "full" },
               },
               {
                 path: pathFor("callRequests"),
                 element: <DeferredPage message="Loading call requests"><CallRequestsPage /></DeferredPage>,
-                handle: { crumb: "Call requests" },
+                handle: { title: "Call requests" },
               },
               {
                 path: pathFor("deleteRequests"),
                 element: <DeferredPage message="Loading delete requests"><DeleteRequestsPage /></DeferredPage>,
-                handle: { crumb: "Delete requests", width: "full" },
+                handle: { title: "Delete requests", width: "full" },
               },
               {
                 path: pathFor("setup"),
                 element: <DeferredPage message="Loading setup"><SetupPage /></DeferredPage>,
-                handle: { crumb: "Setup" },
+                handle: { title: "Setup" },
               },
             ],
           },
@@ -207,7 +207,7 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("users"),
                 element: <DeferredPage message="Loading users"><UserListPage /></DeferredPage>,
-                handle: { crumb: "Users", width: "full" },
+                handle: { title: "Users", width: "full" },
               },
             ],
           },
@@ -216,7 +216,7 @@ export const routes: RouteObject[] = [{
             children: [{
               path: pathFor("adminUsers"),
               element: <DeferredPage message="Loading users"><UserListPage /></DeferredPage>,
-              handle: { crumb: "Users", width: "full" },
+              handle: { title: "Users", width: "full" },
             }],
           },
           {
@@ -226,7 +226,7 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("audit"),
                 element: <DeferredPage message="Loading the audit log"><AuditLogPage /></DeferredPage>,
-                handle: { crumb: "Audit Log", width: "full" },
+                handle: { title: "Audit Log", width: "full" },
               },
             ],
           },
@@ -236,7 +236,7 @@ export const routes: RouteObject[] = [{
             children: [{
               path: pathFor("accountDeletionRequests"),
               element: <DeferredPage message="Loading account deletion requests"><AccountDeletionRequestsPage /></DeferredPage>,
-              handle: { crumb: "Account Deletions", width: "full" },
+              handle: { title: "Account Deletions", width: "full" },
             }],
           },
           {
@@ -245,7 +245,7 @@ export const routes: RouteObject[] = [{
             children: [{
               path: pathFor("retention"),
               element: <DeferredPage message="Loading retention"><RetentionPage /></DeferredPage>,
-              handle: { crumb: "Retention" },
+              handle: { title: "Retention" },
             }],
           },
           {
@@ -254,7 +254,7 @@ export const routes: RouteObject[] = [{
             children: [{
               path: pathFor("reportedComments"),
               element: <DeferredPage message="Loading reported comments"><ReportedCommentsPage /></DeferredPage>,
-              handle: { crumb: "Reported comments" },
+              handle: { title: "Reported comments" },
             }],
           },
 

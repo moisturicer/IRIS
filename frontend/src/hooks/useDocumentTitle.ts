@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useMatches } from "react-router-dom";
 
-import type { RouteHandle } from "@/components/layout/Breadcrumbs";
+import type { RouteHandle } from "@/components/layout/routeHandle";
 import { usePageTitleStore } from "@/store/pageTitle.store";
 
 const SUFFIX = "IRIS";
@@ -14,7 +14,7 @@ export function formatDocumentTitle(page: string | null | undefined): string {
 
 /**
  * Keeps `document.title` on the deepest route's name (IR-1073, WCAG 2.4.2):
- * its `handle.title`, else its `handle.crumb`, unless the page on screen has
+ * its `handle.title`, unless the page on screen has
  * published something more specific through `usePageTitle`.
  */
 export function useRouteDocumentTitle(): void {
@@ -23,8 +23,7 @@ export function useRouteDocumentTitle(): void {
   const named = [...matches]
     .reverse()
     .map((m) => {
-      const handle = m.handle as RouteHandle | undefined;
-      return handle?.title ?? handle?.crumb;
+      return (m.handle as RouteHandle | undefined)?.title;
     })
     .find(Boolean);
   const title = formatDocumentTitle(override ?? named);

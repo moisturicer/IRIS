@@ -547,8 +547,8 @@ export const SCREENS: Screen[] = [
     id: "notifications", path: "/notifications", route: "/notifications", role: "Student",
     mocks: wrap("Student"),
     heading: "Notifications",
-    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
-    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
+    // The breadcrumb's Discover link until IR-1255 removed the breadcrumb.
+    primary: (p) => p.getByRole("button", { name: "Mark all as read" }), primaryLabel: "Mark all as read",
   },
   {
     id: "ask-iris", path: "/ai", route: "/ai", role: "Student",
@@ -640,8 +640,8 @@ export const SCREENS: Screen[] = [
     mocks: wrap("RDCO", (api) =>
       api.on("GET", "/reviews/office/", { office: "rdco", office_label: "RDCO", rows: [], load: [] })),
     heading: /console$/,
-    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
-    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
+    // The breadcrumb's Discover link until IR-1255 removed the breadcrumb.
+    primary: (p) => p.getByRole("link", { name: "Back to My Reviews" }), primaryLabel: "Back to My Reviews",
   },
   {
     id: "workflow-analytics", path: "/rdco/analytics", route: "/rdco/analytics", role: "RDCO",
@@ -652,8 +652,8 @@ export const SCREENS: Screen[] = [
         open_now: [], time_in_stage: [], unmeasured: [], throughput: [], revision_cycles: [], preserved_by_office: [],
       })),
     heading: "Workflow analytics",
-    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
-    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
+    // The breadcrumb's Discover link until IR-1255 removed the breadcrumb.
+    primary: (p) => p.getByLabel("From"), primaryLabel: "From (date)",
   },
   {
     id: "import-records", path: "/records/import", route: "/records/import", role: "RDCO",

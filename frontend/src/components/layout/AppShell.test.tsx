@@ -10,6 +10,8 @@
  * The shell also picks each page's width from its route (IR-521): standard
  * unless the route's handle asks for "full".
  *
+ * A page starts with its own title, with no breadcrumb above it (IR-1255).
+ *
  * Every query goes through the accessible tree, by role and accessible name.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -37,8 +39,8 @@ function renderAt(path: string) {
       {
         element: <AppShell />,
         children: [
-          { path: "/records/mine", element: <h1>My Library</h1>, handle: { crumb: "My Library" } },
-          { path: "/admin/audit", element: <h1>Audit Log</h1>, handle: { crumb: "Audit Log", width: "full" } },
+          { path: "/records/mine", element: <h1>My Library</h1>, handle: { title: "My Library" } },
+          { path: "/admin/audit", element: <h1>Audit Log</h1>, handle: { title: "Audit Log", width: "full" } },
           // Stands in for Ask IRIS, whose toolbar mounts a third bell.
           {
             path: "/with-bell",
@@ -70,6 +72,16 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe("the app shell", () => {
+  it("starts a page with its own title, under no breadcrumb (IR-1255)", async () => {
+    renderAt("/records/mine");
+
+    expect(await screen.findByRole("heading", { level: 1, name: "My Library" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).not.toBeInTheDocument();
+    // Discover is still a click away, from the sidebar, and only from there.
+    const discover = screen.getByRole("link", { name: "Discover" });
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Discover" })).toBe(discover);
+  });
+
   it("draws no top bar and no search box", async () => {
     renderAt("/records/mine");
 

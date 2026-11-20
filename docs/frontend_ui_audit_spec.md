@@ -98,7 +98,7 @@ A compact per-party strip extracted from `ReviewRoutingTracker` ("Cleared on v1 
 - **Neutral copy:** Discover, sign-in and sign-up do not say "CIT-U" (IRIS is not only for CIT-U; live IR-768 already did this for part of it).
 
 ### 4.7 Navigation and layout
-- Office console and Analytics nest under My Reviews (D5). Help moves to the sidebar footer. Breadcrumbs say "Discover", not "Home". Settings tabs are addressable by `?tab=`.
+- Office console and Analytics nest under My Reviews (D5). Help moves to the sidebar footer. Breadcrumbs say "Discover", not "Home" (*superseded 2026-11-21 by IR-1255: no breadcrumb; each page starts with its own title*). Settings tabs are addressable by `?tab=`.
 - Below 1024 px the sidebar becomes a 76 px icon rail, with tooltips and accessible names.
 - On phones, Back and the section control merge into one 56 px record bar.
 - Notes sits above Ask IRIS in the corner (owner's decision, 13 Nov), and pages reserve bottom padding so text scrolls clear of both.
