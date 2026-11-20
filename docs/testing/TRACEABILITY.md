@@ -402,7 +402,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1247** | pdf.js and the paper reader load only when a paper or Publish preview is shown, not in the main bundle (1,035 → 570 KB) — no FR- id | [details](traceability/IR-1247.md) | **PARTIAL** |
 | **IR-1248** | Screens load on demand, prefetched on sidebar hover/focus; the main bundle keeps only Discover and Sign in (570 → 356 KB) — no FR- id | [details](traceability/IR-1248.md) | **PARTIAL** |
 | **IR-1249** | Classifications, PSCED codes, record types and colleges are fetched once per session and forgotten on sign-out — no FR- id | [details](traceability/IR-1249.md) | **PARTIAL** |
-| **IR-1250** | `npm run preview:local` serves the production frontend against the local stack, for judging speed and look — no FR- id | [details](traceability/IR-1250.md) | **IMPLEMENTED** |
+| **IR-1250** | `npm run preview:local` serves the production frontend against the local stack, for judging speed and look — no FR- id | [details](traceability/IR-1250.md) | **VERIFIED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
