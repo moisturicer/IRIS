@@ -370,9 +370,26 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
 
     const draft = within(recent).getByRole("link", { name: "Community Water Monitoring" }).closest("li") as HTMLElement;
     expect(within(draft).getByText("Not submitted yet. It waits on you to finish and send it.")).toBeInTheDocument();
-    // The one action reopens Publish; Delete is not offered on the Overview.
+    // The one action reopens Publish. Beside it, since IR-1256 reversed IR-1084
+    // here, the draft's red Delete trash can.
     expect(within(draft).getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/?publish=12");
-    expect(within(draft).queryByRole("button", { name: /Delete/ })).not.toBeInTheDocument();
+    expect(within(draft).getByRole("button", { name: "Delete draft “Community Water Monitoring”" })).toBeInTheDocument();
+  });
+
+  it("deletes a draft from the Overview after the same question, and drops its row (IR-1256)", async () => {
+    mine([ownRecord({})]);
+    vi.mocked(recordsApi.delete).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.delete>>);
+    const user = userEvent.setup();
+    renderScreen(<MyLibraryPage />);
+
+    const recent = await screen.findByRole("region", { name: "Recent submissions" });
+    await user.click(within(recent).getByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
+    expect(recordsApi.delete).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Delete draft" }));
+
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Community Water Monitoring" })).not.toBeInTheDocument());
+    expect(recordsApi.delete).toHaveBeenCalledWith(12);
   });
 
   it("names every office still reviewing, and the Adviser or RDCO when they hold it", async () => {
@@ -405,7 +422,7 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     expect(screen.queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
   });
 
-  it("offers Delete draft as a quiet button that names the draft before it asks", async () => {
+  it("offers Delete draft as a red trash can, named for the draft, before it asks (IR-1256)", async () => {
     mine([ownRecord({})]);
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
@@ -413,7 +430,9 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     const row = (await screen.findByRole("link", { name: "Community Water Monitoring" })).closest("li") as HTMLElement;
     expect(within(row).getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/?publish=12");
     const remove = within(row).getByRole("button", { name: "Delete draft “Community Water Monitoring”" });
-    // A ghost: no resting fill and no outline ring (a hover tint is fine).
+    // An icon alone, in the danger colour, with no resting fill or outline ring.
+    expect(remove).toHaveTextContent(/^$/);
+    expect(remove).toHaveClass("text-brand");
     expect(remove.className).not.toMatch(/(^|\s)bg-/);
     expect(remove.className).not.toMatch(/(^|\s)ring-/);
 
