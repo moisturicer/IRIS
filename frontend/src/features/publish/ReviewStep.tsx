@@ -29,6 +29,8 @@ export interface ReviewSummary {
   ownerEmails?:   string;
   typeName:       string;
   fileName:       string | null;
+  /** The other documents added to the draft, by name; null when they couldn't be read. */
+  documents:      string[] | "loading" | null;
   title:          string;
   abstract:       string;
   adviserName:    string;
@@ -56,6 +58,7 @@ interface ReviewStepProps {
   fieldLabels:      Record<string, string>;
   onEditManuscript: () => void;
   onEditDetails:    () => void;
+  onEditDocuments:  () => void;
   onEditHints:      () => void;
 }
 
@@ -73,6 +76,7 @@ export function ReviewStep({
   fieldLabels,
   onEditManuscript,
   onEditDetails,
+  onEditDocuments,
   onEditHints,
 }: ReviewStepProps) {
   return (
@@ -98,6 +102,16 @@ export function ReviewStep({
         {summary.keywords && <Row term="Keywords">{summary.keywords}</Row>}
         {summary.ownerEmails && <Row term="Owners">{summary.ownerEmails}</Row>}
         <Row term="Year">{String(summary.year)}</Row>
+      </Group>
+
+      <Group title="Documents" editLabel="Edit documents" onEdit={onEditDocuments}>
+        <Row term="Added">
+          {summary.documents === "loading"
+            ? "Checking…"
+            : summary.documents == null
+              ? "Couldn't be listed. They're kept with your draft."
+              : summary.documents.length > 0 ? summary.documents.join(", ") : "None yet"}
+        </Row>
       </Group>
 
       <Group title="Hints" editLabel="Edit hints" onEdit={onEditHints}>

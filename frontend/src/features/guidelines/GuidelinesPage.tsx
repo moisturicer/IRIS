@@ -23,30 +23,16 @@ import { PlainTextWithLinks } from "@/components/shared/PlainTextWithLinks";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { useApiRead } from "@/hooks/useApiRead";
-import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
-import { downloadBlob } from "@/lib/utils";
 import { RequirementLabel } from "@/features/setup/RequirementLabel";
+import { isGuidelines, isSharedList } from "./requirementGuide";
 import { sectionId } from "./sectionId";
+import { TemplateDownload } from "./TemplateDownload";
 
 /** The record type whose section lists Advisers' Templates (`RecordTypeName.PROPOSAL`). */
 const PROPOSAL = "Proposal";
 
 /** Only a list of record types is usable; anything else is a failed read (CODING_STANDARDS F1). */
-function isGuidelines(data: unknown): data is GuidelineRecordType[] {
-  return Array.isArray(data) && data.every(
-    (rt) => rt && typeof rt.id === "number" && typeof rt.name === "string"
-      && rt.manuscript && Array.isArray(rt.requirements),
-  );
-}
-
-function isSharedList(data: unknown): data is SharedTemplate[] {
-  return Array.isArray(data) && data.every(
-    (t) => t && typeof t.id === "number" && typeof t.title === "string" && t.shared_by
-      && typeof t.shared_by.name === "string",
-  );
-}
-
 export default function GuidelinesPage() {
   const read = useApiRead((signal) => guidelinesApi.list({ signal }).then((r) => r.data), []);
   const types = read.status === "ready" && isGuidelines(read.data) ? read.data : null;
@@ -157,47 +143,6 @@ function RequirementRow({ name, required, description, templateName, download }:
           download={download}
         />
       )}
-    </div>
-  );
-}
-
-/** A Template's file, always downloaded (decision 8); a failure is said beside it. */
-function TemplateDownload({ fileName, label, download }: {
-  fileName: string;
-  label: string;
-  download: () => Promise<{ data: Blob }>;
-}) {
-  const [problem, setProblem] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
-
-  const save = async () => {
-    setProblem(null);
-    setWorking(true);
-    try {
-      const { data } = await download();
-      downloadBlob(data, fileName);
-    } catch (err) {
-      setProblem(errorDetail(err, "The Template didn't download. Try again."));
-    } finally {
-      setWorking(false);
-    }
-  };
-
-  return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap items-center gap-2 text-small text-stone-700">
-        <i className="fas fa-file-arrow-down text-stone-500" aria-hidden />
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={working}
-          aria-label={label}
-          className="break-all text-left font-medium text-brand underline underline-offset-2 disabled:opacity-60"
-        >
-          {fileName}
-        </button>
-      </div>
-      {problem && <p role="alert" className="text-small text-brand">{problem}</p>}
     </div>
   );
 }

@@ -49,7 +49,7 @@ class RecordUploadSerializer(serializers.ModelSerializer):
 
     def get_uploaded_by_name(self, obj):
         if obj.uploaded_by:
-            return f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}".strip() or obj.uploaded_by.username
+            return f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}".strip() or None
         return None
 
 
@@ -110,7 +110,7 @@ class RecordFileSerializer(serializers.ModelSerializer):
 
     def get_uploaded_by_name(self, obj):
         if obj.uploaded_by:
-            return f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}".strip() or obj.uploaded_by.email
+            return f"{obj.uploaded_by.first_name} {obj.uploaded_by.last_name}".strip() or None
         return None
 
 

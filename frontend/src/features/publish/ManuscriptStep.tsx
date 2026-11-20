@@ -159,7 +159,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
           Manuscript file
         </h3>
         <p className="mt-1 text-small text-stone-600">
-          The full paper as a PDF. Nothing else is needed now: if a reviewer needs another document, they'll ask.
+          The full paper as a PDF. It's the only document you need to submit: step 3 lists the others your type asks for, to add now or later.
         </p>
 
         {/* The dropzone announces the start; it is gone by the end, so the
@@ -225,9 +225,9 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
 /**
  * What each record type needs, and its Templates (ADR-063 decision 7, IR-974).
  * A new tab, so leaving to read it never closes Publish; once a type is chosen,
- * straight to its section.
+ * straight to its section. The Documents step shows it too (IR-973).
  */
-function GuidelinesLink({ typeName }: { typeName: string | null }) {
+export function GuidelinesLink({ typeName }: { typeName: string | null }) {
   return (
     <p className="mt-3 text-small text-stone-600">
       <a
