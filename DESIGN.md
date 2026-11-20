@@ -297,7 +297,7 @@ The record page is a container named `reading`, and the Overview column is its o
    - Good: an abstract whose lines all end at the column's edge, at 360 px and at 1745 px.
    - Bad: a justified button label or table cell, or a heading stretched across its box.
 
-**The six allowed cuts.** These, and only these, may end in an ellipsis. Anything else needs this rule changed first. The guard test `src/test/fullTextRule.test.ts` fails on any `truncate`, `text-ellipsis` or `line-clamp-*` that is not one of them (IR-1219).
+**The seven allowed cuts.** These, and only these, may end in an ellipsis. Anything else needs this rule changed first. The guard test `src/test/fullTextRule.test.ts` fails on any `truncate`, `text-ellipsis` or `line-clamp-*` that is not one of them (IR-1219).
 - **A long file name in a table cell** may stay on one line, so one name does not make its row tall. Its full name is shown on hover and on keyboard focus (a `title` alone is not enough: it does not show on focus), and is read in full by screen readers.
   - Good: `Final_Thesis_Manuscript_Revi…` whose cell shows the whole name when hovered or focused, and is announced whole.
 - **An abstract's preview in a list card** (Discover, a person's profile) may be clamped to its few lines. The card links to the paper's page, where the whole abstract is shown, never cut.
@@ -314,6 +314,9 @@ The record page is a container named `reading`, and the Overview column is its o
 - **A paper's title in the reading bar** (the 56px row above a paper, from the reading-split width up) stays on one line and may end in `…`. The full title shows on hover and focus, screen readers read it whole, and the Overview tab shows it in full. Added by IR-1219 (decided by Hermoine Zozobrado, 2026-11-19): the bar is one row (IR-1092), and Paper Chat's dock and the reading pane are sized from its fixed height, so a wrapped title would spill over the paper.
   - Good: a long title ends in `…` in the bar; resting on it shows the whole title.
   - Bad: the same cut on the Overview's own title, or a reading-bar title with no full text on hover.
+- **A conversation's title in Ask IRIS's list** stays on one line and may end in `…`, with one **⋯** menu (Pin, Rename, Delete) in place of row buttons. While a title is cut, it shows whole in a tooltip on hover and on keyboard focus (a `title` alone is not enough). Screen readers read it whole, and the conversation shows it. Added by IR-1253 (asked for by Hermoine Zozobrado, 2026-11-21, "exactly like a Claude chat"): wrapped, a long title reflowed onto more lines whenever the row's buttons appeared on hover, and the row jumped in height.
+  - Good: `Rainwater harvesting in urban ce…` in the list; focusing it shows the whole title, and opening it shows it in the conversation.
+  - Bad: the same cut on the conversation's own heading, or a cut title with no tooltip on keyboard focus.
 
 ## Elevation & Depth
 
@@ -409,6 +412,6 @@ The same typeset entry as your own, at `/people/:id`, with a second column. **Co
 - **Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.
 - **Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.
 - **Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.
-- **Don't** cut text off with an ellipsis, a line clamp or a fixed height, or cap it narrower than its box. The six allowed cuts are named in the Full Text Rule.
+- **Don't** cut text off with an ellipsis, a line clamp or a fixed height, or cap it narrower than its box. The seven allowed cuts are named in the Full Text Rule.
 - **Don't** add a label explaining how AI text was made, or an outlined button where a ghost one is enough.
 - **Don't** put a thick accent border on a rounded shape. The one recorded exception is the entry folder's tab joined to the sheet (`EntryTab`, and register's current step), whose 2 px maroon top edge is the approved Dossier direction (the `border-accent-on-rounded` exception in `.impeccable/config.json`).
