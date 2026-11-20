@@ -1,7 +1,7 @@
 /**
  * Every routed page names its browser tab (IR-1073, audit NAV-01, WCAG 2.4.2).
  *
- * The title comes from the route table (`handle.title`, else `handle.crumb`),
+ * The title comes from the route table (`handle.title`),
  * and a page that knows more -- a paper, a conversation, a count -- refines it
  * through `usePageTitle`. These tests go through the real route table, so a new
  * route added without a name fails here rather than shipping as "IRIS".
@@ -15,7 +15,7 @@ import { READER_PROTOCOL } from "@/api/runtimeReader";
 import { ROLES } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
 import { makeUser, validToken } from "@/test/authFixtures";
-import type { RouteHandle } from "@/components/layout/Breadcrumbs";
+import type { RouteHandle } from "@/components/layout/routeHandle";
 import { routes, router as browserRouter } from "./index";
 import { REDIRECTS } from "./redirects";
 
@@ -160,7 +160,7 @@ describe("browser tab titles", () => {
 function pages(list: RouteObject[], inherited: string | undefined, redirected: Set<string>): string[] {
   return list.flatMap((route) => {
     const handle = route.handle as RouteHandle | undefined;
-    const named = handle?.title ?? handle?.crumb ?? inherited;
+    const named = handle?.title ?? inherited;
     if (route.children) return pages(route.children, named, redirected);
     if (!route.element || (route.path && redirected.has(route.path))) return [];
     return named ? [] : [route.path ?? "(index)"];
