@@ -403,7 +403,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1248** | Screens load on demand, prefetched on sidebar hover/focus; the main bundle keeps only Discover and Sign in (570 → 356 KB) — no FR- id | [details](traceability/IR-1248.md) | **PARTIAL** |
 | **IR-1249** | Classifications, PSCED codes, record types and colleges are fetched once per session and forgotten on sign-out — no FR- id | [details](traceability/IR-1249.md) | **PARTIAL** |
 | **IR-1250** | `npm run preview:local` serves the production frontend against the local stack, for judging speed and look — no FR- id | [details](traceability/IR-1250.md) | **VERIFIED** |
-| **IR-1252** | Only a published paper reaches the AI: every AI path, Ask IRIS and Paper Chat included, reads or sends a paper only while it is published, released, consented, IP-released and not deleted, and publishing queues it — ADR-052 amendment 2026-11-21; no FR- id | [details](traceability/IR-1252.md) | **IMPLEMENTED** |
+| **IR-1252** | Only a published paper reaches the AI: every AI path, Ask IRIS and Paper Chat included, reads or sends a paper only while it is published, released, consented, IP-released and not deleted, and publishing queues it — ADR-052 amendment 2026-11-21; no FR- id | [details](traceability/IR-1252.md) | **VERIFIED** |
 | **IR-1253** | Ask IRIS's conversation rows stay one line with "…" and one ⋯ menu (Pin, Rename, Delete); the Full Text Rule's seventh cut — no FR- id | [details](traceability/IR-1253.md) | **PARTIAL** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
