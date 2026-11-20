@@ -16,7 +16,7 @@ import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
-import { REVIEW_ACTIONS, type DialogReviewAction } from "./reviewActions";
+import { ADD_COLLEAGUE, REVIEWER_FOOTER_ACTIONS, REVIEW_ACTIONS, type DialogReviewAction } from "./reviewActions";
 import { ReviewFooterActions } from "./ReviewFooterActions";
 import type { ShowPlace } from "./changes/ChangeItem";
 import { ChangesTab } from "./changes/ChangesTab";
@@ -41,20 +41,7 @@ const SIDE_TAB_KEY = "iris-review-side-tab";
  * existing route and add-reviewer acts, as two separate controls (IR-685).
  * Everything else stays in the footer.
  */
-const ADD_COLLEAGUE = REVIEW_ACTIONS.filter((a) => a.capability === "add_reviewer")
-  .map((a) => ({ ...a, label: "Add a colleague…" }));
 const ROUTE = REVIEW_ACTIONS.find((a): a is DialogReviewAction => a.capability === "route" && a.kind === "dialog");
-/**
- * What the footer may offer. With *Finish review* granted every verdict goes
- * through it, so the drafts go with it (ADR-032 §7, IR-875);
- * `ReviewFooterActions` turns those into buttons that open it. *Add a
- * colleague* is in the footer's menu too, as the prototype has it (IR-1139),
- * besides the Reviewers list in Details.
- */
-const FOOTER_ACTIONS = [
-  ...REVIEW_ACTIONS.filter((a) => a.capability !== "route" && a.capability !== "add_reviewer"),
-  ...ADD_COLLEAGUE,
-];
 /** The author's tabs add Readiness, first (IR-1206); reviewers keep the tour's. */
 type Tab = TourTab | "readiness";
 
@@ -583,7 +570,7 @@ export function ReviewWorkspaceLayout({
             )
           ) : (
           <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}>
-            <ReviewFooterActions record={record} can={can} actions={FOOTER_ACTIONS} onChanged={onChanged}
+            <ReviewFooterActions record={record} can={can} actions={REVIEWER_FOOTER_ACTIONS} onChanged={onChanged}
               finishing={finishing && !record.review_claim && !unopened} onFinish={tw.finish} drafts={tw.threads.drafts.length}
               lead={record.review_claim
                 ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>

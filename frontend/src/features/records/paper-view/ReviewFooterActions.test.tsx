@@ -17,7 +17,7 @@ import type { RecordDetail } from "@/types/records";
 import { recordsApi } from "@/api/records";
 
 import { ReviewFooterActions } from "./ReviewFooterActions";
-import { REVIEW_ACTIONS } from "./reviewActions";
+import { REVIEWER_FOOTER_ACTIONS } from "./reviewActions";
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
@@ -49,12 +49,9 @@ function renderFooter(can: Capability[], { held = {}, finishing = true, lead, dr
 } = {}) {
   const onFinish = vi.fn();
   const onChanged = vi.fn();
-  const actions = [
-    ...REVIEW_ACTIONS.filter((a) => a.capability !== "route" && a.capability !== "add_reviewer"),
-    ...REVIEW_ACTIONS.filter((a) => a.capability === "add_reviewer").map((a) => ({ ...a, label: "Add a colleague…" })),
-  ];
+  // The list the Review workspace gives its footer, so these tests can't drift from it.
   const view = renderScreen(
-    <ReviewFooterActions record={record(held)} can={new Set(can)} actions={actions} finishing={finishing}
+    <ReviewFooterActions record={record(held)} can={new Set(can)} actions={REVIEWER_FOOTER_ACTIONS} finishing={finishing}
       onFinish={onFinish} lead={lead} onChanged={onChanged} drafts={drafts} />,
   );
   return { ...view, onFinish, onChanged };
@@ -76,7 +73,7 @@ describe("ReviewFooterActions", () => {
 
     const menu = await openMenu();
     expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
-      "Request revision…", "Reject…", "Request documents",
+      "Request revision…", "Reject…",
     ]);
     await userEvent.click(menu.getByRole("menuitem", { name: "Reject…" }));
     expect(onFinish).toHaveBeenCalledWith("reject");
@@ -105,12 +102,13 @@ describe("ReviewFooterActions", () => {
     expect(screen.queryByRole("button", { name: "Release embargo…" })).not.toBeInTheDocument();
   });
 
-  it("gives an office reviewer one Finish review, with documents and a colleague in the menu", async () => {
+  // Changed deliberately by IR-1254: Request documents left the menu for the Documents tab.
+  it("gives an office reviewer one Finish review, with a colleague in the menu", async () => {
     const { onFinish } = renderFooter(OFFICE);
 
     expect(toolbar().getAllByRole("button").map((b) => b.textContent)).toEqual(["", "Finish review…"]);
     const menu = await openMenu();
-    expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Request documents", "Add a colleague…"]);
+    expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add a colleague…"]);
 
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
@@ -133,7 +131,7 @@ describe("ReviewFooterActions", () => {
     const { unmount } = renderFooter(OFFICE, { drafts: 0 });
     expect(screen.queryByRole("button", { name: /^Send/ })).not.toBeInTheDocument();
     unmount();
-    renderFooter(["request_document"], { finishing: false, drafts: 2 });
+    renderFooter(["withdraw_revision"], { finishing: false, drafts: 2 });
     expect(screen.queryByRole("button", { name: /^Send/ })).not.toBeInTheDocument();
   });
 
@@ -143,13 +141,27 @@ describe("ReviewFooterActions", () => {
   });
 
   it("keeps Open review or Claim as the primary and puts every granted act in the menu", async () => {
-    renderFooter(["request_document"], {
+    // Changed deliberately by IR-1254: Withdraw revision request stands in for Request documents.
+    renderFooter(["withdraw_revision"], {
       finishing: false, lead: <button type="button">Open review</button>,
     });
 
     expect(toolbar().getAllByRole("button").map((b) => b.textContent)).toEqual(["", "Open review"]);
     const menu = await openMenu();
-    expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Request documents"]);
+    expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Withdraw revision request"]);
+  });
+
+  // IR-1254 (ADR-032 §7 as amended 2026-11-21): a document request is the Documents
+  // tab's, beside the requests it makes, so the footer never offers one.
+  it("never offers Request documents, and draws nothing when that is all that was granted", async () => {
+    const { unmount } = renderFooter(OFFICE);
+    const menu = await openMenu();
+    expect(menu.queryByRole("menuitem", { name: "Request documents" })).not.toBeInTheDocument();
+    unmount();
+
+    renderFooter(["request_document"], { finishing: false });
+    expect(screen.queryByRole("toolbar", { name: "Review actions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
   });
 
   it("draws nothing for someone granted nothing", () => {
