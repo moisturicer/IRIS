@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { once } from "./referenceLists";
 import type { AdviserOption, User, UserListItem, RoleRequest } from "@/types/auth";
 import type { NoticeAnswer } from "@/types/notice";
 
@@ -140,7 +141,8 @@ export const accountsApi = {
     apiClient.patch<RoleRequest>(`/users/role-requests/${id}/`, { action }),
 
   // Reference data
-  colleges:    ()                   => apiClient.get<PaginatedResponse<College>>("/colleges/"),
+  // A reference list: one request per session (IR-1249).
+  colleges:    ()                   => once("colleges", () => apiClient.get<PaginatedResponse<College>>("/colleges/")),
   departments: (collegeId?: number) => apiClient.get<PaginatedResponse<Department>>("/departments/", { params: collegeId ? { college: collegeId } : {} }),
   courses:     (deptId?: number)    => apiClient.get<PaginatedResponse<Course>>("/courses/", { params: deptId ? { department: deptId } : {} }),
 
