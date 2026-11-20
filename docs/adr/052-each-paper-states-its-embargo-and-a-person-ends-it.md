@@ -10,7 +10,7 @@
 
 **Amended again 2026-11-04 (Hermoine Zozobrado, IR-879 design session; Accepted): every paper is embargoed by default.** Decisions 2, 3, 5 and 16 and the IR-816 and IR-812 amendments change. See *Amendment — 2026-11-04 (IR-879): embargoed by default* at the end. Built by IR-882.
 
-**Amended 2026-11-21 (Hermoine Zozobrado; IR-1252; Accepted on merge): only a published paper reaches the AI.** A release no longer sends a paper to the AI on its own; publishing a released paper does, and Ask IRIS reads nothing else, not even a title. Decision 10 changes. See *Amendment — 2026-11-21 (IR-1252): only a published paper reaches the AI* at the end.
+**Amended 2026-11-21 (Hermoine Zozobrado; IR-1252; Accepted 2026-11-21): only a published paper reaches the AI.** Merged in PR #933 and approved by Ashlee Sean and, verbally, Jive Tyler I. Revalde, as relayed by Hermoine Zozobrado. Not built yet: IR-1252 builds it. A release no longer sends a paper to the AI on its own; publishing a released paper does, and Ask IRIS reads nothing else, not even a title. Decision 10 changes. See *Amendment — 2026-11-21 (IR-1252): only a published paper reaches the AI* at the end.
 
 **Amended 2026-11-13 by [ADR-066](066-ip-applications-beside-publishing.md) (IR-978; Accepted): starting an IP application sets the IP mark.** The mark still never clears, and filing doesn't release the paper: KTTO's IP release (decisions 11–13) stays a separate act.
 
@@ -217,7 +217,7 @@ Decided by Hermoine Zozobrado in the review-workspace design session. Transcribe
 
 ## Amendment — 2026-11-21 (IR-1252): only a published paper reaches the AI
 
-**Decided by Hermoine Zozobrado on 2026-11-21. Accepted on merge.**
+**Decided by Hermoine Zozobrado on 2026-11-21. Accepted 2026-11-21**: PR #933 merged, approved by Ashlee Sean and, verbally, Jive Tyler I. Revalde, as relayed by Hermoine Zozobrado. To be built by IR-1252.
 
 **What changes.** A paper reaches the AI only while it is **published** (`PUBLICLY_VISIBLE_STATUSES`, what Discover lists), **and** every existing condition still holds: its embargo is released, it has consent, an IP mark has KTTO's release, and it isn't deleted. A released paper that is still in review, or accepted but kept unlisted, reaches nothing. "The AI" means every path that sends a paper's text or details out of IRIS, or hands them to a model:
 - Unstructured's read;
