@@ -1,14 +1,11 @@
-import { Suspense, useEffect, useId, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { failureMessage } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
-import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
-import { StatusBadge } from "@/components/shared/StatusBadge";
-import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
-import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
 import { useElementWidth } from "@/hooks/useElementWidth";
@@ -19,13 +16,8 @@ import { followedFromPaperChat, hasCitationQuote } from "@/lib/citedPage";
 import type { ThreadDocument } from "@/types/records";
 import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
-import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
-import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
-import { RelatedWorks } from "./RelatedWorks";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { ContinueProposal } from "../ContinueProposal";
-import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
-import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
   capabilitiesFor,
   hasPaper as recordHasPaper,
@@ -34,52 +26,37 @@ import {
   isReviewing,
   seatToOpen,
   sectionsFor,
-  type PaperSection,
+  type PaperSection as Section,
   type Viewer,
 } from "@/features/records/capabilities";
-import {
-  usePaperChat,
-  PaperChatPanel,
-  PANEL_WIDTH_MIN,
-} from "./PaperChatDock";
-import { AskIrisFab, CORNER_CLEARANCE_CLASS, NotesFab } from "./AskIrisFab";
-import { NotesPanel } from "./NotesPanel";
+import { usePaperChat } from "./PaperChatDock";
+import { CORNER_CLEARANCE_CLASS } from "./AskIrisFab";
 import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
 import { HighlightSwatch, type SelectionAction } from "./SelectionMenu";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
-import { CommentsSection } from "./CommentsSection";
-import { PaperAiOverview } from "./PaperAiOverview";
-import { ContactPersonCard } from "./ContactPersonCard";
-import { EmbargoCard } from "./EmbargoCard";
-import { UnlistedCard } from "./UnlistedCard";
-import { RdcoPaperControls } from "./RdcoPaperControls";
-import { PaperGovernance } from "./PaperGovernance";
-import { DocumentsTab } from "./DocumentsTab";
-import { DocumentInReader, type ShownDocumentState } from "./DocumentInReader";
+import { type ShownDocumentState } from "./DocumentInReader";
 import { slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { EditDetailsDialog } from "./EditDetailsDialog";
-import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
-import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
-import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 import { REVIEW_ACTIONS } from "./reviewActions";
-import { VersionBanner, VersionPicker } from "./VersionPicker";
-import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier } from "./paneLayout";
+import { VersionPicker } from "./VersionPicker";
+import { readingTier } from "./paneLayout";
 import { ReadingHeader } from "./ReadingHeader";
-import { titleSizeClasses } from "./titleSize";
 import { useFragmentFocus } from "./useFragmentFocus";
-import { type CitationResolution } from "./useCitationReference";
+import { citationLandingNotice } from "./citationLandingNotice";
 import { useCitationLanding } from "./useCitationLanding";
 import { useViewLocation } from "./useViewLocation";
-import { WAITING_TARGET } from "../waitingOnYou";
-import { SectionHeading } from "./headings";
 import { PaperDownloadControl } from "./PaperDownloadControl";
-import { PaperPdfReader } from "./lazyReader";
-import { PersonChip } from "./PersonLink";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { IpTagger } from "./IpTagger";
 import { LoadingSkeleton, MainColumnSkeleton } from "./PaperViewSkeletons";
 import { useRecordLoader } from "./useRecordLoader";
 import { useSidePanel } from "./useSidePanel";
+import { PaperSection } from "./PaperSection";
+import { OverviewSection } from "./OverviewSection";
+import { ReviewSection } from "./ReviewSection";
+import { RecordDetailsRail } from "./RecordDetailsRail";
+import { EditorialHeader, LineageLinks } from "./EditorialHeader";
+import { SaveCiteShare } from "./SaveCiteShare";
+import { SidePanel } from "./SidePanel";
 
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
@@ -119,7 +96,6 @@ export default function PaperViewPage() {
   // The previous paper stays in state while the next one loads, so it must match the address.
   usePageTitle(record && String(record.id) === id ? record.title : null);
   const [citeOpen, setCiteOpen] = useState(false);
-  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
   const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
@@ -167,29 +143,10 @@ export default function PaperViewPage() {
   // offered beside any other: the Ask IRIS page still searches the published ones.
   const askOffered = record?.pipeline_status === PIPELINE_STATUS.PUBLISHED;
   // Ask IRIS and Notes (IR-569, IR-580): one panel, laid out by reading tier.
-  const {
-    note,
-    notesWanted,
-    openNotes,
-    openAskFromNotes,
-    askAbout,
-    addToNote,
-    panelRef,
-    askButtonRef,
-    notesButtonRef,
-    chatMinimized,
-    chatModal,
-    panelRoom,
-    panelWidth,
-    panelClass: chatPanelClass,
-    closeChat,
-    backToPaper,
-    openAsk,
-    restore,
-    stepAsideForHighlight,
-  } = useSidePanel({
+  const panel = useSidePanel({
     chat, id, onPaperTab, onReviewTab, tier, workspaceWidth, askOffered, arriving, openAtPage, arrivalKey,
   });
+  const { notesWanted, askAbout, addToNote, chatMinimized, chatModal, stepAsideForHighlight } = panel;
   // The reader draws the reader's own highlights wherever the paper shows, so
   // they are read then, and when Notes lists them (IR-583).
   const highlights = useReadingHighlights(Number(id), !arriving && (onPaperTab || onReviewTab || notesWanted));
@@ -201,20 +158,6 @@ export default function PaperViewPage() {
     return leaveReadingRail;
   }, [onPaperTab, enterReadingRail, leaveReadingRail]);
 
-  // Share copies the paper's permanent link (IR-356), the address a reader
-  // would paste to a colleague. A blocked clipboard claims nothing.
-  const handleShare = async () => {
-    let outcome: "copied" | "failed" = "copied";
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/records/${id}`);
-    } catch {
-      // No clipboard (plain http, or permission refused): say so rather
-      // than failing silently; the address bar still has the link.
-      outcome = "failed";
-    }
-    setShareState(outcome);
-    window.setTimeout(() => setShareState("idle"), 2500);
-  };
 
   /**
    * RDCO withdrew the paper (IR-798): it is deleted, so reading it again would
@@ -274,7 +217,6 @@ export default function PaperViewPage() {
 
   const editOpen = editRequested && can.has("edit_details") && !arriving;
 
-  const authorNames = record.authors.map((a) => a.name.trim()).filter(Boolean);
 
   // Versions (IR-416). Null to a viewer who may not read the review, so a
   // reader of a published paper has none, and `?version=` means nothing to
@@ -388,105 +330,19 @@ export default function PaperViewPage() {
   const pendingInBar =
     (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && !shown &&
     record.download?.state === "pending";
-  // The one reader (IR-352), for the Paper tab and the Review section alike:
-  // a citation lands the same way in either (IR-354).
-  const reader = () => (
-    <>
-      {(viewedVersion || record.manuscript_unsubmitted) && (
-      <div className={cn("space-y-3", onPaperTab && "px-4 pt-3")}>
-      {viewedVersion && latestVersion && (
-        <VersionBanner
-          viewing={viewedVersion.number}
-          latest={latestVersion.number}
-          onBack={() => setViewParam("version", null)}
-        />
-      )}
-      {/* The owner reads their own unsubmitted upload; nobody else is served
-          it (IR-273), so only they are told. */}
-      {!viewedVersion && record.manuscript_unsubmitted && (
-        <div className="rounded-card border border-stone-300 bg-surface px-4 py-3 flex items-start gap-3">
-          <i className="fas fa-file-pen text-sm text-brand mt-0.5" aria-hidden />
-          <div className="min-w-0 flex-1 text-sm">
-            <p className="font-semibold text-stone-900">Your revised manuscript, not yet submitted</p>
-            <p className="text-stone-700 mt-0.5">
-              Reviewers still read {latestVersion ? `v${latestVersion.number}` : "the submitted version"} until
-              you submit the new version.
-            </p>
-            <p className="text-stone-700 mt-0.5">
-              Ask IRIS answers about the submitted version
-              {latestVersion ? ` (v${latestVersion.number})` : ""} until you submit.
-            </p>
-          </div>
-        </div>
-      )}
-      </div>
-      )}
-      {landingNotice && (
-        <p role="status" className={cn("text-small text-stone-600", onPaperTab ? "px-4 pt-3" : "mb-3")}>
-          {landingNotice}
-        </p>
-      )}
-      {highlights.notice && (
-        <p role="status" className={cn("text-small", highlights.notice.kind === "saved" ? "text-stone-600" : "font-semibold text-brand", onPaperTab ? "px-4 pt-3" : "mb-3")}>
-          {highlights.notice.text}
-        </p>
-      )}
-      <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
-        <PaperPdfReader
-          recordId={record.id}
-          version={viewedVersion?.number ?? null}
-          scrollToPage={openedInShown ? openedInShown.page : viewedVersion ? null : landingPage}
-          // Where the reader left off follows their account (IR-573); a citation,
-          // a highlight or `?page=` above still wins, and an earlier Version keeps
-          // none. A citation still being re-read keeps none yet, so the old place
-          // is never put back only to jump to the citation after.
-          keepPlace={resolution.status !== "loading"}
-          highlightRegions={highlightRegions}
-          landingLook={openedInShown ? "highlight" : "citation"}
-          navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey}
-          highlights={drawnHighlights}
-          selectionActions={selectionActions}
-          highlightsShown={highlightsShown}
-          onHighlightsShownChange={setHighlightsShown}
-          contained={onPaperTab || reviewWorkspace || tier === "wide"}
-          fill={onPaperTab || reviewWorkspace}
-          // Notes and Ask IRIS float over the Paper tab's bottom-right (IR-1079).
-          clearCorner={onPaperTab}
-          // On a phone's one-row bar there is no room for the version, so it
-          // sits at the start of the reader's toolbar (IR-1092).
-          toolbarStart={(onPaperTab || reviewWorkspace) && tier === "single" ? paperVersion : undefined}
-          downloadControl={
-            // An earlier version is not offered as a copy: the download route
-            // serves only the current paper, and every copy must be marked.
-            viewedVersion ? undefined : (
-              <PaperDownloadControl
-                recordId={record.id}
-                recordTitle={record.title}
-                download={record.download}
-                fill={onPaperTab || reviewWorkspace}
-                onChanged={reloadRecord}
-                pending={pendingInBar ? "elsewhere" : "here"}
-              />
-            )
-          }
-        />
-      </Suspense>
-    </>
-  );
 
+  // Where *View* opens the paper: Paper, or a participant's Review (IR-879).
+  const hasPaper = readerSection !== "overview" && recordHasPaper(record);
+  const showRail = section === "overview" && !arriving;
+  // Ask IRIS open beside the page leaves no room for the rail (IR-569).
+  const railHidden = showRail && chat.open && !chatMinimized;
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else View (Save
   // where there is no paper to view, IR-569). When
   // the pending action has its own region -- the revision banner, the
   // Review section's action bar -- the header fills nothing. The bar fills
   // its first granted action, so any granted review action puts the primary
-  // there.
-  // Where *View* opens the paper: Paper, or a participant's Review (IR-879).
-  const hasPaper = readerSection !== "overview" && recordHasPaper(record);
-  const showRail = section === "overview" && !arriving;
-  // Ask IRIS open beside the page leaves no room for the rail (IR-569).
-  const railHidden = showRail && chat.open && !chatMinimized;
-  // A draft never reaches this page (it opens in Publish, IR-1227), so
+  // there. A draft never reaches this page (it opens in Publish, IR-1227), so
   // `continue_draft` has no action here.
   const primary = can.has("create_version")
     ? "elsewhere"
@@ -533,7 +389,7 @@ export default function PaperViewPage() {
     />
   ) : null;
 
-  const tabId = (s: PaperSection) => `${tabsId}-${s}`;
+  const tabId = (s: Section) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (step === 0) return;
@@ -553,24 +409,13 @@ export default function PaperViewPage() {
       View
     </button>
   );
+  const saveCiteShare = (
+    <SaveCiteShare record={record} savePrimary={primary === "save"} onCite={() => setCiteOpen(true)} />
+  );
 
   // What left the owners' header for their Review's Details tab (IR-1206):
   // fixing the title or abstract during a revision, and where the paper
   // came from or went next. Each only where the server offers it.
-  const lineageLinks = (
-    <>
-      {record.lineage?.derived_from && (
-        <Link to={`/records/${record.lineage.derived_from.id}`} className="text-small underline">
-          Developed from Proposal #{record.lineage.derived_from.id} — View proposal
-        </Link>
-      )}
-      {record.lineage?.continued_as && (
-        <Link to={`/records/${record.lineage.continued_as.id}`} className="text-small underline">
-          Continued as {record.lineage.continued_as.record_type_name} #{record.lineage.continued_as.id}
-        </Link>
-      )}
-    </>
-  );
   const authorDetails = (can.has("edit_details") || can.has("continue_as") || record.lineage?.derived_from || record.lineage?.continued_as) ? (
     <div className="flex flex-col items-start gap-3">
       {can.has("edit_details") && (
@@ -579,42 +424,45 @@ export default function PaperViewPage() {
           Edit details
         </button>
       )}
-      {lineageLinks}
+      <LineageLinks lineage={record.lineage} />
       {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
     </div>
   ) : null;
 
-  const saveCiteShareActions = (
-    <>
-      <PaperSaveDropdown
-        record={record}
-        variant="pill"
-        emphasis={primary === "save" ? "primary" : "secondary"}
-      />
-
-      <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
-        <i className="fas fa-quote-right text-2xs" aria-hidden />
-        Cite
-      </button>
-
-      <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
-        <i
-          className={cn(
-            "fas text-2xs",
-            shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
-          )}
-          aria-hidden
-        />
-        {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
-      </button>
-      <span className="sr-only" role="status" aria-live="polite">
-        {shareState === "copied"
-          ? "Link to this paper copied"
-          : shareState === "failed"
-            ? "Couldn’t copy the link. Copy it from the address bar."
-            : ""}
-      </span>
-    </>
+  // The one reader (IR-352), for the Paper tab and the Review section alike:
+  // a citation lands the same way in either (IR-354).
+  const reader = (
+    <PaperSection
+      record={record}
+      viewedVersion={viewedVersion}
+      latestVersion={latestVersion}
+      onShowCurrentVersion={() => setViewParam("version", null)}
+      landingNotice={landingNotice}
+      highlightsNotice={highlights.notice}
+      onPaperTab={onPaperTab}
+      workspace={onPaperTab || reviewWorkspace}
+      contained={onPaperTab || reviewWorkspace || tier === "wide"}
+      // On a phone's one-row bar there is no room for the version, so it
+      // sits at the start of the reader's toolbar (IR-1092).
+      toolbarStart={(onPaperTab || reviewWorkspace) && tier === "single" ? paperVersion : undefined}
+      pendingInBar={pendingInBar}
+      onDownloadChanged={reloadRecord}
+      reader={{
+        scrollToPage: openedInShown ? openedInShown.page : viewedVersion ? null : landingPage,
+        // Where the reader left off follows their account (IR-573); a citation,
+        // a highlight or `?page=` above still wins, and an earlier Version keeps
+        // none. A citation still being re-read keeps none yet, so the old place
+        // is never put back only to jump to the citation after.
+        keepPlace: resolution.status !== "loading",
+        highlightRegions,
+        landingLook: openedInShown ? "highlight" : "citation",
+        navKey: openedInShown ? `highlight-${openedInShown.key}` : arrivalKey,
+        highlights: drawnHighlights,
+        selectionActions,
+        highlightsShown,
+        onHighlightsShownChange: setHighlightsShown,
+      }}
+    />
   );
 
   return (
@@ -710,85 +558,23 @@ export default function PaperViewPage() {
               railHidden && "mx-auto",
             )}
           >
-            {/* Editorial header (IR-356): what it is, who wrote it, then
-                what to do with it. Not in Paper mode, where the record bar
-                holds the paper in one line (IR-569). */}
+            {/* Editorial header (IR-356): not in Paper mode, where the record
+                bar holds the paper in one line (IR-569). */}
             {!onPaperTab && !reviewWorkspace && (
-            <header className={cn("space-y-5", section === "overview" && "pb-1")}>
-              {/* Sized by its length (IR-1264), never cut. */}
-              <h1 className={cn("font-display font-semibold tracking-tight text-stone-900 text-balance", titleSizeClasses(record.title))}>
-                {record.title}
-              </h1>
-
-              {/* The byline (IR-1264): each author, then the Adviser when the
-                  record names one (IR-472), in their own pill. Where the record
-                  stands is in Record details for those in its review, and the
-                  year and what it is held under are Record details' rows
-                  (IR-1089), so the header carries neither. */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {authorNames.length > 0 ? (
-                  <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
-                    {authorNames.map((name) => {
-                      const owner = record.owners.find((candidate) => candidate.full_name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
-                      return (
-                        <li key={name}>
-                          <PersonChip id={owner?.user} hasProfile={owner?.has_profile} name={name} role="Author" />
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : <p className="text-sm text-stone-500 italic">Authors not recorded</p>}
-                {record.adviser_name && (
-                  <ul className="flex items-center gap-2 flex-wrap" aria-label="Adviser">
-                    <li>
-                      <PersonChip
-                        id={record.adviser ?? undefined}
-                        hasProfile={record.adviser != null && record.adviser_has_profile === true}
-                        name={record.adviser_name}
-                        role="Adviser"
-                      />
-                    </li>
-                  </ul>
-                )}
-                <ResearchOriginBadge origin={record.origin} />
-              </div>
-
-              {lineageLinks}
-              {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
-              {/* The version picker (IR-416) whenever there is a version,
-                  v1 alone included (IR-1214), and beside the owner's
-                  unsubmitted revision (IR-273). */}
-              {latestVersion && (
-                <VersionPicker
-                  unsubmitted={record.manuscript_unsubmitted}
-                  versions={versions}
-                  viewing={viewedVersion?.number ?? null}
-                  onChoose={chooseVersion}
-                />
-              )}
-
-              {(section !== "overview" || primary === "open_review" || can.has("edit_details")) && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  {primary === "open_review" && (
-                    <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
-                      <i className="fas fa-clipboard-check text-xs" aria-hidden />
-                      Open review
-                    </button>
-                  )}
-
-                  {section !== "overview" && viewAction}
-
-                  {can.has("edit_details") && (
-                    <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
-                      <i className="fas fa-pen text-2xs" aria-hidden />
-                      Edit details
-                    </button>
-                  )}
-
-                  {section !== "overview" && saveCiteShareActions}
-                </div>
-              )}
-            </header>
+              <EditorialHeader
+                record={record}
+                section={section}
+                can={can}
+                primary={primary}
+                versions={versions}
+                latestVersion={latestVersion}
+                viewedVersion={viewedVersion}
+                onChooseVersion={chooseVersion}
+                onOpenReview={openReview}
+                onEditDetails={() => setViewParam("edit", "details")}
+                viewAction={viewAction}
+                saveCiteShareActions={saveCiteShare}
+              />
             )}
 
             <div
@@ -797,277 +583,73 @@ export default function PaperViewPage() {
               aria-labelledby={tabId(section)}
               className={onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
             >
-            {section === "paper" && reader()}
+            {section === "paper" && reader}
 
             {section === "overview" && (
-              <>
-                {/* Action required (spec §4.10): what is waiting on the
-                    owner comes first. The revision banner and the document
-                    requests below are that, whole; a separate "Your
-                    submission" summary repeated them and the rail (IR-1264). */}
-                {/* Revision requests are answered through Submit new version. */}
-                {userIsOwner && record.revision.open.length > 0 && (
-                  <section
-                    id={WAITING_TARGET.revision}
-                    tabIndex={-1}
-                    aria-labelledby="revision-requested-heading"
-                    className="rounded-card border border-stone-300 bg-surface p-4 scroll-mt-20 focus:outline-none"
-                  >
-                    <h2
-                      id="revision-requested-heading"
-                      className="text-sm font-bold text-brand-dark flex items-center gap-2"
-                    >
-                      <i className="fas fa-arrow-rotate-left text-xs" aria-hidden />
-                      Revision requested
-                    </h2>
-                    <p className="text-sm text-brand leading-relaxed mt-1">
-                      Nothing can be decided on this record until you answer with a new version. Offices
-                      that already cleared it keep their clearance; only the reviewers who asked look again.
-                    </p>
-                    <ul className="mt-3 space-y-3">
-                      {record.revision.open.map((r) => (
-                        <li key={r.id} className="text-sm text-stone-900">
-                          <p className="font-semibold">
-                            {r.label} asked for changes
-                            {r.version != null && <span className="font-normal text-stone-600"> · on v{r.version}</span>}
-                          </p>
-                          {r.reason && (
-                            <p className="text-justified mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
-                              {r.reason}
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                    {can.has("create_version") && record.revision.new_version && (
-                      <div className="mt-4 border-t border-stone-300 pt-3">
-                        <p className="text-sm text-stone-700 leading-relaxed">
-                          Upload your revised manuscript here, add any requested document below, or edit
-                          the details, then submit. {newVersionSummary(record.revision.new_version)}
-                        </p>
-                        {can.has("replace_manuscript") && (
-                          <div className="mt-3">
-                            <RevisionManuscriptUpload
-                              recordId={record.id}
-                              staged={record.manuscript_unsubmitted}
-                              onUploaded={handleDocumentRequestChanged}
-                            />
-                          </div>
-                        )}
-                        {record.revision.new_version.blocked && (
-                          <p id="new-version-blocked" className="text-sm text-brand mt-2">
-                            {record.revision.new_version.blocked}
-                          </p>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setNewVersionOpen(true)}
-                          aria-describedby={record.revision.new_version.blocked ? "new-version-blocked" : undefined}
-                          className={cn(PILL_PRIMARY, "mt-3")}
-                        >
-                          <i className="fas fa-paper-plane text-2xs" aria-hidden />
-                          Submit new version
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                )}
-                {/* Rendered while a version can be submitted, so the
-                    announcement lands when it fills; nowhere else, so the page
-                    keeps one status region (Share's) otherwise. */}
-                {(record.revision.new_version != null || newVersionDone) && (
-                  <p role="status" aria-live="polite" className="sr-only">
-                    {newVersionDone ?? ""}
-                  </p>
-                )}
-                {newVersionOpen && record.revision.new_version && (
-                  <NewVersionDialog
-                    recordId={record.id}
-                    hint={record.revision.new_version}
-                    newManuscript={record.manuscript_unsubmitted}
-                    onClose={() => setNewVersionOpen(false)}
-                    onDone={(outcome) => {
-                      setNewVersionOpen(false);
-                      setNewVersionDone(outcome);
-                      addToast({ type: "success", message: outcome });
-                      setTrackerVersion((n) => n + 1);
-                      // A failed reload leaves the page as it was, unless the
-                      // Record can no longer be read (IR-906, IR-1273).
-                      void reloadRecord();
-                    }}
-                    onRefreshed={(fresh) => {
-                      replaceRecord(fresh);
-                      setTrackerVersion((n) => n + 1);
-                    }}
-                  />
-                )}
-
-                {userIsOwner && (
-                  <ActionRequiredPanel
-                    id={WAITING_TARGET.document}
-                    recordId={record.id}
-                    onChanged={handleDocumentRequestChanged}
-                  />
-                )}
-
-                {record.workflow_state === "rejected" && (
-                  <div className="rounded-card border border-stone-300 bg-surface p-4">
-                    <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
-                      <i className="fas fa-circle-xmark text-xs" aria-hidden />
-                      This record was rejected
-                    </p>
-                    <p className="text-sm text-brand leading-relaxed mt-1">
-                      It cannot be resubmitted. Contact the relevant office if you have questions.
-                    </p>
-                  </div>
-                )}
-
-                {/* Reading sections are separated by space. */}
-                <div className="space-y-8">
-                {/* The abstract shares the reading column with its heading and actions. */}
-                <section>
-                  <SectionHeading>Abstract</SectionHeading>
-                  {record.abstract ? (
-                    <p className="text-justified text-lg text-stone-700 leading-7">
-                      {record.abstract}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-stone-500 italic">
-                      No abstract was provided for this record.
-                    </p>
-                  )}
-                  <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-2.5">
-                    {viewAction}
-                    {saveCiteShareActions}
-                  </div>
-                </section>
-
-                <PaperAiOverview record={record} />
-
-                {can.has("tag_ip") && (
-                  <IpTagger
-                    recordId={record.id}
-                    currentIpType={record.ip_type}
-                    onSaved={(updated) => replaceRecord(updated)}
-                  />
-                )}
-
-                {/* The Novelty check (IR-312): the owner's own Proposal only,
-                    per ADR-029's 2026-09-26 amendment, item 9. */}
-                {userIsOwner && record.record_type_name === "Proposal" && (
-                  <RelatedPublishedResearch recordId={record.id} />
-                )}
-
-                <RelatedWorks recordId={record.id} />
-
-                {/* Public comments belong to published papers' Overview only. */}
-                {record.pipeline_status === "published" && (
-                  <CommentsSection recordId={record.id} viewerId={user?.id ?? null} viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null} />
-                )}
-                </div>
-              </>
+              <OverviewSection
+                record={record}
+                can={can}
+                userIsOwner={userIsOwner}
+                viewerId={user?.id ?? null}
+                viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null}
+                actions={<>{viewAction}{saveCiteShare}</>}
+                newVersionOpen={newVersionOpen}
+                newVersionDone={newVersionDone}
+                onOpenNewVersion={() => setNewVersionOpen(true)}
+                onCloseNewVersion={() => setNewVersionOpen(false)}
+                onNewVersionDone={(outcome) => {
+                  setNewVersionOpen(false);
+                  setNewVersionDone(outcome);
+                  addToast({ type: "success", message: outcome });
+                  setTrackerVersion((n) => n + 1);
+                  // A failed reload leaves the page as it was, unless the
+                  // Record can no longer be read (IR-906, IR-1273).
+                  void reloadRecord();
+                }}
+                onNewVersionRefreshed={(fresh) => {
+                  replaceRecord(fresh);
+                  setTrackerVersion((n) => n + 1);
+                }}
+                onDocumentsChanged={handleDocumentRequestChanged}
+                onRecordReplaced={replaceRecord}
+              />
             )}
 
             {section === "review" && (
-              <ReviewWorkspaceLayout
+              <ReviewSection
                 record={record}
-                authorView={userIsOwner}
-                authorDetails={userIsOwner ? authorDetails : undefined}
+                can={can}
+                userIsOwner={userIsOwner}
+                reviewing={reviewing}
+                authorDetails={authorDetails}
                 onOpenReview={openReview}
                 onShowVersion={chooseVersion}
-                can={can}
-                reader={recordHasPaper(record)
-                  ? shown
-                    ? <DocumentInReader recordId={record.id} shown={shown} onBack={showManuscript}
-                        fill={reviewWorkspace} contained={reviewWorkspace || tier === "wide"} />
-                    : reader()
-                  : null}
+                reader={reader}
+                shown={shown}
                 onShowManuscript={showManuscript}
-                onShowDocument={recordHasPaper(record) ? showThreadDocument : undefined}
+                onShowThreadDocument={showThreadDocument}
+                onOpenDocument={openDocument}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
-                // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
                 showDocuments={documentsWanted}
-                // Once shown, the request is spent: the tab is the reviewer's to change.
                 onDocumentsShown={() => setViewParams({ documents: null, section: "review" })}
-                documents={
-                  <DocumentsTab
-                    record={record}
-                    owner={userIsOwner}
-                    editable={can.has("edit_details")}
-                    reviewing={reviewing}
-                    attach={can.has("attach_file")}
-                    replaceManuscript={can.has("replace_manuscript")}
-                    onChanged={handleDocumentRequestChanged}
-                    onOpen={recordHasPaper(record) ? openDocument : undefined}
-                  />
-                }
               />
             )}
             </div>
           </div>
           )}
 
-          {/* What the record is held under, and what is attached (spec §4.6).
-              Beside the page while it is wide, sticky under the record bar;
-              under it otherwise. The party status strip is for participants. */}
           {showRail && (
-            // Folds away while Ask IRIS is open (rows when it sits under the
-            // page, the column when it sits beside), and is inert meanwhile.
-            <div
-              aria-hidden={railHidden || undefined}
-              {...(railHidden ? { inert: "" } : {})}
-              className={cn(
-                "grid min-w-0 transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                // The track is the scroller's content box, so the aside can
-                // fit what its own scrollbar leaves rather than the full
-                // column (IR-1178).
-                "overview-wide:sticky overview-wide:grid-rows-[1fr] overview-wide:grid-cols-[minmax(0,1fr)] overview-wide:overflow-y-auto overview-wide:overflow-x-hidden",
-                OVERVIEW_ASIDE_TOP,
-                OVERVIEW_ASIDE_MAX_HEIGHT,
-                railHidden ? "grid-rows-[0fr] opacity-0 invisible" : "grid-rows-[1fr] opacity-100",
-              )}
-            >
-              <aside
-                aria-labelledby={`${tabsId}-details`}
-                // The column's width, held while the column folds, but never
-                // wider than the scroller leaves it: its scrollbar takes ~23px
-                // and the scroller clipped every row's right edge (IR-1178).
-                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:min-w-[15rem] overview-wide:max-w-full overview-wide:overflow-visible"
-              >
-                <h2 id={`${tabsId}-details`} className="font-display text-section font-semibold text-stone-900">
-                  Record details
-                </h2>
-                {/* Where the record stands, for those in its review, with who
-                    has cleared it; the history is Review's (IR-1264). */}
-                {participant && (
-                  <ReviewRoutingTracker
-                    key={trackerVersion}
-                    recordId={record.id}
-                    status={<StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />}
-                    onOpenHistory={() => setViewParam("section", "review")}
-                  />
-                )}
-                <PaperGovernance
-                  record={record}
-                  // Those in the review see every row; anyone else only the
-                  // ones that say something (IR-1264). Decided by participation,
-                  // never by role (IR-411).
-                  full={participant}
-                  showStatus={!participant}
-                />
-                <ContactPersonCard record={record} onChanged={reloadRecord} />
-                <EmbargoCard record={record} onChanged={reloadRecord} />
-                <UnlistedCard record={record} onChanged={reloadRecord} />
-                <RdcoPaperControls
-                  record={record}
-                  onChanged={reloadRecord}
-                  onWithdrawn={handleRdcoWithdrawn}
-                />
-                {/* No Documents card (IR-1244): Review's Documents tab lists them for
-                    those who may download them, and nobody else is sent them. */}
-              </aside>
-            </div>
+            <RecordDetailsRail
+              record={record}
+              headingId={`${tabsId}-details`}
+              participant={participant}
+              hidden={railHidden}
+              trackerVersion={trackerVersion}
+              onOpenHistory={() => setViewParam("section", "review")}
+              onChanged={reloadRecord}
+              onWithdrawn={handleRdcoWithdrawn}
+            />
           )}
           </div>
 
@@ -1085,114 +667,24 @@ export default function PaperViewPage() {
         )}
       </div>
 
-      {/* Over the paper, the rest of the page waits behind a scrim. */}
-      {chatModal && (
-        <div
-          aria-hidden
-          onClick={closeChat}
-          className="hidden reading-split:block reading-wide:hidden absolute inset-0 z-30 bg-stone-900/25"
-        />
-      )}
-      {chat.open && chat.tool === "ask" && askOffered && (
-        <PaperChatPanel
-          record={record}
-          // Whether a citation inside the chat brought the reader here, which
-          // keeps its conversation open (IR-355); withheld until the record
-          // this navigation is going to has arrived. Keyed by arrival, so a
-          // change of section is not one.
-          arrival={
-            arriving
-              ? null
-              : { key: arrivalKey, fromPaperChat: followedFromPaperChat(location.state) }
-          }
-          onClose={closeChat}
-          onBackToPaper={backToPaper}
-          panelRef={panelRef}
-          modal={chatModal}
-          draft={chat.draft}
-          onDraftChange={chat.setDraft}
-          resize={
-            panelWidth && !chatMinimized
-              ? {
-                  width: panelWidth,
-                  max: Math.max(PANEL_WIDTH_MIN, panelRoom),
-                  onChange: chat.setWidth,
-                }
-              : undefined
-          }
-          style={panelWidth && !chatMinimized ? { width: panelWidth } : undefined}
-          minimized={chatMinimized}
-          onRestore={restore}
-          viewingVersion={viewedVersion?.number ?? null}
-          returnTo={chatReturn}
-          onOpenNotes={onReviewTab ? undefined : openNotes}
-          selection={chat.selection}
-          onSelectionChange={chat.setSelection}
-          className={chatPanelClass}
-        />
-      )}
-      {chat.open && chat.tool === "notes" && (
-        <NotesPanel
-          record={record}
-          note={note}
-          highlights={highlights}
-          onOpenHighlight={openHighlight}
-          canOpenVersion={(n) => versions.some((v) => v.number === n && v.manuscript_url && (v !== latestVersion || record.manuscript_unsubmitted))}
-          onClose={closeChat}
-          onBackToPaper={backToPaper}
-          onOpenAsk={askOffered ? openAskFromNotes : undefined}
-          panelRef={panelRef}
-          modal={chatModal}
-          resize={
-            panelWidth
-              ? { width: panelWidth, max: Math.max(PANEL_WIDTH_MIN, panelRoom), onChange: chat.setWidth }
-              : undefined
-          }
-          style={panelWidth ? { width: panelWidth } : undefined}
-          className={chatPanelClass}
-        />
-      )}
-      {/* Closed: two round icons at the bottom right, Notes above Ask IRIS
-          (IR-569, IR-1079). On the bar while minimized, which is its way back. */}
-      {!chat.open && !onReviewTab && (
-        <>
-          <NotesFab onOpen={openNotes} buttonRef={notesButtonRef} />
-          {askOffered && <AskIrisFab onOpen={openAsk} buttonRef={askButtonRef} />}
-        </>
-      )}
+      <SidePanel
+        record={record}
+        chat={chat}
+        panel={panel}
+        arrival={
+          arriving
+            ? null
+            : { key: arrivalKey, fromPaperChat: followedFromPaperChat(location.state) }
+        }
+        onReviewTab={onReviewTab}
+        askOffered={askOffered}
+        highlights={highlights}
+        onOpenHighlight={openHighlight}
+        canOpenVersion={(n) => versions.some((v) => v.number === n && v.manuscript_url && (v !== latestVersion || record.manuscript_unsubmitted))}
+        viewingVersion={viewedVersion?.number ?? null}
+        chatReturn={chatReturn}
+      />
       </div>
     </div>
   );
-}
-
-/**
- * What a reader is told about where a citation landed, when it is not
- * simply the passage, highlighted (IR-578). Every case says what is and is
- * not marked, so nothing reads as a guess.
- */
-function citationLandingNotice(
-  resolution: CitationResolution,
-  pageContext: boolean,
-  page: number | null,
-  marked: boolean,
-): string | null {
-  switch (resolution.status) {
-    case "changed":
-      // The stored page is from when the answer was written; the paper may
-      // have changed since, so it is offered as that, not as the passage.
-      return page != null
-        ? `The passage this answer quoted has changed since, so nothing is highlighted. Page ${page} is where it was when the answer was written.`
-        : "The passage this answer quoted has changed since, so nothing is highlighted.";
-    case "missing":
-      return "That citation is no longer part of the answer, so nothing is highlighted.";
-    case "elsewhere":
-      return "That citation points at another paper, so nothing is highlighted here.";
-    case "gone":
-      return "The answer this citation came from is no longer available, so nothing is highlighted.";
-    default:
-      if (!pageContext || page == null) return null;
-      return marked
-        ? `Page context: the Overview drew on page ${page} as a whole, so only page ${page} is marked.`
-        : `Page context: the Overview drew on page ${page} as a whole.`;
-  }
 }
