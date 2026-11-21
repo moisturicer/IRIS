@@ -1,4 +1,4 @@
-import { Children, createContext, useContext, useMemo, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { Children, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -7,10 +7,10 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
-import { CitationPanelContext, hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
+import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
 import { remarkLimitMath } from "./mathLimit";
 import { breakLongRuns } from "./runLimit";
-import { REFERENCE, SELECTED_RING } from "@/components/ui/highlightRoles";
+import { REFERENCE } from "@/components/ui/highlightRoles";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -78,32 +78,10 @@ function CitationPlaceholder() {
  */
 function CitationChip({ citation, page = false }: { citation: ChatCitation; page?: boolean }) {
   const { to, state, pageContext } = useCitationLink(citation);
-  const panel = useContext(CitationPanelContext);
   // The Overview cites a page as a whole, and says so (IR-578).
   const label =
     openCitationLabel(citation, hasCitationQuote(citation) ? undefined : "the source") +
     (pageContext ? ", page context" : "");
-  if (panel && !page) {
-    // Beside a Sources panel the chip opens it at this passage (IR-1237).
-    const title = "record_title" in citation ? citation.record_title : undefined;
-    const name = `Source ${citation.marker}${title ? `: ${title}` : ""}${citation.page != null ? `${title ? "," : ":"} page ${citation.page}` : ""}`;
-    return (
-      <button
-        type="button"
-        onClick={() => panel.open(citation.marker)}
-        aria-pressed={panel.active === citation.marker}
-        title={name}
-        aria-label={name}
-        className={
-          "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mx-0.5 rounded-control " +
-          `${panel.active === citation.marker ? SELECTED_RING : REFERENCE} ` +
-          "text-2xs font-semibold tabular-nums align-text-bottom leading-none"
-        }
-      >
-        {citation.marker}
-      </button>
-    );
-  }
   return (
     <Link
       to={to}
@@ -157,50 +135,38 @@ interface CitationTextProps {
   className?: string;
 }
 
-/**
- * What the answer's links resolve against. Held in context so the link renderer
- * below is one stable component: defined inside `CitationText` it was a new type on
- * every render, which remounted each chip and dropped focus from a pressed one (IR-1237).
- */
-const CitationsContext = createContext<{ byMarker: Map<number, ChatCitation>; pageMarkers: boolean }>(
-  { byMarker: new Map(), pageMarkers: false },
-);
+export function CitationText({ text, citations, streaming = false, pageMarkers = false, papers = [], className }: CitationTextProps) {
+  const byMarker = new Map(citations.map((citation) => [citation.marker, citation]));
 
-function CitationLink({ href, children }: ComponentPropsWithoutRef<"a">) {
-  const { byMarker, pageMarkers } = useContext(CitationsContext);
-  // `react-markdown` blanks a link whose scheme it refuses (`javascript:`,
-  // `data:`, ...). An `<a href="">` would still be a live link back to this
-  // page in a new tab, so the words stay and the link goes (IR-917).
-  if (!href) return <span>{children}</span>;
+  function CitationLink({ href, children }: ComponentPropsWithoutRef<"a">) {
+    // `react-markdown` blanks a link whose scheme it refuses (`javascript:`,
+    // `data:`, ...). An `<a href="">` would still be a live link back to this
+    // page in a new tab, so the words stay and the link goes (IR-917).
+    if (!href) return <span>{children}</span>;
 
-  if (href.startsWith(PAPER_SCHEME)) {
-    return (
-      <Link to={`/records/${href.slice(PAPER_SCHEME.length)}`}
-        className="font-medium text-brand decoration-brand/30 underline-offset-2 hover:underline">
-        {children}
-      </Link>
-    );
+    if (href.startsWith(PAPER_SCHEME)) {
+      return (
+        <Link to={`/records/${href.slice(PAPER_SCHEME.length)}`}
+          className="font-medium text-brand decoration-brand/30 underline-offset-2 hover:underline">
+          {children}
+        </Link>
+      );
+    }
+
+    if (!href.startsWith(CITATION_SCHEME)) return <ExternalAddress href={href}>{children}</ExternalAddress>;
+
+    const key = href.slice(CITATION_SCHEME.length);
+    if (key === PENDING) return <CitationPlaceholder />;
+
+    const citation = byMarker.get(Number(key));
+    // An unresolved or invented marker resolves to nothing -- no visible
+    // gap, no dangling chip (IR-329).
+    if (!citation) return null;
+
+    return <CitationChip citation={citation} page={pageMarkers} />;
   }
 
-  if (!href.startsWith(CITATION_SCHEME)) return <ExternalAddress href={href}>{children}</ExternalAddress>;
-
-  const key = href.slice(CITATION_SCHEME.length);
-  if (key === PENDING) return <CitationPlaceholder />;
-
-  const citation = byMarker.get(Number(key));
-  // An unresolved or invented marker resolves to nothing -- no visible
-  // gap, no dangling chip (IR-329).
-  if (!citation) return null;
-
-  return <CitationChip citation={citation} page={pageMarkers} />;
-}
-
-export function CitationText({ text, citations, streaming = false, pageMarkers = false, papers = [], className }: CitationTextProps) {
-  const byMarker = useMemo(() => new Map(citations.map((citation) => [citation.marker, citation])), [citations]);
-  const resolved = useMemo(() => ({ byMarker, pageMarkers }), [byMarker, pageMarkers]);
-
   return (
-    <CitationsContext.Provider value={resolved}>
     <div className={className}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath, remarkLimitMath]}
@@ -221,6 +187,5 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
         {toMarkdownLinks(linkPapers(breakLongRuns(text), streaming ? [] : papers), streaming)}
       </ReactMarkdown>
     </div>
-    </CitationsContext.Provider>
   );
 }
