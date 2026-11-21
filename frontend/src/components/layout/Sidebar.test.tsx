@@ -344,8 +344,33 @@ describe("the sidebar's list", () => {
     expect(screen.queryByText("Collapse")).not.toBeInTheDocument();
   });
 
+  // IR-1260: on the rail the mark is the expand button, drawn as the logo
+  // until it is hovered or focused, when the sidebar icon shows in its place.
+  it("makes the rail's IRIS mark the one expand button, showing the sidebar icon on hover and focus", async () => {
+    const user = userEvent.setup();
+    useUIStore.setState({ sidebarCollapsed: true });
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    const sidebar = within(screen.getByRole("complementary", { name: "Sidebar" }));
+    expect(sidebar.queryByRole("link", { name: "IRIS home" })).not.toBeInTheDocument();
+    const [expand, ...others] = sidebar.getAllByRole("button", { name: "Expand sidebar" });
+    expect(others).toHaveLength(0);
+    expect(expand).toBe(sidebar.getAllByRole("button")[0]);
+    // jsdom applies no CSS: the swap is two drawings, one shown by each class.
+    const [mark, icon] = Array.from(expand.children);
+    expect(mark).toHaveClass("group-hover:opacity-0", "group-focus-visible:opacity-0");
+    expect(icon).toHaveClass("opacity-0", "group-hover:opacity-100", "group-focus-visible:opacity-100");
+    expect(icon.querySelector("svg[aria-hidden]")).not.toBeNull();
+
+    await user.click(expand);
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+    expect(sidebar.getByRole("link", { name: "IRIS home" })).toBeInTheDocument();
+  });
+
   // IR-1260: the mark was the toggle, and nothing said it could be pressed.
-  it("makes the IRIS mark a link home, not a toggle", async () => {
+  it("makes the full sidebar's IRIS mark a link home, not a toggle", async () => {
     const user = userEvent.setup();
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
@@ -912,15 +937,13 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
-  it("gives the IRIS mark, the sidebar button, the bell and the account button a tooltip too", async () => {
+  it("gives the IRIS mark (the expand button), the bell and the account button a tooltip too", async () => {
     const user = userEvent.setup();
     atWidth(width);
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
 
     const sidebar = within(await screen.findByRole("complementary", { name: "Sidebar" }));
-    await user.hover(sidebar.getByRole("link", { name: "IRIS home" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("IRIS home");
     await user.hover(sidebar.getByRole("button", { name: "Expand sidebar" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Expand sidebar");
     await user.hover(sidebar.getByRole("button", { name: /^Notifications/ }));
