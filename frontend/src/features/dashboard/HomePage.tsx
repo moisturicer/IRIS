@@ -1,5 +1,4 @@
 import DiscoverPage from "@/features/discover/DiscoverPage";
-import { PublishDialog } from "@/features/publish/PublishDialog";
 
 /**
  * The home route: Discover, for every role (IR-534, spec §4.1).
@@ -9,14 +8,9 @@ import { PublishDialog } from "@/features/publish/PublishDialog";
  * a separate decision, `lib/landing.ts`: a reviewer with work goes to My
  * Reviews, but `/` is Discover for them too.
  *
- * The Publish dialog lives here because `/?publish=...` is how it opens
- * (IR-408), for a Student or an Adviser alike.
+ * The Publish dialog lived here until IR-1258. It is the app shell's now, so
+ * `?publish=` opens it over any page, not only over Discover.
  */
 export default function HomePage() {
-  return (
-    <>
-      <DiscoverPage />
-      <PublishDialog />
-    </>
-  );
+  return <DiscoverPage />;
 }

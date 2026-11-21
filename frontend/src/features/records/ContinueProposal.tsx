@@ -5,10 +5,12 @@ import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import { describeFailure } from "@/features/publish/draft";
+import { usePublishHref } from "@/features/publish/publishLink";
 
-/** Choose a continuation type, then edit the ordinary child draft in Publish. */
+/** Choose a continuation type, then edit the ordinary child draft in Publish, over this page (IR-1258). */
 export function ContinueProposal({ recordId }: { recordId: number }) {
   const navigate = useNavigate();
+  const publishHref = usePublishHref();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +22,7 @@ export function ContinueProposal({ recordId }: { recordId: number }) {
       const type = types.results.find((item) => item.name === name);
       if (!type) throw new Error("Continuation type unavailable");
       const { data: child } = await recordsApi.continueAs(recordId, type.id);
-      navigate(`/?publish=${child.id}`);
+      navigate(publishHref(child.id));
     } catch (failure) {
       setError(describeFailure(failure, "Could not continue this proposal. Try again.").message);
       setBusy(false);

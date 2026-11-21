@@ -8,6 +8,7 @@ import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
+import { usePublishHref } from "@/features/publish/publishLink";
 import type { MyResearchItem } from "@/types/records";
 
 import { FilterChips } from "./FilterChips";
@@ -69,6 +70,7 @@ interface MyResearchListProps {
  * record now is on its own row, in the server's words. No counts.
  */
 export function MyResearchList({ items, loading, failed, interrupted = false, onRetry, filter, onFilterChange, onDeleted }: MyResearchListProps) {
+  const publishHref = usePublishHref();
   const [query, setQuery] = useState("");
 
   const all = useMemo(() => groupByFilter(items), [items]);
@@ -114,7 +116,7 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
         icon="fa-feather-pointed"
         title="You haven’t published anything yet"
         message="Publish a paper and it will appear here, grouped by who is reviewing it."
-        action={<Link to="/?publish=new" className={cn(PILL_PRIMARY, FOCUS_RING)}>Publish</Link>}
+        action={<Link to={publishHref("new")} className={cn(PILL_PRIMARY, FOCUS_RING)}>Publish</Link>}
       />
     );
   }

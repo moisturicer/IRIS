@@ -18,6 +18,7 @@ import { Link } from "react-router-dom";
 
 import { guidelinesHref } from "@/features/guidelines/sectionId";
 import { typeKey } from "./draft";
+import { usePublishHref } from "./publishLink";
 import { SELECTED } from "@/components/ui/highlightRoles";
 
 /** The same limit `SubmitDocumentView` and the serializer enforce (50 MB). */
@@ -66,6 +67,7 @@ interface ManuscriptStepProps {
 }
 
 export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFile, onRetry, exactMatches = [], typeError, fileError }: ManuscriptStepProps) {
+  const publishHref = usePublishHref();
   const [replacing, setReplacing] = useState(false);
   const uploading = upload.status === "uploading";
 
@@ -148,7 +150,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
             <p className="font-semibold">This manuscript is already attached to a record you can read.</p>
             <ul className="mt-2 space-y-2">
               {exactMatches.map((match) => <li key={match.id}>
-                <Link to={match.action === "resume_draft" ? `/?publish=${match.id}` : match.url} className={cn("underline", FOCUS_RING)}>
+                <Link to={match.action === "resume_draft" ? publishHref(match.id) : match.url} className={cn("underline", FOCUS_RING)}>
                   {match.action === "resume_draft" ? "Resume draft" : "Open record"}: {match.title}
                 </Link>
               </li>)}

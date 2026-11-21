@@ -38,6 +38,8 @@ import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
 import { RelatedWorks } from "./RelatedWorks";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { ContinueProposal } from "../ContinueProposal";
+import { publishHref } from "@/features/publish/publishLink";
+import { pathFor } from "@/lib/access";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
@@ -540,9 +542,10 @@ export default function PaperViewPage() {
       .then(({ data }) => {
         // A draft is not a paper page (IR-1227, ADR-009 decision 6). Only its
         // owner loads one, and opening it is opening the Publish form at the
-        // step they left off -- an old `?section=review` link included.
+        // step they left off -- an old `?section=review` link included -- over
+        // My Library, where the draft lives, not Discover (IR-1258).
         if (data.pipeline_status === "draft") {
-          navigate(`/?publish=${data.id}`, { replace: true });
+          navigate(publishHref({ pathname: pathFor("library"), search: "" }, data.id), { replace: true });
           return;
         }
         setRecord(data);

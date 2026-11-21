@@ -409,6 +409,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1255** | Pages start with their own title: no "Discover / …" breadcrumb above any page; titles keep Discover's font and size — supersedes IR-1085's NAV-03 breadcrumb; no FR- id | [details](traceability/IR-1255.md) | **VERIFIED** |
 | **IR-1256** | Deleting a draft asks in a dialog: over the Publish form, and from a red trash can beside *Continue draft* on both My Library lists; a dialog over another takes Escape and Tab alone — amends ADR-009 decision 6's wording; no FR- id | [details](traceability/IR-1256.md) | **VERIFIED** |
 | **IR-1257** | Ask IRIS's conversation search box has a fill at rest (stone-100 on the stone-50 pane) and the field outline; like every IRIS search box, hover changes nothing and typing shows in the outline only; no FR- id | [details](traceability/IR-1257.md) | **VERIFIED** |
+| **IR-1258** | Publish opens over the page you are on: from My Library, *Continue draft*, a draft's title and *Publish* keep My Library behind the form and current in the sidebar, closing leaves the same tab, and the list is read again — no FR- id | [details](traceability/IR-1258.md) | **PARTIAL** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

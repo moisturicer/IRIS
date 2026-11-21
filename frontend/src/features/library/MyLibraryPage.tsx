@@ -24,6 +24,7 @@ import { SavedCallsSection } from "@/features/opportunities/SavedCallsSection";
 import { SavedView } from "./SavedView";
 import { useLibrary, useReadingHistory } from "./useLibrary";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { PUBLISH_PARAM, usePublishHref } from "@/features/publish/publishLink";
 
 type Tab = "overview" | "research" | "saved" | "calls" | "downloads";
 type SavedViewKind = Exclude<LibraryView, { kind: "research" }>;
@@ -71,6 +72,9 @@ export default function MyLibraryPage() {
   const mayAuthor = useAuthStore((state) => canAuthor(state.user));
   const [searchParams, setSearchParams] = useSearchParams();
   const section = searchParams.get("section");
+  // Publish opens over this page (IR-1258), so its links keep the tab.
+  const publishHref = usePublishHref();
+  const publishing = searchParams.get(PUBLISH_PARAM) != null;
 
   const tab: Tab = tabFromSection(section, mayAuthor);
   const tabs = mayAuthor ? AUTHOR_TABS : READER_TABS;
@@ -97,8 +101,9 @@ export default function MyLibraryPage() {
   const [failed, setFailed] = useState(false);
   const [interrupted, setInterrupted] = useState(false);
 
-  const loadResearch = useCallback(async () => {
-    setLoading(true);
+  const loadResearch = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}) => {
+    // Quiet: the list stays on screen while it is read again.
+    if (!quiet) setLoading(true);
     setFailed(false);
     setInterrupted(false);
     try {
@@ -117,6 +122,13 @@ export default function MyLibraryPage() {
   }, [mayAuthor, loadResearch]);
   // Live updates (ADR-073): the author's own papers, reloaded quietly.
   useLiveRefresh(["library"], () => { void loadResearch(); }, mayAuthor);
+  // Closing Publish leaves the reader here (IR-1258), so the list is read
+  // again: the draft may have been edited, submitted or deleted in it.
+  const wasPublishing = useRef(publishing);
+  useEffect(() => {
+    if (wasPublishing.current && !publishing && mayAuthor) void loadResearch({ quiet: true });
+    wasPublishing.current = publishing;
+  }, [publishing, mayAuthor, loadResearch]);
 
   const selectTab = (next: Tab) => {
     const params = new URLSearchParams(searchParams);
@@ -223,7 +235,7 @@ export default function MyLibraryPage() {
         title="My Library"
         description={mayAuthor ? "Keep your research moving, from submission to the shelf." : "Papers you saved and opened, and your download requests."}
         actions={mayAuthor && (
-          <Link to="/?publish=new" className={cn(PILL_PRIMARY, FOCUS_RING)}>
+          <Link to={publishHref("new")} className={cn(PILL_PRIMARY, FOCUS_RING)}>
             <i className="fas fa-plus text-label" aria-hidden />
             Publish
           </Link>

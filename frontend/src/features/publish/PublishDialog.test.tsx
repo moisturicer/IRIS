@@ -7,6 +7,7 @@
  * the PR, because jsdom has no layout.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useLocation } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
@@ -16,6 +17,12 @@ import { ROLES } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
 
 import { PublishDialog } from "./PublishDialog";
+
+/** Where the router is, read by role and name. */
+function Address() {
+  const { pathname, search } = useLocation();
+  return <output aria-label="Address">{pathname}{search}</output>;
+}
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
@@ -1208,6 +1215,17 @@ describe("closing", () => {
       await waitFor(() => expect(within(question).getByRole("button", { name: "Keep as draft" })).toHaveFocus());
       expect(within(question).getByRole("button", { name: "Delete draft" })).toBeInTheDocument();
       expect(within(question).getByRole("button", { name: "Keep editing" })).toBeInTheDocument();
+    });
+
+    it("leaves the reader on the page it opened over, query and all (IR-1258)", async () => {
+      const user = userEvent.setup();
+      renderScreen(<><PublishDialog /><Address /></>, { route: "/records/mine?section=research&publish=42" });
+      await screen.findByRole("textbox", { name: /^Title/ });
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Keep as draft" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(screen.getByRole("status", { name: "Address" })).toHaveTextContent(/^\/records\/mine\?section=research$/);
     });
 
     it("closes and keeps the draft on Keep as draft", async () => {

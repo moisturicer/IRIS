@@ -19,10 +19,11 @@
  *      Continue: only the manuscript is needed to submit (ADR-063 decision 3).
  *   4. **Review & submit** — every value, the documents added, Submit.
  *
- * **Opened by the URL**: `/?publish=new` starts one, `/?publish=<draftId>`
- * resumes one at its first incomplete step. Creating the draft rewrites the
- * URL to its id, so a reload resumes rather than starting over. Closing clears
- * the parameter and keeps the draft.
+ * **Opened by the URL**, on any page (IR-1258): `?publish=new` starts one,
+ * `?publish=<draftId>` resumes one at its first incomplete step, over the page
+ * the address names (`publishLink.ts`). Creating the draft rewrites the URL to
+ * its id, so a reload resumes rather than starting over. Closing clears the
+ * parameter, keeps the draft and leaves the reader on that page.
  *
  * It decides no workflow. The type list is the server's, the author picks no
  * office (the hints are hints; see `metadataPayload`), and the confirmation
@@ -77,8 +78,9 @@ import { DocumentsStep, isSlotList } from "./DocumentsStep";
 import { ReviewStep } from "./ReviewStep";
 import { IrisLoader } from "@/components/brand/IrisBrand";
 import { PublishDetailsPreview } from "./PublishDetailsPreview";
+import { PUBLISH_PARAM } from "./publishLink";
 
-export const PUBLISH_PARAM = "publish";
+export { PUBLISH_PARAM } from "./publishLink";
 
 const STEPS: Array<{ step: PublishStep; title: string }> = [
   { step: 1, title: "Your manuscript" },
@@ -101,7 +103,8 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 /**
- * Mounted on the home route. Renders nothing unless the URL asks for Publish.
+ * Mounted once, in the app shell (IR-1258), so it opens over the page the
+ * reader is on. Renders nothing unless the URL asks for Publish.
  * Whether the signed-in user may author is the server's `can_author`
  * (IR-1096), the rule `IsAuthor` enforces, so the dialog never opens onto a
  * refusal. A link to Publish from someone who cannot author opens a short

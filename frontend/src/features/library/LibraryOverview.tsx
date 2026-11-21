@@ -8,6 +8,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { formatAuthorList, recordYearLabel } from "@/features/discover/discoverUtils";
 import { waitingHref } from "@/features/records/waitingOnYou";
+import { usePublishHref } from "@/features/publish/publishLink";
 import { cn, formatDate } from "@/lib/utils";
 import type { HistoryItem } from "@/store/history.store";
 import { sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
@@ -58,6 +59,7 @@ interface LibraryOverviewProps {
 export function LibraryOverview({
   research, loading, failed, interrupted = false, onRetry, library, history, folders, onOpenSubmissions, onOpenSaved, onDeleted,
 }: LibraryOverviewProps) {
+  const publishHref = usePublishHref();
   const waiting = useMemo(() => research.filter(isWaiting), [research]);
   /* Only papers the reader can still read; an unavailable entry has no title to show. */
   const recentlyOpened = useMemo(
@@ -163,7 +165,7 @@ export function LibraryOverview({
               icon="fa-feather-pointed"
               title="You haven’t published anything yet"
               message="Publish a paper and it will appear here, grouped by who is reviewing it."
-              action={<Link to="/?publish=new" className={cn(PILL_PRIMARY, FOCUS_RING)}>Publish</Link>}
+              action={<Link to={publishHref("new")} className={cn(PILL_PRIMARY, FOCUS_RING)}>Publish</Link>}
             />
           ) : (
             <SubmissionPanel>
