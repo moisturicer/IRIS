@@ -10,7 +10,7 @@ import { VersionBanner } from "./VersionPicker";
 
 type ReaderProps = ComponentProps<typeof PaperPdfReader>;
 
-interface PaperSectionProps {
+interface PaperReaderProps {
   record: Pick<RecordDetail, "id" | "title" | "download" | "manuscript_unsubmitted">;
   /** The earlier version open in the reader, null for the current paper. */
   viewedVersion: RecordVersion | null;
@@ -50,7 +50,7 @@ interface PaperSectionProps {
  * unchanged (IR-1271): the version banner, the owner's unsubmitted-upload
  * notice, where a citation or highlight landed, and the lazy PDF reader.
  */
-export function PaperSection({
+export function PaperReader({
   record,
   viewedVersion,
   latestVersion,
@@ -64,7 +64,7 @@ export function PaperSection({
   pendingInBar,
   onDownloadChanged,
   reader,
-}: PaperSectionProps) {
+}: PaperReaderProps) {
   return (
     <>
       {(viewedVersion || record.manuscript_unsubmitted) && (

@@ -5,24 +5,19 @@ import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { cn } from "@/lib/utils";
 import type { RecordDetail } from "@/types/records";
 
-interface SaveCiteShareProps {
-  record: RecordDetail;
-  /** Save is the filled action where there is no paper to view (IR-569). */
-  savePrimary: boolean;
-  onCite: () => void;
-}
+export type ShareState = "idle" | "copied" | "failed";
 
 /**
- * Save, Cite and Share (IR-1271, moved out of the page unchanged). Share
- * copies the paper's permanent link (IR-356), the address a reader would
- * paste to a colleague. A blocked clipboard claims nothing.
+ * Share copies the paper's permanent link (IR-356), the address a reader
+ * would paste to a colleague. A blocked clipboard claims nothing. Held by
+ * the page, so what it says outlives a change of section.
  */
-export function SaveCiteShare({ record, savePrimary, onCite }: SaveCiteShareProps) {
-  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
-  const handleShare = async () => {
+export function useShareLink(id: string | undefined) {
+  const [shareState, setShareState] = useState<ShareState>("idle");
+  const share = async () => {
     let outcome: "copied" | "failed" = "copied";
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/records/${record.id}`);
+      await navigator.clipboard.writeText(`${window.location.origin}/records/${id}`);
     } catch {
       // No clipboard (plain http, or permission refused): say so rather
       // than failing silently; the address bar still has the link.
@@ -31,7 +26,20 @@ export function SaveCiteShare({ record, savePrimary, onCite }: SaveCiteShareProp
     setShareState(outcome);
     window.setTimeout(() => setShareState("idle"), 2500);
   };
+  return { shareState, share };
+}
 
+interface SaveCiteShareProps {
+  record: RecordDetail;
+  /** Save is the filled action where there is no paper to view (IR-569). */
+  savePrimary: boolean;
+  onCite: () => void;
+  shareState: ShareState;
+  onShare: () => void;
+}
+
+/** Save, Cite and Share (IR-1271, moved out of the page unchanged). */
+export function SaveCiteShare({ record, savePrimary, onCite, shareState, onShare }: SaveCiteShareProps) {
   return (
     <>
       <PaperSaveDropdown
@@ -45,7 +53,7 @@ export function SaveCiteShare({ record, savePrimary, onCite }: SaveCiteShareProp
         Cite
       </button>
 
-      <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
+      <button type="button" onClick={onShare} className={PILL_SECONDARY}>
         <i
           className={cn(
             "fas text-2xs",

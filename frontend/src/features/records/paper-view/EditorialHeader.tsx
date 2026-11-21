@@ -29,12 +29,15 @@ export function LineageLinks({ lineage }: { lineage: RecordDetail["lineage"] }) 
   );
 }
 
+/** The one filled action a region offers (spec §4.6). */
+export type PrimaryAction = "elsewhere" | "open_review" | "view" | "save";
+
 interface EditorialHeaderProps {
   record: RecordDetail;
   section: PaperSection;
   can: ReadonlySet<Capability>;
   /** The header's filled action, as the page decides it. */
-  primary: "elsewhere" | "open_review" | "view" | "save";
+  primary: PrimaryAction;
   versions: RecordVersion[];
   latestVersion: RecordVersion | null;
   viewedVersion: RecordVersion | null;

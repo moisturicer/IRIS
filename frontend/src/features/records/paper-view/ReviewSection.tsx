@@ -16,7 +16,7 @@ interface ReviewSectionProps {
   authorDetails: ReactNode;
   onOpenReview: () => Promise<void>;
   onShowVersion: (n: number | null) => void;
-  /** The manuscript's reader (PaperSection). */
+  /** The manuscript's reader (PaperReader). */
   reader: ReactNode;
   /** The supporting document shown instead of the manuscript, if any (IR-1203). */
   shown: ShownDocumentState | null;

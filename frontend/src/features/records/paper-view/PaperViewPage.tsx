@@ -26,7 +26,7 @@ import {
   isReviewing,
   seatToOpen,
   sectionsFor,
-  type PaperSection as Section,
+  type PaperSection,
   type Viewer,
 } from "@/features/records/capabilities";
 import { usePaperChat } from "./PaperChatDock";
@@ -50,19 +50,19 @@ import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { LoadingSkeleton, MainColumnSkeleton } from "./PaperViewSkeletons";
 import { useRecordLoader } from "./useRecordLoader";
 import { useSidePanel } from "./useSidePanel";
-import { PaperSection } from "./PaperSection";
+import { PaperReader } from "./PaperReader";
 import { OverviewSection } from "./OverviewSection";
 import { ReviewSection } from "./ReviewSection";
 import { RecordDetailsRail } from "./RecordDetailsRail";
-import { EditorialHeader, LineageLinks } from "./EditorialHeader";
-import { SaveCiteShare } from "./SaveCiteShare";
+import { EditorialHeader, LineageLinks, type PrimaryAction } from "./EditorialHeader";
+import { SaveCiteShare, useShareLink } from "./SaveCiteShare";
 import { SidePanel } from "./SidePanel";
 
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
  *
- * Four sections, kept in the URL as `?section=`: **Overview**, **Paper**,
- * **Review** and **Files**. Which ones a viewer sees, and which actions the
+ * Three sections, kept in the URL as `?section=`: **Overview**, **Paper**
+ * and **Review**. Which ones a viewer sees, and which actions the
  * header offers, come from the capabilities adapter
  * (`features/records/capabilities.ts`); this page reads no role name of its
  * own. A section the viewer may not open falls back to
@@ -96,6 +96,7 @@ export default function PaperViewPage() {
   // The previous paper stays in state while the next one loads, so it must match the address.
   usePageTitle(record && String(record.id) === id ? record.title : null);
   const [citeOpen, setCiteOpen] = useState(false);
+  const { shareState, share } = useShareLink(id);
   /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
   const [newVersionOpen, setNewVersionOpen] = useState(false);
   const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
@@ -158,7 +159,6 @@ export default function PaperViewPage() {
     return leaveReadingRail;
   }, [onPaperTab, enterReadingRail, leaveReadingRail]);
 
-
   /**
    * RDCO withdrew the paper (IR-798): it is deleted, so reading it again would
    * only say it is gone. Say what happened and go to the review queue.
@@ -216,7 +216,6 @@ export default function PaperViewPage() {
   const reviewing = isReviewing(record, viewer);
 
   const editOpen = editRequested && can.has("edit_details") && !arriving;
-
 
   // Versions (IR-416). Null to a viewer who may not read the review, so a
   // reader of a published paper has none, and `?version=` means nothing to
@@ -344,7 +343,7 @@ export default function PaperViewPage() {
   // its first granted action, so any granted review action puts the primary
   // there. A draft never reaches this page (it opens in Publish, IR-1227), so
   // `continue_draft` has no action here.
-  const primary = can.has("create_version")
+  const primary: PrimaryAction = can.has("create_version")
     ? "elsewhere"
     : can.has("open_review") && section !== "review"
       ? "open_review"
@@ -389,7 +388,7 @@ export default function PaperViewPage() {
     />
   ) : null;
 
-  const tabId = (s: Section) => `${tabsId}-${s}`;
+  const tabId = (s: PaperSection) => `${tabsId}-${s}`;
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (step === 0) return;
@@ -410,7 +409,8 @@ export default function PaperViewPage() {
     </button>
   );
   const saveCiteShare = (
-    <SaveCiteShare record={record} savePrimary={primary === "save"} onCite={() => setCiteOpen(true)} />
+    <SaveCiteShare record={record} savePrimary={primary === "save"} onCite={() => setCiteOpen(true)}
+      shareState={shareState} onShare={share} />
   );
 
   // What left the owners' header for their Review's Details tab (IR-1206):
@@ -432,7 +432,7 @@ export default function PaperViewPage() {
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = (
-    <PaperSection
+    <PaperReader
       record={record}
       viewedVersion={viewedVersion}
       latestVersion={latestVersion}
