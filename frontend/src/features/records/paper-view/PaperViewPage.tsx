@@ -3,7 +3,7 @@ import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { failureMessage } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
-import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
@@ -16,16 +16,7 @@ import { useElementWidth } from "@/hooks/useElementWidth";
 import { useUIStore } from "@/store/ui.store";
 import { PIPELINE_STATUS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import {
-  answerReference,
-  citedPage,
-  followedFromPaperChat,
-  hasCitationQuote,
-  landedAsPageContext,
-  trustedCitation,
-  type AnswerReturn,
-} from "@/lib/citedPage";
-import { conversationPath } from "@/lib/askHandoff";
+import { followedFromPaperChat, hasCitationQuote } from "@/lib/citedPage";
 import type { ThreadDocument } from "@/types/records";
 import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
@@ -42,7 +33,6 @@ import {
   isOwner,
   isParticipant,
   isReviewing,
-  landingSection,
   seatToOpen,
   sectionsFor,
   type PaperSection,
@@ -83,7 +73,9 @@ import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type Readin
 import { ReadingHeader } from "./ReadingHeader";
 import { titleSizeClasses } from "./titleSize";
 import { useFragmentFocus } from "./useFragmentFocus";
-import { useCitationReference, type CitationResolution } from "./useCitationReference";
+import { type CitationResolution } from "./useCitationReference";
+import { useCitationLanding } from "./useCitationLanding";
+import { useViewLocation } from "./useViewLocation";
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PaperDownloadControl } from "./PaperDownloadControl";
@@ -113,7 +105,6 @@ const TIER_RANK: Record<ReadingTier, number> = { single: 0, overlay: 1, wide: 2 
 export default function PaperViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const { user } = useAuth();
   const tabsId = useId();
@@ -174,74 +165,13 @@ export default function PaperViewPage() {
   // A My Library link names the request it answers as `#fragment` (IR-625).
   useFragmentFocus(location.hash, record != null);
 
-  // A citation links here with `?page=` (IR-284), so acting on it lands on
-  // the page that supports the claim rather than the paper's first. The
-  // rules for reading that number live in `lib/citedPage`, testable without
-  // standing up this screen.
-  //
-  // The answer it was followed from rides in the address as ids (IR-578).
-  // A citation this page load carried is used as it is; any other -- after a
-  // reload, from a restored tab -- is re-resolved through the reader's own
-  // Conversation, and the page it reads now wins over the address's.
-  const reference = answerReference(searchParams);
-  const carried = trustedCitation(location.state, reference);
-  const resolution = useCitationReference(carried ? null : reference, id ? Number(id) : null);
-  const resolvedPage =
-    resolution.status === "passage" ? resolution.citation.page
-      : resolution.status === "changed" ? resolution.page
-        : null;
-  const openAtPage = resolvedPage ?? citedPage(searchParams.get("page"));
-  // The reader lands once per navigation, so it waits for the re-read: a
-  // landing on the address's page would not move again to the page it reads now.
-  const landingPage = resolution.status === "loading" ? null : openAtPage;
-  // Back to answer (IR-578): Ask IRIS's lives at its address; Paper Chat's is
-  // this page's panel, opened on that conversation.
-  const [chatReturn, setChatReturn] = useState<AnswerReturn | null>(null);
-  const backToAnswer =
-    reference && resolution.status !== "gone" && resolution.status !== "loading"
-      ? () => {
-          if (reference.from === "ask") {
-            navigate(`${conversationPath(reference.conversationId)}?turn=${reference.turnId}`);
-            return;
-          }
-          chat.setOpen(true);
-          chat.setMinimized(false);
-          setChatReturn((last) => ({
-            conversationId: reference.conversationId,
-            turnId: reference.turnId,
-            key: (last?.key ?? 0) + 1,
-          }));
-        }
-      : undefined;
-
-  // What counts as arriving. A change of section or of the Edit details
-  // dialog rewrites the URL, which gives the location a new key, but nobody
-  // arrived: the reader is still on this paper, in the conversation they had.
-  // Such a change records the exact address it asked for, and a new key at
-  // that address is the change landing; every other new key -- a citation, a
-  // link, Back or Forward -- is an arrival. Read during render, and
-  // idempotent there: a second render of the same location changes nothing.
-  const viewChange = useRef<string | null>(null);
-  const lastKey = useRef(location.key);
-  const arrivalKey = useRef(location.key);
-  if (location.key !== lastKey.current) {
-    lastKey.current = location.key;
-    if (viewChange.current === `${location.pathname}${location.search}`) viewChange.current = null;
-    else arrivalKey.current = location.key;
-  }
-
-  /** Set or clear view parameters in place, keeping the rest and the router state. */
-  const setViewParams = (changes: Record<string, string | null>) => {
-    const next = new URLSearchParams(searchParams);
-    for (const [name, value] of Object.entries(changes)) {
-      if (value == null) next.delete(name);
-      else next.set(name, value);
-    }
-    const search = next.toString();
-    viewChange.current = `${location.pathname}${search ? `?${search}` : ""}`;
-    setSearchParams(next, { replace: true, state: location.state });
-  };
-  const setViewParam = (name: string, value: string | null) => setViewParams({ [name]: value });
+  // Landing from a citation (IR-284, IR-578): the page to open at, the passage
+  // to draw and the way back to the answer.
+  const { resolution, openAtPage, landingPage, backToAnswer, chatReturn, navCitation, pageContext } =
+    useCitationLanding(id, () => {
+      chat.setOpen(true);
+      chat.setMinimized(false);
+    });
 
   // The workspace's own width picks the Paper layout (IR-569), so either
   // sidebar state counts; null until measured.
@@ -258,20 +188,16 @@ export default function PaperViewPage() {
   // Before the early returns below, so the hooks that follow can use them.
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
   const sections = record ? sectionsFor(record, viewer) : [];
-  // The section asked for, else the reader for a citation's page -- Paper, or
-  // a participant's Review, which holds their reader (IR-879) -- else
-  // Overview. One the viewer may not open is Overview too, and a
-  // participant's old Paper or Files link lands in Review.
-  const landing = landingSection(searchParams.get("section"), sections);
-  const readerSection: PaperSection = sections.includes("paper")
-    ? "paper"
-    : sections.includes("review")
-      ? "review"
-      : "overview";
-  const section: PaperSection = landing?.section ?? (openAtPage != null ? readerSection : "overview");
-  // Review's Documents tab (IR-1203; the drawer it replaced was IR-879):
-  // `?documents=open`, or an old `?section=files`, opens it.
-  const documentsWanted = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
+  const {
+    section,
+    readerSection,
+    documentsWanted,
+    editRequested,
+    askedVersion,
+    arrivalKey,
+    setViewParams,
+    setViewParam,
+  } = useViewLocation({ sections, openAtPage });
   // Still on the record being left while the next one loads.
   const arriving = loadStatus === "loading" || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
@@ -403,7 +329,7 @@ export default function PaperViewPage() {
     // chat's state is read, not a trigger: opening the chat is not following
     // a citation, and neither is switching section.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openAtPage, arrivalKey.current]);
+  }, [openAtPage, arrivalKey]);
 
   // Share copies the paper's permanent link (IR-356), the address a reader
   // would paste to a colleague. A blocked clipboard claims nothing.
@@ -476,19 +402,10 @@ export default function PaperViewPage() {
   const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
 
-  const editOpen = searchParams.get("edit") === "details" && can.has("edit_details") && !arriving;
+  const editOpen = editRequested && can.has("edit_details") && !arriving;
 
   const authorNames = record.authors.map((a) => a.name.trim()).filter(Boolean);
 
-  // A citation carries the exact chunk it points at as router `state`
-  // (IR-335), so the reader draws its highlight with no second fetch. A
-  // navigation this link did not originate -- a typed URL, a refresh, a
-  // bookmark -- carries no state, and the reader still opens at `openAtPage`
-  // with nothing to highlight, which is the same graceful case a passage
-  // with no recovered regions already is.
-  const navCitation = carried ?? (resolution.status === "passage" ? resolution.citation : null);
-  // The Overview cites a page as a whole: only that page is marked (IR-578).
-  const pageContext = landedAsPageContext(searchParams, location.state);
   // One Ask IRIS everywhere (IR-569): a column or drawer in the Paper
   // workspace, a column beside the page on the other sections. The Review section has none
   // (spec §4.6): the panel stays mounted there, only hidden.
@@ -505,7 +422,6 @@ export default function PaperViewPage() {
   // has a manuscript; the newest is the current paper, read as it always was.
   const versions = record.versions ?? [];
   const latestVersion = versions.length > 0 ? versions[versions.length - 1] : null;
-  const askedVersion = Number(searchParams.get("version"));
   // While the owner's revised manuscript is unsubmitted (IR-273), the current
   // paper is that upload, so the newest version opens like an earlier one.
   const viewedVersion =
@@ -516,7 +432,7 @@ export default function PaperViewPage() {
   // A highlight opened from Notes lands like a citation: its page and region,
   // in the version it belongs to. It holds only for the navigation it was
   // opened in, and only once the version it names is the one shown.
-  const openedHere = opened && opened.arrival === arrivalKey.current ? opened : null;
+  const openedHere = opened && opened.arrival === arrivalKey ? opened : null;
   const openedInShown =
     openedHere && openedHere.version === (viewedVersion?.number ?? null) ? openedHere : null;
   // What the reader draws: highlights made on the bytes it shows. A stale one is
@@ -564,7 +480,7 @@ export default function PaperViewPage() {
     setHighlightsShown(true);
     const version = h.state === "stale" ? h.open_version : null;
     setOpened((last) => ({
-      key: (last?.key ?? 0) + 1, page: h.page, regions: h.regions, version, arrival: arrivalKey.current,
+      key: (last?.key ?? 0) + 1, page: h.page, regions: h.regions, version, arrival: arrivalKey,
     }));
     // The paper, in the version that has its bytes; a panel that would cover
     // the passage steps aside, as it does for a citation.
@@ -670,7 +586,7 @@ export default function PaperViewPage() {
           keepPlace={resolution.status !== "loading"}
           highlightRegions={highlightRegions}
           landingLook={openedInShown ? "highlight" : "citation"}
-          navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey.current}
+          navKey={openedInShown ? `highlight-${openedInShown.key}` : arrivalKey}
           highlights={drawnHighlights}
           selectionActions={selectionActions}
           highlightsShown={highlightsShown}
@@ -1326,7 +1242,7 @@ export default function PaperViewPage() {
           arrival={
             arriving
               ? null
-              : { key: arrivalKey.current, fromPaperChat: followedFromPaperChat(location.state) }
+              : { key: arrivalKey, fromPaperChat: followedFromPaperChat(location.state) }
           }
           onClose={closeChat}
           onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
