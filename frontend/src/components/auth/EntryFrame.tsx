@@ -126,16 +126,19 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col items-center px-4 pb-12 pt-section sm:px-8 sm:pt-10 lg:pt-12">
+      {/* `short:` (IR-1265) tightens the rhythm on a wide but short window,
+          so Sign in stays in the first screenful at 1536x730. */}
+      <main className="flex flex-1 flex-col items-center px-4 pb-12 pt-section sm:px-8 sm:pt-10 lg:pt-12 short:pt-6">
+        {/* Capped at 48px (IR-1265): 60px crowded the form on a laptop. */}
         {lede && (
-          <h1 className="order-1 text-balance font-display text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl md:text-center lg:text-6xl">
+          <h1 className="order-1 text-balance font-display text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl md:text-center short:text-4xl">
             {lede.headline}
           </h1>
         )}
-        {/* A readable measure (IR-1263): unbounded, the sentence ran the full
-            width of a desktop screen in two very long lines. */}
+        {/* A readable measure (IR-1263), now the sheet's own width and body
+            size (IR-1265), so it reads as the headline's caption. */}
         {lede && (
-          <p className="order-3 mt-section max-w-2xl text-pretty text-body text-stone-700 md:order-2 md:mt-4 md:text-balance md:text-center md:text-lg">
+          <p className="order-3 mt-section max-w-xl text-pretty text-body text-stone-700 md:order-2 md:mt-4 md:text-balance md:text-center short:mt-3">
             {lede.sentence}
           </p>
         )}
@@ -144,7 +147,7 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
             it under the page's own background. */}
         <div
           className={cn(
-            "relative isolate order-2 mt-section w-full motion-safe:animate-sheet-settle md:order-3 md:mt-section-lg",
+            "relative isolate order-2 mt-section w-full motion-safe:animate-sheet-settle md:order-3 md:mt-section-lg short:mt-section",
             wide ? "max-w-5xl" : "max-w-xl",
           )}
         >
@@ -153,7 +156,7 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
             className="absolute inset-x-0 bottom-0 top-11 -z-10 translate-x-2 translate-y-2 rounded-card border border-stone-200 bg-stone-100"
             aria-hidden
           />
-          <div className="rounded-b-card rounded-tr-card border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
+          <div className="rounded-b-card rounded-tr-card border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10 short:py-7">
             {children}
           </div>
         </div>

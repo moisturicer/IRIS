@@ -11,7 +11,9 @@ type Size = "md" | "lg";
 
 const SIZE_CLASSES: Record<Size, string> = {
   md: "px-3 py-2 text-control",
-  lg: "min-h-11 px-4 py-3 text-base",
+  // 44px and the app's 14px control text from `sm` up (IR-1265); 16px on a
+  // phone, where iOS Safari zooms into any field set smaller.
+  lg: "min-h-11 px-3.5 py-2 text-base sm:text-control",
 };
 
 // `size` is omitted from the native attributes deliberately: HTML's own `size`

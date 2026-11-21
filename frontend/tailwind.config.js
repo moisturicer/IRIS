@@ -53,6 +53,11 @@ export default {
         // decides whether a control needs 44px. Defined after the window
         // breakpoints so it wins over a `md:` compact size on a touch tablet.
         touch: { raw: "(pointer: coarse)" },
+        // A wide but short window (IR-1265): a 1080p laptop at Windows' 125%
+        // scaling is about 1536x730, where the entry page's tall rhythm pushed
+        // Sign in below the fold. The width floor keeps phones, which are
+        // short too, on their own layout.
+        short: { raw: "(min-width: 768px) and (max-height: 820px)" },
       },
 
       // The one cap for an app page (IR-519): PageContainer's "standard" width.
