@@ -9,7 +9,24 @@ import {
   trustedCitation,
   type AnswerReturn,
 } from "@/lib/citedPage";
-import { useCitationReference } from "./useCitationReference";
+import { useCitationReference, type CitationResolution } from "./useCitationReference";
+
+export interface CitationLanding {
+  /** Where re-reading the answer reference stands (`none` when there is none). */
+  resolution: CitationResolution;
+  /** The page a citation or `?page=` asks for, null for none. */
+  openAtPage: number | null;
+  /** `openAtPage`, held back while the reference is still being re-read. */
+  landingPage: number | null;
+  /** Back to the answer this landing came from; undefined when there is none to go back to. */
+  backToAnswer: (() => void) | undefined;
+  /** The answer Paper Chat should reopen at, bumped on each Back to answer. */
+  chatReturn: AnswerReturn | null;
+  /** The passage to draw: the one this load carried, else the one re-read. */
+  navCitation: ReturnType<typeof trustedCitation> | Extract<CitationResolution, { status: "passage" }>["citation"] | null;
+  /** The Overview cited a page as a whole, so only that page is marked. */
+  pageContext: boolean;
+}
 
 /**
  * Landing on Paper View from a citation (IR-1269, moved out of the page
@@ -19,7 +36,7 @@ import { useCitationReference } from "./useCitationReference";
  * `openPaperChat` opens this page's Paper Chat panel, the way back to an
  * answer Paper Chat gave.
  */
-export function useCitationLanding(id: string | undefined, openPaperChat: () => void) {
+export function useCitationLanding(id: string | undefined, openPaperChat: () => void): CitationLanding {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation();
