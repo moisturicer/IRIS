@@ -1,6 +1,7 @@
 /** The Overview title's size follows its length (IR-1264). */
 import { describe, expect, it } from "vitest";
 
+// @ts-expect-error -- the config is plain JS and ships no declaration file
 import { readingVariants } from "../../../../tailwind.config.js";
 import { TITLE_LONG_MAX, TITLE_SHORT_MAX, titleSize, titleSizeClasses } from "./titleSize";
 

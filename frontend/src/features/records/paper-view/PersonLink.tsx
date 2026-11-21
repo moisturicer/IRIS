@@ -22,6 +22,8 @@ export function PersonChip({ id, name, role, hasProfile = false }: {
   hasProfile?: boolean;
 }) {
   const linked = hasProfile && id != null;
+  // The person's place in the byline, not the viewer's account role.
+  const isAuthor = role === "Author";
   const classes = cn(
     "inline-flex min-h-11 reading-split:min-h-9 items-center gap-2 rounded-full bg-stone-100 py-0.5 pl-0.5 pr-3.5 text-small font-semibold text-stone-900",
     linked && "hover:bg-stone-200 hover:text-brand",
@@ -33,7 +35,7 @@ export function PersonChip({ id, name, role, hasProfile = false }: {
       <span
         className={cn(
           "w-7 h-7 shrink-0 rounded-full text-2xs font-semibold flex items-center justify-center",
-          role === "Author" ? "bg-brand text-white" : "bg-white text-stone-900 ring-1 ring-inset ring-stone-300",
+          isAuthor ? "bg-brand text-white" : "bg-white text-stone-900 ring-1 ring-inset ring-stone-300",
         )}
         aria-hidden
       >
@@ -41,7 +43,7 @@ export function PersonChip({ id, name, role, hasProfile = false }: {
       </span>
       <span className="break-words">
         {name}
-        {role === "Adviser" && (
+        {!isAuthor && (
           <span className="font-normal text-stone-600">
             <span aria-hidden> · </span>
             <span>Adviser</span>
