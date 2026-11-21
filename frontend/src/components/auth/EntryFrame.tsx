@@ -132,8 +132,10 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
             {lede.headline}
           </h1>
         )}
+        {/* A readable measure (IR-1263): unbounded, the sentence ran the full
+            width of a desktop screen in two very long lines. */}
         {lede && (
-          <p className="order-3 mt-section text-pretty text-body text-stone-700 md:order-2 md:text-center md:mt-4 md:text-lg">
+          <p className="order-3 mt-section max-w-2xl text-pretty text-body text-stone-700 md:order-2 md:mt-4 md:text-balance md:text-center md:text-lg">
             {lede.sentence}
           </p>
         )}
