@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import Http404
 from rest_framework.exceptions import ValidationError
 from rest_framework.utils.urls import replace_query_param
@@ -136,6 +136,8 @@ def _newest_first(papers):
     # Discover's own order: there is no separate publication timestamp.
     return (
         papers.select_related("classification", "record_type")
+        # Discover's own count, so `has_manuscript` agrees with its rows.
+        .annotate(file_count=Count("files", distinct=True))
         .prefetch_related(Prefetch("authors", queryset=Author.objects.order_by("pk")))
         .order_by("-created_at", "-pk")
     )
@@ -160,6 +162,9 @@ def paper_payload(record: Record) -> dict:
         "record_type_name": record.record_type.name if record.record_type else "",
         "publication_year": record.publication_year,
         "views": record.access_count,
+        # Whether a first-page thumbnail can be drawn: Discover's rule
+        # (`RecordListSerializer.get_has_manuscript`).
+        "has_manuscript": bool(record.abstract_file or getattr(record, "file_count", 0)),
     }
 
 

@@ -14,6 +14,7 @@ import json
 import shutil
 import tempfile
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
@@ -30,6 +31,7 @@ PROFILE_KEYS = {
 }
 PAPER_KEYS = {
     "id", "title", "authors", "classification_name", "record_type_name", "publication_year", "views",
+    "has_manuscript",
 }
 COLLABORATOR_KEYS = {"id", "first_name", "middle_initial", "last_name", "photo_url", "shared_papers"}
 LISTS = ("research", "advised", "collaborators")
@@ -260,6 +262,17 @@ class PaperListTests(PublicProfileTestCase):
         body = json.dumps(response.data).lower()
         for word in ("total", "citation"):
             self.assertNotIn(word, body)
+
+    def test_a_paper_says_whether_it_has_a_manuscript_for_its_thumbnail(self):
+        with_file = self.paper("With a manuscript", [self.ana], abstract_file=SimpleUploadedFile(
+            "paper.pdf", b"%PDF-1.4 stub", content_type="application/pdf",
+        ))
+        without = self.paper("Metadata only", [self.ana])
+
+        rows = {row["id"]: row for row in self.get(self.ana.pk, "research").data["results"]}
+
+        self.assertIs(rows[with_file.pk]["has_manuscript"], True)
+        self.assertIs(rows[without.pk]["has_manuscript"], False)
 
     def test_a_paper_without_an_area_or_year_reads_empty_not_missing(self):
         self.paper("Bare", [self.ana])
