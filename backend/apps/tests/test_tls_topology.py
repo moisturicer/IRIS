@@ -39,5 +39,14 @@ def test_caddyfile_allows_only_tls_12_and_13():
     assert re.search(r"^\s*protocols tls1\.2 tls1\.3$", CADDYFILE, re.MULTILINE)
 
 
+def test_caddy_compresses_static_text_but_not_api_json():
+    """IR-1262: nginx skips gzip behind Caddy (Via + gzip_proxied off)."""
+    block = re.search(r"^\s*encode zstd gzip \{(.*?)^\t\}$", CADDYFILE, re.MULTILINE | re.DOTALL)
+    assert block, "Caddy must compress responses"
+    types = re.findall(r"header Content-Type (\S+)", block.group(1))
+    assert "application/javascript*" in types and "text/css*" in types
+    assert not any(t.startswith(("application/json", "text/event-stream", "text/*")) for t in types)
+
+
 def test_caddy_does_not_trust_forwarded_headers_from_clients():
     assert "trusted_proxies" not in CADDYFILE.replace("no trusted_proxies set", "")

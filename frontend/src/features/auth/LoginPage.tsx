@@ -26,6 +26,7 @@ import type { User } from "@/types/auth";
 import { landingPathFor } from "@/lib/landing";
 import { safeRedirectPath } from "@/lib/redirectTarget";
 import { sessionAccount } from "@/lib/authSession";
+import { preloadScreen, preloadWhenIdle } from "@/router/lazyScreens";
 import { classifyLoginFailure, type AccountLock, type LoginFailure } from "./loginFailure";
 
 /**
@@ -145,6 +146,10 @@ export default function LoginPage() {
     }
     setFailedAttempts(getLoginAttempts(identifier));
   }, [identifier]);
+
+  // Sign-up and password reset load on demand (IR-1248). Fetch them while the
+  // reader is still on Sign in, so the link finds them here (IR-1262).
+  useEffect(() => preloadWhenIdle(["/signup", "/password/forgot"]), []);
 
   // Why they were signed out, as a dialog in front of the page (IR-1197).
   const signedOutNotice = passwordChanged
@@ -351,6 +356,8 @@ export default function LoginPage() {
         New to IRIS?{" "}
         <Link
           to="/signup"
+          onMouseEnter={() => void preloadScreen("/signup")}
+          onFocus={() => void preloadScreen("/signup")}
           className={cn(
             "inline-flex min-h-11 min-w-11 items-center justify-center rounded-control text-brand font-semibold hover:underline",
             FOCUS_RING,

@@ -520,6 +520,12 @@ jobs:
               def do_GET(self):
                   body = ("xff=%s proto=%s" % (self.headers.get("X-Forwarded-For"), self.headers.get("X-Forwarded-Proto"))).encode()
                   self.send_response(200)
+                  if self.path.endswith(".js"):
+                      body = b"var iris = 1;\n" * 200
+                      self.send_header("Content-Type", "application/javascript")
+                  if self.path == "/api/json":
+                      body = b"{\"iris\": 1}" * 200
+                      self.send_header("Content-Type", "application/json")
                   if self.path.startswith("/api/"):
                       self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
                   self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
@@ -551,6 +557,14 @@ jobs:
             [ "$(printf '%s\n' "$hsts" | grep -c .)" = 1 ] || { echo "::error::$path did not carry exactly one Strict-Transport-Security header"; exit 1; }
             case "$hsts" in *": max-age=31536000; includeSubDomains; preload") ;; *) echo "::error::$path has the wrong Strict-Transport-Security value"; exit 1 ;; esac
           done
+
+          # IR-1262: static JS leaves compressed (nginx skips gzip behind Caddy);
+          # API JSON does not.
+          js_enc=$(curl -sk -D - -o /dev/null -H 'Accept-Encoding: gzip' https://localhost:18443/assets/app.js | tr -d '\r' | grep -i '^content-encoding:' || true)
+          json_enc=$(curl -sk -D - -o /dev/null -H 'Accept-Encoding: gzip' https://localhost:18443/api/json | tr -d '\r' | grep -i '^content-encoding:' || true)
+          echo "JS: ${js_enc:-uncompressed}; API JSON: ${json_enc:-uncompressed}"
+          case "$js_enc" in *gzip*) ;; *) echo "::error::Caddy did not compress JavaScript"; exit 1 ;; esac
+          [ -z "$json_enc" ] || { echo "::error::Caddy compressed an API JSON response"; exit 1; }
 
           probe() { openssl s_client -connect localhost:18443 -servername localhost "$@" </dev/null 2>&1; }
           for version in -tls1_2 -tls1_3; do
