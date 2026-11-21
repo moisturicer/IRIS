@@ -10,7 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { peopleApi } from "@/api/people";
 import { profileApi } from "@/api/profile";
+import { recordsApi } from "@/api/records";
 import { RequestTimeoutError } from "@/api/requestPolicy";
+import { forgetFirstPages } from "@/lib/firstPages";
 import { useAuthStore } from "@/store/auth.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
@@ -27,7 +29,7 @@ const person: PublicProfile = {
 
 const paper = (id: number, over: Partial<ProfilePaper> = {}): ProfilePaper => ({
   id, title: `Paper ${id}`, authors: ["Reyes, A.", "Villanueva, M."], classification_name: "Geomatics",
-  record_type_name: "Thesis / Research", publication_year: 2025, views: 48, ...over,
+  record_type_name: "Thesis / Research", publication_year: 2025, views: 48, has_manuscript: false, ...over,
 });
 
 const collaborator = (id: number, over: Partial<Collaborator> = {}): Collaborator => ({
@@ -126,6 +128,17 @@ describe("a full profile", () => {
     const first = within(research).getAllByRole("listitem")[0];
     expect(within(first).getByRole("link", { name: "Paper 500" })).toHaveAttribute("href", "/records/500");
     expect(first).toHaveTextContent("48 views");
+  });
+
+  it("asks for the first-page thumbnail of a paper with a manuscript, and not of one without", async () => {
+    forgetFirstPages();
+    const firstPage = vi.spyOn(recordsApi, "firstPage").mockResolvedValue({ status: 202, data: new Blob() } as never);
+    serve({ research: () => Promise.resolve(page([paper(500, { has_manuscript: true }), paper(501)])) });
+    open(101);
+    await screen.findByRole("list", { name: "Papers" });
+
+    await waitFor(() => expect(firstPage).toHaveBeenCalledWith(500, expect.anything()));
+    expect(firstPage).not.toHaveBeenCalledWith(501, expect.anything());
   });
 
   it("never prints an email address or a citation count", async () => {

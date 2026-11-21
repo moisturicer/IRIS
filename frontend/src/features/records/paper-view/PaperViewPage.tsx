@@ -4,7 +4,6 @@ import { InterruptedState } from "@/components/shared/InterruptedState";
 import { failureMessage } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
-import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -645,17 +644,20 @@ export default function PaperViewPage() {
   // seat moves to `in_review` and the server stamps `opened_at` -- then moves
   // into the Review section. With no unopened seat it only navigates. A
   // failed recording still opens the review: the seat stays `assigned`, and
-  // the next *Open review* records it.
+  // the next *Open review* records it (IR-1206). A recorded seat re-reads the
+  // Record through `reloadRecord`, so one the viewer can no longer read falls
+  // to the not-available screen (IR-906, IR-1273).
   const openReview = async () => {
     const seat = seatToOpen(record);
     if (seat) {
+      let opened = false;
       try {
         await seatsApi.open(seat.id);
-        const { data } = await recordsApi.detail(record.id);
-        replaceRecord(data);
+        opened = true;
       } catch {
         // See above: the review opens regardless.
       }
+      if (opened) await reloadRecord();
     }
     setViewParam("section", "review");
   };
@@ -1031,8 +1033,9 @@ export default function PaperViewPage() {
                       setNewVersionDone(outcome);
                       addToast({ type: "success", message: outcome });
                       setTrackerVersion((n) => n + 1);
-                      // A failed reload leaves the page as it was; the next visit catches up.
-                      recordsApi.detail(record.id).then(({ data }) => replaceRecord(data)).catch(() => {});
+                      // A failed reload leaves the page as it was, unless the
+                      // Record can no longer be read (IR-906, IR-1273).
+                      void reloadRecord();
                     }}
                     onRefreshed={(fresh) => {
                       replaceRecord(fresh);

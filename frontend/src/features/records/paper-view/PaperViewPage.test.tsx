@@ -227,6 +227,8 @@ vi.mock("@/api/records", () => ({
     changeContactPerson: vi.fn(() => Promise.resolve({ data: { owners: [] } })),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
+    // Submit new version (IR-1273); the dialog's own behaviour is `NewVersionDialog.test.tsx`'s.
+    submitNewVersion: vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
     pscedList:        vi.fn(() => Promise.resolve(page([]))),
     // Review threads load themselves; their behaviour is `ReviewThreads.test.tsx`'s.
@@ -3383,6 +3385,76 @@ describe("a record the viewer cannot read (IR-411)", () => {
     vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
     await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
 
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+  });
+
+  // IR-1273: Open review re-reads the Record once the seat is recorded, through
+  // the same reload, so a Record revoked mid-review does not stay on screen.
+  it("falls to the not-available state when Open review's re-read finds access gone", async () => {
+    const assigned: ReviewerSeat = {
+      id: 77, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
+      reviewer: 2, reviewer_name: "ITSO Reviewer", state: "assigned", state_label: "Assigned",
+      source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
+      opened_at: null, done_at: null,
+    };
+    shownRecord = { ...inReview, my_seats: [assigned], is_participant: true, capabilities: ["cite", "open_review"] };
+    signInAs(2, "ITSO");
+    renderPaperView();
+
+    const open = await screen.findByRole("button", OPEN_REVIEW);
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
+    await userEvent.click(open);
+
+    expect(vi.mocked(seatsApi.open)).toHaveBeenCalledWith(77);
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+  });
+
+  // IR-1206 still holds: a seat that fails to record still opens the review.
+  it("still opens the review when recording the seat fails", async () => {
+    const assigned: ReviewerSeat = {
+      id: 77, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
+      reviewer: 2, reviewer_name: "ITSO Reviewer", state: "assigned", state_label: "Assigned",
+      source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
+      opened_at: null, done_at: null,
+    };
+    shownRecord = { ...inReview, my_seats: [assigned], is_participant: true, capabilities: ["cite", "open_review"] };
+    signInAs(2, "ITSO");
+    renderPaperView();
+
+    vi.mocked(seatsApi.open).mockRejectedValueOnce(new Error("Network Error"));
+    await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
+
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+  });
+
+  // IR-1273: Submit new version re-reads the Record through the same reload.
+  it("falls to the not-available state when Submit new version's re-read finds access gone", async () => {
+    shownRecord = {
+      ...inReview,
+      workflow_state: "awaiting_resubmission",
+      workflow_state_label: "Awaiting resubmission",
+      revision: {
+        party: null, label: null, blocked: null, withdrawable: null,
+        decision_blocked: "Waiting on the author: IERC asked for a revision.",
+        open: [{
+          id: 3, party: "ierc", label: "IERC", reason: "Add the assent form.",
+          requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
+        }],
+        new_version: { number: 3, rereview: ["IERC"], kept: ["ITSO"], blocked: null },
+      },
+      capabilities: ["cite", "create_version", "replace_manuscript", "edit_details"],
+    };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Submit new version" }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit new version" });
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Submit v3" }));
+
+    expect(vi.mocked(recordsApi.submitNewVersion)).toHaveBeenCalledWith(RECORD_ID);
     expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
