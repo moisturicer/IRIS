@@ -8,7 +8,7 @@ interface ChatDrawerProps {
   /** One line under the heading saying what the drawer holds. */
   description?: string;
   /** Which edge it comes from: history on the start side, sources on the end. */
-  side:        "start" | "end" | "bottom";
+  side:        "start" | "end";
   /** The close control's accessible name. */
   closeLabel:  string;
   onClose:     () => void;
@@ -34,23 +34,19 @@ export function ChatDrawer({ title, description, side, closeLabel, onClose, retu
   useDialogFocus(true, panelRef, onClose, returnTo);
 
   return (
-    <div className={cn("absolute inset-0 z-40 flex", side === "bottom" && "flex-col")}>
+    <div className="absolute inset-0 z-40 flex">
       <div aria-hidden onClick={onClose} className="absolute inset-0 bg-stone-900/25" />
       <div
         ref={panelRef}
         tabIndex={-1}
         role="dialog"
-        data-placement={side}
         aria-modal="true"
         aria-labelledby={headingId}
         className={cn(
-          "relative flex flex-col bg-overlay shadow-card-md focus:outline-none",
-          // A phone's sources arrive as a sheet from the bottom (IR-1237).
-          side === "bottom"
-            ? "mt-auto h-[min(80%,34rem)] w-full rounded-t-card motion-safe:animate-fade-in-up"
-            : "h-full w-[min(88%,320px)]",
-          side === "start" && "mr-auto motion-safe:animate-panel-in-start",
-          side === "end" && "ml-auto motion-safe:animate-panel-in",
+          "relative flex flex-col h-full w-[min(88%,320px)] bg-overlay focus:outline-none",
+          side === "start"
+            ? "mr-auto motion-safe:animate-panel-in-start shadow-card-md"
+            : "ml-auto motion-safe:animate-panel-in shadow-card-md",
         )}
       >
         <div className="shrink-0 flex items-start gap-2 pl-4 pr-1.5 py-1.5 min-h-[56px] border-b border-stone-200">

@@ -60,14 +60,6 @@ export const CHAT_COLUMN = `w-full ${CHAT_MEASURE} mx-auto`;
  */
 export const ASK_PHONE_MAX_PX = 640;
 
-/**
- * From this page width the Sources panel sits beside the chat (IR-1237); below it
- * the panel opens over the chat, and a phone gets a bottom sheet. Read off the
- * page's own width, like the conversations pane, and wide enough for the pane, a
- * 360px panel and a readable chat column at once.
- */
-export const ASK_SOURCES_BESIDE_MIN_PX = 1100;
-
 // Auto margins center the opening content and collapse when it needs to scroll.
 export const CHAT_OPENING = "overflow-y-auto before:my-auto before:content-[''] after:my-auto after:content-['']";
 

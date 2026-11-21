@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AxiosAdapter, InternalAxiosRequestConfig } from "axios";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { apiClient } from "@/api/client";
 import recorded from "@/test/fixtures/runtimeReader.recorded.json";
@@ -60,21 +60,17 @@ function renderAsk(at: string) {
 const answerText = () => screen.findByText((_, element) =>
   element?.tagName === "P" && /^Both studies sample water/.test(element.textContent ?? ""));
 
-/** What a reader sees of the answer: its text, then each cited passage in order, with the Sources panel opened (IR-1237). */
+/** What a reader sees of the answer: its text, then each cited passage in order, with the sources opened. */
 async function answerAsRead(user: ReturnType<typeof userEvent.setup>) {
   const answer = (await answerText()).textContent;
-  if (!screen.queryByRole("complementary", { name: "Sources" })) {
-    await user.click(screen.getByRole("button", { name: /^\d+ passages? from \d+ papers?$/ }));
-  }
-  // The panel's own links to the cited pages, not the numbered chips in the text.
-  const panel = screen.getByRole("complementary", { name: "Sources" });
-  const passages = within(panel).getAllByRole("link").filter(link => link.getAttribute("href")?.includes("page="));
+  const toggle = screen.getByRole("button", { name: /sources? for this answer/ });
+  if (toggle.getAttribute("aria-expanded") !== "true") await user.click(toggle);
+  // The passage rows, not the numbered chips in the text that link to the same pages.
+  const passages = screen.getAllByRole("link").filter(link =>
+    link.getAttribute("href")?.includes("page=") && (link.textContent ?? "").length > 3);
   return {
     answer,
-    citations: passages.map(link => ({
-      link: link.getAttribute("href"),
-      text: link.closest("li")?.textContent ?? "",
-    })),
+    citations: passages.map(link => ({ link: link.getAttribute("href"), text: link.textContent })),
   };
 }
 

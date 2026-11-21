@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { ChatMessage } from "@/types/chat";
-import { CitationPanelContext, CitationTurnContext } from "@/lib/citedPage";
+import { CitationTurnContext } from "@/lib/citedPage";
 import { cn } from "@/lib/utils";
-import type { ChatCitation } from "@/types/ai";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
 import { ANSWER_MARKDOWN } from "./answerLayout";
@@ -39,13 +38,6 @@ interface ChatMessageBubbleProps {
   onSelectSources?: (message: ChatMessage) => void;
   /** The sources open beneath the answer itself, rather than in a panel. */
   inlineSources?: boolean;
-  /**
-   * A Sources panel sits beside the chat (IR-1237): the answer's count and chips
-   * open it, at a marker or at none, and `openMarker` is the one it highlights.
-   * Ask again then belongs to the answer, and the question keeps Edit and Copy.
-   */
-  onOpenSources?: (message: ChatMessage, marker: number | null) => void;
-  openMarker?: number | null;
   /** Send this question again as a new Turn (IR-1162). */
   onAskAgain?: (question: string) => void;
   /** Put this question in the input to change and send (IR-1162). */
@@ -89,19 +81,6 @@ function SourcesButton({ markers, selected, onSelect }: { markers: number[]; sel
       </span>
       {label}
       <i aria-hidden className={cn("fas fa-chevron-down text-label transition-transform duration-200", selected && "rotate-180")} />
-    </button>
-  );
-}
-
-/** "3 passages from 2 papers": the answer's evidence in one count, and the way to the panel (IR-1237). */
-function PassageCount({ citations, open, onOpen }: { citations: ChatCitation[]; open: boolean; onOpen: () => void }) {
-  const papers = new Set(citations.map((citation) => citation.record_id)).size;
-  const label = `${citations.length} ${citations.length === 1 ? "passage" : "passages"} from ${papers} ${papers === 1 ? "paper" : "papers"}`;
-  return (
-    <button type="button" onClick={onOpen} aria-expanded={open}
-      className={cn("inline-flex min-h-8 items-center gap-1.5 rounded-control px-2 -ml-2 text-small font-medium transition-colors",
-        open ? "text-brand" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")}>
-      {label}
     </button>
   );
 }
@@ -176,20 +155,15 @@ function RetryButton({ onRetry, disabled }: { onRetry?: () => void; disabled?: b
  */
 export function ChatMessageBubble({
   message, compact = false, retryDisabled, onRetry, sourcesSelected = false, onSelectSources, inlineSources = false,
-  onOpenSources, openMarker = null, onAskAgain, onEdit, controlsDisabled,
+  onAskAgain, onEdit, controlsDisabled,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
   const [expanded, setExpanded] = useState(false);
   const markers = [...new Set((message.citations ?? []).map((citation) => citation.marker))];
-  const inPanelMode = !!onOpenSources;
-  const panel = useMemo(() => onOpenSources
-    ? { active: sourcesSelected ? openMarker : null, open: (marker: number) => onOpenSources(message, marker) }
-    : null, [onOpenSources, sourcesSelected, openMarker, message]);
 
   return (
     // Its citations name this answer, the way back to it (IR-578).
     <CitationTurnContext.Provider value={message.turnId ?? null}>
-    <CitationPanelContext.Provider value={panel}>
     <div
       data-turn={isUser ? undefined : message.turnId}
       className={cn(
@@ -226,7 +200,7 @@ export function ChatMessageBubble({
           <QuestionControls
             question={message.content}
             disabled={controlsDisabled}
-            onAskAgain={inPanelMode ? undefined : onAskAgain}
+            onAskAgain={onAskAgain}
             onEdit={onEdit}
             className={cn("mt-1 -mr-1", REVEAL_ON_HOVER)}
           />
@@ -283,14 +257,10 @@ export function ChatMessageBubble({
 
         {!isUser && (
           <div className="mt-1.5 flex items-center gap-2 motion-safe:animate-fade-in-up">
-            {inPanelMode && markers.length > 0 && (
-              <PassageCount citations={message.citations ?? []} open={sourcesSelected && openMarker === null}
-                onOpen={() => onOpenSources(message, null)} />
-            )}
-            {!inPanelMode && inlineSources && markers.length > 0 && (
+            {inlineSources && markers.length > 0 && (
               <SourcesButton markers={markers} selected={expanded} onSelect={() => setExpanded(v => !v)} />
             )}
-            {!inPanelMode && !inlineSources && onSelectSources && markers.length > 0 && (
+            {!inlineSources && onSelectSources && markers.length > 0 && (
               <SourcesButton
                 markers={markers}
                 selected={sourcesSelected}
@@ -298,15 +268,9 @@ export function ChatMessageBubble({
               />
             )}
             <CopyButton text={message.content} label="Copy answer" className={cn(!markers.length && "-ml-1.5")} />
-            {inPanelMode && onAskAgain && message.question && (
-              <button type="button" disabled={controlsDisabled} onClick={() => onAskAgain(message.question as string)}
-                aria-label="Ask again" title="Ask again" className={MESSAGE_ACTION}>
-                <i className="fas fa-rotate-right text-label" aria-hidden />
-              </button>
-            )}
           </div>
         )}
-        {!isUser && !inPanelMode && inlineSources && expanded && (
+        {!isUser && inlineSources && expanded && (
           <div className="mt-2 origin-top border-t border-stone-200 pt-2.5 motion-safe:animate-[sources-open_260ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <SourcePassages citations={message.citations ?? []} sources={message.sources ?? []} answered
               className="-mx-2" />
@@ -315,7 +279,6 @@ export function ChatMessageBubble({
       </div>
       )}
     </div>
-    </CitationPanelContext.Provider>
     </CitationTurnContext.Provider>
   );
 }
