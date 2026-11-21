@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils";
 type PersonRole = "Author" | "Adviser";
 
 /**
- * An author or adviser in the byline, as the prototype sets them: an author is
- * an avatar and a name, the Adviser is the word "Adviser" and a name, with no
- * pill around either. The role stays in the accessible name, so a screen reader
- * still hears "Ana Reyes, Author". A profile link is rendered only when the API
- * allows it; otherwise the name is plain text that says it has no public profile.
+ * An author or the Adviser in the byline, each in their own pill (IR-1264): an
+ * initials disc, then the name. An author's disc is maroon; the Adviser's is
+ * white with a stone ring and the name is followed by "· Adviser", so the two
+ * tell apart without a label in front. The role stays in the accessible name,
+ * so a screen reader still hears "Ana Reyes, Author". A profile link is
+ * rendered only when the API allows it; otherwise the name is plain text that
+ * says it has no public profile.
  */
 export function PersonChip({ id, name, role, hasProfile = false }: {
   id?: number;
@@ -21,25 +23,31 @@ export function PersonChip({ id, name, role, hasProfile = false }: {
 }) {
   const linked = hasProfile && id != null;
   const classes = cn(
-    "inline-flex min-h-11 items-center gap-2 rounded-full pl-0.5 pr-2.5 text-small font-semibold text-stone-900",
-    linked && "hover:text-brand hover:underline",
+    "inline-flex min-h-11 reading-split:min-h-9 items-center gap-2 rounded-full bg-stone-100 py-0.5 pl-0.5 pr-3.5 text-small font-semibold text-stone-900",
+    linked && "hover:bg-stone-200 hover:text-brand",
     COLOUR_TRANSITION,
     linked && FOCUS_RING,
   );
-  const chip = role === "Author" ? (
+  const chip = (
     <>
       <span
-        className="w-7 h-7 shrink-0 rounded-full bg-brand text-white text-2xs font-semibold flex items-center justify-center"
+        className={cn(
+          "w-7 h-7 shrink-0 rounded-full text-2xs font-semibold flex items-center justify-center",
+          role === "Author" ? "bg-brand text-white" : "bg-white text-stone-900 ring-1 ring-inset ring-stone-300",
+        )}
         aria-hidden
       >
         {initials(name)}
       </span>
-      <span>{name}</span>
-    </>
-  ) : (
-    <>
-      <span className="font-normal text-stone-500">{role}</span>
-      <span>{name}</span>
+      <span className="break-words">
+        {name}
+        {role === "Adviser" && (
+          <span className="font-normal text-stone-600">
+            <span aria-hidden> · </span>
+            <span>Adviser</span>
+          </span>
+        )}
+      </span>
     </>
   );
 

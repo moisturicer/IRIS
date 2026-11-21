@@ -197,7 +197,7 @@ Decided by **Lee Jasmin Adolfo** (project lead and frontend owner) on 2026-11-14
 
 **Creative North Star: "The Bound Volume"**
 
-IRIS should read like a bound thesis in a university library. The cover is maroon, the titles are set in Garamond, and the pages are typeset with hairline rules. Everything else stays quiet so the work can be read. The paper is the one bright object on screen: on the Paper view, only the PDF pages are white, and the record bar, the toolbar, the Ask IRIS header and the desk behind the pages are stone. On the Overview, the page reads as one typeset column, with a large Garamond title, a byline of chips, the actions, and then sections divided by thin rules like the sections of a printed paper.
+IRIS should read like a bound thesis in a university library. The cover is maroon, the titles are set in Garamond, and the pages are typeset with hairline rules. Everything else stays quiet so the work can be read. The paper is the one bright object on screen: on the Paper view, only the PDF pages are white, and the record bar, the toolbar, the Ask IRIS header and the desk behind the pages are stone. On the Overview, the page reads as one typeset column, with a Garamond title sized by its length, a byline of people pills, the actions, and then sections divided by thin rules like the sections of a printed paper.
 
 Maroon is the binding, not the paint. It appears once or twice per view: the filled action, the selected section, the Ask IRIS mark and the page citations. Structure comes from type, space and one-pixel rules, never from boxes. The layout follows the room it has, not the window. The record page measures its own width with container queries, so the sidebar or the Ask IRIS panel beside it changes the layout as surely as a smaller screen does.
 
@@ -253,7 +253,7 @@ Gold and cream are gone (IR-1097): the thumbnail ring and the other decoration w
 
 ### Hierarchy
 - **Shared app roles:** `text-display` 28/34, `text-title` 20/28, `text-heading` 16/24, `text-body` 15/24, `text-small` 13/20 and `text-label` 12/16 come from `frontend/tailwind.config.js`. Display and title use EB Garamond 600; the other roles use Inter. The record page below has documented reading-specific sizes.
-- **Display** (EB Garamond 600, 36 px on a phone and 48 px from `sm`, line-height 1.08, tight tracking, balanced wrap): a record's title on the Overview. The one line the page exists to name.
+- **Display** (EB Garamond 600, tight tracking, balanced wrap): a record's title on the Overview. The one line the page exists to name. Its size follows its length (IR-1264), read from the `overview` container, never the window: up to 80 characters 48 px (36 px below 40 rem), up to 160 characters 36 px (28 px), longer 30 px (24 px). It is never cut.
 - **Headline** (EB Garamond 600, 20/28 px): section headings on the Overview (Abstract, AI Overview, Related works, Comments) and the Ask IRIS heading. Ink, never maroon.
 - **Title** (EB Garamond 600, 20/28 px): the paper's title in the record bar, wrapping onto as many lines as it needs (the Full Text Rule; it was one truncated line before IR-1218); dialog and card titles.
 - **Reading** (Inter 400, 16 px, line-height 1.8): the AI Overview's prose, filling the Overview column. The first paragraph is the lead at 17 px, darker. Markdown section headings inside it are Ink Garamond with space above and no rule; list markers are maroon. The Abstract reads at 17 px with 1.75 leading.
@@ -352,7 +352,7 @@ The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone
 
 ### Chips
 - **Meta chips** (record type, classification, flags): full pills, no fill, Rule Stone outline, 13 px semibold Body Ink.
-- **Author chips:** white pills with a Desk Stone outline and a 24 px maroon initials disc.
+- **People pills** (IR-1264): one per author and one for the Adviser, in one row under the title. A Bar Stone pill, 44 px tall in a reading area narrower than 640 px and 36 px from there (the reading surfaces' control size), holding a 28 px initials disc and the name; an author's disc is maroon, the Adviser's white with a Rule Stone ring, and the Adviser's name is followed by "· Adviser" in Quiet Ink. A pill with a profile is a link (Desk Stone and maroon text on hover); one without is plain text.
 - **Status:** `TONES` in `frontend/src/components/ui/statusTones.ts` defines four tones only. *Quiet* is unfilled with a stone outline, *active* is white with maroon text and a Rule Stone outline, *attention* is solid maroon (the only filled tone), and *settled* is an Ink outline on white. Each carries its word, and stopping states also carry an icon.
 - **Scope chip** ("This paper" / "All papers") in the composer: white with a Rule Stone outline and a maroon dot; filled maroon when widened to all papers.
 
@@ -371,6 +371,9 @@ A toast reports the outcome of something the reader just did, in the bottom-righ
 
 ### Ask IRIS panel (signature)
 A column on Endpaper behind one Rule Stone line, never a card. A Bar Stone header with the Garamond heading, an "AI" tag and the paper's title. Below it, the conversation, or a Garamond "Ask about this paper." with three starter questions in a hairline list (`StarterQuestions`, shared with the Ask IRIS page). At the bottom, the composer. It arrives from its edge (320 ms) and has dialog semantics only when it covers the paper.
+
+### Record details (IR-1264)
+The rail beside the Overview says what the record is held under and, for those in its review, where it stands. **Status** is drawn here, never under the title: the first line of **Review & routing** for a participant (one line per party with its outcome and the *Preserved* mark, then *See review history*, which opens Review), a *Status* row in **About this record** for anyone outside the review while the record is not published, and nothing on a published paper. **About this record** shows only the rows that say something (no em dash, *Not declared* or *Not flagged*) to anyone outside the review; its owners and reviewers see every row, decided by participation, never by role (IR-411). The owner's waiting work is the revision banner and document requests at the top of the Overview; there is no separate summary card.
 
 ### Overview sections (signature)
 Abstract, AI Overview, Related works and Comments, each under one Desk Stone hairline, each with a Garamond headline. The AI Overview has no card and no provenance label: just the heading with the IRIS mark, a ghost Copy, and the article. Comments are drawn and plainly closed (disabled field and Post, "Not open yet") until the feature exists.

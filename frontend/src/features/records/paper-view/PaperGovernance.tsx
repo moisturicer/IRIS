@@ -4,20 +4,43 @@ import type { RecordDetail } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import { RailHeading } from "./headings";
 
+type Row = { label: string; value: string; /** Says nothing to a reader: shown to `full` viewers only. */ quiet?: boolean };
+
 /**
- * Institutional governance facts, as a label/value ledger.
+ * What the record is held under, as a label/value ledger.
  *
  * Every row reads from a field that exists on RecordDetail. A field IRIS does
  * not hold does not get a row — an em dash here means "not set", never
  * "not modelled".
+ *
+ * Who sees what (IR-1264): those in the record's review (`full`: its owners
+ * and reviewers) see every row, the unset and negative ones included, because
+ * they may have to act on them. Anyone else sees only rows that say something:
+ * no em dash, no "Not declared" IP status, no "Not flagged" commercialization.
+ * The page decides `full` by participation, never by role (IR-411).
+ *
+ * `showStatus` adds where the record stands for a viewer outside its review,
+ * who has no Review & routing block to read it from. A published record's
+ * status is left out: everything a reader can open in the catalogue is.
  */
-export function PaperGovernance({ record }: { record: RecordDetail }) {
+export function PaperGovernance({ record, full = false, showStatus = false }: {
+  record: RecordDetail;
+  full?: boolean;
+  showStatus?: boolean;
+}) {
   const headingId = useId();
-  const rows: { label: string; value: string }[] = [
-    // No status row: the title badge states where the record stands, once (IR-525).
-    { label: "Classification", value: record.classification_name ?? "—" },
-    { label: "Record Type", value: record.record_type_name ?? "—" },
-    { label: "Year Accomplished", value: record.year_accomplished ? String(record.year_accomplished) : "—" },
+  const unset = (value: string | null | undefined): Row["value"] => value ?? "—";
+  const rows: Row[] = [
+    ...(showStatus && record.pipeline_status !== "published" && record.workflow_state_label
+      ? [{ label: "Status", value: record.workflow_state_label }]
+      : []),
+    { label: "Classification", value: unset(record.classification_name), quiet: !record.classification_name },
+    { label: "Record Type", value: unset(record.record_type_name), quiet: !record.record_type_name },
+    {
+      label: "Year Accomplished",
+      value: record.year_accomplished ? String(record.year_accomplished) : "—",
+      quiet: !record.year_accomplished,
+    },
     // The facts the header used to carry as chips and counters (IR-1089, audit
     // LAY-03): they are held here, once. A field the record lacks gets no row.
     ...(record.psced ? [{ label: "PSCED", value: record.psced }] : []),
@@ -31,6 +54,7 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
           ? IP_TYPE_LABELS[record.ip_type]
           : "Declared, untyped"
         : "Not declared",
+      quiet: !record.is_ip,
     },
     // KTTO's release (ADR-052 §11): sent only for a marked paper, to the people
     // who see its embargo.
@@ -43,14 +67,16 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
     {
       label: "Commercialization",
       value: record.for_commercialization ? "Eligible" : "Not flagged",
+      quiet: !record.for_commercialization,
     },
   ];
+  const shown = full ? rows : rows.filter((row) => !row.quiet);
 
   return (
     <section aria-labelledby={headingId} className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card">
-      <RailHeading id={headingId} className="mb-3">Institutional Governance</RailHeading>
+      <RailHeading id={headingId} className="mb-3">About this record</RailHeading>
       <dl className="space-y-2">
-        {rows.map((row) => (
+        {shown.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-3">
             <dt className="text-xs text-stone-500 shrink-0">{row.label}</dt>
             {/* `min-w-0` and anywhere-wrapping: a long Classification name wraps

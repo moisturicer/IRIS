@@ -13,6 +13,8 @@ export const readingVariants = {
   // The Overview's own column, which Ask IRIS narrows when it sits beside it:
   // the record details sit beside the page only while there is room for both.
   "overview-wide": "@container overview (min-width: 64rem)",
+  // Past a phone's width: the Overview's title takes its larger size (IR-1264).
+  "overview-roomy": "@container overview (min-width: 40rem)",
 };
 
 const readingTiers = plugin(({ addVariant }) => {

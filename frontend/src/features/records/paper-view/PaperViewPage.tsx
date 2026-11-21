@@ -1,4 +1,3 @@
-import { INSTITUTION } from "@/config/institution";
 import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
@@ -87,7 +86,7 @@ import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
 import { ReadingHeader } from "./ReadingHeader";
-import { SubmissionStatus } from "./SubmissionStatus";
+import { titleSizeClasses } from "./titleSize";
 import { useFragmentFocus } from "./useFragmentFocus";
 import { useCitationReference, type CitationResolution } from "./useCitationReference";
 import { WAITING_TARGET } from "../waitingOnYou";
@@ -1125,24 +1124,19 @@ export default function PaperViewPage() {
                 holds the paper in one line (IR-569). */}
             {!onPaperTab && !reviewWorkspace && (
             <header className={cn("space-y-5", section === "overview" && "pb-1")}>
-              <h1 className="font-display font-semibold text-4xl sm:text-5xl leading-[1.08] tracking-tight text-stone-900 text-balance">
+              {/* Sized by its length (IR-1264), never cut. */}
+              <h1 className={cn("font-display font-semibold tracking-tight text-stone-900 text-balance", titleSizeClasses(record.title))}>
                 {record.title}
               </h1>
 
-              {/* Where the record stands, once. What it is held under (type,
-                  Area, IP, commercialization) is in Record details (IR-1089). */}
+              {/* The byline (IR-1264): each author, then the Adviser when the
+                  record names one (IR-472), in their own pill. Where the record
+                  stands is in Record details for those in its review, and the
+                  year and what it is held under are Record details' rows
+                  (IR-1089), so the header carries neither. */}
               <div className="flex items-center gap-2 flex-wrap">
-                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />
-              </div>
-
-              {/* One byline and one date line (IR-1089, audit LAY-03): the
-                  authors, then the adviser when the record names one (IR-472),
-                  then the date the work was completed. Published and views are
-                  governance facts, in Record details. */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
                 {authorNames.length > 0 ? (
-                  <ul className="flex items-center gap-x-1 gap-y-1 flex-wrap" aria-label="Authors">
+                  <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
                     {authorNames.map((name) => {
                       const owner = record.owners.find((candidate) => candidate.full_name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
                       return (
@@ -1165,14 +1159,7 @@ export default function PaperViewPage() {
                     </li>
                   </ul>
                 )}
-                </div>
                 <ResearchOriginBadge origin={record.origin} />
-                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
-                  {record.origin === "institutional" && (
-                    <span>{[...(record.paper_details?.programs ?? []), INSTITUTION.name].join(" · ")}</span>
-                  )}
-                  {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
-                </div>
               </div>
 
               {lineageLinks}
@@ -1224,8 +1211,9 @@ export default function PaperViewPage() {
             {section === "overview" && (
               <>
                 {/* Action required (spec §4.10): what is waiting on the
-                    owner comes first. */}
-                {record.submitter_status && <SubmissionStatus status={record.submitter_status} />}
+                    owner comes first. The revision banner and the document
+                    requests below are that, whole; a separate "Your
+                    submission" summary repeated them and the rail (IR-1264). */}
                 {/* Revision requests are answered through Submit new version. */}
                 {userIsOwner && record.revision.open.length > 0 && (
                   <section
@@ -1458,8 +1446,24 @@ export default function PaperViewPage() {
                 <h2 id={`${tabsId}-details`} className="font-display text-section font-semibold text-stone-900">
                   Record details
                 </h2>
-                {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
-                <PaperGovernance record={record} />
+                {/* Where the record stands, for those in its review, with who
+                    has cleared it; the history is Review's (IR-1264). */}
+                {participant && (
+                  <ReviewRoutingTracker
+                    key={trackerVersion}
+                    recordId={record.id}
+                    status={<StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />}
+                    onOpenHistory={() => setViewParam("section", "review")}
+                  />
+                )}
+                <PaperGovernance
+                  record={record}
+                  // Those in the review see every row; anyone else only the
+                  // ones that say something (IR-1264). Decided by participation,
+                  // never by role (IR-411).
+                  full={participant}
+                  showStatus={!participant}
+                />
                 <ContactPersonCard record={record} onChanged={reloadRecord} />
                 <EmbargoCard record={record} onChanged={reloadRecord} />
                 <UnlistedCard record={record} onChanged={reloadRecord} />
