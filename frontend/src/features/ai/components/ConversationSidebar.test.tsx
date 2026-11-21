@@ -176,10 +176,12 @@ describe("New conversation, Search, Pinned and Recents", () => {
   });
 
   // IR-1257: on the pane's stone-50 the box vanished until hovered.
-  test("the search box has a fill at rest, darker on hover and while typing", () => {
+  test("the search box has a fill at rest, no change on hover, darker while typing", () => {
     render(<Sidebar />);
     const box = screen.getByRole("searchbox", { name: "Search your past conversations" }).closest("label") as HTMLElement;
-    expect(box).toHaveClass("bg-stone-100", "hover:bg-stone-200", "focus-within:bg-stone-200");
+    expect(box).toHaveClass("bg-stone-100", "focus-within:bg-stone-200");
+    // Like every other search box in IRIS, hovering it changes nothing.
+    expect(box.className).not.toMatch(/(^|\s)hover:/);
     // Conversation rows keep their own style: no fill at rest.
     expect(screen.getByRole("link", { name: /Pond sampling/ }).className).not.toMatch(/(^|\s)bg-/);
   });

@@ -61,9 +61,14 @@ interface ConversationSidebarProps {
   onResize:         (width: number) => void;
 }
 
-const NAV_ITEM =
-  "flex min-h-10 w-full min-w-0 items-center gap-3 rounded-control px-3 text-body text-stone-700 " +
-  "hover:bg-stone-200/70 hover:text-stone-900 " + COLOUR_TRANSITION + " " + FOCUS_RING;
+/**
+ * The history search box (IR-1257): a fill at rest, since on the pane's
+ * stone-50 it vanished, and no change on hover, like every other search box.
+ * Typing darkens it, which is how it shows focus.
+ */
+const SEARCH_BOX =
+  "flex min-h-10 w-full min-w-0 cursor-text items-center gap-3 rounded-control bg-stone-100 px-3 text-body text-stone-700 " +
+  "focus-within:bg-stone-200 " + COLOUR_TRANSITION;
 
 const ICON_BUTTON =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-control text-stone-600 " +
@@ -234,8 +239,7 @@ export function ConversationHistoryList({
 
   return (<>
     <div className="shrink-0 space-y-0.5 px-2 pt-2">
-      {/* A fill at rest (IR-1257): on the pane's stone-50 the box vanished until hovered. */}
-      <label htmlFor={searchId} className={cn(NAV_ITEM, "cursor-text bg-stone-100 hover:bg-stone-200 focus-within:bg-stone-200")}>
+      <label htmlFor={searchId} className={SEARCH_BOX}>
         <i className="fas fa-magnifying-glass w-4 text-center text-label" aria-hidden />
         <span className="sr-only">Search your past conversations</span>
         <input id={searchId} ref={searchRef} type="search" value={search.text} onChange={e => search.onText(e.target.value)}
