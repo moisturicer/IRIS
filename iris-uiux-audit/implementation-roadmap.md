@@ -9,7 +9,26 @@ This roadmap orders the audit's findings into shippable slices.
 
 **Estimates.** S is under half a day, M is one to two days, and L is three days or more. They are rough, for planning only.
 
-**Ownership.** The frontend rows can start now. Rows marked **server** need a backend change first; get the owner's agreement on that change before frontend work starts.
+## Status, 21 Nov 2026: every slice has shipped
+
+**This roadmap is complete. Do not pull work from it.** Every issue it created, IR-1072 (the Phase 0 decisions) through IR-1098 (the Phase 3 polish batch), is **Done** in Jira, with commits on `main`. The tables below are kept as the record of what was planned; they are not a backlog.
+
+Decisions made after the audit change some of its recommendations. Where they differ, **the later decision wins**:
+
+| Audit recommendation | Superseded by | What `main` does now |
+|---|---|---|
+| 2.4: Help in the sidebar footer | IR-1217 | Help leaves the sidebar and opens from Settings |
+| 2.4: "Discover", not "Home", in breadcrumbs | IR-1255 | No breadcrumbs. Every page starts with its own title |
+| 1.8 / 2.1: phone search first, then a scrolling row; Publish kept apart | IR-1190, IR-1188 | Discover's controls are one row at every width, Publish included. One Filters panel holds filters and Areas |
+| 2.5: tablet icon rail | IR-1260 (on top of IR-1086) | The sidebar collapses and expands from a visible button; the IRIS mark expands the rail |
+| 2.14: one status per party in the Details tab | IR-1193 | The review Details tab is restyled to the sidebar mockup |
+| — | IR-1208, IR-1138 | Sidebar links count what waits on you (My Reviews, RDCO queues) |
+
+The decisions in Phase 0 (D1–D6) are recorded as decided in `docs/frontend_ui_audit_spec.md` §7.1 (IR-1072). New frontend work goes in its own Jira issue, not in this file.
+
+---
+
+**Ownership** (at the time of planning). The frontend rows could start immediately. Rows marked **server** need a backend change first; get the owner's agreement on that change before frontend work starts.
 
 ---
 
