@@ -62,13 +62,14 @@ interface ConversationSidebarProps {
 }
 
 /**
- * The history search box (IR-1257): a fill at rest, since on the pane's
- * stone-50 it vanished, and no change on hover, like every other search box.
- * Typing darkens it, which is how it shows focus.
+ * The history search box (IR-1257): a fill and the field outline at rest,
+ * since on the pane's stone-50 it vanished. Like every other search box in
+ * IRIS (My submissions, a Saved folder), hovering changes nothing and typing
+ * shows only in the outline: a brand border and ring, the fill unchanged.
  */
 const SEARCH_BOX =
-  "flex min-h-10 w-full min-w-0 cursor-text items-center gap-3 rounded-control bg-stone-100 px-3 text-body text-stone-700 " +
-  "focus-within:bg-stone-200 " + COLOUR_TRANSITION;
+  "flex min-h-10 w-full min-w-0 cursor-text items-center gap-3 rounded-control border border-field bg-stone-100 px-3 text-body text-stone-700 " +
+  "focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 " + COLOUR_TRANSITION;
 
 const ICON_BUTTON =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-control text-stone-600 " +
