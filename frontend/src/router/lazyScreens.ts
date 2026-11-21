@@ -34,11 +34,29 @@ export async function preloadScreen(path: string): Promise<void> {
   }
 }
 
-// Sign-up and account recovery (public).
-export const SignupPage = screen(() => import("@/features/auth/SignupPage"));
+/**
+ * Preload the screens at `paths` once the browser has nothing else to do, and
+ * return a cancel for an effect's cleanup. Sign in uses it for the two screens
+ * it leads to, so Create an account opens without a spinner (IR-1262).
+ */
+export function preloadWhenIdle(paths: string[]): () => void {
+  const run = () => {
+    for (const path of paths) void preloadScreen(path);
+  };
+  if (typeof window.requestIdleCallback === "function") {
+    const id = window.requestIdleCallback(run, { timeout: 2_000 });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = window.setTimeout(run, 200);
+  return () => window.clearTimeout(id);
+}
+
+// Sign-up and account recovery (public). Sign in preloads sign-up and password
+// reset (IR-1262).
+export const SignupPage = screen(() => import("@/features/auth/SignupPage"), "/signup");
 export const VerifyEmailPage = screen(() => import("@/features/auth/VerifyEmailPage"));
 export const ResendVerificationPage = screen(() => import("@/features/auth/ResendVerificationPage"));
-export const ForgotPasswordPage = screen(() => import("@/features/auth/ForgotPasswordPage"));
+export const ForgotPasswordPage = screen(() => import("@/features/auth/ForgotPasswordPage"), "/password/forgot");
 export const ResetPasswordPage = screen(() => import("@/features/auth/ResetPasswordPage"));
 
 // Everyone's screens.

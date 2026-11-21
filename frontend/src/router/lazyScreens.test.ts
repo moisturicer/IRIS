@@ -6,10 +6,44 @@
  * download before anything can be drawn. A sidebar or account-menu link
  * prefetches its screen when hovered or focused, so the click finds it loaded.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import loginSource from "@/features/auth/LoginPage.tsx?raw";
 import routerSource from "./index.tsx?raw";
-import { preloadScreen, SCREEN_LOADERS } from "./lazyScreens";
+import { preloadScreen, preloadWhenIdle, SCREEN_LOADERS } from "./lazyScreens";
+
+describe("Sign in preloads the screens it leads to (IR-1262)", () => {
+  afterEach(() => {
+    SCREEN_LOADERS.delete("/test-only");
+    vi.useRealTimers();
+  });
+
+  it("registers sign-up and password reset for preloading", () => {
+    expect(SCREEN_LOADERS.has("/signup")).toBe(true);
+    expect(SCREEN_LOADERS.has("/password/forgot")).toBe(true);
+  });
+
+  it("preloads once the browser is idle, and not after the cleanup runs", () => {
+    vi.useFakeTimers();
+    const load = vi.fn(() => Promise.resolve({ default: () => null }));
+    SCREEN_LOADERS.set("/test-only", load);
+
+    preloadWhenIdle(["/test-only"]);
+    expect(load).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(2_000);
+    expect(load).toHaveBeenCalledTimes(1);
+
+    const cancel = preloadWhenIdle(["/test-only"]);
+    cancel();
+    vi.advanceTimersByTime(2_000);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("is wired into Sign in, on mount and on the Create an account link", () => {
+    expect(loginSource).toMatch(/preloadWhenIdle\(\["\/signup", "\/password\/forgot"\]\)/);
+    expect(loginSource).toMatch(/onFocus=\{\(\) => void preloadScreen\("\/signup"\)\}/);
+  });
+});
 
 /** Static imports of feature code, by module path. */
 function staticFeatureImports(text: string): string[] {
