@@ -412,6 +412,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1258** | Publish opens over the page you are on: from My Library, *Continue draft*, a draft's title and *Publish* keep My Library behind the form and current in the sidebar, closing leaves the same tab, and the list is read again — no FR- id | [details](traceability/IR-1258.md) | **PARTIAL** |
 | **IR-1260** | A visible sidebar button collapses the sidebar, beside the bell; on the rail the IRIS mark is the expand button, swapping to the sidebar icon on hover and focus; `[` does the same from 768 px up; on the full sidebar the mark is a link home — supersedes IR-1086's mark-as-toggle; no FR- id | [details](traceability/IR-1260.md) | **IMPLEMENTED** |
 | **IR-1261** | A click anywhere on a My Library row opens it (a draft in Publish, others in Paper View), with no *Continue draft* or *Open review* button; a draft's Delete moves into the row's ⋯ menu — supersedes IR-1256's trash can; no FR- id | [details](traceability/IR-1261.md) | **IMPLEMENTED** |
+| **IR-1264** | Lighter record Overview: title sized by length, people pills, status in Record details, Review & routing a summary, no "Your submission" card — no FR- id | [details](traceability/IR-1264.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

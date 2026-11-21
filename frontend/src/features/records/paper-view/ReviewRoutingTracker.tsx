@@ -1,21 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { recordsApi } from "@/api/records";
 import { isRequestTimeout } from "@/api/requestPolicy";
-import { ClearanceStrip } from "@/components/shared/ClearanceStrip";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type {
   RecordTracker,
   TrackerPartyRow,
   TrackerOutcome,
   TrackerPartyState,
-  TrackerRoutingGroup,
 } from "@/types/records";
 import { RailHeading } from "./headings";
 
 interface ReviewRoutingTrackerProps {
   recordId: number;
+  /** Where the record stands, drawn first (IR-1264): the header no longer carries it. */
+  status?: ReactNode;
+  /** Opens the Review section, which holds the routing and resubmission history. */
+  onOpenHistory?: () => void;
 }
 
 /**
@@ -48,18 +50,21 @@ const OUTCOME_TONE: Record<TrackerOutcome, string> = {
 const HEADING_ID = "review-routing-tracker-heading";
 
 /**
- * The Review & Routing Tracker (IR-258, ADR-021 §14).
+ * The Review & Routing summary in Record details (IR-258, ADR-021 §14, made a
+ * summary by IR-1264).
  *
- * Replaces the per-office clearance track. It answers who holds the record
- * now, who has finished and how, who was never asked, where the record was
- * routed, and what revisions were asked for -- all read from
- * `GET /records/<id>/tracker/`, nothing derived here.
+ * Where the record stands, then one line per party: how far it has got, its
+ * outcome, and whether its clearance was kept from an earlier version -- read
+ * from `GET /records/<id>/tracker/`, nothing derived here. Who reviewed, when,
+ * where the record was routed and what revisions were asked for are the Review
+ * section's (its Details tab and Conversation), which `onOpenHistory` opens;
+ * the rail repeated them in full before IR-1264.
  *
  * The **Preserved** badge is carried over from `ClearanceTrack` verbatim: it is
- * the one place the thesis contribution -- a clearance surviving another
- * office's resubmission request -- is visible on screen.
+ * the one place on the Overview where the thesis contribution -- a clearance
+ * surviving another office's resubmission request -- is visible.
  */
-export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
+export function ReviewRoutingTracker({ recordId, status, onOpenHistory }: ReviewRoutingTrackerProps) {
   const [data, setData] = useState<RecordTracker | null>(null);
   /** Why the read failed (IR-906): a timeout is worded as one, and both offer a retry. */
   const [failed, setFailed] = useState<"failed" | "interrupted" | null>(null);
@@ -87,9 +92,14 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
       aria-labelledby={HEADING_ID}
       className="bg-white ring-1 ring-stone-200 rounded-card p-5 shadow-card"
     >
-      {/* No status chip here: the title badge states where the record stands,
-          once (IR-525). This panel says who holds it and what each party did. */}
       <RailHeading id={HEADING_ID} className="mb-3">Review &amp; Routing</RailHeading>
+      {/* Where the record stands, once on the page (IR-525, moved here by IR-1264). */}
+      {status && (
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-xs text-stone-500">Status</span>
+          {status}
+        </div>
+      )}
 
       {failed ? (
         <div role="alert" className="space-y-2 text-xs text-stone-600">
@@ -116,7 +126,7 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
           </div>
         </div>
       ) : (
-        <TrackerBody data={data} />
+        <TrackerBody data={data} onOpenHistory={onOpenHistory} />
       )}
     </section>
   );
@@ -130,39 +140,19 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
  */
 const RETIRED_PARTY = "intake";
 
-function TrackerBody({ data }: { data: RecordTracker }) {
-  const holders = data.current_holders.filter((h) => h.party !== RETIRED_PARTY);
+function TrackerBody({ data, onOpenHistory }: { data: RecordTracker; onOpenHistory?: () => void }) {
   const parties = data.parties.filter((p) => p.party !== RETIRED_PARTY);
   return (
-    <div className="space-y-4">
-      {holders.length > 0 && (
-        <div>
-          <p id="tracker-holders-label" className="text-2xs font-semibold text-stone-500 mb-1">
-            Currently with
-          </p>
-          <ul aria-labelledby="tracker-holders-label" className="flex flex-wrap gap-1.5">
-            {holders.map((h) => (
-              <li
-                key={h.party}
-                className="px-2 py-0.5 rounded-control bg-surface text-brand ring-1 ring-stone-300 text-xs font-bold"
-              >
-                {h.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* The same strip the lists draw (IR-1083), from the same server field. */}
-      <ClearanceStrip entries={data.clearance_strip} />
-
+    <div className="space-y-3">
+      {parties.length === 0 ? (
+        <p className="text-small text-stone-600">No routing recorded yet.</p>
+      ) : (
       <table className="w-full text-left border-collapse">
         <caption className="sr-only">Parties</caption>
         <thead className="sr-only">
           <tr>
             <th scope="col">Party</th>
             <th scope="col">Status</th>
-            <th scope="col">Date</th>
           </tr>
         </thead>
         <tbody>
@@ -171,68 +161,20 @@ function TrackerBody({ data }: { data: RecordTracker }) {
           ))}
         </tbody>
       </table>
-
-      <RoutingHistory
-        groups={data.routing_history}
-        recordedFrom={data.routing_recorded_from}
-      />
-
-      {data.document_requests && data.document_requests.length > 0 && (
-        <div>
-          <h3
-            id="tracker-document-requests-label"
-            className="text-2xs font-semibold text-stone-600 mb-1.5"
-          >
-            Document requests
-          </h3>
-          <ol aria-labelledby="tracker-document-requests-label" className="space-y-2">
-            {data.document_requests.map((r) => (
-              <li key={r.id} className="text-xs text-stone-700">
-                <span className="font-bold text-stone-900">{r.label}</span> asked for{" "}
-                {/* Each item with its state: accepted, still missing... (IR-263). */}
-                {r.items.map((i) => `${i.label} (${i.state_label})`).join(", ")}
-                {" · "}
-                <span className="font-semibold">{r.state_label}</span>
-                <span className="text-stone-500"> · {formatDate(r.created_at, "MMM d")}</span>
-                {r.message && (
-                  <p className="text-justified text-stone-600 mt-0.5 leading-relaxed break-words">“{r.message}”</p>
-                )}
-                {r.items
-                  .filter((i) => i.rejection_reason)
-                  .map((i) => (
-                    <p key={i.id} className="text-justified text-stone-600 mt-0.5 leading-relaxed break-words">
-                      {r.label} rejected an upload of {i.label}: “{i.rejection_reason}”
-                    </p>
-                  ))}
-              </li>
-            ))}
-          </ol>
-        </div>
       )}
 
-      {data.resubmissions.length > 0 && (
-        <div>
-          <h3
-            id="tracker-resubmissions-label"
-            className="text-2xs font-semibold text-stone-600 mb-1.5"
-          >
-            Resubmission history
-          </h3>
-          <ol aria-labelledby="tracker-resubmissions-label" className="space-y-2">
-            {data.resubmissions.map((r) => (
-              <li key={r.id} className="text-xs text-stone-700">
-                <span className="font-bold text-stone-900">{r.label}</span> asked for changes
-                {" · "}
-                <span className="font-semibold">{r.state_label}</span>
-                {r.withdrawn_by_decision && <p className="text-stone-700">{r.withdrawn_by_decision}; this request was superseded by the Decision.</p>}
-                <span className="text-stone-500"> · {formatDate(r.created_at, "MMM d")}</span>
-                {r.reason && (
-                  <p className="text-justified text-stone-600 mt-0.5 leading-relaxed">“{r.reason}”</p>
-                )}
-              </li>
-            ))}
-          </ol>
-        </div>
+      {onOpenHistory && (
+        <button
+          type="button"
+          onClick={onOpenHistory}
+          className={cn(
+            "inline-flex min-h-11 reading-split:min-h-9 items-center gap-1.5 rounded-control text-xs font-semibold text-brand underline decoration-stone-300 underline-offset-[3px] hover:decoration-brand",
+            FOCUS_RING,
+          )}
+        >
+          See review history
+          <i className="fas fa-arrow-right text-3xs" aria-hidden />
+        </button>
       )}
     </div>
   );
@@ -281,8 +223,8 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
           </span>
         </span>
       </th>
-      <td className="py-1.5 pr-2">
-        <span className="flex items-center gap-1.5 flex-wrap text-2xs">
+      <td className="py-1.5">
+        <span className="flex items-center justify-end gap-1.5 flex-wrap text-2xs text-right">
           <span className={cn("font-semibold", meta.tone)}>{row.state_label}</span>
           {outcome && (
             <span className={cn("font-semibold", OUTCOME_TONE[outcome])}>
@@ -309,90 +251,7 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
             </span>
           )}
         </span>
-        {/* Who is reviewing, per seat: participants only, so `seats` is null
-            for anyone else and nothing is drawn (ADR-032 §10, IR-269). Always
-            shown rather than on hover, so touch and keyboard read it too. */}
-        {row.seats && row.seats.length > 0 && (
-          // A reviewer's name is free text: wrapping anywhere in the seat list keeps
-          // one long name from holding the table wider than the card at 360px
-          // (IR-921). Scoped here, not to the table, so the party and status
-          // columns keep their widths and never break inside a word.
-          <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-0.5 text-2xs text-stone-600 [overflow-wrap:anywhere]">
-            {row.seats.map((seat, i) => (
-              <li key={i}>
-                {seat.reviewer_name ?? "A reviewer"} — {seat.state_label.toLowerCase()}
-                {seat.verdict_label && (
-                  <span
-                    className={cn(
-                      "font-semibold",
-                      seat.verdict === "negative_finding" ? "text-brand" : "text-stone-900",
-                    )}
-                  >
-                    {" "}
-                    · {seat.verdict_label}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </td>
-      <td className="py-1.5 text-right text-2xs text-stone-500 whitespace-nowrap">
-        {row.at ? formatDate(row.at, "MMM d") : ""}
       </td>
     </tr>
-  );
-}
-
-function RoutingHistory({
-  groups,
-  recordedFrom,
-}: {
-  groups: TrackerRoutingGroup[];
-  recordedFrom: string | null;
-}) {
-  return (
-    <div>
-      <h3
-        id="tracker-routing-label"
-        className="text-2xs font-semibold text-stone-600 mb-1.5"
-      >
-        Routing history
-      </h3>
-      {groups.length === 0 ? (
-        // One line. The date is when the system began recording routing, not
-        // when this record did, so it is stated as that and not as "since".
-        <p className="text-xs text-stone-500">
-          {recordedFrom
-            ? `Routing is recorded from ${formatDate(recordedFrom)}; none recorded yet.`
-            : "No routing recorded yet."}
-        </p>
-      ) : (
-        <ol aria-labelledby="tracker-routing-label" className="space-y-2">
-          {groups.map((g) => (
-            <li key={g.group_id} className="text-xs text-stone-700">
-              <span className="font-semibold text-stone-900">
-                {g.from_label
-                  ? `${g.from_label} → ${g.to_labels.join(" + ")}`
-                  : `Submitted to ${g.to_labels.join(" + ")}`}
-              </span>
-              <span className="text-stone-500">
-                {" · "}
-                {formatDate(g.at, "MMM d")}
-                {g.actor && ` · ${g.actor}`}
-              </span>
-              {g.reason && (
-                <p className="text-justified text-stone-600 mt-0.5 leading-relaxed">“{g.reason}”</p>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
-      {groups.length > 0 && recordedFrom && (
-        <p className="text-2xs text-stone-500 mt-2">
-          Routing recorded from {formatDate(recordedFrom)}.
-        </p>
-      )}
-    </div>
   );
 }

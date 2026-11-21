@@ -1,5 +1,6 @@
 /**
- * The Review & Routing Tracker panel on the paper view (IR-258).
+ * The Review & Routing summary in Record details (IR-258; a summary since
+ * IR-1264, with the record's status first and its history left to Review).
  *
  * Everything the panel says comes from `GET /records/<id>/tracker/`; nothing is
  * worked out here (workflow_routing_architecture.md §9.1). These cases feed it
@@ -166,8 +167,8 @@ beforeEach(() => {
   tracker.mockReset();
 });
 
-function renderTracker() {
-  return renderScreen(<ReviewRoutingTracker recordId={RECORD_ID} />);
+function renderTracker(props: Partial<Parameters<typeof ReviewRoutingTracker>[0]> = {}) {
+  return renderScreen(<ReviewRoutingTracker recordId={RECORD_ID} {...props} />);
 }
 
 async function partyRow(name: RegExp) {
@@ -213,41 +214,71 @@ describe("ReviewRoutingTracker", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("shows the clearance strip the lists show, from the server's field (IR-1083)", async () => {
+  it("leaves the clearance strip and every history to Review, and links there (IR-1264)", async () => {
     tracker.mockResolvedValue({
       data: {
         ...afterResubmission,
         clearance_strip: [
           { party: "itso", label: "ITSO", kind: "kept", text: "Cleared", note: "Kept from v1", version: 1 },
-          { party: "ierc", label: "IERC", kind: "reviewing", text: "Reviewing v2", note: "Reset by v2", version: 2 },
         ],
       },
     });
-    renderTracker();
-
-    const strip = await screen.findByRole("list", { name: "Clearances" });
-    expect(strip).toHaveTextContent("ITSO: Cleared · Kept from v1");
-    expect(strip).toHaveTextContent("IERC: Reviewing v2 · Reset by v2");
-  });
-
-  it("keeps a retired Intake out of the party table once it has completed, but not out of the history", async () => {
-    tracker.mockResolvedValue({ data: afterResubmission });
-    renderTracker();
+    const onOpenHistory = vi.fn();
+    const { container } = renderTracker({ onOpenHistory });
 
     const table = await screen.findByRole("table", { name: /parties/i });
     expect(within(table).queryByRole("row", { name: /intake/i })).not.toBeInTheDocument();
-    // The routing history is history: it keeps the server's words for it.
-    const history = screen.getByRole("list", { name: /routing history/i });
-    expect(history).toHaveTextContent("Intake → ITSO + IERC + KTTO");
+    // One line per party is the summary; the strip would say the same twice.
+    expect(screen.queryByRole("list", { name: "Clearances" })).not.toBeInTheDocument();
+    for (const history of [/currently with/i, /routing history/i, /resubmission history/i, /document requests/i]) {
+      expect(screen.queryByRole("list", { name: history })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText("Needs all three offices.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Consent form is missing.")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /see review history/i }));
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
+
+    await expectNoBlockingA11yViolations(container);
   });
 
-  it("does not repeat the record's status; the page states it once", async () => {
+  it("says no routing is recorded yet when there is no party to show, and still links to Review (IR-1264)", async () => {
+    tracker.mockResolvedValue({ data: payload({}) });
+    const { container } = renderTracker({ onOpenHistory: vi.fn() });
+
+    expect(await screen.findByText("No routing recorded yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: /parties/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /see review history/i })).toBeInTheDocument();
+
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("offers no history link when there is nowhere to send the reader", async () => {
+    tracker.mockResolvedValue({ data: afterResubmission });
+    renderTracker();
+
+    await screen.findByRole("table", { name: /parties/i });
+    expect(screen.queryByRole("button", { name: /see review history/i })).not.toBeInTheDocument();
+  });
+
+  it("states the record's status first, once, from what the page gives it (IR-1264)", async () => {
+    tracker.mockResolvedValue({ data: newProposal });
+    renderTracker({ status: <span>Under review</span> });
+
+    await partyRow(/adviser/i);
+    const region = screen.getByRole("region", { name: /review & routing/i });
+    expect(within(region).getAllByText("Under review")).toHaveLength(1);
+    // The tracker's own copy of the state is not drawn beside it.
+    expect(within(region).queryByText("Submitted")).not.toBeInTheDocument();
+  });
+
+  it("draws no status line when it is given none", async () => {
     tracker.mockResolvedValue({ data: newProposal });
     renderTracker();
 
     await partyRow(/adviser/i);
-    const region = screen.getByRole("region", { name: /review & routing/i });
-    expect(within(region).queryByText("Submitted")).not.toBeInTheDocument();
+    // The table's own sr-only column header is also "Status"; the line is a span.
+    expect(screen.queryByText("Status", { selector: "span" })).not.toBeInTheDocument();
   });
 
   it("shows a new Proposal with the Adviser active and RDCO not requested", async () => {
@@ -256,17 +287,6 @@ describe("ReviewRoutingTracker", () => {
 
     expect(await partyRow(/adviser/i)).toHaveTextContent(/active/i);
     expect(await partyRow(/rdco/i)).toHaveTextContent(/not requested/i);
-  });
-
-  it("shows who holds the record now", async () => {
-    tracker.mockResolvedValue({ data: afterResubmission });
-    renderTracker();
-
-    const holders = await screen.findByRole("list", { name: /currently with/i });
-    expect(within(holders).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "IERC",
-      "KTTO",
-    ]);
   });
 
   it("shows a completed office with its outcome, and the preserved badge", async () => {
@@ -285,7 +305,7 @@ describe("ReviewRoutingTracker", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("on the new model: RDCO not required, a pool unassigned, and who reviews per seat (IR-269)", async () => {
+  it("on the new model: RDCO not required and a pool unassigned; who reviews is Review's (IR-269, IR-1264)", async () => {
     tracker.mockResolvedValue({
       data: payload({
         workflow_state: "in_review",
@@ -312,11 +332,9 @@ describe("ReviewRoutingTracker", () => {
 
     const itso = await partyRow(/^itso/i);
     expect(itso).toHaveTextContent("Cleared (earlier review) · reviewing again");
-    const reviewing = within(itso).getByRole("list", { name: "Reviewing for ITSO" });
-    expect(within(reviewing).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
-      "Maria Reyes — in review",
-      "Juan Santos — done · Negative finding",
-    ]);
+    // Reviewers by name are in Review's Details tab, not repeated in the rail.
+    expect(within(itso).queryByRole("list", { name: "Reviewing for ITSO" })).not.toBeInTheDocument();
+    expect(itso).not.toHaveTextContent("Maria Reyes");
     expect(await partyRow(/^ierc/i)).toHaveTextContent(/unassigned/i);
     expect(await partyRow(/^rdco/i)).toHaveTextContent("Not required");
 
@@ -366,30 +384,7 @@ describe("ReviewRoutingTracker", () => {
     expect(within(itso).queryByRole("list")).not.toBeInTheDocument();
   });
 
-  it("groups one routing decision to several parties into one line", async () => {
-    tracker.mockResolvedValue({ data: afterResubmission });
-    renderTracker();
-
-    const history = await screen.findByRole("list", { name: /routing history/i });
-    const moves = within(history).getAllByRole("listitem");
-    expect(moves).toHaveLength(2);
-    expect(moves[0]).toHaveTextContent(/submitted.*intake/i);
-    expect(moves[1]).toHaveTextContent("Intake → ITSO + IERC + KTTO");
-    expect(moves[1]).toHaveTextContent("Needs all three offices.");
-  });
-
-  it("lists the resubmission history", async () => {
-    tracker.mockResolvedValue({ data: afterResubmission });
-    renderTracker();
-
-    const list = await screen.findByRole("list", { name: /resubmission history/i });
-    const [request] = within(list).getAllByRole("listitem");
-    expect(request).toHaveTextContent(/ierc/i);
-    expect(request).toHaveTextContent(/resubmitted/i);
-    expect(request).toHaveTextContent("Consent form is missing.");
-  });
-
-  it("marks a party waiting on a document and lists the request (IR-262)", async () => {
+  it("marks a party waiting on a document (IR-262)", async () => {
     const awaitingDocument = payload({
       ...afterResubmission,
       workflow_state: "awaiting_document",
@@ -412,52 +407,10 @@ describe("ReviewRoutingTracker", () => {
 
     expect(await partyRow(/^ierc/i)).toHaveTextContent(/awaiting document/i);
     expect(await partyRow(/^ktto/i)).not.toHaveTextContent(/awaiting document/i);
-
-    const list = screen.getByRole("list", { name: /document requests/i });
-    const [request] = within(list).getAllByRole("listitem");
-    expect(request).toHaveTextContent("IERC asked for Consent form");
-    expect(request).toHaveTextContent("Open");
-    expect(request).toHaveTextContent("Rescan the consent form.");
+    // The request itself is answered on the Overview and listed in Review.
+    expect(screen.queryByText("Rescan the consent form.")).not.toBeInTheDocument();
 
     await expectNoBlockingA11yViolations(container);
-  });
-
-  it("shows each item's state, a reject reason and a withdrawal in the history (IR-263)", async () => {
-    const base = {
-      party: "ierc" as const, label: "IERC", message: "Rescan the consent form.",
-      requested_by: "Ivy Ethics", created_at: "2026-09-20T02:00:00Z", can_manage: false,
-    };
-    const itemBase = { slot: null, upload: null, uploaded_at: null, decided_at: null };
-    tracker.mockResolvedValue({
-      data: payload({
-        ...afterResubmission,
-        document_requests: [
-          {
-            ...base, id: 5, state: "fulfilled", state_label: "Fulfilled",
-            closed_at: "2026-09-22T02:00:00Z",
-            items: [
-              { ...itemBase, id: 51, label: "Consent form", state: "accepted",
-                state_label: "Accepted", rejection_reason: "Unreadable scan." },
-              { ...itemBase, id: 52, label: "Protocol", state: "accepted",
-                state_label: "Accepted", rejection_reason: null },
-            ],
-          },
-          {
-            ...base, id: 6, state: "withdrawn", state_label: "Withdrawn",
-            closed_at: "2026-09-23T02:00:00Z",
-            items: [{ ...itemBase, id: 61, label: "Budget", state: "missing",
-              state_label: "Missing", rejection_reason: null }],
-          },
-        ],
-      }),
-    });
-    renderTracker();
-
-    const list = await screen.findByRole("list", { name: /document requests/i });
-    const [accepted, withdrawn] = within(list).getAllByRole("listitem");
-    expect(accepted).toHaveTextContent("Consent form (Accepted), Protocol (Accepted)");
-    expect(accepted).toHaveTextContent("IERC rejected an upload of Consent form: “Unreadable scan.”");
-    expect(withdrawn).toHaveTextContent("IERC asked for Budget (Missing) · Withdrawn");
   });
 
   it("discloses nothing about requests to a viewer who may not read them (IR-349)", async () => {
@@ -480,29 +433,6 @@ describe("ReviewRoutingTracker", () => {
     expect(screen.queryByRole("heading", { name: /document requests/i })).not.toBeInTheDocument();
 
     await expectNoBlockingA11yViolations(container);
-  });
-
-  it("says when routing history begins", async () => {
-    tracker.mockResolvedValue({ data: afterResubmission });
-    renderTracker();
-
-    expect(await screen.findByText(/routing recorded from sep 19, 2026/i)).toBeInTheDocument();
-  });
-
-  it("gives an empty routing history one coherent line, not two that contradict (IR-525)", async () => {
-    tracker.mockResolvedValue({ data: payload({ routing_history: [] }) });
-    renderTracker();
-
-    expect(await screen.findByText("Routing is recorded from Sep 19, 2026; none recorded yet.")).toBeInTheDocument();
-    expect(screen.queryByText(/no routing recorded yet/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^routing recorded from/i)).not.toBeInTheDocument();
-  });
-
-  it("says plainly that nothing is recorded when history has no start date either", async () => {
-    tracker.mockResolvedValue({ data: payload({ routing_history: [], routing_recorded_from: null }) });
-    renderTracker();
-
-    expect(await screen.findByText("No routing recorded yet.")).toBeInTheDocument();
   });
 
   it("says so when the tracker cannot be loaded", async () => {

@@ -72,7 +72,9 @@ describe("the governance ledger", () => {
 describe("the routing tracker", () => {
   beforeEach(() => tracker.mockReset());
 
-  it("lets a reviewer's long name wrap in the seat list, not widen the table", async () => {
+  // Changed deliberately by IR-1264: the rail no longer lists reviewers by name
+  // (Review's Details tab does), so a long name cannot widen it at all.
+  it("keeps a reviewer's long name out of the rail, so it cannot widen it", async () => {
     const party = {
       party: "ierc", label: "IERC", state: "active", state_label: "Active", started: true,
       outcome: null, outcome_label: null, at: "2026-11-05T01:00:00Z", preserved: false,
@@ -91,11 +93,9 @@ describe("the routing tracker", () => {
     });
     renderScreen(<ReviewRoutingTracker recordId={15} />);
 
-    const seats = await screen.findByRole("list", { name: "Reviewing for IERC" });
-    expect(within(seats).getByText(new RegExp(LONG))).toBeInTheDocument();
-    expect(seats.className).toContain("[overflow-wrap:anywhere]");
-    // Not table-wide: that would let the party and status columns break inside
-    // a word on a wide screen, where nothing overflows.
-    expect(seats.closest("table")!.className).not.toContain("overflow-wrap");
+    const table = await screen.findByRole("table", { name: /parties/i });
+    expect(within(table).getByRole("row", { name: /ierc/i })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Reviewing for IERC" })).not.toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(LONG))).not.toBeInTheDocument();
   });
 });

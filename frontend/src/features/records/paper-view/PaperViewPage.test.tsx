@@ -386,11 +386,15 @@ function renderPaperView() {
   return renderPaper(`/records/${RECORD_ID}`);
 }
 
-it("names the configured institution on an institutional paper", async () => {
+// Changed deliberately by IR-1264: the "Institution · Completed YYYY" line is
+// gone from the header. Every paper in IRIS is the institution's unless marked
+// otherwise (an imported reference still says so), so the line said nothing.
+it("does not name the institution in an institutional paper's header (IR-1264)", async () => {
   shownRecord = { ...record, origin: "institutional" };
   signInAs(99, "Student");
   renderPaperView();
-  expect(await screen.findByText("Example Research University")).toBeVisible();
+  await waitForRecord(record.title);
+  expect(screen.queryByText(/Example Research University/)).not.toBeInTheDocument();
 });
 
 describe("loading the record (IR-939)", () => {
@@ -1031,35 +1035,17 @@ describe("the submitter's own status (IR-625)", () => {
     },
   };
 
-  it("tells the owner where the record is, what waits on them, and each version's history", async () => {
+  // Changed deliberately by IR-1264: the "Your submission" summary is gone. It
+  // repeated the revision banner and the document requests below it, the
+  // status in Record details and the Version picker's versions.
+  it("answers what waits on the owner with the requests themselves, not a summary of them (IR-1264)", async () => {
     shownRecord = waitingOwner;
     signInAs(OWNER_ID, "Student");
-    const { container } = renderPaperView();
-
-    const panel = await screen.findByRole("region", { name: "Your submission" });
-    expect(panel).toHaveTextContent("Revision requested by IERC: action needed");
-
-    const waiting = within(panel).getByRole("region", { name: "Waiting on you" });
-    expect(within(waiting).getByRole("link", { name: "Submit a new version (Revision requested by IERC)" }))
-      .toHaveAttribute("href", "#revision-requested");
-    expect(within(waiting).getByRole("link", { name: "Upload the documents (Documents requested by Adviser)" }))
-      .toHaveAttribute("href", "#documents-requested");
-
-    const versions = within(within(panel).getByRole("list", { name: "Version history" })).getAllByRole("listitem");
-    expect(versions).toHaveLength(2);
-    expect(versions[0]).toHaveTextContent("v1 · Submission");
-    expect(versions[0]).toHaveTextContent("Adviser: Approved · IERC: Revision requested");
-    expect(versions[1]).toHaveTextContent("No decision yet");
-    await expectNoBlockingA11yViolations(container);
-  });
-
-  it("shows nothing of the kind to anyone the server sends none", async () => {
-    shownRecord = { ...waitingOwner, submitter_status: null };
-    signInAs(99, "Student");
     renderPaperView();
 
     await waitForRecord(inReview.title);
     expect(screen.queryByRole("region", { name: "Your submission" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Version history" })).not.toBeInTheDocument();
   });
 
   it("lands on the request a My Library link named, once it has loaded", async () => {
@@ -1108,7 +1094,7 @@ describe("Ask IRIS beside a paper not yet published (IR-1252)", () => {
 // page makes room for (IR-569): the same heading, composer and width, beside
 // a page that narrows to fit rather than sitting under it.
 describe("Ask IRIS on Overview (IR-569)", () => {
-  const RAIL = { name: "Institutional Governance" };
+  const RAIL = { name: "About this record" };
 
   beforeEach(() => {
     shownRecord = record;
@@ -1219,7 +1205,7 @@ describe("Ask IRIS on Overview (IR-569)", () => {
 // one-line record bar replaces the editorial header; the workspace's width
 // picks the layout, and the reader sizes the panel.
 describe("the Paper tab (IR-372, IR-569)", () => {
-  const RAIL = { name: "Institutional Governance" };
+  const RAIL = { name: "About this record" };
   const ASK = { name: "Ask IRIS" };
 
   beforeEach(() => {
@@ -3634,7 +3620,9 @@ describe("the Overview's header (IR-569)", () => {
     expect(within(details).getByText("Applied Research")).toBeInTheDocument();
   });
 
-  it("sets the authors and the Adviser in one row, with the program line under them (IR-1142)", async () => {
+  // Changed deliberately by IR-1264: the program and institution line is gone
+  // from the header, and the Adviser's role follows the name inside its pill.
+  it("sets the authors and the Adviser in one row of pills, with no program line (IR-1142, IR-1264)", async () => {
     shownRecord = {
       ...record, origin: "institutional", adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos",
       paper_details: { ...sidebarDetails, programs: ["BS Computer Science"] },
@@ -3646,21 +3634,25 @@ describe("the Overview's header (IR-569)", () => {
     const adviser = screen.getByRole("list", { name: "Adviser" });
     expect(authors.parentElement).toBe(adviser.parentElement);
     // The Adviser is named once as a role; an author is a name, not a pill saying "Author".
-    expect(within(adviser).getByText("Adviser")).toBeInTheDocument();
-    expect(within(authors).queryByText("Author")).not.toBeInTheDocument();
-    expect(screen.getByText(/^BS Computer Science · /)).toBeInTheDocument();
+    expect(within(adviser).getByRole("listitem")).toHaveTextContent("Maria Santos · Adviser");
+    expect(within(authors).queryByText(/Author/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/BS Computer Science/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Example Research University/)).not.toBeInTheDocument();
   });
 
-  it("names the authors once and dates the work once, above the abstract (IR-1089)", async () => {
+  // Changed deliberately by IR-1264: the year is Record details' row only.
+  it("names the authors once and dates the work once, in Record details (IR-1089, IR-1264)", async () => {
     shownRecord = { ...record, publication_year: 2025, access_count: 3 };
     renderPaperView();
     await waitForRecord(record.title);
 
     expect(screen.getAllByText("R. Dela Cruz")).toHaveLength(1);
-    expect(screen.getAllByText(/^Completed /)).toHaveLength(1);
+    expect(screen.queryByText(/^Completed /)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Added /)).not.toBeInTheDocument();
     const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
-    expect(within(header).getByText("Completed 2026")).toBeInTheDocument();
+    expect(within(header).queryByText(/2026/)).not.toBeInTheDocument();
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Year Accomplished").parentElement).toHaveTextContent("2026");
     // Neither the publication year nor the view count is a second date or a stat in the header.
     expect(within(header).queryByText(/Published \d{4}/)).not.toBeInTheDocument();
     expect(within(header).queryByText(/\d+ views?$/)).not.toBeInTheDocument();
@@ -3700,6 +3692,61 @@ describe("the Overview's header (IR-569)", () => {
     expect(row("Community Extension")).toHaveTextContent("Yes");
     expect(row("IP Status")).toHaveTextContent("Patent");
     expect(row("Commercialization")).toHaveTextContent("Eligible");
+  });
+
+  it("shows a reader only the Record details rows that say something, and no status (IR-1264)", async () => {
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Classification")).toBeInTheDocument();
+    for (const quiet of ["IP Status", "Not declared", "Commercialization", "Not flagged", "Status"]) {
+      expect(within(details).queryByText(quiet)).not.toBeInTheDocument();
+    }
+    expect(within(details).queryByRole("region", { name: /review & routing/i })).not.toBeInTheDocument();
+    // Nor in the header: a reader can open only what is published.
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    expect(within(header).queryByText(record.workflow_state_label!)).not.toBeInTheDocument();
+  });
+
+  it("states the status once, in Review & routing, to the owner, with every row (IR-1264)", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+    await waitForRecord(inReview.title);
+
+    const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
+    expect(within(header).queryByText(inReview.workflow_state_label!)).not.toBeInTheDocument();
+    const routing = screen.getByRole("region", { name: /review & routing/i });
+    expect(within(routing).getByText("Status", { selector: "span" })).toBeInTheDocument();
+    expect(within(routing).getByText(inReview.workflow_state_label!)).toBeInTheDocument();
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("IP Status").parentElement).toHaveTextContent("Not declared");
+    expect(within(details).getByText("Commercialization").parentElement).toHaveTextContent("Not flagged");
+  });
+
+  it("gives office staff outside the review the status as a row, and the rows a reader sees (IR-1264)", async () => {
+    shownRecord = { ...inReview, owners: [], is_participant: false, my_seats: [], review_claim: null };
+    signInAs(77, "KTTO");
+    renderPaperView();
+    await waitForRecord(inReview.title);
+
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Status").parentElement).toHaveTextContent(inReview.workflow_state_label!);
+    // Rows follow participation, never role (IR-411): staff outside the review read as a reader does.
+    expect(within(details).queryByText("IP Status")).not.toBeInTheDocument();
+    expect(within(details).queryByRole("region", { name: /review & routing/i })).not.toBeInTheDocument();
+  });
+
+  it("sizes the title by its length, never cutting it (IR-1264)", async () => {
+    const long = "Activity Preference and Level of Physical Activity Participation of CIT University Administrative Employees";
+    shownRecord = { ...record, title: long };
+    renderPaperView();
+    await waitForRecord(long);
+
+    const title = screen.getByRole("heading", { level: 1 });
+    expect(title).toHaveClass("text-display", "overview-roomy:text-4xl");
+    expect(title.className).not.toMatch(/truncate|line-clamp/);
   });
 
   it("reads its headings in order, none above its parent's size, inside the AI Overview (IR-1089)", async () => {
@@ -3755,7 +3802,7 @@ describe("the Overview's header (IR-569)", () => {
     // The publication year is a governance field now, in Record details (IR-1089).
     const details = screen.getByRole("complementary", { name: "Record details" });
     expect(within(details).getByText("Published").parentElement).toHaveTextContent("2017");
-    expect(screen.getByText("Completed 2020")).toBeInTheDocument();
+    expect(within(details).getByText("Year Accomplished").parentElement).toHaveTextContent("2020");
     expect(screen.getByText("Imported reference")).toBeInTheDocument();
     expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
   });
@@ -3765,7 +3812,7 @@ describe("the Overview's header (IR-569)", () => {
     await waitForRecord(record.title);
 
     const details = screen.getByRole("complementary", { name: "Record details" });
-    expect(within(details).getByRole("heading", { name: "Institutional Governance" })).toBeInTheDocument();
+    expect(within(details).getByRole("heading", { name: "About this record" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Record details" })).not.toBeInTheDocument();
   });
 
@@ -4076,13 +4123,13 @@ describe("the embargo in Record details (IR-817)", () => {
     await expectNoBlockingA11yViolations(document.body);
   });
 
-  it("says in Institutional Governance whether KTTO released the IP mark", async () => {
+  it("says in About this record whether KTTO released the IP mark", async () => {
     shownRecord = { ...underEmbargo, is_ip: true, ip_type: "patent", ip_release: { released: true, released_at: "2026-11-03T02:00:00Z" } };
     workspaceAt(1400);
     renderPaperView();
     await waitForRecord(record.title);
 
-    const governance = screen.getByRole("region", { name: "Institutional Governance" });
+    const governance = screen.getByRole("region", { name: "About this record" });
     expect(within(governance).getByText("Released for the AI by KTTO")).toBeInTheDocument();
   });
 });
