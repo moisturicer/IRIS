@@ -59,7 +59,7 @@ This directly violates **NFR-S4**: *"no authenticated user can view, modify, app
     - The manuscript duplicate check (`records.duplicates`) reads through `visible_to`, so it no longer reports someone else's draft of the same file to an Adviser or an office account. It never could to a student.
     - Nothing in the app relied on reading another person's draft. Every list already filters drafts out. Notifications reach the Adviser and the offices only at Submit or later, and comments and mentions already refuse a draft. `seed_demo`'s draft is opened only by its creator.
 - **Presentation** (part of the same decision). A draft is not shown as a paper page. Its creator opening `/records/<id>`, including an old link to `?section=review`, lands in the Publish form at the step they left off (`/?publish=<id>`). Closing the Publish form asks what to do with the work:
-    - with a draft saved (*Leave this submission?*): **Keep as draft** (the default), **Delete draft**, confirmed once (*Delete this draft? This can't be undone.*), and **Keep editing**;
+    - with a draft saved (*Leave this submission?*): **Keep as draft** (the default), **Delete draft**, confirmed once, and **Keep editing**. *Amended 2026-11-21 (IR-1256):* the confirmation is a dialog over the form, the one My Library uses (*Delete this draft?* "“<title>” and its files will be removed. It can't be restored.", Cancel focused), and Cancel returns to *Leave this submission?*;
     - with entries but no manuscript yet, so nothing saved (*Discard what you've entered?*): **Discard** and **Keep editing**;
     - while a file uploads, the existing *Stop the upload and close?*;
     - with nothing entered, it simply closes.

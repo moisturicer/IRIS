@@ -2,6 +2,17 @@ import { useEffect, useRef, type RefObject } from "react";
 import { nextTrapFocus, tabbableWithin } from "@/lib/focusTrap";
 
 /**
+ * The open surfaces, oldest first. A question can open over a form (IR-1256:
+ * "Delete this draft?" over Publish); only the newest hears Escape and Tab,
+ * so Escape closes the question alone and Tab is trapped once.
+ */
+const openSurfaces: object[] = [];
+
+function isTop(surface: object): boolean {
+  return openSurfaces[openSurfaces.length - 1] === surface;
+}
+
+/**
  * The keyboard half of a modal surface: Escape closes it, focus moves in on
  * open, Tab stays inside, and focus goes back to whatever opened it on close
  * (IR-158). Shared by `Modal` and Ask IRIS's phone drawers (IR-570), so the
@@ -9,6 +20,8 @@ import { nextTrapFocus, tabbableWithin } from "@/lib/focusTrap";
  *
  * `panelRef` should carry `tabIndex={-1}`, so a panel of pure text still
  * takes focus and Escape.
+ *
+ * With one surface open over another, only the top one acts (IR-1256).
  *
  * `returnTo` names where focus goes back to when the opener cannot be read
  * off the page at open: a surface that makes the rest of the page inert in
@@ -24,11 +37,25 @@ export function useDialogFocus(
   // The element that had focus when the dialog opened. Without it, closing
   // drops focus to <body> and a keyboard user restarts from the top.
   const triggerRef = useRef<HTMLElement | null>(null);
+  // This surface's place in `openSurfaces` while it is open.
+  const surfaceRef = useRef<object>({});
+
+  useEffect(() => {
+    if (!open) return;
+    const surface = surfaceRef.current;
+    openSurfaces.push(surface);
+    return () => {
+      const at = openSurfaces.lastIndexOf(surface);
+      if (at >= 0) openSurfaces.splice(at, 1);
+    };
+  }, [open]);
 
   // Close on Escape.
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isTop(surfaceRef.current)) onClose();
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
@@ -64,7 +91,7 @@ export function useDialogFocus(
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Tab") return;
+      if (e.key !== "Tab" || !isTop(surfaceRef.current)) return;
       const panel = panelRef.current;
       if (!panel) return;
 

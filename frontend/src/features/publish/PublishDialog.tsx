@@ -36,6 +36,7 @@ import { useSearchParams } from "react-router-dom";
 import { accountsApi } from "@/api/accounts";
 import { documentsApi } from "@/api/documents";
 import { recordsApi, type ManuscriptMatch } from "@/api/records";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -168,7 +169,7 @@ function PublishUnavailable({ onClose }: { onClose: () => void }) {
 }
 
 /** The question closing the form asks (IR-1227). */
-type Closing = "upload" | "leave" | "delete" | "discard";
+type Closing = "upload" | "leave" | "discard";
 
 /**
  * One question about closing, inline above the form while it waits: an
@@ -316,6 +317,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [matchFailure, setMatchFailure] = useState("");
   // The question closing asks, if any (IR-1227, ADR-009 decision 6).
   const [closing, setClosing] = useState<Closing | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   // Escape or Close put a question on screen; focus goes to its default, once.
@@ -770,9 +772,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     onClose();
   }
 
+  /** Asked over the form, as My Library asks (IR-1256); Cancel returns to "Leave this submission?". */
   function askToDelete() {
     setDeleteError(null);
-    setClosing("delete");
+    setConfirmingDelete(true);
   }
 
   /** Delete the draft as My submissions does (`DELETE /records/<id>/`, IR-508). */
@@ -896,6 +899,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   }
 
   return (
+    <>
     <Modal
       open
       onClose={requestClose}
@@ -936,24 +940,6 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           </Button>
           <Button type="button" variant="ghost" size="page" onClick={() => setClosing(null)}>
             Keep editing
-          </Button>
-        </CloseQuestion>
-      )}
-
-      {closing === "delete" && (
-        <CloseQuestion title="Delete this draft?" body="This can't be undone." error={deleteError}>
-          <Button type="button" variant="danger" size="page" loading={deleting} onClick={() => void deleteDraft()}>
-            Delete draft
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="page"
-            ref={closeDefaultRef}
-            disabled={deleting}
-            onClick={() => setClosing("leave")}
-          >
-            Keep draft
           </Button>
         </CloseQuestion>
       )}
@@ -1135,6 +1121,22 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         </>
       )}
     </Modal>
+    {/* Over the form, not in it (IR-1256): the one closing question that cannot be undone. */}
+    <ConfirmDialog
+      open={confirmingDelete}
+      title="Delete this draft?"
+      message={values.title?.trim()
+        ? `“${values.title.trim()}” and its files will be removed. It can't be restored.`
+        : "This draft and its files will be removed. It can't be restored."}
+      confirmLabel="Delete draft"
+      danger
+      focusCancel
+      confirming={deleting}
+      error={deleteError}
+      onConfirm={() => void deleteDraft()}
+      onCancel={() => setConfirmingDelete(false)}
+    />
+    </>
   );
 }
 

@@ -92,6 +92,7 @@ export default function MyLibraryPage() {
   const dismissFailure = useLibraryStore((s) => s.dismissFailure);
 
   const [research, setResearch] = useState<MyResearchItem[]>([]);
+  const dropDeleted = (id: number) => setResearch((items) => items.filter((item) => item.id !== id));
   const [loading, setLoading] = useState(mayAuthor);
   const [failed, setFailed] = useState(false);
   const [interrupted, setInterrupted] = useState(false);
@@ -277,6 +278,7 @@ export default function MyLibraryPage() {
             folders={folders}
             onOpenSubmissions={openSubmissions}
             onOpenSaved={openSaved}
+            onDeleted={dropDeleted}
           />
         )}
         {mayAuthor && tab === "research" && (
@@ -288,7 +290,7 @@ export default function MyLibraryPage() {
             onRetry={() => void loadResearch()}
             filter={researchFilter}
             onFilterChange={setResearchFilter}
-            onDeleted={(id) => setResearch((items) => items.filter((item) => item.id !== id))}
+            onDeleted={dropDeleted}
           />
         )}
         {tab === "saved" && savedPanel}

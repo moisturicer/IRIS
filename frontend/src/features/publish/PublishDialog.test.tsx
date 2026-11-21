@@ -1228,13 +1228,16 @@ describe("closing", () => {
       expect(screen.getByRole("textbox", { name: /^Title/ })).toBeInTheDocument();
     });
 
-    it("deletes it only once confirmed, then closes", async () => {
+    // IR-1256: asked in a dialog over the form, as My Library asks, rather than inline.
+    it("asks over the form, deletes only once confirmed, then closes", async () => {
       vi.mocked(recordsApi.delete).mockResolvedValue({ status: 204 } as never);
       const user = await closeDraft();
 
       await user.click(screen.getByRole("button", { name: "Delete draft" }));
-      const confirm = screen.getByRole("alertdialog", { name: "Delete this draft?" });
-      expect(confirm).toHaveAccessibleDescription("This can't be undone.");
+      const confirm = screen.getByRole("dialog", { name: "Delete this draft?" });
+      expect(confirm).toHaveTextContent("and its files will be removed. It can't be restored.");
+      expect(screen.getByRole("dialog", { name: "Publish your research" })).not.toContainElement(confirm);
+      await waitFor(() => expect(within(confirm).getByRole("button", { name: "Cancel" })).toHaveFocus());
       expect(recordsApi.delete).not.toHaveBeenCalled();
       await user.click(within(confirm).getByRole("button", { name: "Delete draft" }));
 
@@ -1242,14 +1245,26 @@ describe("closing", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     });
 
-    it("keeps the draft when the deletion is cancelled", async () => {
+    it("keeps the draft when the deletion is cancelled, back at the leave question", async () => {
       const user = await closeDraft();
 
       await user.click(screen.getByRole("button", { name: "Delete draft" }));
-      await user.click(screen.getByRole("button", { name: "Keep draft" }));
+      await user.click(within(screen.getByRole("dialog", { name: "Delete this draft?" })).getByRole("button", { name: "Cancel" }));
 
       expect(recordsApi.delete).not.toHaveBeenCalled();
+      expect(screen.queryByRole("dialog", { name: "Delete this draft?" })).not.toBeInTheDocument();
       expect(screen.getByRole("alertdialog", { name: "Leave this submission?" })).toBeInTheDocument();
+    });
+
+    it("closes only the question on Escape, leaving the form open", async () => {
+      const user = await closeDraft();
+
+      await user.click(screen.getByRole("button", { name: "Delete draft" }));
+      await user.keyboard("{Escape}");
+
+      expect(screen.queryByRole("dialog", { name: "Delete this draft?" })).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "Publish your research" })).toBeInTheDocument();
+      expect(recordsApi.delete).not.toHaveBeenCalled();
     });
 
     it("stays open and says so when the deletion fails", async () => {
@@ -1257,11 +1272,11 @@ describe("closing", () => {
       const user = await closeDraft();
 
       await user.click(screen.getByRole("button", { name: "Delete draft" }));
-      const confirm = screen.getByRole("alertdialog", { name: "Delete this draft?" });
+      const confirm = screen.getByRole("dialog", { name: "Delete this draft?" });
       await user.click(within(confirm).getByRole("button", { name: "Delete draft" }));
 
       expect(await within(confirm).findByRole("alert")).not.toBeEmptyDOMElement();
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "Publish your research" })).toBeInTheDocument();
     });
   });
 

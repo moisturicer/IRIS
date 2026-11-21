@@ -15,7 +15,8 @@ import type { MyResearchItem } from "@/types/records";
 /**
  * A row's actions (IR-1084): one of Continue draft, the act that answers an
  * open request, or Open review. The Overview's short list (`brief`) shows
- * exactly one; the full list also offers Delete draft, quietly, on a draft.
+ * exactly one of those. A draft also has its red Delete trash can beside
+ * Continue draft, on both lists (IR-1256).
  */
 function RowActions({ item, brief, onDeleted }: { item: MyResearchItem; brief: boolean; onDeleted?: (id: number) => void }) {
   if (item.can_continue) return <ContinueProposal recordId={item.id} />;
@@ -25,7 +26,7 @@ function RowActions({ item, brief, onDeleted }: { item: MyResearchItem; brief: b
         <Link to={`/?publish=${item.id}`} className={cn(PILL_PRIMARY, "min-h-9 px-4", FOCUS_RING)}>
           Continue draft <span className="sr-only">“{item.title}”</span>
         </Link>
-        {!brief && onDeleted && <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />}
+        {onDeleted && <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />}
       </>
     );
   }
@@ -56,7 +57,7 @@ function RowActions({ item, brief, onDeleted }: { item: MyResearchItem; brief: b
 
 interface SubmissionRowProps {
   item: MyResearchItem;
-  /** The Overview's short list: no clearance strip, one action, no Delete. */
+  /** The Overview's short list: no clearance strip, one action (and a draft's Delete). */
   brief?: boolean;
   /** Offered on a draft: the row is gone once the server deleted it. */
   onDeleted?: (id: number) => void;

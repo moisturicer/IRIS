@@ -407,6 +407,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1253** | Ask IRIS's conversation rows stay one line with "…" and one ⋯ menu (Pin, Rename, Delete); the Full Text Rule's seventh cut — no FR- id | [details](traceability/IR-1253.md) | **PARTIAL** |
 | **IR-1254** | Request documents is offered only on the Review pane's Documents tab, not in the review footer's ⋯ menu — ADR-032 amendment 2026-11-21; no FR- id | [details](traceability/IR-1254.md) | **VERIFIED** |
 | **IR-1255** | Pages start with their own title: no "Discover / …" breadcrumb above any page; titles keep Discover's font and size — supersedes IR-1085's NAV-03 breadcrumb; no FR- id | [details](traceability/IR-1255.md) | **VERIFIED** |
+| **IR-1256** | Deleting a draft asks in a dialog: over the Publish form, and from a red trash can beside *Continue draft* on both My Library lists; a dialog over another takes Escape and Tab alone — amends ADR-009 decision 6's wording; no FR- id | [details](traceability/IR-1256.md) | **VERIFIED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

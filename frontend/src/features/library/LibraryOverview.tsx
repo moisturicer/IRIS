@@ -45,6 +45,8 @@ interface LibraryOverviewProps {
   folders:     LibraryFolder[];
   onOpenSubmissions: (filter: ResearchFilter) => void;
   onOpenSaved: (view: LibraryView) => void;
+  /** A draft was deleted from its row (IR-1256); drop it. */
+  onDeleted: (recordId: number) => void;
 }
 
 /**
@@ -54,7 +56,7 @@ interface LibraryOverviewProps {
  * except beside Waiting on you, where each one is a thing to do.
  */
 export function LibraryOverview({
-  research, loading, failed, interrupted = false, onRetry, library, history, folders, onOpenSubmissions, onOpenSaved,
+  research, loading, failed, interrupted = false, onRetry, library, history, folders, onOpenSubmissions, onOpenSaved, onDeleted,
 }: LibraryOverviewProps) {
   const waiting = useMemo(() => research.filter(isWaiting), [research]);
   /* Only papers the reader can still read; an unavailable entry has no title to show. */
@@ -165,7 +167,7 @@ export function LibraryOverview({
             />
           ) : (
             <SubmissionPanel>
-              {recent.map((item) => <SubmissionRow key={item.id} item={item} brief />)}
+              {recent.map((item) => <SubmissionRow key={item.id} item={item} brief onDeleted={onDeleted} />)}
             </SubmissionPanel>
           )}
         </section>
