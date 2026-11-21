@@ -23,7 +23,6 @@ import { Select }       from "@/components/ui/Select";
 import { Badge }        from "@/components/ui/Badge";
 import { Modal }        from "@/components/ui/Modal";
 import { STAFF_ROLES } from "@/lib/constants";
-import { formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore }   from "@/store/ui.store";
 import { rolesToOffer, rowActions } from "./accountActions";
@@ -203,15 +202,6 @@ export default function UserListPage() {
           </Badge>
           {/* Only the System Admin's list holds these; RDCO's leaves them out (IR-705, IR-804). */}
           {row.original.is_verified === false && <Badge variant="warning">Unverified</Badge>}
-        </span>
-      ),
-    },
-    {
-      header: "Last active",
-      id: "last_active",
-      cell: ({ row }) => (
-        <span className="whitespace-nowrap text-stone-600">
-          {row.original.last_login ? formatDate(row.original.last_login) : "Never"}
         </span>
       ),
     },

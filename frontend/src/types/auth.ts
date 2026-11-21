@@ -164,8 +164,6 @@ export interface UserListItem {
   /** May assign, reassign and withdraw reviewers in their office (ADR-032 §4). */
   is_office_coordinator: boolean;
   date_joined: string;
-  /** Last sign-in; null when the account never signed in (IR-1138). */
-  last_login?: string | null;
   /** The Users page's Unit: the department, else the college (IR-1138). */
   department_name?: string;
   college_name?: string;
