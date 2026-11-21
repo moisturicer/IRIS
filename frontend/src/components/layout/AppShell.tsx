@@ -88,8 +88,8 @@ export function AppShell() {
   // closed it is only slid off screen, so it is made inert to keep its links
   // out of the tab order; while it is open the page behind it is inert
   // instead, Escape closes it, and focus moves in and back out again.
-  // From 768 to 1023 px it is the icon rail, and the IRIS mark opens the full
-  // sidebar over the page the same way (IR-1086): the rail itself is never
+  // From 768 to 1023 px it is the icon rail, and the sidebar button opens the
+  // full sidebar over the page the same way (IR-1086, IR-1260): the rail itself is never
   // inert, but an opened sidebar behaves like the drawer.
   // jsdom, which has no matchMedia, renders the desktop shell.
   const mode = useSidebarMode();
@@ -118,10 +118,10 @@ export function AppShell() {
     }
     if (returnFocus.current) {
       returnFocus.current = false;
-      // The rail's mark, which opened a tablet's sidebar, is on screen; Open
-      // menu is not (it is the phone's).
+      // The rail's sidebar button, which opened a tablet's sidebar, is on
+      // screen; Open menu is not (it is the phone's).
       const returnTo = mode === "rail"
-        ? sidebarRef.current?.querySelector<HTMLElement>("[data-sidebar-mark]")
+        ? sidebarRef.current?.querySelector<HTMLElement>("[data-sidebar-toggle]")
         : menuButtonRef.current;
       returnTo?.focus();
     }

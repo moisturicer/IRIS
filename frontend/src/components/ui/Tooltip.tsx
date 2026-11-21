@@ -9,6 +9,11 @@ interface TooltipProps {
   disabled?: boolean;
   /** Classes for the wrapper, e.g. `block` to wrap a full-width link. */
   className?: string;
+  /**
+   * A key that does the same thing, drawn after the label as a key cap
+   * (IR-1260: `[` for the sidebar). Visual only, like the tip itself.
+   */
+  shortcut?: string;
   children: ReactNode;
 }
 
@@ -23,7 +28,7 @@ interface TooltipProps {
  * control's name does not hear it twice. It is drawn in a portal at the
  * control's right edge, because the rail's nav scrolls and would clip it.
  */
-export function Tooltip({ label, disabled = false, className, children }: TooltipProps) {
+export function Tooltip({ label, disabled = false, className, shortcut, children }: TooltipProps) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -66,6 +71,10 @@ export function Tooltip({ label, disabled = false, className, children }: Toolti
       onPointerLeave={() => { setHovered(false); setDismissed(false); pressing.current = false; }}
       onMouseDown={() => { pressing.current = true; }}
       onMouseUp={() => { pressing.current = false; }}
+      // A press acts on the control, which may move or change its name (the
+      // sidebar's toggle does both), so the tip placed for it goes until the
+      // pointer leaves or focus moves.
+      onClick={() => { if (open) setDismissed(true); }}
       onFocus={() => { if (!pressing.current) setFocused(true); }}
       onBlur={() => { setFocused(false); setDismissed(false); }}
       onKeyDown={(e) => { if (e.key === "Escape" && open) setDismissed(true); }}
@@ -80,9 +89,14 @@ export function Tooltip({ label, disabled = false, className, children }: Toolti
         >
           <span
             role="tooltip"
-            className="block w-max max-w-[min(18rem,calc(100vw-5rem))] break-words rounded-control bg-stone-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-card-md animate-fade-in motion-reduce:animate-none"
+            className="flex w-max max-w-[min(18rem,calc(100vw-5rem))] items-center gap-2 break-words rounded-control bg-stone-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-card-md animate-fade-in motion-reduce:animate-none"
           >
             {label}
+            {shortcut && (
+              <kbd className="inline-flex h-5 min-w-5 items-center justify-center border border-b-2 border-white/40 px-1 font-sans text-3xs font-semibold leading-none text-white">
+                {shortcut}
+              </kbd>
+            )}
           </span>
         </span>,
         document.body,

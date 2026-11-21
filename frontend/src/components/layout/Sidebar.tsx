@@ -1,5 +1,5 @@
-import { forwardRef, useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { forwardRef, useEffect, useRef, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { dashboardApi, type QueueCounts } from "@/api/dashboard";
 import { onQueueCountsChanged } from "@/lib/queueCounts";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -15,6 +15,7 @@ import { ASK_IRIS_ICON, navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, typ
 import { AskIrisGlyph, IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { isRail, useSidebarMode } from "@/lib/layout";
+import { landingPathFor } from "@/lib/landing";
 import { HERE } from "@/components/ui/highlightRoles";
 import { preloadScreen } from "@/router/lazyScreens";
 
@@ -181,6 +182,44 @@ function NavGroup({
   );
 }
 
+/**
+ * The sidebar toggle's icon (IR-1260): a window with its left pane filled,
+ * and a chevron for the way the sidebar will move. Drawn rather than a Font
+ * Awesome glyph because the free set has no sidebar icon; the filled pane
+ * and 2 px strokes match the weight of the solid icons beside it.
+ */
+function SidebarPanelGlyph({ expand }: { expand: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden focusable={false}>
+      <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="2" />
+      <path d="M4 5h5v14H4z" fill="currentColor" />
+      <path
+        d={expand ? "M13 9l3 3-3 3" : "M16 9l-3 3 3 3"}
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** The key that collapses and expands the sidebar (IR-1260). */
+export const SIDEBAR_KEY = "[";
+
+/**
+ * Whether a key press belongs to something else: typing in a field, a chord
+ * with a modifier, or a dialog open over the page. Only a bare `[` with focus
+ * on the page toggles the sidebar.
+ */
+function isOwnedElsewhere(e: KeyboardEvent): boolean {
+  if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return true;
+  const target = e.target instanceof Element ? e.target : null;
+  if (!target) return false;
+  if (target.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")) return true;
+  return target.closest("[role='dialog'], [role='alertdialog'], [aria-modal='true']") != null;
+}
+
 interface SidebarProps {
   className?: string;
   /** Set by `AppShell` while the phone drawer is closed: out of the tab order. */
@@ -201,9 +240,14 @@ interface SidebarProps {
  * bell is at the top (IR-519); the account menu is at the bottom, and Help is
  * in Settings (IR-1217). Below `md` it is a
  * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
- * rail, and the IRIS mark opens the full sidebar over the page (IR-1086). From
- * 1024 px it is at full width, or as the rail if the user chooses (stored per
- * browser; the choice is not read below 1024 px).
+ * rail, and the sidebar button opens the full sidebar over the page (IR-1086).
+ * From 1024 px it is at full width, or as the rail if the user chooses (stored
+ * per browser; the choice is not read below 1024 px).
+ *
+ * The sidebar button (IR-1260) is a visible control of its own, beside the
+ * bell or under the mark on the rail, and `[` does the same. The IRIS mark was
+ * the toggle before and nothing said it could be pressed; it is now only the
+ * logo, a link to the user's home.
  */
 const NO_QUEUES: QueueCounts = {};
 
@@ -224,10 +268,27 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
   const mode = useSidebarMode();
   const collapsed = isRail(mode, sidebarOpen, preferCollapsed);
-  // The mark's job: on the desktop it saves a collapse preference; on a tablet
-  // it opens and closes the full sidebar over the page and saves nothing.
+  // The sidebar button's job: on the desktop it saves a collapse preference;
+  // on a tablet it opens and closes the full sidebar over the page and saves
+  // nothing. The phone has its own Open and Close menu buttons.
   const dismiss = onDismiss ?? closeSidebar;
-  const onMark = mode !== "rail" ? toggleCollapsed : collapsed ? () => setSidebarOpen(true) : dismiss;
+  const onToggle = mode !== "rail" ? toggleCollapsed : collapsed ? () => setSidebarOpen(true) : dismiss;
+  const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
+
+  // `[` does what the button does, from 768 px up (IR-1260). Read through a
+  // ref so the listener is added once, not on every render.
+  const toggleRef = useRef(onToggle);
+  toggleRef.current = onToggle;
+  useEffect(() => {
+    if (mode === "drawer") return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== SIDEBAR_KEY || isOwnedElsewhere(e)) return;
+      e.preventDefault();
+      toggleRef.current();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mode]);
   const [queueCounts, setQueueCounts] = useState<QueueCounts>(NO_QUEUES);
   const [needsAction, setNeedsAction] = useState(false);
   /** My Reviews' To review count, from the same stats read (IR-1208). */
@@ -237,6 +298,9 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // Every nav decision comes from lib/access.ts, the same map the router gates
   // on, and My Reviews from the same `review_access` flag its route reads.
   const nav = navFor(roleName as Parameters<typeof navFor>[0], user?.review_access);
+  // The mark goes where signing in goes (IR-534), named for that page.
+  const home = user ? landingPathFor(user) : "/";
+  const homeName = nav.find((entry) => entry.to === home)?.label ?? "Discover";
 
   // The queues' counts, in one call (IR-1138): RDCO's three and the Reported
   // comments queue RDCO shares with the System Admin (IR-693). Read again when
@@ -347,23 +411,23 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     >
       {/* ── Brand ──────────────────────────────────────────────────────── */}
       <div className={cn("px-4 pb-4 pt-5", collapsed && "md:px-0 md:pb-3")}>
-        <div className={cn("flex items-center gap-3", collapsed && "md:justify-center")}>
-          <Tooltip label="Open sidebar" disabled={!collapsed} className="hidden flex-shrink-0 md:block">
-            <button
-              type="button"
-              onClick={onMark}
-              aria-label={collapsed ? "Open sidebar" : "Collapse sidebar"}
-              title={collapsed ? undefined : "Collapse sidebar"}
-              // Where AppShell puts focus when a tablet's full sidebar opens,
-              // and puts it back when that closes.
-              data-sidebar-mark
-              {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
-              className={cn("block h-9 w-9 touch:h-11 touch:w-11 rounded-control", FOCUS_RING)}
+        {/* On the rail the row stands up: the mark, then the sidebar button
+            directly under it, then the bell below. */}
+        <div className={cn("flex items-center gap-3", collapsed && "md:flex-col md:gap-2.5")}>
+          {/* The logo, and a way home. It is not the toggle any more (IR-1260). */}
+          <Tooltip label={`Go to ${homeName}`} disabled={!collapsed} className="flex-shrink-0">
+            <Link
+              to={home}
+              onClick={closeSidebar}
+              aria-label={`IRIS, go to ${homeName}`}
+              className={cn(
+                "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-brand",
+                FOCUS_RING,
+              )}
             >
-              <IrisMark className="h-9 w-9 text-brand" />
-            </button>
+              <IrisMark className="h-9 w-9" />
+            </Link>
           </Tooltip>
-          <IrisMark className="h-9 w-9 flex-shrink-0 text-brand md:hidden" />
           <p
             className={cn(
               "min-w-0 flex-1 leading-none text-brand",
@@ -373,13 +437,32 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             <IrisWordmark className="h-4 w-auto" />
             <span className="sr-only">IRIS</span>
           </p>
-          {/* Desktop only: below md the phone bar carries the bell, and a
-              second one in the drawer would put two on screen at once. */}
-          {!collapsed && (
-            <div className="hidden flex-shrink-0 md:block">
-              <NotificationBell align="start" />
-            </div>
-          )}
+          {/* From md only: below it the phone bar carries the bell, and a
+              second one in the drawer would put two on screen at once. The
+              phone's drawer has Close menu instead of the sidebar button. */}
+          <div className="hidden flex-shrink-0 items-center gap-1 md:flex">
+            {!collapsed && <NotificationBell align="start" />}
+            <Tooltip label={toggleLabel} shortcut={SIDEBAR_KEY} className="block">
+              <button
+                type="button"
+                onClick={onToggle}
+                aria-label={toggleLabel}
+                aria-expanded={!collapsed}
+                aria-controls="app-sidebar"
+                // Where AppShell puts focus when a tablet's full sidebar opens,
+                // and puts it back when that closes.
+                data-sidebar-toggle
+                {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
+                className={cn(
+                  "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100 hover:text-stone-900 active:bg-stone-200",
+                  COLOUR_TRANSITION,
+                  FOCUS_RING,
+                )}
+              >
+                <SidebarPanelGlyph expand={collapsed} />
+              </button>
+            </Tooltip>
+          </div>
           <button
             type="button"
             onClick={onDismiss ?? closeSidebar}
@@ -400,7 +483,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
           Research-to-IP Platform
         </p>
         {collapsed && (
-          <div className="mt-3 hidden justify-center md:flex">
+          <div className="mt-2.5 hidden justify-center md:flex">
             <Tooltip label="Notifications">
               <NotificationBell align="start" showTitle={false} />
             </Tooltip>
