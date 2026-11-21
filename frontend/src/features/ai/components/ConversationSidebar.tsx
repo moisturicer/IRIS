@@ -234,7 +234,8 @@ export function ConversationHistoryList({
 
   return (<>
     <div className="shrink-0 space-y-0.5 px-2 pt-2">
-      <label htmlFor={searchId} className={cn(NAV_ITEM, "cursor-text focus-within:bg-stone-200/70")}>
+      {/* A fill at rest (IR-1257): on the pane's stone-50 the box vanished until hovered. */}
+      <label htmlFor={searchId} className={cn(NAV_ITEM, "cursor-text bg-stone-100 hover:bg-stone-200 focus-within:bg-stone-200")}>
         <i className="fas fa-magnifying-glass w-4 text-center text-label" aria-hidden />
         <span className="sr-only">Search your past conversations</span>
         <input id={searchId} ref={searchRef} type="search" value={search.text} onChange={e => search.onText(e.target.value)}
