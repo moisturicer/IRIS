@@ -244,10 +244,10 @@ interface SidebarProps {
  * From 1024 px it is at full width, or as the rail if the user chooses (stored
  * per browser; the choice is not read below 1024 px).
  *
- * The sidebar button (IR-1260) is a visible control of its own, beside the
- * bell or under the mark on the rail, and `[` does the same. The IRIS mark was
- * the toggle before and nothing said it could be pressed; it is now only the
- * logo, a link to the user's home.
+ * The sidebar button (IR-1260) is a visible control beside the bell, and `[`
+ * does the same. On the rail the IRIS mark is the expand button: the logo at
+ * rest, the sidebar icon on hover or focus, so it shows what it does before
+ * it is pressed. On the full sidebar the mark is the logo, a link home.
  */
 const NO_QUEUES: QueueCounts = {};
 
@@ -412,23 +412,47 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     >
       {/* ── Brand ──────────────────────────────────────────────────────── */}
       <div className={cn("px-4 pb-4 pt-5", collapsed && "md:px-0 md:pb-3")}>
-        {/* On the rail the row stands up: the mark, then the sidebar button
-            directly under it, then the bell below. */}
-        <div className={cn("flex items-center gap-3", collapsed && "md:flex-col md:gap-2.5")}>
-          {/* The logo, and a way home. It is not the toggle any more (IR-1260). */}
-          <Tooltip label="IRIS home" disabled={!collapsed} className="flex-shrink-0">
+        <div className={cn("flex items-center gap-3", collapsed && "md:justify-center")}>
+          {collapsed ? (
+            // The rail's one control at the top (IR-1260): the logo at rest,
+            // the sidebar icon on hover or keyboard focus, so the reader sees
+            // what pressing it does before pressing. It expands the sidebar.
+            <Tooltip label={toggleLabel} shortcut={SIDEBAR_KEY} className="flex-shrink-0">
+              <button
+                type="button"
+                onClick={onToggle}
+                aria-label={toggleLabel}
+                aria-expanded={false}
+                aria-controls="app-sidebar"
+                // Where AppShell puts focus back when a tablet's full sidebar
+                // closes.
+                data-sidebar-toggle
+                className={cn(
+                  "group relative flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100 hover:text-stone-900 focus-visible:bg-stone-100 active:bg-stone-200",
+                  COLOUR_TRANSITION,
+                  FOCUS_RING,
+                )}
+              >
+                <IrisMark className="h-9 w-9 text-brand transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0 motion-reduce:transition-none" />
+                <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none">
+                  <SidebarPanelGlyph expand />
+                </span>
+              </button>
+            </Tooltip>
+          ) : (
+            // The logo, and a way home.
             <Link
               to={home}
               onClick={closeSidebar}
               aria-label="IRIS home"
               className={cn(
-                "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-brand",
+                "flex h-9 w-9 flex-shrink-0 touch:h-11 touch:w-11 items-center justify-center rounded-control text-brand",
                 FOCUS_RING,
               )}
             >
               <IrisMark className="h-9 w-9" />
             </Link>
-          </Tooltip>
+          )}
           <p
             className={cn(
               "min-w-0 flex-1 leading-none text-brand",
@@ -441,29 +465,31 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
           {/* From md only: below it the phone bar carries the bell, and a
               second one in the drawer would put two on screen at once. The
               phone's drawer has Close menu instead of the sidebar button. */}
-          <div className="hidden flex-shrink-0 items-center gap-1 md:flex">
-            {!collapsed && <NotificationBell align="start" />}
-            <Tooltip label={toggleLabel} shortcut={SIDEBAR_KEY} className="block">
-              <button
-                type="button"
-                onClick={onToggle}
-                aria-label={toggleLabel}
-                aria-expanded={!collapsed}
-                aria-controls="app-sidebar"
-                // Where AppShell puts focus when a tablet's full sidebar opens,
-                // and puts it back when that closes.
-                data-sidebar-toggle
-                {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
-                className={cn(
-                  "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100 hover:text-stone-900 active:bg-stone-200",
-                  COLOUR_TRANSITION,
-                  FOCUS_RING,
-                )}
-              >
-                <SidebarPanelGlyph expand={collapsed} />
-              </button>
-            </Tooltip>
-          </div>
+          {!collapsed && (
+            <div className="hidden flex-shrink-0 items-center gap-1 md:flex">
+              <NotificationBell align="start" />
+              <Tooltip label={toggleLabel} shortcut={SIDEBAR_KEY} className="block">
+                <button
+                  type="button"
+                  onClick={onToggle}
+                  aria-label={toggleLabel}
+                  aria-expanded
+                  aria-controls="app-sidebar"
+                  // Where AppShell puts focus when a tablet's full sidebar opens,
+                  // and puts it back when that closes.
+                  data-sidebar-toggle
+                  {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
+                  className={cn(
+                    "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100 hover:text-stone-900 active:bg-stone-200",
+                    COLOUR_TRANSITION,
+                    FOCUS_RING,
+                  )}
+                >
+                  <SidebarPanelGlyph expand={false} />
+                </button>
+              </Tooltip>
+            </div>
+          )}
           <button
             type="button"
             onClick={onDismiss ?? closeSidebar}
