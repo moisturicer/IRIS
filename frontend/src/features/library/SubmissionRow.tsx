@@ -14,33 +14,26 @@ import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
 /**
- * A row's actions (IR-1084): one of Continue draft, the act that answers an
- * open request, or Open review. The Overview's short list (`brief`) shows
- * exactly one of those. A draft also has its red Delete trash can beside
- * Continue draft, on both lists (IR-1256).
+ * Where the row itself leads: a draft opens Publish over this page, since a
+ * draft has no paper page (IR-1227) and going through one would leave My
+ * Library (IR-1258); anything else opens Paper View. The whole row is that
+ * link, so it carries no separate "Continue draft" or "Open review" button.
  */
-function RowActions({ item, brief, onDeleted }: { item: MyResearchItem; brief: boolean; onDeleted?: (id: number) => void }) {
-  const publishHref = usePublishHref();
+function rowHref(item: MyResearchItem, publishHref: (target: number) => string) {
+  return item.pipeline_status === "draft" ? publishHref(item.id) : `/records/${item.id}`;
+}
+
+/**
+ * The acts a row offers beyond opening it (IR-1084): continuing a finished
+ * proposal, or the act that answers each open request. The Overview's short
+ * list (`brief`) shows only the first request. Null when there is none.
+ */
+function rowActions(item: MyResearchItem, brief: boolean): ReactNode {
   if (item.can_continue) return <ContinueProposal recordId={item.id} />;
-  if (item.pipeline_status === "draft") {
-    return (
-      <>
-        <Link to={publishHref(item.id)} className={cn(PILL_PRIMARY, "min-h-9 px-4", FOCUS_RING)}>
-          Continue draft <span className="sr-only">“{item.title}”</span>
-        </Link>
-        {onDeleted && <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />}
-      </>
-    );
-  }
+  if (item.pipeline_status === "draft") return null;
   // One link per open request, straight to the act on Paper View (IR-625).
   const waiting = brief ? item.submitter_status.waiting_on_you.slice(0, 1) : item.submitter_status.waiting_on_you;
-  if (waiting.length === 0) {
-    return (
-      <Link to={`/records/${item.id}`} className={cn(PILL_SECONDARY, "min-h-9 px-4", FOCUS_RING)}>
-        Open review <span className="sr-only">of “{item.title}”</span>
-      </Link>
-    );
-  }
+  if (waiting.length === 0) return null;
   return (
     <>
       {waiting.map((request, i) => (
@@ -67,12 +60,10 @@ interface SubmissionRowProps {
 
 /**
  * One of the owner's records as a row in a ruled list (IR-410). The title is
- * the row's one link, stretched over the row; only the actions sit above it.
- * The status words are the server's (`submitter_status.line`); the sentence
- * under the title says what the record waits on (`waitingOn`, IR-1084). A
- * draft's title opens Publish over this page, as Continue draft does: a draft
- * has no paper page (IR-1227), and going through one would leave My Library
- * (IR-1258).
+ * the row's one link, stretched over the row, so a click anywhere opens it
+ * (`rowHref`); only the actions and a draft's "⋯" menu sit above it. The
+ * status words are the server's (`submitter_status.line`); the sentence under
+ * the title says what the record waits on (`waitingOn`, IR-1084).
  */
 export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowProps) {
   const publishHref = usePublishHref();
@@ -80,7 +71,8 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
     item.authors.map((author) => author.name).join(", "),
     item.adviser_name && `Adviser: ${item.adviser_name}`,
   ].filter(Boolean).join(" · ");
-  const actions = <RowActions item={item} brief={brief} onDeleted={onDeleted} />;
+  const actions = rowActions(item, brief);
+  const deletable = item.pipeline_status === "draft" && onDeleted;
 
   return (
     <li className={cn("group relative flex gap-4 px-4 py-4 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>
@@ -93,11 +85,12 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-col gap-x-6 gap-y-2 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
+          {/* Room on a narrow screen for the "⋯" pinned to the corner. */}
+          <div className={cn("min-w-0", deletable && "pr-10 md:pr-0")}>
             <p className="text-label text-stone-600">{item.record_type_name ?? "Research"}</p>
             <h3 className="mt-0.5 font-display text-title font-semibold leading-snug text-stone-900">
               <Link
-                to={item.pipeline_status === "draft" ? publishHref(item.id) : `/records/${item.id}`}
+                to={rowHref(item, publishHref)}
                 className={cn(
                   "rounded-control group-hover:text-brand",
                   COLOUR_TRANSITION,
@@ -115,6 +108,13 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
           <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-end">
             <StatusBadge state={item.workflow_state} label={item.submitter_status.line} />
             <span className="text-label tabular-nums text-stone-500">Updated {formatDate(item.updated_at)}</span>
+            {/* Under the date beside the chevron; in the row's top corner on a
+                narrow screen, where the chevron is hidden and the line wraps. */}
+            {deletable && (
+              <div className="absolute right-2 top-2 z-10 md:relative md:right-auto md:top-auto md:-mr-1.5">
+                <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />
+              </div>
+            )}
           </div>
         </div>
 
