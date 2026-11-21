@@ -184,6 +184,9 @@ export default function PaperViewPage() {
     panelClass: chatPanelClass,
     closeChat,
     backToPaper,
+    openAsk,
+    restore,
+    stepAsideForHighlight,
   } = useSidePanel({
     chat, id, onPaperTab, onReviewTab, tier, workspaceWidth, askOffered, arriving, openAtPage, arrivalKey,
   });
@@ -339,7 +342,7 @@ export default function PaperViewPage() {
     // The paper, in the version that has its bytes; a panel that would cover
     // the passage steps aside, as it does for a citation.
     setViewParams({ section: readerSection, version: version == null ? null : String(version) });
-    if (chat.open && tier !== "wide") chat.setOpen(false);
+    stepAsideForHighlight();
   };
   /** Open version `n`, or the current paper for null, in a section that shows the paper. */
   const chooseVersion = (n: number | null) =>
@@ -1103,7 +1106,7 @@ export default function PaperViewPage() {
               : { key: arrivalKey, fromPaperChat: followedFromPaperChat(location.state) }
           }
           onClose={closeChat}
-          onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
+          onBackToPaper={backToPaper}
           panelRef={panelRef}
           modal={chatModal}
           draft={chat.draft}
@@ -1119,7 +1122,7 @@ export default function PaperViewPage() {
           }
           style={panelWidth && !chatMinimized ? { width: panelWidth } : undefined}
           minimized={chatMinimized}
-          onRestore={() => chat.setMinimized(false)}
+          onRestore={restore}
           viewingVersion={viewedVersion?.number ?? null}
           returnTo={chatReturn}
           onOpenNotes={onReviewTab ? undefined : openNotes}
@@ -1136,7 +1139,7 @@ export default function PaperViewPage() {
           onOpenHighlight={openHighlight}
           canOpenVersion={(n) => versions.some((v) => v.number === n && v.manuscript_url && (v !== latestVersion || record.manuscript_unsubmitted))}
           onClose={closeChat}
-          onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
+          onBackToPaper={backToPaper}
           onOpenAsk={askOffered ? openAskFromNotes : undefined}
           panelRef={panelRef}
           modal={chatModal}
@@ -1154,7 +1157,7 @@ export default function PaperViewPage() {
       {!chat.open && !onReviewTab && (
         <>
           <NotesFab onOpen={openNotes} buttonRef={notesButtonRef} />
-          {askOffered && <AskIrisFab onOpen={() => chat.setOpen(true)} buttonRef={askButtonRef} />}
+          {askOffered && <AskIrisFab onOpen={openAsk} buttonRef={askButtonRef} />}
         </>
       )}
       </div>

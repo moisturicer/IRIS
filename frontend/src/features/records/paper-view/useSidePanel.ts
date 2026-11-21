@@ -156,6 +156,17 @@ export function useSidePanel({
     else chat.setMinimized(true);
   };
 
+  /** Back to the paper, offered only where the panel stands in for it: Paper at a single column. */
+  const backToPaperAction = onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined;
+  /** Open Ask IRIS from its button. */
+  const openAsk = () => chat.setOpen(true);
+  /** Bring a minimized Ask IRIS back up. */
+  const restore = () => chat.setMinimized(false);
+  /** A highlight opened from Notes: a panel that would cover the passage steps aside. */
+  const stepAsideForHighlight = () => {
+    if (chat.open && tier !== "wide") chat.setOpen(false);
+  };
+
   // Over the paper, focus moves in and stays in, and Escape leaves; on
   // leaving, focus returns to the header's Ask IRIS once it is not inert.
   useEffect(() => {
@@ -242,6 +253,9 @@ export function useSidePanel({
     panelWidth,
     panelClass,
     closeChat,
-    backToPaper,
+    backToPaper: backToPaperAction,
+    openAsk,
+    restore,
+    stepAsideForHighlight,
   };
 }
