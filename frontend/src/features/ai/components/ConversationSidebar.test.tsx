@@ -175,6 +175,19 @@ describe("New conversation, Search, Pinned and Recents", () => {
     expect(screen.getByRole("searchbox", { name: "Search your past conversations" })).toHaveFocus();
   });
 
+  // IR-1257: on the pane's stone-50 the box vanished until hovered.
+  test("the search box has a fill and an outline at rest, and shows typing in the outline only", () => {
+    render(<Sidebar />);
+    const box = screen.getByRole("searchbox", { name: "Search your past conversations" }).closest("label") as HTMLElement;
+    // The field outline every IRIS search box has, and its focus border and ring.
+    expect(box).toHaveClass("bg-stone-100", "border", "border-field", "focus-within:border-brand", "focus-within:ring-2");
+    // Like every other search box in IRIS, hovering and typing never change the fill.
+    expect(box.className).not.toMatch(/(^|\s)hover:/);
+    expect(box.className).not.toMatch(/(^|\s)focus-within:bg-/);
+    // Conversation rows keep their own style: no fill at rest.
+    expect(screen.getByRole("link", { name: /Pond sampling/ }).className).not.toMatch(/(^|\s)bg-/);
+  });
+
   test("the column resizes by keyboard within its bounds", async () => {
     const user = userEvent.setup();
     render(<Sidebar />);

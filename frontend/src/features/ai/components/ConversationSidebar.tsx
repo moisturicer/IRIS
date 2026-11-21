@@ -61,9 +61,15 @@ interface ConversationSidebarProps {
   onResize:         (width: number) => void;
 }
 
-const NAV_ITEM =
-  "flex min-h-10 w-full min-w-0 items-center gap-3 rounded-control px-3 text-body text-stone-700 " +
-  "hover:bg-stone-200/70 hover:text-stone-900 " + COLOUR_TRANSITION + " " + FOCUS_RING;
+/**
+ * The history search box (IR-1257): a fill and the field outline at rest,
+ * since on the pane's stone-50 it vanished. Like every other search box in
+ * IRIS (My submissions, a Saved folder), hovering changes nothing and typing
+ * shows only in the outline: a brand border and ring, the fill unchanged.
+ */
+const SEARCH_BOX =
+  "flex min-h-10 w-full min-w-0 cursor-text items-center gap-3 rounded-control border border-field bg-stone-100 px-3 text-body text-stone-700 " +
+  "focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 " + COLOUR_TRANSITION;
 
 const ICON_BUTTON =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-control text-stone-600 " +
@@ -234,14 +240,15 @@ export function ConversationHistoryList({
 
   return (<>
     <div className="shrink-0 space-y-0.5 px-2 pt-2">
-      <label htmlFor={searchId} className={cn(NAV_ITEM, "cursor-text focus-within:bg-stone-200/70")}>
+      <label htmlFor={searchId} className={SEARCH_BOX}>
         <i className="fas fa-magnifying-glass w-4 text-center text-label" aria-hidden />
         <span className="sr-only">Search your past conversations</span>
         <input id={searchId} ref={searchRef} type="search" value={search.text} onChange={e => search.onText(e.target.value)}
           onKeyDown={e => { if (e.key === "Escape") { search.onText(""); e.currentTarget.blur(); } }}
           placeholder="Search" autoComplete="off" maxLength={200} disabled={search.state === "error"}
           className="min-w-0 flex-1 bg-transparent text-body text-stone-900 placeholder:text-stone-700 focus:outline-none" />
-        <kbd aria-hidden className="shrink-0 font-sans text-2xs text-stone-500">Ctrl+K</kbd>
+        {/* stone-600: stone-500 falls under 4.5:1 on the box's stone-100 fill (IR-1257). */}
+        <kbd aria-hidden className="shrink-0 font-sans text-2xs text-stone-600">Ctrl+K</kbd>
       </label>
       <p role="status" aria-live="polite" className="px-3 text-label text-stone-600">
         {search.query && search.state === "ready" ? `${conversations.length}${search.hasMore ? "+" : ""} found` : ""}
