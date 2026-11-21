@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { Suspense, useEffect, useId, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { failureMessage } from "@/lib/readFailure";
@@ -40,16 +40,11 @@ import {
 import {
   usePaperChat,
   PaperChatPanel,
-  DOCKED_PANEL_CLASS,
-  MINIMIZED_SHEET_CLASS,
   PANEL_WIDTH_MIN,
-  PAPER_WORKSPACE_PANEL_CLASS,
-  fitPanelWidth,
 } from "./PaperChatDock";
 import { AskIrisFab, CORNER_CLEARANCE_CLASS, NotesFab } from "./AskIrisFab";
 import { NotesPanel } from "./NotesPanel";
 import { useReadingHighlights, type ReadableHighlight } from "./useReadingHighlights";
-import { useReadingNote } from "./useReadingNote";
 import { HighlightSwatch, type SelectionAction } from "./SelectionMenu";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { CommentsSection } from "./CommentsSection";
@@ -68,7 +63,7 @@ import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
 import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
-import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
+import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier } from "./paneLayout";
 import { ReadingHeader } from "./ReadingHeader";
 import { titleSizeClasses } from "./titleSize";
 import { useFragmentFocus } from "./useFragmentFocus";
@@ -84,6 +79,7 @@ import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { IpTagger } from "./IpTagger";
 import { LoadingSkeleton, MainColumnSkeleton } from "./PaperViewSkeletons";
 import { useRecordLoader } from "./useRecordLoader";
+import { useSidePanel } from "./useSidePanel";
 
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
@@ -99,8 +95,6 @@ import { useRecordLoader } from "./useRecordLoader";
  * is not an arrival: Back still leaves the paper, and Paper Chat keeps the
  * conversation it is on, pinned or not (IR-355).
  */
-const TIER_RANK: Record<ReadingTier, number> = { single: 0, overlay: 1, wide: 2 };
-
 export default function PaperViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -109,36 +103,8 @@ export default function PaperViewPage() {
   const tabsId = useId();
 
   const chat = usePaperChat();
-  // The reader's private note (IR-580): held here so closing Notes keeps the
-  // draft, and read only once Notes is first opened.
-  const [notesWanted, setNotesWanted] = useState(false);
-  const note = useReadingNote(Number(id), notesWanted);
   // Saved highlights are drawn until a plain click on the paper hides them (IR-581).
   const [highlightsShown, setHighlightsShown] = useState(true);
-  // Lines a Highlight's note adds to the reader's Notes once their note has loaded (IR-581).
-  const pendingNote = useRef<string[]>([]);
-  const noteRef = useRef(note);
-  noteRef.current = note;
-  const appendPendingNote = () => {
-    const current = noteRef.current;
-    if (current.phase !== "ready" || pendingNote.current.length === 0) return;
-    const lines = pendingNote.current;
-    pendingNote.current = [];
-    current.setText([current.text.trimEnd(), ...lines].filter(Boolean).join("\n\n"));
-  };
-  useEffect(appendPendingNote, [note.phase]);
-  // Focus follows a swap of Ask IRIS and Notes into the new panel, in every
-  // layout: the control that was clicked is gone with the old panel.
-  const focusPanel = useRef(false);
-  const openNotes = () => {
-    setNotesWanted(true);
-    focusPanel.current = true;
-    chat.openNotes();
-  };
-  const openAskFromNotes = () => {
-    focusPanel.current = true;
-    chat.setOpen(true);
-  };
   // The supporting document Review's reader shows (IR-1203); see `shownDocument`.
   const [documentShown, setDocumentShown] = useState<ShownDocumentState | null>(null);
   // The highlight the reader asked to open from Notes (IR-583): where to land,
@@ -179,10 +145,6 @@ export default function PaperViewPage() {
   const enterReadingRail = useUIStore((s) => s.enterReadingRail);
   const leaveReadingRail = useUIStore((s) => s.leaveReadingRail);
   const addToast = useUIStore((s) => s.addToast);
-  const panelRef = useRef<HTMLElement>(null);
-  const askButtonRef = useRef<HTMLButtonElement>(null);
-  const notesButtonRef = useRef<HTMLButtonElement>(null);
-  const refocusAsk = useRef(false);
 
   // Before the early returns below, so the hooks that follow can use them.
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
@@ -204,53 +166,33 @@ export default function PaperViewPage() {
   // Ask IRIS reads published papers only (ADR-052 as amended, IR-1252), so it isn't
   // offered beside any other: the Ask IRIS page still searches the published ones.
   const askOffered = record?.pipeline_status === PIPELINE_STATUS.PUBLISHED;
+  // Ask IRIS and Notes (IR-569, IR-580): one panel, laid out by reading tier.
+  const {
+    note,
+    notesWanted,
+    openNotes,
+    openAskFromNotes,
+    askAbout,
+    addToNote,
+    panelRef,
+    askButtonRef,
+    notesButtonRef,
+    chatMinimized,
+    chatModal,
+    panelRoom,
+    panelWidth,
+    panelClass: chatPanelClass,
+    closeChat,
+    backToPaper,
+    openAsk,
+    restore,
+    stepAsideForHighlight,
+  } = useSidePanel({
+    chat, id, onPaperTab, onReviewTab, tier, workspaceWidth, askOffered, arriving, openAtPage, arrivalKey,
+  });
   // The reader draws the reader's own highlights wherever the paper shows, so
   // they are read then, and when Notes lists them (IR-583).
   const highlights = useReadingHighlights(Number(id), !arriving && (onPaperTab || onReviewTab || notesWanted));
-  // Never beside the paper, where there is no sheet to tuck away.
-  // Only Ask IRIS tucks away to a bar; Notes has nothing to answer back to.
-  const chatMinimized = chat.minimized && chat.open && chat.tool === "ask" && !onReviewTab && tier !== "wide";
-  // Ask IRIS over the paper, or instead of the page: the rest waits (IR-569).
-  const chatModal =
-    chat.open &&
-    !chatMinimized &&
-    !onReviewTab &&
-    (tier === "single" || (onPaperTab && tier === "overlay"));
-  // The reader's width, held to half the workspace, and beside the paper to
-  // what leaves it 640px.
-  const half = Math.floor(workspaceWidth / 2);
-  const panelRoom = tier === "wide" && onPaperTab ? Math.min(half, workspaceWidth - 656) : half;
-  const panelWidth =
-    tier === "wide" || tier === "overlay" ? fitPanelWidth(chat.width, panelRoom) : undefined;
-
-  // Opening the sidebar narrows the workspace; Ask IRIS steps aside rather than
-  // taking over the page (IR-569): over the paper at any narrowing, and on the
-  // other sections only where it would become the whole view. Widening leaves
-  // it as it was.
-  const lastTier = useRef<ReadingTier | null>(null);
-  useEffect(() => {
-    const before = lastTier.current;
-    lastTier.current = tier;
-    if (onReviewTab || !chat.open || before == null || tier == null) return;
-    const narrowed = TIER_RANK[tier] < TIER_RANK[before];
-    if (narrowed && (onPaperTab || tier === "single")) chat.setOpen(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tier]);
-
-  // Entering Paper opens Ask IRIS, once per visit to the section (IR-569).
-  // Following a citation within it is not an entry.
-  const enteredPaper = useRef(false);
-  useEffect(() => {
-    if (!onPaperTab) {
-      enteredPaper.current = false;
-      chat.setMinimized(false);
-      return;
-    }
-    if (arriving || enteredPaper.current) return;
-    enteredPaper.current = true;
-    if (askOffered) chat.setOpen(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onPaperTab, arriving]);
 
   // Reading collapses the sidebar to its rail, for this visit only (IR-569).
   useEffect(() => {
@@ -258,77 +200,6 @@ export default function PaperViewPage() {
     enterReadingRail();
     return leaveReadingRail;
   }, [onPaperTab, enterReadingRail, leaveReadingRail]);
-
-  const closeChat = () => {
-    // Notes returns focus to its icon in every layout; Ask IRIS only where it was a dialog.
-    if (chatModal || chat.tool === "notes") refocusAsk.current = true;
-    chat.setOpen(false);
-  };
-  const backToPaper = () => {
-    refocusAsk.current = true;
-    // Notes has no minimized bar: back to the paper is closing it.
-    if (chat.tool === "notes") chat.setOpen(false);
-    else chat.setMinimized(true);
-  };
-
-  // Over the paper, focus moves in and stays in, and Escape leaves; on
-  // leaving, focus returns to the header's Ask IRIS once it is not inert.
-  useEffect(() => {
-    if (!chatModal) return;
-    panelRef.current?.focus();
-    // A dialog opened on top of the panel keeps its own Escape and focus.
-    const inOtherDialog = (target: EventTarget | null) => {
-      const owner = target instanceof Element ? target.closest('[role="dialog"],[role="alertdialog"]') : null;
-      return owner != null && owner !== panelRef.current;
-    };
-    const onKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || inOtherDialog(e.target)) return;
-      if (tier === "single" && onPaperTab) backToPaper();
-      else closeChat();
-    };
-    // The sidebar is the app's, not inert here: focus reaching it comes back.
-    const onFocusIn = (e: FocusEvent) => {
-      const panel = panelRef.current;
-      if (!panel || !(e.target instanceof Node) || panel.contains(e.target) || inOtherDialog(e.target)) return;
-      panel.focus();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("focusin", onFocusIn);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("focusin", onFocusIn);
-    };
-    // `chat.tool`: swapping Ask IRIS for Notes replaces the panel, so focus follows it in.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatModal, tier, onPaperTab, chat.tool]);
-  useEffect(() => {
-    if (focusPanel.current && chat.open && panelRef.current) {
-      focusPanel.current = false;
-      panelRef.current.focus();
-    }
-    if (!refocusAsk.current || chatModal) return;
-    refocusAsk.current = false;
-    const bar = panelRef.current?.querySelector<HTMLElement>('button[aria-label="Ask IRIS: back to the answer"]');
-    (bar ?? (chat.tool === "notes" ? notesButtonRef.current : askButtonRef.current))?.focus();
-  });
-
-  useEffect(() => {
-    if (openAtPage == null) return;
-    // A citation followed while the chat covers the paper would land its
-    // passage under it, so it tucks away to a bar (IR-354).
-    if (chat.open && tier !== "wide") {
-      // Notes would cover the passage just as the chat would, and has no bar
-      // to tuck into: it closes, and the Notes icon brings it back.
-      if (chat.tool === "notes") chat.setOpen(false);
-      else chat.setMinimized(true);
-    }
-    // The arrival key is unique per navigation, including a second click on
-    // the very citation already open -- without it in the dependency list,
-    // clicking the same marker twice would not re-fire this effect. The
-    // chat's state is read, not a trigger: opening the chat is not following
-    // a citation, and neither is switching section.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openAtPage, arrivalKey]);
 
   // Share copies the paper's permanent link (IR-356), the address a reader
   // would paste to a colleague. A blocked clipboard claims nothing.
@@ -405,16 +276,6 @@ export default function PaperViewPage() {
 
   const authorNames = record.authors.map((a) => a.name.trim()).filter(Boolean);
 
-  // One Ask IRIS everywhere (IR-569): a column or drawer in the Paper
-  // workspace, a column beside the page on the other sections. The Review section has none
-  // (spec §4.6): the panel stays mounted there, only hidden.
-  const chatPanelClass = onReviewTab
-    ? "hidden"
-    : chatMinimized
-      ? MINIMIZED_SHEET_CLASS
-      : onPaperTab
-        ? PAPER_WORKSPACE_PANEL_CLASS
-        : DOCKED_PANEL_CLASS;
   // Versions (IR-416). Null to a viewer who may not read the review, so a
   // reader of a published paper has none, and `?version=` means nothing to
   // them. An earlier version is open only while it is asked for, exists and
@@ -451,8 +312,7 @@ export default function PaperViewPage() {
       placeholder: "Ask IRIS about this passage…",
       icon: <AskIrisMark className="size-4" />,
       run: (passage, manuscriptRevision, question) => {
-        focusPanel.current = true;
-        chat.askAbout({
+        askAbout({
           recordId: record.id, title: record.title, versionLabel: currentVersionLabel, manuscriptRevision,
           page: passage.page, quote: passage.quote,
           ...(question ? { question, send: true } : {}),
@@ -468,9 +328,7 @@ export default function PaperViewPage() {
         void highlights.save(passage, manuscriptRevision);
         // The reader's own words go to their Notes, never into the highlight (ADR-065 §1).
         if (text) {
-          pendingNote.current = [...pendingNote.current, `Page ${passage.page}: ${text}`];
-          setNotesWanted(true);
-          appendPendingNote();
+          addToNote(`Page ${passage.page}: ${text}`);
         }
       },
     },
@@ -484,7 +342,7 @@ export default function PaperViewPage() {
     // The paper, in the version that has its bytes; a panel that would cover
     // the passage steps aside, as it does for a citation.
     setViewParams({ section: readerSection, version: version == null ? null : String(version) });
-    if (chat.open && tier !== "wide") chat.setOpen(false);
+    stepAsideForHighlight();
   };
   /** Open version `n`, or the current paper for null, in a section that shows the paper. */
   const chooseVersion = (n: number | null) =>
@@ -1248,7 +1106,7 @@ export default function PaperViewPage() {
               : { key: arrivalKey, fromPaperChat: followedFromPaperChat(location.state) }
           }
           onClose={closeChat}
-          onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
+          onBackToPaper={backToPaper}
           panelRef={panelRef}
           modal={chatModal}
           draft={chat.draft}
@@ -1264,7 +1122,7 @@ export default function PaperViewPage() {
           }
           style={panelWidth && !chatMinimized ? { width: panelWidth } : undefined}
           minimized={chatMinimized}
-          onRestore={() => chat.setMinimized(false)}
+          onRestore={restore}
           viewingVersion={viewedVersion?.number ?? null}
           returnTo={chatReturn}
           onOpenNotes={onReviewTab ? undefined : openNotes}
@@ -1281,7 +1139,7 @@ export default function PaperViewPage() {
           onOpenHighlight={openHighlight}
           canOpenVersion={(n) => versions.some((v) => v.number === n && v.manuscript_url && (v !== latestVersion || record.manuscript_unsubmitted))}
           onClose={closeChat}
-          onBackToPaper={onPaperTab && (tier === "single" || tier === null) ? backToPaper : undefined}
+          onBackToPaper={backToPaper}
           onOpenAsk={askOffered ? openAskFromNotes : undefined}
           panelRef={panelRef}
           modal={chatModal}
@@ -1299,7 +1157,7 @@ export default function PaperViewPage() {
       {!chat.open && !onReviewTab && (
         <>
           <NotesFab onOpen={openNotes} buttonRef={notesButtonRef} />
-          {askOffered && <AskIrisFab onOpen={() => chat.setOpen(true)} buttonRef={askButtonRef} />}
+          {askOffered && <AskIrisFab onOpen={openAsk} buttonRef={askButtonRef} />}
         </>
       )}
       </div>
