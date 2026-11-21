@@ -298,9 +298,10 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // Every nav decision comes from lib/access.ts, the same map the router gates
   // on, and My Reviews from the same `review_access` flag its route reads.
   const nav = navFor(roleName as Parameters<typeof navFor>[0], user?.review_access);
-  // The mark goes where signing in goes (IR-534), named for that page.
+  // The mark goes where signing in goes (IR-534). Named "IRIS home", not
+  // "IRIS, go to Discover": a name holding a page action's words ("Go to
+  // Discover" on the not-found screen) would be a second match for it.
   const home = user ? landingPathFor(user) : "/";
-  const homeName = nav.find((entry) => entry.to === home)?.label ?? "Discover";
 
   // The queues' counts, in one call (IR-1138): RDCO's three and the Reported
   // comments queue RDCO shares with the System Admin (IR-693). Read again when
@@ -415,11 +416,11 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             directly under it, then the bell below. */}
         <div className={cn("flex items-center gap-3", collapsed && "md:flex-col md:gap-2.5")}>
           {/* The logo, and a way home. It is not the toggle any more (IR-1260). */}
-          <Tooltip label={`Go to ${homeName}`} disabled={!collapsed} className="flex-shrink-0">
+          <Tooltip label="IRIS home" disabled={!collapsed} className="flex-shrink-0">
             <Link
               to={home}
               onClick={closeSidebar}
-              aria-label={`IRIS, go to ${homeName}`}
+              aria-label="IRIS home"
               className={cn(
                 "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-brand",
                 FOCUS_RING,

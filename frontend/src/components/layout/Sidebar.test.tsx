@@ -352,7 +352,7 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     const sidebar = within(screen.getByRole("complementary", { name: "Sidebar" }));
-    const mark = sidebar.getByRole("link", { name: "IRIS, go to Discover" });
+    const mark = sidebar.getByRole("link", { name: "IRIS home" });
     expect(sidebar.queryByRole("button", { name: /IRIS/ })).not.toBeInTheDocument();
 
     await user.click(mark);
@@ -360,13 +360,13 @@ describe("the sidebar's list", () => {
     expect(useUIStore.getState().sidebarCollapsed).toBe(false);
   });
 
-  it("sends the mark where signing in lands, named for that page", async () => {
+  it("sends the mark where signing in lands", async () => {
     signIn(ROLES.SYSTEM_ADMIN);
     renderAt("/profile");
 
     await screen.findByRole("heading", { name: "Profile" });
     const sidebar = within(screen.getByRole("complementary", { name: "Sidebar" }));
-    expect(sidebar.getByRole("link", { name: "IRIS, go to Users" })).toHaveAttribute("href", pathFor("adminUsers"));
+    expect(sidebar.getByRole("link", { name: "IRIS home" })).toHaveAttribute("href", pathFor("adminUsers"));
   });
 
   it("shows the sidebar button's key in its tooltip", async () => {
@@ -919,8 +919,8 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     renderAt("/records/mine");
 
     const sidebar = within(await screen.findByRole("complementary", { name: "Sidebar" }));
-    await user.hover(sidebar.getByRole("link", { name: "IRIS, go to Discover" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Go to Discover");
+    await user.hover(sidebar.getByRole("link", { name: "IRIS home" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("IRIS home");
     await user.hover(sidebar.getByRole("button", { name: "Expand sidebar" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Expand sidebar");
     await user.hover(sidebar.getByRole("button", { name: /^Notifications/ }));
