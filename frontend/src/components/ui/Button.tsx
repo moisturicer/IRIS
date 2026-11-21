@@ -76,7 +76,8 @@ const SIZE_CLASSES: Record<Size, string> = {
   md:   "rounded-full font-medium px-4 py-2 text-control touch:min-h-11",
   lg:   "rounded-full font-medium px-5 py-2.5 text-control touch:min-h-11",
   page: "rounded-full font-semibold justify-center min-h-11 px-5 text-control",
-  full: "rounded-full font-medium w-full justify-center min-h-11 px-5 py-3.5 text-md",
+  // 44px, the height of the entry fields above it (IR-1265); it was 52px.
+  full: "rounded-full font-medium w-full justify-center min-h-11 px-5 py-2.5 text-control",
   // 44px square on touch-sized screens (12-accessibility.md section 4), 36px
   // beside a desktop pointer: the height of every other control (IR-569). It
   // keeps the 0.75rem radius: DESIGN.md gives reading controls that shape, and
