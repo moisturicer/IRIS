@@ -247,7 +247,8 @@ export function ConversationHistoryList({
           onKeyDown={e => { if (e.key === "Escape") { search.onText(""); e.currentTarget.blur(); } }}
           placeholder="Search" autoComplete="off" maxLength={200} disabled={search.state === "error"}
           className="min-w-0 flex-1 bg-transparent text-body text-stone-900 placeholder:text-stone-700 focus:outline-none" />
-        <kbd aria-hidden className="shrink-0 font-sans text-2xs text-stone-500">Ctrl+K</kbd>
+        {/* stone-600: stone-500 falls under 4.5:1 on the box's stone-100 fill (IR-1257). */}
+        <kbd aria-hidden className="shrink-0 font-sans text-2xs text-stone-600">Ctrl+K</kbd>
       </label>
       <p role="status" aria-live="polite" className="px-3 text-label text-stone-600">
         {search.query && search.state === "ready" ? `${conversations.length}${search.hasMore ? "+" : ""} found` : ""}
