@@ -87,22 +87,28 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("Unit, Last active and the role filter (IR-1138)", () => {
-  it("shows the department, else the college, and when each person last signed in", async () => {
+describe("Unit and the role filter (IR-1138)", () => {
+  it("shows the department, else the college", async () => {
     userList.mockResolvedValue(listing([
-      user({ id: 6, email: "dept@cit.edu", department_name: "Computer Science", college_name: "CCS", last_login: "2026-11-10T08:00:00Z" }),
+      user({ id: 6, email: "dept@cit.edu", department_name: "Computer Science", college_name: "CCS" }),
       user({ id: 7, email: "college@cit.edu", college_name: "College of Engineering" }),
-      user({ id: 8, email: "none@cit.edu", last_login: null }),
+      user({ id: 8, email: "none@cit.edu" }),
     ]));
     renderScreen(<UserListPage />);
 
     const dept = await rowFor("dept@cit.edu");
     expect(within(dept).getByRole("cell", { name: "Computer Science" })).toBeInTheDocument();
-    expect(within(dept).getByRole("cell", { name: "Nov 10, 2026" })).toBeInTheDocument();
     expect(within(await rowFor("college@cit.edu")).getByRole("cell", { name: "College of Engineering" })).toBeInTheDocument();
-    const none = within(await rowFor("none@cit.edu"));
-    expect(none.getByRole("cell", { name: "—" })).toBeInTheDocument();
-    expect(none.getByRole("cell", { name: "Never" })).toBeInTheDocument();
+    expect(within(await rowFor("none@cit.edu")).getByRole("cell", { name: "—" })).toBeInTheDocument();
+  });
+
+  // The API does not supply a last sign-in, so the table claims nothing about one (IR-1186).
+  it("has no last-active column, and never says an account has never signed in", async () => {
+    renderScreen(<UserListPage />);
+
+    const table = await screen.findByRole("table", { name: "User accounts" });
+    expect(within(table).queryByRole("columnheader", { name: /last active/i })).not.toBeInTheDocument();
+    expect(within(table).queryByText("Never")).not.toBeInTheDocument();
   });
 
   it("asks for one role at a time and back to everyone", async () => {
@@ -123,8 +129,8 @@ describe("the users table", () => {
 
     const table = await screen.findByRole("table", { name: "User accounts" });
     const headers = within(table).getAllByRole("columnheader");
-    // User, Role, Unit, Status, Last active and the actions (IR-1138).
-    expect(headers).toHaveLength(6);
+    // User, Role, Unit, Status and the actions (IR-1138, IR-1186).
+    expect(headers).toHaveLength(5);
     for (const header of headers) expect(header).toHaveAttribute("scope", "col");
     expect(within(table).getByRole("columnheader", { name: "Actions" })).toBeInTheDocument();
   });
