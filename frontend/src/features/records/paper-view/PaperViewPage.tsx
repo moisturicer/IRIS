@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { InterruptedState } from "@/components/shared/InterruptedState";
-import { failureMessage, readFailureKind } from "@/lib/readFailure";
+import { failureMessage } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
@@ -26,17 +26,14 @@ import {
   type AnswerReturn,
 } from "@/lib/citedPage";
 import { conversationPath } from "@/lib/askHandoff";
-import type { RecordDetail, ThreadDocument } from "@/types/records";
+import type { ThreadDocument } from "@/types/records";
 import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
-import { useHistoryStore } from "@/store/history.store";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
 import { RelatedWorks } from "./RelatedWorks";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { ContinueProposal } from "../ContinueProposal";
-import { publishHref } from "@/features/publish/publishLink";
-import { pathFor } from "@/lib/access";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
@@ -93,9 +90,9 @@ import { PaperDownloadControl } from "./PaperDownloadControl";
 import { PaperPdfReader } from "./lazyReader";
 import { PersonChip } from "./PersonLink";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { IpTagger } from "./IpTagger";
 import { LoadingSkeleton, MainColumnSkeleton } from "./PaperViewSkeletons";
+import { useRecordLoader } from "./useRecordLoader";
 
 /**
  * One page for a record, for every role (IR-411; spec §4.6, ADR-032 §10).
@@ -160,18 +157,11 @@ export default function PaperViewPage() {
   const [opened, setOpened] = useState<{
     key: number; page: number; regions: Region[]; version: number | null; arrival: string;
   } | null>(null);
-  const [record, setRecord] = useState<RecordDetail | null>(null);
+  const { record, status: loadStatus, error: loadError, retry, reload: reloadRecord, replace: replaceRecord } =
+    useRecordLoader(id);
   // The tab names the paper (IR-1073); until it loads, the route's own "Paper".
   // The previous paper stays in state while the next one loads, so it must match the address.
   usePageTitle(record && String(record.id) === id ? record.title : null);
-  const [loading, setLoading] = useState(true);
-  /**
-   * The last load failed for a reason other than "no such record": `failed`
-   * for an error, `interrupted` for no answer in time. Retry bumps `attempt`.
-   */
-  const [loadFailed, setLoadFailed] = useState<"failed" | "interrupted" | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  const [loadError, setLoadError] = useState<unknown>(null);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   /** *Submit new version* (IR-273): the dialog, and what the last one announced. */
@@ -283,7 +273,7 @@ export default function PaperViewPage() {
   // `?documents=open`, or an old `?section=files`, opens it.
   const documentsWanted = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
   // Still on the record being left while the next one loads.
-  const arriving = loading || !record || record.id !== Number(id);
+  const arriving = loadStatus === "loading" || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
   const onReviewTab = section === "review";
   // Ask IRIS reads published papers only (ADR-052 as amended, IR-1252), so it isn't
@@ -415,43 +405,6 @@ export default function PaperViewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAtPage, arrivalKey.current]);
 
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    recordsApi
-      .detail(Number(id))
-      .then(({ data }) => {
-        // A draft is not a paper page (IR-1227, ADR-009 decision 6). Only its
-        // owner loads one, and opening it is opening the Publish form at the
-        // step they left off -- an old `?section=review` link included -- over
-        // My Library, where the draft lives, not Discover (IR-1258).
-        if (data.pipeline_status === "draft") {
-          navigate(publishHref({ pathname: pathFor("library"), search: "" }, data.id), { replace: true });
-          return;
-        }
-        setRecord(data);
-        setLoadFailed(null);
-        // access_count is a global counter, so it cannot answer "what have I
-        // read?". The reader's history is recorded here, on their account, by
-        // an explicit call (IR-756): reading the Record above records nothing,
-        // and a paused history sends nothing at all.
-        void useHistoryStore.getState().recordVisit(data.id);
-      })
-      // A 404 is a missing record and a refused one alike (IR-153): the API
-      // never says which, so neither does this page, and a 403 reads the same.
-      // Any other failure is not "not found", and says so with a way to try again.
-      .catch((err: unknown) => {
-        const kind = readFailureKind(err);
-        setLoadError(err);
-        setRecord(null);
-        setLoadFailed(kind === "unavailable" ? null : kind);
-      })
-      .finally(() => setLoading(false));
-    if (attempt === 0) recordsApi.incrementAccess(Number(id)).catch(() => {});
-    // `attempt` is Try again; a retry is not a second visit to count.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, attempt]);
-
   // Share copies the paper's permanent link (IR-356), the address a reader
   // would paste to a colleague. A blocked clipboard claims nothing.
   const handleShare = async () => {
@@ -466,26 +419,6 @@ export default function PaperViewPage() {
     setShareState(outcome);
     window.setTimeout(() => setShareState("idle"), 2500);
   };
-
-  /**
-   * Re-read the record after something changed -- the viewer's download state
-   * (IR-677), a document request. A failure leaves the page as
-   * it was, except one that means the viewer can no longer read the record
-   * (revoked while it was open, IR-906): that becomes the same not-available
-   * screen as a record that never existed.
-   */
-  const reloadRecord = async () => {
-    if (!id) return;
-    try {
-      const { data } = await recordsApi.detail(Number(id));
-      setRecord(data);
-    } catch (err) {
-      if (readFailureKind(err) === "unavailable") setRecord(null);
-      // Otherwise the control keeps its last state; a reload catches up.
-    }
-  };
-  // Live updates (ADR-073): this paper changed for someone who may see it.
-  useLiveRefresh(id ? [`record:${id}`] : [], () => { void reloadRecord(); });
 
   /**
    * RDCO withdrew the paper (IR-798): it is deleted, so reading it again would
@@ -506,13 +439,13 @@ export default function PaperViewPage() {
   // Moving from one record to another keeps the page, and Paper Chat with
   // it, and swaps only the main column (IR-355): a citation followed from
   // the chat must not unmount the conversation it was followed from.
-  if (loading && !record) return <LoadingSkeleton />;
+  if (loadStatus === "loading" && !record) return <LoadingSkeleton />;
 
-  if (!record && loadFailed === "interrupted") {
-    return <InterruptedState what="record" onRetry={() => setAttempt((n) => n + 1)} />;
+  if (loadStatus === "interrupted") {
+    return <InterruptedState what="record" onRetry={retry} />;
   }
 
-  if (!record && loadFailed) {
+  if (loadStatus === "failed") {
     return (
       <StatusScreen
         tone="error"
@@ -522,7 +455,7 @@ export default function PaperViewPage() {
         actions={
           <button
             type="button"
-            onClick={() => setAttempt((n) => n + 1)}
+            onClick={retry}
             className={cn(PILL_PRIMARY, FOCUS_RING)}
           >
             Try again
@@ -803,7 +736,7 @@ export default function PaperViewPage() {
       try {
         await seatsApi.open(seat.id);
         const { data } = await recordsApi.detail(record.id);
-        setRecord(data);
+        replaceRecord(data);
       } catch {
         // See above: the review opens regardless.
       }
@@ -1183,10 +1116,10 @@ export default function PaperViewPage() {
                       addToast({ type: "success", message: outcome });
                       setTrackerVersion((n) => n + 1);
                       // A failed reload leaves the page as it was; the next visit catches up.
-                      recordsApi.detail(record.id).then(({ data }) => setRecord(data)).catch(() => {});
+                      recordsApi.detail(record.id).then(({ data }) => replaceRecord(data)).catch(() => {});
                     }}
                     onRefreshed={(fresh) => {
-                      setRecord(fresh);
+                      replaceRecord(fresh);
                       setTrackerVersion((n) => n + 1);
                     }}
                   />
@@ -1238,7 +1171,7 @@ export default function PaperViewPage() {
                   <IpTagger
                     recordId={record.id}
                     currentIpType={record.ip_type}
-                    onSaved={(updated) => setRecord(updated)}
+                    onSaved={(updated) => replaceRecord(updated)}
                   />
                 )}
 
@@ -1368,7 +1301,7 @@ export default function PaperViewPage() {
             selfId={user?.id ?? null}
             onClose={() => setViewParam("edit", null)}
             onSaved={(updated) => {
-              setRecord(updated);
+              replaceRecord(updated);
               setViewParam("edit", null);
             }}
           />
