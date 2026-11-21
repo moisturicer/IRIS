@@ -155,7 +155,7 @@ export const STATES: UiState[] = [
     error: "Could not load the review tracker.",
   }, {
     variant: "review tracker", also: asParticipant, interrupted: "The review tracker took too long to load.",
-    ok: TRACKER, recovered: text("Currently with"),
+    ok: TRACKER, recovered: text("See review history"),
     loading: announced("Loading the review tracker"),
   }),
   ...reads("paper-view", "GET", "/records/101/tracker/", {

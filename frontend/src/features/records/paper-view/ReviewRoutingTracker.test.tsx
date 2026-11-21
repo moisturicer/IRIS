@@ -242,6 +242,17 @@ describe("ReviewRoutingTracker", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("says no routing is recorded yet when there is no party to show, and still links to Review (IR-1264)", async () => {
+    tracker.mockResolvedValue({ data: payload({}) });
+    const { container } = renderTracker({ onOpenHistory: vi.fn() });
+
+    expect(await screen.findByText("No routing recorded yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: /parties/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /see review history/i })).toBeInTheDocument();
+
+    await expectNoBlockingA11yViolations(container);
+  });
+
   it("offers no history link when there is nowhere to send the reader", async () => {
     tracker.mockResolvedValue({ data: afterResubmission });
     renderTracker();

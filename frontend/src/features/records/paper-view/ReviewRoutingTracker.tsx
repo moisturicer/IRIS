@@ -144,6 +144,9 @@ function TrackerBody({ data, onOpenHistory }: { data: RecordTracker; onOpenHisto
   const parties = data.parties.filter((p) => p.party !== RETIRED_PARTY);
   return (
     <div className="space-y-3">
+      {parties.length === 0 ? (
+        <p className="text-small text-stone-600">No routing recorded yet.</p>
+      ) : (
       <table className="w-full text-left border-collapse">
         <caption className="sr-only">Parties</caption>
         <thead className="sr-only">
@@ -158,6 +161,7 @@ function TrackerBody({ data, onOpenHistory }: { data: RecordTracker; onOpenHisto
           ))}
         </tbody>
       </table>
+      )}
 
       {onOpenHistory && (
         <button
