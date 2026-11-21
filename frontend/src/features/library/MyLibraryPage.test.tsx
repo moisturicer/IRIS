@@ -183,17 +183,16 @@ describe("My Library: an author's research", () => {
     expect(await screen.findByRole("button", { name: "Continue as Thesis" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue as Project" })).toBeInTheDocument();
   });
-  it("opens My submissions from ?section=research, with the server's status and Continue into Publish for a draft", async () => {
+  it("opens My submissions from ?section=research, with the server's status, and a draft's row reopens Publish", async () => {
     mine([ownRecord({})]);
     const { container } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    // A draft's title and Continue draft both open Publish over this tab
-    // (IR-1258), not over Discover and not through its paper page.
+    // The whole row is the link: a draft's opens Publish over this tab
+    // (IR-1258), with no separate "Continue draft" button beside it.
     expect(await screen.findByRole("link", { name: "Community Water Monitoring" }))
       .toHaveAttribute("href", "/records/mine?section=research&publish=12");
     expect(within(section("Drafts")).getByText("Draft: not yet submitted")).toBeInTheDocument();
-    // Renamed from "Continue" by IR-1084, which asks for "Continue draft".
-    expect(screen.getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/records/mine?section=research&publish=12");
+    expect(screen.queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
     expect(recordsApi.mine).toHaveBeenCalledOnce();
     await expectNoBlockingA11yViolations(container);
   });
@@ -204,7 +203,8 @@ describe("My Library: an author's research", () => {
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    await user.click(await screen.findByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
+    await user.click(await screen.findByRole("button", { name: "Actions for “Community Water Monitoring”" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete draft" }));
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
     expect(recordsApi.delete).not.toHaveBeenCalled();
@@ -215,7 +215,7 @@ describe("My Library: an author's research", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     // Only a draft offers it.
     expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Actions for/ })).not.toBeInTheDocument();
   });
 
   it("keeps the draft and says why when the delete fails", async () => {
@@ -224,7 +224,8 @@ describe("My Library: an author's research", () => {
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    await user.click(await screen.findByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
+    await user.click(await screen.findByRole("button", { name: "Actions for “Community Water Monitoring”" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete draft" }));
     await user.click(screen.getByRole("button", { name: "Delete draft" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("A delete decision is already pending for this record.");
@@ -407,15 +408,17 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     const recent = await screen.findByRole("region", { name: "Recent submissions" });
     const review = within(recent).getByRole("link", { name: "Still with the offices" }).closest("li") as HTMLElement;
     expect(within(review).getByText("IERC is reviewing your version 2. Nothing to do yet.")).toBeInTheDocument();
-    expect(within(review).getByRole("link", { name: /^Open review/ })).toHaveAttribute("href", "/records/13");
+    // The row itself opens the review; there is no "Open review" button to add.
+    expect(within(recent).getByRole("link", { name: "Still with the offices" })).toHaveAttribute("href", "/records/13");
+    expect(within(review).queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
     expect(within(review).queryByRole("button")).not.toBeInTheDocument();
 
     const draft = within(recent).getByRole("link", { name: "Community Water Monitoring" }).closest("li") as HTMLElement;
     expect(within(draft).getByText("Not submitted yet. It waits on you to finish and send it.")).toBeInTheDocument();
-    // The one action reopens Publish. Beside it, since IR-1256 reversed IR-1084
-    // here, the draft's red Delete trash can.
-    expect(within(draft).getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/?publish=12");
-    expect(within(draft).getByRole("button", { name: "Delete draft “Community Water Monitoring”" })).toBeInTheDocument();
+    // The row reopens Publish; Delete waits in the draft's "⋯" menu.
+    expect(within(recent).getByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/?publish=12");
+    expect(within(draft).queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
+    expect(within(draft).getByRole("button", { name: "Actions for “Community Water Monitoring”" })).toBeInTheDocument();
   });
 
   it("deletes a draft from the Overview after the same question, and drops its row (IR-1256)", async () => {
@@ -425,7 +428,8 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     renderScreen(<MyLibraryPage />);
 
     const recent = await screen.findByRole("region", { name: "Recent submissions" });
-    await user.click(within(recent).getByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
+    await user.click(within(recent).getByRole("button", { name: "Actions for “Community Water Monitoring”" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete draft" }));
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
     expect(recordsApi.delete).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole("button", { name: "Delete draft" }));
@@ -464,19 +468,20 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     expect(screen.queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
   });
 
-  it("offers Delete draft as a red trash can, named for the draft, before it asks (IR-1256)", async () => {
+  it("offers Delete draft in the row's ⋯ menu, named for the draft, before it asks", async () => {
     mine([ownRecord({})]);
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     const row = (await screen.findByRole("link", { name: "Community Water Monitoring" })).closest("li") as HTMLElement;
-    expect(within(row).getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/records/mine?section=research&publish=12");
-    const remove = within(row).getByRole("button", { name: "Delete draft “Community Water Monitoring”" });
-    // An icon alone, in the danger colour, with no resting fill or outline ring.
-    expect(remove).toHaveTextContent(/^$/);
-    expect(remove).toHaveClass("text-brand");
-    expect(remove.className).not.toMatch(/(^|\s)bg-/);
-    expect(remove.className).not.toMatch(/(^|\s)ring-/);
+    const more = within(row).getByRole("button", { name: "Actions for “Community Water Monitoring”" });
+    expect(more).toHaveAttribute("aria-haspopup", "menu");
+    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+
+    await user.click(more);
+    const remove = screen.getByRole("menuitem", { name: "Delete draft" });
+    expect(remove).toHaveFocus();
+    expect(remove).toHaveClass("text-brand-dark");
 
     await user.click(remove);
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });

@@ -411,6 +411,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1257** | Ask IRIS's conversation search box has a fill at rest (stone-100 on the stone-50 pane) and the field outline; like every IRIS search box, hover changes nothing and typing shows in the outline only; no FR- id | [details](traceability/IR-1257.md) | **VERIFIED** |
 | **IR-1258** | Publish opens over the page you are on: from My Library, *Continue draft*, a draft's title and *Publish* keep My Library behind the form and current in the sidebar, closing leaves the same tab, and the list is read again — no FR- id | [details](traceability/IR-1258.md) | **PARTIAL** |
 | **IR-1260** | A visible sidebar button collapses and expands the sidebar, beside the bell or under the mark on the rail, and `[` does the same from 768 px up; the IRIS mark is a link home, no longer the toggle — supersedes IR-1086's mark-as-toggle; no FR- id | [details](traceability/IR-1260.md) | **IMPLEMENTED** |
+| **IR-1261** | A click anywhere on a My Library row opens it (a draft in Publish, others in Paper View), with no *Continue draft* or *Open review* button; a draft's Delete moves into the row's ⋯ menu — supersedes IR-1256's trash can; no FR- id | [details](traceability/IR-1261.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
