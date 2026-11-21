@@ -39,6 +39,8 @@ export interface ProfilePaper {
    * it was published, its owners never counted (IR-369). Never summed.
    */
   views:               number;
+  /** A manuscript the server can draw a first-page thumbnail from (Discover's rule). */
+  has_manuscript:      boolean;
 }
 
 /** Another account that shared a published paper with this person. */

@@ -16,7 +16,7 @@ import ProfilePage from "./ProfilePage";
 
 const paper = (id: number): ProfilePaper => ({
   id, title: `Paper ${id}`, authors: ["Reyes, A."], classification_name: "Geomatics",
-  record_type_name: "Thesis / Research", publication_year: 2025, views: 48,
+  record_type_name: "Thesis / Research", publication_year: 2025, views: 48, has_manuscript: false,
 });
 const collaborator = (id: number): Collaborator => ({
   id, first_name: "Marites", middle_initial: "C", last_name: "Villanueva", photo_url: null, shared_papers: 2,
