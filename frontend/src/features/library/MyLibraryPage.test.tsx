@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useSearchParams } from "react-router-dom";
 import { libraryApi, type FolderEntry, type ReadingHistoryEntry, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
 import { recordsApi } from "@/api/records";
 import { RequestTimeoutError } from "@/api/requestPolicy";
@@ -10,6 +11,16 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { ClearanceStripEntry, MyResearchItem, ReaderDownloadRequest, RecordListItem } from "@/types/records";
 import MyLibraryPage from "./MyLibraryPage";
+
+/** Stands in for closing the Publish form, which removes only `publish` (IR-1258). */
+function ClosePublish() {
+  const [, setParams] = useSearchParams();
+  return (
+    <button type="button" onClick={() => setParams((prev) => { const next = new URLSearchParams(prev); next.delete("publish"); return next; }, { replace: true })}>
+      Close Publish
+    </button>
+  );
+}
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
@@ -176,10 +187,13 @@ describe("My Library: an author's research", () => {
     mine([ownRecord({})]);
     const { container } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    expect(await screen.findByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/records/12");
+    // A draft's title and Continue draft both open Publish over this tab
+    // (IR-1258), not over Discover and not through its paper page.
+    expect(await screen.findByRole("link", { name: "Community Water Monitoring" }))
+      .toHaveAttribute("href", "/records/mine?section=research&publish=12");
     expect(within(section("Drafts")).getByText("Draft: not yet submitted")).toBeInTheDocument();
     // Renamed from "Continue" by IR-1084, which asks for "Continue draft".
-    expect(screen.getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/?publish=12");
+    expect(screen.getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/records/mine?section=research&publish=12");
     expect(recordsApi.mine).toHaveBeenCalledOnce();
     await expectNoBlockingA11yViolations(container);
   });
@@ -313,15 +327,16 @@ describe("My Library: an author's research", () => {
       ownRecord({ id: 15, title: "Asked for a form", pipeline_status: "in_review", workflow_state: "awaiting_document", workflow_state_label: "Awaiting document", holders: [{ party: "adviser", label: "Adviser" }], submitter_status: { line: "Documents requested by Adviser: action needed", waiting_on_you: [document] } }),
       ownRecord({ id: 12 }),
     ]);
-    const { container } = renderScreen(<MyLibraryPage />);
+    const { container } = renderScreen(<MyLibraryPage />, { route: "/records/mine" });
 
     expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
     const waiting = screen.getByRole("region", { name: "Waiting on you" });
     expect(within(waiting).getByText("1")).toBeInTheDocument();
     expect(within(waiting).getByRole("link", { name: /^Upload the documents/ }))
       .toHaveAttribute("href", "/records/15?section=overview#documents-requested");
+    // The draft's title opens Publish over My Library (IR-1258).
     expect(within(screen.getByRole("region", { name: "Recent submissions" })).getByRole("link", { name: "Community Water Monitoring" }))
-      .toHaveAttribute("href", "/records/12");
+      .toHaveAttribute("href", "/records/mine?publish=12");
     expect(screen.getByRole("region", { name: "Reading shelf" })).toHaveTextContent("Saved papers follow your account.");
     await expectNoBlockingA11yViolations(container);
 
@@ -338,6 +353,33 @@ describe("My Library: an author's research", () => {
       expect(link).toHaveAttribute("href", "/?publish=new");
     }
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("opens Publish over the tab it is on, never over Discover (IR-1258)", async () => {
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    expect(await screen.findByRole("heading", { name: "You haven’t published anything yet" })).toBeInTheDocument();
+    for (const link of screen.getAllByRole("link", { name: "Publish" })) {
+      expect(link).toHaveAttribute("href", "/records/mine?section=research&publish=new");
+    }
+  });
+
+  it("reads its papers again, without a spinner, when Publish closes over it (IR-1258)", async () => {
+    vi.mocked(recordsApi.mine)
+      .mockResolvedValueOnce({ data: [ownRecord({})] } as unknown as MineResponse)
+      // Deleted in the form: the server no longer lists it.
+      .mockResolvedValueOnce({ data: [] } as unknown as MineResponse);
+    const user = userEvent.setup();
+    renderScreen(<><MyLibraryPage /><ClosePublish /></>, { route: "/records/mine?section=research&publish=12" });
+
+    expect(await screen.findByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
+    expect(recordsApi.mine).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole("button", { name: "Close Publish" }));
+
+    await waitFor(() => expect(recordsApi.mine).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Community Water Monitoring" })).not.toBeInTheDocument());
+    expect(screen.getByRole("tab", { name: "My submissions" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("offers a retry when the research list fails to load", async () => {
@@ -428,7 +470,7 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     const row = (await screen.findByRole("link", { name: "Community Water Monitoring" })).closest("li") as HTMLElement;
-    expect(within(row).getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/?publish=12");
+    expect(within(row).getByRole("link", { name: /^Continue draft/ })).toHaveAttribute("href", "/records/mine?section=research&publish=12");
     const remove = within(row).getByRole("button", { name: "Delete draft “Community Water Monitoring”" });
     // An icon alone, in the danger colour, with no resting fill or outline ring.
     expect(remove).toHaveTextContent(/^$/);

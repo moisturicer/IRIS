@@ -82,6 +82,27 @@ describe("the app shell", () => {
     expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Discover" })).toBe(discover);
   });
 
+  // The shell owns Publish (IR-1258), so `?publish=` opens it over the page
+  // the reader is on. A reader who cannot author gets its short explanation,
+  // which reads nothing from the server -- enough to see where it opens.
+  it("opens Publish over the page it is on and leaves the reader there (IR-1258)", async () => {
+    useAuthStore.setState({ user: makeUser({ role_name: ROLES.STUDENT, can_author: false }) });
+    const user = userEvent.setup();
+    const { router } = renderAt("/records/mine?section=saved&publish=12");
+
+    const dialog = await screen.findByRole("dialog", { name: "Publishing isn't available to your account" });
+    expect(screen.getByRole("heading", { level: 1, name: "My Library" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "My Library" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Discover" })).not.toHaveAttribute("aria-current");
+
+    await user.click(within(dialog).getByRole("button", { name: "Got it" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/records/mine");
+    expect(router.state.location.search).toBe("?section=saved");
+  });
+
   it("draws no top bar and no search box", async () => {
     renderAt("/records/mine");
 

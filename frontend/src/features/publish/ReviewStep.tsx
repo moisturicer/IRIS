@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { ApiFailure } from "./draft";
 import type { ManuscriptMatch } from "@/api/records";
 import { Link } from "react-router-dom";
+import { usePublishHref } from "./publishLink";
 
 /** The server's names for the fields the Details step edits. */
 const DETAIL_FIELDS: Record<string, true> = {
@@ -79,6 +80,7 @@ export function ReviewStep({
   onEditDocuments,
   onEditHints,
 }: ReviewStepProps) {
+  const publishHref = usePublishHref();
   return (
     <div className="flex flex-col gap-section">
       <p className="text-small text-stone-600">
@@ -126,7 +128,7 @@ export function ReviewStep({
         <h3 className="font-semibold">Identical manuscript</h3>
         <p>Choose another file or open the matching record.</p>
         <ul>{exactMatches.map((match) => <li key={match.id}>
-          <Link to={match.action === "resume_draft" ? `/?publish=${match.id}` : match.url} className={cn("underline", FOCUS_RING)}>
+          <Link to={match.action === "resume_draft" ? publishHref(match.id) : match.url} className={cn("underline", FOCUS_RING)}>
             {match.action === "resume_draft" ? "Resume draft" : "Open record"}: {match.title}
           </Link>
         </li>)}</ul>
@@ -135,7 +137,7 @@ export function ReviewStep({
         <h3 id="publish-likely-heading" className="font-semibold">Likely manuscript matches</h3>
         <p>Review these readable records before submitting. A match is a warning, not a plagiarism finding.</p>
         <ul className="mt-2 list-disc pl-5">{likelyMatches.map((match) => <li key={match.id}>
-          <Link to={match.action === "resume_draft" ? `/?publish=${match.id}` : match.url} className={cn("underline", FOCUS_RING)}>{match.title}</Link>
+          <Link to={match.action === "resume_draft" ? publishHref(match.id) : match.url} className={cn("underline", FOCUS_RING)}>{match.title}</Link>
           {match.reason === "same_title" ? " — same title" : " — similar title and author"}
         </li>)}</ul>
         <button type="button" onClick={onAcknowledge} disabled={matchesAcknowledged} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-3 min-h-9 px-4")}>

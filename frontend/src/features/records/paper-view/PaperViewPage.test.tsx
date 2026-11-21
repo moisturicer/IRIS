@@ -1696,7 +1696,8 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
   };
 
   // A draft is not a paper page (IR-1227, ADR-009 decision 6): only its owner
-  // can load one, and opening it is opening the Publish form where they left off.
+  // can load one, and opening it is opening the Publish form where they left off,
+  // over My Library, where the draft lives -- not Discover (IR-1258).
   it.each([
     ["its address", `/records/${RECORD_ID}`],
     ["an old link to its Review", `/records/${RECORD_ID}?section=review`],
@@ -1705,7 +1706,7 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
     signInAs(OWNER_ID, "Student");
     renderWithProbe(route);
 
-    await waitFor(() => expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(`/?publish=${RECORD_ID}`));
+    await waitFor(() => expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(`/records/mine?publish=${RECORD_ID}`));
     expect(screen.queryByRole("heading", { name: draft.title })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
   });

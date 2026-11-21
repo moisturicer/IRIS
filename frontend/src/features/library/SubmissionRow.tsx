@@ -7,6 +7,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ContinueProposal } from "@/features/records/ContinueProposal";
 import { waitingHref } from "@/features/records/waitingOnYou";
+import { usePublishHref } from "@/features/publish/publishLink";
 import { DeleteDraft } from "./DeleteDraft";
 import { waitingOn } from "./waitingOn";
 import { cn, formatDate } from "@/lib/utils";
@@ -19,11 +20,12 @@ import type { MyResearchItem } from "@/types/records";
  * Continue draft, on both lists (IR-1256).
  */
 function RowActions({ item, brief, onDeleted }: { item: MyResearchItem; brief: boolean; onDeleted?: (id: number) => void }) {
+  const publishHref = usePublishHref();
   if (item.can_continue) return <ContinueProposal recordId={item.id} />;
   if (item.pipeline_status === "draft") {
     return (
       <>
-        <Link to={`/?publish=${item.id}`} className={cn(PILL_PRIMARY, "min-h-9 px-4", FOCUS_RING)}>
+        <Link to={publishHref(item.id)} className={cn(PILL_PRIMARY, "min-h-9 px-4", FOCUS_RING)}>
           Continue draft <span className="sr-only">“{item.title}”</span>
         </Link>
         {onDeleted && <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />}
@@ -67,9 +69,13 @@ interface SubmissionRowProps {
  * One of the owner's records as a row in a ruled list (IR-410). The title is
  * the row's one link, stretched over the row; only the actions sit above it.
  * The status words are the server's (`submitter_status.line`); the sentence
- * under the title says what the record waits on (`waitingOn`, IR-1084).
+ * under the title says what the record waits on (`waitingOn`, IR-1084). A
+ * draft's title opens Publish over this page, as Continue draft does: a draft
+ * has no paper page (IR-1227), and going through one would leave My Library
+ * (IR-1258).
  */
 export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowProps) {
+  const publishHref = usePublishHref();
   const people = [
     item.authors.map((author) => author.name).join(", "),
     item.adviser_name && `Adviser: ${item.adviser_name}`,
@@ -91,7 +97,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
             <p className="text-label text-stone-600">{item.record_type_name ?? "Research"}</p>
             <h3 className="mt-0.5 font-display text-title font-semibold leading-snug text-stone-900">
               <Link
-                to={`/records/${item.id}`}
+                to={item.pipeline_status === "draft" ? publishHref(item.id) : `/records/${item.id}`}
                 className={cn(
                   "rounded-control group-hover:text-brand",
                   COLOUR_TRANSITION,

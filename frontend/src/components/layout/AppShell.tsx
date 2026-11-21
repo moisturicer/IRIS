@@ -12,6 +12,7 @@ import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import { useSidebarMode } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
+import { PublishDialog } from "@/features/publish/PublishDialog";
 
 /** The id of `main`, the skip link's target (IR-1184). */
 const MAIN_ID = "main-content";
@@ -217,6 +218,9 @@ export function AppShell() {
               <Outlet />
             </PageContainer>
           )}
+          {/* Publish opens over whatever page this is (IR-1258): `?publish=`
+              on any address, and closing it leaves the reader here. */}
+          <PublishDialog />
         </main>
       </div>
     </div>

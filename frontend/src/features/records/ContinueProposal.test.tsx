@@ -30,6 +30,12 @@ describe("Proposal continuation", () => {
     expect(await screen.findByText("/?publish=42")).toBeInTheDocument();
   });
 
+  it("opens Publish over the page it was chosen on (IR-1258)", async () => {
+    renderScreen(<><ContinueProposal recordId={12} /><Address /></>, { route: "/records/12?section=overview" });
+    await userEvent.click(screen.getByRole("button", { name: "Continue as Project" }));
+    expect(await screen.findByText("/records/12?section=overview&publish=42")).toBeInTheDocument();
+  });
+
   it("shows a refusal and allows retry without navigating", async () => {
     vi.mocked(recordsApi.continueAs).mockRejectedValueOnce({ response: {
       status: 409, data: { detail: "This proposal has already been continued." },
