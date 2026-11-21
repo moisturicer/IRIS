@@ -21,6 +21,7 @@ import { useUIStore } from "@/store/ui.store";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
 
 import { queueCountsChanged } from "@/lib/queueCounts";
+import { pathFor } from "@/lib/access";
 
 import { AppShell } from "./AppShell";
 
@@ -307,7 +308,7 @@ describe("the sidebar's list", () => {
       expect(label).toHaveClass("md:sr-only");
       expect(label).not.toHaveClass("md:hidden");
     }
-    expect(screen.getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
   });
 
   // Audit VIS-08 (IR-1098): Ask IRIS's nav icon was a brain while its mark
@@ -323,17 +324,94 @@ describe("the sidebar's list", () => {
     expect(ask.querySelector("i")).toBeNull();
   });
 
-  it("collapses and expands from the logo without a footer control", async () => {
+  it("collapses and expands from its own sidebar button, which says which it will do", async () => {
     const user = userEvent.setup();
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    const collapse = screen.getByRole("button", { name: "Collapse sidebar" });
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    expect(collapse).toHaveAttribute("aria-controls", "app-sidebar");
+
+    await user.click(collapse);
     expect(useUIStore.getState().sidebarCollapsed).toBe(true);
-    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+    const expand = screen.getByRole("button", { name: "Expand sidebar" });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(expand);
     expect(useUIStore.getState().sidebarCollapsed).toBe(false);
     expect(screen.queryByText("Collapse")).not.toBeInTheDocument();
+  });
+
+  // IR-1260: the mark was the toggle, and nothing said it could be pressed.
+  it("makes the IRIS mark a link home, not a toggle", async () => {
+    const user = userEvent.setup();
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    const sidebar = within(screen.getByRole("complementary", { name: "Sidebar" }));
+    const mark = sidebar.getByRole("link", { name: "IRIS home" });
+    expect(sidebar.queryByRole("button", { name: /IRIS/ })).not.toBeInTheDocument();
+
+    await user.click(mark);
+    expect(await screen.findByRole("heading", { name: "Discover" })).toBeInTheDocument();
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+  });
+
+  it("sends the mark where signing in lands", async () => {
+    signIn(ROLES.SYSTEM_ADMIN);
+    renderAt("/profile");
+
+    await screen.findByRole("heading", { name: "Profile" });
+    const sidebar = within(screen.getByRole("complementary", { name: "Sidebar" }));
+    expect(sidebar.getByRole("link", { name: "IRIS home" })).toHaveAttribute("href", pathFor("adminUsers"));
+  });
+
+  it("shows the sidebar button's key in its tooltip", async () => {
+    const user = userEvent.setup();
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    await user.hover(screen.getByRole("button", { name: "Collapse sidebar" }));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Collapse sidebar");
+    expect(within(tip).getByText("[")).toBeInTheDocument();
+  });
+
+  it("collapses and expands on [ outside a field, and not while typing or in a dialog", async () => {
+    const user = userEvent.setup();
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    // user-event reads `[` as the start of a key name; `[[` is the character.
+    await user.keyboard("[[");
+    expect(useUIStore.getState().sidebarCollapsed).toBe(true);
+    await user.keyboard("[[");
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+
+    const field = document.body.appendChild(document.createElement("input"));
+    field.setAttribute("aria-label", "Search");
+    await user.click(field);
+    await user.keyboard("[[");
+    expect(field).toHaveValue("[");
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+    field.remove();
+
+    const dialog = document.body.appendChild(document.createElement("div"));
+    dialog.setAttribute("role", "dialog");
+    const inDialog = dialog.appendChild(document.createElement("button"));
+    inDialog.textContent = "Cite";
+    inDialog.focus();
+    await user.keyboard("[[");
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+    dialog.remove();
+
+    await user.keyboard("{Control>}[[{/Control}");
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
   });
 
   it("has no serious or critical accessibility violations", async () => {
@@ -751,6 +829,23 @@ describe("the phone drawer and its account menu", () => {
     expect(useUIStore.getState().sidebarOpen).toBe(false);
     expect(openMenu).not.toHaveFocus();
   });
+
+  // IR-1260: the phone keeps Open menu and Close menu; it has no sidebar
+  // button and no [ key (a phone has no keyboard to press it on).
+  it("has no sidebar button and ignores [", async () => {
+    const user = userEvent.setup();
+    atPhoneWidth();
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    await user.keyboard("[[");
+    expect(useUIStore.getState().sidebarOpen).toBe(false);
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+    // jsdom applies no CSS: the button is in the tree but its wrapper is
+    // `hidden md:flex`, which is what keeps it off a phone.
+    expect(screen.getByRole("button", { name: "Collapse sidebar" }).closest(".md\\:flex")).toHaveClass("hidden");
+  });
 });
 
 describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) => {
@@ -772,7 +867,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     for (const label of within(nav).getAllByText(LABELS)) {
       expect(label).toHaveClass("md:sr-only");
     }
-    expect(within(sidebar).getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
     expect(within(sidebar).getByRole("button", { name: /^Notifications/ })).toBeInTheDocument();
     expect(within(sidebar).getByRole("button", { name: /account menu/ })).toBeInTheDocument();
     expect(sidebar).toHaveClass("md:w-rail");
@@ -817,22 +912,41 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
-  it("gives the IRIS mark, the bell and the account button a tooltip too", async () => {
+  it("gives the IRIS mark, the sidebar button, the bell and the account button a tooltip too", async () => {
     const user = userEvent.setup();
     atWidth(width);
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
 
     const sidebar = within(await screen.findByRole("complementary", { name: "Sidebar" }));
-    await user.hover(sidebar.getByRole("button", { name: "Open sidebar" }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Open sidebar");
+    await user.hover(sidebar.getByRole("link", { name: "IRIS home" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("IRIS home");
+    await user.hover(sidebar.getByRole("button", { name: "Expand sidebar" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Expand sidebar");
     await user.hover(sidebar.getByRole("button", { name: /^Notifications/ }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Notifications");
     await user.hover(sidebar.getByRole("button", { name: /account menu/ }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Ana Adviser");
   });
 
-  it("opens the full sidebar over the page from the IRIS mark, without saving a preference", async () => {
+  it("opens and closes the full sidebar over the page on [, returning focus to the sidebar button", async () => {
+    const user = userEvent.setup();
+    atWidth(width);
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    await user.keyboard("[[");
+    expect(useUIStore.getState().sidebarOpen).toBe(true);
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toHaveFocus();
+
+    await user.keyboard("[[");
+    expect(useUIStore.getState().sidebarOpen).toBe(false);
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveFocus();
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+  });
+
+  it("opens the full sidebar over the page from the sidebar button, without saving a preference", async () => {
     const user = userEvent.setup();
     atWidth(width);
     useUIStore.setState({ sidebarCollapsed: false });
@@ -840,7 +954,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     renderAt("/records/mine");
 
     const page = await screen.findByRole("heading", { name: "My Library" });
-    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+    await user.click(screen.getByRole("button", { name: "Expand sidebar" }));
 
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
     expect(sidebar).toHaveClass("md:w-60");
@@ -854,7 +968,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
 
     await user.keyboard("{Escape}");
     expect(useUIStore.getState().sidebarOpen).toBe(false);
-    expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveFocus();
   });
 
   it("closes the full sidebar when a link is chosen", async () => {
@@ -863,12 +977,12 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
 
-    await user.click(await screen.findByRole("button", { name: "Open sidebar" }));
+    await user.click(await screen.findByRole("button", { name: "Expand sidebar" }));
     await user.click(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Discover" }));
 
     expect(await screen.findByRole("heading", { name: "Discover" })).toBeInTheDocument();
     expect(useUIStore.getState().sidebarOpen).toBe(false);
-    expect(screen.getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
   });
 
   it("closes the opened sidebar when the window widens to the desktop, and keeps the rail when it narrows", async () => {
@@ -877,7 +991,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
 
-    await user.click(await screen.findByRole("button", { name: "Open sidebar" }));
+    await user.click(await screen.findByRole("button", { name: "Expand sidebar" }));
     expect(useUIStore.getState().sidebarOpen).toBe(true);
 
     resizeTo(1280);
@@ -885,7 +999,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
 
     resizeTo(width);
-    expect(screen.getByRole("button", { name: "Open sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
     expect(useUIStore.getState().sidebarCollapsed).toBe(false);
   });
 
