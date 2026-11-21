@@ -102,6 +102,20 @@ function draftDetail(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Publish's Documents step (IR-973): the draft's slots, and what RDCO asks a Thesis / Research for. */
+function mockDraftDocuments(api: MockApi) {
+  api.on("GET", "/documents/records/42/slots/", [{
+    id: 31, name: "Approval Sheet", record_type: 1, is_required: true, description: "", position: 1,
+    template_name: "", hidden: false, uploads: [],
+  }]);
+  api.on("GET", "/documents/guidelines/", [{
+    id: 1, name: "Thesis / Research", description: "",
+    manuscript: { description: "", template_name: "" },
+    requirements: [{ id: 31, name: "Approval Sheet", is_required: true, description: "", template_name: "approval-sheet.docx" }],
+  }]);
+  api.on("POST", "/documents/submit/", { upload: { id: 600 }, extraction: { id: 1, status: "queued" } });
+}
+
 function mockReadyDraft(api: MockApi, initialDraft = draftDetail()) {
   mockShell(api);
   api.on("GET", "/dashboard/queue-counts/", { download_requests: 0, delete_requests: 0, role_change_requests: 0 });
@@ -170,6 +184,7 @@ function mockReadyDraft(api: MockApi, initialDraft = draftDetail()) {
   api.on("POST", "/records/42/increment_access/", {});
   api.on("GET", "/ai/records/42/overview/", { state: "not_indexed", overview: null });
   api.on("GET", "/records/42/similar/", { results: [] });
+  mockDraftDocuments(api);
   return {
     setActor(role: SmokeRole) {
       actor = role;
@@ -198,6 +213,7 @@ function mockNewSubmission(api: MockApi) {
     status: 200, headers: { "content-type": "application/pdf" }, body: manuscriptPdf("Keyboard fixture"),
   }));
   api.on("POST", "/records/42/submit/", { detail: "Submitted." });
+  mockDraftDocuments(api);
 }
 
 async function openRevisionSurface(page: Page, api: Parameters<typeof mockShell>[0], which: "request a revision" | "submit a new version") {
@@ -363,6 +379,18 @@ test("a new submission can be created and sent for review using only the keyboar
   const detailsContinue = dialog.getByRole("button", { name: "Continue" });
   await tabTo(page, detailsContinue);
   await expectVisibleFocus(detailsContinue);
+  await page.keyboard.press("Enter");
+
+  // Documents (IR-973): a requirement's compact Upload works from the keyboard, and Continue is never blocked.
+  const documentUpload = dialog.getByRole("button", { name: /^Upload Approval Sheet/ });
+  await tabTo(page, documentUpload);
+  await expectVisibleFocus(documentUpload);
+  const documentChooser = page.waitForEvent("filechooser");
+  await page.keyboard.press("Enter");
+  await (await documentChooser).setFiles({ name: "approval.pdf", mimeType: "application/pdf", buffer: manuscriptPdf("Approval") });
+  const documentsContinue = dialog.getByRole("button", { name: "Continue" });
+  await tabTo(page, documentsContinue);
+  await expectVisibleFocus(documentsContinue);
   await page.keyboard.press("Enter");
 
   const submit = dialog.getByRole("button", { name: "Submit for review" });

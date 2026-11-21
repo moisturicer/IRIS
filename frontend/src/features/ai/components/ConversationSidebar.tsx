@@ -1,11 +1,12 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { cn, formatDate } from "@/lib/utils";
 import { TITLE_MAX, TITLE_TOO_LONG, type ReaderConversationSummary } from "@/api/runtimeReader";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { HERE } from "@/components/ui/highlightRoles";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { ChevronDownIcon, PanelLeftIcon, PencilIcon, PinIcon, PlusIcon, SearchIcon, TrashIcon } from "./AskIrisIcons";
+import { RowMenu, type RowMenuItem } from "@/features/accounts/RowMenu";
+import { ChevronDownIcon, PanelLeftIcon, PlusIcon, SearchIcon } from "./AskIrisIcons";
 import { EarlierConversationList } from "./EarlierConversations";
 import { usePinnedConversations, type Pin } from "../hooks/usePinnedConversations";
 import type { TroubleKind } from "../runtime/trouble";
@@ -300,12 +301,25 @@ function HistoryRow({ entry, updatedAt, active, pinned, onPin, onRename, onDelet
   const [value, setValue] = useState(entry.title);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const renameRef = useRef<HTMLButtonElement>(null);
+  const rowRef = useRef<HTMLLIElement>(null);
+  const titleRef = useRef<HTMLSpanElement>(null);
+  // Whether the title is cut right now. Measured as the pointer or focus arrives,
+  // when the ⋯ button has taken its room, so only a cut title offers its tooltip.
+  const [cut, setCut] = useState(false);
+  const measure = () => {
+    const el = titleRef.current;
+    setCut(!!el && el.scrollWidth > el.clientWidth);
+  };
   const problemId = useId();
   const title = entry.title || "New conversation";
 
   const start = () => { setValue(entry.title); setProblem(null); setEditing(true); };
-  const stop = () => { setEditing(false); setProblem(null); requestAnimationFrame(() => renameRef.current?.focus()); };
+  // Back on the row's ⋯ menu, where Rename was chosen (IR-1253).
+  const stop = () => {
+    setEditing(false);
+    setProblem(null);
+    requestAnimationFrame(() => rowRef.current?.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')?.focus());
+  };
   const save = async () => {
     if (saving) return;
     if (value.trim() === entry.title) return stop();
@@ -331,37 +345,36 @@ function HistoryRow({ entry, updatedAt, active, pinned, onPin, onRename, onDelet
     </li>;
   }
 
-  return <li className={cn("group relative flex items-center rounded-control",
-    active ? HERE : "text-stone-700 hover:bg-stone-200/70")}>
-    {/* A link to the conversation's own address (IR-548), so it opens in a new tab and survives a refresh. */}
-    <Link to={`/ai/conversations/${entry.id}`} aria-current={active ? "page" : undefined} title={title}
-      className={cn("block min-h-10 min-w-0 flex-1 rounded-control px-3 py-2 text-left group-hover:pr-24 group-focus-within:pr-24", FOCUS_RING)}>
-      <span className={cn("block break-words text-body", active ? "font-semibold" : "font-normal")}>{title}</span>
-      {updatedAt && <span className="sr-only">{formatDate(updatedAt, "MMM d · h:mm a")}</span>}
-    </Link>
-    <span className="absolute right-1 flex items-center rounded-control opacity-0 transition-opacity
-      group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:static [@media(hover:none)]:opacity-100">
-      <RowAction label={pinned ? `Unpin ${title}` : `Pin ${title}`} hint={pinned ? "Unpin" : "Pin"} onClick={onPin}>
-        <PinIcon inline className={cn(pinned && "text-brand")} />
-      </RowAction>
-      {onRename && <RowAction label={`Rename ${title}`} hint="Rename" onClick={start} buttonRef={renameRef}>
-        <PencilIcon inline />
-      </RowAction>}
-      <RowAction label={`Delete ${title}`} hint="Delete" onClick={onDelete}>
-        <TrashIcon inline />
-      </RowAction>
+  const items: RowMenuItem[] = [
+    { key: "pin", label: pinned ? "Unpin" : "Pin", onSelect: onPin },
+    ...(onRename ? [{ key: "rename", label: "Rename", onSelect: start }] : []),
+    { key: "delete", label: "Delete", danger: true, onSelect: onDelete },
+  ];
+
+  // One line, ending in "…" when it doesn't fit: the seventh cut DESIGN.md's Full Text
+  // Rule allows (IR-1253). The whole title stays the link's accessible name, shows in a
+  // tooltip on hover and keyboard focus while it is cut (a `title` alone would not show
+  // on focus), and the conversation shows it. Never wrapping is what keeps the row's
+  // height still when the ⋯ menu appears on hover; wrapped, a long title reflowed.
+  return <li ref={rowRef} onMouseEnter={measure} onFocus={measure}
+    className={cn("group relative flex items-center rounded-control",
+      active ? HERE : "text-stone-700 hover:bg-stone-200/70")}>
+    <Tooltip label={title} disabled={!cut} className="block min-w-0 flex-1">
+      {/* A link to the conversation's own address (IR-548), so it opens in a new tab and survives a refresh. */}
+      <Link to={`/ai/conversations/${entry.id}`} aria-current={active ? "page" : undefined}
+        className={cn("block min-h-10 min-w-0 rounded-control px-3 py-2 text-left",
+          "group-hover:pr-10 group-focus-within:pr-10 group-has-[[aria-expanded=true]]:pr-10", FOCUS_RING)}>
+        <span ref={titleRef} className={cn("block truncate text-body", active ? "font-semibold" : "font-normal")}>{title}</span>
+        {updatedAt && <span className="sr-only">{formatDate(updatedAt, "MMM d · h:mm a")}</span>}
+      </Link>
+    </Tooltip>
+    {/* Shown on hover and focus, and kept while its menu is open; always shown on touch. */}
+    <span className="absolute right-1 flex items-center opacity-0 transition-opacity
+      group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100
+      [@media(hover:none)]:static [@media(hover:none)]:opacity-100">
+      <RowMenu small label={`Actions for ${title}`} items={items} />
     </span>
   </li>;
-}
-
-function RowAction({ label, hint, onClick, children, buttonRef }: {
-  label: string; hint: string; onClick: () => void; children: ReactNode; buttonRef?: Ref<HTMLButtonElement>;
-}) {
-  return <button ref={buttonRef} type="button" onClick={onClick} aria-label={label} title={hint}
-    className={cn("flex size-7 items-center justify-center rounded-control text-stone-500 hover:bg-stone-300/60 hover:text-stone-900",
-      "[@media(hover:none)]:size-11", FOCUS_RING)}>
-    {children}
-  </button>;
 }
 
 /** Starts a new conversation; heads the history list wherever it is shown. */

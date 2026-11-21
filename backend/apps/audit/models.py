@@ -138,9 +138,9 @@ class AuditEvent(models.Model):
     # file's `sha256`, `size` and `filename`, and the scanner's `signature`.
     # Never the bytes: nothing flagged is stored.
     UPLOAD_REFUSED_UNSAFE = "UPLOAD_REFUSED_UNSAFE"
-    # `scan_stored_uploads` moved a stored file that failed out of use. No
-    # `user`; the record it belongs to; metadata `model`, `pk`, `field`,
-    # `sha256`, `size` and `signature`.
+    # A stored file that failed a re-scan was taken out of use. No longer
+    # written: the command that wrote it was removed (ADR-074 amendment
+    # 2026-11-19, IR-975). Kept so any earlier row still reads by its name.
     FILE_QUARANTINED      = "FILE_QUARANTINED"
     # Comment moderation (ADR-032 §7, amendment 2026-10-31; IR-691). `user` is
     # RDCO or the System Admin; the record is the comment's paper. Metadata:
@@ -155,6 +155,33 @@ class AuditEvent(models.Model):
     # metadata `expired` and `skipped` counts: never a name or an address.
     REGISTRATION_REPLACED            = "REGISTRATION_REPLACED"
     UNVERIFIED_REGISTRATIONS_EXPIRED = "UNVERIFIED_REGISTRATIONS_EXPIRED"
+
+    # RDCO's Setup (ADR-063 decision 11, IR-971). `user` is the RDCO account.
+    # Metadata: `record_type` (id) and `record_type_name`; a requirement's
+    # `slot` (id) and `name`; CHANGED's `changes` ({field: [before, after]},
+    # descriptions as character counts, never their text); REORDERED's
+    # `order` (slot ids); REMOVED's `outcome` (`hidden` or `deleted`); a
+    # Template's `target` (`requirement` or `manuscript`), `filename` and
+    # `bytes`. Downloads are not logged (decision 11).
+    REQUIREMENT_ADDED     = "REQUIREMENT_ADDED"
+    REQUIREMENT_CHANGED   = "REQUIREMENT_CHANGED"
+    REQUIREMENTS_REORDERED = "REQUIREMENTS_REORDERED"
+    REQUIREMENT_REMOVED   = "REQUIREMENT_REMOVED"
+    TEMPLATE_REPLACED     = "TEMPLATE_REPLACED"
+    TEMPLATE_REMOVED      = "TEMPLATE_REMOVED"
+    RECORD_TYPE_DESCRIBED = "RECORD_TYPE_DESCRIBED"
+
+    # My Templates: an Adviser's proposal Templates (ADR-063 decisions 8 and 11,
+    # IR-975). `user` is the Adviser, who alone may change them. Metadata:
+    # `template` (id) and `title`; ADDED's `description_characters`, `filename`
+    # and `bytes`; CHANGED's `changes` ({field: [before, after]}, the
+    # description as character counts, never its text, and a replaced file as
+    # `file` names plus `bytes`); REORDERED's `order` (ids); REMOVED's
+    # `filename`. Downloads are not logged.
+    ADVISER_TEMPLATE_ADDED     = "ADVISER_TEMPLATE_ADDED"
+    ADVISER_TEMPLATE_CHANGED   = "ADVISER_TEMPLATE_CHANGED"
+    ADVISER_TEMPLATES_REORDERED = "ADVISER_TEMPLATES_REORDERED"
+    ADVISER_TEMPLATE_REMOVED   = "ADVISER_TEMPLATE_REMOVED"
 
     # Account deletion (ADR-051 §8-§12, IR-785)
     ACCOUNT_DELETION_REQUESTED = "ACCOUNT_DELETION_REQUESTED"
@@ -241,6 +268,17 @@ class AuditEvent(models.Model):
         (NOTICE_PUBLISHED,             "Data Notice Published"),
         (AI_ANSWER_CHANGED,            "AI Answer Changed"),
         (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
+        (REQUIREMENT_ADDED,            "Requirement Added"),
+        (REQUIREMENT_CHANGED,          "Requirement Changed"),
+        (REQUIREMENTS_REORDERED,       "Requirements Reordered"),
+        (REQUIREMENT_REMOVED,          "Requirement Removed"),
+        (TEMPLATE_REPLACED,            "Template Replaced"),
+        (TEMPLATE_REMOVED,             "Template Removed"),
+        (RECORD_TYPE_DESCRIBED,        "Record Type Description Changed"),
+        (ADVISER_TEMPLATE_ADDED,       "Adviser Template Added"),
+        (ADVISER_TEMPLATE_CHANGED,     "Adviser Template Changed"),
+        (ADVISER_TEMPLATES_REORDERED,  "Adviser Templates Reordered"),
+        (ADVISER_TEMPLATE_REMOVED,     "Adviser Template Removed"),
         (CALL_POSTED,                  "Call Posted"),
         (CALL_EDITED,                  "Call Edited"),
         (CALL_DELETED,                 "Call Deleted"),

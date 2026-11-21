@@ -190,7 +190,9 @@ def test_a_passage_the_reader_cannot_read_is_never_returned_however_close_its_ve
 
     ((_, as_owner),) = run(research, owner, script, request="hybrid-owner-1", embedder=embedder)
     ((_, as_stranger),) = run(research, stranger, script, request="hybrid-stranger-1", embedder=embedder)
-    assert private.pk in {p.record_id for p in as_owner.passages}
+    # Not even its owner: only a published paper reaches the AI (IR-1252). Before
+    # it, the owner's search returned the draft here.
+    assert {p.record_id for p in as_owner.passages} == {public.pk}
     assert {p.record_id for p in as_stranger.passages} == {public.pk}
     assert as_stranger.coverage.inspected_records == 1
     assert private.pk not in {r.record_id for r in as_stranger.records}

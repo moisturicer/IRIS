@@ -130,6 +130,7 @@ def confirm_deletion(request_id: int, actor) -> AccountDeletionRequest:
         metadata={"request": found.pk, "target_user": address},
     )
     _settle_papers(person)
+    _remove_shared_templates(person)
     _delete_private_rows(person)
     _erase_person(person)
 
@@ -182,6 +183,13 @@ def _settle_papers(person) -> None:
         record.adviser_name = person.get_full_name() or ""
         record.adviser = None
         record.save(update_fields=["adviser_name", "adviser", "updated_at"])
+
+
+def _remove_shared_templates(person) -> None:
+    """An Adviser's My Templates, files included (IR-975): no deleted account shows again."""
+    from apps.documents.adviser_templates import remove_all_of_deleted_account
+
+    remove_all_of_deleted_account(person)
 
 
 def _delete_private_rows(person) -> None:

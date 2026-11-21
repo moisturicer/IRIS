@@ -44,10 +44,13 @@ class ItemSpec:
 
 
 def picklist(record):
-    """The slots a reviewer chooses from: the record type's, never an ad-hoc one (§2)."""
-    return UploadSlot.objects.filter(
-        record_type_id=record.record_type_id, record__isnull=True
-    ).order_by("pk")
+    """
+    The slots a reviewer chooses from: the record type's, never an ad-hoc one
+    (§2), and never one RDCO removed (ADR-063 decision 5), in RDCO's order.
+    """
+    from .setup import listed_slots
+
+    return listed_slots(record.record_type_id)
 
 
 def requesting_party(record, user, party=None) -> str:
@@ -108,8 +111,14 @@ def create_request(record, user, *, party, message, specs: list[ItemSpec]) -> Do
 
 
 def slot_accepts_uploads_for(slot: UploadSlot, record) -> bool:
-    """An ad-hoc slot belongs to one record; any other slot to none in particular."""
-    return slot.record_id is None or slot.record_id == record.pk
+    """
+    An ad-hoc slot belongs to one record; any other slot to none in particular.
+    A removed requirement takes no new file (ADR-063 decision 5): its files stay,
+    and an open request for it is answered through the request item instead.
+    """
+    if slot.record_id is None:
+        return slot.hidden_at is None
+    return slot.record_id == record.pk
 
 
 def _adhoc_slot(record, label: str) -> UploadSlot:

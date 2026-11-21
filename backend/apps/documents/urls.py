@@ -8,10 +8,46 @@ from .views import (
     RecordFileDownloadView, RecordFileDeleteView, RecordFileDownloadAllView,
     UploadReviewCreateView,
 )
+from .setup_views import (
+    SetupRecordTypeListView, SetupRecordTypeView, SetupRequirementCreateView,
+    SetupRequirementOrderView, SetupRequirementView, SetupRequirementTemplateView,
+    SetupManuscriptTemplateView, RequirementTemplateDownloadView,
+    ManuscriptTemplateDownloadView, GuidelinesView,
+)
+from .adviser_template_views import (
+    MyTemplateListView, MyTemplateOrderView, MyTemplateView, MyTemplateDownloadView,
+    ShownAdviserTemplateListView, AdviserTemplateDownloadView,
+)
 
 urlpatterns = [
     path("submit/",                              SubmitDocumentView.as_view(),          name="document-submit"),
     path("slots/",                               UploadSlotListView.as_view(),          name="upload-slots"),
+    # Guidelines: what each record type needs, for anyone signed in (ADR-063 decision 7, IR-974)
+    path("guidelines/",                          GuidelinesView.as_view(),              name="guidelines"),
+    # Templates, as downloads, for anyone signed in (ADR-063 decision 8, IR-971)
+    path("slots/<int:pk>/template/",             RequirementTemplateDownloadView.as_view(), name="upload-slot-template"),
+    path("record-types/<int:pk>/manuscript-template/", ManuscriptTemplateDownloadView.as_view(),
+         name="record-type-manuscript-template"),
+    # My Templates: an Adviser's own proposal Templates (ADR-063 decision 8, IR-975)
+    path("my-templates/",                        MyTemplateListView.as_view(),          name="my-templates"),
+    path("my-templates/order/",                  MyTemplateOrderView.as_view(),         name="my-template-order"),
+    path("my-templates/<int:pk>/",               MyTemplateView.as_view(),              name="my-template"),
+    path("my-templates/<int:pk>/file/",          MyTemplateDownloadView.as_view(),      name="my-template-file"),
+    # ...and the shown ones, for anyone signed in
+    path("adviser-templates/",                   ShownAdviserTemplateListView.as_view(), name="adviser-templates"),
+    path("adviser-templates/<int:pk>/file/",     AdviserTemplateDownloadView.as_view(), name="adviser-template-file"),
+    # RDCO's Setup: Requirements & Templates (ADR-063 decisions 1-12, IR-971)
+    path("setup/record-types/",                  SetupRecordTypeListView.as_view(),     name="setup-record-types"),
+    path("setup/record-types/<int:pk>/",         SetupRecordTypeView.as_view(),         name="setup-record-type"),
+    path("setup/record-types/<int:pk>/manuscript-template/", SetupManuscriptTemplateView.as_view(),
+         name="setup-manuscript-template"),
+    path("setup/record-types/<int:pk>/requirements/", SetupRequirementCreateView.as_view(),
+         name="setup-requirements"),
+    path("setup/record-types/<int:pk>/requirements/order/", SetupRequirementOrderView.as_view(),
+         name="setup-requirement-order"),
+    path("setup/requirements/<int:pk>/",         SetupRequirementView.as_view(),        name="setup-requirement"),
+    path("setup/requirements/<int:pk>/template/", SetupRequirementTemplateView.as_view(),
+         name="setup-requirement-template"),
     # Combined slot+uploads view for DocumentsPage
     path("records/<int:pk>/slots/",              RecordSlotListView.as_view(),          name="record-slot-list"),
     path("uploads/",                             RecordUploadListView.as_view(),        name="record-uploads"),

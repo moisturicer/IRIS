@@ -37,6 +37,7 @@ from apps.ai.models.chunk import ChunkEmbedding, DocumentChunk
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.repositories import DjangoChunkRepository
 from apps.records.models import Record
+from core.enums import PipelineStatus
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -90,8 +91,9 @@ def space(_one_active_space):
 
 
 def _disclosable_record(**kwargs) -> Record:
-    """A record the disclosure policy permits: answered "no embargo" (ADR-052)."""
+    """A record the disclosure policy permits: published (IR-1252) and released (ADR-052)."""
     record = Record.objects.create(
+        pipeline_status=PipelineStatus.PUBLISHED,
         title=kwargs.pop("title", "A thesis"),
         abstract=kwargs.pop("abstract", "An abstract about pond sampling."),
         is_ip=False,

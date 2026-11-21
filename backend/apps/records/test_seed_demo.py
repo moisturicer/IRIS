@@ -547,8 +547,16 @@ class SeedDemoEmbargoTests(TestCase):
     def setUp(self):
         seed()
 
-    def test_an_ordinary_submitted_paper_is_released_and_may_reach_the_ai(self):
+    def test_an_ordinary_submitted_paper_is_released_but_reaches_the_ai_only_once_published(self):
+        """IR-1252: before it, a released paper in review reached the AI."""
         record = Record.objects.get(title=PROPOSAL_AT_ADVISER_TITLE)
+
+        self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
+        self.assertEqual(decision_for_record(record).reasons, (Reason.UNPUBLISHED,))
+
+    def test_a_catalogue_paper_is_published_released_and_may_reach_the_ai(self):
+        # One with no IP mark: a mark KTTO hasn't released refuses it on its own.
+        record = Record.objects.get(title=next(entry[0] for entry in CATALOGUE if not entry[4]))
 
         self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
         self.assertTrue(decision_for_record(record).allowed)

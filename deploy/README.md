@@ -141,18 +141,10 @@ It doesn't back up the database first; do that yourself before an update that mi
 
 Every upload is scanned by the `clamav` service before it is stored. While ClamAV is down or still loading its signatures, **uploads are refused** with "File checking is temporarily unavailable"; reading and downloading carry on. On a fresh server its first start downloads the signatures (about 100 MB), which takes a minute or two; step 4 waits for it.
 
-- **Memory:** about 1.0 GiB with the signatures loaded (measured 2026-11-16, `clamav/clamav:stable`, on a development machine; **not yet measured on the demo host**, so check `docker stats clamav` at the first deploy); the limit is 1.5 GB.
+- **Memory:** 947.7 MiB with the signatures loaded on the demo host (measured 2026-11-20 after the first deploy, `clamav/clamav:stable`, idle), about 62% of its 1.5 GiB limit; about 1.0 GiB on a development machine (2026-11-16). To check it again: `docker stats --no-stream $(docker compose -f docker-compose.prod.yml ps -q clamav)`. Plain `docker stats clamav` finds nothing, because Compose names the container `iris-clamav-1`.
 - **Is it up?** `docker compose -f docker-compose.prod.yml ps clamav` shows `healthy`.
 
-**Once, right after the update that adds scanning**, scan the files stored before it:
-
-```bash
-cd ~/IRIS
-docker compose -f docker-compose.prod.yml exec backend python manage.py scan_stored_uploads --dry-run
-docker compose -f docker-compose.prod.yml exec backend python manage.py scan_stored_uploads
-```
-
-The dry run lists what fails and changes nothing. The real run moves each failing file to the `quarantine` volume (never served), empties it from every row that names it, drops what IRIS read from it (a Manuscript's extracted text, Figures and chunks; a slot upload's extracted text), audits it as `FILE_QUARANTINED`, and tells its uploader and RDCO. It stops, changing nothing more, if ClamAV doesn't answer. Running it again is harmless.
+Files stored before scanning started are not re-scanned: `scan_stored_uploads` was removed on 2026-11-19 (ADR-074 amendment, IR-975). A server that ran an earlier release keeps an unused `quarantine` volume, which `docker volume ls` lists; `docker volume rm` removes it once you have checked it is empty.
 
 ## aws/iris-demo.yaml
 

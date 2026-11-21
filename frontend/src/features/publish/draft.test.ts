@@ -58,7 +58,8 @@ describe("firstIncompleteStep", () => {
       step: 2,
     },
     { label: "the author as adviser", draft: { typeId: 2, hasManuscript: true, values: { ...complete, adviser: 7 } }, step: 2 },
-    { label: "everything", draft: { typeId: 2, hasManuscript: true, values: complete }, step: 3 },
+    // Documents (step 3) never hold a draft back (IR-973, ADR-063 decision 3).
+    { label: "everything", draft: { typeId: 2, hasManuscript: true, values: complete }, step: 4 },
   ];
 
   it.each(cases)("$label → step $step", ({ draft, step }) => {

@@ -30,6 +30,21 @@ vi.mock("@/api/documents", () => ({
   },
 }));
 
+// A requested slot's Template comes from Guidelines' list (IR-973, ADR-063 decision 6).
+const guidelinesList = vi.fn();
+const downloadRequirementTemplate = vi.fn();
+vi.mock("@/api/guidelines", () => ({
+  guidelinesApi: {
+    list: () => guidelinesList(),
+    downloadRequirementTemplate: (id: number) => downloadRequirementTemplate(id),
+  },
+}));
+const GUIDE = [{
+  id: 2, name: "Thesis / Research", description: "",
+  manuscript: { description: "", template_name: "" },
+  requirements: [{ id: 3, name: "Ethics Clearance", is_required: true, description: "", template_name: "ethics-form.docx" }],
+}];
+
 const RECORD_ID = 9;
 
 function request(overrides: Partial<DocumentRequest> = {}): DocumentRequest {
@@ -58,6 +73,8 @@ function request(overrides: Partial<DocumentRequest> = {}): DocumentRequest {
 }
 
 beforeEach(() => {
+  guidelinesList.mockReset().mockResolvedValue({ data: GUIDE });
+  downloadRequirementTemplate.mockReset().mockResolvedValue({ data: new Blob(["docx"]) });
   documentRequests.mockReset();
   uploadForRequestItem.mockReset().mockResolvedValue({ data: {} });
 });
@@ -78,6 +95,20 @@ describe("ActionRequiredPanel", () => {
     expect(missing).toHaveTextContent("Requested");
     expect(uploaded).toHaveTextContent("Consent form");
     expect(uploaded).toHaveTextContent("Uploaded · awaiting review");
+  });
+
+  it("offers the requested slot's Template, and none for an Other item, which has no slot", async () => {
+    documentRequests.mockResolvedValue({ data: [request()] });
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const items = await screen.findByRole("list", { name: /documents requested by IERC/i });
+    const [missing, other] = within(items).getAllByRole("listitem");
+    const template = await within(missing).findByRole("button", { name: "Download the Ethics Clearance Template, ethics-form.docx" });
+    expect(template).toHaveTextContent("ethics-form.docx");
+    expect(within(other).queryByRole("button", { name: /Template/ })).not.toBeInTheDocument();
+
+    fireEvent.click(template);
+    await waitFor(() => expect(downloadRequirementTemplate).toHaveBeenCalledWith(3));
   });
 
   it("offers an upload only for a missing item", async () => {

@@ -22,6 +22,7 @@ from apps.documents.models import DocumentKind, PdfExtraction
 from apps.documents.phases import ExtractionPhase
 from apps.documents.sources import reset_manuscript
 from apps.records.models import Record, RecordType
+from core.enums import PipelineStatus
 
 pytestmark = [
     pytest.mark.db_required,
@@ -60,9 +61,10 @@ def enforced(settings):
     enforce(settings, **PRICES)
 
 
-def _record(*, consent=True, embargo=None, released=True):
+def _record(*, consent=True, embargo=None, released=True, status=PipelineStatus.PUBLISHED):
+    """Published unless a test says otherwise: only a published paper is read (IR-1252)."""
     record = Record.objects.create(
-        title="A thesis",
+        title="A thesis", pipeline_status=status,
         record_type=RecordType.objects.get_or_create(name="Thesis")[0],
         abstract_file=SimpleUploadedFile("thesis.pdf", PDF),
         # Embargoed by default (IR-882): released only when asked, and never with a date.
@@ -336,6 +338,30 @@ def test_a_later_yes_queues_the_read(enforced, queued, ai_sends):
         _queue(record)
         with transaction.atomic():
             Record.objects.filter(pk=record.pk).update(ai_consent=True)
+            send_to_ai_on_commit(record.pk)
+
+    assert _read_of(record) in queued
+
+
+def test_a_paper_in_review_is_read_once_published_and_not_at_its_release(enforced, queued, ai_sends):
+    """IR-1252 (ADR-052 decision 10, as amended): publishing, not releasing, sends it."""
+    from django.db import transaction
+
+    from apps.accounts.models import User
+    from apps.ai.tasks import send_to_ai_on_commit
+    from apps.records.embargo import release_embargo
+
+    record = _record(embargo=date(2030, 1, 1), status=PipelineStatus.IN_REVIEW)
+    with use_extractor(_offcampus()):
+        _queue(record)
+        actor = User.objects.create_user(email="adviser@cit.edu", password="x")
+        with transaction.atomic():
+            release_embargo(Record.objects.select_for_update().get(pk=record.pk), actor=actor)
+        assert [call for call in queued if call[0] == "read"] == []
+        assert _extraction(record).phase == ExtractionPhase.AWAITING_DISCLOSURE
+
+        with transaction.atomic():
+            Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
             send_to_ai_on_commit(record.pk)
 
     assert _read_of(record) in queued

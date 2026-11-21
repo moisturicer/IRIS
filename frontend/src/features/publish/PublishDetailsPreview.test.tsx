@@ -2,7 +2,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { render, screen, userEvent, waitFor } from "@/test/render";
+import { render, screen, userEvent, waitFor, within } from "@/test/render";
 
 import { PublishDetailsPreview } from "./PublishDetailsPreview";
 
@@ -20,6 +20,23 @@ function Details() {
     </label>
   );
 }
+
+describe("PublishDetailsPreview loads the reader on demand (IR-1247)", () => {
+  it("says the reader is loading, then shows it", async () => {
+    render(
+      <PublishDetailsPreview recordId={42} sourceKey={0}>
+        <Details />
+      </PublishDetailsPreview>,
+    );
+
+    // pdf.js is fetched only now, so the preview holds a busy loading region
+    // meanwhile (its text arrives a tick later, so screen readers announce it).
+    const preview = screen.getByRole("region", { name: "Manuscript preview" });
+    expect(within(preview).getByRole("status")).toHaveAttribute("aria-busy", "true");
+    expect(await within(preview).findByText("Shared authenticated PDF reader")).toBeInTheDocument();
+    expect(within(preview).queryByRole("status")).not.toBeInTheDocument();
+  });
+});
 
 describe("PublishDetailsPreview (IR-834)", () => {
   it("moves focus between narrow-screen panes without losing Details edits", async () => {

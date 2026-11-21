@@ -17,7 +17,7 @@ from core.enums import EmbargoState
 
 def _inputs(**overrides) -> DisclosureInputs:
     """A record that is allowed to leave, unless a test says otherwise."""
-    base = dict(is_ip=False, embargo=EmbargoState.RELEASED, consent_given=True)
+    base = dict(is_ip=False, embargo=EmbargoState.RELEASED, consent_given=True, published=True)
     base.update(overrides)
     return DisclosureInputs(**base)
 
@@ -87,6 +87,28 @@ class IpReleaseTests:
         assert decision.reasons == (Reason.NO_CONSENT,)
 
 
+class PublicationTests:
+    """ADR-052 as amended 2026-11-21 (IR-1252): only a published paper reaches the AI."""
+
+    def test_an_unpublished_paper_is_refused_though_released_and_consented(self):
+        decision = may_disclose(_inputs(published=False))
+        assert decision.allowed is False
+        assert decision.reasons == (Reason.UNPUBLISHED,)
+
+    def test_publication_is_unknown_unless_said_otherwise(self):
+        """A caller that forgets publication is refused, never let through."""
+        decision = may_disclose(DisclosureInputs(is_ip=False, embargo=EmbargoState.RELEASED,
+                                                 consent_given=True))
+        assert decision.reasons == (Reason.UNPUBLISHED,)
+
+    def test_publishing_does_not_release_an_embargo(self):
+        decision = may_disclose(_inputs(published=True, embargo=EmbargoState.ACTIVE))
+        assert decision.reasons == (Reason.EMBARGOED,)
+
+    def test_the_refusal_says_so_in_words(self):
+        assert "published" in may_disclose(_inputs(published=False)).explain()
+
+
 class ReportingTests:
     def test_every_failing_input_is_reported_not_just_the_first(self):
         """A refusal that names one cause sends the reader to fix one thing and
@@ -134,6 +156,7 @@ class IndependentInputTests:
             dict(is_ip=True),
             dict(embargo=EmbargoState.ACTIVE),
             dict(consent_given=False),
+            dict(published=False),
         ],
     )
     def test_any_single_failing_input_refuses_on_its_own(self, overrides):

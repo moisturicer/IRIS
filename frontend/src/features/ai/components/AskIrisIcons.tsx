@@ -181,11 +181,6 @@ export const PencilIcon = outline(
 );
 export const UserIcon = outline("UserIcon", <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>);
 export const SearchIcon = outline("SearchIcon", <><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>);
-export const PinIcon = outline(
-  "PinIcon",
-  <path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />,
-);
-export const TrashIcon = outline("TrashIcon", <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />);
 export const CopyIcon = outline("CopyIcon", <><rect x="8" y="8" width="14" height="14" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></>);
 export const DownloadIcon = outline("DownloadIcon", <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5M12 15V3" />);
 /** An arc that turns: give it `animate-spin motion-reduce:animate-none`. */
@@ -222,7 +217,7 @@ export const UnplugIcon = outline(
 /** Every glyph of the outline set, by name. */
 export const OUTLINE_ICONS = {
   PlusIcon, ArrowUpIcon, ArrowRightIcon, CloseIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon,
-  CheckIcon, RetryIcon, PencilIcon, UserIcon, SearchIcon, PinIcon, TrashIcon, CopyIcon, DownloadIcon,
+  CheckIcon, RetryIcon, PencilIcon, UserIcon, SearchIcon, CopyIcon, DownloadIcon,
   SpinnerIcon, QuestionIcon, WarningIcon, LayersIcon, ArrowTurnDownIcon, HalfCircleIcon, BookIcon,
   HistoryIcon, CircleIcon, CircleDotIcon, FileTextIcon, QuoteIcon, StopIcon, UnplugIcon,
 };

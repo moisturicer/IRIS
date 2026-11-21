@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
+
+import { guidelinesHref } from "@/features/guidelines/sectionId";
 
 import { canAccess, hasReviewWork } from "@/lib/access";
 import type { RoleName } from "@/lib/constants";
@@ -13,7 +16,7 @@ export interface HelpReader {
 }
 
 export interface HelpSection {
-  /** The anchor: `/help#<id>`. Stable, because other screens link to it. */
+  /** The anchor: `/settings?tab=help#<id>` (`/help#<id>` redirects there). Stable, because other screens link to it. */
   id:    string;
   title: string;
   /**
@@ -139,6 +142,11 @@ export const HELP_SECTIONS: HelpSection[] = [
           Choose <strong>Publish</strong> on Discover to start a record. Pick its type (Proposal,
           Thesis / Research or Project), fill in its details, name your Adviser and upload the
           manuscript. Your Adviser cannot also be one of the record&rsquo;s owners.
+        </p>
+        <p>
+          What each type needs, and the Templates to follow, are on{" "}
+          <Link to={guidelinesHref()} className="font-medium text-brand underline underline-offset-2">Guidelines</Link>,
+          including the proposal formats Advisers share. Only the manuscript is needed to submit.
         </p>
         <p>
           Every paper starts under an embargo. An embargo keeps a paper&rsquo;s text from going to

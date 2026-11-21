@@ -11,7 +11,7 @@
 import type { Locator, Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
 import { PAPER, PAPER_DETAIL, paginated, type SmokeRole } from "./fixtures";
-import { OPPORTUNITY } from "./screens";
+import { ADVISERS_TEMPLATES, GUIDELINES, OPPORTUNITY } from "./screens";
 
 export interface DialogCase {
   id: string;
@@ -65,6 +65,56 @@ const reviewing = (...capabilities: string[]) => (api: MockApi) =>
   });
 /** A 1x1 PNG: enough for the photo field to accept a file and open its crop dialog. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+
+/**
+ * A Proposal draft resumed with everything filled (IR-973), so Publish opens on
+ * Review, and its Edit documents shows step 3. Its Adviser shares Templates,
+ * with long names throughout.
+ */
+const DRAFT_ID = 91;
+const publishDraft = (api: MockApi) => {
+  api.on("GET", "/records/record-types/", paginated(GUIDELINES.map(({ id, name }) => ({ id, name }))));
+  api.on("GET", "/users/advisers/", paginated([{
+    id: 40, email: "maria.santiago@cit.edu", first_name: "Maria Concepcion", middle_initial: "", last_name: "Villanueva-Dela Cruz Santiago",
+    role_name: "Adviser", department_name: "Computer Science",
+  }]));
+  api.on("GET", `/records/${DRAFT_ID}/`, {
+    ...PAPER_DETAIL, id: DRAFT_ID, title: "Clearance-aware resubmission in a university research office",
+    abstract: "An abstract that is comfortably longer than the thirty-character minimum the form asks for.",
+    abstract_file: `/api/v1/records/${DRAFT_ID}/manuscript/`, record_type: "Proposal", record_type_name: "Proposal",
+    adviser: 40, year_accomplished: 2026, pipeline_status: "draft", workflow_state: "draft", current_holders: [],
+    authors: [{ id: 1, name: "Sam Student", role: null }], added_by: 1, embargo: { state: "active", until: null },
+  });
+  api.on("GET", `/records/${DRAFT_ID}/duplicate-matches/`, { exact: [], likely: [], acknowledged: false });
+  api.on("GET", `/records/${DRAFT_ID}/metadata-suggestions/`, { state: "ready", suggestions: { title: null, abstract: null }, source: "pdf_structure" });
+  api.on("GET", "/documents/guidelines/", GUIDELINES);
+  api.on("GET", "/documents/adviser-templates/", ADVISERS_TEMPLATES.map((t) => ({ ...t, shared_by: { ...t.shared_by, id: 40 } })));
+  api.on("GET", `/documents/records/${DRAFT_ID}/slots/`, [
+    {
+      id: 11, name: "Thesis Revision Form", record_type: 1, is_required: true, description: "", position: 1,
+      template_name: "thesis-revision-form.pdf", hidden: false,
+      uploads: [{
+        id: 600, record: DRAFT_ID, slot: 11, slot_name: "Thesis Revision Form", file: "uploads/revision.pdf", version: 1,
+        status: null, status_name: null, uploaded_by: 1, uploaded_by_name: "Samantha Student-Villanueva",
+        created_at: "2026-11-19T02:00:00Z", reviews: [], delete_refused: null,
+      }],
+    },
+    {
+      id: 12, name: "Patent Search Report", record_type: 1, is_required: false, description: "", position: 2,
+      template_name: "", hidden: false, uploads: [],
+    },
+  ]);
+};
+const publishDocuments = (id: string, viewport?: { width: number; height: number }): DialogCase => ({
+  id, screen: "discover", path: `/?publish=${DRAFT_ID}`, viewport,
+  sources: ["features/publish/PublishDialog.tsx"],
+  override: publishDraft,
+  open: async (page) => {
+    await page.getByRole("button", { name: "Edit documents" }).click();
+    await page.getByRole("list", { name: "Documents" }).waitFor();
+  },
+  dialog: (page) => page.getByRole("dialog", { name: "Publish your research" }),
+});
 
 /** One office the reviewer may ask, with one person to nominate there. */
 const ROUTE_TARGETS = [{ party: "itso", label: "ITSO", members: [{ id: 5, name: "Ines Tan" }], already_holds: false, author_hint: null }];
@@ -177,6 +227,9 @@ export const DIALOGS: DialogCase[] = [
     override: (api) => api.on("GET", "/users/advisers/", paginated([])),
     open: press("Publish"), dialog: anyDialog,
   },
+  // IR-973: Publish's Documents step, as wide as a laptop and as narrow as 320 px.
+  publishDocuments("publish documents step"),
+  publishDocuments("publish documents step at 320 px", { width: 320, height: 800 }),
   {
     id: "discover filters", screen: "discover", sources: ["features/discover/DiscoverFilterBar.tsx"],
     open: press(/^Filters/), dialog: (page) => page.getByRole("dialog", { name: "Filters" }),
@@ -237,6 +290,17 @@ export const DIALOGS: DialogCase[] = [
     open: fromRowMenu(/coordinator$/), dialog: anyDialog,
   },
   {
+    id: "remove a requirement", screen: "rdco-setup", sources: ["features/setup/SetupPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: async (page) => { await page.getByRole("button", { name: "Remove Publication / Conference Presentation / Both" }).click(); },
+    dialog: anyDialog,
+  },
+  {
+    id: "remove one of my Templates", screen: "my-templates",
+    sources: ["features/myTemplates/MyTemplatesPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: async (page) => { await page.getByRole("button", { name: "Remove Budget sheet" }).click(); },
+    dialog: anyDialog,
+  },
+  {
     id: "lock or unlock an account", screen: "rdco-users", sources: ["features/accounts/UserListPage.tsx", "components/shared/ConfirmDialog.tsx"],
     open: fromRowMenu(/^(Lock|Unlock)/), dialog: anyDialog,
   },
@@ -270,8 +334,8 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog", { name: "Erase existing data?" }),
   },
   {
-    id: "publish a new notice version", screen: "notices",
-    sources: ["features/admin/NoticesPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    id: "publish a new notice version", screen: "rdco-setup-notice",
+    sources: ["features/setup/NoticeSection.tsx", "components/shared/ConfirmDialog.tsx"],
     override: (api) => api.on("GET", "/auth/notice/versions/impact/", { current_version: 1, accounts_to_answer: 41 }),
     open: async (page) => {
       await page.getByRole("textbox", { name: "Notice text" }).fill("IRIS data notice, version two");

@@ -3,9 +3,16 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { pathFor } from "@/lib/access";
+import { preloadScreen } from "@/router/lazyScreens";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+
+/** Start a screen's download on hover or focus, before the click (IR-1248). */
+const prefetch = (path: string) => ({
+  onMouseEnter: () => void preloadScreen(path),
+  onFocus: () => void preloadScreen(path),
+});
 
 interface AccountMenuProps {
   /** The desktop rail is collapsed: show the avatar alone, open to the right. */
@@ -143,19 +150,19 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
           </div>
           <ul role="list" className="pt-1.5">
             <li>
-              <Link to={pathFor("profile")} onClick={choose} className={ITEM}>
+              <Link to={pathFor("profile")} onClick={choose} {...prefetch(pathFor("profile"))} className={ITEM}>
                 <i aria-hidden className="fas fa-user w-4 text-center text-stone-500" />
                 Profile
               </Link>
             </li>
             <li>
-              <Link to={pathFor("settings")} onClick={choose} className={ITEM}>
+              <Link to={pathFor("settings")} onClick={choose} {...prefetch(pathFor("settings"))} className={ITEM}>
                 <i aria-hidden className="fas fa-gear w-4 text-center text-stone-500" />
                 Settings
               </Link>
             </li>
             <li>
-              <Link to={pathFor("notifications")} onClick={choose} className={ITEM}>
+              <Link to={pathFor("notifications")} onClick={choose} {...prefetch(pathFor("notifications"))} className={ITEM}>
                 <i aria-hidden className="fas fa-bell w-4 text-center text-stone-500" />
                 Notifications
               </Link>

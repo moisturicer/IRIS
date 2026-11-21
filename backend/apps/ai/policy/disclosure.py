@@ -7,10 +7,11 @@ fall back to (ADR-008 rejected one, and ADR-015's original local lane was
 removed the same day for contradicting that). A refusal degrades to the same
 PostgreSQL full-text path a vendor outage degrades to.
 
-Three facts, kept independent because ADR-015 names them independently and a
-single combined flag is how a case goes missing: IP status, embargo, consent.
-An IP mark refuses until KTTO releases it (ADR-052 §11-13), and that release
-opens nothing else.
+Four facts, kept independent because a single combined flag is how a case goes
+missing: IP status, embargo, consent (ADR-015), and publication (ADR-052 as
+amended 2026-11-21, IR-1252: only a published paper reaches the AI, because Ask
+IRIS should see what users can see). An IP mark refuses until KTTO releases it
+(ADR-052 §11-13), and that release opens nothing else.
 
 Pure -- no database, no network, no clock. **It reads an embargo's state and
 never its date** (ADR-052 §9): text sent to a vendor cannot be recalled, so a
@@ -34,6 +35,7 @@ class Reason(enum.Enum):
     EMBARGOED = "embargoed"
     NO_CONSENT = "no_consent"
     EMBARGO_UNKNOWN = "embargo_unknown"
+    UNPUBLISHED = "unpublished"
 
 
 _EXPLANATIONS = {
@@ -48,6 +50,7 @@ _EXPLANATIONS = {
         "whether the record is under embargo could not be determined, and an "
         "undetermined embargo is treated as an embargo"
     ),
+    Reason.UNPUBLISHED: "the record is not published",
 }
 
 
@@ -66,6 +69,9 @@ class DisclosureInputs:
     #: KTTO's release of the mark. Defaults to unreleased, so a caller that
     #: forgets it is refused rather than let through.
     ip_released: bool = False
+    #: Published and not deleted (IR-1252). Defaults to unpublished, so a caller
+    #: that forgets it is refused rather than let through.
+    published: bool = False
 
 
 @dataclass(frozen=True)
@@ -112,5 +118,8 @@ def may_disclose(inputs: DisclosureInputs) -> Decision:
 
     if not inputs.consent_given:
         reasons.append(Reason.NO_CONSENT)
+
+    if not inputs.published:
+        reasons.append(Reason.UNPUBLISHED)
 
     return Decision(allowed=not reasons, reasons=tuple(reasons))

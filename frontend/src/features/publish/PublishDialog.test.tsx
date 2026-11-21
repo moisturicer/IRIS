@@ -49,12 +49,23 @@ vi.mock("@/api/accounts", () => ({
 }));
 
 vi.mock("@/api/documents", () => ({
-  documentsApi: { slots: vi.fn() },
+  documentsApi: { slots: vi.fn(), slotsForRecord: vi.fn(), upload: vi.fn() },
+}));
+
+vi.mock("@/api/guidelines", () => ({
+  guidelinesApi: {
+    list: vi.fn(),
+    advisersTemplates: vi.fn(),
+    downloadManuscriptTemplate: vi.fn(),
+    downloadRequirementTemplate: vi.fn(),
+    downloadAdviserTemplate: vi.fn(),
+  },
 }));
 
 const { recordsApi } = await import("@/api/records");
 const { accountsApi } = await import("@/api/accounts");
 const { documentsApi } = await import("@/api/documents");
+const { guidelinesApi } = await import("@/api/guidelines");
 
 const SELF_ID = 7;
 
@@ -66,6 +77,35 @@ const TYPES = [
   { id: 1, name: "Proposal" },
   { id: 2, name: "Thesis / Research" },
   { id: 3, name: "Project" },
+];
+
+// What RDCO asks a Thesis / Research for, from Guidelines' list (IR-973).
+const APPROVAL = 31;
+const PATENT_SEARCH = 32;
+const GUIDE = [
+  { id: 1, name: "Proposal", description: "", manuscript: { description: "", template_name: "proposal-format.docx" }, requirements: [] },
+  {
+    id: 2, name: "Thesis / Research", description: "",
+    manuscript: { description: "", template_name: "thesis-format.docx" },
+    requirements: [
+      { id: APPROVAL, name: "Approval Sheet", is_required: true, description: "", template_name: "approval-sheet.docx" },
+      { id: PATENT_SEARCH, name: "Patent Search Report", is_required: false, description: "", template_name: "" },
+    ],
+  },
+  { id: 3, name: "Project", description: "", manuscript: { description: "", template_name: "" }, requirements: [] },
+];
+
+/** The draft's own slots, as `records/<id>/slots/` answers; an upload adds a version. */
+let draftSlots: Array<Record<string, unknown>>;
+function draftSlot(id: number, name: string, isRequired: boolean) {
+  return { id, name, record_type: 2, is_required: isRequired, description: "", position: id, template_name: "", hidden: false, uploads: [] };
+}
+
+/** Advisers' shown Templates: two of Maria Santos's, and another Adviser's. */
+const SHARED = [
+  { id: 81, title: "Proposal format", description: "Use the 2026 layout.", file_name: "santos-format.docx", position: 1, updated_at: "2026-11-01T00:00:00Z", shared_by: { id: 21, name: "Maria C. Santos" } },
+  { id: 82, title: "Budget sheet", description: "", file_name: "santos-budget.xlsx", position: 2, updated_at: "2026-11-01T00:00:00Z", shared_by: { id: 21, name: "Maria C. Santos" } },
+  { id: 83, title: "Lab rules", description: "", file_name: "cruz-lab.docx", position: 1, updated_at: "2026-11-01T00:00:00Z", shared_by: { id: 99, name: "Jose Cruz" } },
 ];
 
 const ADVISERS = [
@@ -131,6 +171,16 @@ function suggestions(state: string, found: { title?: string; abstract?: string }
 }
 
 beforeEach(() => {
+  draftSlots = [draftSlot(APPROVAL, "Approval Sheet", true), draftSlot(PATENT_SEARCH, "Patent Search Report", false)];
+  vi.mocked(documentsApi.slotsForRecord).mockImplementation(() => Promise.resolve({ data: structuredClone(draftSlots) }) as never);
+  vi.mocked(documentsApi.upload).mockImplementation((_record, slotId, file) => {
+    draftSlots = draftSlots.map((slot) => slot.id === slotId
+      ? { ...slot, uploads: [{ id: 600, record: 42, slot: slotId, slot_name: slot.name, file: `uploads/${file.name}`, version: 1, status: null, status_name: null, uploaded_by: SELF_ID, uploaded_by_name: "Ada Reyes", created_at: "2026-11-20T02:00:00Z", reviews: [], delete_refused: null }] }
+      : slot);
+    return Promise.resolve({ data: { upload: { id: 600 }, extraction: { id: 1, status: "queued" } } }) as never;
+  });
+  vi.mocked(guidelinesApi.list).mockResolvedValue({ data: GUIDE } as never);
+  vi.mocked(guidelinesApi.advisersTemplates).mockResolvedValue({ data: SHARED } as never);
   vi.mocked(recordsApi.recordTypes).mockResolvedValue(page(TYPES) as never);
   vi.mocked(recordsApi.classifications).mockResolvedValue(page([{ id: 5, name: "Computing" }]) as never);
   vi.mocked(recordsApi.pscedList).mockResolvedValue(page([{ id: 9, name: "Information Technology" }]) as never);
@@ -215,8 +265,8 @@ function dropFile(file: File) {
 }
 
 /** Step 1 done: a type chosen and a manuscript uploaded. */
-async function completeManuscript(user: ReturnType<typeof userEvent.setup>) {
-  await chooseType(user, /Thesis \/ Research/);
+async function completeManuscript(user: ReturnType<typeof userEvent.setup>, type: RegExp = /Thesis \/ Research/) {
+  await chooseType(user, type);
   dropFile(pdf());
   await screen.findByText(/uploaded/i, { selector: "p" });
   await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -230,19 +280,31 @@ async function chooseAdviser(user: ReturnType<typeof userEvent.setup>, name: str
   await user.click(await screen.findByRole("option", { name: new RegExp(name) }));
 }
 
-/** Step 2 filled with valid values and continued to the review. */
-async function completeDetails(user: ReturnType<typeof userEvent.setup>) {
+/** Step 2 filled with valid values. */
+async function fillDetails(user: ReturnType<typeof userEvent.setup>) {
   const title = screen.getByRole("textbox", { name: /^Title/ });
   await user.clear(title);
   await user.type(title, COMPLETE.title);
   await user.type(screen.getByRole("textbox", { name: /^Abstract/ }), COMPLETE.abstract);
   await chooseAdviser(user, "Maria C. Santos");
+}
+
+/** Step 2 filled and continued to step 3, Documents. */
+async function toDocuments(user: ReturnType<typeof userEvent.setup>) {
+  await fillDetails(user);
   await user.click(screen.getByRole("button", { name: "Continue" }));
-  await screen.findByRole("heading", { name: "Manuscript" });
+  await screen.findByRole("list", { name: "Documents" });
+}
+
+/** Steps 2 and 3 done, adding no document: continued to the review. */
+async function completeDetails(user: ReturnType<typeof userEvent.setup>) {
+  await toDocuments(user);
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await screen.findByRole("button", { name: "Submit for review" });
 }
 
 describe("opening", () => {
-  it("is a labelled dialog that opens on step 1 of 3, asking nothing about an embargo", async () => {
+  it("is a labelled dialog that opens on step 1 of 4, asking nothing about an embargo", async () => {
     await openNew();
 
     const dialog = await screen.findByRole("dialog", { name: "Publish your research" });
@@ -307,6 +369,22 @@ describe("record types (invariant 7)", () => {
     await chooseType(user, /Thesis \/ Research/);
     expect(screen.getByRole("radio", { name: /Thesis \/ Research/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Thesis \/ Research/ })).toBeEnabled();
+  });
+});
+
+describe("Guidelines (IR-974)", () => {
+  it("links to what each type needs in a new tab, so the dialog stays, and to the chosen type's section", async () => {
+    const user = userEvent.setup();
+    await openNew();
+
+    const link = screen.getByRole("link", { name: /What each record type needs.*opens in a new tab/ });
+    expect(link).toHaveAttribute("href", "/guidelines");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+
+    await chooseType(user, /Thesis \/ Research/);
+    expect(screen.getByRole("link", { name: /What a Thesis \/ Research needs.*opens in a new tab/ }))
+      .toHaveAttribute("href", "/guidelines#thesis-research");
   });
 });
 
@@ -686,22 +764,167 @@ describe("the review", () => {
     expect(await screen.findByRole("checkbox", { name: /intellectual property/ })).toBeVisible();
   });
 
-  it("asks for no supporting documents anywhere", async () => {
-    const user = userEvent.setup();
-    await openNew();
-    await completeManuscript(user);
-    await completeDetails(user);
-
-    expect(documentsApi.slots).not.toHaveBeenCalled();
-    expect(screen.queryByText(/supporting document/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/required documents/i)).not.toBeInTheDocument();
-  });
-
   it("passes axe", async () => {
     const user = userEvent.setup();
     const { container } = await openNew();
     await completeManuscript(user);
     await completeDetails(user);
+
+    await expectNoBlockingA11yViolations(container);
+  });
+});
+
+// IR-973 (ADR-063 decision 6): step 3 lists the type's documents as the same
+// compact rows the Documents tab draws. It replaces IR-408's "asks for no
+// supporting documents anywhere": a label never blocks submitting (decision 3).
+describe("documents", () => {
+  const row = (name: string) => screen.getByRole("group", { name });
+  const dropOn = (name: string, file: File) =>
+    fireEvent.drop(within(row(name)).getByRole("button", { name: new RegExp(`^Upload ${name}`) }), {
+      dataTransfer: { files: [file] },
+    });
+
+  it("lists the type's documents after Details, each labelled, with its Template", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+
+    expect(screen.getByRole("list", { name: "Publish steps" })).toHaveTextContent("Step 3: Documents");
+    const names = within(screen.getByRole("list", { name: "Documents" })).getAllByRole("heading").map((h) => h.textContent);
+    expect(names).toEqual(["Manuscript", "Approval Sheet", "Patent Search Report"]);
+    expect(await within(row("Manuscript")).findByText("Required")).toBeInTheDocument();
+    expect(within(row("Manuscript")).getByText("My_Clearance-Study.pdf")).toBeInTheDocument();
+    expect(within(row("Manuscript")).getByRole("button", { name: "Download the Manuscript Template, thesis-format.docx" })).toBeInTheDocument();
+    expect(within(row("Approval Sheet")).getByText("Required")).toBeInTheDocument();
+    expect(within(row("Approval Sheet")).getByRole("button", { name: "Download the Approval Sheet Template, approval-sheet.docx" })).toBeInTheDocument();
+    expect(within(row("Patent Search Report")).getByText("Optional")).toBeInTheDocument();
+    expect(within(row("Patent Search Report")).queryByRole("button", { name: /Template/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Only the manuscript is needed to submit/)).toBeInTheDocument();
+  });
+
+  it("uploads a document into the draft's slot, and its row then shows it", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+
+    dropOn("Approval Sheet", pdf("approval.pdf"));
+
+    await waitFor(() => expect(documentsApi.upload).toHaveBeenCalledWith(42, APPROVAL, expect.any(File), expect.any(Object)));
+    expect(await within(row("Approval Sheet")).findByText(/^v1 · Ada Reyes/)).toBeInTheDocument();
+  });
+
+  it("continues and submits with a Required document still missing", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+
+    const next = screen.getByRole("button", { name: "Continue" });
+    expect(next).toBeEnabled();
+    await user.click(next);
+    const submit = await screen.findByRole("button", { name: "Submit for review" });
+    expect(submit).toBeEnabled();
+    await user.click(submit);
+
+    await waitFor(() => expect(recordsApi.submit).toHaveBeenCalledWith(42));
+    expect(documentsApi.upload).not.toHaveBeenCalled();
+  });
+
+  it("lists the uploaded documents at Review, and Edit returns to them", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+    dropOn("Approval Sheet", pdf("approval.pdf"));
+    await within(row("Approval Sheet")).findByText(/^v1 · Ada Reyes/);
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    const documents = await screen.findByRole("region", { name: "Documents" });
+    expect(documents).toHaveTextContent("Approval Sheet");
+    expect(documents).not.toHaveTextContent("Patent Search Report");
+    await user.click(within(documents).getByRole("button", { name: "Edit documents" }));
+    expect(await screen.findByRole("list", { name: "Documents" })).toBeInTheDocument();
+  });
+
+  it("says None yet at Review when no other document was added", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await completeDetails(user);
+
+    expect(screen.getByRole("region", { name: "Documents" })).toHaveTextContent("None yet");
+  });
+
+  // ADR-063 decision 5: a removed requirement leaves Publish, except for a file the draft already holds.
+  it("shows a requirement RDCO removed only for the file it holds, with no Upload", async () => {
+    const holding = { ...draftSlot(40, "Old Endorsement", true), hidden: true, uploads: [{ id: 601, record: 42, slot: 40, slot_name: "Old Endorsement", file: "uploads/old.pdf", version: 1, status: null, status_name: null, uploaded_by: SELF_ID, uploaded_by_name: "Ada Reyes", created_at: "2026-11-19T02:00:00Z", reviews: [], delete_refused: null }] };
+    draftSlots = [...draftSlots, holding, { ...draftSlot(41, "Old Form", false), hidden: true }];
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+
+    const old = row("Old Endorsement");
+    expect(within(old).getByText(/^v1 · Ada Reyes/)).toBeInTheDocument();
+    expect(within(old).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
+    expect(within(old).queryByText(/^(Required|Optional)$/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Old Form" })).not.toBeInTheDocument();
+  });
+
+  it("links to the chosen type's Guidelines in a new tab", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+
+    const link = screen.getByRole("link", { name: /What a Thesis \/ Research needs, and its Templates/ });
+    expect(link).toHaveAttribute("href", "/guidelines#thesis-research");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("points out the chosen Adviser's Templates on a Proposal, and no other Adviser's", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user, /Proposal/);
+    await toDocuments(user);
+
+    const theirs = await screen.findByRole("region", { name: "Templates from your Adviser, Maria C. Santos" });
+    expect(within(theirs).getByRole("button", { name: "Download Proposal format by Maria C. Santos, santos-format.docx" })).toBeInTheDocument();
+    expect(within(theirs).getByRole("button", { name: "Download Budget sheet by Maria C. Santos, santos-budget.xlsx" })).toBeInTheDocument();
+    expect(screen.queryByText("Lab rules")).not.toBeInTheDocument();
+  });
+
+  it("points out no Adviser's Templates on a Thesis", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+
+    expect(screen.queryByRole("region", { name: /Templates from your Adviser/ })).not.toBeInTheDocument();
+    expect(guidelinesApi.advisersTemplates).not.toHaveBeenCalled();
+  });
+
+  it("still continues when the documents don't load, and says so", async () => {
+    vi.mocked(documentsApi.slotsForRecord).mockRejectedValueOnce({ isAxiosError: true, response: { status: 500, data: {} } });
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await fillDetails(user);
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByText("Your documents didn't load. You can still continue and submit.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("button", { name: "Submit for review" })).toBeEnabled();
+  });
+
+  it("passes axe on the Documents step", async () => {
+    const user = userEvent.setup();
+    const { container } = await openNew();
+    await completeManuscript(user, /Proposal/);
+    await toDocuments(user);
+    await screen.findByRole("region", { name: /Templates from your Adviser/ });
 
     await expectNoBlockingA11yViolations(container);
   });

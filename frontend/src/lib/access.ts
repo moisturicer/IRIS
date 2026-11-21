@@ -133,15 +133,14 @@ export const SCREEN_ACCESS = {
   notifications: { path: "/notifications", roles: EVERYONE },
   // Profile and Settings live in the account menu in the sidebar's user block
   // (IR-413, spec §4.2), not in the nav list. Profile (who you are) and
-  // Settings (your account) are separate pages since IR-933. Help is a link of
-  // its own in the sidebar's footer (IR-1085), also outside the nav list.
+  // Settings (your account) are separate pages since IR-933. Help is a section
+  // of Settings (IR-1245); `/help` is a redirect (`router/redirects.tsx`).
   profile:       { path: "/profile",       roles: EVERYONE },
   profileEdit:   { path: "/profile/edit",  roles: EVERYONE },
   // Another person's Profile (IR-700), opened by clicking their name. Who may be
   // opened is the server's decision: a hidden account answers 404.
   person:        { path: "/people/:id",    roles: EVERYONE },
   settings:      { path: "/settings",      roles: EVERYONE },
-  help:          { path: "/help",          roles: EVERYONE },
   // Reached from Discover and the queues, never from the nav. Which *records*
   // are visible is the server's decision (IR-153), not this map's, and what a
   // viewer may do there is the capabilities adapter's (IR-411). The documents
@@ -177,10 +176,21 @@ export const SCREEN_ACCESS = {
                   nav: { label: "Office console", icon: "fa-users-gear", section: "Main",
                          parent: "reviewQueue", needsCoordinator: true } },
 
+  // An Adviser's own proposal Templates (ADR-063 decision 8, IR-975). Only
+  // the Adviser's; the server refuses anyone else, RDCO included.
+  myTemplates: { path: "/my-templates", roles: [ROLES.ADVISER],
+                 nav: { label: "My Templates", icon: "fa-file-lines", section: "Main" } },
+
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,
                    nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Main", onlyFor: RESEARCH_ROLES } },
+  // What each record type needs and its Templates (ADR-063 decision 7, IR-974).
+  // Anyone signed in may open it; the sidebar lists it last in Main for every
+  // role but the System Admin, whose sidebar is its administration (ADR-063
+  // amendment 2026-11-19).
+  guidelines:    { path: "/guidelines", roles: EVERYONE,
+                   nav: { label: "Guidelines", icon: "fa-book", section: "Main", onlyFor: RESEARCH_ROLES } },
   // A poster's own Calls in every status (IR-765), reached from the board.
   myCalls:       { path: "/opportunities/mine", roles: CALL_POSTERS },
 
@@ -199,19 +209,20 @@ export const SCREEN_ACCESS = {
   deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
                  nav: { label: "Delete requests", icon: "fa-trash-alt", section: "RDCO" } },
   // One page for RDCO and the System Admin (IR-693, decision 2026-11-15), each
-  // reaching it from their own section, as with Notices below.
+  // reaching it from their own section.
   reportedComments: { path: "/moderation/comments", roles: COORDINATOR,
                  nav: { label: "Reported comments", icon: "fa-flag", section: "RDCO" } },
-  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): one
-  // Notices page at one address. RDCO publishes there; the System Admin reads
-  // it from `adminNotices`, the same page, in its own sidebar section.
-  notices:       { path: "/notices", roles: COORDINATOR,
-                 nav: { label: "Notices", icon: "fa-file-signature", section: "RDCO" } },
   // Workflow analytics (IR-626): every office's figures, read by RDCO alone
   // in its own section since IR-1216 (ADR-043 amendment 2026-11-18). It was
   // under My Reviews for every office; `/review/analytics` redirects here.
   reviewAnalytics: { path: "/rdco/analytics", roles: COORDINATOR,
                  nav: { label: "Workflow analytics", icon: "fa-chart-column", section: "RDCO" } },
+  // ADR-063 decision 9 (IR-971, IR-972): RDCO's Setup, each record type's
+  // Requirements & Templates, and the Notice (`?section=notice`), which was the
+  // Notices page (IR-800). Every RDCO account; the server refuses anyone else.
+  // An old `/notices` link redirects (router/redirects.tsx).
+  setup:         { path: "/rdco/setup", roles: COORDINATOR,
+                 nav: { label: "Setup", icon: "fa-sliders", section: "RDCO" } },
 
   // Both roles use the same Users page, with distinct addresses and server permissions.
   adminUsers:    { path: "/admin/users", roles: SYSTEM_ADMIN,
@@ -227,9 +238,6 @@ export const SCREEN_ACCESS = {
   // ADR-051 §3 and §19: the System Admin sets retention periods (IR-795).
   retention:     { path: "/admin/retention", roles: SYSTEM_ADMIN,
                  nav: { label: "Retention", icon: "fa-clock-rotate-left", section: "Administration" } },
-  // The Notices page above, read-only for the System Admin (IR-800).
-  adminNotices:  { path: "/notices", roles: SYSTEM_ADMIN,
-                 nav: { label: "Notices", icon: "fa-file-signature", section: "Administration" } },
 } as const satisfies Record<string, ScreenDef>;
 
 export type ScreenKey = keyof typeof SCREEN_ACCESS;

@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useRef } from "react";
 import { Link, Outlet, useLocation, useMatches } from "react-router-dom";
 import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Sidebar } from "./Sidebar";
-import { Breadcrumbs, type RouteHandle } from "./Breadcrumbs";
+import type { RouteHandle } from "./routeHandle";
 import { NotificationBell } from "./NotificationBell";
 import { useUnreadNotificationsFetch } from "@/hooks/useNotifications";
 import { PageContainer } from "./PageContainer";
@@ -213,7 +213,7 @@ export function AppShell() {
             <Outlet />
           ) : (
             <PageContainer width={width}>
-              <Breadcrumbs />
+              {/* A page starts with its own title: no breadcrumb above it (IR-1255). */}
               <Outlet />
             </PageContainer>
           )}

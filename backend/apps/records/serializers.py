@@ -572,11 +572,16 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         # the nginx block and Django's DEBUG route -- every one of these links
         # was a 404 (IR-334).
         from apps.documents.attachments import may_remove, removable_parties
+        from core.permissions import may_read_record_documents
 
+        user = getattr(self.context.get("request"), "user", None)
+        # Only those who may download the attachments are told of them (IR-1244):
+        # a reader of a published paper would get filenames and links that 403.
+        if not may_read_record_documents(user, obj):
+            return []
         files = list(obj.files.all().order_by("-created_at"))
         if not files:
             return []
-        user = getattr(self.context.get("request"), "user", None)
         # The delete view's own rule (IR-476), asked once for the record.
         removable = removable_parties(obj, user)
         return [

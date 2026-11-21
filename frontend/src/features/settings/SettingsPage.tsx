@@ -1,6 +1,6 @@
 import { INSTITUTION } from "@/config/institution";
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -17,6 +17,7 @@ import { AiAnswerPanel } from "./AiAnswerPanel";
 import { CurrentNoticePanel } from "./CurrentNoticePanel";
 import { DeleteAccountPanel, DownloadMyDataPanel } from "./YourDataPanels";
 import { HERE } from "@/components/ui/highlightRoles";
+import { HelpGuide } from "@/features/help/HelpGuide";
 
 /**
  * Settings: the account. Who you are on IRIS (name, photo, bio, interests)
@@ -39,12 +40,15 @@ import { HERE } from "@/components/ui/highlightRoles";
  * Both are filed rather than faked.
  */
 
-type TabId = "security" | "privacy" | "role";
+type TabId = "security" | "privacy" | "role" | "help";
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: "security", label: "Account & security",     icon: "fa-shield-halved" },
   { id: "privacy",  label: "Data privacy & consent", icon: "fa-lock"         },
   { id: "role",     label: "Role & access",          icon: "fa-id-badge"     },
+  // Help lives here, not in the sidebar (IR-1217), and opens in place like the
+  // others, so reading it never leaves Settings (IR-1245). `/help` redirects here.
+  { id: "help",     label: "Help",                   icon: "fa-circle-question" },
 ];
 
 /**
@@ -79,9 +83,11 @@ export default function SettingsPage() {
       />
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
+        {/* Below lg the sections wrap rather than scroll sideways, so the open one
+            is always in view, Help included (IR-1246). */}
         <nav
           className="w-full lg:w-[260px] shrink-0 bg-white rounded-card border border-stone-200 p-2
-            flex lg:flex-col gap-1 overflow-x-auto scrollbar-thin"
+            flex flex-wrap lg:flex-col lg:flex-nowrap gap-1"
           aria-label="Settings sections"
         >
           {TABS.map((t) => {
@@ -105,25 +111,17 @@ export default function SettingsPage() {
               </button>
             );
           })}
-          {/* Help lives here, not in the sidebar (IR-1217). A link, not a
-              tab: it leaves Settings for the Help page. */}
-          <Link
-            to={pathFor("help")}
-            className={cn(
-              "flex items-center gap-2.5 px-3 py-2.5 rounded-control text-body font-medium",
-              "whitespace-nowrap transition-colors text-left text-stone-600 hover:bg-stone-50",
-              FOCUS_RING,
-            )}
-          >
-            <i className="fas fa-circle-question text-small w-4 shrink-0" aria-hidden />
-            Help
-          </Link>
         </nav>
 
         <div className="flex-1 min-w-0 w-full">
           {tab === "security" && <SecurityTab email={user.email} isVerified={user.is_verified} />}
           {tab === "privacy"  && <PrivacyTab user={user} />}
           {tab === "role"     && <RoleTab user={user} />}
+          {tab === "help"     && (
+            <Panel title="Help" caption="How to find, publish and review research in IRIS.">
+              <HelpGuide />
+            </Panel>
+          )}
         </div>
       </div>
     </div>

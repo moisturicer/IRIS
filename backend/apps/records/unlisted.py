@@ -103,6 +103,10 @@ def publish_unlisted(record: Record, note, *, actor) -> dict:
     record.pipeline_status = PipelineStatus.PUBLISHED
     record.save(update_fields=["pipeline_status", "updated_at"])
     audit.published_from_unlisted(record, actor)
+    # Publishing opens the disclosure gate (ADR-052 as amended, IR-1252).
+    from apps.ai.tasks import send_to_ai_on_commit
+
+    send_to_ai_on_commit(record.pk)
     transaction.on_commit(lambda: notify_published_later(record, published_by=actor, note=note))
     return {
         "id": record.pk,

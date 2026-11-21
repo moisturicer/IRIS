@@ -13,16 +13,19 @@ from django.utils import timezone
 
 from apps.ai.policy import Reason, decision_for_record
 from apps.records.models import Record
-from core.enums import EmbargoState
+from core.enums import EmbargoState, PipelineStatus
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 
 def _paper(**fields) -> Record:
-    """A consented paper with no IP mark, so only its embargo decides."""
+    """A published, consented paper with no IP mark, so only its embargo decides.
+
+    Published since IR-1252: an unpublished paper is refused whatever its embargo.
+    """
+    fields.setdefault("pipeline_status", PipelineStatus.PUBLISHED)
     return Record.objects.create(
-        title="A thesis", abstract="An abstract.", is_ip=False,
-        ai_consent=True, **fields,
+        title="A thesis", abstract="An abstract.", is_ip=False, ai_consent=True, **fields,
     )
 
 
@@ -82,17 +85,31 @@ class TestIndependentFacts:
     """ADR-052 §1, §13: a release never overrides the other inputs."""
 
     def test_a_release_does_not_stand_in_for_consent(self):
-        record = Record.objects.create(title="A thesis", abstract="An abstract.", **_released())
+        record = Record.objects.create(title="A thesis", abstract="An abstract.",
+                                       pipeline_status=PipelineStatus.PUBLISHED, **_released())
 
         assert decision_for_record(record).reasons == (Reason.NO_CONSENT,)
 
     def test_a_release_does_not_clear_an_ip_mark(self):
         record = Record.objects.create(
             title="A thesis", abstract="An abstract.", is_ip=True,
-            ai_consent=True, **_released(),
+            ai_consent=True, pipeline_status=PipelineStatus.PUBLISHED, **_released(),
         )
 
         assert decision_for_record(record).reasons == (Reason.UNRELEASED_IP,)
+
+    @pytest.mark.parametrize("status", [PipelineStatus.DRAFT, PipelineStatus.IN_REVIEW,
+                                        PipelineStatus.APPROVED, PipelineStatus.COMPLETED])
+    def test_a_release_does_not_stand_in_for_publication(self, status):
+        """IR-1252: a released, consented paper not yet published reaches nothing."""
+        record = _paper(**_released(pipeline_status=status))
+
+        assert decision_for_record(record).reasons == (Reason.UNPUBLISHED,)
+
+    def test_a_deleted_paper_is_refused_though_published(self):
+        record = _paper(**_released(is_deleted=True))
+
+        assert decision_for_record(record).reasons == (Reason.UNPUBLISHED,)
 
 
 class TestRowsThatCannotExist:

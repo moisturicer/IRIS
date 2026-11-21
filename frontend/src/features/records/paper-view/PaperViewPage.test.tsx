@@ -205,7 +205,7 @@ vi.mock("@/api/records", () => ({
     // The Action required panel loads itself; its behaviour is tested in
     // features/document-requests (IR-262). Here only its placement is.
     documentRequests: () => documentRequests(),
-    // Request documents, from the Review section's action bar (IR-412).
+    // Request documents, from the Review section's Documents tab (IR-412, IR-1254).
     documentRequestSlots:  vi.fn(() => Promise.resolve({ data: [{ id: 3, name: "Ethics Clearance" }] })),
     createDocumentRequest: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
     // Request review, from the sidebar's Reviewers (IR-685); the dialog's own
@@ -1073,6 +1073,37 @@ describe("the submitter's own status (IR-625)", () => {
   });
 });
 
+// Ask IRIS reads published papers only (ADR-052 as amended, IR-1252), so a
+// paper not yet published offers it nowhere on its page: the Ask IRIS page
+// in the sidebar still searches the published papers.
+describe("Ask IRIS beside a paper not yet published (IR-1252)", () => {
+  beforeEach(() => {
+    // The fixture the Paper workspace tests read, held back from publication.
+    shownRecord = { ...record, pipeline_status: "in_review" };
+    signInAs(99, "Student");
+    useUIStore.setState({ sidebarCollapsed: false, sidebarOpen: false, readingRail: null });
+  });
+
+  it("isn't opened on entering Paper, offered as an icon, or linked from Notes", async () => {
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open/i);
+
+    expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Notes" }));
+    await screen.findByRole("heading", { name: "Notes" });
+    expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+  });
+
+  it("is offered again once the paper is published", async () => {
+    shownRecord = record;
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+
+    expect(await screen.findByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
+  });
+});
+
 // Ask IRIS on the Overview is the Paper workspace's panel, as a column the
 // page makes room for (IR-569): the same heading, composer and width, beside
 // a page that narrows to fit rather than sitting under it.
@@ -1809,7 +1840,6 @@ describe("the Review section (IR-412)", () => {
     vi.unstubAllGlobals();
   });
 
-  const bar = () => screen.getByRole("toolbar", { name: "Review actions" });
   /** A reviewer opens on Documents (IR-1203): open Conversation, where the timeline and comment box are. */
   const openConversation = async () => userEvent.click(await screen.findByRole("tab", { name: "Conversation" }));
   /** Details is a tab at every width now (IR-1094): open it and return its panel. */
@@ -3193,26 +3223,31 @@ describe("the Review section (IR-412)", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("offers a reviewer who may request documents exactly that action", async () => {
+  // Changed deliberately by IR-1254 (ADR-032 §7 as amended 2026-11-21): these two
+  // found Request documents in the footer. It is the Documents tab's alone now.
+  it("offers a party that may ask but not decide Request documents on the Documents tab, and no footer", async () => {
     shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
-    await screen.findByRole("tab", { name: "Review", selected: true });
-    expect(within(bar()).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
-      "Request documents",
-    ]);
-    expect(within(bar()).queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
+    const documents = await screen.findByRole("tabpanel", { name: "Documents" });
+    expect(await within(documents).findByRole("button", { name: "Request documents" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Request documents" })).toHaveLength(1);
+    expect(screen.queryByRole("toolbar", { name: "Review actions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
   });
 
-  it("offers Request documents alone to a party that may ask but not decide", async () => {
-    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
+  it("keeps Request documents out of the footer for a reviewer with another act", async () => {
+    shownRecord = {
+      ...inReview, can_request_document: ["ierc"],
+      capabilities: ["cite", "request_document", "withdraw_revision"],
+    };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
 
-    await screen.findByRole("tab", { name: "Review", selected: true });
-    expect(within(bar()).getByRole("button", { name: "Request documents" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
+    const footer = await screen.findByRole("toolbar", { name: "Review actions" });
+    expect(within(footer).getAllByRole("button").map((b) => b.textContent?.trim()))
+      .toEqual(["Withdraw revision request"]);
   });
 
   it("gives an owner the timeline and no action bar: nothing was granted", async () => {
@@ -3245,7 +3280,7 @@ describe("the Review section (IR-412)", () => {
     expect(screen.queryByRole("textbox", { name: "Comment" })).not.toBeInTheDocument();
   });
 
-  it("requests documents from the bar and re-reads the timeline after", async () => {
+  it("requests documents from the Documents tab and re-reads the timeline after", async () => {
     shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
     signInAs(2, "IERC");
     renderPaper(`/records/${RECORD_ID}?section=review`);
@@ -3628,6 +3663,20 @@ describe("the Overview's header (IR-569)", () => {
     // Neither the publication year nor the view count is a second date or a stat in the header.
     expect(within(header).queryByText(/Published \d{4}/)).not.toBeInTheDocument();
     expect(within(header).queryByText(/\d+ views?$/)).not.toBeInTheDocument();
+  });
+
+  it("lists no documents in Record details: they are Review's to show (IR-1244)", async () => {
+    shownRecord = {
+      ...record,
+      files: [{ id: 88, filename: "consent.pdf", url: "/api/v1/documents/files/88/download/" } as RecordDetail["files"][number]],
+    };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).queryByText("Documents")).not.toBeInTheDocument();
+    expect(within(details).queryByText("consent.pdf")).not.toBeInTheDocument();
+    expect(within(details).queryByRole("link", { name: "Manage documents" })).not.toBeInTheDocument();
   });
 
   it("keeps governance fields in Record details and out of the header (IR-1089)", async () => {

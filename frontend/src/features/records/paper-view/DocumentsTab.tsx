@@ -5,7 +5,9 @@
  *
  * Everything filed with the record, one compact `DocumentRow` each: the
  * manuscript, each document slot with its versions, what reviewers have asked
- * for, and any supplementary attachment.
+ * for, and any supplementary attachment. Each of RDCO's requirements, and
+ * the manuscript, carries its Required/Optional label and its Template, read
+ * from Guidelines' list (IR-973, ADR-063 decision 6).
  *
  * - **One upload path.** Every upload goes through `UploadDropzone`. A request
  *   for a slot is answered by uploading into that slot (IR-346), so a
@@ -27,7 +29,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { UploadDropzone, type UploadState } from "@/components/shared/UploadDropzone";
+import { UploadDropzone } from "@/components/shared/UploadDropzone";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -35,24 +37,28 @@ import { cn, downloadBlob, formatDate } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
-import { errorDetail, fieldError } from "@/lib/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip, itemStatus } from "@/features/document-requests/itemStatus";
 import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerDocumentRequests";
+import {
+  GuideUnavailable, ManuscriptTemplate, RequirementTemplate, useRequirementGuide,
+} from "@/features/guidelines/requirementGuide";
 
 import { CONTROL_SIZE } from "./controls";
-import { DocumentRow } from "./DocumentRow";
+import { DocumentRow, byline } from "./DocumentRow";
 import { useReviewPane } from "./reviewPane";
 import { extensionOf, opensInReader, readerFormat, slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { SectionHeading } from "./headings";
+import { useRowUploads } from "./rowUploads";
 
-const PDF_LIMIT = 50 * 1024 * 1024;
 /** What an office may attach (IR-1220, ADR-032 §10 as amended 2026-11-18). */
 const SUPPLEMENTARY_TYPES = ".pdf,.docx,.png,.jpg,.jpeg";
 
 interface DocumentsTabProps {
   record:    Pick<
     RecordDetail,
-    "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted" | "versions"
+    "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted"
+    | "record_type_name" | "versions"
   >;
   /** The viewer owns the record: they upload what is asked for. */
   owner:     boolean;
@@ -119,17 +125,6 @@ async function saveBlob(fetch: () => Promise<{ data: unknown }>, filename: strin
   downloadBlob(data as Blob, filename);
 }
 
-/**
- * Why the server refused an upload, or "Please try again." when it gave no
- * reason (a dropped connection, a 5xx). A document upload carries `detail`;
- * the manuscript goes up as a PATCH of the record, so DRF refuses it keyed by
- * field (`abstract_file`) with no `detail` (IR-1048). A fixed reason like
- * "unsupported active content" must show: retrying the same file can't help.
- */
-function uploadRefusal(err: unknown): string {
-  return errorDetail(err, "") || fieldError(err, "abstract_file", "file") || "Please try again.";
-}
-
 export function DocumentsTab({
   record,
   owner,
@@ -141,11 +136,12 @@ export function DocumentsTab({
   onOpen,
 }: DocumentsTabProps) {
   const pane = useReviewPane();
+  const guideRead = useRequirementGuide();
+  const guide = guideRead.guide;
   const [slots, setSlots] = useState<SlotWithUploads[] | null>(null);
   const [files, setFiles] = useState<RecordFile[]>([]);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [failed, setFailed] = useState(false);
-  const [uploads, setUploads] = useState<Record<string, UploadState | undefined>>({});
   const [notice, setNotice] = useState<string | null>(null);
   // Every removal asks first (IR-872): a removed file is gone from storage.
   const [removing, setRemoving] = useState<{ name: string; run: () => Promise<void> } | null>(null);
@@ -202,30 +198,7 @@ export function DocumentsTab({
     onChanged?.();
   };
 
-  /** Upload one file under `key`, keeping the dropzone's progress and retry. */
-  const send = async (key: string, file: File, post: (onProgress: (p: number) => void) => Promise<unknown>) => {
-    setUploads((u) => ({ ...u, [key]: { status: "uploading", fileName: file.name, progress: 0 } }));
-    try {
-      await post((progress) =>
-        setUploads((u) => {
-          const current = u[key];
-          return current?.status === "uploading" ? { ...u, [key]: { ...current, progress } } : u;
-        }),
-      );
-      setUploads((u) => ({ ...u, [key]: undefined }));
-      await changed();
-    } catch (err) {
-      setUploads((u) => ({
-        ...u,
-        [key]: {
-          status: "failed",
-          fileName: file.name,
-          error: uploadRefusal(err),
-          onRetry: () => void send(key, file, post),
-        },
-      }));
-    }
-  };
+  const { uploads, send, pdfUpload } = useRowUploads(changed);
 
   if (failed && slots == null) {
     return (
@@ -244,11 +217,6 @@ export function DocumentsTab({
   const download = (fetch: () => Promise<{ data: unknown }>, filename: string) =>
     saveBlob(fetch, filename).catch(() => setNotice(`Could not download ${filename}. Please try again.`));
   const manuscript = record.versions?.[record.versions.length - 1] ?? null;
-  /** A row's compact PDF upload, keeping its progress and retry under `key`. */
-  const pdfUpload = (key: string, label: string, post: (file: File, onProgress: (p: number) => void) => Promise<unknown>) => (
-    <UploadDropzone compact label={label} accept=".pdf" validate maxBytes={PDF_LIMIT} upload={uploads[key]}
-      onFiles={([file]) => void send(key, file, (onProgress) => post(file, onProgress))} />
-  );
   const downloadVersion = (name: string, u: RecordUpload) =>
     download(() => documentsApi.downloadUpload(u.id), `${name} v${u.version}.${extensionOf(u.file)}`);
   /** A slot version's Open, when there is a reader and the version is a PDF. */
@@ -271,9 +239,12 @@ export function DocumentsTab({
         <ReviewerDocumentRequests record={record} reviewing onChanged={() => void changed()} />
       )}
 
+      <GuideUnavailable read={guideRead} />
       <ul aria-label="Documents" className="divide-y divide-stone-200 rounded-card border border-stone-200 bg-white">
         <DocumentRow
           name="Manuscript"
+          required={guide ? true : undefined}
+          template={<ManuscriptTemplate recordType={guide?.recordType({ name: record.record_type_name }) ?? null} />}
           latest={record.abstract_file
             ? manuscript ? byline(manuscript.number, manuscript.created_by_name, manuscript.created_at) : "Uploaded"
             : null}
@@ -305,10 +276,13 @@ export function DocumentsTab({
           const canUpload = owner && (editable || (asked != null && needsUpload(asked)));
           // Newest first, as the server lists them.
           const [latest] = slot.uploads;
+          const requirement = guide?.requirement(slot.id) ?? null;
           return (
             <DocumentRow
               key={slot.id}
               name={slot.name}
+              required={requirement?.is_required}
+              template={<RequirementTemplate requirement={requirement} />}
               latest={latest ? byline(latest.version, latest.uploaded_by_name, latest.created_at) : null}
               status={asked && <ItemStatusChip item={asked.item} />}
               note={asked && <AskedNote asked={asked} />}
@@ -436,11 +410,6 @@ export function DocumentsTab({
       />
     </div>
   );
-}
-
-/** A version in words, "v2 · Ana Cruz · Nov 3, 2026", leaving out a name the server did not give. */
-function byline(version: number, by: string | null | undefined, at: string): string {
-  return [`v${version}`, by, formatDate(at)].filter(Boolean).join(" · ");
 }
 
 /** Who asked for a document, and why its last upload was not accepted. */

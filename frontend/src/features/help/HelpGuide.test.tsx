@@ -13,11 +13,11 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, within } from "@/test/render";
 import type { User } from "@/types/auth";
 
-import HelpPage from "./HelpPage";
+import { HelpGuide } from "./HelpGuide";
 
 function renderAs(overrides: Partial<User>) {
   useAuthStore.setState({ user: makeUser(overrides), isAuthenticated: true });
-  return renderScreen(<HelpPage />, { route: "/help" });
+  return renderScreen(<HelpGuide />, { route: "/settings?tab=help" });
 }
 
 const section = (name: string) => screen.queryByRole("region", { name });
@@ -28,7 +28,7 @@ describe("Help", () => {
   it("lists its sections as contents that link to each one", async () => {
     const { container } = renderAs({ role_name: ROLES.STUDENT, can_author: true });
 
-    expect(screen.getByRole("heading", { level: 1, name: "Help" })).toBeInTheDocument();
+    // No title of its own since IR-1245: it is a section of Settings, whose title it sits under.
     const contents = screen.getByRole("navigation", { name: "Help contents" });
     expect(within(contents).getByRole("link", { name: "Asking IRIS" })).toHaveAttribute("href", "#ask-iris");
     expect(section("Asking IRIS")).toHaveAttribute("id", "ask-iris");
@@ -62,6 +62,8 @@ describe("Help", () => {
     expect(within(publishing).getByText(/outside AI companies/)).toBeInTheDocument();
     expect(within(publishing).getByText(/doesn.t end the embargo/)).toBeInTheDocument();
     expect(within(publishing).getByText(/Only your Adviser or RDCO can release it/)).toBeInTheDocument();
+    // IR-974: what each record type needs, and its Templates.
+    expect(within(publishing).getByRole("link", { name: "Guidelines" })).toHaveAttribute("href", "/guidelines");
   });
 
   it("always explains the review workflow and who to contact", () => {

@@ -16,6 +16,7 @@ import { AskIrisGlyph, IrisMark, IrisWordmark } from "@/components/brand/IrisBra
 import { Tooltip } from "@/components/ui/Tooltip";
 import { isRail, useSidebarMode } from "@/lib/layout";
 import { HERE } from "@/components/ui/highlightRoles";
+import { preloadScreen } from "@/router/lazyScreens";
 
 interface NavItem {
   to:     string;
@@ -55,6 +56,10 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
         // Ask IRIS stays current on its conversation addresses (IR-548).
         end={item.to !== ASK_PATH}
         onClick={onNavigate}
+        // Screens load on demand (IR-1248): start this one's download when the
+        // link is pointed at or reached by keyboard, so the click finds it here.
+        onMouseEnter={() => void preloadScreen(item.to)}
+        onFocus={() => void preloadScreen(item.to)}
         className={({ isActive }) =>
           cn(
             // 44px on the phone drawer; compact from md, where a pointer is (IR-1092).

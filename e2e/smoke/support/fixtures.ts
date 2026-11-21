@@ -38,11 +38,13 @@ export function token(): string {
   return `${b64url({ alg: "HS256", typ: "JWT" })}.${b64url({ user_id: 1, role_id: 1, exp })}.signature`;
 }
 
-export type SmokeRole = "Student" | "RDCO" | "System Admin";
+export type SmokeRole = "Student" | "Adviser" | "RDCO" | "System Admin";
 
 /** What differs between the roles the smoke specs sign in as. */
 const PROFILES: Record<SmokeRole, { email: string; office: boolean; admin: boolean }> = {
   Student: { email: "student@cit.edu", office: false, admin: false },
+  // For the Adviser's own screens (My Templates, IR-975); no review work.
+  Adviser: { email: "adviser@cit.edu", office: false, admin: false },
   RDCO: { email: "rdco@cit.edu", office: true, admin: false },
   "System Admin": { email: "admin@cit.edu", office: false, admin: true },
 };
@@ -69,8 +71,8 @@ export function account(role: SmokeRole = "Student") {
     department_name: "",
     course_name: "",
     review_access: { my_reviews: office, offices: office ? ["rdco"] : [], is_coordinator: office },
-    // What the server says (IR-1096). The smoke roles hold no Adviser, so Student alone authors.
-    can_author: role === "Student",
+    // What the server says (IR-1096): Students and Advisers author.
+    can_author: role === "Student" || role === "Adviser",
   };
 }
 

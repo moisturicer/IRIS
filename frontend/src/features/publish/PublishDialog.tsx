@@ -1,8 +1,8 @@
 /**
  * Publish: starting a submission is a short dialog (IR-408; spec §4.4).
  *
- * It replaces the Submit Disclosure page and its wizard. There are three steps,
- * the fewest that keep the upload, the confirmation and the consent separate.
+ * It replaces the Submit Disclosure page and its wizard. There are four steps:
+ * the upload, the details, the other documents and the confirmation.
  * It asks nothing about an embargo: every paper starts embargoed, and only its
  * Adviser or RDCO date or release one (ADR-052 as amended for IR-882).
  *
@@ -14,7 +14,10 @@
  *      The manuscript's own title and abstract are filled in once it has been
  *      read, with Undo, and its labelled authors, keywords and publication year
  *      offered (IR-833, `usePrefill` and `autofill`); none of it blocks Details.
- *   3. **Review & submit** — every value, consent, Submit.
+ *   3. **Documents** — the type's requirements as compact rows, each with its
+ *      label, Template and Upload (`DocumentsStep`, IR-973). None blocks
+ *      Continue: only the manuscript is needed to submit (ADR-063 decision 3).
+ *   4. **Review & submit** — every value, the documents added, Submit.
  *
  * **Opened by the URL**: `/?publish=new` starts one, `/?publish=<draftId>`
  * resumes one at its first incomplete step. Creating the draft rewrites the
@@ -31,6 +34,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
+import { documentsApi } from "@/api/documents";
 import { recordsApi, type ManuscriptMatch } from "@/api/records";
 import { Modal } from "@/components/ui/Modal";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
@@ -38,6 +42,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { canAuthor } from "@/lib/access";
 import { errorDetail } from "@/lib/errorDetail";
 import { tabbableWithin } from "@/lib/focusTrap";
+import { useApiRead } from "@/hooks/useApiRead";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import type { AdviserOption, User } from "@/types/auth";
@@ -67,6 +72,7 @@ import { isStaleEdit, useAutosave, type SaveStatus } from "./autosave";
 import { AutofilledNote, PrefillChip } from "./PrefillChip";
 import { usePrefill, type Prefill } from "./prefill";
 import { PublishSuccess, successHeadline } from "./PublishSuccess";
+import { DocumentsStep, isSlotList } from "./DocumentsStep";
 import { ReviewStep } from "./ReviewStep";
 import { IrisLoader } from "@/components/brand/IrisBrand";
 import { PublishDetailsPreview } from "./PublishDetailsPreview";
@@ -76,7 +82,8 @@ export const PUBLISH_PARAM = "publish";
 const STEPS: Array<{ step: PublishStep; title: string }> = [
   { step: 1, title: "Your manuscript" },
   { step: 2, title: "Details" },
-  { step: 3, title: "Review & submit" },
+  { step: 3, title: "Documents" },
+  { step: 4, title: "Review & submit" },
 ];
 
 /** The server's field names, as the form labels them. */
@@ -288,6 +295,16 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     },
   });
 
+  // The draft's slots, read once the author reaches Documents (step 3), which
+  // uploads into them, and Review (step 4), which lists what was added.
+  const reachedDocuments = step >= 3;
+  const documentsRead = useApiRead(
+    (signal) => (draftId != null && reachedDocuments
+      ? documentsApi.slotsForRecord(draftId, { signal }).then((r) => r.data)
+      : Promise.resolve(null)),
+    [draftId, reachedDocuments, typeId],
+  );
+
   const [moreOpen, setMoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stepFailure, setStepFailure] = useState<ApiFailure | null>(null);
@@ -420,7 +437,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     setStep(next);
     setContinueTried(false);
     setStepFailure(null);
-    setAnnouncement(`Step ${next} of 3: ${STEPS[next - 1].title}`);
+    setAnnouncement(`Step ${next} of ${STEPS.length}: ${STEPS[next - 1].title}`);
   }
 
   /* ── Step 1: create the draft once, then upload onto it ─────────────── */
@@ -578,7 +595,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   }
 
   useEffect(() => {
-    if (phase.kind !== "form" || step !== 3 || draftId == null) return;
+    if (phase.kind !== "form" || step !== 4 || draftId == null) return;
     let active = true;
     recordsApi.duplicateMatches(draftId).then(({ data }) => {
       if (!active) return;
@@ -809,6 +826,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     ownerEmails: values.owner_emails,
     typeName,
     fileName: acceptedUpload?.fileName ?? null,
+    documents: documentsRead.status === "ready" && isSlotList(documentsRead.data)
+      ? documentsRead.data.filter((slot) => slot.uploads.length > 0).map((slot) => slot.name)
+      : documentsRead.status === "loading" ? ("loading" as const) : null,
     title: values.title ?? "",
     abstract: values.abstract ?? "",
     adviserName: adviserName ?? "",
@@ -860,6 +880,12 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
             </Button>
           )}
           {step === 3 && (
+            // Never blocked by a missing document: only the manuscript is needed (ADR-063 decision 3).
+            <Button type="button" size="page" onClick={() => goTo(4)}>
+              Continue
+            </Button>
+          )}
+          {step === 4 && (
             <Button type="button" size="page" loading={submitting} onClick={() => void submit()}>
               Submit for review
             </Button>
@@ -996,7 +1022,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         <>
           <StepIndicator current={step} />
 
-          {stepFailure && step !== 3 && (
+          {stepFailure && step < 3 && (
             <div role="alert" className={cn(LOAD_ERROR, "mb-section flex-wrap")}>
               <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
               <span className="flex-1">{stepFailure.message}</span>
@@ -1069,7 +1095,19 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
             </PublishDetailsPreview>
           )}
 
-          {step === 3 && (
+          {step === 3 && draftId != null && (
+            <DocumentsStep
+              recordId={draftId}
+              typeId={typeId}
+              typeName={typeName}
+              manuscriptName={acceptedUpload?.fileName ?? null}
+              slots={documentsRead}
+              adviser={adviser && adviserName ? { id: adviser.id, name: adviserName } : null}
+              isProposal={isProposal(typeName)}
+            />
+          )}
+
+          {step === 4 && (
             <ReviewStep
               summary={summary}
               failure={submitFailure}
@@ -1086,6 +1124,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               fieldLabels={FIELD_LABELS}
               onEditManuscript={() => goTo(1)}
               onEditDetails={() => goTo(2)}
+              onEditDocuments={() => goTo(3)}
               onEditHints={() => {
                 setMoreOpen(true);
                 goTo(2);
@@ -1201,9 +1240,9 @@ function StepIndicator({ current }: { current: Exclude<PublishStep, 0> }) {
   return (
     <div className="mb-section">
       <p className="text-small text-stone-600 sm:hidden" aria-hidden>
-        Step {current} of 3 · {STEPS[current - 1].title}
+        Step {current} of {STEPS.length} · {STEPS[current - 1].title}
       </p>
-      <ol aria-label="Publish steps" className="mt-2 grid grid-cols-3 gap-2 sm:mt-0">
+      <ol aria-label="Publish steps" className="mt-2 grid grid-cols-4 gap-2 sm:mt-0">
         {STEPS.map(({ step, title }) => {
           const done = step < current;
           const isCurrent = step === current;

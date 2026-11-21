@@ -8,8 +8,8 @@ import type { Classification, PSCEDClassification, RecordDetail, RecordType } fr
 
 import { emptyMetadata, metadataSchema, type MetadataValues } from "@/features/records/metadata/metadataSchema";
 
-/** The three numbered steps. */
-export type PublishStep = 1 | 2 | 3;
+/** The four numbered steps: manuscript, details, documents, review (IR-973). */
+export type PublishStep = 1 | 2 | 3 | 4;
 
 /** Today in Manila, where the server decides whether a date has passed. */
 export function manilaToday(): string {
@@ -106,7 +106,8 @@ export function firstIncompleteStep(
 ): PublishStep {
   if (draft.typeId == null || !draft.hasManuscript) return 1;
   if (!metadataSchema(selfId).safeParse(draft.values).success) return 2;
-  return 3;
+  // Documents never hold a draft back (ADR-063 decision 3): a complete one resumes at Review.
+  return 4;
 }
 
 /** What an API failure says, split into one message and any per-field errors. */

@@ -77,8 +77,8 @@ first and in the table's test second.
   chat are drawn empty.
 - "Primary action" is the control the screen exists for where there is one
   (Publish, Sign In, Export CSV). Where a screen is for reading, the entry names
-  the first control a visitor would reach for (a tab, a filter, the Home
-  breadcrumb), which proves the screen is usable at that width but is a weaker
+  the first control a visitor would reach for (a tab, a filter, a back
+  link), which proves the screen is usable at that width but is a weaker
   claim. The results table names the control in each row.
 - Retired addresses (`router/redirects.tsx`) are not visited; the page each one
   lands on is a screen of its own in the matrix.

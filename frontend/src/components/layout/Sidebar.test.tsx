@@ -27,6 +27,8 @@ import { AppShell } from "./AppShell";
 vi.mock("@/api/client", () => ({ apiClient: { get: vi.fn() } }));
 vi.mock("@/api/notifications", () => ({ notificationsApi: { list: vi.fn() } }));
 vi.mock("@/api/auth", () => ({ authApi: { logout: vi.fn() } }));
+vi.mock("@/router/lazyScreens", () => ({ preloadScreen: vi.fn(() => Promise.resolve()) }));
+const { preloadScreen } = await import("@/router/lazyScreens");
 
 const { apiClient } = await import("@/api/client");
 const { notificationsApi } = await import("@/api/notifications");
@@ -133,7 +135,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences"]);
+    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences", "Guidelines"]);
     expect(screen.queryByText("Research Exploration")).not.toBeInTheDocument();
     expect(screen.queryByText("Tools")).not.toBeInTheDocument();
   });
@@ -146,6 +148,22 @@ describe("the sidebar's list", () => {
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: "My Library" })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "Discover" })).not.toHaveAttribute("aria-current");
+  });
+
+  // IR-1248: screens load on demand, so a link starts its screen's download
+  // when it is pointed at or focused, before the click.
+  it("prefetches a link's screen on hover and on focus (IR-1248)", async () => {
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+    await screen.findByRole("heading", { name: "My Library" });
+    vi.mocked(preloadScreen).mockClear();
+    const nav = screen.getByRole("navigation", { name: "Main" });
+
+    await userEvent.hover(within(nav).getByRole("link", { name: "Calls & Conferences" }));
+    expect(preloadScreen).toHaveBeenCalledWith("/opportunities");
+
+    act(() => within(nav).getByRole("link", { name: "Guidelines" }).focus());
+    expect(preloadScreen).toHaveBeenCalledWith("/guidelines");
   });
 
   it("shows My Reviews to an office member with review work", async () => {
@@ -255,9 +273,10 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    // IR-693 adds Reported comments, after Account Deletions.
+    // IR-693 adds Reported comments, after Account Deletions; IR-972 moves the Notice onto RDCO's Setup.
+    // IR-974: no Guidelines link for the System Admin (ADR-063 amendment 2026-11-19).
     expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
-      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention", "Notices"]);
+      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
@@ -266,8 +285,9 @@ describe("the sidebar's list", () => {
       .toHaveAttribute("href", "/admin/account-deletion-requests");
     // IR-795 adds the retention periods.
     expect(within(admin).getByRole("link", { name: "Retention" })).toHaveAttribute("href", "/admin/retention");
-    // IR-800 adds the Notices page, read-only for the System Admin.
-    expect(within(admin).getByRole("link", { name: "Notices" })).toHaveAttribute("href", "/notices");
+    // IR-972: the Notices page became Setup's (RDCO's); the System Admin reads
+    // publications in the Audit Log.
+    expect(within(admin).queryByRole("link", { name: "Notices" })).not.toBeInTheDocument();
     expect(within(nav).queryByRole("list", { name: "RDCO" })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
@@ -278,7 +298,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences"]);
+    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences", "Guidelines"]);
     // jsdom applies no CSS, so the names above would be there whether the
     // labels were `md:sr-only` or `md:hidden`. The class is what keeps them
     // in the accessibility tree on the rail, so it is what is checked.

@@ -1216,9 +1216,6 @@ MALWARE_SCAN_HOST = config("MALWARE_SCAN_HOST", default="")
 MALWARE_SCAN_PORT = config("MALWARE_SCAN_PORT", default=3310, cast=int)
 # Long enough for a 50 MB file and a signature reload, which holds scans (ADR-074 decision 5).
 MALWARE_SCAN_TIMEOUT_SECONDS = config("MALWARE_SCAN_TIMEOUT_SECONDS", default=60, cast=float)
-# Where `scan_stored_uploads` moves a stored file that fails (ADR-074 decision 4):
-# outside MEDIA_ROOT, so nothing can serve it, and kept for inspection.
-QUARANTINE_ROOT = Path(config("QUARANTINE_ROOT", default=str(BASE_DIR / "quarantine")))
 # IR-1053: the PDF evidence reader's own sandbox, beside PDF_VALIDATION_MAX_PAGES
 # and the 50 MB upload cap. Required: unset, extraction stores no evidence.
 PDF_EVIDENCE_WALL_SECONDS = config("PDF_EVIDENCE_WALL_SECONDS", default="", cast=lambda v: float(v) if v else None)

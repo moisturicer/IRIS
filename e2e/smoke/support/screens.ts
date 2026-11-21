@@ -64,6 +64,57 @@ const wrap = (role: SmokeRole, extra?: (api: MockApi) => void) => (api: MockApi)
   extra?.(api);
 };
 
+/** An Adviser's Templates (IR-975): a long title, and a description holding a link. */
+const MY_TEMPLATES = [
+  {
+    id: 7, title: "Chapter 1 to 3 proposal format for the Bachelor of Science in Information Technology capstone",
+    description: "Use this for every chapter.\nSee https://cit.edu/forms/capstone-proposal-format-guidelines-2026.",
+    file_name: "capstone-proposal-format-chapters-1-to-3-bsit-2026-revised-edition.docx", position: 1,
+    updated_at: when("11-19"),
+  },
+  { id: 8, title: "Budget sheet", description: "", file_name: "budget.xlsx", position: 2, updated_at: when("11-19") },
+];
+
+/** Guidelines (IR-974): long names, long file names and descriptions holding links, at every width. */
+export const GUIDELINES = [
+  {
+    id: 1, name: "Proposal", description: "Comes before a Thesis / Research. See https://cit.edu/research/proposal-guidelines-2026-revised.",
+    manuscript: { description: "The proposal itself, chapters 1 to 3.", template_name: "cit-u-research-proposal-manuscript-format-2026-revised-edition.docx" },
+    requirements: [
+      { id: 11, name: "Thesis Revision Form", is_required: true, description: "", template_name: "thesis-revision-form.pdf" },
+      { id: 12, name: "Patent Search Report", is_required: false, description: "Only when the work may be patentable.", template_name: "" },
+    ],
+  },
+  {
+    id: 2, name: "Thesis / Research", description: "Needs an approved Proposal first.",
+    manuscript: { description: "", template_name: "" },
+    requirements: [
+      { id: 21, name: "Publication / Conference Presentation / Both", is_required: true,
+        description: "Proof of acceptance. See https://cit.edu/research/forms.", template_name: "publication-proof-of-acceptance-form.pdf" },
+    ],
+  },
+  { id: 3, name: "Project", description: "", manuscript: { description: "", template_name: "" }, requirements: [] },
+];
+
+export const ADVISERS_TEMPLATES = MY_TEMPLATES.map((t) => ({
+  ...t, shared_by: { id: 40, name: "Maria Concepcion Villanueva-Dela Cruz Santiago" },
+}));
+
+/** Setup's record types (IR-971): one requirement with a long name, a Template and a description holding a link. */
+const SETUP_RECORD_TYPES = [
+  {
+    id: 2, name: "Thesis / Research", description: "Needs an approved Proposal first.",
+    manuscript: { description: "Use the CIT-U manuscript format.", template_name: "CIT-U manuscript format.docx" },
+    requirements: [
+      { id: 11, name: "Publication / Conference Presentation / Both", is_required: true,
+        description: "Proof of acceptance. See https://cit.edu/research/forms.", position: 1,
+        template_name: "publication-proof-of-acceptance-form.pdf", in_use: true },
+      { id: 12, name: "Ethics Clearance", is_required: false, description: "", position: 2, template_name: "", in_use: false },
+    ],
+  },
+  { id: 1, name: "Proposal", description: "", manuscript: { description: "", template_name: "" }, requirements: [] },
+];
+
 /**
  * The owner's Review with its documents (IR-1203): one slot version, one
  * attachment with a long unbroken name (the Full Text Rule, IR-1218).
@@ -92,6 +143,7 @@ const reviewDocumentsMocks = (api: MockApi) => {
         id: 31, record: PAPER.id, file: "x.pdf", filename: "Final_Thesis_Manuscript_Revised_Signed_Adviser_Copy_v3.pdf",
         uploaded_by: 1, uploaded_by_name: "Sam Student", created_at: "2026-11-04T08:00:00+08:00", can_remove: true,
       }]);
+      api.on("GET", "/documents/guidelines/", GUIDELINES);
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
       api.on("GET", "/library/saves/", { results: [] });
       api.on("GET", "/library/folders/", { results: [], limit: 10 });
@@ -299,6 +351,8 @@ export const SCREENS: Screen[] = [
       api.on("GET", `/records/${PAPER.id}/response-letters/`, []);
       // A participant's Review opens on its Documents tab (IR-1203), which reads these.
       api.on("GET", `/documents/records/${PAPER.id}/slots/`, []);
+      // Its rows read their labels and Templates from Guidelines (IR-973).
+      api.on("GET", "/documents/guidelines/", GUIDELINES);
       api.on("GET", "/documents/files/", []);
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
     }),
@@ -473,11 +527,28 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: /^Edit and send again/ }).first(), primaryLabel: "Edit and send again",
   },
   {
+    // An Adviser's own proposal Templates (ADR-063 decision 8, IR-975).
+    id: "my-templates", path: "/my-templates", route: "/my-templates", role: "Adviser",
+    mocks: wrap("Adviser", (api) => api.on("GET", "/documents/my-templates/", MY_TEMPLATES)),
+    heading: "My Templates",
+    primary: (p) => p.getByRole("button", { name: "Add a Template" }), primaryLabel: "Add a Template",
+  },
+  {
+    id: "guidelines", path: "/guidelines", route: "/guidelines", role: "Student",
+    mocks: wrap("Student", (api) => {
+      api.on("GET", "/documents/guidelines/", GUIDELINES);
+      api.on("GET", "/documents/adviser-templates/", ADVISERS_TEMPLATES);
+    }),
+    heading: "Guidelines",
+    primary: (p) => p.getByRole("button", { name: /^Download the Manuscript Template, cit-u-research-proposal/ }),
+    primaryLabel: "Download the Proposal's Manuscript Template",
+  },
+  {
     id: "notifications", path: "/notifications", route: "/notifications", role: "Student",
     mocks: wrap("Student"),
     heading: "Notifications",
-    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
-    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
+    // The breadcrumb's Discover link until IR-1255 removed the breadcrumb.
+    primary: (p) => p.getByRole("button", { name: "Mark all as read" }), primaryLabel: "Mark all as read",
   },
   {
     id: "ask-iris", path: "/ai", route: "/ai", role: "Student",
@@ -493,9 +564,10 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: "Send message" }), primaryLabel: "Send message",
   },
   {
-    id: "help", path: "/help", route: "/help", role: "Student",
+    // Help is a Settings section since IR-1245; `/help` redirects here.
+    id: "help", path: "/settings?tab=help", route: "/settings", role: "Student",
     mocks: wrap("Student"),
-    heading: "Help",
+    heading: "Settings",
     primary: (p) => p.getByRole("link", { name: "Finding research" }).first(), primaryLabel: "Finding research (contents)",
   },
   {
@@ -568,8 +640,8 @@ export const SCREENS: Screen[] = [
     mocks: wrap("RDCO", (api) =>
       api.on("GET", "/reviews/office/", { office: "rdco", office_label: "RDCO", rows: [], load: [] })),
     heading: /console$/,
-    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
-    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
+    // The breadcrumb's Discover link until IR-1255 removed the breadcrumb.
+    primary: (p) => p.getByRole("link", { name: "Back to My Reviews" }), primaryLabel: "Back to My Reviews",
   },
   {
     id: "workflow-analytics", path: "/rdco/analytics", route: "/rdco/analytics", role: "RDCO",
@@ -580,8 +652,8 @@ export const SCREENS: Screen[] = [
         open_now: [], time_in_stage: [], unmeasured: [], throughput: [], revision_cycles: [], preserved_by_office: [],
       })),
     heading: "Workflow analytics",
-    // The breadcrumb's first step, not the sidebar's Discover link (IR-1085).
-    primary: (p) => p.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Discover" }), primaryLabel: "Discover (breadcrumb)",
+    // The breadcrumb's Discover link until IR-1255 removed the breadcrumb.
+    primary: (p) => p.getByLabel("From"), primaryLabel: "From (date)",
   },
   {
     id: "import-records", path: "/records/import", route: "/records/import", role: "RDCO",
@@ -629,6 +701,12 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: "Refresh" }), primaryLabel: "Refresh",
     table: (p) => p.getByRole("table").first(),
   },
+  {
+    id: "rdco-setup", path: "/rdco/setup", route: "/rdco/setup", role: "RDCO",
+    mocks: wrap("RDCO", (api) => api.on("GET", "/documents/setup/record-types/", SETUP_RECORD_TYPES)),
+    heading: "Setup",
+    primary: (p) => p.getByRole("button", { name: "Add a requirement" }), primaryLabel: "Add a requirement",
+  },
   // IR-693: RDCO and the System Admin share this queue at one path, as Notices does.
   {
     id: "reported-comments", path: "/moderation/comments", route: "/moderation/comments", role: "RDCO",
@@ -662,15 +740,15 @@ export const SCREENS: Screen[] = [
     heading: "Retention",
     primary: (p) => p.getByRole("button", { name: "Save period" }), primaryLabel: "Save period",
   },
-  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): RDCO
-  // publishes the next version of the data notice here.
+  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800, IR-972):
+  // RDCO publishes the next version of the data notice in Setup's Notice section.
   {
-    id: "notices", path: "/notices", route: "/notices", role: "RDCO",
+    id: "rdco-setup-notice", path: "/rdco/setup?section=notice", route: "/rdco/setup", role: "RDCO",
     mocks: wrap("RDCO", (api) => (api.on("GET", "/auth/notice/draft/", null), api.on("GET", "/auth/notice/versions/", [{
       version: 1, text: "IRIS data notice\n\nWhat IRIS keeps\nYour name and CIT-U email.",
       published_at: when("11-01"), published_by: { id: 4, name: "Rita Dela Cruz", email: "rdco@cit.edu" },
     }]))),
-    heading: "Notices",
+    heading: "Version history",
     primary: (p) => p.getByRole("button", { name: "Preview" }), primaryLabel: "Preview",
   },
   {

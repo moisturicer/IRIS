@@ -7,11 +7,16 @@
  * six (IR-534). IR-783 removes old RDCO addresses without redirects (ADR-051).
  *
  * A `:param` in `path` carries into the same `:param` in `to`, so an old link
- * to a record's documents lands on that record.
+ * to a record's documents lands on that record. `byRole` sends a role whose
+ * old page went somewhere else to its own destination instead of `to`.
  */
-import { Navigate, useParams, type RouteObject } from "react-router-dom";
+import { Navigate, useLocation, useParams, type RouteObject } from "react-router-dom";
+import { ROLES, type RoleName } from "@/lib/constants";
+import { useAuthStore } from "@/store/auth.store";
 
-export const REDIRECTS: ReadonlyArray<{ path: string; to: string; why: string }> = [
+export const REDIRECTS: ReadonlyArray<{
+  path: string; to: string; byRole?: Partial<Record<RoleName, string>>; why: string;
+}> = [
   { path: "workspace", to: "/records/mine?section=research", why: "My Workspace became My Library's My research section (IR-410)" },
   { path: "records/add", to: "/?publish=new", why: "Submit Disclosure became the Publish dialog (IR-408)" },
   {
@@ -35,19 +40,33 @@ export const REDIRECTS: ReadonlyArray<{ path: string; to: string; why: string }>
     why: "ADR-032 retired the Proposal complete act, and with it the Approved Proposals page (IR-534)",
   },
   {
+    path: "notices",
+    to: "/rdco/setup?section=notice",
+    byRole: { [ROLES.SYSTEM_ADMIN]: "/admin/audit?event_type=NOTICE_PUBLISHED" },
+    why: "The Notices page became Setup's Notice section; the System Admin reads publications in the Audit Log (ADR-063 decision 9, IR-972)",
+  },
+  {
     path: "review/analytics",
     to: "/rdco/analytics",
     why: "Workflow analytics left My Reviews for RDCO's own section, RDCO alone (IR-1216)",
   },
+  {
+    path: "help",
+    to: "/settings?tab=help",
+    why: "Help became a Settings section, so opening it never leaves Settings (IR-1245)",
+  },
 ];
 
-function RetiredUrl({ to }: { to: string }) {
+function RetiredUrl({ to, byRole }: { to: string; byRole?: Partial<Record<RoleName, string>> }) {
   const params = useParams();
-  const target = to.replace(/:(\w+)/g, (_, name: string) => encodeURIComponent(params[name] ?? ""));
-  return <Navigate to={target} replace />;
+  // The fragment carries over, so an old link to a section lands on it (IR-1245).
+  const { hash } = useLocation();
+  const role = useAuthStore((state) => state.user?.role_name) as RoleName | undefined;
+  const target = ((role && byRole?.[role]) || to).replace(/:(\w+)/g, (_, name: string) => encodeURIComponent(params[name] ?? ""));
+  return <Navigate to={`${target}${hash}`} replace />;
 }
 
-export const redirectRoutes: RouteObject[] = REDIRECTS.map(({ path, to }) => ({
+export const redirectRoutes: RouteObject[] = REDIRECTS.map(({ path, to, byRole }) => ({
   path,
-  element: <RetiredUrl to={to} />,
+  element: <RetiredUrl to={to} byRole={byRole} />,
 }));

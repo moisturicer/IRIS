@@ -23,7 +23,6 @@ from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
-from apps.records.models import RecordType
 from apps.reviews.workflow_test_helpers import model_at_current_state, purge_records_at_current_state
 from apps.reviews.models import (
     RecordClearance,
@@ -103,7 +102,7 @@ class _World:
         # get_or_create: a flushing TransactionTestCase earlier in the run
         # removes the rows records/0002 seeds.
         self.types = {
-            name: RecordType.objects.get_or_create(name=name)[0]
+            name: model_at_current_state("records", "RecordType").objects.get_or_create(name=name)[0]
             for name in ("Proposal", "Thesis / Research", "Project")
         }
         self.minute = 0
