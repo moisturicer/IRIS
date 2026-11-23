@@ -83,6 +83,7 @@ function RequestRow({ request, onCancel, onDownload, onRequestAgain, busy }: Row
         )}
         {request.actions.includes("request_again") && (
           <button type="button" className={ACTION} onClick={() => onRequestAgain(request)}>
+            <i className="fas fa-lock" aria-hidden />
             Request again
           </button>
         )}

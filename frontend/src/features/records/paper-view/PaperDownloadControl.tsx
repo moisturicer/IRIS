@@ -133,7 +133,8 @@ export function PaperDownloadControl({
         title={download.message}
         className={CONTROL_SIZE}
       >
-        <i className="fas fa-download" aria-hidden />
+        {/* A lock, not the download arrow: this asks RDCO, it saves nothing (IR-1302). */}
+        <i className="fas fa-lock" aria-hidden />
         {ended ? "Request again" : "Request download"}
       </Button>
       <DownloadRequestModal
