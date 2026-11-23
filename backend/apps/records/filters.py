@@ -1,5 +1,6 @@
 import django_filters
 from rest_framework.filters import OrderingFilter
+from .completion import COMPLETION_YEAR, with_completion_year
 from .models import Record
 from .views_count import order_by_trending
 
@@ -18,8 +19,8 @@ class RecordFilter(django_filters.FilterSet):
     # still returns any record to any authenticated user. Ids that fail the
     # predicate simply drop out of the response.
     id              = NumberInFilter(field_name="id", lookup_expr="in")
-    year_from       = django_filters.NumberFilter(field_name="year_accomplished", lookup_expr="gte")
-    year_to         = django_filters.NumberFilter(field_name="year_accomplished", lookup_expr="lte")
+    year_from       = django_filters.NumberFilter(method="filter_completed", lookup_expr="gte")
+    year_to         = django_filters.NumberFilter(method="filter_completed", lookup_expr="lte")
     classification  = NumberInFilter(field_name="classification_id", lookup_expr="in")
     psced           = django_filters.NumberFilter(field_name="psced_id")
     record_type     = django_filters.NumberFilter(field_name="record_type_id")
@@ -37,6 +38,10 @@ class RecordFilter(django_filters.FilterSet):
         distinct=True,
     )
     for_commercialization = django_filters.BooleanFilter()   # KTTO commercial-ready feed
+
+    def filter_completed(self, queryset, name, value):
+        bound = "gte" if name == "year_from" else "lte"
+        return with_completion_year(queryset).filter(**{f"completion_year__{bound}": value})
 
     class Meta:
         model  = Record
@@ -62,3 +67,12 @@ class RecordOrderingFilter(OrderingFilter):
         if request.query_params.get(self.ordering_param) == self.TRENDING:
             return order_by_trending(queryset)
         return super().filter_queryset(request, queryset, view)
+
+    def get_ordering(self, request, queryset, view):
+        """`year_accomplished` orders by the one completion year (IR-1316)."""
+        ordering = super().get_ordering(request, queryset, view)
+        return ordering and [
+            COMPLETION_YEAR.desc(nulls_last=True) if term == "-year_accomplished"
+            else COMPLETION_YEAR.asc(nulls_last=True) if term == "year_accomplished" else term
+            for term in ordering
+        ]

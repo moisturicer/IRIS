@@ -26,9 +26,17 @@ TAXONOMIES = {
     "record_type": ("records_recordtype", "record_type_id"),
 }
 YEAR_RANGE = (1900, 2100)
-FILTERS = (*TAXONOMIES, "year_from", "year_to", "is_ip")
+#: Completion years, then publication years (IR-1316).
+YEARS = ("year_from", "year_to", "published_from", "published_to")
+#: The day a paper was added, as ISO dates (IR-1316).
+DAYS = ("added_from", "added_to")
+FILTERS = (*TAXONOMIES, *YEARS, *DAYS, "is_ip")
 #: Group name -> the counted row's column.
 GROUPS = ("classification", "psced", "record_type", "year")
+#: Groups under research-14 (IR-1316).
+DATED_GROUPS = (*GROUPS, "publication_year")
+#: Listing orders under research-14; a date sorts newest first (IR-1316).
+SORTS = ("title", "completed", "published", "added")
 
 
 def title_key(text: str) -> str:

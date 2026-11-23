@@ -155,14 +155,15 @@ def _count(fact: Count) -> dict:
     return {"total": fact.total, "filters": [list(f) for f in fact.filters], "group_by": fact.group_by,
             "groups": [list(g) for g in fact.groups], "ungrouped": fact.ungrouped,
             "scope_record_id": fact.scope_record_id, "population": sorted(fact.population),
-            "relative_to": fact.relative_to}
+            "relative_to": fact.relative_to,
+            **({"undated": fact.undated} if fact.undated is not None else {})}
 
 
 def _load_count(raw: dict) -> Count:
     return Count(total=raw["total"], filters=_tuples(raw["filters"]), group_by=raw["group_by"],
                  groups=_tuples(raw["groups"]), ungrouped=raw["ungrouped"],
                  scope_record_id=raw["scope_record_id"], population=frozenset(raw["population"]),
-                 relative_to=raw["relative_to"])
+                 relative_to=raw["relative_to"], undated=raw.get("undated"))
 
 
 def _investigation(found: Investigation) -> dict:
