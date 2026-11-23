@@ -22,7 +22,7 @@ import { DeferredPage } from "./DeferredPage";
 // sidebar prefetch it (IR-749, IR-1248).
 import {
   AccountDeletionRequestsPage, AuditLogPage, CallRequestsPage, CallsAndConferencesPage,
-  DeleteRequestsPage, DownloadRequestsPage, EditProfilePage, ForgotPasswordPage, GuidelinesPage,
+  DeleteRequestsPage, DownloadRequestsPage, ForgotPasswordPage, GuidelinesPage,
   ImportRecordsPage, MyCallsPage, MyLibraryPage, MyReviewsPage, MyTemplatesPage, NotificationsPage,
   OfficeConsolePage, PaperViewPage, PersonProfilePage, ProfilePage, RAGChatPage, ReportedCommentsPage,
   ResendVerificationPage, ResetPasswordPage, RetentionPage, ReviewAnalyticsPage, RoleRequestsPage,
@@ -118,14 +118,9 @@ export const routes: RouteObject[] = [{
               },
             ],
           },
-          {
-            // Edit profile sits under Profile; its Cancel returns there.
-            path: "profile", handle: { title: "Profile" },
-            children: [
-              { index: true,  element: <DeferredPage message="Loading your profile"><ProfilePage /></DeferredPage> },
-              { path: "edit", element: <DeferredPage message="Loading your profile"><EditProfilePage /></DeferredPage>, handle: { title: "Edit profile" } },
-            ],
-          },
+          // Profile is the preview of what others see; editing it is in Settings
+          // (IR-1304), and `/profile/edit` redirects there.
+          { path: "profile",               element: <DeferredPage message="Loading your profile"><ProfilePage /></DeferredPage>,  handle: { title: "Profile" } },
           { path: "settings",              element: <DeferredPage message="Loading settings"><SettingsPage /></DeferredPage>,    handle: { title: "Settings" } },
           // Another person's Profile (IR-700, IR-1133).
           { path: "people/:id",            element: <DeferredPage message="Loading the profile"><PersonProfilePage /></DeferredPage>, handle: { title: "People" } },

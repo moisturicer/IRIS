@@ -33,13 +33,18 @@ interface SaveCiteShareProps {
   record: RecordDetail;
   /** Save is the filled action where there is no paper to view (IR-569). */
   savePrimary: boolean;
+  /** The server's `cite` capability: only a published paper offers it (IR-1305). */
+  canCite: boolean;
   onCite: () => void;
   shareState: ShareState;
   onShare: () => void;
 }
 
-/** Save, Cite and Share (IR-1271, moved out of the page unchanged). */
-export function SaveCiteShare({ record, savePrimary, onCite, shareState, onShare }: SaveCiteShareProps) {
+/**
+ * Save, Cite and Share (IR-1271). Cite appears only where the server offers
+ * `cite`, on a published paper; Save and Share stay on every record (IR-1305).
+ */
+export function SaveCiteShare({ record, savePrimary, canCite, onCite, shareState, onShare }: SaveCiteShareProps) {
   return (
     <>
       <PaperSaveDropdown
@@ -48,10 +53,12 @@ export function SaveCiteShare({ record, savePrimary, onCite, shareState, onShare
         emphasis={savePrimary ? "primary" : "secondary"}
       />
 
-      <button type="button" onClick={onCite} className={PILL_SECONDARY}>
-        <i className="fas fa-quote-right text-2xs" aria-hidden />
-        Cite
-      </button>
+      {canCite && (
+        <button type="button" onClick={onCite} className={PILL_SECONDARY}>
+          <i className="fas fa-quote-right text-2xs" aria-hidden />
+          Cite
+        </button>
+      )}
 
       <button type="button" onClick={onShare} className={PILL_SECONDARY}>
         <i

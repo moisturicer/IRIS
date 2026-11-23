@@ -1,11 +1,10 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import {
   BIO_MAX_LENGTH, INTEREST_MAX_LENGTH, MAX_INTERESTS, profileApi,
 } from "@/api/profile";
 import { authApi } from "@/api/auth";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { FieldLabel } from "@/components/ui/FieldLabel";
 import { fieldClasses, LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -14,36 +13,39 @@ import { useAuth } from "@/hooks/useAuth";
 import { pathFor } from "@/lib/access";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
+import { affiliationOf } from "@/features/profile/names";
+import { PhotoField, type PhotoChange } from "@/features/profile/PhotoField";
 
-import { affiliationOf } from "./names";
-import { PhotoField, type PhotoChange } from "./PhotoField";
+import { Message } from "./settingsParts";
 
 /**
- * Edit profile (IR-933): the name and the optional Profile fields (IR-699:
- * photo, bio, research interests), on a page of their own, apart from
- * Settings. The middle initial and the ORCID iD are not edited here: the
- * Profile shows neither as a field of its own.
+ * The form in Settings' Profile tab (IR-1304; it was IR-933's Edit profile
+ * page): the name and the optional Profile fields (IR-699: photo, bio, research
+ * interests). Editing is an account action, so it lives in Settings; the Profile
+ * page is only what other people see. The middle initial and the ORCID iD are
+ * not edited here: the Profile shows neither as a field of its own.
  *
  * Every optional field may be left empty, which is how a person keeps it off
  * their Profile: there is no privacy switch. A new or removed photo is shown at
  * once but, like the name and the text fields, saved only by Save, which sends
- * each changed part as the request the API takes for it. Cancel drops every
- * change, the photo included. Save and Cancel both return to the Profile.
+ * each changed part as the request the API takes for it. Discard changes puts
+ * back everything saved, the photo included. Save and Discard both wait for a
+ * change, and Save leaves the person on the tab, saying it saved.
  */
 
 const HINT = "text-small text-stone-600 mt-1";
 
 const sameInterest = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
 
-export default function EditProfilePage() {
+export function ProfileTab() {
   const { user, updateUser } = useAuth();
-  const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState(user?.first_name ?? "");
   const [lastName, setLastName] = useState(user?.last_name ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
   const [interests, setInterests] = useState<string[]>(user?.research_interests ?? []);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [photoChange, setPhotoChange] = useState<PhotoChange | null>(null);
 
@@ -69,9 +71,21 @@ export default function EditProfilePage() {
   if (!user) return null;
   const dirty = nameDirty || fieldsDirty || !!photoChange;
 
+  /** Puts back everything saved: the text fields, the interests and any chosen photo. */
+  const discard = () => {
+    setFirstName(user.first_name);
+    setLastName(user.last_name);
+    setBio(user.bio ?? "");
+    setInterests(user.research_interests ?? []);
+    setPhotoChange(null);
+    setError(null);
+    setSaved(false);
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSaved(false);
     if (!firstName.trim() || !lastName.trim()) {
       setError("First and last name are required.");
       return;
@@ -106,7 +120,11 @@ export default function EditProfilePage() {
         updateUser({ ...latest, photo_url: null });
         setPhotoChange(null);
       }
-      navigate(pathFor("profile"), { state: { saved: true } });
+      // The name was sent trimmed, so the fields show it trimmed: otherwise the
+      // saved name would still look like an unsaved change.
+      setFirstName(firstName.trim());
+      setLastName(lastName.trim());
+      setSaved(true);
     } catch (err) {
       setError(
         fieldError(err, "bio", "research_interests", "photo", "crop_x", "crop_y", "crop_size") ??
@@ -121,11 +139,6 @@ export default function EditProfilePage() {
 
   return (
     <form onSubmit={save} className="max-w-3xl">
-      <PageHeader
-        title="Edit profile"
-        description="What you add here appears on your Profile, which anyone signed in to IRIS can open. Leave an optional field empty to keep it off."
-      />
-
       <Section id={nameSectionId} title="Photo and name" caption="Your name is attached to disclosures, paper citations and clearances.">
         <PhotoField user={user} change={photoChange} onChange={setPhotoChange} />
 
@@ -176,27 +189,44 @@ export default function EditProfilePage() {
 
       {error && <p role="alert" className={cn(LOAD_ERROR, "mt-6")}>{error}</p>}
 
-      <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-stone-200 pt-4">
-        <Link to={pathFor("profile")} className={cn(PILL_SECONDARY, FOCUS_RING)}>Cancel</Link>
-        <button
-          type="submit"
-          disabled={!dirty || saving}
-          className={cn(PILL_PRIMARY, FOCUS_RING)}
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
+      <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-stone-200 pt-4">
+        {saved && !dirty && (
+          <Message tone="ok" role="status">
+            Profile saved.{" "}
+            <Link to={pathFor("profile")} className={cn("font-semibold underline underline-offset-2", FOCUS_RING)}>
+              View your profile
+            </Link>
+          </Message>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={discard}
+            disabled={!dirty || saving}
+            className={cn(PILL_SECONDARY, FOCUS_RING)}
+          >
+            Discard changes
+          </button>
+          <button
+            type="submit"
+            disabled={!dirty || saving}
+            className={cn(PILL_PRIMARY, FOCUS_RING)}
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
       </div>
     </form>
   );
 }
 
-/** A titled group on the edit page, divided from the next by one hairline. */
+/** A titled group in the form, divided from the next by one hairline (none above the first). */
 function Section({
   id, title, caption, children,
 }: { id: string; title: string; caption: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="border-t border-stone-200 py-6">
-      <h2 id={id} className="font-display text-title font-semibold text-stone-900">{title}</h2>
+    <section aria-labelledby={id} className="border-t border-stone-200 py-6 first:border-t-0 first:pt-0">
+      <h3 id={id} className="font-display text-title font-semibold text-stone-900">{title}</h3>
       <p className="mt-1 text-small text-stone-600">{caption}</p>
       <div className="mt-5">{children}</div>
     </section>
