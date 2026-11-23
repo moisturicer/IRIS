@@ -67,6 +67,7 @@ Only one allowance exists. `RunLimits.allowance()` is the same for both depths, 
 | `RUNS_AGENT_MODEL` | `openai/gpt-6-luna:floor` | | The pinned model |
 | `RUNS_AGENT_BOUNDS` | ordinary 4 steps / 4 calls, deep 10 / 10, history 6 turns | | Research length per depth |
 | `RUNS_AGENT_RESERVES` | answer 16,000, reasoning 16,000, next result 9,000, repair 1,500 | | Room held back in every request |
+| `RUNS_AGENT_PROVIDER_RETRIES` | 1 | | Resends of a model call that failed in transit; each is admitted and charged (IR-1286) |
 | `RUNS_AGENT_COMPACTION` | threshold 200,000, summary 3,000, keep 2 exchanges, 2 attempts | | When earlier context is condensed (option B changes the threshold) |
 | `AGENT_LLM_CAPACITIES` | 272,000 context, 32,000 output (reasoning inside), 1,000,000 request bytes | | The model's limits as IRIS uses them. OpenRouter lists 1,050,000 context and 128,000 output for `gpt-6-luna` |
 | `AI_ADMISSION_MAX_OUTPUT_TOKENS` | 32,000 | | The largest completion cap any one call may reserve |

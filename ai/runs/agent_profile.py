@@ -20,7 +20,9 @@ from ai.agent.protocol import Pin
 from ai.infrastructure import agent_config
 from ai.runs import config as runs_config
 
-REQUIRED = ("RUNS_AGENT_MODEL", "RUNS_AGENT_BOUNDS", "RUNS_AGENT_RESERVES")
+REQUIRED = ("RUNS_AGENT_MODEL", "RUNS_AGENT_BOUNDS", "RUNS_AGENT_RESERVES", "RUNS_AGENT_PROVIDER_RETRIES")
+#: Most resends of one failed model attempt; each is admitted and charged on its own (IR-1286).
+MAX_PROVIDER_RETRIES = 3
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,8 @@ class AgentProfile:
     reserves: Reserves
     provider: agent_config.AgentProviderConfig
     limits: Limits
+    #: Resends of a model attempt that failed in transit (IR-1286).
+    provider_retries: int
     #: None never compacts (IR-734).
     compaction: Optional[Compaction] = None
     #: "enforce" repairs or trims a failing draft; "flag" delivers it and notes what it could not match; "advisory" only logs.
@@ -62,6 +66,13 @@ def _tool_concurrency(values) -> int:
         return 1
     if not raw.isdigit() or not 1 <= int(raw) <= 16:
         raise NotConfigured("RUNS_AGENT_TOOL_CONCURRENCY must be a whole number from 1 to 16")
+    return int(raw)
+
+
+def _provider_retries(values) -> int:
+    raw = str(getattr(values, "RUNS_AGENT_PROVIDER_RETRIES", "") or "").strip()
+    if not raw.isdigit() or int(raw) > MAX_PROVIDER_RETRIES:
+        raise NotConfigured(f"RUNS_AGENT_PROVIDER_RETRIES must be a whole number from 0 to {MAX_PROVIDER_RETRIES}")
     return int(raw)
 
 
@@ -113,7 +124,7 @@ def read(values) -> AgentProfile:
         state_version=runs_config.SCHEMA, data_policy=provider.data_policy,
     )
     return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits,
-                        compaction=compaction, checks=checks, tool_concurrency=_tool_concurrency(values))
+                        provider_retries=_provider_retries(values), compaction=compaction, checks=checks, tool_concurrency=_tool_concurrency(values))
 
 
 def executor(profile: AgentProfile, dsn: str, *, provider=None):
@@ -127,7 +138,8 @@ def executor(profile: AgentProfile, dsn: str, *, provider=None):
     from ai.infrastructure.openai_adapter import OpenAICompatibleAgentProvider
 
     inner = provider if provider is not None else OpenAICompatibleAgentProvider(profile.provider)
-    admitted = AdmittedAgentProvider(inner, Ledger(dsn, profile.limits), purpose=PURPOSE)
+    admitted = AdmittedAgentProvider(inner, Ledger(dsn, profile.limits), purpose=PURPOSE,
+                                     retries=profile.provider_retries)
     return AgentExecutor(admitted, profile.pin, profile.reserves, profiles=profile.bounds,
                          price=profile.limits.prices[profile.pin.model], compaction=profile.compaction,
                          checks=profile.checks, tool_concurrency=profile.tool_concurrency)
