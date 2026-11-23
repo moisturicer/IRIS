@@ -412,7 +412,8 @@ export const DIALOGS: DialogCase[] = [
       submitter_status: { line: "Draft: not yet submitted", waiting_on_you: [] },
       created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-02T08:00:00+08:00",
     }]),
-    open: press(/^Delete draft/), dialog: anyDialog,
+    // IR-1311: Delete draft is in the row's ⋯ menu.
+    open: fromRowMenu("Delete draft"), dialog: anyDialog,
   },
   {
     id: "crop a profile photo", screen: "profile-settings", sources: ["features/profile/PhotoCropDialog.tsx"],
