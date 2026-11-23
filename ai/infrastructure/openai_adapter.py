@@ -150,7 +150,9 @@ class OpenAICompatibleAgentProvider(LLMProvider):
                         chunk = json.loads(data)
                     except ValueError:
                         continue
-                    if chunk.get("error"):
+                    # OpenRouter keeps 200 and reports a failed route in the body (IR-1286).
+                    if chunk.get("error") or any(
+                            c.get("finish_reason") == "error" for c in chunk.get("choices") or []):
                         raise self._transient("stream error", status=status, body=chunk)
                     usage = chunk.get("usage") or usage
                     for choice in chunk.get("choices") or []:
@@ -225,11 +227,13 @@ class OpenAICompatibleAgentProvider(LLMProvider):
         message = str(error.get("message") or "")
         if self.config.api_key:
             message = message.replace(self.config.api_key, "[key]")
-        generation = body.get("id") if isinstance(body, dict) else None
+        known = body if isinstance(body, dict) else {}
+        metadata = error.get("metadata") if isinstance(error.get("metadata"), dict) else {}
         log.warning(
-            "agent provider attempt failed: reason=%s status=%s code=%s message=%r generation=%s exception=%s",
-            reason, status, error.get("code"), message[:LOGGED_MESSAGE_CHARS], generation,
-            type(exception).__name__ if exception is not None else None,
+            "agent provider attempt failed: reason=%s status=%s code=%s error_type=%s message=%r"
+            " generation=%s provider=%s exception=%s",
+            reason, status, error.get("code"), metadata.get("error_type"), message[:LOGGED_MESSAGE_CHARS],
+            known.get("id"), known.get("provider"), type(exception).__name__ if exception is not None else None,
         )
         return TransientProviderError(reason)
 

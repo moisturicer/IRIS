@@ -471,6 +471,10 @@ def piece(text):
 STOP = {"id": "gen-ok", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
         "usage": {"prompt_tokens": 21, "completion_tokens": 7}}
 STREAM_ERROR = {"id": "gen-FAILED-1", "error": {"code": 502, "message": "Upstream provider error"}}
+#: OpenRouter's documented mid-stream failure: still HTTP 200, the last route's error in the body.
+ROUTE_ERROR = {"id": "gen-FAILED-2", "provider": "Azure",
+               "error": {"code": 429, "message": "Rate limited", "metadata": {"error_type": "rate_limit_exceeded"}},
+               "choices": [{"index": 0, "delta": {"content": ""}, "finish_reason": "error"}]}
 
 
 def streamed(vendor, *, retries=1, phase="final", live=True, request=None):
@@ -584,3 +588,26 @@ def test_a_plain_send_logs_its_failure_too(caplog, failure, expected):
     logged = "\n".join(r.getMessage() for r in caplog.records)
     assert all(e in logged for e in expected)
     assert "Question-TEXT" not in logged and API_KEY not in logged
+
+
+def test_openrouters_mid_stream_error_is_resent_and_logged_with_route_details(caplog):
+    import logging
+
+    caplog.set_level(logging.WARNING)
+    vendor = Vendor(sse(ROUTE_ERROR, done=False), sse(piece("Answer."), STOP))
+    redis, ledger, go = streamed(vendor)
+    assert run(go()).text == "Answer." and len(vendor.requests) == 2
+    logged = "\n".join(r.getMessage() for r in caplog.records)
+    for expected in ("status=200", "code=429", "error_type=rate_limit_exceeded",
+                     "generation=gen-FAILED-2", "provider=Azure"):
+        assert expected in logged
+
+
+def test_a_finish_reason_of_error_without_an_error_object_is_a_transient_failure():
+    from ai.domain.ports import TransientProviderError
+
+    failed = {"id": "gen-F3", "choices": [{"index": 0, "delta": {}, "finish_reason": "error"}]}
+    vendor = Vendor(sse(failed, done=False), sse(piece("Answer."), STOP))
+    _, _, go = streamed(vendor, retries=0)
+    with pytest.raises(TransientProviderError):
+        run(go())
