@@ -138,7 +138,6 @@ export const SCREEN_ACCESS = {
   // Settings (your account) are separate pages since IR-933. Help is a section
   // of Settings (IR-1245); `/help` is a redirect (`router/redirects.tsx`).
   profile:       { path: "/profile",       roles: EVERYONE },
-  profileEdit:   { path: "/profile/edit",  roles: EVERYONE },
   // Another person's Profile (IR-700), opened by clicking their name. Who may be
   // opened is the server's decision: a hidden account answers 404.
   person:        { path: "/people/:id",    roles: EVERYONE },

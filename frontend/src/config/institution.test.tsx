@@ -16,7 +16,8 @@ vi.mock("@/config/institution", () => ({
 
 it("identifies the configured institution managing account details", () => {
   useAuthStore.setState({ user: makeUser(), isAuthenticated: true, authReady: true });
-  renderScreen(<SettingsPage />, { route: "/settings" });
+  // The sign-in email note is in Account & security, no longer the section Settings opens on (IR-1304).
+  renderScreen(<SettingsPage />, { route: "/settings?tab=security" });
   expect(screen.getByText(/Managed by Example Research University/)).toBeVisible();
 });
 

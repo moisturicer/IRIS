@@ -16,14 +16,14 @@ const AVATAR = 80;
 
 /**
  * A photo change not yet saved: a newly framed photo, or taking the photo off.
- * The Edit profile page holds it and sends it with Save, so Cancel drops it.
+ * Settings' Profile section holds it and sends it with Save, so Discard changes drops it.
  */
 export type PhotoChange =
   | { kind: "upload"; file: File; crop: CropRect; image: ImageSize }
   | { kind: "remove" };
 
 /**
- * The profile photo on Edit profile (IR-699): shown as a circle, or the
+ * The profile photo in Settings' Profile section (IR-699, IR-1304): shown as a circle, or the
  * person's initials when there is none. Choosing a file opens the crop dialog;
  * the framed photo, or Remove photo, is shown here at once but saved only
  * with the page's Save.

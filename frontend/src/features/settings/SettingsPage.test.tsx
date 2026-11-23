@@ -179,27 +179,30 @@ describe("addressable tabs", () => {
     expect(screen.getByLabelText("Current password")).toBeVisible();
   });
 
-  it("opens on Account & security when the tab is missing or unknown", () => {
+  // Changed deliberately by IR-1304: Profile is the first section, so it is the
+  // one a missing or unknown tab opens on (it was Account & security).
+  it("opens on Profile when the tab is missing or unknown", () => {
     renderAt("/settings?tab=billing");
 
-    expect(tab("Account & security")).toHaveAttribute("aria-current", "page");
-    expect(screen.getByLabelText("Current password")).toBeVisible();
+    expect(tab("Profile")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("First name")).toBeVisible();
   });
 });
 
-// IR-933: Profile is its own page; Settings keeps the account.
+// IR-933: Profile is its own page; IR-1304: Settings is where it is edited.
 describe("settings and profile are separate", () => {
-  it("has the account sections only, opening on Account & security", () => {
+  it("has Profile first, then the account sections, opening on Profile", () => {
     renderScreen(<SettingsPage />, { route: "/settings" });
 
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
     const nav = screen.getByRole("navigation", { name: "Settings sections" });
-    // Changed deliberately by IR-1245: Help is a fourth section, not a link out.
+    // Changed deliberately by IR-1245: Help is a section, not a link out; and by
+    // IR-1304: Profile, where it is edited, is the first.
     expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Account & security", "Data privacy & consent", "Role & access", "Help",
+      "Profile", "Account & security", "Data privacy & consent", "Role & access", "Help",
     ]);
-    expect(within(nav).getByRole("button", { name: "Account & security" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByLabelText("Current password")).toBeVisible();
+    expect(within(nav).getByRole("button", { name: "Profile" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("First name")).toBeVisible();
   });
 
   // IR-1245 replaces IR-1217's link: Help opened from Settings stays in Settings.
@@ -256,16 +259,18 @@ describe("settings and profile are separate", () => {
     }
   });
 
-  it("points to the Profile instead of holding it", () => {
+  // Changed deliberately by IR-1304: Settings now holds the editing (it used to
+  // point away from it), and still links to the Profile it changes.
+  it("links to the Profile preview, and holds the editing of it", () => {
     renderScreen(<SettingsPage />, { route: "/settings" });
 
     expect(screen.getByRole("link", { name: "Your profile" })).toHaveAttribute("href", "/profile");
-    expect(screen.queryByLabelText("Bio")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Bio")).toBeVisible();
     expect(screen.queryByRole("link", { name: "View my profile" })).not.toBeInTheDocument();
   });
 
   it("shows the sign-in email as read-only, managed by the university", () => {
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<SettingsPage />, { route: "/settings?tab=security" });
 
     expect(screen.getByLabelText("Sign-in email")).toHaveValue("reader@cit.edu");
     expect(screen.getByLabelText("Sign-in email")).toHaveAttribute("readonly");
