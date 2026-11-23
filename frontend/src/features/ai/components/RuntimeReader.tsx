@@ -18,6 +18,7 @@ import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AskIrisMark } from "./AskIrisIcons";
 import { ReasoningBar } from "./ReasoningBar";
 import { StarterQuestions } from "./StarterQuestions";
+import { EditQuestion } from "./EditQuestion";
 import { ASK_STARTERS, PAPER_STARTERS } from "./askStarters";
 import { TokenUsageMeter } from "./TokenUsageMeter";
 import { AskedPassage, SELECTION_QUESTION, SELECTION_REFUSALS, SelectionChip, selectionRefusal, type AskSelection } from "./SelectionChip";
@@ -223,10 +224,10 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     return () => clearTimeout(timer);
   }, [api, run, error, fail, reopen]);
 
-  const send = async (question: string, retry = false) => {
-    if (sending.current) return;
+  const send = async (question: string, retry = false): Promise<boolean> => {
+    if (sending.current) return false;
     const request = retry ? pending.current : { question, depth, key: crypto.randomUUID(), conversation, selection: asked };
-    if (!request) return;
+    if (!request) return false;
     pending.current = request;
     sending.current = true;
     setBusy(true); setError(undefined);
@@ -234,21 +235,22 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     try {
       const next = await api.submit(request.question, request.depth, request.key, request.conversation,
         request.selection);
-      if (version !== generation.current) return;
+      if (version !== generation.current) return false;
       pending.current = undefined;
       if (request.selection) onSelectionChange?.(null);
       setRun(next);
       await reopen(next.conversation_id, version);
-      if (version !== generation.current) return;
+      if (version !== generation.current) return true;
       onConversation?.(next.conversation_id);
+      return true;
     } catch (failure) {
-      if (version !== generation.current) return;
+      if (version !== generation.current) return false;
       const refusal = request.selection ? selectionRefusal(failure) : null;
       if (refusal) {
         pending.current = undefined;
         setDraft(request.question);
         setSelectionNote(SELECTION_REFUSALS[refusal]);
-        return;
+        return false;
       }
       if (isAxiosError(failure) && failure.response?.status === 409) {
         pending.current = undefined;
@@ -265,6 +267,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
         if (!next.retry) pending.current = undefined;
         setError(next);
       }
+      return false;
     }
     finally {
       sending.current = false;
@@ -345,7 +348,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   };
 
   const reconnect = async () => {
-    if (pending.current) return send(pending.current.question, true);
+    if (pending.current) { await send(pending.current.question, true); return; }
     if (pendingRetry.current) return retryRun(true);
     const id = run?.conversation_id ?? conversationId;
     if (!id) return;
@@ -381,8 +384,32 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answeredKey]);
 
-  const runs = [...(conversation?.runs ?? [])];
+  // A question edited in place (IR-1306): its earlier question and answer leave the page, and the
+  // new one takes their place. The conversation keeps both; this browser remembers which it set aside.
+  const [editingRun, setEditingRun] = useState<string | null>(null);
+  const replacedKey = conversation ? `iris:replaced:${conversation.id}` : null;
+  const [replaced, setReplaced] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    if (!replacedKey) { setReplaced(new Set()); return; }
+    try { setReplaced(new Set(JSON.parse(localStorage.getItem(replacedKey) ?? "[]") as string[])); }
+    catch { setReplaced(new Set()); }
+  }, [replacedKey]);
+  const setAside = (id: string, hidden: boolean) => setReplaced(current => {
+    const next = new Set(current);
+    if (hidden) next.add(id); else next.delete(id);
+    if (replacedKey) try { localStorage.setItem(replacedKey, JSON.stringify([...next])); } catch { /* optional */ }
+    return next;
+  });
+  const sendEdited = async (id: string, question: string) => {
+    setEditingRun(null);
+    setAside(id, true);
+    if (!(await send(question))) setAside(id, false);
+  };
+
+  const runs = [...(conversation?.runs ?? [])].filter(item => !replaced.has(item.id));
   if (run && !runs.some(item => item.id === run.id)) runs.push(run);
+  // Only the latest question is edited in place, once its run has ended.
+  const editable = runs.length > 0 && !activeRun(runs[runs.length - 1]) ? runs[runs.length - 1].id : null;
 
   // Follows the newest text while the reader is at the bottom; scrolling up lets go until they return.
   const scroller = useRef<HTMLDivElement>(null);
@@ -407,27 +434,27 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
   useEffect(() => {
     if (focusDraft.current && !blocked) { focusDraft.current = false; composerRef.current?.focus(); }
   }, [blocked]);
-  const editQuestion = (question: string) => { setDraft(question); composerRef.current?.focus(); };
 
   return <div className={`flex h-full max-h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : "overflow-hidden"}`}>
     <div ref={scroller} onScroll={e => {
       const box = e.currentTarget;
       pinned.current = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-    }} className={cn(dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
+    }} className={cn(
+      // The opening takes the composer's own padding and width, so its edges line up with the box below (IR-1306).
+      centered ? "px-4 py-6 sm:px-6" : dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
       centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin")}>
-      <div ref={column} className={cn(dense ? "space-y-5" : `${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} space-y-6`)}>
-        {centered && (dense
-          ? <p className="font-display text-xl text-left text-stone-900">{scope ? "Ask about this paper." : "What would you like to investigate?"}</p>
-          : <div className="flex flex-col items-center gap-3">
-            <span aria-hidden className="inline-flex size-12 items-center justify-center rounded-full bg-stone-100 text-brand">
-              <AskIrisMark className="size-6" />
-            </span>
-            <p className="font-display text-display text-balance text-stone-900">
-              {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>
-            <p className="text-body text-stone-600 text-balance">
-              {scope ? "Answers come from this paper and cite the page they draw on."
-                : "Ask about the research held in IRIS. Every answer cites the passages it draws on."}</p>
-          </div>)}
+      <div ref={column} className={cn(centered ? `${CHAT_OPENING_COLUMN} ${dense ? "space-y-5" : "space-y-6"}`
+        : dense ? "space-y-5" : `${CHAT_COLUMN} space-y-6`)}>
+        {centered && <div className={cn("flex flex-col items-center", dense ? "gap-2" : "gap-3")}>
+          <span aria-hidden className={cn("inline-flex items-center justify-center rounded-full bg-stone-100 text-brand", dense ? "size-10" : "size-12")}>
+            <AskIrisMark className={dense ? "size-5" : "size-6"} />
+          </span>
+          <p className={cn("font-display text-balance text-stone-900", dense ? "text-xl" : "text-display")}>
+            {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>
+          <p className={cn("text-balance text-stone-600", dense ? "text-small" : "text-body")}>
+            {scope ? "Answers come from this paper and cite the page they draw on."
+              : "Ask about the research held in IRIS. Every answer cites the passages it draws on."}</p>
+        </div>}
         {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}
         {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" onRetry={() => setOpenAttempt(n => n + 1)} />}
         {opening === "unavailable" && <div role="alert" className="py-10 text-center">
@@ -445,11 +472,14 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
           return <div key={item.id} className="space-y-5">
             {current.selection && <AskedPassage selection={current.selection} />}
             {messages.filter(m => m.id === `q:${item.id}` || (m.id === `a:${item.id}` && !(writing && item.id === run?.id))).map(m => <div key={m.id}>
-              <ChatMessageBubble message={m} compact={dense} inlineSources
-                sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources}
-                controlsDisabled={blocked}
-                onAskAgain={m.role === "user" ? question => void send(question) : undefined}
-                onEdit={m.role === "user" ? editQuestion : undefined} />
+              {m.role === "user" && editingRun === item.id
+                ? <EditQuestion question={m.content} compact={dense} onCancel={() => setEditingRun(null)}
+                  onSend={question => void sendEdited(item.id, question)} />
+                : <ChatMessageBubble message={m} compact={dense} inlineSources
+                  sourcesSelected={m.id === selectedId} onSelectSources={onSelectSources}
+                  controlsDisabled={blocked}
+                  onAskAgain={m.role === "user" ? question => void send(question) : undefined}
+                  onEdit={m.role === "user" && item.id === editable ? () => setEditingRun(item.id) : undefined} />}
             </div>)}
             {(() => {
               // The streamed draft stays up until the checked answer lands, so it never blinks out between the two.

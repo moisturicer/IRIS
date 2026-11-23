@@ -11,7 +11,6 @@ import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/cite
 import { remarkLimitMath } from "./mathLimit";
 import { nestLists } from "./listIndent";
 import { breakLongRuns } from "./runLimit";
-import { REFERENCE } from "@/components/ui/highlightRoles";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -77,6 +76,17 @@ function CitationPlaceholder() {
  * number, so it reads as one -- "p8", at the size of the type around it -- the
  * way a reader would cite a page, instead of an 8px digit in a dot.
  */
+/**
+ * One citation mark for chat and the AI Overview alike (IR-1306): white figures
+ * on the binding maroon at 70%, which darkens to Binding Maroon Dark under the
+ * pointer or focus. 70% keeps white text at about 5.5:1; a lighter wash would not.
+ * `min-w`: a marker can run to three digits, or "p12" in the Overview.
+ */
+const CITATION_CHIP =
+  "inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-control mx-0.5 px-1 align-text-bottom " +
+  "bg-brand/70 text-2xs font-semibold leading-none tabular-nums text-white no-underline " +
+  "transition-colors duration-150 hover:bg-brand-dark focus-visible:bg-brand-dark motion-reduce:transition-none";
+
 function CitationChip({ citation, page = false }: { citation: ChatCitation; page?: boolean }) {
   const { to, state, pageContext } = useCitationLink(citation);
   // The Overview cites a page as a whole, and says so (IR-578).
@@ -94,14 +104,7 @@ function CitationChip({ citation, page = false }: { citation: ChatCitation; page
       state={state}
       title={label}
       aria-label={label}
-      className={
-        page
-          ? "inline-flex items-center px-1 mx-0.5 rounded-control text-2xs font-semibold tabular-nums " +
-            "text-brand leading-5 align-baseline no-underline hover:bg-stone-100 hover:underline transition-colors duration-150"
-          : // min-w: a marker can run to three digits.
-            "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mx-0.5 rounded-control " +
-            `${REFERENCE} text-2xs font-semibold tabular-nums align-text-bottom leading-none no-underline`
-      }
+      className={CITATION_CHIP}
     >
       {page ? `p${citation.marker}` : citation.marker}
     </Link>

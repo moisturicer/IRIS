@@ -193,7 +193,8 @@ describe("New conversation, Search, Pinned and Recents", () => {
     render(<Sidebar />);
     const edge = screen.getByRole("separator", { name: "Resize conversations" });
     edge.focus();
-    await user.keyboard("{ArrowRight}");
+    // The pane is on the right (IR-1306): its edge faces left, so ArrowLeft widens it.
+    await user.keyboard("{ArrowLeft}");
     expect(edge).toHaveAttribute("aria-valuenow", "304");
     await user.keyboard("{End}");
     expect(edge).toHaveAttribute("aria-valuenow", String(SIDEBAR_MAX));

@@ -106,14 +106,15 @@ describe("the AI overview on a paper", () => {
   });
 
   // Reverses IR-569's "no card" (IR-1306): the reader should see at a glance that AI wrote it.
-  it("sits in its own labelled container that says it is AI-generated", async () => {
+  it("sits in its own labelled container that says AI wrote it", async () => {
     renderScreen(<PaperAiOverview record={record} />);
 
     const heading = await screen.findByRole("heading", { level: 2, name: "AI Overview" });
     const section = screen.getByRole("region", { name: "AI Overview" });
     expect(section).toContainElement(heading);
     expect(section).toHaveClass("rounded-card", "border");
-    expect(within(section).getByText("AI-generated")).toBeInTheDocument();
+    // The AI-generated pill is gone (IR-1306); the footer line still says so.
+    expect(within(section).queryByText("AI-generated")).not.toBeInTheDocument();
     expect(await within(section).findByText(/Written by AI from this paper/)).toBeInTheDocument();
   });
 

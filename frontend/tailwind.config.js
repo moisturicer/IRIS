@@ -364,11 +364,7 @@ export default {
           "0%":   { opacity: "0", transform: "translateY(0.45em)", filter: "blur(3px)" },
           "100%": { opacity: "1", transform: "translateY(0)", filter: "blur(0)" },
         },
-        // A title pulled from the shelf while IRIS reads (IR-1306).
-        "shelf-in": {
-          "0%":   { opacity: "0", transform: "translateX(-6px)" },
-          "100%": { opacity: "1", transform: "translateX(0)" },
-        },
+
         // A citation's passage briefly reads stronger on arrival, so a
         // reader's eye finds it on the page rather than searching for a
         // static box among the surrounding text (IR-335). Maroon, the colour of
@@ -409,7 +405,6 @@ export default {
         "fade-in":    "fade-in 0.2s ease-out",
         "citation-flash": "citation-flash 1.6s ease-out",
         "verb-in": "verb-in 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards",
-        "shelf-in": "shelf-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
       },
     },
   },

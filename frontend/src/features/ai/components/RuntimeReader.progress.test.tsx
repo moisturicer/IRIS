@@ -41,9 +41,10 @@ test("a working run shows what it reports under a polite heading, and nothing it
   expect(live).toHaveAttribute("aria-live", "polite");
   expect(live).toContainElement(within(progress).getByRole("heading"));
   expect(progress.querySelector("[aria-live=assertive], [role=alert]")).toBeNull();
-  expect(within(progress).getByText("Searching papers")).toBeInTheDocument();
-  expect(within(progress).getByText("Read 2 papers")).toBeInTheDocument();
-  expect(within(progress).getByText("Sampling a river")).toBeInTheDocument();
+  // IR-1306: no step chip or titles; the verb names the tool, and a screen reader hears what the run reported.
+  expect(within(progress).getByText("Searching papers. Read 2 papers")).toHaveClass("sr-only");
+  expect(within(progress).queryByText("Sampling a river")).not.toBeInTheDocument();
+  expect(within(progress).getByText(/^(Reading the pages|Reading closely)…$/)).toBeInTheDocument();
 
   const steps = within(within(progress).getByRole("list", { name: "Research plan" })).getAllByRole("listitem");
   expect(steps.map(step => step.textContent)).toEqual([

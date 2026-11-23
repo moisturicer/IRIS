@@ -247,9 +247,8 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
         <button type="button" onClick={() => setRecentOpen(v => !v)} aria-expanded={recentOpen} disabled={recent.length === 0}
           aria-label={recent.length > 0 ? `Recent chats (${recent.length})` : "Recent chats"}
           title={recent.length > 0 ? `Recent chats (${recent.length})` : "No recent chats yet"}
-          className={cn(ICON_BUTTON, recentOpen && "bg-stone-200 text-stone-900")}>
+          className={cn(ICON_BUTTON, recentOpen && "bg-surface text-stone-900 ring-1 ring-stone-300")}>
           <i className="fas fa-clock-rotate-left text-xs" aria-hidden />
-          {recent.length > 0 && <span aria-hidden className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-brand px-1 text-3xs font-semibold leading-4 text-white">{recent.length}</span>}
         </button>
         {conversationId && <DownloadConversation download={() => api.download(conversationId)} className="hover:bg-stone-200" />}
         <button type="button" onClick={newChat} aria-label="New chat" title="New chat" className={ICON_BUTTON}>
@@ -266,7 +265,8 @@ function RuntimePaperChatPanel(props: PaperChatPanelProps) {
       <p className="mt-2 break-words text-2xs text-stone-600">{props.record.title}</p>
       {props.viewingVersion != null && <p className="mt-1 text-2xs text-stone-700">
         Answers are about the current version, not v{props.viewingVersion}.</p>}
-      {recentOpen && <RecentChats className="mt-2 max-h-48 overflow-y-auto" chats={recent} activeId={conversationId ?? null}
+      {recentOpen && <RecentChats className="-mx-1 mt-3 max-h-[min(22rem,45vh)] overflow-y-auto overscroll-contain rounded-card bg-surface p-2 ring-1 ring-stone-200 scrollbar-thin"
+        chats={recent} activeId={conversationId ?? null} onNew={newChat}
         onChoose={chat => { setRecentOpen(false); remember(chat.id); }} />}
     </div>
 

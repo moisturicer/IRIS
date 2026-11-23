@@ -3,35 +3,45 @@ import type { ReaderActivity, ReaderRun } from "@/api/runtimeReader";
 import { IrisLoader } from "@/components/brand/IrisBrand";
 import { cn } from "@/lib/utils";
 
-const STEP_ICONS: Record<NonNullable<ReaderActivity["step"]>["kind"], string> = {
-  read: "fas fa-book-open",
-  search: "fas fa-magnifying-glass",
-  catalogue: "fas fa-layer-group",
-  recall: "fas fa-clock-rotate-left",
+/**
+ * What the heading says IRIS is doing (IR-1306), chosen from the phase and the
+ * tool the run reported, never guessed. The server names a model phase
+ * (Thinking, Writing the answer, Checking the answer) and each tool step
+ * (`TOOL_STEPS` in `ai/runs/public.py`); every set below describes only that.
+ */
+const VERBS: Record<string, readonly string[]> = {
+  waiting:    ["Waiting for a reading desk"],
+  thinking:   ["Reading your question", "Planning where to look"],
+  writing:    ["Writing the answer", "Setting down the citations"],
+  checking:   ["Checking each citation", "Checking the figures"],
+  search:     ["Searching the stacks", "Scanning the shelves"],
+  lookup:     ["Finding the paper you named"],
+  catalogue:  ["Consulting the catalogue"],
+  count:      ["Counting the records"],
+  details:    ["Reading the record's details"],
+  read:       ["Reading the pages", "Reading closely"],
+  outline:    ["Reading the table of contents"],
+  recall:     ["Recalling this conversation"],
+  reread:     ["Rereading an earlier answer"],
 };
 
-/**
- * What the heading says IRIS is doing (IR-1306), in the library's own words.
- * Each set describes only the kind of step the run reported, so turning
- * through it never claims work the run is not doing.
- */
-const VERBS = {
-  waiting:   ["Waiting for a reading desk"],
-  starting:  ["Reading your question", "Planning where to look"],
-  search:    ["Searching the stacks", "Scanning the shelves", "Pulling likely papers"],
-  read:      ["Reading the pages", "Following the passage", "Reading closely"],
-  catalogue: ["Consulting the catalogue", "Checking the records"],
-  recall:    ["Rereading earlier answers", "Recalling this conversation"],
-} as const;
+function verbKey(activity?: ReaderActivity | null): string {
+  if (!activity) return "thinking";
+  if (activity.phase === "waiting") return "waiting";
+  const label = activity.label.toLowerCase();
+  if (label.startsWith("writing")) return "writing";
+  if (label.startsWith("checking")) return "checking";
+  const step = activity.step;
+  if (!step) return "thinking";
+  const said = step.label.toLowerCase();
+  if (step.kind === "recall") return said.includes("earlier answer") ? "reread" : "recall";
+  if (step.kind === "catalogue") return said.includes("count") ? "count" : said.includes("details") ? "details" : "catalogue";
+  if (step.kind === "search") return said.includes("looked up") ? "lookup" : "search";
+  return said.includes("section") || said.includes("outline") ? "outline" : "read";
+}
 
 /** How long one verb stays before the next in its set. */
 const VERB_MS = 3200;
-
-function verbsFor(activity?: ReaderActivity | null): readonly string[] {
-  if (!activity) return VERBS.starting;
-  if (activity.step) return VERBS[activity.step.kind];
-  return activity.phase === "waiting" ? VERBS.waiting : VERBS.starting;
-}
 
 /** Turns through `verbs`, starting again whenever the set changes. */
 function useVerb(verbs: readonly string[]): string {
@@ -75,8 +85,9 @@ const PLAN_STATUS: Record<PlanStep["status"], { word: string; mark: string }> = 
  * so a run that has reported nothing shows the heading alone. Everything but the clock and the
  * turning verb sits in one polite live region, so an update is announced without interrupting.
  *
- * IR-1306: the Folio Ribbon mark opens and closes in place of a spinner, and the heading names the
- * kind of step in library words, one rising into view after another. A screen reader hears one
+ * IR-1306: the Folio Ribbon mark opens and closes in place of a spinner, and the heading names what the
+ * run is doing in library words, from the phase and tool it reported, one rising into view after another.
+ * The step chip and the titles under it are gone: the verb alone says what is happening. A screen reader hears one
  * steady heading instead, since a verb changing every few seconds would be read out each time.
  */
 export function ReasoningBar({ activity, plan, deep = false, runStartedAt, compact = false }: {
@@ -89,8 +100,7 @@ export function ReasoningBar({ activity, plan, deep = false, runStartedAt, compa
   compact?: boolean;
 }) {
   const elapsed = useSeconds(runStartedAt ?? activity?.since);
-  const verb = useVerb(verbsFor(activity));
-  const step = activity?.step;
+  const verb = useVerb(VERBS[verbKey(activity)]);
   const steps = plan?.steps ?? [];
   return (
     <section aria-label="Research progress" className={cn("relative pl-4", compact ? "text-small" : "text-control")}>
@@ -111,20 +121,8 @@ export function ReasoningBar({ activity, plan, deep = false, runStartedAt, compa
           {/* Decoration for sighted readers: a clock ticking in a live region would be read out every tenth of a second. */}
           {elapsed && <span aria-hidden className="text-small tabular-nums text-stone-500">{elapsed}</span>}
         </div>
-        {activity && <p key={activity.label} className="text-stone-700 motion-safe:animate-fade-in">{activity.label}</p>}
-        {step && <div key={`${step.kind}:${step.label}`} className="space-y-1">
-          <p className="inline-flex items-center gap-2 text-small font-medium text-stone-800 motion-safe:animate-fade-in-up">
-            <i className={cn(STEP_ICONS[step.kind], "w-4 text-center text-label text-brand")} aria-hidden />{step.label}
-          </p>
-          {/* Paper titles, so in the titles' own Garamond, pulled out one after another. */}
-          {step.detail.length > 0 && <ul className="space-y-0.5 pl-6">
-            {step.detail.map((title, index) => <li key={title}
-              style={{ animationDelay: `${Math.min(index, 5) * 70}ms` }}
-              className="font-display text-body leading-snug text-stone-700 [overflow-wrap:anywhere] motion-safe:animate-shelf-in">
-              {title}
-            </li>)}
-          </ul>}
-        </div>}
+        {/* What the run reported, for a screen reader: sighted readers have the verb. */}
+        {activity && <p className="sr-only">{activity.step ? `${activity.label}. ${activity.step.label}` : activity.label}</p>}
         {steps.length > 0 && <ol aria-label="Research plan" className="space-y-1.5">
           {steps.map(item => {
             const { word, mark } = PLAN_STATUS[item.status];

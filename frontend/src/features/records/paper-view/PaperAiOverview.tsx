@@ -102,10 +102,6 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
             <AskIrisMark className="size-4" />
           </span>
           <h2 id="ai-overview-heading" className="font-display text-section font-semibold text-stone-900">AI Overview</h2>
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-label font-medium text-stone-600 ring-1 ring-stone-300">
-            <i aria-hidden className="fas fa-wand-magic-sparkles text-3xs text-brand" />
-            AI-generated
-          </span>
         </div>
         {state === "ready" && overview && (
           <button type="button" onClick={() => void copy()} className={cn("px-2.5 font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800", CONTROL_BASE)}>

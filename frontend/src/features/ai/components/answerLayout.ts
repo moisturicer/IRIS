@@ -13,11 +13,12 @@ export const ANSWER_MARKDOWN = [
   "chat-markdown prose prose-base max-w-none prose-pre:my-2 prose-pre:bg-stone-900 prose-pre:text-stone-100",
   // One reading type for every model answer (IR-1306): Ask IRIS and the AI
   // Overview set the same size, leading, headings and list markers, so the two
-  // read as one voice. 16 px Inter at 1.75; any heading the model writes is a
-  // 17 px ink Garamond line with room above it and no rule under it.
+  // read as one voice. 16 px Inter at 1.75. A heading the model writes is a
+  // maroon Garamond line with no rule under it, on a ladder that stays above the
+  // body text: Garamond's small x-height made 17 px read smaller than 16 px Inter.
   "text-md prose-p:leading-[1.75] prose-li:leading-[1.75] prose-li:my-[0.3em] prose-li:marker:text-brand",
-  "prose-headings:text-stone-900 prose-h1:border-b-0 prose-h2:border-b-0 prose-h1:pb-0 prose-h2:pb-0",
-  "prose-h1:text-[1.0625em] prose-h2:text-[1.0625em] prose-h3:text-[1.0625em] prose-h4:text-[1.0625em]",
+  "prose-headings:text-brand prose-h1:border-b-0 prose-h2:border-b-0 prose-h1:pb-0 prose-h2:pb-0",
+  "prose-h1:text-[1.3125em] prose-h2:text-[1.1875em] prose-h3:text-[1.125em] prose-h4:text-[1.0625em]",
   "prose-h1:mt-[1.6em] prose-h2:mt-[1.6em] prose-h3:mt-[1.3em] prose-h1:mb-[0.35em] prose-h2:mb-[0.35em] prose-h3:mb-[0.3em]",
 ].join(" ");
 
@@ -29,8 +30,6 @@ export const ANSWER_MARKDOWN = [
  */
 export const OVERVIEW_MARKDOWN = [
   ANSWER_MARKDOWN,
-  // The same 17 px, pinned under the Overview's own 22 px heading (IR-1089).
-  "prose-h1:text-lg prose-h2:text-lg prose-h3:text-lg prose-h4:text-lg",
   "[&_p]:text-justified",
 ].join(" ");
 
