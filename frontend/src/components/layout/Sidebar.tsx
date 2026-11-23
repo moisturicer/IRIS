@@ -279,7 +279,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const [queueCounts, setQueueCounts] = useState<QueueCounts>(NO_QUEUES);
   /** My Library's count: the user's records waiting on them (IR-1310). */
-  const [needsAction, setNeedsAction] = useState<number | undefined>(undefined);
+  const [libraryWaiting, setLibraryWaiting] = useState<number | undefined>(undefined);
   /** My Reviews' To review count, from the same stats read (IR-1208). */
   const [reviewsWaiting, setReviewsWaiting] = useState<number | undefined>(undefined);
   const { pathname, search } = useLocation();
@@ -319,7 +319,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   }, [showsQueues, pathname, search, queuesTick]);
 
   // My Library's count: the user's records waiting on them -- a revision or
-  // a document was asked for (B2, `needs_action_mine`; a dot until IR-1310). The same read carries
+  // a document was asked for (B2, `needs_action_mine`; a dot until IR-1310).
+  // The same read carries
   // My Reviews' count, the reviews waiting on the user (IR-1208, the To review
   // tab's own number, `reviews_waiting_mine`). Asked again whenever
   // the address changes, query string included -- Paper View's sections are
@@ -327,17 +328,17 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // A failed read shows no count rather than a stale one.
   const showsLibrary = nav.some((entry) => entry.key === "library");
   useEffect(() => {
-    if (!showsLibrary) { setNeedsAction(undefined); setReviewsWaiting(undefined); return; }
+    if (!showsLibrary) { setLibraryWaiting(undefined); setReviewsWaiting(undefined); return; }
     let live = true;
     dashboardApi
       .stats()
       .then(({ data }) => {
         if (!live) return;
-        setNeedsAction(data.needs_action_mine);
+        setLibraryWaiting(data.needs_action_mine);
         // The same number as My Reviews' To review tab (IR-1208).
         setReviewsWaiting(data.reviews_waiting_mine);
       })
-      .catch(() => { if (live) { setNeedsAction(undefined); setReviewsWaiting(undefined); } });
+      .catch(() => { if (live) { setLibraryWaiting(undefined); setReviewsWaiting(undefined); } });
     return () => { live = false; };
   }, [pathname, search, showsLibrary, statsTick]);
 
@@ -348,7 +349,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     // Reviews waiting on the user, for every reviewer with work (IR-1208).
     reviewQueue: reviewsWaiting,
     // The user's records waiting on them (IR-1310), a number like the others.
-    library: needsAction,
+    library: libraryWaiting,
     roleRequests: queueCounts.role_change_requests,
     downloadRequests: queueCounts.download_requests,
     deleteRequests: queueCounts.delete_requests,
@@ -359,13 +360,20 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     notifications: unreadCount,
   };
 
+  // What a screen reader hears after a count, where "pending" is not it.
+  // Notifications are unread (IR-370); My Library's records wait on the user
+  // (IR-1310), worded so one reads as well as many.
+  const BADGE_WORDS: Partial<Record<NavEntry["key"], string>> = {
+    notifications: "unread",
+    library: "waiting on you",
+  };
+
   const toItem = (entry: NavEntry): NavItem => {
     const children = nav.filter((child) => child.parent === entry.key).map(toItem);
     return {
       to: entry.to, label: entry.label, icon: entry.icon,
       badge: BADGES[entry.key],
-      ...(entry.key === "notifications" ? { badgeWord: "unread" } : {}),
-      ...(entry.key === "library" ? { badgeWord: "waiting on you" } : {}),
+      badgeWord: BADGE_WORDS[entry.key],
       ...(children.length > 0 ? { children } : {}),
     };
   };

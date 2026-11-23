@@ -535,6 +535,17 @@ describe("the My Library count (IR-1310; a dot until then, IR-534 B2)", () => {
     expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
   });
 
+  it("shows no count, not a stale one, when the read fails", async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error("down"));
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/stats/"));
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
+  });
+
   it("stays named with the count on the collapsed rail", async () => {
     useUIStore.setState({ sidebarCollapsed: true });
     waitingOnYou(1);
