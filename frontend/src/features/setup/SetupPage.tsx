@@ -413,7 +413,7 @@ function RowFrame({ number, label, head, actions, children }: {
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2 pt-0.5">{head}</div>
-          {actions && <div className="-my-1 flex flex-wrap items-center gap-1">{actions}</div>}
+          {actions && <div className="flex flex-wrap items-center gap-1">{actions}</div>}
         </div>
         {children}
       </div>
