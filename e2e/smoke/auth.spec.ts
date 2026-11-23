@@ -24,7 +24,8 @@ test("rejected credentials keep the visitor on sign-in with an explanation", asy
   await page.getByLabel("Email Address").fill("student@cit.edu");
   await page.getByLabel("Password", { exact: true }).fill("wrong-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  // Said in a dialog in front of the form, so the form does not move (IR-1303).
+  await expect(page.getByRole("alertdialog", { name: "Invalid email or password" })).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
 });
 
