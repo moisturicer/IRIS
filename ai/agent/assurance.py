@@ -46,6 +46,19 @@ _ABSENCE = re.compile(
     r"|\bnone\b|\bnothing\b", re.I)
 _LINE = re.compile(r"\n+")
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
+#: Opens or closes a fenced code block; its lines are code, never sentences (IR-1280).
+_FENCE = re.compile(r"^\s*(?:```|~~~)")
+
+
+def _markdown_lines(text: str):
+    """(line, is_prose) for each line of `text`; fence lines and code inside a fence are not prose."""
+    fenced = False
+    for line in text.split("\n"):
+        if _FENCE.match(line):
+            fenced = not fenced
+            yield line, False
+        else:
+            yield line, not fenced
 
 
 def numbers(text: str) -> set[Decimal]:
@@ -256,9 +269,16 @@ def _claims(text: str, investigation: Investigation, *, prior=(), excluded=()) -
 def qualified(text: str, investigation: Investigation, *, prior=(), excluded=()) -> str:
     """`text` whole: citations that bind to no passage are removed, and a sentence that still fails
     the checks without them (an unsupported number or title) is kept but marked as not established.
+
+    The Markdown around the sentences is kept (IR-1280): blank lines between paragraphs, each
+    line's indentation, and fenced code verbatim. Lines rejoined by single newlines read as one
+    paragraph, so an answer used to reach the reader as one block.
     """
     out = []
-    for line in _LINE.split(text.strip()):
+    for line, prose in _markdown_lines(text.strip()):
+        if not prose or not line.strip():
+            out.append(line if not prose else "")
+            continue
         units = []
         for unit in _sentences(line):
             if not check(unit, investigation, prior=prior, excluded=excluded):
@@ -268,8 +288,14 @@ def qualified(text: str, investigation: Investigation, *, prior=(), excluded=())
             # A bad citation alone is just removed; the sentence is qualified only if it still fails.
             still = cleaned and _claims(cleaned, investigation, prior=prior, excluded=excluded)
             units.append(f"{cleaned} {QUALIFIER}" if still else cleaned)
-        out.append(" ".join(u for u in units if u))
-    return "\n".join(line for line in out if line)
+        kept = " ".join(u for u in units if u)
+        if kept.startswith("|") and kept.endswith(f"| {QUALIFIER}"):
+            # After a table row's closing pipe the mark would be a cell past the header, and dropped.
+            kept = f"{kept[:-len(f'| {QUALIFIER}')].rstrip()} {QUALIFIER} |"
+        if kept:
+            out.append(line[:len(line) - len(line.lstrip())] + kept)
+    # A line emptied of every sentence leaves at most one blank line, never a run of them.
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
 
 
 def unmatched_note(found: dict[str, list[str]]) -> str:
@@ -290,10 +316,15 @@ def bindable(text: str, investigation: Investigation, *, excluded=()) -> str:
     def keep(match: re.Match) -> str:
         passage = investigation.passages.get(match.group(1))
         return match.group(0) if passage is not None and passage.record_id not in excluded else ""
-    # A number or handle the model typed in brackets reads as a citation but points at nothing.
-    text = _MARKER_LIKE.sub("", CITE.sub(keep, text))
-    # A removed citation leaves no gap before the punctuation that followed it.
-    return re.sub(r"[ \t]+([.,;:!?])", r"\1", re.sub(r"[ \t]{2,}", " ", text)).strip()
+    def tidy(line: str) -> str:
+        # A number or handle the model typed in brackets reads as a citation but points at nothing.
+        line = _MARKER_LIKE.sub("", CITE.sub(keep, line))
+        # A removed citation leaves no gap inside the line, nor before the punctuation that followed
+        # it; a line's own indentation, which nests a list, is never touched (IR-1280).
+        line = re.sub(r"(?<=\S)[ \t]{2,}(?=\S)", " ", line)
+        return re.sub(r"(?<=\S)[ \t]+([.,;:!?])", r"\1", line)
+    # Fenced code is shown as written.
+    return "\n".join(tidy(line) if prose else line for line, prose in _markdown_lines(text)).strip()
 
 
 def deliver(text: str, investigation: Investigation) -> tuple[str, tuple[Citation, ...]]:
