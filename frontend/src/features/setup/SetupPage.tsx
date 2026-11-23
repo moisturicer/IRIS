@@ -13,12 +13,18 @@
  * image file up to 50 MB, and always downloads.
  *
  * Every change is saved at once and audited by the server.
+ *
+ * Requirements & Templates is Guidelines in edit mode (`Handbook`): the same
+ * record-type rail, the same numbered rows in the same order, each row
+ * carrying its edit controls and its Template slot, so RDCO edits exactly
+ * what everyone reads.
  */
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   setupApi, TEMPLATE_ACCEPT, type RequirementFields, type SetupRecordType, type SetupRequirement,
 } from "@/api/setup";
+import { Handbook, RAIL_LIST, RailCaption, railItemClass } from "@/components/layout/Handbook";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { InterruptedState } from "@/components/shared/InterruptedState";
@@ -27,11 +33,13 @@ import { PlainTextWithLinks } from "@/components/shared/PlainTextWithLinks";
 import { RequirementLabel } from "./RequirementLabel";
 import { Button } from "@/components/ui/Button";
 import { fieldClasses, LABEL, WARNING_NOTICE } from "@/components/ui/fieldClasses";
+import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { Spinner } from "@/components/ui/Spinner";
 import { useApiRead } from "@/hooks/useApiRead";
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage } from "@/lib/readFailure";
-import { downloadBlob } from "@/lib/utils";
+import { cn, downloadBlob } from "@/lib/utils";
 import NoticeSection from "./NoticeSection";
 
 const MAX_TEMPLATE_BYTES = 50 * 1024 * 1024;
@@ -78,12 +86,16 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       <PageHeader
         title="Setup"
         description="What each record type asks for, the forms people download, how each type is described, and the data notice. Changes show at once wherever they appear."
       />
-      <div role="tablist" aria-label="Setup sections" className="flex flex-wrap gap-1 border-b border-stone-200">
+      <div
+        role="tablist"
+        aria-label="Setup sections"
+        className="mb-8 inline-flex max-w-full flex-wrap gap-0.5 rounded-control bg-stone-200 p-0.5"
+      >
         {SECTIONS.map(({ value, label }) => (
           <button
             key={value}
@@ -96,11 +108,12 @@ export default function SetupPage() {
             tabIndex={value === section ? 0 : -1}
             onClick={() => open(value)}
             onKeyDown={onKey}
-            className={`-mb-px border-b-2 px-4 py-2 text-small font-medium transition-colors ${
-              value === section
-                ? "border-brand text-brand"
-                : "border-transparent text-stone-600 hover:text-stone-900"
-            }`}
+            className={cn(
+              "rounded-control px-4 py-1.5 text-small font-semibold touch:min-h-11",
+              value === section ? SELECTED_SEGMENT : "text-stone-600 hover:text-stone-900",
+              COLOUR_TRANSITION,
+              FOCUS_RING,
+            )}
           >
             {label}
           </button>
@@ -151,9 +164,28 @@ function RequirementsSection() {
   };
 
   const current = types?.find((rt) => rt.id === selected) ?? null;
+  const typeTabs = useRef<Record<number, HTMLButtonElement | null>>({});
+
+  const choose = (id: number) => {
+    setSelected(id);
+    setOutcome(null);
+  };
+
+  /* The ARIA tabs pattern: arrows (either axis, since the rail turns) move between record types. */
+  const onTypeKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (!types?.length) return;
+    const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1
+      : event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const i = types.findIndex((rt) => rt.id === selected);
+    const next = types[(i + step + types.length) % types.length].id;
+    choose(next);
+    typeTabs.current[next]?.focus();
+  };
 
   return (
-    <div className="space-y-4">
+    <div>
       {read.status === "interrupted" && !types ? (
         <InterruptedState what="setup" onRetry={read.retry} framed />
       ) : read.status === "failed" && !types ? (
@@ -171,33 +203,47 @@ function RequirementsSection() {
           </p>
         )
       ) : (
-        <>
-          <div role="tablist" aria-label="Record types" className="flex flex-wrap gap-2">
-            {types.map((rt) => (
-              <button
-                key={rt.id}
-                type="button"
-                role="tab"
-                id={`${tabsId}-tab-${rt.id}`}
-                aria-selected={rt.id === selected}
-                aria-controls={`${tabsId}-panel`}
-                onClick={() => { setSelected(rt.id); setOutcome(null); }}
-                className={`rounded-full border px-4 py-1.5 text-small font-medium transition-colors ${
-                  rt.id === selected
-                    ? "border-brand bg-brand text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:border-brand hover:text-brand"
-                }`}
+        <Handbook
+          rail={
+            <div>
+              <RailCaption id={`${tabsId}-caption`}>Record types</RailCaption>
+              <div
+                role="tablist"
+                aria-label="Record types"
+                aria-orientation="vertical"
+                className={RAIL_LIST}
               >
-                {rt.name}
-              </button>
-            ))}
-          </div>
-
+                {types.map((rt) => (
+                  <button
+                    key={rt.id}
+                    ref={(el) => { typeTabs.current[rt.id] = el; }}
+                    type="button"
+                    role="tab"
+                    id={`${tabsId}-tab-${rt.id}`}
+                    aria-selected={rt.id === selected}
+                    aria-controls={`${tabsId}-panel`}
+                    tabIndex={rt.id === selected ? 0 : -1}
+                    onClick={() => choose(rt.id)}
+                    onKeyDown={onTypeKey}
+                    className={cn(railItemClass(rt.id === selected), "text-left")}
+                  >
+                    {rt.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          }
+        >
           <div aria-live="polite">
             {outcome && (
               outcome.kind === "done"
-                ? <p role="status" className="text-small text-stone-700">{outcome.text}</p>
-                : <p role="alert" className={WARNING_NOTICE}>{outcome.text}</p>
+                ? (
+                  <p role="status" className="mb-6 flex items-start gap-2 text-small text-stone-700">
+                    <i className="fas fa-check mt-1 text-stone-900" aria-hidden />
+                    <span>{outcome.text}</span>
+                  </p>
+                )
+                : <p role="alert" className={cn(WARNING_NOTICE, "mb-6")}>{outcome.text}</p>
             )}
           </div>
 
@@ -206,13 +252,13 @@ function RequirementsSection() {
               role="tabpanel"
               id={`${tabsId}-panel`}
               aria-labelledby={`${tabsId}-tab-${current.id}`}
-              className="space-y-4"
+              className="divide-y divide-stone-200"
             >
               <TypeDescription key={`d-${current.id}`} recordType={current} act={act} />
               <Requirements key={`r-${current.id}`} recordType={current} act={act} />
             </div>
           )}
-        </>
+        </Handbook>
       )}
     </div>
   );
@@ -241,12 +287,12 @@ function TypeDescription({ recordType, act }: { recordType: SetupRecordType; act
   };
 
   return (
-    <section aria-labelledby={`${fieldId}-title`} className="rounded-card border border-stone-200 bg-white p-5">
-      <h2 id={`${fieldId}-title`} className="text-heading font-semibold text-stone-900">Description</h2>
-      <form onSubmit={(e) => void save(e)} className="mt-3 space-y-3">
+    <section aria-labelledby={`${fieldId}-title`} className="pb-8">
+      <h2 id={`${fieldId}-title`} className="font-display text-section font-semibold text-stone-900">Description</h2>
+      <form onSubmit={(e) => void save(e)} className="mt-4 space-y-3">
         <div>
           <label htmlFor={fieldId} className={LABEL}>What a {recordType.name} is</label>
-          <p className="mb-2 text-label text-stone-600">
+          <p className="mb-2 text-small text-stone-600">
             Shown at the top of this type&apos;s Guidelines. Plain text: line breaks are kept and web links become clickable.
           </p>
           <textarea
@@ -303,19 +349,21 @@ function Requirements({ recordType, act }: { recordType: SetupRecordType; act: A
   };
 
   return (
-    <section aria-labelledby={titleId} className="rounded-card border border-stone-200 bg-white p-5">
-      <h2 id={titleId} className="text-heading font-semibold text-stone-900">Requirements &amp; Templates</h2>
+    <section aria-labelledby={titleId} className="pt-8">
+      <h2 id={titleId} className="font-display text-section font-semibold text-stone-900">Requirements &amp; Templates</h2>
       <p className="mt-1 text-small text-stone-600">
         Required and Optional are labels. They tell people what RDCO expects and never stop anyone submitting.
+        A Template is a PDF, Word, spreadsheet or image up to 50 MB, and people download it.
       </p>
 
-      <ol aria-label={`${recordType.name} requirements`} className="mt-4 divide-y divide-stone-100">
+      <ol aria-label={`${recordType.name} requirements`} className="mt-6 divide-y divide-stone-200 border-y border-stone-200">
         <li className="py-4">
           <ManuscriptRow recordType={recordType} act={act} />
         </li>
         {list.map((requirement, index) => (
           <li key={requirement.id} className="py-4">
             <RequirementRow
+              number={index + 2}
               requirement={requirement}
               recordType={recordType}
               act={act}
@@ -347,17 +395,51 @@ function Requirements({ recordType, act }: { recordType: SetupRecordType; act: A
   );
 }
 
+/**
+ * One requirement as Guidelines draws it, numbered in the margin, with its
+ * edit controls at the end of the name line. `aria-label` names the group so a
+ * row is found by its requirement.
+ */
+function RowFrame({ number, label, head, actions, children }: {
+  number: number;
+  label: string;
+  head: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div role="group" aria-label={label} className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3 handbook-wide:gap-x-6">
+      <span aria-hidden className="pt-1 text-small tabular-nums text-stone-500">{number}</span>
+      <div className="min-w-0 space-y-2">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 pt-0.5">{head}</div>
+          {actions && <div className="-my-1 flex flex-wrap items-center gap-1">{actions}</div>}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function ManuscriptRow({ recordType, act }: { recordType: SetupRecordType; act: Act }) {
   const [editing, setEditing] = useState(false);
   const { description, template_name } = recordType.manuscript;
 
   return (
-    <div role="group" aria-label="Manuscript" className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-small font-semibold text-stone-900">Manuscript</h3>
+    <RowFrame
+      number={1}
+      label="Manuscript"
+      head={<>
+        <h3 className="text-heading font-semibold text-stone-900">Manuscript</h3>
         <RequirementLabel required />
-      </div>
-      <p className="text-label text-stone-600">Always first. It can&apos;t be removed or made Optional.</p>
+      </>}
+      actions={editing ? undefined : (
+        <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
+          Edit description
+        </Button>
+      )}
+    >
+      <p className="text-small text-stone-600">Always first. It can&apos;t be removed or made Optional.</p>
       {editing ? (
         <DescriptionOnlyForm
           initial={description}
@@ -373,14 +455,7 @@ function ManuscriptRow({ recordType, act }: { recordType: SetupRecordType; act: 
           }}
         />
       ) : (
-        <>
-          {description && <PlainTextWithLinks text={description} className="text-small text-stone-700" />}
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
-              Edit description
-            </Button>
-          </div>
-        </>
+        description && <PlainTextWithLinks text={description} className="text-small text-justified text-stone-700" />
       )}
       <TemplateControls
         owner="the Manuscript"
@@ -390,13 +465,14 @@ function ManuscriptRow({ recordType, act }: { recordType: SetupRecordType; act: 
         remove={() => setupApi.removeManuscriptTemplate(recordType.id)}
         download={() => setupApi.downloadManuscriptTemplate(recordType.id)}
       />
-    </div>
+    </RowFrame>
   );
 }
 
 function RequirementRow({
-  requirement, recordType, act, onMoveUp, onMoveDown, onRemove,
+  number, requirement, recordType, act, onMoveUp, onMoveDown, onRemove,
 }: {
+  number: number;
   requirement: SetupRequirement;
   recordType: SetupRecordType;
   act: Act;
@@ -408,6 +484,7 @@ function RequirementRow({
 
   if (editing) {
     return (
+      <div className="rounded-card border border-stone-200 bg-stone-50 p-5">
       <RequirementForm
         title={`Edit ${requirement.name}`}
         initial={requirement}
@@ -424,38 +501,42 @@ function RequirementRow({
         }}
         siblings={recordType.requirements.filter((r) => r.id !== requirement.id)}
       />
+      </div>
     );
   }
 
   return (
-    <div role="group" aria-label={requirement.name} className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-small font-semibold text-stone-900">{requirement.name}</h3>
+    <RowFrame
+      number={number}
+      label={requirement.name}
+      head={<>
+        <h3 className="text-heading font-semibold text-stone-900">{requirement.name}</h3>
         <RequirementLabel required={requirement.is_required} />
-      </div>
-      {requirement.description && (
-        <PlainTextWithLinks text={requirement.description} className="text-small text-stone-700" />
-      )}
-      <div className="flex flex-wrap gap-2">
+      </>}
+      actions={<>
         <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
           Edit
         </Button>
         <Button
-          type="button" variant="ghost" size="sm" disabled={!onMoveUp} onClick={onMoveUp}
-          aria-label={`Move up ${requirement.name}`}
+          type="button" variant="ghost" size="icon" disabled={!onMoveUp} onClick={onMoveUp}
+          aria-label={`Move up ${requirement.name}`} title="Move up"
         >
-          Move up
+          <i className="fas fa-arrow-up" aria-hidden />
         </Button>
         <Button
-          type="button" variant="ghost" size="sm" disabled={!onMoveDown} onClick={onMoveDown}
-          aria-label={`Move down ${requirement.name}`}
+          type="button" variant="ghost" size="icon" disabled={!onMoveDown} onClick={onMoveDown}
+          aria-label={`Move down ${requirement.name}`} title="Move down"
         >
-          Move down
+          <i className="fas fa-arrow-down" aria-hidden />
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onRemove} aria-label={`Remove ${requirement.name}`}>
           Remove
         </Button>
-      </div>
+      </>}
+    >
+      {requirement.description && (
+        <PlainTextWithLinks text={requirement.description} className="text-small text-justified text-stone-700" />
+      )}
       <TemplateControls
         owner={requirement.name}
         templateName={requirement.template_name}
@@ -464,7 +545,7 @@ function RequirementRow({
         remove={() => setupApi.removeTemplate(requirement.id)}
         download={() => setupApi.downloadTemplate(requirement.id)}
       />
-    </div>
+    </RowFrame>
   );
 }
 
@@ -515,14 +596,20 @@ function TemplateControls({
   };
 
   return (
-    <div className="rounded-card bg-stone-50 px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2 text-small text-stone-700">
-        <i className="fas fa-file-arrow-down text-stone-500" aria-hidden />
+    <div className="pt-1">
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-stone-700",
+          // A file on record is a boxed attachment; an empty slot is one quiet line.
+          templateName && "rounded-control border border-stone-200 bg-surface px-3 py-2",
+        )}
+      >
+        <i className={cn("fas", templateName ? "fa-file-lines text-stone-600" : "fa-file text-stone-400")} aria-hidden />
         {templateName ? (
           <button
             type="button"
             onClick={() => void save()}
-            className="font-medium text-brand underline underline-offset-2"
+            className={cn("min-w-0 break-all rounded-control text-left font-medium text-brand underline underline-offset-2", FOCUS_RING)}
             aria-label={`Download the Template for ${owner}, ${templateName}`}
           >
             {templateName}
@@ -559,7 +646,6 @@ function TemplateControls({
           </Button>
         )}
       </div>
-      <p className="mt-1 text-label text-stone-600">PDF, Word, spreadsheet or image, up to 50 MB. People download it.</p>
       {problem && <p role="alert" className="mt-1 text-small text-brand">{problem}</p>}
     </div>
   );
@@ -574,9 +660,9 @@ function AddRequirement({ recordType, act }: { recordType: SetupRecordType; act:
 
   if (!open) {
     return (
-      <div className="mt-4">
+      <div className="mt-5">
         <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-          <i className="fas fa-plus mr-2" aria-hidden />
+          <i className="fas fa-plus" aria-hidden />
           Add a requirement
         </Button>
       </div>
@@ -584,7 +670,7 @@ function AddRequirement({ recordType, act }: { recordType: SetupRecordType; act:
   }
 
   return (
-    <div className="mt-4 rounded-card border border-stone-200 p-4">
+    <div className="mt-5 rounded-card border border-stone-200 bg-stone-50 p-5">
       <RequirementForm
         title={`Add a requirement to ${recordType.name}`}
         initial={{ name: "", is_required: false, description: "" }}

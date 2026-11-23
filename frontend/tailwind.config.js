@@ -15,6 +15,10 @@ export const readingVariants = {
   "overview-wide": "@container overview (min-width: 64rem)",
   // Past a phone's width: the Overview's title takes its larger size (IR-1264).
   "overview-roomy": "@container overview (min-width: 40rem)",
+  // A handbook page (Guidelines, Setup, Workflow analytics): its Contents rail
+  // sits beside the column once the page's own box has room for both, so the
+  // sidebar opening changes the layout as surely as a narrower window does.
+  "handbook-wide": "@container handbook (min-width: 52rem)",
 };
 
 const readingTiers = plugin(({ addVariant }) => {
