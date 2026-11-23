@@ -7,8 +7,9 @@
 For testing date questions only: the years are made up and say nothing about the
 papers. Only the named loader's published papers declared an imported reference or
 synthetic are touched, and only their blank years. The same seed always gives a
-paper the same years, so `--undo` with that seed blanks exactly those values and
-keeps any a person has since changed.
+paper the same years, so `--undo` with that seed blanks them again and keeps any a
+person has since changed. It cannot tell a recorded year that happens to equal the
+seed's from one it wrote, so run it only on papers this command filled.
 
 Refuses with `DEBUG` off, and has no `--force`. Calls no vendor.
 """

@@ -20,6 +20,7 @@ from ai.agent import checkpoint, compaction, prompts  # noqa: E402
 from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.agent.prompts import DATED_INSTRUCTIONS, FULLER_INSTRUCTIONS, PROMPTS, TODAY_PREFIX  # noqa: E402
 from ai.agent.protocol import User  # noqa: E402
+from ai.agent.tools import Investigation  # noqa: E402
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
 from ai.research import recency  # noqa: E402
 from ai.research.tools import OK, Count, Coverage, PaperDetails, ToolResult, valid_filters  # noqa: E402
@@ -51,7 +52,7 @@ class Dated(Corpus):
     async def hybrid_search(self, query, limit=10, filters=None):
         self.calls.append(("hybrid", query, dict(filters or {})))
         found = await self.search(query, limit)
-        return dataclasses.replace(found, records=(self.found(1, 2025, 2026, date(2026, 10, 5)),))
+        return dataclasses.replace(found, records=(self.found(1, 2025, 2026, date(2026, 10, 5)),), undated=3)
 
     async def details(self, handles):
         return ToolResult(OK, coverage=Coverage(1, 1), details=(PaperDetails(
@@ -160,7 +161,9 @@ def test_search_takes_the_range_and_gives_each_papers_dates():
         PIN_15, tools(call("s", "search", query="floods rainfall", published_from=2024, added_from="2026-08-26")),
         reply(f"Floods are forecast from rainfall gauges [{handle('P', 1)}]."), corpus=corpus)
     assert ("hybrid", "floods rainfall", {"published_from": 2024, "added_from": "2026-08-26"}) in corpus.calls
-    (paper,) = sent(provider.requests[1], "s")["papers"]
+    body = sent(provider.requests[1], "s")
+    (paper,) = body["papers"]
+    assert body["undated"] == 3
     assert (paper["completion_year"], paper["publication_year"], paper["date_added"]) == (2025, 2026, "2026-10-05")
 
 
@@ -172,6 +175,38 @@ def test_details_give_one_completion_year_and_the_date_added():
     assert (paper["completion_year"], paper["publication_year"], paper["date_added"]) == (2025, 2026, "2026-10-05")
     assert "year_completed" not in paper and "year_accomplished" not in paper
     assert len(provider.requests) == 2
+
+
+def test_the_other_recorded_year_is_not_stated_as_the_completion_year():
+    # The record also holds year_completed 2021, which the model is not shown.
+    provider, _ = answered(
+        PIN_15, tools(call("d", "paper_details", papers=[handle("R", 1)])),
+        reply("«Flood forecasting» was completed in 2021."), reply("«Flood forecasting» was completed in 2025."))
+    assert len(provider.requests) == 3
+
+
+def test_a_range_may_be_stated_as_before_or_after_its_end():
+    provider, _ = answered(
+        PIN_15, tools(call("c", "count_records", year_to=2017)),
+        reply("2 papers of the records you can see were completed before 2018; 3 have no completion year."))
+    assert len(provider.requests) == 2
+
+
+def test_the_recent_range_may_be_stated_after_a_listing_sorted_by_date():
+    provider, _ = answered(
+        PIN_15, tools(call("l", "list_records", sort="completed")),
+        reply("Completed 2022 to 2026, newest first: «Flood forecasting» (2025) and «Pond sampling» (2023)."))
+    assert len(provider.requests) == 2
+
+
+def test_an_unrelated_undated_paper_never_makes_a_stated_count_stale():
+    assert Count(total=2, undated=3) == Count(total=2, undated=4)
+
+
+def test_an_earlier_pin_is_shown_no_undated_count():
+    provider, _ = answered(PIN_14, tools(call("c", "count_records", year_from=2022)),
+                           reply("2 papers of the records you can see."))
+    assert "undated" not in sent(provider.requests[1], "c")["count"]
 
 
 def test_counts_group_by_publication_year():
@@ -189,13 +224,31 @@ def test_a_listings_later_page_is_read_whether_or_not_calls_run_together(concurr
     assert ("list", {}, 50, "title") in corpus.calls and ("list", {}, 0, "added") in corpus.calls
 
 
-@pytest.mark.parametrize("bad", [{"sort": "random"}, {"added_from": "last week"}, {"published_from": "2024"}])
-def test_an_unusable_date_argument_is_refused_not_ignored(bad):
-    if "sort" in bad:
-        provider, _ = answered(PIN_15, tools(call("l", "list_records", **bad)), reply("I could not list them."))
-        assert sent(provider.requests[1], "l") == {"error": "invalid_arguments"}
-    else:
-        assert not valid_filters(bad)
+def test_an_unknown_order_is_refused_not_ignored():
+    provider, _ = answered(PIN_15, tools(call("l", "list_records", sort="random")), reply("I could not list them."))
+    assert sent(provider.requests[1], "l") == {"error": "invalid_arguments"}
+
+
+@pytest.mark.parametrize("bad", [{"added_from": "last week"}, {"published_from": "2024"}])
+def test_an_unusable_date_filter_is_not_valid(bad):
+    assert not valid_filters(bad)
+
+
+@pytest.mark.parametrize("claim", ["The method used 5 sensors.", "It ran for 10 hours.", "It trained 24 models."])
+def test_a_recorded_dates_day_or_month_never_supports_another_number(claim):
+    # The listing gives October 5, and its range ends today, November 24.
+    provider, _ = answered(
+        PIN_15, tools(call("l", "list_records", added_from="2026-08-26")), reply(claim),
+        reply("«Flood forecasting» was added October 5, 2026."))
+    assert len(provider.requests) == 3
+
+
+@pytest.mark.parametrize("written", ["October 5, 2026", "5 October 2026", "Oct. 5, 2026", "2026-10-05", "October 5"])
+def test_a_recorded_date_may_be_written_any_usual_way(written):
+    provider, _ = answered(
+        PIN_15, tools(call("l", "list_records", added_from="2026-08-26")),
+        reply(f"«Flood forecasting» was added {written}, within August 26 to November 24, 2026."))
+    assert len(provider.requests) == 2
 
 
 def test_a_day_filter_is_a_real_iso_day():
@@ -206,4 +259,11 @@ def test_a_day_filter_is_a_real_iso_day():
 
 def test_a_resumed_run_keeps_what_a_range_left_out():
     fact = Count(total=2, filters=(("year_from", 2022),), population=frozenset({1, 2}), undated=3)
-    assert checkpoint._load_count(json.loads(json.dumps(checkpoint._count(fact)))) == fact
+    assert checkpoint._load_count(json.loads(json.dumps(checkpoint._count(fact)))).undated == 3
+
+
+def test_a_resumed_run_may_still_state_the_dates_it_read():
+    read, resumed = Investigation(None), Investigation(None)
+    read.dates = {date(2026, 10, 5)}
+    checkpoint._restore_investigation(resumed, json.loads(json.dumps(checkpoint._investigation(read))))
+    assert resumed.dates == {date(2026, 10, 5)}

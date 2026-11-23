@@ -337,6 +337,8 @@ class Investigation:
     details: bool = False
     #: The day the three dates are read on, under the research-14 tool version; None offers no dates (IR-1316).
     today: Optional[date] = None
+    #: Recorded days, and the ends of ranges used, that an answer may state (IR-1316).
+    dates: set[date] = field(default_factory=set)
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
@@ -417,6 +419,8 @@ class Investigation:
             raise InvalidArguments
         filters = {k: v for k, v in args.items() if k not in ("offset", "sort")}
         sort = {"sort": args["sort"]} if "sort" in args else {}
+        if sort and self.today:
+            self._recent()
         return await self.research.list_records(filters, offset=args.get("offset", 0), **sort)
 
     async def execute(self, call: ToolCall, *, room: int = 0, fetched=None) -> Outcome:
@@ -484,7 +488,8 @@ class Investigation:
             if not valid_filters(filters):
                 raise InvalidArguments
             self.searched = True
-            self._ranged(filters.items())
+            if self.today:
+                self._ranged(filters.items())
             return await self.research.hybrid_search(args["query"], args.get("limit", 10), filters)
         if spec is SEARCH:
             if not _str(args["query"]) or ("limit" in args and not _int(args["limit"])):
@@ -590,6 +595,9 @@ class Investigation:
                             "kind": turn.kind, "truncated": turn.truncated}
         if result.reading is not None:
             new = self._read_into(result, call_id, body) or new
+        if self.today and result.undated is not None:
+            body["undated"] = result.undated
+            self.figures.add(str(result.undated))
         if result.sections:
             outline = ("outline", *sorted(d.revision for d in result.dependencies))
             new = new or outline not in self.seen
@@ -681,13 +689,15 @@ class Investigation:
             self.papers.setdefault(found.record_id, (found.handle, found.title))
             new = new or ("details", found.record_id) not in self.seen
             self.seen.add(("details", found.record_id))
-            self.figures.update(str(year) for year in found.years)
+            years = found.years if self.today is None else {found.completion_year, found.publication_year} - {None}
+            self.figures.update(str(year) for year in years)
             # Catalogue names an answer may quote like titles (IR-750).
             self.terms.update(v.casefold() for v in (found.record_type, found.classification, found.psced) if v)
         if result.details:
             body["details"] = [shown_details(found, dated=self.today is not None) for found in result.details]
             for found in result.details if self.today else ():
-                self.figures.update(recency.parts(found.date_added) if found.date_added else ())
+                if found.date_added:
+                    self._day(found.date_added)
             body["recorded_by"] = "submitter"
         returned = {found.handle for found in result.details}
         missing = [h for h in requested if h not in returned]
@@ -718,21 +728,40 @@ class Investigation:
         """Let an answer state the date range it used, whose open end is today (IR-1316)."""
         used = [(name, v) for name, v in filters if name in (*metadata.YEARS, *metadata.DAYS)]
         for name, v in used:
-            self.figures.update({str(v)} if name in metadata.YEARS else recency.parts(date.fromisoformat(v)))
+            if name in metadata.YEARS:
+                # "Before 2018" is a range ending in 2017, "after 2021" one starting in 2022.
+                near = v - 1 if name.endswith("_from") else v + 1
+                self.figures.update({str(v), str(near)} if self.today else {str(v)})
+            else:
+                self._day(date.fromisoformat(v))
         if used and self.today:
-            self.figures.update(recency.parts(self.today))
+            self._recent()
+
+    def _recent(self) -> None:
+        """Let an answer state the recent ranges it was told, once a date is used (IR-1316)."""
+        window = recency.window(self.today)
+        self.figures.update(str(y) for y in window["recent_years"].values())
+        for day in window["recent_added"].values():
+            self._day(date.fromisoformat(day))
+
+    def _day(self, day: date) -> None:
+        self.dates.add(day)
+        self.figures.add(str(day.year))
 
     def _dated(self, record) -> dict:
         """A paper's three dates, which an answer may then state; nothing on earlier pins (IR-1316)."""
         if self.today is None or record.added is None:
             return {}
         self.figures.update(str(y) for y in (record.year, record.publication_year) if y is not None)
-        self.figures.update(recency.parts(record.added))
+        self._day(record.added)
         return {"completion_year": record.year, "publication_year": record.publication_year,
                 "date_added": record.added.isoformat()}
 
     def _left_out(self, fact: Count) -> dict:
-        return {"undated": fact.undated} if self.today and fact.undated is not None else {}
+        if self.today is None or fact.undated is None:
+            return {}
+        self.figures.add(str(fact.undated))
+        return {"undated": fact.undated}
 
     def _counted(self, result: Evidence) -> Outcome:
         """An exact count, typed for the model; the counted Records never leave the run (IR-750)."""

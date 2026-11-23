@@ -210,13 +210,13 @@ class Count:
     population: frozenset[int] = frozenset()
     relative_to: str = metadata.RELATIVE_TO
     #: Records a year range left out for having no such year; None with no year range (IR-1316).
-    undated: int | None = None
+    #: Not compared: a paper outside the population never makes a stated count stale.
+    undated: int | None = field(default=None, compare=False)
 
     @property
     def figures(self) -> set[int]:
         """Every number this count computed."""
-        return {self.total, self.ungrouped, *(n for _, n in self.groups),
-                *(() if self.undated is None else (self.undated,))}
+        return {self.total, self.ungrouped, *(n for _, n in self.groups)}
 
     @property
     def stated(self) -> set[int]:
@@ -302,6 +302,8 @@ class ToolResult:
     signals: tuple[tuple[str, str], ...] = ()
     #: Recorded details of the papers a details call could read (IR-1278).
     details: tuple[PaperDetails, ...] = ()
+    #: Papers a search's year range left out for having no such year (IR-1316).
+    undated: int | None = None
 
     @classmethod
     def unavailable(cls, reason: str, **kw) -> "ToolResult":
@@ -348,9 +350,12 @@ COMPLETION_YEAR = "coalesce(r.year_accomplished, r.year_completed)"
 DATE_ADDED = "(r.created_at AT TIME ZONE 'Asia/Manila')::date"
 _DATES = f"{COMPLETION_YEAR} AS year, r.publication_year, {DATE_ADDED} AS added"
 #: `list_records` orders; a date sorts newest first, unrecorded last (IR-1316).
-_ORDERS = dict(zip(metadata.SORTS, (
-    "", f"{COMPLETION_YEAR} DESC NULLS LAST, ", "r.publication_year DESC NULLS LAST, ", f"{DATE_ADDED} DESC, ",
-)))
+_ORDERS = {
+    "title": "",
+    "completed": f"{COMPLETION_YEAR} DESC NULLS LAST, ",
+    "published": "r.publication_year DESC NULLS LAST, ",
+    "added": f"{DATE_ADDED} DESC, ",
+}
 #: How many parameters `_filter_sql` reads.
 FILTER_PARAMS = 10
 
@@ -1031,9 +1036,14 @@ class ResearchTools:
         blank = " OR ".join(sql for used, sql in (
             (completed, f"{COMPLETION_YEAR} IS NULL"), (published, "r.publication_year IS NULL")) if used)
         rest = [*params[:3], None, None, params[5], None, None, *params[8:]]
+        # A recorded year must still be in its own range: only a blank one is forgiven.
+        n = 2 + FILTER_PARAMS
+        kept = "".join(
+            f" AND ({sql} IS NULL OR ((${i}::int IS NULL OR {sql} >= ${i}) AND (${i + 1}::int IS NULL OR {sql} <= ${i + 1})))"
+            for i, sql in ((n, COMPLETION_YEAR), (n + 2, "r.publication_year")))
         return await conn.fetchval(
             f"SELECT count(*) FROM public.records_record r WHERE ($1::bigint IS NULL OR r.id = $1) AND ({blank})"
-            + _filter_sql(2), self.scope, *rest)
+            + _filter_sql(2) + kept, self.scope, *rest, *params[3:5], *params[6:8])
 
     async def list_records(self, filters: dict, limit: int | None = None, offset: int = 0,
                            sort: str = "title") -> ToolResult:
@@ -1416,13 +1426,15 @@ class ResearchTools:
                       AND ($2::bigint IS NULL OR c.record_id = $2)""",
                 [r["id"] for r in ordered], self.scope))
             rows = [r for r in ordered if r["id"] in still]
+            undated = await self._undated(conn, params)
             if not rows:
                 return ToolResult(NO_MATCH, coverage=Coverage(0, None, truncated, found["inspected"]),
-                                  signals=signals)
+                                  signals=signals, undated=undated)
             records, passages = await self._found(conn, rows, limit)
             coverage = Coverage(_retrieved(passages), None, truncated, found["inspected"])
             return ToolResult(OK, records=records, passages=passages, coverage=coverage,
-                              dependencies=frozenset(p.source for p in passages), signals=signals)
+                              dependencies=frozenset(p.source for p in passages), signals=signals,
+                              undated=undated)
 
         return await self._call("hybrid_search", body)
 

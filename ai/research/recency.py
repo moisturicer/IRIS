@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta, timezone
 
 #: The Philippines keeps no daylight saving time.
@@ -25,6 +26,11 @@ def window(day: date) -> dict:
     }
 
 
-def parts(day: date) -> set[str]:
-    """The numbers a written date states."""
-    return {str(day.year), str(day.month), str(day.day)}
+def without(text: str, days) -> str:
+    """`text` with these days removed however they are written, so their numbers are not read as findings."""
+    for day in days:
+        month = rf"(?:{day:%B}|{day:%b}|Sept)\.?" if day.month == 9 else rf"(?:{day:%B}|{day:%b})\.?"
+        number, year = rf"0?{day.day}(?:st|nd|rd|th)?", rf"(?:,?\s+{day.year})?"
+        text = re.sub(rf"\b(?:{day.isoformat()}|{month}\s+{number}{year}|{number}\s+{month}{year})(?!\w)",
+                      " ", text, flags=re.I)
+    return text

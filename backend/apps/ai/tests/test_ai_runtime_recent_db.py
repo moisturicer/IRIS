@@ -90,6 +90,22 @@ def test_papers_filter_sort_and_group_by_publication_year(research):
     assert grouped.count.groups == ((2019, 1), (2025, 1), (2026, 1)) and grouped.count.ungrouped == 1
 
 
+def test_only_a_blank_year_counts_as_left_out_when_both_ranges_are_used(research):
+    reader = make_user("recent-both@cit.edu")
+    bare("In both", year_accomplished=2024, publication_year=2025)
+    bare("No publication year", year_accomplished=2024)
+    bare("No completion year", publication_year=2025)
+    bare("Too old, no publication year", year_accomplished=2010)
+    bare("Neither")
+
+    async def script(tools):
+        await tools.count({"year_from": 2022, "published_from": 2022})
+
+    _, seen, _ = ask(research, reader, script, key="recent-both")
+    ((_, counted),) = seen
+    assert (counted.count.total, counted.count.undated) == (1, 3)
+
+
 def test_papers_filter_and_sort_by_the_campus_day_they_were_added(research):
     reader = make_user("recent-added@cit.edu")
     added(bare("Late"), utc(2026, 8, 25, 17))     # 26 August, 1 a.m. in Cebu
@@ -114,6 +130,7 @@ def test_search_narrows_by_every_date_and_returns_them(research):
     old, new = (paper(title, {4: [("Methods", FLOOD)]}) for title in ("Old floods", "New floods"))
     Record.objects.filter(pk=old.pk).update(year_accomplished=2016, publication_year=2017, created_at=utc(2025, 1, 2))
     Record.objects.filter(pk=new.pk).update(year_accomplished=2024, publication_year=2025, created_at=utc(2026, 10, 5))
+    bare("No years recorded")
     query = "neural network rainfall"
 
     async def script(tools):
@@ -125,6 +142,7 @@ def test_search_narrows_by_every_date_and_returns_them(research):
     assert {(r.title, r.year, r.publication_year, r.added) for r in every.records} == {
         ("Old floods", 2016, 2017, date(2025, 1, 2)), ("New floods", 2024, 2025, date(2026, 10, 5))}
     assert [titles(result) for _, result in narrowed] == [["New floods"]] * 3
+    assert [result.undated for _, result in seen] == [None, 1, 1, None]
 
 
 @pytest.mark.parametrize("status", [PipelineStatus.DRAFT, PipelineStatus.IN_REVIEW, PipelineStatus.APPROVED])

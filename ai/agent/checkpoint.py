@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass
+from datetime import date
 from typing import Optional
 
 from ai.agent.protocol import (
@@ -181,6 +182,7 @@ def _investigation(found: Investigation) -> dict:
         "searched": found.searched, "outages": list(found.outages),
         "readings": {revision: _reading(read) for revision, read in found.readings.items()},
         "recovered": {str(ordinal): answer for ordinal, answer in found.recovered.items()},
+        **({"dates": sorted(day.isoformat() for day in found.dates)} if found.dates else {}),
     }
 
 
@@ -205,6 +207,7 @@ def _restore_investigation(found: Investigation, raw: dict) -> None:
     found.readings = {str(revision): _load_reading(read) for revision, read in raw.get("readings", {}).items()}
     # Original Turns recovered before the takeover (IR-735); a body from before it has none.
     found.recovered = {int(ordinal): str(answer) for ordinal, answer in raw.get("recovered", {}).items()}
+    found.dates = {date.fromisoformat(day) for day in raw.get("dates", ())}
 
 
 def _span(span: Optional[Span]) -> Optional[list]:
